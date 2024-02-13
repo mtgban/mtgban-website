@@ -1,4 +1,4 @@
-module github.com/kodabb/mtgban-website
+module github.com/mtgban/mtgban-website
 
 go 1.19
 
