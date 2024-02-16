@@ -384,9 +384,9 @@
                 <br>
                 <ul class="indent">
                     <li>
-                        <h4>How is EV calculated?</h4>
+                        <h4>How is Best Guess calculated?</h4>
                         <ul class="indent">
-                            For any product with a static decklist, the card values a just summed up and provided as is. For boosters and booster boxes, we generate as many boosters as needed to represent the product (typically 36 boosters for a draft booster box), for 5000 times to even out any possible variance, and then run the mean and median of the results. Note that every product is individually run, so a booster box won't exactly be 36 times the price of a booster pack. Also note that even if the content search (explained below) only list one card, the presented EVs definitely take into account the possibility of opening multiple copies of the same card.
+                            For any product with a static decklist, the card values a just summed up and provided as is. For boosters and booster boxes, we generate as many boosters as needed to represent the product (typically 36 boosters for a draft booster box), for 5000 times to even out any possible variance, and then run the mean and median of the results. Note that every product is individually run, so a booster box won't exactly be 36 times the price of a booster pack. Also note that even if the content search (explained below) only list one card, the presented Best Guesss definitely take into account the possibility of opening multiple copies of the same card.
                         </ul>
                     </li>
                     <li>
@@ -398,7 +398,7 @@
                     <li>
                         <h4>Can you describe the data sources available?</h4>
                         <ul class="indent">
-                            There are three EV-dependent data sources: <i>TCG Low</i>, which reflects the lowest possible value on TCG (excluding shipping), <i>TCG Direct</i>, which represents the Direct price <u>minus fees</u> that the cards could be sold at, and <i>CK buylist</i>, which shows how much a given set of cards could be sold to the vendor. Note that TCG Direct prices could be sometimes skewed due to ridiculous prices being set by sellers "parking" their cards - we try to work around this by capping the maximum value to twice as much as TCG Low when we're able to detect such an offset. <br>
+                            There are three Best Guess-dependent data sources: <i>TCG Low</i>, which reflects the lowest possible value on TCG (excluding shipping), <i>TCG Direct</i>, which represents the Direct price <u>minus fees</u> that the cards could be sold at, and <i>CK buylist</i>, which shows how much a given set of cards could be sold to the vendor. Note that TCG Direct prices could be sometimes skewed due to ridiculous prices being set by sellers "parking" their cards - we try to work around this by capping the maximum value to twice as much as TCG Low when we're able to detect such an offset. <br>
                             The other prices shown under <i>Available offers</i> represent the prices of the sealed products as available from different stores.
                         </ul>
                     </li>
@@ -418,7 +418,7 @@
                     <li>
                         <h4>What's up with these odd prices for this just released set?</h4>
                         <ul class="indent">
-                           Our EV prices reflect the price of the actual printing of the card, they do not reflect the value of the card before the reprint. As such it takes a few days for all the listings to be filled in and for prices to propagate to the calculator -- in particular, in case of Direct prices might look a bit off until the whole TCG Direct inventory appears, and in the meantime we'll do our best estimates using the market price. Also keep in mind that in the early days, the expected values will reflect preorder prices, which are almost always higher than normal.
+                           Our Best Guess prices reflect the price of the actual printing of the card, they do not reflect the value of the card before the reprint. As such it takes a few days for all the listings to be filled in and for prices to propagate to the calculator -- in particular, in case of Direct prices might look a bit off until the whole TCG Direct inventory appears, and in the meantime we'll do our best estimates using the market price. Also keep in mind that in the early days, the expected values will reflect preorder prices, which are almost always higher than normal.
                         </ul>
                     </li>
                     <li>
@@ -435,17 +435,17 @@
                             * the 🔍 will unpack a product and list all its possible contents. This means that a booster box will only list a single booster pack, while a booster pack will display all possible picks.<br>
                             In both cases, once in the search page, you can add search terms normally to filter for color, rarities, and names using the common search syntax.<br>
                             Note that depending on the content type, the search result might show you at most one copy per card or list the same card multiple times: this to show accurate and easy to import results for decklists and box sets, while displaying compact results for other sealed types.<br>
-                            Note that, as mentioned above, the list you visualize is different than the list used to compute the actual EV, in which (potential) multiple copies of the same card are taken into account.
+                            Note that, as mentioned above, the list you visualize is different than the list used to compute the actual Best Guess, in which (potential) multiple copies of the same card are taken into account.
                         </ul>
                     </li>
                     <li>
                         <h4>Is there a minimum or maxumum value for a card to be considered?</h4>
                         <ul class="indent">
-                           Yes. Initially we considered every single price found and added it up, but we found out that counting up "worthless cards" and "extremely expensive cards" skew the results even on repeated runs. So we're now excluding all bulk (sub $0.30) and all serialized cards, since the odds of opening are low, but impact the EV result too optimistically. The multiple runs should take care of the variance for EV computation for all other cards.
+                           Yes. Initially we considered every single price found and added it up, but we found out that counting up "worthless cards" and "extremely expensive cards" skew the results even on repeated runs. So we're now excluding all bulk (sub $0.30) and all serialized cards, since the odds of opening are low, but impact the Best Guess result too optimistically. The multiple runs should take care of the variance for Best Guess computation for all other cards.
                         </ul>
                     </li>
                     <li>
-                        <h4>Do you consider The List cards, boxtoppers, variations etc when computing a box EV?</h4>
+                        <h4>Do you consider The List cards, boxtoppers, variations etc when computing a box Best Guess?</h4>
                         <ul class="indent">
                            Yes (with the exclusion of outliers as mentioned above).
                         </ul>
