@@ -1,3 +1,12 @@
+<<<<<<< Updated upstream
+=======
+
+// Import the Firebase SDK for Google Cloud Functions.
+import * as firebase from 'firebase/app';
+import 'firebase/auth';
+import * as firebaseui from 'firebaseui';
+//imoprt firebase ad
+>>>>>>> Stashed changes
 var firebaseConfig = {
     apiKey: "AIzaSyA3NJHS3hDkXyw0TFuBsGWB6A4o8PghimQ",
     authDomain: "ban-on-fire.firebaseapp.com",
@@ -52,39 +61,36 @@ auth.onAuthStateChanged(async (user) => {
     }
 });
 
+
 // Submits token to server
 function submitTokenToServer(idToken) {
-    const formData = new FormData();
-    formData.append('idToken', idToken);
+    // Correctly stringify the data for JSON format
+    const data = JSON.stringify({ idToken: idToken });
 
     fetch('/verify-token', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json', // Ensure the server expects JSON
         },
-        body: JSON.stringify({ idToken: idToken })
+        body: data
     })
-        .then(response => response.text())  // Get the response as text
-        .then(text => {
-            try {
-                // Try to parse the response as JSON
-                return JSON.parse(text);
-            } catch (error) {
-                // If the response is not valid JSON, throw an error
-                throw new Error('Bad response from server');
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
             }
+            return response.json(); // Process the response as JSON
         })
         .then(data => handleServerResponse(data))
         .catch(error => console.error('Token verification error: ', error));
+}
 
-    function handleServerResponse(data) {
-        console.log('Token verification response: ', data);
-        if (data.status === 'success') {
-            alert('User has logged in. Redirecting to search page...');
-            window.location.href = '/search';
-        } else {
-            alert('Please try logging in again.');
-            window.location.href = '/login';
-        }
+function handleServerResponse(data) {
+    console.log('Token verification response: ', data);
+    if (data.status === 'success') {
+        alert('User has logged in. Redirecting to search page...');
+        window.location.href = '/search';
+    } else {
+        alert('Please try logging in again.');
+        window.location.href = '/login';
     }
 }

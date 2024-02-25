@@ -21,6 +21,7 @@ import (
 	"database/sql"
 
 	"cloud.google.com/go/storage"
+	firebase "firebase.google.com/go/v4"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
@@ -329,10 +330,18 @@ var Config struct {
 		Secret map[string]string `json:"secret"`
 		Emails map[string]string `json:"emails"`
 	} `json:"patreon"`
-	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
-	GoogleCredentials string            `json:"google_credentials"`
+	ApiUserSecrets    map[string]string                       `json:"api_user_secrets"`
+	GoogleCredentials string                                  `json:"google_credentials"`
+	ACL               map[string]map[string]map[string]string `json:"acl"`
 
-	ACL map[string]map[string]map[string]string `json:"acl"`
+	SA struct {
+		Firebase string `json:"firebase"`
+		Bigquery string `json:"bigquery"`
+	} `json:"SA"`
+
+	FreeEnable   bool   `json:"free_enable"`
+	FreeLevel    string `json:"free_level"`
+	FreeHostname string `json:"free_hostname"`
 
 	Uploader struct {
 		ServiceAccount string `json:"service_account"`
@@ -484,6 +493,10 @@ func loadVars(cfg string) error {
 		Config.Port = DefaultConfigPort
 	}
 
+	if Config.Port == "" {
+		Config.Port = DefaultConfigPort
+	}
+
 	// Load from env
 	v := os.Getenv("BAN_SECRET")
 	if v == "" {
@@ -506,18 +519,48 @@ func openDBs() (err error) {
 	return nil
 }
 
-func loadGoogleCredentials(credentials string) (*http.Client, error) {
-	data, err := os.ReadFile(credentials)
+func initializeAppWithServiceAccount() *firebase.App {
+	opt := option.WithCredentialsFile(Config.SA.Firebase)
+	app, err := firebase.NewApp(context.Background(), nil, opt)
 	if err != nil {
-		return nil, err
+		log.Fatalf("error initializing app: %v\n", err)
+	}
+	return app
+}
+
+func verifyTokenHandler(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		IDToken string `json:"idToken"`
 	}
 
-	conf, err := google.JWTConfigFromJSON(data, spreadsheet.Scope)
+	// Decode the JSON body
+	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		return nil, err
+		http.Error(w, "Bad Request", http.StatusBadRequest)
+		return
 	}
 
-	return conf.Client(context.Background()), nil
+	// Initialize Firebase Admin SDK
+	app := initializeAppWithServiceAccount()
+	client, err := app.Auth(context.Background())
+	if err != nil {
+		http.Error(w, "Error initializing Firebase Auth client", http.StatusInternalServerError)
+		return
+	}
+
+	// Verify ID token
+	token, err := client.VerifyIDToken(context.Background(), request.IDToken)
+	if err != nil {
+		http.Error(w, "Failed to verify ID token", http.StatusUnauthorized)
+		return
+	}
+
+	// Log or use the token's UID
+	fmt.Printf("Verified ID token for user ID: %v\n", token.UID)
+
+	// Respond to the client
+	response := map[string]string{"status": "success", "uid": token.UID}
+	json.NewEncoder(w).Encode(response)
 }
 
 const DefaultConfigPath = "config.json"
@@ -548,6 +591,22 @@ func main() {
 	}
 	if *port != "" {
 		Config.Port = *port
+	}
+
+	// Cache a  signature
+	if Config.FreeEnable {
+		host := Config.FreeHostname
+		level := Config.FreeLevel
+		if host == "" || level == "" {
+			log.Fatalln("missing parameter for free level")
+		}
+		host += ":" + Config.Port
+		_, found := Config.ACL[level]
+		if !found {
+			log.Fatalln("level", level, "not found in the ACL config")
+		}
+		FreeSignature = sign(host, level, nil)
+		log.Println("Running in free mode")
 	}
 
 	_, err = os.Stat(LogDir)
@@ -588,21 +647,35 @@ func main() {
 
 	// load website up
 	go func() {
-		var err error
+		go func() {
+			log.Println("Loading MTGJSONv5")
+			err := loadDatastore()
+			if err != nil {
+				log.Fatalln("error loading mtgjson:", err)
+			}
+		}()
 
-		log.Println("Loading MTGJSONv5")
-		err = loadDatastore()
+		// Try loading prices
+		if *noloadCache {
+			log.Println("Skipping cache loading as requested")
+			DatabaseLoaded = true
+			return
+		}
+		log.Println("Loading cache")
+		err := startup()
 		if err != nil {
-			log.Fatalln("error loading mtgjson:", err)
+			log.Fatalln("error loading cache:", err)
 		}
 
-		err = loadScrapersNG()
-		if err != nil {
-			log.Println("error loading config:", err)
-			loadScrapers()
+		if *skipInitialRefresh {
+			log.Println("Skipping prices refresh as requested")
+			return
 		}
-
-		DatabaseLoaded = true
+		log.Println("Loading BQ")
+		err = loadBQ()
+		if err != nil {
+			log.Fatalln("error loading bq:", err)
+		}
 
 		// Nothing else to do if hacking around
 		if DevMode {
@@ -661,6 +734,8 @@ func main() {
 
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
+	http.HandleFunc("/verify-token", verifyTokenHandler)
+	http.Handle("/", noSigning(http.HandlerFunc(Home)))
 
 	for key, nav := range ExtraNavs {
 		// Set up logging
@@ -690,6 +765,10 @@ func main() {
 	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
 	http.HandleFunc("/favicon.ico", Favicon)
 	http.HandleFunc("/auth", Auth)
+
+	if port, exists := os.LookupEnv("PORT"); exists {
+		Config.Port = port
+	}
 
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
