@@ -493,10 +493,6 @@ func loadVars(cfg string) error {
 		Config.Port = DefaultConfigPort
 	}
 
-	if Config.Port == "" {
-		Config.Port = DefaultConfigPort
-	}
-
 	// Load from env
 	v := os.Getenv("BAN_SECRET")
 	if v == "" {
@@ -735,7 +731,6 @@ func main() {
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
 	http.HandleFunc("/verify-token", verifyTokenHandler)
-	http.Handle("/", noSigning(http.HandlerFunc(Home)))
 
 	for key, nav := range ExtraNavs {
 		// Set up logging
@@ -764,7 +759,6 @@ func main() {
 	http.Handle("/api/tcgplayer/lastsold/", enforceSigning(http.HandlerFunc(TCGLastSoldAPI)))
 	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
 	http.HandleFunc("/favicon.ico", Favicon)
-	http.HandleFunc("/auth", Auth)
 
 	if port, exists := os.LookupEnv("PORT"); exists {
 		Config.Port = port

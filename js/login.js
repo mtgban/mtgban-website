@@ -1,12 +1,9 @@
-<<<<<<< Updated upstream
-=======
 
 // Import the Firebase SDK for Google Cloud Functions.
 import * as firebase from 'firebase/app';
 import 'firebase/auth';
 import * as firebaseui from 'firebaseui';
 //imoprt firebase ad
->>>>>>> Stashed changes
 var firebaseConfig = {
     apiKey: "AIzaSyA3NJHS3hDkXyw0TFuBsGWB6A4o8PghimQ",
     authDomain: "ban-on-fire.firebaseapp.com",
