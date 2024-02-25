@@ -21,7 +21,6 @@ import (
 	"database/sql"
 
 	"cloud.google.com/go/storage"
-	firebase "firebase.google.com/go/v4"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
@@ -42,6 +41,7 @@ type PageVars struct {
 	PatreonURL   string
 	PatreonLogin bool
 	ShowPromo    bool
+	EnableFree   bool
 
 	Title          string
 	ErrorMessage   string
@@ -113,7 +113,7 @@ type PageVars struct {
 	SleepersColors []string
 
 	Headers      []string
-	OtherTable   [][]string
+	Tables       [][][]string
 	CurrentTime  time.Time
 	Uptime       string
 	DiskStatus   string
@@ -330,14 +330,10 @@ var Config struct {
 		Secret map[string]string `json:"secret"`
 		Emails map[string]string `json:"emails"`
 	} `json:"patreon"`
-	ApiUserSecrets    map[string]string                       `json:"api_user_secrets"`
-	GoogleCredentials string                                  `json:"google_credentials"`
-	ACL               map[string]map[string]map[string]string `json:"acl"`
+	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
+	GoogleCredentials string            `json:"google_credentials"`
 
-	SA struct {
-		Firebase string `json:"firebase"`
-		Bigquery string `json:"bigquery"`
-	} `json:"SA"`
+	ACL map[string]map[string]map[string]string `json:"acl"`
 
 	FreeEnable   bool   `json:"free_enable"`
 	FreeLevel    string `json:"free_level"`
@@ -346,7 +342,16 @@ var Config struct {
 	Uploader struct {
 		ServiceAccount string `json:"service_account"`
 		BucketName     string `json:"bucket_name"`
+		ProjectID      string `json:"project_id"`
+		DatasetID      string `json:"dataset_id"`
 	} `json:"uploader"`
+
+	Scrapers map[string][]struct {
+		HasRedis   bool   `json:"has_redis,omitempty"`
+		RedisIndex int    `json:"redis_index,omitempty"`
+		TableName  string `json:"table_name"`
+		mtgban.ScraperInfo
+	} `json:"scrapers"`
 
 	/* The location of the configuation file */
 	filePath string
@@ -354,9 +359,8 @@ var Config struct {
 
 var DevMode bool
 var SigCheck bool
-var SkipInitialRefresh bool
-var SkipPrices bool
 var BenchMode bool
+var FreeSignature string
 var LogDir string
 var LastUpdate string
 var DatabaseLoaded bool
@@ -441,6 +445,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		PatreonId:    PatreonClientId,
 		PatreonURL:   PatreonHost,
 		PatreonLogin: showPatreonLogin,
+		EnableFree:   Config.FreeEnable,
 	}
 
 	// Allocate a new navigation bar
@@ -515,68 +520,36 @@ func openDBs() (err error) {
 	return nil
 }
 
-func initializeAppWithServiceAccount() *firebase.App {
-	opt := option.WithCredentialsFile(Config.SA.Firebase)
-	app, err := firebase.NewApp(context.Background(), nil, opt)
+func loadGoogleCredentials(credentials string) (*http.Client, error) {
+	data, err := os.ReadFile(credentials)
 	if err != nil {
-		log.Fatalf("error initializing app: %v\n", err)
+		return nil, err
 	}
-	return app
+
+	conf, err := google.JWTConfigFromJSON(data, spreadsheet.Scope)
+	if err != nil {
+		return nil, err
+	}
+
+	return conf.Client(context.Background()), nil
 }
 
-func verifyTokenHandler(w http.ResponseWriter, r *http.Request) {
-	var request struct {
-		IDToken string `json:"idToken"`
-	}
-
-	// Decode the JSON body
-	err := json.NewDecoder(r.Body).Decode(&request)
-	if err != nil {
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-		return
-	}
-
-	// Initialize Firebase Admin SDK
-	app := initializeAppWithServiceAccount()
-	client, err := app.Auth(context.Background())
-	if err != nil {
-		http.Error(w, "Error initializing Firebase Auth client", http.StatusInternalServerError)
-		return
-	}
-
-	// Verify ID token
-	token, err := client.VerifyIDToken(context.Background(), request.IDToken)
-	if err != nil {
-		http.Error(w, "Failed to verify ID token", http.StatusUnauthorized)
-		return
-	}
-
-	// Log or use the token's UID
-	fmt.Printf("Verified ID token for user ID: %v\n", token.UID)
-
-	// Respond to the client
-	response := map[string]string{"status": "success", "uid": token.UID}
-	json.NewEncoder(w).Encode(response)
-}
-
-const DefaultConfigPath = "config.json"
+const DefaultConfigPath = "/mnt/config.json"
 
 func main() {
 	config := flag.String("cfg", DefaultConfigPath, "Load configuration file")
 	devMode := flag.Bool("dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
-	skipInitialRefresh := flag.Bool("skip", true, "Skip initial refresh")
-	noload := flag.Bool("noload", false, "Do not load price data")
+	skipInitialRefresh := flag.Bool("skip", false, "Skip initial refresh")
+	noloadCache := flag.Bool("noload", false, "Do not load cached price data")
 	logdir := flag.String("log", "logs", "Directory for scrapers logs")
 	port := flag.String("port", "", "Override server port")
 
 	flag.Parse()
 	DevMode = *devMode
-	SkipPrices = *noload
 	SigCheck = true
 	if DevMode {
 		SigCheck = *sigCheck
-		SkipInitialRefresh = *skipInitialRefresh
 	}
 	LogDir = *logdir
 
@@ -601,7 +574,7 @@ func main() {
 		if !found {
 			log.Fatalln("level", level, "not found in the ACL config")
 		}
-		FreeSignature = sign(host, level, nil)
+		FreeSignature = sign(Config.FreeHostname, level, nil)
 		log.Println("Running in free mode")
 	}
 
@@ -678,19 +651,14 @@ func main() {
 			return
 		}
 
-		// Set up new refreshes as needed
+		// Set up new refreshes as needed (Times are in UTC)
 		c := cron.New()
 
-		// Times are in UTC
+		// Reload data from BQ every 3 hours
+		c.AddFunc("0 */3 * * *", loadBQcron)
 
-		// Refresh everything daily at 2am (after MTGJSON update)
-		c.AddFunc("35 11 * * *", loadScrapers)
-		// Refresh CK at every 4th hour, 40 minutes past the hour (six times in total)
-		c.AddFunc("40 */4 * * *", reloadCK)
-		// Refresh TCG at every 4th hour, 45 minutes past the hour (six times in total)
-		c.AddFunc("45 */4 * * *", reloadTCG)
-		// Refresh SCG every day at 2:15pm (twice in total)
-		c.AddFunc("15 14 * * *", reloadSCG)
+		// Reload infos every 12 hours
+		c.AddFunc("0 */12 * * *", loadInfos)
 
 		// MTGJSON builds go live 7am EST, pull the update 30 minutes after
 		c.AddFunc("30 11 * * *", func() {
@@ -700,9 +668,6 @@ func main() {
 				log.Println(err)
 			}
 		})
-
-		// Slean up the csv cache every 3 days
-		c.AddFunc("0 0 */3 * *", deleteOldCache)
 
 		c.Start()
 	}()
@@ -730,7 +695,6 @@ func main() {
 
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
-	http.HandleFunc("/verify-token", verifyTokenHandler)
 
 	for key, nav := range ExtraNavs {
 		// Set up logging
@@ -754,15 +718,13 @@ func main() {
 	http.Handle("/sets", enforceSigning(http.HandlerFunc(Search)))
 	http.Handle("/sealed", enforceSigning(http.HandlerFunc(Search)))
 
+	http.Handle("/api/bq/refresh/", enforceAPISigning(http.HandlerFunc(RefreshTable)))
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
 	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
 	http.Handle("/api/tcgplayer/lastsold/", enforceSigning(http.HandlerFunc(TCGLastSoldAPI)))
 	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
 	http.HandleFunc("/favicon.ico", Favicon)
-
-	if port, exists := os.LookupEnv("PORT"); exists {
-		Config.Port = port
-	}
+	http.HandleFunc("/auth", Auth)
 
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
@@ -813,8 +775,21 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			n, _ := strconv.ParseFloat(s, 64)
 			return fmt.Sprintf("$ %0.2f", n)
 		},
-		"scraper_name": func(s string) string {
-			return ScraperNames[s]
+		"seller_name": func(s string) string {
+			for _, scraperData := range Config.Scrapers["sellers"] {
+				if s == scraperData.Shorthand {
+					return scraperData.Name
+				}
+			}
+			return ""
+		},
+		"vendor_name": func(s string) string {
+			for _, scraperData := range Config.Scrapers["vendors"] {
+				if s == scraperData.Shorthand {
+					return scraperData.Name
+				}
+			}
+			return ""
 		},
 		"slice_has": func(s []string, p string) bool {
 			return slices.Contains(s, p)

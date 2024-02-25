@@ -27,6 +27,7 @@ var PatreonHost string
 const (
 	DefaultHost              = "www.mtgban.com"
 	DefaultSignatureDuration = 11 * 24 * time.Hour
+	FreeSignatureDuration    = 10 * 365 * 24 * time.Hour
 )
 
 const (
@@ -217,9 +218,18 @@ func getUserTier(tc *http.Client, userId string) (string, error) {
 func getBaseURL(r *http.Request) string {
 	host := r.Host
 	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
-		host = DefaultHost
+		if Config.FreeEnable {
+			host = Config.FreeHostname
+		} else {
+			host = DefaultHost
+		}
 	}
-	baseURL := "http://" + host
+	baseURL := ""
+	if strings.Contains(host, "http") {
+		baseURL = host
+	} else {
+		baseURL = "http://" + host
+	}
 	if r.TLS != nil {
 		baseURL = strings.Replace(baseURL, "http", "https", 1)
 	}
@@ -320,6 +330,11 @@ func getSignatureFromCookies(r *http.Request) string {
 		sig = querySig
 	}
 
+	// If no signature is provided, use a default one, with no expiration check
+	if sig == "" && Config.FreeEnable {
+		return FreeSignature
+	}
+
 	exp := GetParamFromSig(sig, "Expires")
 	if exp == "" {
 		return ""
@@ -333,6 +348,11 @@ func getSignatureFromCookies(r *http.Request) string {
 }
 
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
+	// Nothing in cookies for the free run, so that we don't have to deal with expiration
+	if sig == FreeSignature {
+		return
+	}
+
 	baseURL := getBaseURL(r)
 
 	year, month, _ := time.Now().Date()
@@ -448,7 +468,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			q.Set("Expires", exp)
 		}
 
-		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
+		data := fmt.Sprintf("%s%d%s%s", r.Method, expires, getBaseURL(r), q.Encode())
 		valid := signHMACSHA1Base64([]byte(secret), []byte(data))
 
 		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
@@ -669,7 +689,11 @@ func sign(link string, tierTitle string, userData *PatreonUserData) string {
 		v.Set("UserTier", tierTitle)
 	}
 
-	expires := time.Now().Add(DefaultSignatureDuration)
+	duration := DefaultSignatureDuration
+	if Config.FreeEnable {
+		duration = FreeSignatureDuration
+	}
+	expires := time.Now().Add(duration)
 	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
 	key := os.Getenv("BAN_SECRET")
 	sig := signHMACSHA1Base64([]byte(key), []byte(data))
