@@ -32,3 +32,5 @@ logs/
 
 #dev container stuff
 compose-dev.yaml
+
+node_modules/
