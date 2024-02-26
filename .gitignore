@@ -8,6 +8,7 @@
 *.so
 *.dylib
 mtgban-website
+node_modules
 
 # Test binary, built with `go test -c`
 *.test
@@ -32,5 +33,3 @@ logs/
 
 #dev container stuff
 compose-dev.yaml
-
-node_modules/
