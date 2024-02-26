@@ -34,12 +34,15 @@ rm AllPrintings.json.xz\n' > get-mtgjson.sh && \
 chmod +x get-mtgjson.sh && \ 
 ./get-mtgjson.sh
 
-RUN echo $'#!/bin/sh\n\
-if [ $? -z "$PORT" ]; then\n\
-    PORT=8080\n\
-fi\n\
-exec /app/bantu/mtgbantu-website -port $PORT\n' > entrypoint.sh && \
-chmod +x entrypoint.sh
+#RUN echo $'#!/bin/sh\n\
+#if [ -z "$PORT" ]; then\n\
+#    PORT=8080\n\
+#fi\n\
+#exec /app/bantu/mtgbantu-website -port $PORT\n' > entrypoint.sh && \
+#chmod +x entrypoint.sh
+
+COPY entrypoint.sh /app/bantu/
+RUN chmod +x /app/bantu/entrypoint.sh
 
 COPY --from=build /mtgbantu-website .
 COPY /templates ./templates
@@ -47,4 +50,4 @@ COPY /css ./css
 COPY /js ./js
 COPY /img ./img
 
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/bantu/entrypoint.sh"]
