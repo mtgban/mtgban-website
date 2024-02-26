@@ -1,12 +1,14 @@
 package main
 
 import (
-	"context"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +17,8 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
+
+	"golang.org/x/sync/singleflight"
 )
 
 type meta struct {
@@ -56,14 +60,8 @@ func prepareCKAPI() error {
 	}
 	CKAPIData = list
 
-	// Backup option for stashing CK data
-	rdbRT := ScraperOptions["cardkingdom"].RDBs["retail"]
-	rdbBL := ScraperOptions["cardkingdom"].RDBs["buylist"]
-	key := time.Now().Format("2006-01-02")
-
 	output := map[string]*ck2id{}
 
-	var skipRedis bool
 	for _, card := range list {
 		theCard, err := cardkingdom.Preprocess(card)
 		if err != nil {
@@ -73,22 +71,6 @@ func prepareCKAPI() error {
 		cardId, err := mtgmatcher.Match(theCard)
 		if err != nil {
 			continue
-		}
-
-		if card.SellQuantity > 0 && !skipRedis {
-			// We use Set for retail because prices are more accurate
-			err = rdbRT.HSet(context.Background(), cardId, key, card.SellPrice).Err()
-			if err != nil {
-				log.Printf("redis error for %s: %s", cardId, err)
-				skipRedis = true
-			}
-		}
-		if card.BuyQuantity > 0 && !skipRedis {
-			err = rdbBL.HSetNX(context.Background(), cardId, key, card.BuyPrice).Err()
-			if err != nil {
-				log.Printf("redis error for %s: %s", cardId, err)
-				skipRedis = true
-			}
 		}
 
 		co, err := mtgmatcher.GetUUID(cardId)
@@ -217,6 +199,35 @@ func TCGLastSoldAPI(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
 		return
 	}
+}
+
+var tableGroup singleflight.Group
+
+func RefreshTable(w http.ResponseWriter, r *http.Request) {
+	table := filepath.Base(r.URL.Path)
+
+	ServerNotify("tableRefresh", table+" refresh started")
+
+	now := time.Now()
+
+	resp, _, _ := tableGroup.Do(table, func() (interface{}, error) {
+		return updateScraper(table), nil
+	})
+
+	msg := "ok"
+	if resp != nil {
+		msg = resp.(error).Error()
+		ServerNotify("tableRefresh", msg)
+	} else {
+		ServerNotify("tableRefresh", fmt.Sprintf("%s refreshed in %v", table, time.Since(now)))
+	}
+	w.Write([]byte(`{"msg": "` + msg + `"}`))
+
+	doRedir, _ := strconv.ParseBool(r.FormValue("redir"))
+	if doRedir {
+		http.Redirect(w, r, "/admin?msg="+msg, http.StatusFound)
+	}
+	return
 }
 
 func UUID2CKCSV(w *csv.Writer, ids, qtys []string) error {

@@ -27,9 +27,6 @@ const (
 	TooManyMessage    = "More results available, try adjusting your filters"
 	NoResultsMessage  = "No results found"
 	NoCardsMessage    = "No cards found"
-
-	defaultSellerPriorityOpt = TCG_MARKET
-	defaultVendorPriorityOpt = "CK"
 )
 
 type SearchEntry struct {
@@ -62,7 +59,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	query := r.FormValue("q")
 
 	pageVars.IsSets = r.URL.Path == "/sets"
-	pageVars.PromoTags = mtgmatcher.AllPromoTypes()
+	pageVars.PromoTags = mtgjson.AllPromoTypes
 
 	pageVars.Nav = insertNavBar("Search", pageVars.Nav, []NavElem{
 		NavElem{
@@ -391,22 +388,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return sortSetsAlphabetical(allKeys[i], allKeys[j])
 		})
 	case "retail":
-		retSeller := readCookie(r, "SearchSellersPriority")
-		if retSeller == "" {
-			retSeller = defaultSellerPriorityOpt
-		}
-
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsByRetail(allKeys[i], allKeys[j], retSeller)
+			return sortSetsByRetail(allKeys[i], allKeys[j])
 		})
 	case "buylist":
-		blVendor := readCookie(r, "SearchVendorsPriority")
-		if blVendor == "" {
-			blVendor = defaultVendorPriorityOpt
-		}
-
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsByBuylist(allKeys[i], allKeys[j], blVendor)
+			return sortSetsByBuylist(allKeys[i], allKeys[j])
 		})
 	default:
 		sort.Slice(allKeys, func(i, j int) bool {
@@ -742,32 +729,21 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 					continue
 				}
 
-				icon := ""
-				name := seller.Info().Name
-				switch name {
-				case TCG_MAIN:
-					name = "TCGplayer"
-				case TCG_DIRECT:
-					name = "TCGplayer Direct"
-					icon = "img/misc/direct.png"
-				case CT_ZERO:
-					icon = "img/misc/zero.png"
-				case CT_STANDARD_SEALED:
-					name = CT_STANDARD
-				case CT_ZERO_SEALED:
-					name = CT_ZERO
-					icon = "img/misc/zero.png"
+				// Check if the current entry has any condition
+				_, found = foundSellers[cardId][conditions]
+				if !found {
+					foundSellers[cardId][conditions] = []SearchEntry{}
 				}
 
 				// Prepare all the deets
 				res := SearchEntry{
-					ScraperName: name,
+					ScraperName: seller.Info().Name,
 					Shorthand:   seller.Info().Shorthand,
 					Price:       entry.Price,
 					Quantity:    entry.Quantity,
 					URL:         entry.URL,
 					NoQuantity:  seller.Info().NoQuantityInventory || seller.Info().MetadataOnly,
-					BundleIcon:  icon,
+					BundleIcon:  seller.Info().CustomFields["icon"],
 					Country:     Country2flag[seller.Info().CountryFlag],
 				}
 
@@ -824,26 +800,15 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 
 				conditions := entry.Conditions
 
-				icon := ""
-				name := vendor.Info().Name
-				switch name {
-				case TCG_DIRECT_NET:
-					icon = "img/misc/direct.png"
-				case "TCG Player Market":
-					name = "TCGplayer Trade-In"
-				case "Sealed EV Scraper":
-					name = "CK Buylist for Singles"
-				}
-
 				res := SearchEntry{
-					ScraperName: name,
+					ScraperName: vendor.Info().Name,
 					Shorthand:   vendor.Info().Shorthand,
 					Price:       entry.BuyPrice,
 					Credit:      entry.TradePrice,
 					Ratio:       entry.PriceRatio,
 					Quantity:    entry.Quantity,
 					URL:         entry.URL,
-					BundleIcon:  icon,
+					BundleIcon:  vendor.Info().CustomFields["icon"],
 					Country:     Country2flag[vendor.Info().CountryFlag],
 				}
 
@@ -1134,15 +1099,14 @@ func sortSetsAlphabeticalSet(uuidI, uuidJ string) bool {
 	return cI.Edition < cJ.Edition
 }
 
-// Sort cards by their prices according to the passed in seller,
-// fallbacking to TCG LOW if missing
+// Sort cards by their prices according to TCG MARKET, fallbacking to TCG LOW
 // If same price is found, sort as normal
-func sortSetsByRetail(uuidI, uuidJ, retSeller string) bool {
-	priceI := price4seller(uuidI, retSeller)
+func sortSetsByRetail(uuidI, uuidJ string) bool {
+	priceI := price4seller(uuidI, TCG_MARKET)
 	if priceI == 0 {
 		priceI = price4seller(uuidI, TCG_LOW)
 	}
-	priceJ := price4seller(uuidJ, retSeller)
+	priceJ := price4seller(uuidJ, TCG_MARKET)
 	if priceJ == 0 {
 		priceJ = price4seller(uuidJ, TCG_LOW)
 	}
@@ -1154,14 +1118,14 @@ func sortSetsByRetail(uuidI, uuidJ, retSeller string) bool {
 	return priceI > priceJ
 }
 
-// Sort cards by their prices according to the passed in vendor
-// If same price is found, sort by the default retail price
-func sortSetsByBuylist(uuidI, uuidJ, blVendor string) bool {
-	priceI := price4vendor(uuidI, blVendor)
-	priceJ := price4vendor(uuidJ, blVendor)
+// Sort cards by their prices according to CK
+// If same price is found, sort by retail price
+func sortSetsByBuylist(uuidI, uuidJ string) bool {
+	priceI := price4vendor(uuidI, "CK")
+	priceJ := price4vendor(uuidJ, "CK")
 
 	if priceI == priceJ {
-		return sortSetsByRetail(uuidI, uuidJ, defaultSellerPriorityOpt)
+		return sortSetsByRetail(uuidI, uuidJ)
 	}
 
 	return priceI > priceJ
