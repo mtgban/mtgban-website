@@ -1,4 +1,4 @@
-package cloud_project
+package firebasemanager
 
 import (
 	"context"

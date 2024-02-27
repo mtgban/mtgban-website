@@ -1,4 +1,4 @@
-package cloud_project
+package secretsmanager
 
 import (
 	"context"
@@ -10,13 +10,12 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-// SecretInfo represents necessary details (name and version) to retrieve a specific secret.
 type SecretInfo struct {
-	Name string `json:"name"`
-	Ver  int    `json:"ver"`
+	Name      string `json:"name"`
+	Version   int    `json:"ver"`
+	MountPath string `json:"mount_path"`
 }
 
-// ServiceAccountCredentials defines the structure for service accounnt credentials, duh.
 type ServiceAccountCredentials struct {
 	Type                    string `json:"type"`
 	ProjectID               string `json:"project_id"`
@@ -30,8 +29,6 @@ type ServiceAccountCredentials struct {
 	ClientX509CertURL       string `json:"client_x509_cert_url"`
 }
 
-// RetrieveSecretAsString fetches the secret value as a raw string from Google Secret Manager.
-// For secrets that are simple strings, such as API keys or database passwords.
 func RetrieveSecretAsString(ctx context.Context, secretResourceID string) (string, error) {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
@@ -48,7 +45,6 @@ func RetrieveSecretAsString(ctx context.Context, secretResourceID string) (strin
 	return secretValue, nil
 }
 
-// FetchServiceAccountCredentials specifically is used for retrieving and unmarshalling service account credentials structured in JSON format.
 func FetchServiceAccountCredentials(ctx context.Context, secretResourceID string) (*ServiceAccountCredentials, error) {
 	secretValue, err := RetrieveSecretAsString(ctx, secretResourceID)
 	if err != nil {
@@ -62,10 +58,8 @@ func FetchServiceAccountCredentials(ctx context.Context, secretResourceID string
 	return &credentials, nil
 }
 
-// GetServiceAccountCredentials creates Google credentials from a service account configuration.
-// Used to authenticate a client for various Google Cloud services.
-func GetServiceAccountCredentials(ctx context.Context, projectID string, serviceAccount SecretInfo) (*google.Credentials, error) {
-	secretResourceID := fmt.Sprintf("projects/%s/secrets/%s/versions/%d", projectID, serviceAccount.Name, serviceAccount.Ver)
+func CreateAuthenticatedClient(ctx context.Context, projectID string, serviceAccount SecretInfo) (*google.Credentials, error) {
+	secretResourceID := fmt.Sprintf("projects/%s/secrets/%s/versions/latest", projectID, serviceAccount.Name)
 	credentials, err := FetchServiceAccountCredentials(ctx, secretResourceID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch service account credentials: %v", err)
@@ -82,32 +76,3 @@ func GetServiceAccountCredentials(ctx context.Context, projectID string, service
 	}
 	return googleCredentials, nil
 }
-
-// For use in main.go
-// import {
-//	"github.com/kodabb/mtgban-website/google_cloud/secretsmanager"
-// }
-// func main() {
-//	ctx := context.Background()
-//
-//  Load Config struct from config.json.
-//
-// Example usage for retrieving service account credentials:
-//
-//firebaseSignerConfig := Config.SA.Firebase
-//creds, err := secretsmanager.GetServiceAccountCredentials(ctx, Config.ProjectId, secretsmanager.SecretInfo{
-//    Name: urlSignerConfig.Name,
-//    Ver:  urlSignerConfig.Ver,
-//})
-//if err != nil {
-//    log.Fatalf("Failed to get service account credentials: %v", err)
-//}
-// Use the creds as needed for authenticating clients for various Google Cloud services.
-//
-// For non-service account secrets, you can retrieve them as raw strings:
-// secretResourceID := fmt.Sprintf("projects/%s/secrets/%s/versions/%s", Config.ProjectId, "your-secret-name", "latest")
-// rawSecretValue, err := secretsmanager.RetrieveSecretAsString(ctx, secretResourceID)
-// if err != nil {
-//     log.Fatalf("Failed to retrieve raw secret value: %v", err)
-// }
-// Use the rawSecretValue as needed in your application.
