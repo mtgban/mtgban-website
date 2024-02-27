@@ -20,8 +20,12 @@ import (
 
 	"database/sql"
 
-	"cloud.google.com/go/storage"
+	storage "cloud.google.com/go/storage"
 	_ "github.com/go-sql-driver/mysql"
+	secrets "github.com/mtgban/mtgban-website/secretsmanager"
+
+	bigquery "cloud.google.com/go/bigquery"
+	firebase "firebase.google.com/go/v4"
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
@@ -306,7 +310,9 @@ func init() {
 	}
 }
 
-var Config struct {
+var Config AppConfig
+
+type AppConfig struct {
 	Port                   string            `json:"port"`
 	DBAddress              string            `json:"db_address"`
 	RedisAddr              string            `json:"redis_addr"`
@@ -330,8 +336,11 @@ var Config struct {
 		Secret map[string]string `json:"secret"`
 		Emails map[string]string `json:"emails"`
 	} `json:"patreon"`
-	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
-	GoogleCredentials string            `json:"google_credentials"`
+	ApiUserSecrets          map[string]string  `json:"api_user_secrets"`
+	GoogleCredentials       string             `json:"google_credentials"`
+	GCSBucketServiceAccount secrets.SecretInfo `json:"gcsBucketServiceAccount"`
+	FirebaseServiceAccount  secrets.SecretInfo `json:"firebaseServiceAccount"`
+	BigQueryServiceAccount  secrets.SecretInfo `json:"bigqueryServiceAccount"`
 
 	ACL map[string]map[string]map[string]string `json:"acl"`
 
@@ -357,38 +366,146 @@ var Config struct {
 	filePath string
 }
 
-var DevMode bool
-var SigCheck bool
-var BenchMode bool
-var FreeSignature string
-var LogDir string
-var LastUpdate string
-var DatabaseLoaded bool
-var Sellers []mtgban.Seller
-var Vendors []mtgban.Vendor
-var Infos map[string]mtgban.InventoryRecord
+var (
+	DevMode        bool
+	SigCheck       bool
+	BenchMode      bool
+	FreeSignature  string
+	LogDir         string
+	LastUpdate     string
+	DatabaseLoaded bool
+	Sellers        []mtgban.Seller
+	Vendors        []mtgban.Vendor
+	Infos          map[string]mtgban.InventoryRecord
 
-var SealedEditionsSorted []string
-var SealedEditionsList map[string][]EditionEntry
-var AllEditionsKeys []string
-var AllEditionsMap map[string]EditionEntry
-var TreeEditionsKeys []string
-var TreeEditionsMap map[string][]EditionEntry
-var ReprintsKeys []string
-var ReprintsMap map[string][]ReprintEntry
+	SealedEditionsSorted               []string
+	SealedEditionsList                 map[string][]EditionEntry
+	AllEditionsKeys                    []string
+	AllEditionsMap                     map[string]EditionEntry
+	TreeEditionsKeys                   []string
+	TreeEditionsMap                    map[string][]EditionEntry
+	ReprintsKeys                       []string
+	ReprintsMap                        map[string][]ReprintEntry
+	TotalSets, TotalCards, TotalUnique int
 
-var TotalSets, TotalCards, TotalUnique int
+	Newspaper3dayDB *sql.DB
+	Newspaper1dayDB *sql.DB
 
-var Newspaper3dayDB *sql.DB
-var Newspaper1dayDB *sql.DB
-
-var GoogleDocsClient *http.Client
-var GCSBucketClient *storage.Client
+	GCSBucketClient  *storage.Client
+	GoogleDocsClient *http.Client
+	FirebaseApp      *firebase.App
+	BigQueryClient   *bigquery.Client
+)
 
 const (
 	DefaultConfigPort = "8080"
 	DefaultSecret     = "NotVerySecret!"
 )
+
+var err error
+
+func initCredentials(ctx context.Context, config AppConfig) {
+	serviceAccounts := map[string]secrets.SecretInfo{
+		"GCSBucket": config.GCSBucketServiceAccount,
+		"Firebase":  config.FirebaseServiceAccount,
+		"BigQuery":  config.BigQueryServiceAccount,
+	}
+	for service, info := range serviceAccounts {
+		credentials, err := secrets.CreateAuthenticatedClient(ctx, config.Uploader.ProjectID, info)
+		if err != nil {
+			log.Fatalf("Failed to create credentials for %s: %v", service, err)
+		}
+		switch service {
+		case "GCSBucket":
+			GCSBucketClient, err = storage.NewClient(ctx, option.WithCredentials(credentials))
+		case "Firebase":
+			FirebaseApp, err = firebase.NewApp(ctx, nil, option.WithCredentials(credentials))
+		case "BigQuery":
+			BigQueryClient, err = bigquery.NewClient(ctx, Config.Uploader.ProjectID, option.WithCredentials(credentials))
+		default:
+			log.Fatalf("Unknown service: %s", service)
+		}
+
+		if err != nil {
+			log.Fatalf("Failed to initialize client for %s: %v", service, err)
+		}
+	}
+}
+
+func loadConfig() error {
+	localConfigPath := os.Getenv("CONFIG_PATH")
+	if localConfigPath != "" {
+		// Attempt to load from a local file
+		config, err := loadConfigFromFile(localConfigPath)
+		if err == nil {
+			log.Println("Loaded local config")
+			applyDefaults(config)
+			Config = *config
+			return nil
+		}
+		log.Printf("Unable to load local config: %v", err)
+	}
+	// Use config from Google Secret Manager
+	return loadConfigFromSecretManager()
+}
+
+// Loads configuration from the specified local file
+func loadConfigFromFile(filePath string) (*AppConfig, error) {
+	file, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("file not found or unable to read: %v", err)
+	}
+
+	var config AppConfig
+	if err := json.Unmarshal(file, &config); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal JSON into struct: %v", err)
+	}
+
+	return &config, nil
+}
+
+// Loads configuration from Google Secret Manager
+func loadConfigFromSecretManager() error {
+	ctx := context.Background()
+	projectID := os.Getenv("PROJECT_ID")
+	configSecret := os.Getenv("CONFIG_SECRET")
+	if projectID == "" || configSecret == "" {
+		return fmt.Errorf("PROJECT_ID or CONFIG_SECRET environment variables are not set")
+	}
+	secretId := fmt.Sprintf("projects/%s/secrets/%s/versions/latest", projectID, configSecret)
+
+	configJSON, err := secrets.RetrieveSecretAsString(ctx, secretId)
+	if err != nil {
+		return fmt.Errorf("config file not loaded from Secret Manager: %v", err)
+	}
+
+	if err := json.Unmarshal([]byte(configJSON), &Config); err != nil {
+		return fmt.Errorf("error unmarshalling configuration from Secret Manager: %v", err)
+	}
+
+	applyDefaults(&Config)
+	return nil
+}
+
+// apply certain default values if not set
+func applyDefaults(config *AppConfig) {
+	if config.Port == "" {
+		config.Port = DefaultConfigPort
+	}
+	if os.Getenv("BAN_SECRET") == "" {
+		log.Printf("BAN_SECRET not set, using a default one")
+		os.Setenv("BAN_SECRET", DefaultSecret)
+	}
+
+	if config.FreeEnable {
+		if config.FreeLevel == "" {
+			config.FreeLevel = "free"
+		}
+		if config.FreeHostname == "" {
+			config.FreeHostname = "localhost"
+		}
+	}
+}
 
 func Favicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "img/misc/favicon.ico")
@@ -478,36 +595,6 @@ func genPageNav(activeTab, sig string) PageVars {
 	return pageVars
 }
 
-func loadVars(cfg string) error {
-	// Load from command line
-	file, err := os.Open(cfg)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	d := json.NewDecoder(file)
-	err = d.Decode(&Config)
-	if err != nil {
-		return err
-	}
-
-	Config.filePath = cfg
-
-	if Config.Port == "" {
-		Config.Port = DefaultConfigPort
-	}
-
-	// Load from env
-	v := os.Getenv("BAN_SECRET")
-	if v == "" {
-		log.Printf("BAN_SECRET not set, using a default one")
-		os.Setenv("BAN_SECRET", DefaultSecret)
-	}
-
-	return nil
-}
-
 func openDBs() (err error) {
 	Newspaper3dayDB, err = sql.Open("mysql", Config.DBAddress+"/three_day_newspaper")
 	if err != nil {
@@ -534,10 +621,8 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-const DefaultConfigPath = "/mnt/config.json"
-
 func main() {
-	config := flag.String("cfg", DefaultConfigPath, "Load configuration file")
+	ctx := context.Background()
 	devMode := flag.Bool("dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	skipInitialRefresh := flag.Bool("skip", false, "Skip initial refresh")
@@ -554,12 +639,25 @@ func main() {
 	LogDir = *logdir
 
 	// load necessary environmental variables
-	err := loadVars(*config)
-	if err != nil {
-		log.Fatalln("unable to load config file:", err)
+	if err := loadConfig(); err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
 	}
+
+	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
+	if err != nil {
+		if DevMode {
+			log.Println("error creating a Google client:", err)
+		} else {
+			log.Fatalln("error creating a Google client:", err)
+		}
+	}
+
 	if *port != "" {
 		Config.Port = *port
+	}
+
+	if err := openDBs(); err != nil {
+		log.Println("Failed to open database connection: %v", err)
 	}
 
 	// Cache a  signature
@@ -578,32 +676,12 @@ func main() {
 		log.Println("Running in free mode")
 	}
 
-	_, err = os.Stat(LogDir)
-	if errors.Is(err, os.ErrNotExist) {
-		err = os.MkdirAll(LogDir, 0700)
-	}
-	if err != nil {
-		log.Fatalln("unable to create necessary folders", err)
+	if _, err := os.Stat(LogDir); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(LogDir, 0700); err != nil {
+			log.Fatalf("Unable to create log directory: %v", err)
+		}
 	}
 	LogPages = map[string]*log.Logger{}
-
-	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
-	if err != nil {
-		if DevMode {
-			log.Println("error creating a Google client:", err)
-		} else {
-			log.Fatalln("error creating a Google client:", err)
-		}
-	}
-
-	GCSBucketClient, err = storage.NewClient(context.Background(), option.WithCredentialsFile(Config.Uploader.ServiceAccount))
-	if err != nil {
-		if DevMode {
-			log.Println("error creating the GCSBucketClient:", err)
-		} else {
-			log.Fatalln("error creating the GCSBucketClient:", err)
-		}
-	}
 
 	err = openDBs()
 	if err != nil {
