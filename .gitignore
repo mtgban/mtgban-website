@@ -1,6 +1,6 @@
 # Colly caches
 .cache/
-
+*.md
 # Binaries for programs and plugins
 *.exe
 *.exe~
