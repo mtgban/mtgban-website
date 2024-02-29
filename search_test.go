@@ -42,6 +42,10 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func loadScrapersNG() {
+	panic("unimplemented")
+}
+
 func BenchmarkRegexp(b *testing.B) {
 	input := fmt.Sprintf("%s sm:prefix cn:%s f:foil vendor:CK date>%s", NameToBeFound, NumberToBeFound, EditionToBeFound)
 

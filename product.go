@@ -264,7 +264,7 @@ const (
 )
 
 // Produce a map of card : []ReprintEntry containing array reprints sorted by age
-func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
+func GetReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 	var tcgLow mtgban.InventoryRecord
 	var tcgMarket mtgban.InventoryRecord
 	for _, seller := range Sellers {
@@ -354,7 +354,7 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 		var shouldSkip bool
 		for i := range reprints {
 			// Skip cards that are not old enough
-			if time.Now().Sub(reprints[i].Date).Hours()/24/365 <= YearsBeforeReprint {
+			if time.Since(reprints[i].Date).Hours()/24/365 <= YearsBeforeReprint {
 				shouldSkip = true
 				break
 			}

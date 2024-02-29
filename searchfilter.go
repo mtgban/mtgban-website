@@ -1313,12 +1313,13 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 			default:
 				// Adjust input for these known cases
 				newValue, found := isKnownPromo[value]
+
 				if found {
 					value = newValue
 				}
 
 				// Fall back to any promo type currently supported
-				if slices.Contains(mtgjson.AllPromoTypes, value) {
+				if slices.Contains(mtgmatcher.AllPromoTypes(), value) {
 					if co.HasPromoType(value) {
 						return false
 					}
