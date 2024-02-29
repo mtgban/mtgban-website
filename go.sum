@@ -174,8 +174,6 @@ github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 h1:RWengNIwukTxcDr9
 github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826/go.mod h1:TaXosZuwdSHYgviHp1DAtfrULt5eUgsSMsZf+YrPgl8=
 github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd5E/OeU=
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
-github.com/mtgban/go-mtgban v0.0.0-20240122184616-98a0653f21c9 h1:WItJ0dbxa3BX6cvyLDAMMqopStSrM64yWLL0NXkExeM=
-github.com/mtgban/go-mtgban v0.0.0-20240122184616-98a0653f21c9/go.mod h1:DKYUT+EgFFzzdIkJyUOx2DO0bjZH7UCj+dyPNRzYC08=
 github.com/mtgban/go-mtgban v0.0.0-20240213001450-67eeb8cdbed2 h1:eQh8UKw8ivjr/sAsuCHreiJkOJHVFecLOQyXV9yfoRM=
 github.com/mtgban/go-mtgban v0.0.0-20240213001450-67eeb8cdbed2/go.mod h1:mfDjWIVl2PGWxss1WWwklCkyriXY5JfoItZ2pqyctL8=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
