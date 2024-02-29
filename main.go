@@ -31,7 +31,6 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"gopkg.in/Iwark/spreadsheet.v2"
-	cron "gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -719,35 +718,15 @@ func main() {
 			return
 		}
 		log.Println("Loading BQ")
-		err = loadBQ()
+		err = loadBQ(BigQueryClient)
 		if err != nil {
-			log.Fatalln("error loading bq:", err)
+			log.Println("error loading bq:", err)
 		}
 
 		// Nothing else to do if hacking around
 		if DevMode {
 			return
 		}
-
-		// Set up new refreshes as needed (Times are in UTC)
-		c := cron.New()
-
-		// Reload data from BQ every 3 hours
-		c.AddFunc("0 */3 * * *", loadBQcron)
-
-		// Reload infos every 12 hours
-		c.AddFunc("0 */12 * * *", loadInfos)
-
-		// MTGJSON builds go live 7am EST, pull the update 30 minutes after
-		c.AddFunc("30 11 * * *", func() {
-			log.Println("Reloading MTGJSONv5")
-			err := loadDatastore()
-			if err != nil {
-				log.Println(err)
-			}
-		})
-
-		c.Start()
 	}()
 
 	err = setupDiscord()

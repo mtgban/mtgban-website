@@ -66,13 +66,6 @@ func (e *dbElement) Load(v []bigquery.Value, schema bigquery.Schema) error {
 	return nil
 }
 
-func loadBQcron() {
-	err := loadBQ()
-	if err != nil {
-		log.Println(err.Error())
-	}
-}
-
 const SellersPath = "sellers"
 const VendorsPath = "vendors"
 
