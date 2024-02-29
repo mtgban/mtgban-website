@@ -13,7 +13,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/go-redis/redis/v8"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -140,7 +139,7 @@ func startup() error {
 
 	if len(Sellers) > 0 && len(Vendors) > 0 {
 		DatabaseLoaded = true
-		log.Println("DB loaded from cache in", time.Since(now), "with", len(Sellers), "sellers and ", len(Vendors), "vendors")
+		log.Println("DB loaded from cache in", time.Since(now), "with", len(Sellers), "sellers and", len(Vendors), "vendors")
 	}
 	return nil
 }
@@ -198,18 +197,52 @@ func loadBuylistFromTable(client *bigquery.Client, tableName string) (mtgban.Buy
 	return bl, nil
 }
 
-func loadBQ() error {
+type LoadSummary struct {
+	SuccessCount int
+	TotalCount   int
+	Errors       []error
+	ErrorTables  []string
+}
+
+func newLoadSummary(totalCount int) *LoadSummary {
+	return &LoadSummary{
+		TotalCount: totalCount,
+	}
+}
+
+func (ls *LoadSummary) RecordSuccess() {
+	ls.SuccessCount++
+}
+
+func (ls *LoadSummary) RecordError(err error, tableName string) {
+	ls.Errors = append(ls.Errors, err)
+	ls.ErrorTables = append(ls.ErrorTables, tableName)
+}
+
+func (ls *LoadSummary) LogSummary(side string, startTime time.Time) {
+	if len(ls.Errors) == 0 {
+		log.Printf("%s: All %d tables loaded successfully in %s.\n", side, ls.SuccessCount, time.Since(startTime))
+	} else {
+		log.Printf("%s: Encountered errors in %d/%d tables.\n", side, len(ls.Errors), ls.TotalCount)
+		for _, err := range ls.Errors {
+			log.Println(err)
+		}
+	}
+}
+
+func loadBQ(client *bigquery.Client) error {
 	var sellers []mtgban.Seller
 	var vendors []mtgban.Vendor
 
 	// Set up a context and a BigQuery client.
 	ctx := context.Background()
-	client, err := bigquery.NewClient(ctx, Config.Uploader.ProjectID, option.WithCredentialsFile(Config.Uploader.ServiceAccount))
 	if err != nil {
 		return err
 	}
 
 	now := time.Now()
+	sellerSummary := newLoadSummary(len(Config.Scrapers["sellers"]))
+	vendorSummary := newLoadSummary(len(Config.Scrapers["vendors"]))
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -223,15 +256,16 @@ func loadBQ() error {
 			go func() {
 				defer subWg.Done()
 
-				log.Println("Loading seller", scraperData.TableName)
+				//log.Println("Loading seller", scraperData.TableName)
 				now := time.Now()
 
 				inv, err := loadInventoryFromTable(client, scraperData.TableName)
 				if err != nil {
-					ServerNotify("BQ "+scraperData.TableName, err.Error())
+					//ServerNotify("BQ "+scraperData.TableName, err.Error())
+					sellerSummary.RecordError(err, scraperData.TableName)
 					return
 				}
-				log.Println(scraperData.TableName, "took", time.Since(now), "for", len(inv), "items")
+				//log.Println(scraperData.TableName, "took", time.Since(now), "for", len(inv), "items")
 
 				// Create the metadata portion
 				info := scraperData.ScraperInfo
@@ -240,6 +274,7 @@ func loadBQ() error {
 
 				// Send result on channel
 				channel <- mtgban.NewSellerFromInventory(inv, info)
+				sellerSummary.RecordSuccess()
 
 				// Stash data to redis if requested
 				if scraperData.HasRedis {
@@ -314,21 +349,23 @@ func loadBQ() error {
 			go func() {
 				defer subWg.Done()
 
-				log.Println("Loading vendor", scraperData.TableName)
+				//log.Println("Loading vendor", scraperData.TableName)
 				now := time.Now()
 
 				bl, err := loadBuylistFromTable(client, scraperData.TableName)
 				if err != nil {
-					ServerNotify("BQ "+scraperData.TableName, err.Error())
+					//ServerNotify("BQ "+scraperData.TableName, err.Error())
+					vendorSummary.RecordError(err, scraperData.TableName)
 					return
 				}
-				log.Println(scraperData.TableName, "took", time.Since(now), "for", len(bl), "items")
+				//log.Println(scraperData.TableName, "took", time.Since(now), "for", len(bl), "items")
 
 				info := scraperData.ScraperInfo
 				now = time.Now()
 				info.BuylistTimestamp = &now
 
 				channel <- mtgban.NewVendorFromBuylist(bl, info)
+				vendorSummary.RecordSuccess()
 
 				if scraperData.HasRedis {
 					redisClient := redis.NewClient(&redis.Options{
@@ -383,6 +420,8 @@ func loadBQ() error {
 	}()
 
 	wg.Wait()
+	sellerSummary.LogSummary("Sellers", now)
+	vendorSummary.LogSummary("Vendors", now)
 
 	if len(sellers) == 0 || len(vendors) == 0 {
 		return errors.New("nothing got loaded")
@@ -390,7 +429,7 @@ func loadBQ() error {
 
 	DatabaseLoaded = true
 	LastUpdate = time.Now().Format(time.RFC3339)
-	log.Println("DB loaded from BQ in", time.Since(now), "with", len(Sellers), "sellers and", len(Vendors), "vendors")
+	//	log.Println("DB loaded from BQ in", time.Since(now), "with", len(Sellers), "sellers and", len(Vendors), "vendors")
 
 	go updateStaticData()
 
@@ -418,7 +457,7 @@ func updateScraper(tableName string) error {
 	}
 
 	ctx := context.Background()
-	client, err := bigquery.NewClient(ctx, Config.Uploader.ProjectID, option.WithCredentialsFile(Config.Uploader.ServiceAccount))
+	client, err := bigquery.NewClient(ctx, Config.ProjectId)
 	if err != nil {
 		return err
 	}

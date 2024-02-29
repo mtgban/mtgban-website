@@ -335,11 +335,11 @@ type AppConfig struct {
 		Secret map[string]string `json:"secret"`
 		Emails map[string]string `json:"emails"`
 	} `json:"patreon"`
-	ApiUserSecrets          map[string]string  `json:"api_user_secrets"`
-	GoogleCredentials       string             `json:"google_credentials"`
-	GCSBucketServiceAccount secrets.SecretInfo `json:"gcsBucketServiceAccount"`
-	FirebaseServiceAccount  secrets.SecretInfo `json:"firebaseServiceAccount"`
-	BigQueryServiceAccount  secrets.SecretInfo `json:"bigqueryServiceAccount"`
+	ApiUserSecrets         map[string]string  `json:"api_user_secrets"`
+	GoogleCredentials      string             `json:"google_credentials"`
+	GCSServiceAccount      secrets.SecretInfo `json:"gcsServiceAccount"`
+	FirebaseServiceAccount secrets.SecretInfo `json:"firebaseServiceAccount"`
+	BigQueryServiceAccount secrets.SecretInfo `json:"bigQueryServiceAccount"`
 
 	ACL map[string]map[string]map[string]string `json:"acl"`
 
@@ -403,34 +403,6 @@ const (
 
 var err error
 
-func initCredentials(ctx context.Context, config AppConfig) {
-	serviceAccounts := map[string]secrets.SecretInfo{
-		"GCSBucket": config.GCSBucketServiceAccount,
-		"Firebase":  config.FirebaseServiceAccount,
-		"BigQuery":  config.BigQueryServiceAccount,
-	}
-	for service, info := range serviceAccounts {
-		credentials, err := secrets.CreateAuthenticatedClient(ctx, config.Uploader.ProjectID, info)
-		if err != nil {
-			log.Fatalf("Failed to create credentials for %s: %v", service, err)
-		}
-		switch service {
-		case "GCSBucket":
-			GCSBucketClient, err = storage.NewClient(ctx, option.WithCredentials(credentials))
-		case "Firebase":
-			FirebaseApp, err = firebase.NewApp(ctx, nil, option.WithCredentials(credentials))
-		case "BigQuery":
-			BigQueryClient, err = bigquery.NewClient(ctx, Config.Uploader.ProjectID, option.WithCredentials(credentials))
-		default:
-			log.Fatalf("Unknown service: %s", service)
-		}
-
-		if err != nil {
-			log.Fatalf("Failed to initialize client for %s: %v", service, err)
-		}
-	}
-}
-
 func loadConfig() error {
 	localConfigPath := os.Getenv("CONFIG_PATH")
 	if localConfigPath != "" {
@@ -444,7 +416,6 @@ func loadConfig() error {
 		}
 		log.Printf("Unable to load local config: %v", err)
 	}
-	// Use config from Google Secret Manager
 	return loadConfigFromSecretManager()
 }
 
@@ -465,13 +436,15 @@ func loadConfigFromFile(filePath string) (*AppConfig, error) {
 
 // Loads configuration from Google Secret Manager
 func loadConfigFromSecretManager() error {
+	log.Printf("Accessing Secrets..")
 	ctx := context.Background()
 	projectID := os.Getenv("PROJECT_ID")
 	configSecret := os.Getenv("CONFIG_SECRET")
+	configVersion := os.Getenv("CONFIG_VERSION")
 	if projectID == "" || configSecret == "" {
 		return fmt.Errorf("PROJECT_ID or CONFIG_SECRET environment variables are not set")
 	}
-	secretId := fmt.Sprintf("projects/%s/secrets/%s/versions/latest", projectID, configSecret)
+	secretId := fmt.Sprintf("projects/%s/secrets/%s/versions/%v", projectID, configSecret, configVersion)
 
 	configJSON, err := secrets.RetrieveSecretAsString(ctx, secretId)
 	if err != nil {
@@ -502,6 +475,55 @@ func applyDefaults(config *AppConfig) {
 		}
 		if config.FreeHostname == "" {
 			config.FreeHostname = "localhost"
+		}
+	}
+}
+
+func createBigQueryClient(ctx context.Context, projectId string, creds []byte) (*bigquery.Client, error) {
+	credentials, err := google.CredentialsFromJSON(ctx, creds, bigquery.Scope)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create credentials from JSON: %v", err)
+	}
+	return bigquery.NewClient(ctx, projectId, option.WithCredentials(credentials))
+}
+
+func createStorageClient(ctx context.Context, projectId string, creds []byte) (*storage.Client, error) {
+	credentials, err := google.CredentialsFromJSON(ctx, creds, storage.ScopeFullControl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create credentials from JSON: %v", err)
+	}
+	return storage.NewClient(ctx, option.WithCredentials(credentials))
+}
+
+// with Config struct now populated => fetch and init service clients
+func initCredentials(ctx context.Context, config AppConfig) {
+	serviceAccounts := map[string]secrets.SecretInfo{
+		"GCSBucket": config.GCSServiceAccount,
+		"BigQuery":  config.BigQueryServiceAccount,
+	}
+	for serviceAccount, secretInfo := range serviceAccounts {
+		secret := secrets.SecretInfo{
+			Name:      secretInfo.Name,
+			Version:   secretInfo.Version,
+			MountPath: secretInfo.MountPath,
+		}
+		credentials, err := secrets.CreateAuthenticatedClient(ctx, Config.ProjectId, secret)
+		if err != nil {
+			log.Fatalf("Failed to create authenticated client: %v", err)
+		}
+		switch serviceAccount {
+		case "GCSBucket":
+			GCSBucketClient, err = createStorageClient(ctx, Config.ProjectId, credentials.JSON)
+			if GCSBucketClient == nil {
+				log.Fatalf("Failed to create GCS client: %v", err)
+			}
+		case "BigQuery":
+			BigQueryClient, err = createBigQueryClient(ctx, Config.ProjectId, credentials.JSON)
+			if BigQueryClient == nil {
+				log.Fatalf("Failed to create BigQuery client: %v", err)
+			}
+		default:
+			log.Fatalf("Unknown service account: %s", serviceAccount)
 		}
 	}
 }
@@ -628,35 +650,36 @@ func main() {
 	noloadCache := flag.Bool("noload", false, "Do not load cached price data")
 	logdir := flag.String("log", "logs", "Directory for scrapers logs")
 	port := flag.String("port", "", "Override server port")
-
 	flag.Parse()
+
 	DevMode = *devMode
 	SigCheck = true
+
 	if DevMode {
 		SigCheck = *sigCheck
 	}
+
 	LogDir = *logdir
+
+	_, err := os.Stat("allprintings5.json")
+	if os.IsNotExist(err) {
+		fetchMtgjson(ctx)
+	}
 
 	// load necessary environmental variables
 	if err := loadConfig(); err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
+	initCredentials(ctx, Config)
 
 	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
-	if err != nil {
-		if DevMode {
-			log.Println("error creating a Google client:", err)
-		} else {
-			log.Fatalln("error creating a Google client:", err)
-		}
-	}
 
 	if *port != "" {
 		Config.Port = *port
 	}
 
 	if err := openDBs(); err != nil {
-		log.Println("Failed to open database connection: %v", err)
+		log.Printf("Failed to open database connection: %v", err)
 	}
 
 	// Cache a  signature
