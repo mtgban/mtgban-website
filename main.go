@@ -248,28 +248,35 @@ var ExtraNavs map[string]NavElem
 
 func init() {
 	ExtraNavs = map[string]NavElem{
-		"Search": NavElem{
+		"Subscribe": {
+			Name:   "Subscribe",
+			Short:  "⛓️",
+			Link:   "/subscriptions",
+			Handle: ProductPage,
+			Page:   "productPage.html",
+		},
+		"Search": {
 			Name:   "Search",
 			Short:  "🔍",
 			Link:   "/search",
 			Handle: Search,
 			Page:   "search.html",
 		},
-		"Newspaper": NavElem{
+		"Newspaper": {
 			Name:   "Newspaper",
 			Short:  "🗞️",
 			Link:   "/newspaper",
 			Handle: Newspaper,
 			Page:   "news.html",
 		},
-		"Sleepers": NavElem{
+		"Sleepers": {
 			Name:   "Sleepers",
 			Short:  "💤",
 			Link:   "/sleepers",
 			Handle: Sleepers,
 			Page:   "sleep.html",
 		},
-		"Upload": NavElem{
+		"Upload": {
 			Name:    "Upload",
 			Short:   "🚢",
 			Link:    "/upload",
@@ -277,28 +284,28 @@ func init() {
 			Page:    "upload.html",
 			CanPOST: true,
 		},
-		"Global": NavElem{
+		"Global": {
 			Name:   "Global",
 			Short:  "🌍",
 			Link:   "/global",
 			Handle: Global,
 			Page:   "arbit.html",
 		},
-		"Arbit": NavElem{
+		"Arbit": {
 			Name:   "Arbitrage",
 			Short:  "📈",
 			Link:   "/arbit",
 			Handle: Arbit,
 			Page:   "arbit.html",
 		},
-		"Reverse": NavElem{
+		"Reverse": {
 			Name:   "Reverse",
 			Short:  "📉",
 			Link:   "/reverse",
 			Handle: Reverse,
 			Page:   "arbit.html",
 		},
-		"Admin": NavElem{
+		"Admin": {
 			Name:   "Admin",
 			Short:  "❌",
 			Link:   "/admin",
@@ -316,6 +323,7 @@ type AppConfig struct {
 	Port                   string            `json:"port"`
 	DBAddress              string            `json:"db_address"`
 	RedisAddr              string            `json:"redis_addr"`
+	ProjectId              string            `json:"projectId"`
 	DiscordHook            string            `json:"discord_hook"`
 	DiscordNotifHook       string            `json:"discord_notif_hook"`
 	DiscordInviteLink      string            `json:"discord_invite_link"`
