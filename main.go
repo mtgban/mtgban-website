@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path"
 	"strconv"
@@ -640,6 +641,20 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	}
 
 	return conf.Client(context.Background()), nil
+}
+
+func fetchMtgjson(ctx context.Context) {
+	cmd := exec.Command("sh", "get-mtgjson.sh")
+	cmd.Dir = "./"
+	err := cmd.Start()
+	if err != nil {
+		log.Fatalf("Error starting command: %v", err)
+	}
+
+	err = cmd.Wait()
+	if err != nil {
+		log.Fatalf("Error waiting for command: %v", err)
+	}
 }
 
 func main() {
