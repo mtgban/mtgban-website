@@ -327,7 +327,7 @@ func getSignatureFromCookies(r *http.Request) string {
 
 	querySig := r.FormValue("sig")
 	if sig == "" && querySig != "" {
-		sig = querySig
+		sig = FreeSignature
 	}
 
 	// If no signature is provided, use a default one, with no expiration check

@@ -45,8 +45,6 @@ const (
 	CT_ZERO_SEALED     = "Card Trader Zero Sealed"
 )
 
-const AllPrintingsFileName = "allprintings5.json"
-
 var Country2flag = map[string]string{
 	"EU": "🇪🇺",
 	"JP": "🇯🇵",
@@ -79,10 +77,7 @@ type GenericCard struct {
 	SourceSealed []string
 }
 
-// A default scale for converting non-NM prices to NM
-var defaultGradeMap = map[string]float64{
-	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
-}
+const AllPrintingsFileName = "allprintings5.json"
 
 func fileExists(filename string) bool {
 	fi, err := os.Lstat(filename)
@@ -264,7 +259,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		case co.BorderColor == mtgjson.BorderColorBorderless:
 			variant = "Borderless "
 		case co.FrameVersion == "1997":
-			variant = "Retro Frame"
+			variant = "Retro Frame "
 		}
 	}
 	// Loop through the supported promo types, skipping Boosterfun already processed above

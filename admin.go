@@ -180,6 +180,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "Reloading scrapers in the background...")
 		doReboot = true
 
+
 	case "server":
 		v = url.Values{}
 		v.Set("msg", "Restarting the server...")

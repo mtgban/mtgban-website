@@ -248,35 +248,35 @@ var ExtraNavs map[string]NavElem
 
 func init() {
 	ExtraNavs = map[string]NavElem{
-		"Subscribe": {
+		"Subscribe": NavElem{
 			Name:   "Subscribe",
 			Short:  "⛓️",
 			Link:   "/subscriptions",
 			Handle: ProductPage,
 			Page:   "productPage.html",
 		},
-		"Search": {
+		"Search": NavElem{
 			Name:   "Search",
 			Short:  "🔍",
 			Link:   "/search",
 			Handle: Search,
 			Page:   "search.html",
 		},
-		"Newspaper": {
+		"Newspaper": NavElem{
 			Name:   "Newspaper",
 			Short:  "🗞️",
 			Link:   "/newspaper",
 			Handle: Newspaper,
 			Page:   "news.html",
 		},
-		"Sleepers": {
+		"Sleepers": NavElem{
 			Name:   "Sleepers",
 			Short:  "💤",
 			Link:   "/sleepers",
 			Handle: Sleepers,
 			Page:   "sleep.html",
 		},
-		"Upload": {
+		"Upload": NavElem{
 			Name:    "Upload",
 			Short:   "🚢",
 			Link:    "/upload",
@@ -284,28 +284,28 @@ func init() {
 			Page:    "upload.html",
 			CanPOST: true,
 		},
-		"Global": {
+		"Global": NavElem{
 			Name:   "Global",
 			Short:  "🌍",
 			Link:   "/global",
 			Handle: Global,
 			Page:   "arbit.html",
 		},
-		"Arbit": {
+		"Arbit": NavElem{
 			Name:   "Arbitrage",
 			Short:  "📈",
 			Link:   "/arbit",
 			Handle: Arbit,
 			Page:   "arbit.html",
 		},
-		"Reverse": {
+		"Reverse": NavElem{
 			Name:   "Reverse",
 			Short:  "📉",
 			Link:   "/reverse",
 			Handle: Reverse,
 			Page:   "arbit.html",
 		},
-		"Admin": {
+		"Admin": NavElem{
 			Name:   "Admin",
 			Short:  "❌",
 			Link:   "/admin",
@@ -451,7 +451,7 @@ func loadConfigFromSecretManager() error {
 	configSecret := os.Getenv("CONFIG_SECRET")
 	configVersion := os.Getenv("CONFIG_VERSION")
 	if projectID == "" || configSecret == "" {
-		return fmt.Errorf("PROJECT_ID or CONFIG_SECRET environment variables are not set")
+		return fmt.Errorf("PROJECT_ID, CONFIG_SECRET or CONFIG_VERSION environment variables are not set")
 	}
 	secretId := fmt.Sprintf("projects/%s/secrets/%s/versions/%v", projectID, configSecret, configVersion)
 
@@ -694,8 +694,7 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 	initCredentials(ctx, Config)
-
-	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
+	loadGoogleCredentials(Config.GoogleCredentials)
 
 	if *port != "" {
 		Config.Port = *port
@@ -712,6 +711,7 @@ func main() {
 		if host == "" || level == "" {
 			log.Fatalln("missing parameter for free level")
 		}
+
 		host += ":" + Config.Port
 		_, found := Config.ACL[level]
 		if !found {
@@ -740,7 +740,6 @@ func main() {
 	// load website up
 	go func() {
 		go func() {
-			log.Println("Loading MTGJSONv5")
 			err := loadDatastore()
 			if err != nil {
 				log.Fatalln("error loading mtgjson:", err)

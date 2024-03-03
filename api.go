@@ -227,7 +227,6 @@ func RefreshTable(w http.ResponseWriter, r *http.Request) {
 	if doRedir {
 		http.Redirect(w, r, "/admin?msg="+msg, http.StatusFound)
 	}
-	return
 }
 
 func UUID2CKCSV(w *csv.Writer, ids, qtys []string) error {

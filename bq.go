@@ -21,9 +21,13 @@ import (
 )
 
 type dbElement struct {
-	UUID string
+	UUID string `json:"uuid"`
 	mtgban.InventoryEntry
-	mtgban.BuylistEntry
+	mtgban.BuylistEntry `json:"-"`
+}
+
+var defaultGradeMap = map[string]float64{
+	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
 }
 
 func (e *dbElement) Load(v []bigquery.Value, schema bigquery.Schema) error {
