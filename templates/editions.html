@@ -61,12 +61,30 @@
                         element.style.display = ''
                     );
                 }
+                function searchTable() {
+                    var input, filter, table, tr, td, i, txtValue;
+                    input = document.getElementById("searchInput");
+                    filter = input.value.toUpperCase();
+                    table = document.getElementById("table");
+                    tr = table.getElementsByTagName("tr");
+                    for (i = 0; i < tr.length; i++) {
+                        td = tr[i].getElementsByTagName("td")[0];
+                        if (td) {
+                            txtValue = td.textContent || td.innerText;
+                            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                                tr[i].style.display = "";
+                            } else {
+                                tr[i].style.display = "none";
+                            }
+                        }
+                    }
+                };
             </script>
             <div class="indent" style="max-width: 85%">
                 Tracking {{.TotalSets}} editions, for {{.TotalCards}} cards over {{.TotalUnique}} printings. <a href="javascript:showAll()" id="hideme">Show additional search options.</a>
             </div>
             <br>
-
+            <input type="text" id="searchInput" placeholder="Enter a set name..." onkeyup="searchTable()">
             <table style="float: left; background-color: var(--background); width:60%" id="table">
                 <tr>
                     <th><a class="btn default" style="padding: 0 0 0 0" href="/sets?sort=name" title="Sort by edition name"> Name</a></th>

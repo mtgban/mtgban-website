@@ -796,3 +796,18 @@ img.hoverImage {
     max-width: 640px;
     max-height: 360px;
 }
+
+.search-container {
+    float: top; 
+    text-align: left; 
+    margin-left: 10px; 
+    margin-bottom: 12px;
+}
+
+#searchInput {
+    padding: 10px;
+    margin-top: 8px;
+    font-size: 17px;
+    min-width: 35%;
+    border: 1px solid #ddd;
+}
