@@ -23,7 +23,7 @@ WORKDIR /app/bantu
 
 RUN apk update && apk add --no-cache sudo bash curl xz jq
 
-# Create and execute the script in one RUN command to reduce layers
+# Create and execute the script
 RUN echo $'#!/bin/sh\n\
 curl -O "https://mtgjson.com/api/v5/AllPrintings.json.xz"\n\
 xz -dc AllPrintings.json.xz | jq > /tmp/allprintings5.json.new\n\
