@@ -102,7 +102,9 @@ func keyruneForCardSet(cardId string) string {
 
 	// Skip setting rarity for common, so that a color is not forcefully set
 	// on the symbol, and can become white on a dark theme
-	if rarity != "common" {
+	// Also skip setting rarity on any foil cards due to rendering issues
+	// https://github.com/andrewgioia/keyrune/issues/228
+	if rarity != "common" && !co.Foil {
 		out += " ss-" + rarity
 	}
 
