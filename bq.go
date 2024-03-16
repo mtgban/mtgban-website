@@ -38,7 +38,7 @@ func (e *dbElement) Load(v []bigquery.Value, schema bigquery.Schema) error {
 		}
 
 		switch field.Name {
-		case "CKTItle", "CKID", "CKFoil", "CKSKU", "CKEdition",
+		case "CKTitle", "CKID", "CKFoil", "CKSKU", "CKEdition",
 			"SCGName", "SCGEdition", "SCGLanguage", "SCGFinish":
 			strVal, ok := v[i].(string)
 			if !ok {
@@ -48,6 +48,7 @@ func (e *dbElement) Load(v []bigquery.Value, schema bigquery.Schema) error {
 				e.BuylistEntry.CustomFields = map[string]string{}
 			}
 			e.BuylistEntry.CustomFields[field.Name] = strVal
+
 		case "price_ratio", "trade_price", "buy_price", "price":
 			floatVal, ok := v[i].(float64)
 			if !ok {
@@ -68,6 +69,7 @@ func (e *dbElement) Load(v []bigquery.Value, schema bigquery.Schema) error {
 			case "price":
 				e.InventoryEntry.Price = floatVal
 			}
+      
 		case "url", "conditions", "UUID":
 			strVal, ok := v[i].(string)
 			if !ok {

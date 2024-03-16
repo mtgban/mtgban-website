@@ -1,6 +1,6 @@
 module github.com/mtgban/mtgban-website
 
-go 1.19
+go 1.18
 
 require (
 	cloud.google.com/go/bigquery v1.56.0
@@ -27,7 +27,6 @@ require (
 	golang.org/x/time v0.3.0
 	google.golang.org/api v0.147.0
 	gopkg.in/Iwark/spreadsheet.v2 v2.0.0-20230915040305-7677e8164883
-	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
 )
 
 require (
