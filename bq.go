@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -39,30 +40,57 @@ func (e *dbElement) Load(v []bigquery.Value, schema bigquery.Schema) error {
 		switch field.Name {
 		case "CKTItle", "CKID", "CKFoil", "CKSKU", "CKEdition",
 			"SCGName", "SCGEdition", "SCGLanguage", "SCGFinish":
+			strVal, ok := v[i].(string)
+			if !ok {
+				return fmt.Errorf("expected string for %s, got %T", field.Name, v[i])
+			}
 			if e.BuylistEntry.CustomFields == nil {
 				e.BuylistEntry.CustomFields = map[string]string{}
 			}
+			e.BuylistEntry.CustomFields[field.Name] = strVal
+		case "price_ratio", "trade_price", "buy_price", "price":
+			floatVal, ok := v[i].(float64)
+			if !ok {
+				// value might be int
+				if intVal, ok := v[i].(int64); ok {
+					floatVal = float64(intVal)
+				} else {
+					return fmt.Errorf("expected float64 for %s, got %T", field.Name, v[i])
+				}
+			}
+			switch field.Name {
+			case "price_ratio":
+				e.BuylistEntry.PriceRatio = floatVal
+			case "trade_price":
+				e.BuylistEntry.TradePrice = floatVal
+			case "buy_price":
+				e.BuylistEntry.BuyPrice = floatVal
+			case "price":
+				e.InventoryEntry.Price = floatVal
+			}
+		case "url", "conditions", "UUID":
+			strVal, ok := v[i].(string)
+			if !ok {
+				return fmt.Errorf("expected string for %s, got %T", field.Name, v[i])
+			}
+			switch field.Name {
+			case "url":
+				e.InventoryEntry.URL = strVal
+				e.BuylistEntry.URL = strVal
+			case "conditions":
+				e.InventoryEntry.Conditions = strVal
+				e.BuylistEntry.Conditions = strVal
+			case "UUID":
+				e.UUID = strVal
+			}
 
-			e.BuylistEntry.CustomFields[field.Name] = v[i].(string)
-		case "price_ratio":
-			e.BuylistEntry.PriceRatio = v[i].(float64)
-		case "url":
-			e.InventoryEntry.URL = v[i].(string)
-			e.BuylistEntry.URL = v[i].(string)
-		case "trade_price":
-			e.BuylistEntry.TradePrice = v[i].(float64)
-		case "buy_price":
-			e.BuylistEntry.BuyPrice = v[i].(float64)
-		case "price":
-			e.InventoryEntry.Price = v[i].(float64)
-		case "conditions":
-			e.InventoryEntry.Conditions = v[i].(string)
-			e.BuylistEntry.Conditions = v[i].(string)
 		case "quantity":
-			e.InventoryEntry.Quantity = int(v[i].(int64))
-			e.BuylistEntry.Quantity = int(v[i].(int64))
-		case "UUID":
-			e.UUID = v[i].(string)
+			intVal, ok := v[i].(int64)
+			if !ok {
+				return fmt.Errorf("expected int64 for quantity, got %T", v[i])
+			}
+			e.InventoryEntry.Quantity = int(intVal)
+			e.BuylistEntry.Quantity = int(intVal)
 		}
 	}
 
