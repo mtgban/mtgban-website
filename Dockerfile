@@ -43,4 +43,6 @@ COPY /css ./css
 COPY /js ./js
 COPY /img ./img
 
+EXPOSE 8080
+
 ENTRYPOINT ["/app/bantu/entrypoint.sh"]
