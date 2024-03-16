@@ -84,7 +84,9 @@
                 Tracking {{.TotalSets}} editions, for {{.TotalCards}} cards over {{.TotalUnique}} printings. <a href="javascript:showAll()" id="hideme">Show additional search options.</a>
             </div>
             <br>
-            <input type="text" id="searchInput" placeholder="Enter a set name..." onkeyup="searchTable()">
+            <div style="float: left; padding: 10px;">
+                <input type="text" id="searchInput" placeholder="Enter a set name..." onkeyup="searchTable()">
+            </div>
             <table style="float: left; background-color: var(--background); width:60%" id="table">
                 <tr>
                     <th><a class="btn default" style="padding: 0 0 0 0" href="/sets?sort=name" title="Sort by edition name"> Name</a></th>

@@ -651,7 +651,7 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-func fetchMtgjson(ctx context.Context) {
+func fetchMtgjson(_ context.Context) {
 	cmd := exec.Command("sh", "get-mtgjson.sh")
 	cmd.Dir = "./"
 	err := cmd.Start()
