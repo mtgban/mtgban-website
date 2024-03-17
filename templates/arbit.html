@@ -312,10 +312,10 @@
                     <hr width=20%>
                 </div>
 
-                <table onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                <table class="filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
                     <tr>
                         <th class="stickyHeaderTiny">Card Name</th>
-                        <th class="stickyHeaderTiny">Edition</th>
+                        <th class="stickyHeaderTiny">Edition<input type="text" id="filterInput" onkeyup="filterArbitTable()" placeholder="Filter.."></th>
                         <th class="stickyHeaderTiny"><center>#</center></th>
                         <th class="stickyHeaderTiny">Finish</th>
                         {{if not .HasNoConds}}
@@ -362,7 +362,7 @@
                         <th class="stickyHeaderTiny"><center>Quicklinks</center></th>
                     </tr>
                     {{range .Arbit}}
-                        <tr onmouseover="document.getElementById('hoverImage').src={{(index $.Metadata .CardId).ImageURL}};">
+                        <tr onmouseover="document.getElementById('hoverImage').src='{{(index $.Metadata .CardId).ImageURL}}';">
                             <td>
                                 <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{(index $.Metadata .CardId).Name}}')" title="Copy to clipboard">📝</span>&nbsp;
                                 <a href="{{(index $.Metadata .CardId).SearchURL}}">{{(index $.Metadata .CardId).Name}}</a>
