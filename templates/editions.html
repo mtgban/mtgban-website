@@ -67,9 +67,9 @@
             </div>
             <br>
 
-            <table style="float: left; background-color: var(--background); width:60%" id="table">
+            <table class="filterable" style="float: left; background-color: var(--background); width:60%" id="table">
                 <tr>
-                    <th><a class="btn default" style="padding: 0 0 0 0" href="/sets?sort=name" title="Sort by edition name"> Name</a></th>
+                    <th><a class="btn default" style="padding: 0 0 0 0;" href="/sets?sort=name" title="Sort by edition name">Name</a>&nbsp;&nbsp;&nbsp;<input type="text" id="filterInput" onkeyup="filterEditionsTable()" placeholder="Filter.."></th>
                     <th>Finish</th>
                     <th style="display:none;">Color</th>
                     <th style="display:none;">Rarity</th>
