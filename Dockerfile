@@ -1,41 +1,42 @@
+# First stage: build the Go binary
 FROM golang:1.19 AS build
 
 WORKDIR /src
 
+# Copy mod files first to leverage Docker cache
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copy the rest of the source code
 COPY . .
+
+# Build the binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o /mtgbantu-website
 
+# Second stage: Prepare the runtime container
 FROM alpine:3.19
 
-# Updating APK and installing dependencies
-RUN apk update && apk add --no-cache ca-certificates jq curl bash
+RUN apk update && apk add --no-cache ca-certificates jq curl bash xz
 
 WORKDIR /app/bantu
 
-# Copying necessary files and directories from the build stage
+# Copy the binary from the build stage
 COPY --from=build /mtgbantu-website ./mtgbantu-website
 COPY templates ./templates
 COPY css ./css
 COPY js ./js
 COPY img ./img
 
-# Creating and setting up scripts directory and entrypoint script
-RUN mkdir /scripts \
-    && echo '#!/bin/sh' > /scripts/get-mtgjson.sh \
-    && echo 'curl -O https://mtgjson.com/api/v5/AllPrintings.json.xz' >> /scripts/get-mtgjson.sh \
-    && chmod +x /scripts/get-mtgjson.sh
+# Add/create get-mtgjson script to PATH
+RUN echo '#!/bin/sh' > /usr/local/bin/get-mtgjson.sh \
+    && echo 'curl -O "https://mtgjson.com/api/v5/AllPrintings.json.xz"' >> /usr/local/bin/get-mtgjson.sh \
+    && echo 'xz -dc AllPrintings.json.xz | jq > /tmp/allprintings5.json.new' >> /usr/local/bin/get-mtgjson.sh \
+    && echo 'if [ $? -eq 0 ]; then mv /tmp/allprintings5.json.new ./allprintings5.json; fi' >> /usr/local/bin/get-mtgjson.sh \
+    && echo 'rm AllPrintings.json.xz' >> /usr/local/bin/get-mtgjson.sh \
+    && chmod +x /usr/local/bin/get-mtgjson.sh
 
-RUN echo '#!/bin/sh' > /entrypoint.sh \
-    && echo 'sh /scripts/get-mtgjson.sh' >> /entrypoint.sh \
-    && echo 'if [ -z "$PORT" ]; then PORT=8080; fi' >> /entrypoint.sh \
-    && echo 'exec ./mtgbantu-website' >> /entrypoint.sh \
-    && chmod +x /entrypoint.sh
+# Expose variable port
+EXPOSE 8080
 
-# Setting PATH environment variable to include /scripts directory
-ENV PATH="/scripts:${PATH}"
-
-# Setting the entrypoint to the entrypoint script
-ENTRYPOINT ["/entrypoint.sh"]
+# Define entrypoint and CMD
+ENTRYPOINT ["/bin/sh", "-c", "get-mtgjson.sh && ./mtgbantu-website"]

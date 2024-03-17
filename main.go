@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -652,13 +653,19 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 }
 
 func fetchMtgjson(ctx context.Context) {
-	cmd := exec.Command("get-mtgjson.sh")
-	cmd.Dir = "./"
-	err := cmd.Start()
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatalf("Error getting current working directory: %v", err)
+	}
+
+	scriptPath := filepath.Join(cwd, "get-mtgjson.sh")
+
+	// Execute the script
+	cmd := exec.Command(scriptPath)
+	err = cmd.Start()
 	if err != nil {
 		log.Fatalf("Error starting command: %v", err)
 	}
-
 	err = cmd.Wait()
 	if err != nil {
 		log.Fatalf("Error waiting for command: %v", err)
@@ -672,6 +679,7 @@ func main() {
 	skipInitialRefresh := flag.Bool("skip", false, "Skip initial refresh")
 	noloadCache := flag.Bool("noload", false, "Do not load cached price data")
 	logdir := flag.String("log", "logs", "Directory for scrapers logs")
+
 	flag.Parse()
 
 	DevMode = *devMode
@@ -823,25 +831,25 @@ func main() {
 	http.HandleFunc("/favicon.ico", Favicon)
 	http.HandleFunc("/auth", Auth)
 
-		port := os.Getenv("PORT")
+	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // Default port if not specified
-		log.Printf("Defaulting to port %s", port)
+		port = "8080"
+		log.Println("$PORT not specified, defaulting to 8080")
 	}
-
 
 	srv := &http.Server{
 		Addr: ":" + port,
 	}
 
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("Listening on port %s", port)
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	<-done
 
