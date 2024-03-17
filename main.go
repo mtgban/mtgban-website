@@ -651,8 +651,8 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-func fetchMtgjson(_ context.Context) {
-	cmd := exec.Command("sh", "get-mtgjson.sh")
+func fetchMtgjson(ctx context.Context) {
+	cmd := exec.Command("get-mtgjson.sh")
 	cmd.Dir = "./"
 	err := cmd.Start()
 	if err != nil {
@@ -672,7 +672,6 @@ func main() {
 	skipInitialRefresh := flag.Bool("skip", false, "Skip initial refresh")
 	noloadCache := flag.Bool("noload", false, "Do not load cached price data")
 	logdir := flag.String("log", "logs", "Directory for scrapers logs")
-	port := flag.String("port", "", "Override server port")
 	flag.Parse()
 
 	DevMode = *devMode
@@ -695,10 +694,6 @@ func main() {
 	}
 	initCredentials(ctx, Config)
 	loadGoogleCredentials(Config.GoogleCredentials)
-
-	if *port != "" {
-		Config.Port = *port
-	}
 
 	if err := openDBs(); err != nil {
 		log.Printf("Failed to open database connection: %v", err)
@@ -828,15 +823,22 @@ func main() {
 	http.HandleFunc("/favicon.ico", Favicon)
 	http.HandleFunc("/auth", Auth)
 
+		port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // Default port if not specified
+		log.Printf("Defaulting to port %s", port)
+	}
+
+
 	srv := &http.Server{
-		Addr: ":" + Config.Port,
+		Addr: ":" + port,
 	}
 
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
-		err := srv.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()

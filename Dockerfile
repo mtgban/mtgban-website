@@ -1,46 +1,41 @@
-# First stage: build the Go binary
 FROM golang:1.19 AS build
-
-RUN go env -w GO111MODULE=auto
-
-RUN mkdir /src
 
 WORKDIR /src
 
 COPY go.mod go.sum ./
-
 RUN go mod download
 
-COPY . /src
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o /mtgbantu-website
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o /mtgbantu-website -v -x
+FROM alpine:3.19
 
-# Second stage: Run Go binary
-FROM alpine:3.19 AS build-release-stage
+# Updating APK and installing dependencies
+RUN apk update && apk add --no-cache ca-certificates jq curl bash
 
-RUN mkdir -p /app/bantu
 WORKDIR /app/bantu
 
-RUN apk update && apk add --no-cache sudo bash curl xz jq
+# Copying necessary files and directories from the build stage
+COPY --from=build /mtgbantu-website ./mtgbantu-website
+COPY templates ./templates
+COPY css ./css
+COPY js ./js
+COPY img ./img
 
-# Create and execute the script
-RUN echo $'#!/bin/sh\n\
-curl -O "https://mtgjson.com/api/v5/AllPrintings.json.xz"\n\
-xz -dc AllPrintings.json.xz | jq > /tmp/allprintings5.json.new\n\
-if [ $? -eq 0 ]; then\n\
-    mv /tmp/allprintings5.json.new ./allprintings5.json\n\
-fi\n\
-rm AllPrintings.json.xz\n' > get-mtgjson.sh && \ 
-chmod +x get-mtgjson.sh && \ 
-./get-mtgjson.sh
+# Creating and setting up scripts directory and entrypoint script
+RUN mkdir /scripts \
+    && echo '#!/bin/sh' > /scripts/get-mtgjson.sh \
+    && echo 'curl -O https://mtgjson.com/api/v5/AllPrintings.json.xz' >> /scripts/get-mtgjson.sh \
+    && chmod +x /scripts/get-mtgjson.sh
 
-COPY entrypoint.sh /app/bantu/
-RUN chmod +x /app/bantu/entrypoint.sh
+RUN echo '#!/bin/sh' > /entrypoint.sh \
+    && echo 'sh /scripts/get-mtgjson.sh' >> /entrypoint.sh \
+    && echo 'if [ -z "$PORT" ]; then PORT=8080; fi' >> /entrypoint.sh \
+    && echo 'exec ./mtgbantu-website' >> /entrypoint.sh \
+    && chmod +x /entrypoint.sh
 
-COPY --from=build /mtgbantu-website .
-COPY /templates ./templates
-COPY /css ./css
-COPY /js ./js
-COPY /img ./img
+# Setting PATH environment variable to include /scripts directory
+ENV PATH="/scripts:${PATH}"
 
-ENTRYPOINT ["/app/bantu/entrypoint.sh"]
+# Setting the entrypoint to the entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
