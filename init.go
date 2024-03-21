@@ -428,7 +428,7 @@ var DBs = map[string]int{
 	"mkm_trend":     5,
 	"starcitygames": 6,
 	"abugames":      7,
-	"tcglow_median": 8,
+	"tcglow_ev":     8,
 }
 
 var ScraperOptions = map[string]*scraperOption{
@@ -701,9 +701,9 @@ var ScraperOptions = map[string]*scraperOption{
 		Keepers:      sealedev.NewScraper("").MarketNames(),
 		StashMarkets: true,
 		RDBs: map[string]*redis.Client{
-			"TCG Low EV Median": redis.NewClient(&redis.Options{
+			"TCG Low EV": redis.NewClient(&redis.Options{
 				Addr: Config.RedisAddr,
-				DB:   DBs["tcglow_median"],
+				DB:   DBs["tcglow_ev"],
 			}),
 		},
 	},

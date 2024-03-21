@@ -508,8 +508,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		tmp := indexArray[:0]
 		mkmIndex := -1
 		tcgIndex := -1
-		tcgEVIndex := -1
-		tcgEVDirctIndex := -1
+		tcgSimIndex := -1
+		tcgSimDirectIndex := -1
 
 		// Iterate on array, always passthrough, except for specific entries
 		for i := range indexArray {
@@ -545,41 +545,41 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			case TCG_DIRECT_LOW:
 				// Skip this one for search results
 				continue
-			case "TCG Low EV Mean":
+			case "TCG Low Sim Mean":
 				// Save reference to the array
 				tmp = append(tmp, indexArray[i])
-				tcgEVIndex = len(tmp) - 1
-				tmp[tcgEVIndex].ScraperName = "TCG Low EV"
-			case "TCG Low EV Median":
+				tcgSimIndex = len(tmp) - 1
+				tmp[tcgSimIndex].ScraperName = "TCG Low Sim"
+			case "TCG Low Sim Median":
 				// If the reference is found, add a secondary price
 				// otherwise just leave it as is
-				if tcgEVIndex >= 0 {
+				if tcgSimIndex >= 0 {
 					// Skip if prices match
-					if indexArray[i].Price == tmp[tcgEVIndex].Price {
+					if indexArray[i].Price == tmp[tcgSimIndex].Price {
 						continue
 					}
-					tmp[tcgEVIndex].Secondary = indexArray[i].Price
-					tmp[tcgEVIndex].ScraperName = "TCG Low EV (Mean / Median)"
-					tmp[tcgEVIndex].IndexCombined = true
+					tmp[tcgSimIndex].Secondary = indexArray[i].Price
+					tmp[tcgSimIndex].ScraperName = "TCG Low Sim (Mean / Median)"
+					tmp[tcgSimIndex].IndexCombined = true
 				} else {
 					tmp = append(tmp, indexArray[i])
 				}
-			case "TCG Direct (net) EV Mean":
+			case "TCG Direct (net) Sim Mean":
 				// Save reference to the array
 				tmp = append(tmp, indexArray[i])
-				tcgEVDirctIndex = len(tmp) - 1
-				tmp[tcgEVDirctIndex].ScraperName = "Direct EV"
-			case "TCG Direct (net) EV Median":
+				tcgSimDirectIndex = len(tmp) - 1
+				tmp[tcgSimDirectIndex].ScraperName = "Direct Sim"
+			case "TCG Direct (net) Sim Median":
 				// If the reference is found, add a secondary price
 				// otherwise just leave it as is
-				if tcgEVDirctIndex >= 0 {
+				if tcgSimDirectIndex >= 0 {
 					// Skip if prices match
-					if indexArray[i].Price == tmp[tcgEVDirctIndex].Price {
+					if indexArray[i].Price == tmp[tcgSimDirectIndex].Price {
 						continue
 					}
-					tmp[tcgEVDirctIndex].Secondary = indexArray[i].Price
-					tmp[tcgEVDirctIndex].ScraperName = "Direct EV (Mean / Median)"
-					tmp[tcgEVDirctIndex].IndexCombined = true
+					tmp[tcgSimDirectIndex].Secondary = indexArray[i].Price
+					tmp[tcgSimDirectIndex].ScraperName = "Direct Sim (Mean / Median)"
+					tmp[tcgSimDirectIndex].IndexCombined = true
 				} else {
 					tmp = append(tmp, indexArray[i])
 				}

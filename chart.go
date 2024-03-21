@@ -92,9 +92,9 @@ var enabledDatasets = []scraperConfig{
 		Color:       "rgb(153, 102, 255)",
 	},
 	{
-		PublicName:  "Sealed EV Median",
+		PublicName:  "Sealed EV (TCG Low)",
 		ScraperName: "sealed_ev",
-		KindName:    "TCG Low EV Median",
+		KindName:    "TCG Low EV",
 		Color:       "rgb(201, 203, 207)",
 		HasSealed:   true,
 		OnlySealed:  true,
