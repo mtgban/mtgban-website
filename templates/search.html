@@ -2,21 +2,21 @@
 <html>
 <head>
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="../css/main.css">
+    <link rel="stylesheet" type="text/css" href="../css/main.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
     <title>{{.Title}}</title>
     {{if not .IsSealed}}
-        <script type="text/javascript" src="../js/autocomplete.js"></script>
-        <script type="text/javascript" src="../js/fetchnames.js"></script>
+        <script type="text/javascript" src="../js/autocomplete.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="../js/fetchnames.js?hash={{.Hash}}"></script>
     {{end}}
     {{if not (eq .ChartID "")}}
         <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.bundle.js"></script>
-        <script type="text/javascript" src="../js/chartopts.js"></script>
+        <script type="text/javascript" src="../js/chartopts.js?hash={{.Hash}}"></script>
     {{end}}
 </head>
 
 <body class="light-theme">
-<script type="text/javascript" src="../js/themechecker.js"></script>
+<script type="text/javascript" src="../js/themechecker.js?hash={{.Hash}}"></script>
 <nav>
     <ul>
         <li><a href="https://www.patreon.com/ban_community"><img src="img/misc/patreon.png" width=48></a></li>
@@ -34,7 +34,7 @@
                     <input type="checkbox"/>
                     <span class="slider"></span>
                 </div>
-                <script type="text/javascript" src="../js/nightmode.js"></script>
+                <script type="text/javascript" src="../js/nightmode.js?hash={{.Hash}}"></script>
             </label>
         </li>
     </ul>
@@ -47,7 +47,7 @@
             <img class="center" src="img/promo/search.jpg">
         {{end}}
     {{else if eq .Title "Options"}}
-        <script type="text/javascript" src="../js/cookies.js"></script>
+        <script type="text/javascript" src="../js/cookies.js?hash={{.Hash}}"></script>
         <br>
 
         <script type="text/javascript">
@@ -219,7 +219,7 @@
 
         {{if .IsSealed}}
             <img id="hoverImage" class="hoverImage" src=""/>
-            <script type="text/javascript" src="../js/followmouse.js"></script>
+            <script type="text/javascript" src="../js/followmouse.js?hash={{.Hash}}"></script>
         {{end}}
 
         <div class="indent sticky" style="top: 48px; background-color: var(--background); float:left">
@@ -454,7 +454,7 @@
             </div>
 
         {{else}}
-            <script type="text/javascript" src="../js/copy2clip.js"></script>
+            <script type="text/javascript" src="../js/copy2clip.js?hash={{.Hash}}"></script>
 
             <script type="text/javascript">
                 function updateSidebar(src, printings, products) {

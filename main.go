@@ -41,6 +41,7 @@ type PageVars struct {
 	PatreonURL   string
 	PatreonLogin bool
 	ShowPromo    bool
+	Hash         string
 
 	Title          string
 	ErrorMessage   string
@@ -432,6 +433,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		PatreonId:    PatreonClientId,
 		PatreonURL:   PatreonHost,
 		PatreonLogin: showPatreonLogin,
+		Hash:         BuildCommit,
 	}
 
 	// Allocate a new navigation bar
