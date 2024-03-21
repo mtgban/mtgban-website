@@ -350,11 +350,12 @@
              </div>
         {{else if and (eq .SearchQuery "") (.IsSealed)}}
             <p style="max-width: 70%">
+                Make sure to read the <a class="btn normal" href="#faq">F.A.Q.</a>
+                <br>
                 Jump to
                 {{range $key := .EditionSort}}
                     <a class="btn normal" href="#{{.}}">{{.}}</a>
                 {{end}}
-                <a class="btn normal" href="#faq">F.A.Q.</a>
             </p>
 
             {{range $key := .EditionSort}}
