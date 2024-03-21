@@ -791,8 +791,15 @@
                                     {{end}}
                                     {{range $conditions := $.CondKeys}}
                                         {{$entries := (index $condsEntry $conditions)}}
-                                        {{if ne $conditions "INDEX"}}
-                                            {{if $entries}}
+                                        {{if $entries}}
+                                            {{if and (eq $conditions "INDEX") $.IsSealed}}
+                                                <tr onmocuseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
+                                                    <td></td>
+                                                    <th style="min-width: 60px; text-align: center;">EV</td>
+                                                    <th style="min-width: 60px; text-align: center;">Sim (mean)</td>
+                                                    <th style="min-width: 60px; text-align: center;">Sim (median)</td>
+                                                </tr>
+                                            {{else if not (eq $conditions "INDEX")}}
                                                 <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
                                                     <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Available offers{{else}}Conditions: {{$conditions}}{{end}}</i></td>
                                                 </tr>
@@ -800,7 +807,7 @@
                                         {{end}}
                                         {{range $entries}}
                                             <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
-                                                <td>
+                                                <td {{if $.IsSealed}}style="min-width: 140px;"{{end}}>
                                                     {{if eq .URL ""}}
                                                         <a class="btn default">
                                                     {{else}}
@@ -812,26 +819,42 @@
                                                         {{end}}
                                                     </a>
                                                 </td>
-                                                <td style="text-align: center; vertical-align: middle;">
-                                                    $ {{printf "%.2f" .Price}}
-                                                </td>
-                                                {{if .IndexCombined}}
+                                                {{if and (eq $conditions "INDEX") $.IsSealed}}
                                                     <td style="text-align: center; vertical-align: middle;">
-                                                        /
+                                                        $ {{printf "%.2f" .Price}}
                                                     </td>
                                                     <td style="text-align: center; vertical-align: middle;">
                                                         $ {{printf "%.2f" .Secondary}}
                                                     </td>
-                                                {{else}}
-                                                    <td>
-                                                    </td>
                                                     <td style="text-align: center; vertical-align: middle;">
-                                                        {{if .BundleIcon}}
-                                                            <img style="padding-top:4px;" src="{{.BundleIcon}}">
-                                                        {{else if not .NoQuantity}}
-                                                            {{.Quantity}}
-                                                        {{end}}
+                                                        $ {{printf "%.2f" .Tertiary}}
                                                     </td>
+                                                {{else}}
+                                                                                                        {{if $.IsSealed}}
+                                                            <td></td>
+                                                        {{end}}
+                                                    <td style="text-align: center; vertical-align: middle;">
+                                                        $ {{printf "%.2f" .Price}}
+                                                    </td>
+                                                    {{if .IndexCombined}}
+                                                        <td style="text-align: center; vertical-align: middle;">
+                                                            /
+                                                        </td>
+                                                        <td style="text-align: center; vertical-align: middle;">
+                                                            $ {{printf "%.2f" .Secondary}}
+                                                        </td>
+                                                    {{else}}
+                                                        {{if not $.IsSealed}}
+                                                            <td></td>
+                                                        {{end}}
+                                                        <td style="text-align: center; vertical-align: middle;">
+                                                            {{if .BundleIcon}}
+                                                                <img style="padding-top:4px;" src="{{.BundleIcon}}">
+                                                            {{else if not .NoQuantity}}
+                                                                {{.Quantity}}
+                                                            {{end}}
+                                                        </td>
+                                                    {{end}}
                                                 {{end}}
                                             </tr>
                                         {{end}}

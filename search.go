@@ -47,6 +47,9 @@ type SearchEntry struct {
 
 	IndexCombined bool
 	Secondary     float64
+
+	// Cannot use slices or pointers to remain compatible with Comparable
+	Tertiary float64
 }
 
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
@@ -508,11 +511,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		tmp := indexArray[:0]
 		mkmIndex := -1
 		tcgIndex := -1
-		tcgSimIndex := -1
-		tcgSimDirectIndex := -1
+		tcgEVLowIndex := -1
+		tcgEVDirectIndex := -1
 
 		// Iterate on array, always passthrough, except for specific entries
 		for i := range indexArray {
+			// Set index for sealed reuse
+			evIndex := 0
+			if strings.Contains(indexArray[i].ScraperName, "Mean") {
+				evIndex = 1
+			} else if strings.Contains(indexArray[i].ScraperName, "Median") {
+				evIndex = 2
+			}
+
 			switch indexArray[i].ScraperName {
 			case MKM_LOW:
 				// Save reference to the array
@@ -545,43 +556,37 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			case TCG_DIRECT_LOW:
 				// Skip this one for search results
 				continue
-			case "TCG Low Sim Mean":
-				// Save reference to the array
-				tmp = append(tmp, indexArray[i])
-				tcgSimIndex = len(tmp) - 1
-				tmp[tcgSimIndex].ScraperName = "TCG Low Sim"
-			case "TCG Low Sim Median":
-				// If the reference is found, add a secondary price
-				// otherwise just leave it as is
-				if tcgSimIndex >= 0 {
-					// Skip if prices match
-					if indexArray[i].Price == tmp[tcgSimIndex].Price {
-						continue
-					}
-					tmp[tcgSimIndex].Secondary = indexArray[i].Price
-					tmp[tcgSimIndex].ScraperName = "TCG Low Sim (Mean / Median)"
-					tmp[tcgSimIndex].IndexCombined = true
-				} else {
+			case "TCG Low EV",
+				"TCG Low Sim Mean",
+				"TCG Low Sim Median":
+				if tcgEVLowIndex < 0 {
 					tmp = append(tmp, indexArray[i])
+					tcgEVLowIndex = len(tmp) - 1
+					tmp[tcgEVLowIndex].ScraperName = "TCG Low"
 				}
-			case "TCG Direct (net) Sim Mean":
-				// Save reference to the array
-				tmp = append(tmp, indexArray[i])
-				tcgSimDirectIndex = len(tmp) - 1
-				tmp[tcgSimDirectIndex].ScraperName = "Direct Sim"
-			case "TCG Direct (net) Sim Median":
-				// If the reference is found, add a secondary price
-				// otherwise just leave it as is
-				if tcgSimDirectIndex >= 0 {
-					// Skip if prices match
-					if indexArray[i].Price == tmp[tcgSimDirectIndex].Price {
-						continue
-					}
-					tmp[tcgSimDirectIndex].Secondary = indexArray[i].Price
-					tmp[tcgSimDirectIndex].ScraperName = "Direct Sim (Mean / Median)"
-					tmp[tcgSimDirectIndex].IndexCombined = true
-				} else {
+				switch evIndex {
+				case 0:
+					tmp[tcgEVLowIndex].Price = indexArray[i].Price
+				case 1:
+					tmp[tcgEVLowIndex].Secondary = indexArray[i].Price
+				case 2:
+					tmp[tcgEVLowIndex].Tertiary = indexArray[i].Price
+				}
+			case "TCG Direct (net) EV",
+				"TCG Direct (net) Sim Mean",
+				"TCG Direct (net) Sim Median":
+				if tcgEVDirectIndex < 0 {
 					tmp = append(tmp, indexArray[i])
+					tcgEVDirectIndex = len(tmp) - 1
+					tmp[tcgEVDirectIndex].ScraperName = "Direct (net)"
+				}
+				switch evIndex {
+				case 0:
+					tmp[tcgEVDirectIndex].Price = indexArray[i].Price
+				case 1:
+					tmp[tcgEVDirectIndex].Secondary = indexArray[i].Price
+				case 2:
+					tmp[tcgEVDirectIndex].Tertiary = indexArray[i].Price
 				}
 			default:
 				tmp = append(tmp, indexArray[i])
