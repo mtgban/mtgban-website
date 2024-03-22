@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -340,72 +341,84 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 	if err != nil {
 		return err
 	}
+
 	direct, _ := GetInventoryForSeller(TCG_DIRECT_LOW)
 	low, _ := GetInventoryForSeller(TCG_LOW)
 
-	err = w.Write(tcgcsvHeader)
-	if err != nil {
+	if err = w.Write(tcgcsvHeader); err != nil {
 		return err
 	}
-	for _, id := range ids {
-		price := 0.0
-		lowPrice := 0.0
-		directPrice := 0.0
 
+	type aggRecord struct {
+		SKU         string
+		Edition     string
+		Name        string
+		Number      string
+		Rarity      string
+		Condition   string
+		Price       float64
+		DirectPrice float64
+		LowPrice    float64
+		Qty         int
+	}
+
+	aggRecords := make(map[string]*aggRecord)
+
+	for _, id := range ids {
 		invEntries, found := inventory[id]
 		if !found {
 			continue
 		}
-		price = invEntries[0].Price
-		directEntries, found := direct[id]
-		if found {
-			directPrice = directEntries[0].Price
+
+		price, directPrice, lowPrice := 0.0, 0.0, 0.0
+		for _, entry := range invEntries {
+			tcgSkuId := entry.InstanceId
+			rec, exists := aggRecords[tcgSkuId]
+			if !exists {
+				co, err := mtgmatcher.GetUUID(id)
+				if err != nil {
+					continue
+				}
+				if directEntries, ok := direct[id]; ok {
+					directPrice = directEntries[0].Price
+				}
+				if lowEntries, ok := low[id]; ok {
+					lowPrice = lowEntries[0].Price
+				}
+				condition := "Near Mint"
+				if co.Foil {
+					condition += " Foil"
+				}
+
+				aggRecords[tcgSkuId] = &aggRecord{
+					SKU:         tcgSkuId,
+					Edition:     co.Edition,
+					Name:        co.Name,
+					Number:      co.Number,
+					Rarity:      strings.ToUpper(co.Rarity[:1]),
+					Condition:   condition,
+					Price:       price,
+					DirectPrice: directPrice,
+					LowPrice:    lowPrice,
+					Qty:         entry.Quantity,
+				}
+			} else {
+				rec.Qty += entry.Quantity
+			}
 		}
-		lowEntries, found := low[id]
-		if found {
-			lowPrice = lowEntries[0].Price
+	}
+
+	for _, rec := range aggRecords {
+		record := []string{
+			rec.SKU, "", rec.Edition, rec.Name, "", rec.Number,
+			rec.Rarity, rec.Condition, fmt.Sprintf("%0.2f", rec.Price),
+			fmt.Sprintf("%0.2f", rec.DirectPrice), "", fmt.Sprintf("%0.2f", rec.LowPrice),
+			"", strconv.Itoa(rec.Qty), "", "",
 		}
-
-		co, err := mtgmatcher.GetUUID(id)
-		if err != nil {
-			continue
-		}
-
-		tcgSkuId, found := invEntries[0].CustomFields["TCGSKUID"]
-		if !found {
-			continue
-		}
-
-		cond := "Near Mint"
-		if co.Foil {
-			cond = "Near Mint Foil"
-		}
-
-		record := make([]string, 0, len(tcgcsvHeader))
-
-		record = append(record, tcgSkuId)
-		record = append(record, "")
-		record = append(record, co.Edition)
-		record = append(record, co.Name)
-		record = append(record, "")
-		record = append(record, co.Number)
-		record = append(record, strings.ToUpper(co.Rarity[:1]))
-		record = append(record, cond)
-		record = append(record, fmt.Sprintf("%0.2f", price))
-		record = append(record, fmt.Sprintf("%0.2f", directPrice))
-		record = append(record, "")
-		record = append(record, fmt.Sprintf("%0.2f", lowPrice))
-		record = append(record, "")
-		record = append(record, "1")
-		record = append(record, "")
-		record = append(record, "")
-
-		err = w.Write(record)
-		if err != nil {
+		if err := w.Write(record); err != nil {
 			return err
 		}
-
 		w.Flush()
 	}
-	return nil
+	return w.Error()
 }
