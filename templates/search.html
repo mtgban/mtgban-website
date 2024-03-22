@@ -17,6 +17,7 @@
 
 <body class="light-theme">
 <script type="text/javascript" src="../js/themechecker.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="../js/filtering.js?hash={{.Hash}}"></script>
 <nav>
     <ul>
         <li><a href="https://www.patreon.com/ban_community"><img src="img/misc/patreon.png" width=48></a></li>
@@ -356,6 +357,8 @@
                 {{range $key := .EditionSort}}
                     <a class="btn normal" href="#{{.}}">{{.}}</a>
                 {{end}}
+                <br>
+                Filter by <input type="text" style="margin-left: 8px;" id="filterInput" onkeyup="filterPageContent()" placeholder="Edition...">
             </p>
 
             {{range $key := .EditionSort}}

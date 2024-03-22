@@ -41,3 +41,22 @@ function filterEditionsTable() {
         }
     }
 };
+
+function filterPageContent() {
+    var input, filter, nobrs, a, i, txtValue;
+    input = document.getElementById("filterInput");
+    filter = input.value.toUpperCase();
+    nobrs = document.getElementsByTagName("nobr");
+
+    for (i = 0; i < nobrs.length; i++) {
+        a = nobrs[i].getElementsByTagName("a")[0];
+        if (a) {
+            txtValue = a.textContent || a.innerText;
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+                nobrs[i].style.display = "";
+            } else {
+                nobrs[i].style.display = "none";
+            }
+        }
+    }
+};
