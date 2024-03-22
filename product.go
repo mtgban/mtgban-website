@@ -64,22 +64,13 @@ var categoryOverrides = map[string]string{
 }
 
 var editionRenames = map[string]string{
-	"Duel Decks Anthology: Elves vs. Goblins": "Duel Decks Anthology",
-	"Media Inserts":                        "San Diego Comic-Con",
-	"Modern Horizons 1 Timeshifts":         "Modern Horizons",
-	"Mystery Booster Playtest Cards 2019":  "Mystery Booster Convention Edition 2019",
-	"Mystery Booster Playtest Cards 2021":  "Mystery Booster Convention Edition 2021",
-	"Mystery Booster Retail Edition Foils": "Mystery Booster Retail Edition",
-	"World Championship Decks 1997":        "World Championship Decks",
-	"Judge Gift Cards 2014":                "Judge Gift Cards",
+	"Judge Gift Cards 2014": "Judge Gift Cards",
 }
 
 var sealedEditionSkips = map[string]string{
-	"Chronicles Japanese":    "",
-	"Legends Italian":        "",
-	"The Dark Italian":       "",
-	"Rivals Quick Start Set": "",
-	"Modern Horizons":        "",
+	"Chronicles Japanese": "",
+	"Legends Italian":     "",
+	"The Dark Italian":    "",
 }
 
 func makeEditionEntry(set *mtgjson.Set, names ...string) EditionEntry {
@@ -96,7 +87,7 @@ func makeEditionEntry(set *mtgjson.Set, names ...string) EditionEntry {
 	case "H1R",
 		"SCD":
 		special = true
-	case "PLIST",
+	case "PLST",
 		"CLB",
 		"CMR",
 		"TSR",
