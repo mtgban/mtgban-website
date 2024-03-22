@@ -825,8 +825,8 @@
                                                 <tr onmocuseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
                                                     <td></td>
                                                     <th style="min-width: 60px; text-align: center;">EV</td>
-                                                    <th style="min-width: 60px; text-align: center;">Sim (mean)</td>
-                                                    <th style="min-width: 60px; text-align: center;">Sim (median)</td>
+                                                    <th style="min-width: 60px; text-align: center;">Sim (Median)</td>
+                                                    <th style="min-width: 60px; text-align: center;">Sim (StdDev)</td>
                                                 </tr>
                                             {{else if not (eq $conditions "INDEX")}}
                                                 <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
@@ -856,7 +856,11 @@
                                                         $ {{printf "%.2f" .Secondary}}
                                                     </td>
                                                     <td style="text-align: center; vertical-align: middle;">
-                                                        $ {{printf "%.2f" .Tertiary}}
+                                                        {{if .Tertiary}}
+                                                            $ {{printf "%.2f" .Tertiary}}
+                                                        {{else}}
+                                                            n/a
+                                                        {{end}}
                                                     </td>
                                                 {{else}}
                                                                                                         {{if $.IsSealed}}

@@ -540,9 +540,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		for i := range indexArray {
 			// Set index for sealed reuse
 			evIndex := 0
-			if strings.Contains(indexArray[i].ScraperName, "Mean") {
+			if strings.Contains(indexArray[i].ScraperName, "Median") {
 				evIndex = 1
-			} else if strings.Contains(indexArray[i].ScraperName, "Median") {
+			} else if strings.Contains(indexArray[i].ScraperName, "StdDev") {
 				evIndex = 2
 			}
 
@@ -579,7 +579,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				// Skip this one for search results
 				continue
 			case "TCG Low EV",
-				"TCG Low Sim Mean",
+				"TCG Low Sim StdDev",
 				"TCG Low Sim Median":
 				if tcgEVLowIndex < 0 {
 					tmp = append(tmp, indexArray[i])
@@ -595,7 +595,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					tmp[tcgEVLowIndex].Tertiary = indexArray[i].Price
 				}
 			case "TCG Direct (net) EV",
-				"TCG Direct (net) Sim Mean",
+				"TCG Direct (net) Sim StdDev",
 				"TCG Direct (net) Sim Median":
 				if tcgEVDirectIndex < 0 {
 					tmp = append(tmp, indexArray[i])
