@@ -448,11 +448,12 @@
                         </ul>
                     </li>
                     <li>
-                        <h4>What are the custom buttons next to product titles for (🎁 and 🔍)?</h4>
+                        <h4>What are the custom buttons next to product titles for?</h4>
                         <ul class="indent">
                             These two buttons lead to different search options:<br>
                             * the 🎁 (when available) will similuate opening a pack using the information available. Every run is fully randomized and unpredictable;<br>
                             * the 🔍 will unpack a product and list all its possible contents. This means that a booster box will only list a single booster pack, while a booster pack will display all possible picks.<br>
+                            * the <img width=14 src=img/misc/decklist.png> (when available) will let you download a CSV of the decklist, TCGplayer-formatted, ready for uplaod.<br>
                             In both cases, once in the search page, you can add search terms normally to filter for color, rarities, and names using the common search syntax.<br>
                             Note that depending on the content type, the search result might show you at most one copy per card or list the same card multiple times: this to show accurate and easy to import results for decklists and box sets, while displaying compact results for other sealed types.<br>
                         </ul>
@@ -746,6 +747,12 @@
                                             {{if $card.Booster}}
                                                 <td rowspan=2>
                                                     <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">🎁</span></a>
+                                                </td>
+                                            {{else}}
+                                                <td rowspan=2>
+                                                    <a href='/search?downloadCSV=decklist&q=decklist:"{{$card.Name}}"' title="Download a TCGplayer-formatted decklist">
+                                                        <img width=28 src="img/misc/decklist.png">
+                                                    </a>
                                                 </td>
                                             {{end}}
                                             <td rowspan=2>

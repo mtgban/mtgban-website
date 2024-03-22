@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -297,6 +298,109 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		}
 
 		err = w.Write([]string{name, edition, language, finish, quantity})
+		if err != nil {
+			return err
+		}
+
+		w.Flush()
+	}
+	return nil
+}
+
+var tcgcsvHeader = []string{
+	"TCGplayer Id",
+	"Product Line",
+	"Set Name",
+	"Product Name",
+	"Title",
+	"Number",
+	"Rarity",
+	"Condition",
+	"TCG Market Price",
+	"TCG Direct Low",
+	"TCG Low Price With Shipping",
+	"TCG Low Price",
+	"Total Quantity",
+	"Add to Quantity",
+	"TCG Marketplace Price",
+	"Photo URL",
+}
+
+func GetInventoryForSeller(sellerName string) (mtgban.InventoryRecord, error) {
+	for _, seller := range Sellers {
+		if seller != nil && seller.Info().Shorthand == sellerName {
+			return seller.Inventory()
+		}
+	}
+	return nil, errors.New("scraper not found")
+}
+
+func UUID2TCGCSV(w *csv.Writer, ids []string) error {
+	inventory, err := GetInventoryForSeller(TCG_MAIN)
+	if err != nil {
+		return err
+	}
+	direct, _ := GetInventoryForSeller(TCG_DIRECT_LOW)
+	low, _ := GetInventoryForSeller(TCG_LOW)
+
+	err = w.Write(tcgcsvHeader)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		price := 0.0
+		lowPrice := 0.0
+		directPrice := 0.0
+
+		invEntries, found := inventory[id]
+		if !found {
+			continue
+		}
+		price = invEntries[0].Price
+		directEntries, found := direct[id]
+		if found {
+			directPrice = directEntries[0].Price
+		}
+		lowEntries, found := low[id]
+		if found {
+			lowPrice = lowEntries[0].Price
+		}
+
+		co, err := mtgmatcher.GetUUID(id)
+		if err != nil {
+			continue
+		}
+
+		tcgSkuId, found := invEntries[0].CustomFields["TCGSKUID"]
+		if !found {
+			continue
+		}
+
+		cond := "Near Mint"
+		if co.Foil {
+			cond = "Near Mint Foil"
+		}
+
+		record := make([]string, 0, len(tcgcsvHeader))
+
+		record = append(record, tcgSkuId)
+		record = append(record, "")
+		record = append(record, co.Edition)
+		record = append(record, co.Name)
+		record = append(record, "")
+		record = append(record, co.Number)
+		record = append(record, strings.ToUpper(co.Rarity[:1]))
+		record = append(record, cond)
+		record = append(record, fmt.Sprintf("%0.2f", price))
+		record = append(record, fmt.Sprintf("%0.2f", directPrice))
+		record = append(record, "")
+		record = append(record, fmt.Sprintf("%0.2f", lowPrice))
+		record = append(record, "")
+		record = append(record, "1")
+		record = append(record, "")
+		record = append(record, "")
+
+		err = w.Write(record)
 		if err != nil {
 			return err
 		}

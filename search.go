@@ -260,7 +260,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Hijack for csv download
 	downloadCSV := r.FormValue("downloadCSV")
-	if canDownloadCSV && downloadCSV != "" {
+	if canDownloadCSV && (downloadCSV == "retail" || downloadCSV == "buylist") {
 		// Perform the search
 		selectedUUIDs, err := searchAndFilter(config)
 		if err != nil {
@@ -309,6 +309,28 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		csvWriter := csv.NewWriter(w)
 
 		err = BanPrice2CSV(csvWriter, results, true, true, true)
+		if err != nil {
+			w.Header().Del("Content-Type")
+			UserNotify("search", err.Error())
+			pageVars.InfoMessage = "Unable to download CSV right now"
+			render(w, "search.html", pageVars)
+		}
+		return
+	} else if downloadCSV == "decklist" {
+		// Perform the search
+		selectedUUIDs, err := searchAndFilter(config)
+		if err != nil {
+			UserNotify("search", err.Error())
+			pageVars.InfoMessage = "Unable to download CSV right now"
+			render(w, "search.html", pageVars)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"decklist.csv\"")
+		csvWriter := csv.NewWriter(w)
+
+		err = UUID2TCGCSV(csvWriter, selectedUUIDs)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			UserNotify("search", err.Error())
