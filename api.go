@@ -16,6 +16,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
+	"golang.org/x/exp/maps"
 )
 
 type meta struct {
@@ -347,7 +348,14 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Track total quantity, and skip repeats
+	qty := map[string]int{}
 	for _, id := range ids {
+		qty[id]++
+	}
+
+	for _, id := range maps.Keys(qty) {
 		price := 0.0
 		lowPrice := 0.0
 		directPrice := 0.0
@@ -396,7 +404,7 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 		record = append(record, "")
 		record = append(record, fmt.Sprintf("%0.2f", lowPrice))
 		record = append(record, "")
-		record = append(record, "1")
+		record = append(record, fmt.Sprint(qty[id]))
 		record = append(record, "")
 		record = append(record, "")
 
