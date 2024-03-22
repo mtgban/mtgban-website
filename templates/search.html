@@ -385,9 +385,28 @@
                 <br>
                 <ul class="indent">
                     <li>
+                        <h4>Understanding EV and SIM at BAN</h4>
+                        <ul class="indent">
+                            At BAN, we aim to empower our users with data-driven insight into the potential value of their sealed MTG products through two distinct but complementary methods: Expected Value (EV) and Simulated Box Openings (SIM).<br>
+                            For any product with a static decklist, the card values are just summed up and provided as is, and there is no difference between the two methods, while for product with randomness associated with it (ie. booster packs and certain decks) there can be profound differences between predicted value and typical openings, especially at low sample sizes. Thus, we take both approaches to help the user decide the spread and likely value of opening moderate to large amount of product vs. selling it outright.
+                        </ul>
+                    </li>
+                    <li>
                         <h4>How is EV calculated?</h4>
                         <ul class="indent">
-                            For any product with a static decklist, the card values a just summed up and provided as is. For boosters and booster boxes, we generate as many boosters as needed to represent the product (typically 36 boosters for a draft booster box), for 5000 times to even out any possible variance, and then run the mean and median of the results. Note that every product is individually run, so a booster box won't exactly be 36 times the price of a booster pack. Also note that even if the content search (explained below) only list one card, the presented EVs definitely take into account the possibility of opening multiple copies of the same card.
+                            EV calculates a product's average value by analyzing the distribution of cards on print sheets, using each card's drop rate and market value. This approach offers a theoretical perspective on what a product might be worth, providing a foundational understanding of its potential value. In other words the final value of the box is linearly dependent on the drop rate (or probability) for each card to appear in any given booster slot.
+                        </ul>
+                    </li>
+                    <li>
+                        <h4>How is SIM calculated?</h4>
+                        <ul class="indent">
+                            SIM, in contrast, brings the experience of opening booster packs and boxes closer to reality. By conducting thousands of simulated openings, we derive mean and median values to forecast what one might realistically expect. This method acknowledges the variance inherent in opening sealed products, thus offering a more practical viewpoint on potential outcomes.<br></br>
+                        </ul>
+                    </li>
+                    <li>
+                        <h4>Which is the one I should follow?</h4>
+                        <ul class="indent">
+                            Our objective at BAN is to furnish our members with detailed and actionable insights into their collectibles. By merging the theoretical calculations of EV with the practical applications of SIM, we ensure a comprehensive analysis that supports informed decision-making. As always the "best" method is wildly dependant on individual business and use case.
                         </ul>
                     </li>
                     <li>
@@ -419,7 +438,7 @@
                     <li>
                         <h4>What's up with these odd prices for this just released set?</h4>
                         <ul class="indent">
-                           Our EV prices reflect the price of the actual printing of the card, they do not reflect the value of the card before the reprint. As such it takes a few days for all the listings to be filled in and for prices to propagate to the calculator -- in particular, in case of Direct prices might look a bit off until the whole TCG Direct inventory appears, and in the meantime we'll do our best estimates using the market price. Also keep in mind that in the early days, the expected values will reflect preorder prices, which are almost always higher than normal.
+                           Our prices reflect the price of the actual printing of the card, they do not reflect the value of the card before the reprint. As such it takes a few days for all the listings to be filled in and for prices to propagate to the calculator -- in particular, in case of Direct prices might look a bit off until the whole TCG Direct inventory appears, and in the meantime we'll do our best estimates using the market price. Also keep in mind that in the early days, the expected values will reflect preorder prices, which are almost always higher than normal.
                         </ul>
                     </li>
                     <li>
@@ -436,19 +455,18 @@
                             * the 🔍 will unpack a product and list all its possible contents. This means that a booster box will only list a single booster pack, while a booster pack will display all possible picks.<br>
                             In both cases, once in the search page, you can add search terms normally to filter for color, rarities, and names using the common search syntax.<br>
                             Note that depending on the content type, the search result might show you at most one copy per card or list the same card multiple times: this to show accurate and easy to import results for decklists and box sets, while displaying compact results for other sealed types.<br>
-                            Note that, as mentioned above, the list you visualize is different than the list used to compute the actual EV, in which (potential) multiple copies of the same card are taken into account.
+                        </ul>
+                    </li>
+                    <li>
+                        <h4>This product has multiple copies of the same card, but I see only one, what gives?</h4>
+                        <ul class="indent">
+                            In order to avoid polluting the results with multiple instances of the same information, duplicated copies of the same cards are hidden in the search results. Even though the search only lists one card, the presented EV and SIM calcs do take into account the possibility of opening multiple copies of the same card.
                         </ul>
                     </li>
                     <li>
                         <h4>Is there a minimum or maxumum value for a card to be considered?</h4>
                         <ul class="indent">
-                           Yes. Initially we considered every single price found and added it up, but we found out that counting up "worthless cards" and "extremely expensive cards" skew the results even on repeated runs. So we're now excluding all bulk (sub $0.30) and all serialized cards, since the odds of opening are low, but impact the EV result too optimistically. The multiple runs should take care of the variance for EV computation for all other cards.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>Do you consider The List cards, boxtoppers, variations etc when computing a box EV?</h4>
-                        <ul class="indent">
-                           Yes (with the exclusion of outliers as mentioned above).
+                           Yes. Initially we considered every single price found and added it up, but we found out that counting up "worthless cards" and "extremely expensive cards" skew the results even on repeated runs. So we're now excluding all bulk (sub $0.30) and all serialized cards, since the odds of opening are low, but impact the result too optimistically. This is true for both EV and SIM, and in the latter case the multiple runs should take care of the variance for computation for all other cards.
                         </ul>
                     </li>
                 </ul>
