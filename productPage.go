@@ -18,7 +18,7 @@ func ProductPage(w http.ResponseWriter, r *http.Request) {
 	case "UserNotFound", "TierNotFound":
 		message = ErrMsg
 	case "logout":
-		domain := "mtgban.com"
+		domain := Config.CloudRunHost
 		if strings.Contains(getBaseURL(r), "localhost") {
 			domain = "localhost"
 		}

@@ -323,7 +323,9 @@ var Config AppConfig
 type AppConfig struct {
 	Port                   string            `json:"port"`
 	DBAddress              string            `json:"db_address"`
-	RedisAddr              string            `json:"redis_addr"`
+	CloudRunHost           string            `json:"cloudrun_host"`
+	RedisHost              string            `json:"redis_host"`
+	RedisPort              string            `json:"redis_port"`
 	ProjectId              string            `json:"projectId"`
 	DiscordHook            string            `json:"discord_hook"`
 	DiscordNotifHook       string            `json:"discord_notif_hook"`
@@ -492,12 +494,13 @@ func applyDefaults(config *AppConfig) {
 func createBigQueryClient(ctx context.Context, projectId string, creds []byte) (*bigquery.Client, error) {
 	credentials, err := google.CredentialsFromJSON(ctx, creds, bigquery.Scope)
 	if err != nil {
+		log.Println("Error creating BigQuery client:", err)
 		return nil, fmt.Errorf("failed to create credentials from JSON: %v", err)
 	}
 	return bigquery.NewClient(ctx, projectId, option.WithCredentials(credentials))
 }
 
-func createStorageClient(ctx context.Context, projectId string, creds []byte) (*storage.Client, error) {
+func createStorageClient(ctx context.Context, creds []byte) (*storage.Client, error) {
 	credentials, err := google.CredentialsFromJSON(ctx, creds, storage.ScopeFullControl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create credentials from JSON: %v", err)
@@ -523,7 +526,7 @@ func initCredentials(ctx context.Context, config AppConfig) {
 		}
 		switch serviceAccount {
 		case "GCSBucket":
-			GCSBucketClient, err = createStorageClient(ctx, Config.ProjectId, credentials.JSON)
+			GCSBucketClient, err = createStorageClient(ctx, credentials.JSON)
 			if GCSBucketClient == nil {
 				log.Fatalf("Failed to create GCS client: %v", err)
 			}
@@ -652,7 +655,7 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-func fetchMtgjson(ctx context.Context) {
+func fetchMtgjson(_ context.Context) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatalf("Error getting current working directory: %v", err)

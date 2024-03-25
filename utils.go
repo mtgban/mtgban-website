@@ -473,8 +473,6 @@ func notify(kind, message, hook string) {
 	resp.Body.Close()
 }
 
-// Read the query parameter, if present set a cookie that will be
-// used as default preference, otherwise retrieve the said cookie
 func readSetFlag(w http.ResponseWriter, r *http.Request, queryParam, cookieName string) bool {
 	val := r.FormValue(queryParam)
 	flag, err := strconv.ParseBool(val)
@@ -498,7 +496,7 @@ func readCookie(r *http.Request, cookieName string) string {
 
 // Set a cookie in the response with no expiration at the default root
 func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
-	domain := "mtgban.com"
+	domain := Config.CloudRunHost
 	if strings.Contains(getBaseURL(r), "localhost") {
 		domain = "localhost"
 	}

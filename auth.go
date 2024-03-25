@@ -25,7 +25,7 @@ import (
 var PatreonHost string
 
 const (
-	DefaultHost              = "www.mtgban.com"
+	DefaultHost              = "mtgban.org"
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 	FreeSignatureDuration    = 10 * 365 * 24 * time.Hour
 )
@@ -48,7 +48,7 @@ const (
 	ErrMsgUseAPI  = "Slow down, you're making too many requests! For heavy data use consider the BAN API"
 )
 
-func getUserToken(code, baseURL, ref string) (string, error) {
+func getUserToken(code, baseURL, _ string) (string, error) {
 	clientId := PatreonClientId
 	secret := Config.Patreon.Secret["ban"]
 
@@ -219,19 +219,16 @@ func getBaseURL(r *http.Request) string {
 	host := r.Host
 	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
 		if Config.FreeEnable {
-			host = Config.FreeHostname
+			host = Config.CloudRunHost
 		} else {
 			host = DefaultHost
 		}
 	}
 	baseURL := ""
-	if strings.Contains(host, "http") {
+	if strings.Contains(host,  "https") {
 		baseURL = host
 	} else {
-		baseURL = "http://" + host
-	}
-	if r.TLS != nil {
-		baseURL = strings.Replace(baseURL, "http", "https", 1)
+		baseURL = "https://" + host
 	}
 	return baseURL
 }
@@ -357,7 +354,7 @@ func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 
 	year, month, _ := time.Now().Date()
 	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
-	domain := "mtgban.com"
+	domain := "mtgban.org"
 	if strings.Contains(baseURL, "localhost") {
 		domain = "localhost"
 	}

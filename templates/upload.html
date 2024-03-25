@@ -536,7 +536,7 @@
                                     {{end}}
 
                                     <nobr>
-                                        <a class="btn normal" {{if $price}}href="https://mtgban.com/go/{{.}}/{{$cardId}}"{{end}} target="_blank">
+                                        <a class="btn normal" {{if $price}}href="https://mtgbantu-k5mdrgjrhq-uc.a.run.app/go/{{.}}/{{$cardId}}"{{end}} target="_blank">
                                             {{$indexName}}:
                                         </a>
                                         {{if not $price}}
@@ -563,7 +563,7 @@
                                         {{range $.ScraperKeys}}
                                             {{$price := (index $scraperEntries .)}}
                                             <td class="fullAnchor" style="border:1px solid black;min-width:50px">
-                                                <a class="btn {{if $price}}{{if and $.IsBuylist (and (ne $oPrice 0.0) (lt $oPrice $price))}}success{{else}}normal{{end}}{{else}}default{{end}}" {{if $price}}href="https://mtgban.com/go/{{if $.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}"{{end}} target="_blank">
+                                                <a class="btn {{if $price}}{{if and $.IsBuylist (and (ne $oPrice 0.0) (lt $oPrice $price))}}success{{else}}normal{{end}}{{else}}default{{end}}" {{if $price}}href="https://mtgbantu-k5mdrgjrhq-uc.a.run.app/go/{{if $.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}"{{end}} target="_blank">
                                                     {{if $.IsBuylist}}
                                                         {{vendor_name .}}
                                                     {{else}}

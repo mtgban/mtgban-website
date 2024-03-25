@@ -118,7 +118,7 @@ func rdbClientForScraper(group, shorthand string) (*redis.Client, error) {
 	}
 
 	redisClient := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
+		Addr: Config.RedisHost + ":" + Config.RedisPort,
 		DB:   Config.Scrapers[group][idx].RedisIndex,
 	})
 	_, err := redisClient.Ping(context.Background()).Result()
