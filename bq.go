@@ -313,7 +313,7 @@ func loadBQ(client *bigquery.Client) error {
 				// Stash data to redis if requested
 				if scraperData.HasRedis {
 					redisClient := redis.NewClient(&redis.Options{
-						Addr: "localhost:6379",
+						Addr: Config.RedisHost + ":" + Config.RedisPort,
 						DB:   scraperData.RedisIndex,
 					})
 					// Check redis is running
@@ -403,7 +403,7 @@ func loadBQ(client *bigquery.Client) error {
 
 				if scraperData.HasRedis {
 					redisClient := redis.NewClient(&redis.Options{
-						Addr: "localhost:6379",
+						Addr: Config.RedisHost + ":" + Config.RedisPort,
 						DB:   scraperData.RedisIndex,
 					})
 					_, err := redisClient.Ping(ctx).Result()
