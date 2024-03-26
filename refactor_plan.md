@@ -1,5 +1,4 @@
-## **Mtgban-Website Refactoring Plan of Action**
-
+## **Are you sure we cant sell fish?**
 
 - [**Mtgban-Website Refactoring Plan of Action**](#mtgban-website-refactoring-plan-of-action)
   - [New Directory Structure](#new-directory-structure)
@@ -7,7 +6,28 @@
   - [Structs](#structs)
   - [Vars \& Constants](#vars--constants)
 
-### New Directory Structure
+- [**Services Breakdown**]
+  - [Search Service](#1-search-service)
+    - [Functions](#functions-1)
+    - [Structs](#structs-1)
+  - [Newspaper Service](#2-newspaper-service)
+    - [Functions](#functions-2)
+    - [Structs](#structs-2)
+  - [Sleepers Service](#3-sleepers-service)
+    - [Functions](#functions-3)
+    - [Structs](#structs-3)
+  - [Upload Service](#4-upload-service)
+    - [Functions](#functions-4)
+    - [Structs](#structs-4)
+  - [Arbitrage Service](#5-arbitrage-service)
+    - [Global](#global-functions)
+    - [Arbit](#arbit-functions)
+    - [Reverse](#reverse-functions)
+      - [Arbitrage Structs](#arbitrage-structs)
+
+
+### Directory Structure
+
 ```sh
 mtgban-website/
 │
@@ -80,7 +100,7 @@ mtgban-website/
 └── README.md # Project documentation
 ```
 
-### Functions 
+### Functions - ***[Top](#are-you-sure-we-cant-sell-fish)*** 
 | Functions             | Category    |
 | --------------------- | ----------- |
 | genPageNav            | navigation  |
@@ -112,7 +132,7 @@ mtgban-website/
 | setupDiscord          | discord     |
 | cleanupDiscord        | discord     |
 
-### Structs
+### Structs - ***[Top](#are-you-sure-we-cant-sell-fish)***
 | Struct               | Category |
 | -------------------- | -------- |
 | PageVars             | models   |
@@ -128,7 +148,7 @@ mtgban-website/
 | EditionEntry         | models   |
 | ReprintEntry         | models   |
 
-### Vars & Constants
+### Vars & Constants - ***[Top](#are-you-sure-we-cant-sell-fish)***
 | Name              | Category   |
 | ----------------- | ---------- |
 | startTime         | global     |
@@ -150,3 +170,136 @@ mtgban-website/
 | DefaultConfigPort | config     |
 | DefaultSecret     | config     |
 | OptionalFields    | config     |
+
+
+# Services Overview
+
+## 1. Search Service - ***[Top](#are-you-sure-we-cant-sell-fish)***
+
+### Functions:
+- Search
+- parseSearchOptionsNG
+- searchAndFilter
+- searchParallelNG
+- processSellersResults
+- processVendorsResults
+- shouldSkipCardNG
+- shouldSkipStoreNG
+- shouldSkipPriceNG
+- shouldSkipEntryNG
+- sortSets
+- sortSetsAlphabetical
+- sortSetsByRetail
+- sortSetsByBuylist
+
+### Structs:
+- SearchConfig
+- FilterElem
+- FilterStoreElem
+- FilterPriceElem
+- FilterEntryElem
+- SearchEntry
+
+## 2. Newspaper Service - ***[Top](#are-you-sure-we-cant-sell-fish)***
+
+### Functions:
+- Newspaper
+- getLastDBUpdate
+
+### Structs:
+- Heading
+- NewspaperPage
+
+## 3. Sleepers Service - ***[Top](#are-you-sure-we-cant-sell-fish)***
+
+### Functions:
+- Sleepers
+- getBulks
+- getReprints
+- getTiers
+- sleepersLayout
+
+### Structs:
+- Sleeper
+
+## 4. Upload Service - ***[Top](#are-you-sure-we-cant-sell-fish)***
+
+### Functions:
+- Upload
+- parseHeader
+- parseRow
+- loadHashes
+- loadCollection
+- loadSpreadsheet
+- loadOldXls
+- loadXlsx
+- loadCsv
+- mergeIdenticalEntries
+- getPrice
+- getQuantity
+- UUID2CKCSV
+- UUID2SCGCSV
+
+### Structs:
+- UploadEntry
+- OptimizedUploadEntry
+
+## 5. Arbitrage Service - ***[Top](#are-you-sure-we-cant-sell-fish)***
+
+### Global Functions:
+- Global
+- scraperCompare
+
+### Arbit Functions:
+- Arbit
+- scraperCompare
+
+### Reverse Functions:
+- Reverse
+- scraperCompare
+
+### Structs: 
+- Arbitrage
+
+## 8. Admin Service - ***[Top](#are-you-sure-we-cant-sell-fish)***
+
+### Functions:
+- Admin
+- pullCode
+- build
+- uptime
+- mem
+- getDemoKey
+- generateAPIKey
+- RefreshTable
+
+### Structs:
+- AppConfig
+
+## 9. Datastore Service - ***[Top](#are-you-sure-we-cant-sell-fish)***
+
+### Functions:
+- startup
+- loadInventoryFromTable
+- loadBuylistFromTable
+- loadBQ
+- updateScraper
+- updateStaticData
+- loadInfos
+- loadDatastore
+- loadSellerFromFile
+- dumpSellerToFile
+- loadVendorFromFile
+- dumpVendorToFile
+- prepareCKAPI
+- API
+- getLastSold
+- TCGLastSoldAPI
+
+### Arbitrage Structs:
+- dbElement
+- LoadSummary
+- EditionEntry
+- ReprintEntry
+- Dataset
+- scraperConfig
