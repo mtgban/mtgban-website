@@ -21,7 +21,6 @@ import (
 	"github.com/mtgban/go-mtgban/cardmarket"
 	"github.com/mtgban/go-mtgban/cardtrader"
 	"github.com/mtgban/go-mtgban/coolstuffinc"
-	"github.com/mtgban/go-mtgban/hareruya"
 	"github.com/mtgban/go-mtgban/magiccorner"
 	"github.com/mtgban/go-mtgban/miniaturemarket"
 	"github.com/mtgban/go-mtgban/mtgseattle"
@@ -602,17 +601,6 @@ var ScraperOptions = map[string]*scraperOption{
 	"mtgseattle": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := mtgseattle.NewScraper()
-			scraper.LogCallback = logger.Printf
-			return scraper, nil
-		},
-	},
-	"hareruya": &scraperOption{
-		OnlyVendor: true,
-		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper, err := hareruya.NewScraper()
-			if err != nil {
-				return nil, err
-			}
 			scraper.LogCallback = logger.Printf
 			return scraper, nil
 		},
