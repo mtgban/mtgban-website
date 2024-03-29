@@ -725,12 +725,13 @@ Sims are not required for pre-constructed decks and other products where the sam
                             {{$firstProduct = $card.Products}}
                         {{end}}
 
-                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" title="{{$card.Title}}">
+                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" title="[{{$card.SetCode}}] {{$card.Title}}">
                             <th colspan="3" class="wrap stickyHeader" style="text-align: left; vertical-align: middle;">
                                 <table style="margin:0 0 0 18">
                                     <tr style="background-color:rgba(0, 0, 0, 0);">
                                         <td rowspan=2>
                                             <a href="search?q=s:{{$card.SetCode}}">
+                                                <span class="small-hidden-text" aria-hidden="true">{{$card.SetCode}}</span>
                                                 <i class="ss {{$card.Keyrune}} ss-2x ss-fw"></i>
                                             </a>
                                         </td>
