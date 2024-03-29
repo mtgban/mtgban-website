@@ -289,7 +289,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 				continue
 			}
 			keyruneCode := strings.ToLower(set.KeyruneCode)
-			printings += fmt.Sprintf("<a class='pagination' title='%s' href='/search?q=%s'><i class='ss ss-%s ss-2x'></i> </a>", set.Name, url.QueryEscape(co.Name+" s:"+setCode), keyruneCode)
+			printings += fmt.Sprintf(`<a class="pagination" title="%s" href="/search?q=%s"><i class="ss ss-%s ss-2x"></i> </a>`, set.Name, url.QueryEscape(co.Name+" s:"+setCode), keyruneCode)
 			if i == MaxRuneSymbols && len(co.Printings) > MaxRuneSymbols {
 				printings += "<br>and many more (too many to list)..."
 				break
