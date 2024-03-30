@@ -603,12 +603,17 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			if len(uuids) < 1 {
 				continue
 			}
+			// Retrieve the data to search from the first uuid
 			co, _ := mtgmatcher.GetUUID(uuids[0])
-			if mtgmatcher.SealedIsRandom(co.SetCode, co.UUID) {
+			// Retrieve decklist
+			uuids, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+			// Assign data so that on error the entire db is returned
+			config.UUIDs = uuids
+			config.SearchMode = "hashing"
+			// Check error
+			if err != nil {
 				continue
 			}
-			config.SearchMode = "hashing"
-			config.UUIDs, _ = mtgmatcher.GetPicksForSealed(co.SetCode, co.UUID)
 
 		// Options that modify the card searches
 		case "s", "edition":
