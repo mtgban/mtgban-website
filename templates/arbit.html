@@ -379,7 +379,7 @@
                             </td>
                             <td>
                                 {{$card := (index $.Metadata .CardId)}}
-                                {{if and $card.Sealed (not (index $.Metadata .CardId).Booster)}}
+                                {{if $card.HasDeck}}
                                     <center title="Decklist">🎁</center>
                                 {{else if $card.Etched}}
                                     <center title="Etched">💫</center>
