@@ -311,6 +311,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		err = BanPrice2CSV(csvWriter, results, true, true, true)
 		if err != nil {
 			w.Header().Del("Content-Type")
+			w.Header().Del("Content-Disposition")
 			UserNotify("search", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "search.html", pageVars)
@@ -333,6 +334,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		err = UUID2TCGCSV(csvWriter, selectedUUIDs)
 		if err != nil {
 			w.Header().Del("Content-Type")
+			w.Header().Del("Content-Disposition")
 			UserNotify("search", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "search.html", pageVars)
