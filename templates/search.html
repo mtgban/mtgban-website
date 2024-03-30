@@ -434,7 +434,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                         <h4>Can you describe the data sources available?</h4>
                         <ul class="indent">
                             There are three EV-dependent data sources: <i>TCG Low</i>, which reflects the lowest possible value on TCG (excluding shipping), <i>TCG Direct</i>, which represents the Direct price <u>minus fees</u> that the cards could be sold at, and <i>CK buylist</i>, which shows how much a given set of cards could be sold to the vendor. Note that TCG Direct prices could be sometimes skewed due to ridiculous prices being set by sellers "parking" their cards - we try to work around this by capping the maximum value to twice as much as TCG Low when we're able to detect such an offset. <br>
-                            The other prices shown under <i>Available offers</i> represent the prices of the sealed products as available from different stores.
+                            The other prices shown under <i>Purchase from</i> and <i>Sell to</i> represent the prices of the sealed products as available from different stores.
                         </ul>
                     </li>
                     <li>
@@ -836,7 +836,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 </tr>
                                             {{else if not (eq $conditions "INDEX")}}
                                                 <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
-                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Available offers{{else}}Conditions: {{$conditions}}{{end}}</i></td>
+                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Purchase from{{else}}Conditions: {{$conditions}}{{end}}</i></td>
                                                 </tr>
                                             {{end}}
                                         {{end}}
@@ -918,7 +918,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         {{if ne $conditions "INDEX"}}
                                             {{if $entries }}
                                                 <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});">
-                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Available offers{{else}}Conditions: {{$conditions}}{{end}}</i></td>
+                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Sell to{{else}}Conditions: {{$conditions}}{{end}}</i></td>
                                                 </tr>
                                             {{end}}
                                         {{end}}
