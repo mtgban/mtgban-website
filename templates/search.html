@@ -757,7 +757,8 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 <td rowspan=2>
                                                     <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">🎁</span></a>
                                                 </td>
-                                            {{else}}
+                                            {{end}}
+                                            {{if $card.HasDeck}}
                                                 <td rowspan=2>
                                                     <a href='/search?downloadCSV=decklist&q=decklist:"{{$card.Name}}"' title="Download a TCGplayer-formatted decklist">
                                                         <img width=28 src="img/misc/decklist.png">

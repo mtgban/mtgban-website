@@ -48,6 +48,7 @@ type GenericCard struct {
 	Date      string
 	Sealed    bool
 	Booster   bool
+	HasDeck   bool
 
 	SourceSealed []string
 }
@@ -329,10 +330,12 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	}
 
 	var canBoosterGen bool
+	var hasDecklist bool
 	path := "search"
 	if co.Sealed {
 		path = "sealed"
 		canBoosterGen = mtgmatcher.SealedIsRandom(co.SetCode, co.UUID)
+		hasDecklist = mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID)
 	}
 
 	var sourceSealed []string
@@ -393,6 +396,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		Date:      co.OriginalReleaseDate,
 		Sealed:    co.Sealed,
 		Booster:   canBoosterGen,
+		HasDeck:   hasDecklist,
 
 		SourceSealed: sourceSealed,
 	}
