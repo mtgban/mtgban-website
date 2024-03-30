@@ -363,9 +363,16 @@
                         <th class="stickyHeaderTiny"><center>Quicklinks</center></th>
                     </tr>
                     {{range .Arbit}}
+                        {{$card := (index $.Metadata .CardId)}}
                         <tr onmouseover="document.getElementById('hoverImage').src='{{(index $.Metadata .CardId).ImageURL}}';">
                             <td>
-                                <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{(index $.Metadata .CardId).Name}}')" title="Copy to clipboard">📝</span>&nbsp;
+                                {{if $card.Sealed}}
+                                <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product">
+                                    <span class="emoji">🔎</span>
+                                </a>&nbsp;
+                                {{else}}
+                                    <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{(index $.Metadata .CardId).Name}}')" title="Copy to clipboard">📝</span>&nbsp;
+                                {{end}}
                                 <a href="{{(index $.Metadata .CardId).SearchURL}}">{{(index $.Metadata .CardId).Name}}</a>
                                 {{if (index $.Metadata .CardId).Reserved}} *{{end}}
                                 {{if (index $.Metadata .CardId).Stocks}} •{{end}}
@@ -378,7 +385,6 @@
                                 {{(index $.Metadata .CardId).Number}}
                             </td>
                             <td>
-                                {{$card := (index $.Metadata .CardId)}}
                                 {{if $card.HasDeck}}
                                     <center title="Decklist">🎁</center>
                                 {{else if $card.Etched}}
