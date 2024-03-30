@@ -535,8 +535,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		tmp := indexArray[:0]
 		mkmIndex := -1
 		tcgIndex := -1
-		tcgEVLowIndex := -1
-		tcgEVDirectIndex := -1
+		sealedEVindexes := map[string]int{}
 
 		// Iterate on array, always passthrough, except for specific entries
 		for i := range indexArray {
@@ -580,40 +579,35 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			case TCG_DIRECT_LOW:
 				// Skip this one for search results
 				continue
-			case "TCG Low EV",
-				"TCG Low Sim StdDev",
-				"TCG Low Sim Median":
-				if tcgEVLowIndex < 0 {
-					tmp = append(tmp, indexArray[i])
-					tcgEVLowIndex = len(tmp) - 1
-					tmp[tcgEVLowIndex].ScraperName = "TCG Low"
-				}
-				switch evIndex {
-				case 0:
-					tmp[tcgEVLowIndex].Price = indexArray[i].Price
-				case 1:
-					tmp[tcgEVLowIndex].Secondary = indexArray[i].Price
-				case 2:
-					tmp[tcgEVLowIndex].Tertiary = indexArray[i].Price
-				}
-			case "TCG Direct (net) EV",
-				"TCG Direct (net) Sim StdDev",
-				"TCG Direct (net) Sim Median":
-				if tcgEVDirectIndex < 0 {
-					tmp = append(tmp, indexArray[i])
-					tcgEVDirectIndex = len(tmp) - 1
-					tmp[tcgEVDirectIndex].ScraperName = "Direct (net)"
-				}
-				switch evIndex {
-				case 0:
-					tmp[tcgEVDirectIndex].Price = indexArray[i].Price
-				case 1:
-					tmp[tcgEVDirectIndex].Secondary = indexArray[i].Price
-				case 2:
-					tmp[tcgEVDirectIndex].Tertiary = indexArray[i].Price
-				}
 			default:
-				tmp = append(tmp, indexArray[i])
+				if slices.Contains(ScraperOptions["sealed_ev"].Keepers, indexArray[i].ScraperName) {
+					// Determine an identifiers from the name (the second word)
+					fields := strings.Fields(indexArray[i].ScraperName)
+					if len(fields) < 2 {
+						continue
+					}
+					id := fields[1]
+
+					// If index is not present add to array and save index
+					idx, found := sealedEVindexes[id]
+					if !found {
+						tmp = append(tmp, indexArray[i])
+						idx = len(tmp) - 1
+						sealedEVindexes[id] = idx
+					}
+
+					// Index is present, add to the existing entry
+					switch evIndex {
+					case 0:
+						tmp[idx].Price = indexArray[i].Price
+					case 1:
+						tmp[idx].Secondary = indexArray[i].Price
+					case 2:
+						tmp[idx].Tertiary = indexArray[i].Price
+					}
+				} else {
+					tmp = append(tmp, indexArray[i])
+				}
 			}
 		}
 
