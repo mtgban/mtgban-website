@@ -328,7 +328,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"decklist.csv\"")
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+config.PrivateData+".csv\"")
 		csvWriter := csv.NewWriter(w)
 
 		err = UUID2TCGCSV(csvWriter, selectedUUIDs)
