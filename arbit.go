@@ -578,7 +578,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	}
 
 	// Customize opts for Globals
-	if pageVars.GlobalMode {
+	if pageVars.GlobalMode && !source.Info().SealedMode {
 		opts.MinSpread = MinSpreadGlobal
 		opts.MaxSpread = MaxSpreadGlobal
 
@@ -595,7 +595,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		opts.Editions = FilteredEditions
 	}
 
-	if source.Info().SealedMode {
+	if !pageVars.GlobalMode && source.Info().SealedMode {
 		opts.MinSpread = MinSpreadNegative
 		opts.MinDiff = MinDiffNegative
 	}
@@ -607,8 +607,14 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			if seller == nil {
 				continue
 			}
+
 			// Skip unactionable sellers
 			if seller.Info().SealedMode && seller.Info().MetadataOnly {
+				continue
+			}
+
+			// Keep categories separate
+			if source.Info().SealedMode != seller.Info().SealedMode {
 				continue
 			}
 
@@ -616,9 +622,10 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 	} else {
 		for _, vendor := range Vendors {
-			if vendor == nil {
+			if vendor == nil || source.Info().SealedMode != vendor.Info().SealedMode {
 				continue
 			}
+
 			scrapers = append(scrapers, vendor)
 		}
 	}
@@ -643,7 +650,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		var arbit []mtgban.ArbitEntry
 		var err error
-		if pageVars.GlobalMode {
+		if pageVars.GlobalMode && source.Info().SealedMode {
+			arbit, err = mtgban.Mismatch(opts, source.(mtgban.Seller), scraper.(mtgban.Seller))
+		} else if pageVars.GlobalMode {
 			arbit, err = mtgban.Mismatch(opts, scraper.(mtgban.Seller), source.(mtgban.Seller))
 		} else if pageVars.ReverseMode {
 			arbit, err = mtgban.Arbit(opts, source.(mtgban.Vendor), scraper.(mtgban.Seller))
@@ -728,9 +737,8 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 		if pageVars.GlobalMode {
 			entry.HasCredit = false
-			entry.HasNoConds = source.Info().MetadataOnly
-		}
-		if source.Info().SealedMode {
+			entry.HasNoConds = source.Info().MetadataOnly || source.Info().SealedMode
+		} else if source.Info().SealedMode {
 			entry.HasNoConds = scraper.Info().MetadataOnly
 		}
 

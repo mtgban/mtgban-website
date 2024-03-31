@@ -317,8 +317,12 @@
                     <tr>
                         <th class="stickyHeaderTiny">Card Name</th>
                         <th class="stickyHeaderTiny">Edition&nbsp;&nbsp;&nbsp;<input type="text" id="filterInput" onkeyup="filterArbitTable()" placeholder="Filter.."></th>
-                        <th class="stickyHeaderTiny"><center>#</center></th>
-                        <th class="stickyHeaderTiny">Finish</th>
+                        {{if not $.IsSealed}}
+                            <th class="stickyHeaderTiny"><center>#</center></th>
+                        {{end}}
+                        <th class="stickyHeaderTiny">
+                            {{if $.IsSealed}}Decklist{{else}}Finish{{end}}
+                        </th>
                         {{if not .HasNoConds}}
                             <th class="stickyHeaderTiny">Conditions</th>
                         {{end}}
@@ -329,8 +333,12 @@
                         {{end}}
                         <th class="stickyHeaderTiny">
                             <a href="javascript:sortBy('sell_price', '{{.Name}}')">
-                                {{if $.GlobalMode}}
-                                    {{$.ScraperShort}}
+                                {{if and $.GlobalMode}}
+                                    {{if $.IsSealed}}
+                                        {{.Name}}
+                                    {{else}}
+                                        {{$.ScraperShort}}
+                                    {{end}}
                                 {{else}}
                                     Sell Price
                                 {{end}}
@@ -338,8 +346,12 @@
                         </th>
                         <th class="stickyHeaderTiny">
                             <a href="javascript:sortBy('buy_price', '{{.Name}}')">
-                                {{if $.GlobalMode}}
-                                    {{.Name}}
+                                {{if and $.GlobalMode}}
+                                    {{if $.IsSealed}}
+                                        {{$.ScraperShort}}
+                                    {{else}}
+                                        {{.Name}}
+                                    {{end}}
                                 {{else}}
                                     Buy Price
                                 {{end}}
@@ -381,9 +393,11 @@
                             <td>
                                 <i class="ss {{(index $.Metadata .CardId).Keyrune}} ss-1x ss-fw"></i> {{(index $.Metadata .CardId).Edition}}
                             </td>
-                            <td>
-                                {{(index $.Metadata .CardId).Number}}
-                            </td>
+                            {{if not $.IsSealed}}
+                                <td>
+                                    {{(index $.Metadata .CardId).Number}}
+                                </td>
+                            {{end}}
                             <td>
                                 {{if $card.HasDeck}}
                                     <center title="Decklist">🎁</center>
@@ -444,8 +458,10 @@
                                     {{if ne .BuylistEntry.URL ""}}
                                         <a class="btn normal" href="{{.BuylistEntry.URL}}" target="_blank" rel="nofollow">Sell</a>
                                     {{end}}
-                                    {{if ne .ReferenceEntry.URL ""}}
-                                        <a class="btn normal" href="{{.ReferenceEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
+                                    {{if not (and $.GlobalMode $card.Sealed)}}
+                                        {{if ne .ReferenceEntry.URL ""}}
+                                            <a class="btn normal" href="{{.ReferenceEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
+                                        {{end}}
                                     {{end}}
                                 </center>
                             </td>
