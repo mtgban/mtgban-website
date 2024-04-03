@@ -223,7 +223,7 @@
         {{end}}
 
         <div class="indent sticky" style="top: 48px; background-color: var(--background); float:left">
-            <form class="search autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+            <form class="search autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform" onsubmit="formSubmissionIntercept()">
                 <label style="clear: both; float: left; width: 110%" for="searchbox">
                     {{if not .SearchQuery}}
                         Search for a {{if .IsSealed}}product{{else}}card{{end}}, or... <a class="btn info" href="/random{{if .IsSealed}}sealed{{end}}">surprise me</a>
@@ -268,6 +268,13 @@
                     {{end}}
                 </label>
                 <input id="searchbox" class="w3-input w3-border w3-round-small search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="200" autofocus autocapitalize="none">
+                <div class="radio-container">
+                    <span class="search-mode-label"; font-size: small;">Search Mode:</span>
+                    <input type="radio" id="any" name="search_mode" value="sm:any "><label for="any">Any</label>
+                    <input type="radio" id="regexp" name="search_mode" value="sm:regexp "><label for="regexp">Regexp</label>
+                    <input type="radio" id="exact" name="search_mode" value="sm:exact " checked><label for="exact">Exact</label>
+                    <input type="radio" id="prefix" name="search_mode" value="sm:prefix "><label for="prefix">Prefix</label>
+                </div>
             </form>
 
         {{if not .IsSealed}}
@@ -936,5 +943,7 @@
     {{end}}
     <br>
 </div>
+<script type="text/javascript" src="../js/utils.js"></script>
+
 </body>
 </html>

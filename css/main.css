@@ -796,3 +796,20 @@ img.hoverImage {
     max-width: 640px;
     max-height: 360px;
 }
+
+.radio-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center; 
+    margin-top: 10px;
+    gap: 2px;
+}
+
+.radio-container input[type="radio"],
+.radio-container label {
+    margin-right: 5px;
+}
+
+.search-mode-label {
+    white-space: nowrap;
+}
