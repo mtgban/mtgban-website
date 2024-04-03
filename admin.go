@@ -342,12 +342,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pageVars.Headers = []string{
-		"", "Name", "Id+Logs", "Last Update", "Entries", "Status",
+		"", "Name", "Id+Logs", "Sealed", "Last Update", "Entries", "Status",
 	}
 	for i := range Sellers {
 		if Sellers[i] == nil {
 			row := []string{
-				fmt.Sprintf("Error at Seller %d", i), "", "", "", "",
+				fmt.Sprintf("Error at Seller %d", i), "", "", "", "", "",
 			}
 			pageVars.Table = append(pageVars.Table, row)
 			continue
@@ -369,9 +369,15 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			status = "🔴"
 		}
 
+		sealed := ""
+		if Sellers[i].Info().SealedMode {
+			sealed = "🎁"
+		}
+
 		row := []string{
 			Sellers[i].Info().Name,
 			Sellers[i].Info().Shorthand,
+			sealed,
 			lastUpdate,
 			fmt.Sprint(len(inv)),
 			status,
@@ -383,7 +389,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	for i := range Vendors {
 		if Vendors[i] == nil {
 			row := []string{
-				fmt.Sprintf("Error at Vendor %d", i), "", "", "", "",
+				fmt.Sprintf("Error at Vendor %d", i), "", "", "", "", "",
 			}
 			pageVars.OtherTable = append(pageVars.Table, row)
 			continue
@@ -405,9 +411,15 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			status = "🔴"
 		}
 
+		sealed := ""
+		if Vendors[i].Info().SealedMode {
+			sealed = "🎁"
+		}
+
 		row := []string{
 			Vendors[i].Info().Name,
 			Vendors[i].Info().Shorthand,
+			sealed,
 			lastUpdate,
 			fmt.Sprint(len(bl)),
 			status,
