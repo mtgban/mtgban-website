@@ -7,8 +7,10 @@ import (
 	"log"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -85,6 +87,13 @@ func loadInventoryFromFile(fname string) (mtgban.Seller, error) {
 	link, err := os.Readlink(fname)
 	if err != nil {
 		return nil, err
+	}
+
+	// Validate we're loading the right thing
+	baseName := filepath.Base(fname)
+	linkedName := filepath.Base(link)
+	if strings.Replace(baseName, "-latest", "", 1) != linkedName {
+		return nil, errors.New("invalid link")
 	}
 
 	log.Println("File dump found:", link)
