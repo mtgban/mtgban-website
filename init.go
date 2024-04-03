@@ -919,6 +919,20 @@ func loadScrapers() {
 		return
 	}
 
+	log.Println("Scraper Map table")
+	var msgM string
+	for key, val := range ScraperMap {
+		msgM += fmt.Sprintf("%s -> %s\n", key, val)
+	}
+	ServerNotify("init", msgM)
+
+	log.Println("Scraper Name table")
+	var msgN string
+	for key, val := range ScraperNames {
+		msgN += fmt.Sprintf("%s -> %s\n", key, val)
+	}
+	ServerNotify("init", msgN)
+
 	log.Println("Sellers table")
 	var msgS string
 	for i := range newSellers {

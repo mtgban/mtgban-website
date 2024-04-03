@@ -109,7 +109,8 @@ func updateSellers(scraper mtgban.Scraper) {
 				ServerNotify("refresh", msg, true)
 				continue
 			}
-			ServerNotify("refresh", scraper.Info().Shorthand+" inventory updated")
+			msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, i)
+			ServerNotify("refresh", msg)
 		}
 	}
 }
@@ -153,7 +154,8 @@ func updateVendors(scraper mtgban.Scraper) {
 				ServerNotify("refresh", msg, true)
 				continue
 			}
-			ServerNotify("refresh", scraper.Info().Shorthand+" buylist updated")
+			msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, i)
+			ServerNotify("refresh", msg)
 		}
 	}
 }
