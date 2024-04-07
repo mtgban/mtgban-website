@@ -199,6 +199,9 @@
                 <input type="checkbox" id="noSyp" name="noSyp">
                 <label for="noSyp">Don't show the SYP indication (†)</label>
                 <br>
+                <input type="checkbox" id="noUpsell" name="noUpsell">
+                <label for="noUpsell">Hide the upsell reminder to download CSVs</label>
+                <br>
             </div>
         </div>
 
@@ -637,6 +640,16 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 <input type="submit" value="Check Uploader!" />
                                             </noscript>
                                         </form>
+                                    </center>
+                                </td>
+                            </tr>
+                        {{else if not $.ShowPromo}}
+                            <tr>
+                                <td>
+                                    <center>
+                                        <i>
+                                            Increase your tier to be able to download any search results as CSVs or to transfer them to the Upload optimizer!
+                                        </i>
                                     </center>
                                 </td>
                             </tr>

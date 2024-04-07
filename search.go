@@ -254,6 +254,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				config.SkipEmptyBuylist = true
 			case "noSyp":
 				hideSyp = true
+			case "noUpsell":
+				pageVars.ShowPromo = true
 			}
 		}
 	}
