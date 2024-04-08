@@ -375,6 +375,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else if gdocURL != "" {
 		if strings.HasPrefix(gdocURL, "https://store.tcgplayer.com/collection/view/") {
 			uploadedData, err = loadCollection(gdocURL, maxRows)
+		} else if strings.HasPrefix(gdocURL, "https://www.moxfield.com/decks/") {
+			uploadedData, err = loadMoxfieldDeck(gdocURL, maxRows)
 		} else if strings.HasPrefix(gdocURL, "https://docs.google.com/spreadsheets/") {
 			uploadedData, err = loadSpreadsheet(gdocURL, maxRows)
 		} else {
