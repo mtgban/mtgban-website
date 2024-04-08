@@ -338,6 +338,7 @@ var Config struct {
 	Uploader struct {
 		ServiceAccount string `json:"service_account"`
 		BucketName     string `json:"bucket_name"`
+		Moxfield       string `json:"moxfield"`
 	} `json:"uploader"`
 
 	/* The location of the configuation file */
