@@ -183,13 +183,8 @@ func dumpInventoryToFile(seller mtgban.Seller, currentDir, fname string) error {
 		return err
 	}
 
-	// Remove old symlink
-	err = os.Remove(fname)
-	if err != nil {
-		return err
-	}
-
 	// Link dumpfile to the latest available source
+	os.Remove(fname)
 	return os.Symlink(outName, fname)
 }
 
@@ -233,13 +228,8 @@ func dumpBuylistToFile(vendor mtgban.Vendor, currentDir, fname string) error {
 		return err
 	}
 
-	// Remove old symlink
-	err = os.Remove(fname)
-	if err != nil {
-		return err
-	}
-
 	// Link dumpfile to the latest available source
+	os.Remove(fname)
 	return os.Symlink(outName, fname)
 }
 
