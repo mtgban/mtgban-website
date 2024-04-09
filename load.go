@@ -176,16 +176,28 @@ func downloadSellers(configs []ScraperConfig) ([]mtgban.Seller, error) {
 	var sellers []mtgban.Seller
 
 	for _, config := range configs {
-		log.Println("Downloading", config.Path)
+		log.Println("Downloading seller", config.Shorthand)
 		start := time.Now()
 
 		seller, err := downloadSeller(config.Path)
 		if err != nil {
-			return nil, err
+			log.Println("Error downloading", config.Path)
+
+			// Try reusing existing seller if available
+			for _, subseller := range Sellers {
+				if subseller != nil && subseller.Info().Shorthand == config.Shorthand {
+					seller = subseller
+					log.Println(config.Shorthand, "- Reusing existing scraper")
+					break
+				}
+			}
+			if seller == nil {
+				continue
+			}
 		}
 		sellers = append(sellers, seller)
 
-		log.Println(config.Shorthand, "took", time.Since(start))
+		log.Println(config.Shorthand, "seller took", time.Since(start))
 
 		// Cache the obtained data
 		fname := path.Join(InventoryDir, config.Shorthand+".json")
@@ -231,17 +243,28 @@ func downloadVendors(configs []ScraperConfig) ([]mtgban.Vendor, error) {
 	var vendors []mtgban.Vendor
 
 	for _, config := range configs {
-		log.Println("Downloading", config.Path)
+		log.Println("Downloading vendor", config.Shorthand)
 
 		start := time.Now()
 
 		vendor, err := downloadVendor(config.Path)
 		if err != nil {
-			return nil, err
+			log.Println("Error downloading", config.Path)
+
+			for _, subvendor := range Vendors {
+				if subvendor != nil && subvendor.Info().Shorthand == config.Shorthand {
+					vendor = subvendor
+					log.Println(config.Shorthand, "- Reusing existing scraper")
+					break
+				}
+			}
+			if vendor == nil {
+				continue
+			}
 		}
 		vendors = append(vendors, vendor)
 
-		log.Println(config.Shorthand, "took", time.Since(start))
+		log.Println(config.Shorthand, "vendor took", time.Since(start))
 
 		// Cache the obtained data
 		fname := path.Join(BuylistDir, config.Shorthand+".json")
