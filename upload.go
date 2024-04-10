@@ -468,9 +468,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Search
 	var results map[string]map[string]*BanPrice
 	if blMode {
-		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions)
+		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false)
 	} else {
-		results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions)
+		results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false)
 	}
 
 	// Allow downloading data as CSV
@@ -490,7 +490,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indexResults := getSellerPrices("", UploadIndexKeys, "", cardIds, "", false, shouldCheckForConditions)
+	indexResults := getSellerPrices("", UploadIndexKeys, "", cardIds, "", false, shouldCheckForConditions, false)
 	pageVars.IndexKeys = UploadIndexKeys[:len(UploadIndexKeys)-1]
 
 	// Orders implies priority of argument search

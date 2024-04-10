@@ -615,16 +615,18 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 </td>
                             </tr>
                         {{end}}
-                        {{if .CanDownloadCSV}}
-                            <tr>
-                                <td>
-                                    <center>
-                                        Download prices as CSV<br>
-                                        <a class="btn success" href="search?q={{.SearchQuery}}&downloadCSV=retail" target="_blank">Retail</a>
-                                        <a class="btn warning" href="search?q={{.SearchQuery}}&downloadCSV=buylist" target="_blank">Buylist</a>
-                                    </center>
-                                </td>
-                            </tr>
+                    {{end}}
+                    {{if .CanDownloadCSV}}
+                        <tr>
+                            <td>
+                                <center>
+                                    Download prices as CSV<br>
+                                    <a class="btn success" href="search?q={{.SearchQuery}}&downloadCSV=retail" target="_blank">Retail</a>
+                                    <a class="btn warning" href="search?q={{.SearchQuery}}&downloadCSV=buylist" target="_blank">Buylist</a>
+                                </center>
+                            </td>
+                        </tr>
+                        {{if not .IsSealed}}
                             <tr>
                                 <td>
                                     <center>
@@ -643,17 +645,17 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     </center>
                                 </td>
                             </tr>
-                        {{else if not $.ShowPromo}}
-                            <tr>
-                                <td>
-                                    <center>
-                                        <i>
-                                            Increase your tier to be able to download any search results as CSVs or to transfer them to the Upload optimizer!
-                                        </i>
-                                    </center>
-                                </td>
-                            </tr>
                         {{end}}
+                    {{else if not $.ShowPromo}}
+                        <tr>
+                            <td>
+                                <center>
+                                    <i>
+                                        Increase your tier to be able to download any search results as CSVs{{if not .IsSealed}} or to transfer them to the Upload optimizer!{{end}}
+                                    </i>
+                                </center>
+                            </td>
+                        </tr>
                     {{end}}
                     <tr>
                         <td style="background-color: var(--background);">

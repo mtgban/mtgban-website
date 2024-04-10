@@ -24,6 +24,7 @@ type BanPrice struct {
 	Regular    float64            `json:"regular,omitempty"`
 	Foil       float64            `json:"foil,omitempty"`
 	Etched     float64            `json:"etched,omitempty"`
+	Sealed     float64            `json:"sealed,omitempty"`
 	Qty        int                `json:"qty,omitempty"`
 	QtyFoil    int                `json:"qty_foil,omitempty"`
 	QtyEtched  int                `json:"qty_etched,omitempty"`
@@ -167,13 +168,19 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	dumpType := ""
 	canRetail := slices.Contains(enabledModes, "retail") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
 	canBuylist := slices.Contains(enabledModes, "buylist") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
-	if (strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail {
-		dumpType += "retail"
-		out.Retail = getSellerPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds)
+	canSealed := slices.Contains(enabledModes, "sealed") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
+	isSealed := strings.HasPrefix(urlPath, "sealed") && canSealed
+	if isSealed {
+		dumpType += "sealed"
 	}
-	if (strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist {
+
+	if ((strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail) || isSealed {
+		dumpType += "retail"
+		out.Retail = getSellerPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed)
+	}
+	if ((strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist) || isSealed {
 		dumpType += "buylist"
-		out.Buylist = getVendorPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds)
+		out.Buylist = getVendorPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed)
 	}
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -242,6 +249,9 @@ func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
 		}
 	case "mtgjson":
 		return func(co *mtgmatcher.CardObject) string {
+			if co.Sealed {
+				return co.UUID
+			}
 			return co.Identifiers["mtgjsonId"]
 		}
 	case "mkm":
@@ -262,11 +272,14 @@ func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
 		}
 	}
 	return func(co *mtgmatcher.CardObject) string {
+		if co.Sealed && mode != "sealed_uuid" {
+			return co.Name
+		}
 		return co.UUID
 	}
 }
 
-func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty bool, conds bool) map[string]map[string]*BanPrice {
+func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty bool, conds bool, sealed bool) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 	idFunc := getIdFunc(mode)
 	for _, seller := range Sellers {
@@ -275,8 +288,9 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		}
 		sellerTag := seller.Info().Shorthand
 
-		// Only keep singles
-		if seller.Info().SealedMode {
+		// Only keep the right product type
+		if (!sealed && seller.Info().SealedMode) ||
+			(sealed && !seller.Info().SealedMode) {
 			continue
 		}
 
@@ -310,11 +324,14 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 			if filterByHash != nil && !slices.Contains(filterByHash, cardId) {
 				continue
 			}
-			if filterByFinish != "" && checkFinish(co, filterByFinish) {
+			if !sealed && filterByFinish != "" && checkFinish(co, filterByFinish) {
 				continue
 			}
 
 			id := idFunc(co)
+			if id == "" {
+				continue
+			}
 
 			_, found := out[id]
 			if !found {
@@ -330,7 +347,14 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 			// (only for retail).
 			shouldQty := qty && !seller.Info().MetadataOnly && sellerTag != "TCG Player" && sellerTag != "TCG Direct"
 
-			if co.Etched {
+			if co.Sealed {
+				out[id][sellerTag].Sealed = inventory[cardId][0].Price
+				if shouldQty {
+					for i := range inventory[cardId] {
+						out[id][sellerTag].Qty += inventory[cardId][i].Quantity
+					}
+				}
+			} else if co.Etched {
 				out[id][sellerTag].Etched = inventory[cardId][0].Price
 				if shouldQty {
 					for i := range inventory[cardId] {
@@ -384,7 +408,7 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 	return out
 }
 
-func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty bool, conds bool) map[string]map[string]*BanPrice {
+func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty bool, conds bool, sealed bool) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 	idFunc := getIdFunc(mode)
 	for _, vendor := range Vendors {
@@ -393,8 +417,9 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		}
 		vendorTag := vendor.Info().Shorthand
 
-		// Only keep singles
-		if vendor.Info().SealedMode {
+		// Only keep the right proudct type
+		if (!sealed && vendor.Info().SealedMode) ||
+			(sealed && !vendor.Info().SealedMode) {
 			continue
 		}
 
@@ -428,11 +453,14 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 			if filterByHash != nil && !slices.Contains(filterByHash, cardId) {
 				continue
 			}
-			if filterByFinish != "" && checkFinish(co, filterByFinish) {
+			if !sealed && filterByFinish != "" && checkFinish(co, filterByFinish) {
 				continue
 			}
 
 			id := idFunc(co)
+			if id == "" {
+				continue
+			}
 
 			_, found := out[id]
 			if !found {
@@ -441,7 +469,15 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 			if out[id][vendorTag] == nil {
 				out[id][vendorTag] = &BanPrice{}
 			}
-			if co.Etched {
+
+			if co.Sealed {
+				out[id][vendorTag].Sealed = buylist[cardId][0].BuyPrice
+				if qty && !vendor.Info().MetadataOnly {
+					for i := range buylist[cardId] {
+						out[id][vendorTag].Qty += buylist[cardId][i].Quantity
+					}
+				}
+			} else if co.Etched {
 				out[id][vendorTag].Etched = buylist[cardId][0].BuyPrice
 				if qty && !vendor.Info().MetadataOnly {
 					for i := range buylist[cardId] {
@@ -513,7 +549,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 
 	header := []string{"UUID"}
 	if shouldFullName {
-		header = append(header, "TCG Product Id", "Card Name", "Edition", "Number", "Rarity")
+		header = append(header, "TCG Product Id", "Name", "Edition", "Number", "Rarity")
 	}
 	header = append(header, "Store", "Regular Price", "Foil Price", "Etched Price")
 	if shouldQty {
