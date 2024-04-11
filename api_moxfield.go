@@ -20,10 +20,10 @@ type MoxfieldDeck struct {
 type MoxBoard struct {
 	Count int
 	Cards map[string]struct {
-		Quantity int `json:"quantity"`
+		Quantity int    `json:"quantity"`
+		Finish   string `json:"finish"`
 		Card     struct {
 			ScryfallID string `json:"scryfall_id"`
-			Finish     string `json:"finish"`
 		} `json:"card"`
 	} `json:"cards"`
 }
@@ -94,7 +94,7 @@ func extractDecklist(data *MoxfieldDeck) []MoxCard {
 		for _, card := range board.Cards {
 			cardInfoList = append(cardInfoList, MoxCard{
 				ScryfallID: card.Card.ScryfallID,
-				Finish:     card.Card.Finish,
+				Finish:     card.Finish,
 				Quantity:   card.Quantity,
 			})
 		}
