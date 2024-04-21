@@ -563,9 +563,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	pageVars.Metadata = map[string]GenericCard{}
 
 	opts := &mtgban.ArbitOpts{
-		MinSpread:     MinSpread,
-		MaxSpread:     MaxSpread,
-		MaxPriceRatio: MaxPriceRatio,
+		MinSpread: MinSpread,
 	}
 
 	// Set options
@@ -581,6 +579,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	if pageVars.GlobalMode && !source.Info().SealedMode {
 		opts.MinSpread = MinSpreadGlobal
 		opts.MaxSpread = MaxSpreadGlobal
+		opts.MaxPriceRatio = MaxPriceRatio
 
 		if arbitFilters["nolow"] {
 			opts.MinSpread = MinSpreadHighYieldGlobal
