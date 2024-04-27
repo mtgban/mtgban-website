@@ -57,10 +57,7 @@ func configMap2configArray(configMap map[string]*ScraperConfig) []ScraperConfig 
 		configs = append(configs, *config)
 	}
 	sort.Slice(configs, func(i, j int) bool {
-		if configs[i].Name == configs[j].Name {
-			return configs[i].Shorthand < configs[j].Shorthand
-		}
-		return configs[i].Name < configs[j].Name
+		return configs[i].Shorthand < configs[j].Shorthand
 	})
 	return configs
 }
