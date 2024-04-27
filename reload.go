@@ -107,10 +107,11 @@ func updateSellers(scraper mtgban.Scraper) {
 			if err != nil {
 				msg := fmt.Sprintf("seller %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
 				ServerNotify("refresh", msg, true)
-				continue
+			} else {
+				msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, i)
+				ServerNotify("refresh", msg)
 			}
-			msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, i)
-			ServerNotify("refresh", msg)
+			return
 		}
 	}
 }
@@ -152,10 +153,11 @@ func updateVendors(scraper mtgban.Scraper) {
 			if err != nil {
 				msg := fmt.Sprintf("vendor %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
 				ServerNotify("refresh", msg, true)
-				continue
+			} else {
+				msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, i)
+				ServerNotify("refresh", msg)
 			}
-			msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, i)
-			ServerNotify("refresh", msg)
+			return
 		}
 	}
 }
