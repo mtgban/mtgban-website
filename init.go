@@ -130,11 +130,10 @@ func uploadSeller(seller mtgban.Seller, currentDir string) error {
 	configMutex.Lock()
 	_, found := SellersConfigMap[seller.Info().Shorthand]
 	if !found {
-		SellersConfigMap[seller.Info().Shorthand] = &ScraperConfig{
-			Name:      seller.Info().Name,
-			Shorthand: seller.Info().Shorthand,
-		}
+		SellersConfigMap[seller.Info().Shorthand] = &ScraperConfig{}
 	}
+	SellersConfigMap[seller.Info().Shorthand].Name = seller.Info().Name
+	SellersConfigMap[seller.Info().Shorthand].Shorthand = seller.Info().Shorthand
 	SellersConfigMap[seller.Info().Shorthand].Path = outName
 	uploadScrapersConfig(SellersConfigMap, "sellers.json")
 	configMutex.Unlock()
@@ -162,11 +161,10 @@ func uploadVendor(vendor mtgban.Vendor, currentDir string) error {
 	configMutex.Lock()
 	_, found := VendorsConfigMap[vendor.Info().Shorthand]
 	if !found {
-		VendorsConfigMap[vendor.Info().Shorthand] = &ScraperConfig{
-			Name:      vendor.Info().Name,
-			Shorthand: vendor.Info().Shorthand,
-		}
+		VendorsConfigMap[vendor.Info().Shorthand] = &ScraperConfig{}
 	}
+	VendorsConfigMap[vendor.Info().Shorthand].Name = vendor.Info().Name
+	VendorsConfigMap[vendor.Info().Shorthand].Shorthand = vendor.Info().Shorthand
 	VendorsConfigMap[vendor.Info().Shorthand].Path = outName
 	uploadScrapersConfig(VendorsConfigMap, "vendors.json")
 	configMutex.Unlock()
