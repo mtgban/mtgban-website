@@ -72,10 +72,10 @@ var VendorsConfigMap map[string]*ScraperConfig
 func loadScrapersNG() error {
 	init := !DatabaseLoaded
 	if init {
-		ServerNotify("init", "loading started")
+		ServerNotify("init", "loading started (NG)")
 		ScraperNames = map[string]string{}
 	} else {
-		ServerNotify("refresh", "full refresh started")
+		ServerNotify("refresh", "full refresh started (NG)")
 	}
 
 	var err error
