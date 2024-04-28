@@ -1018,16 +1018,17 @@ func loadSellers(newSellers []mtgban.Seller) {
 				continue
 			}
 
-			opts := ScraperOptions[ScraperMap[newSellers[i].Info().Shorthand]]
+			shorthand := ScraperMap[newSellers[i].Info().Shorthand]
+			opts := ScraperOptions[shorthand]
 
 			// If the old scraper data is old enough, pull from the new scraper
 			// and update it in the global slice
 			if Sellers[i] == nil || time.Since(*Sellers[i].Info().InventoryTimestamp) > SkipRefreshCooldown {
-				ServerNotify("reload", "Loading from seller "+newSellers[i].Info().Shorthand)
+				ServerNotify("reload", "Loading from seller "+shorthand)
 				start := time.Now()
 				err := updateSellerAtPosition(newSellers[i], i, true)
 				if err != nil {
-					msg := fmt.Sprintf("seller %s %s - %s", newSellers[i].Info().Name, newSellers[i].Info().Shorthand, err.Error())
+					msg := fmt.Sprintf("seller %s %s - %s", newSellers[i].Info().Name, shorthand, err.Error())
 					ServerNotify("reload", msg, true)
 					continue
 				}
@@ -1037,7 +1038,7 @@ func loadSellers(newSellers []mtgban.Seller) {
 			// Stash data to DB if requested
 			if opts.StashInventory {
 				start := time.Now()
-				log.Println("Stashing", Sellers[i].Info().Name, Sellers[i].Info().Shorthand, "inventory data to DB")
+				log.Println("Stashing", Sellers[i].Info().Name, shorthand, "inventory data to DB")
 				inv, _ := Sellers[i].Inventory()
 
 				key := Sellers[i].Info().InventoryTimestamp.Format("2006-01-02")
