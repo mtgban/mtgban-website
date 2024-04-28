@@ -16,7 +16,6 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/leemcloughlin/logfile"
-	"golang.org/x/exp/slices"
 
 	"github.com/mtgban/go-mtgban/abugames"
 	"github.com/mtgban/go-mtgban/cardkingdom"
@@ -239,146 +238,6 @@ func dumpVendorToFile(vendor mtgban.Vendor, fname string) error {
 	defer file.Close()
 
 	return mtgban.WriteVendorToJSON(vendor, file)
-}
-
-func untangleMarket(init bool, currentDir string, newbc *mtgban.BanClient, scraper mtgban.Market, key string) error {
-	names := ScraperOptions[key].Keepers
-	log.Println("Untangling", scraper.Info().Shorthand, "to", names)
-
-	for _, name := range names {
-		ScraperMap[name] = key
-		ScraperNames[name] = name
-	}
-	var needsLoading bool
-
-	// Try reading from the two sub seller files (the main file is not dumped)
-	if init {
-		// Both files need to be present
-		ok := true
-		for _, name := range names {
-			subfname := path.Join(InventoryDir, name+"-latest.json")
-			if !fileExists(subfname) {
-				ok = false
-				break
-			}
-		}
-
-		if ok {
-			for _, name := range names {
-				subfname := path.Join(InventoryDir, name+"-latest.json")
-
-				seller, err := loadInventoryFromFile(subfname)
-				if err != nil {
-					return err
-				}
-
-				// Register so that it will be added to the main Sellers array
-				newbc.Register(seller)
-
-				inv, _ := seller.Inventory()
-				log.Printf("Loaded from file with %d entries", len(inv))
-			}
-
-			log.Println("-- OK")
-			return nil
-		}
-
-		// If one of the seller files is missing we need to load from scraper
-		needsLoading = true
-	} else {
-		// Check if recent data already exists
-		for _, seller := range Sellers {
-			// In case there are any nil members just load everything
-			if seller == nil {
-				needsLoading = true
-				continue
-			}
-
-			// Load if all the sellers inventory timestamps are past the cooldown
-			if slices.Contains(names, seller.Info().Shorthand) && time.Since(*seller.Info().InventoryTimestamp) < SkipRefreshCooldown {
-				log.Println("Trying to skip", seller.Info().Name, seller.Info().Shorthand, "because too recent")
-			} else {
-				needsLoading = true
-			}
-		}
-	}
-
-	if needsLoading {
-		log.Println("Loading from Market scraper")
-		start := time.Now()
-
-		// Preload the market
-		ScraperOptions[key].Mutex.Lock()
-		ScraperOptions[key].Busy = true
-		inv, err := scraper.Inventory()
-		ScraperOptions[key].Busy = false
-		ScraperOptions[key].Mutex.Unlock()
-		if err != nil {
-			return err
-		}
-		if len(inv) == 0 {
-			return errors.New("empty inventory")
-		}
-		log.Println("Took", time.Since(start))
-
-		// Split subsellers
-		sellers, err := mtgban.Seller2Sellers(scraper)
-		if err != nil {
-			return err
-		}
-
-		// Dump files for the requested sellers
-		for _, seller := range sellers {
-			if slices.Contains(names, seller.Info().Shorthand) {
-				// Add selected seller to the future global seller map
-				newbc.Register(seller)
-
-				fname := path.Join(InventoryDir, seller.Info().Shorthand+"-latest.json")
-
-				err = dumpInventoryToFile(seller, currentDir, fname)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				ScraperOptions[key].Logger.Println(seller.Info().Name, "saved to file")
-
-				targetDir := path.Join(InventoryDir, time.Now().Format("2006-01-02/15"))
-				err = uploadSeller(seller, targetDir)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				ScraperOptions[key].Logger.Println(seller.Info().Name, "uploaded to the cloud")
-			}
-		}
-
-		// Stash to redis if requested
-		if ScraperOptions[key].StashMarkets {
-			for _, seller := range sellers {
-				db, found := ScraperOptions[key].RDBs[seller.Info().Shorthand]
-				if !found {
-					continue
-				}
-
-				start := time.Now()
-				log.Printf("Stashing %s inventory data to DB", seller.Info().Shorthand)
-				inv, _ := seller.Inventory()
-				key := seller.Info().InventoryTimestamp.Format("2006-01-02")
-				for uuid, entries := range inv {
-					err = db.HSet(context.Background(), uuid, key, entries[0].Price).Err()
-					if err != nil {
-						ServerNotify("redis", err.Error())
-						break
-					}
-				}
-				log.Println("Took", time.Since(start))
-			}
-		}
-
-		log.Println("-- OK")
-	}
-
-	return nil
 }
 
 type scraperOption struct {
@@ -845,18 +704,10 @@ func loadScrapers() {
 
 		if len(opt.Keepers) != 0 {
 			if !opt.OnlyVendor {
-				err := untangleMarket(init, currentDir, newbc, scraper.(mtgban.Market), key)
-				if err != nil {
-					msg := fmt.Sprintf("failed to load %s: %s", key, err.Error())
-					ServerNotify("init", msg, true)
-					// Use the old data instead of skipping it
-					if !init {
-						for _, seller := range Sellers {
-							if seller != nil && slices.Contains(ScraperOptions[key].Keepers, seller.Info().Shorthand) {
-								newbc.RegisterSeller(seller)
-							}
-						}
-					}
+				for _, keeper := range opt.Keepers {
+					newbc.RegisterMarket(scraper, keeper)
+					ScraperMap[keeper] = key
+					ScraperNames[keeper] = keeper
 				}
 			}
 			if !opt.OnlySeller {
@@ -1013,12 +864,6 @@ func loadSellers(newSellers []mtgban.Seller) {
 				log.Println(err)
 			}
 		} else {
-			_, ok := newSellers[i].(mtgban.Scraper).(mtgban.Market)
-			if ok {
-				log.Println("Already loaded during untangling")
-				continue
-			}
-
 			shorthand := ScraperMap[newSellers[i].Info().Shorthand]
 			opts := ScraperOptions[shorthand]
 
@@ -1037,10 +882,15 @@ func loadSellers(newSellers []mtgban.Seller) {
 			}
 
 			// Stash data to DB if requested
-			if opts.StashInventory {
+			if opts.StashInventory || (opts.StashMarkets && opts.RDBs[shorthand] != nil) {
 				start := time.Now()
 				log.Println("Stashing", shorthand, "inventory data to DB")
 				inv, _ := Sellers[i].Inventory()
+
+				dbName := "retail"
+				if opts.RDBs[shorthand] != nil {
+					dbName = shorthand
+				}
 
 				key := Sellers[i].Info().InventoryTimestamp.Format("2006-01-02")
 				for uuid, entries := range inv {
@@ -1048,7 +898,7 @@ func loadSellers(newSellers []mtgban.Seller) {
 					price := entries[0].Price * defaultGradeMap[entries[0].Conditions]
 					// Use NX because the price might have already been set using more accurate
 					// information (instead of the derivation above)
-					err := opts.RDBs["retail"].HSetNX(context.Background(), uuid, key, price).Err()
+					err := opts.RDBs[dbName].HSetNX(context.Background(), uuid, key, price).Err()
 					if err != nil {
 						ServerNotify("redis", err.Error())
 						break
