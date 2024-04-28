@@ -840,6 +840,9 @@ func loadScrapers() {
 			continue
 		}
 
+		ScraperMap[scraper.Info().Shorthand] = key
+		ScraperNames[scraper.Info().Shorthand] = scraper.Info().Name
+
 		if len(opt.Keepers) != 0 {
 			if !opt.OnlyVendor {
 				err := untangleMarket(init, currentDir, newbc, scraper.(mtgban.Market), key)
@@ -866,8 +869,6 @@ func loadScrapers() {
 		} else {
 			newbc.Register(scraper)
 		}
-		ScraperMap[scraper.Info().Shorthand] = key
-		ScraperNames[scraper.Info().Shorthand] = scraper.Info().Name
 	}
 
 	// Sort the sellers/vendors arrays by name
