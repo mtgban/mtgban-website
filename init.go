@@ -1038,7 +1038,7 @@ func loadSellers(newSellers []mtgban.Seller) {
 			// Stash data to DB if requested
 			if opts.StashInventory {
 				start := time.Now()
-				log.Println("Stashing", Sellers[i].Info().Name, shorthand, "inventory data to DB")
+				log.Println("Stashing", shorthand, "inventory data to DB")
 				inv, _ := Sellers[i].Inventory()
 
 				key := Sellers[i].Info().InventoryTimestamp.Format("2006-01-02")
@@ -1120,7 +1120,7 @@ func loadVendors(newVendors []mtgban.Vendor) {
 			// Stash data to DB if requested
 			if opts.StashBuylist {
 				start := time.Now()
-				log.Println("Stashing", Vendors[i].Info().Name, Vendors[i].Info().Shorthand, "buylist data to DB")
+				log.Println("Stashing", Vendors[i].Info().Shorthand, "buylist data to DB")
 				bl, _ := Vendors[i].Buylist()
 				key := Vendors[i].Info().BuylistTimestamp.Format("2006-01-02")
 				for uuid, entries := range bl {
