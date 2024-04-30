@@ -62,6 +62,10 @@ type FilterElem struct {
 	Name   string
 	Negate bool
 	Values []string
+
+	// List of additional filters that are run *before* the main filter
+	// and determine whether to run it or not
+	Subfilters []FilterElem
 }
 
 type FilterStoreElem struct {
@@ -1364,6 +1368,21 @@ func shouldSkipCardNG(cardId string, filters []FilterElem) bool {
 	}
 
 	for i := range filters {
+		skip := false
+		for _, subfilter := range filters[i].Subfilters {
+			subres := FilterCardFuncs[subfilter.Name](subfilter.Values, co)
+			if subfilter.Negate {
+				subres = !subres
+			}
+			if subres {
+				skip = true
+				break
+			}
+		}
+		if skip {
+			continue
+		}
+
 		res := FilterCardFuncs[filters[i].Name](filters[i].Values, co)
 		if filters[i].Negate {
 			res = !res
