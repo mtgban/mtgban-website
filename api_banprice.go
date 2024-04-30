@@ -376,7 +376,7 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 	if filterByEdition != "" && co.SetCode != filterByEdition {
 		return
 	}
-	if !co.Sealed && filterByFinish != "" && checkFinish(co, filterByFinish) {
+	if filterByFinish != "" && checkFinish(co, filterByFinish) {
 		return
 	}
 	id := getIdFunc(mode)(co)
@@ -503,7 +503,7 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 	if filterByEdition != "" && co.SetCode != filterByEdition {
 		return
 	}
-	if !co.Sealed && filterByFinish != "" && checkFinish(co, filterByFinish) {
+	if filterByFinish != "" && checkFinish(co, filterByFinish) {
 		return
 	}
 	id := getIdFunc(mode)(co)
@@ -578,6 +578,9 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 }
 
 func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
+	if co.Sealed {
+		return false
+	}
 	switch finish {
 	case "nonfoil":
 		return co.Foil || co.Etched
