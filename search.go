@@ -310,7 +310,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
 		csvWriter := csv.NewWriter(w)
 
-		err = BanPrice2CSV(csvWriter, results, true, true, true)
+		err = BanPrice2CSV(csvWriter, results, true, true, true, pageVars.IsSealed)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")

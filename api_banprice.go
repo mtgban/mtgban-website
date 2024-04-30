@@ -218,9 +218,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		var err error
 		csvWriter := csv.NewWriter(w)
 		if out.Retail != nil {
-			err = BanPrice2CSV(csvWriter, out.Retail, qty, conds, showFullName)
+			err = BanPrice2CSV(csvWriter, out.Retail, qty, conds, showFullName, false)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(csvWriter, out.Buylist, qty, conds, showFullName)
+			err = BanPrice2CSV(csvWriter, out.Buylist, qty, conds, showFullName, false)
 		}
 		if err != nil {
 			log.Println(err)
@@ -545,7 +545,7 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 	return false
 }
 
-func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, shouldCond, shouldFullName bool) error {
+func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, shouldCond, shouldFullName, sealed bool) error {
 	var condKeys []string
 
 	header := []string{"UUID"}
@@ -563,6 +563,9 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 			"NM_etched", "SP_etched", "MP_etched", "HP_etched", "PO_etched",
 		}
 		header = append(header, condKeys...)
+	}
+	if sealed {
+		header = []string{"UUID", "TCG Product Id", "Name", "Edition", "Store", "Price", "Quantity"}
 	}
 
 	err := w.Write(header)
@@ -616,8 +619,6 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 				if shouldQty && entry.QtySealed != 0 {
 					sealedQty = fmt.Sprintf("%d", entry.QtySealed)
 				}
-				regular = sealedPrice
-				qty = sealedQty
 			}
 
 			record := []string{id}
@@ -637,6 +638,9 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 					}
 					record = append(record, priceStr)
 				}
+			}
+			if sealed {
+				record = []string{id, tcgId, cardName, edition, scraper, sealedPrice, sealedQty}
 			}
 
 			err = w.Write(record)
