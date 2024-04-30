@@ -644,10 +644,32 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			} else if operation == "<" {
 				opt = "number_less_than"
 			}
+
+			var subfilters []FilterElem
+			if strings.Contains(code, "-") {
+				codes := strings.Split(code, "-")
+				// Validate that the first element is a number and not a year
+				// to avoid interfering with PLST and similar
+				_, err := strconv.Atoi(codes[0])
+				if err == nil && mtgmatcher.ExtractYear(codes[0]) == "" {
+					code = codes[0]
+					opt = "number_greater_than"
+					subfilters = append(subfilters, FilterElem{
+						Name:       opt,
+						Values:     fixupNumberNG(code),
+						Subfilters: subfilters,
+					})
+					// Reset options to reuse the filter addition below
+					code = codes[1]
+					opt = "number_less_than"
+				}
+			}
+
 			filters = append(filters, FilterElem{
-				Name:   opt,
-				Negate: negate,
-				Values: fixupNumberNG(code),
+				Name:       opt,
+				Negate:     negate,
+				Values:     fixupNumberNG(code),
+				Subfilters: subfilters,
 			})
 		case "cne":
 			filters = append(filters, FilterElem{
