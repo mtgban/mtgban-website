@@ -138,6 +138,7 @@
                 <label for="sellersPriority">Retail priority</label>
                 <select id="sellersPriority" class="select-css">
                     <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick a store</option>
+                    <option value="">&nbsp;&nbsp;&nbsp;Reset to Default</option>
                     {{range $i, $key := .SellerKeys}}
                         <option value="{{$key}}">&nbsp;&nbsp;&nbsp;{{scraper_name $key}}</option>
                     {{end}}
@@ -146,6 +147,7 @@
                 <label for="vendorsPriority">Buylist priority</label>
                 <select id="vendorsPriority" class="select-css">
                     <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick a store</option>
+                    <option value="">&nbsp;&nbsp;&nbsp;Reset to Default</option>
                     {{range $i, $key := .VendorKeys}}
                         <option value="{{$key}}">&nbsp;&nbsp;&nbsp;{{scraper_name $key}}</option>
                     {{end}}
