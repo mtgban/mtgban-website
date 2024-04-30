@@ -63,6 +63,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	query := r.FormValue("q")
 
+	pageVars.IsSealed = r.URL.Path == "/sealed"
 	pageVars.IsSets = r.URL.Path == "/sets"
 	pageVars.PromoTags = mtgmatcher.AllPromoTypes()
 
@@ -121,8 +122,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") == "prices")
-
-	pageVars.IsSealed = r.URL.Path == "/sealed"
 
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
