@@ -857,12 +857,6 @@ func loadSellers(newSellers []mtgban.Seller) {
 
 			inv, _ := seller.Inventory()
 			log.Printf("Loaded from file with %d entries", len(inv))
-
-			targetDir := path.Join(InventoryDir, time.Now().Format("2006-01-02/15"))
-			err = uploadSeller(Sellers[i], targetDir)
-			if err != nil {
-				log.Println(err)
-			}
 		} else {
 			shorthand := newSellers[i].Info().Shorthand
 			opts := ScraperOptions[ScraperMap[shorthand]]
@@ -948,9 +942,6 @@ func loadVendors(newVendors []mtgban.Vendor) {
 
 			bl, _ := vendor.Buylist()
 			log.Printf("Loaded from file with %d entries", len(bl))
-
-			targetDir := path.Join(BuylistDir, time.Now().Format("2006-01-02/15"))
-			uploadVendor(vendor, targetDir)
 		} else {
 			opts := ScraperOptions[ScraperMap[newVendors[i].Info().Shorthand]]
 
