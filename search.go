@@ -293,12 +293,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var filename string
+		mode := "scryfall"
+		if pageVars.IsSealed {
+			mode = "mtgjson"
+		}
 		var results map[string]map[string]*BanPrice
 		if downloadCSV == "retail" {
-			results = getSellerPrices("scryfall", enabledStores, "", selectedUUIDs, "", true, true, pageVars.IsSealed)
+			results = getSellerPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, pageVars.IsSealed)
 			filename = "mtgban_retail_prices.csv"
 		} else if downloadCSV == "buylist" {
-			results = getVendorPrices("scryfall", enabledStores, "", selectedUUIDs, "", true, true, pageVars.IsSealed)
+			results = getVendorPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, pageVars.IsSealed)
 			filename = "mtgban_buylist_prices.csv"
 		} else {
 			pageVars.InfoMessage = "Unable to download CSV right now"

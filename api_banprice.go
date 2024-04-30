@@ -60,6 +60,45 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Endpoint for retrieving the set codes
+	if strings.HasPrefix(urlPath, "sets") {
+		sets := mtgmatcher.GetAllSets()
+		filter := r.FormValue("filter")
+		if filter == "singles" {
+			var filtered []string
+			for _, code := range sets {
+				set, _ := mtgmatcher.GetSet(code)
+				if len(set.Cards) > 0 {
+					filtered = append(filtered, code)
+				}
+			}
+			sets = filtered
+		} else if filter == "sealed" {
+			var filtered []string
+			for _, code := range sets {
+				set, _ := mtgmatcher.GetSet(code)
+				if len(set.SealedProduct) > 0 {
+					filtered = append(filtered, code)
+				}
+			}
+			sets = filtered
+		}
+
+		if strings.HasSuffix(urlPath, ".json") {
+			json.NewEncoder(w).Encode(&sets)
+		} else if strings.HasSuffix(urlPath, ".csv") {
+			w.Header().Set("Content-Type", "text/csv")
+			csvWriter := csv.NewWriter(w)
+			csvWriter.Write([]string{"Code"})
+			for _, code := range sets {
+				csvWriter.Write([]string{code})
+			}
+			csvWriter.Flush()
+			return
+		}
+		return
+	}
+
 	storesOpt := GetParamFromSig(sig, "API")
 	if DevMode && !SigCheck && storesOpt == "" {
 		storesOpt = "DEV_ACCESS"
@@ -565,7 +604,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 		header = append(header, condKeys...)
 	}
 	if sealed {
-		header = []string{"UUID", "TCG Product Id", "Name", "Edition", "Store", "Price", "Quantity"}
+		header = []string{"UUID", "Store", "TCG Product Id", "Name", "Edition", "Price", "Quantity"}
 	}
 
 	err := w.Write(header)
@@ -640,7 +679,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 				}
 			}
 			if sealed {
-				record = []string{id, tcgId, cardName, edition, scraper, sealedPrice, sealedQty}
+				record = []string{id, scraper, tcgId, cardName, edition, sealedPrice, sealedQty}
 			}
 
 			err = w.Write(record)
