@@ -28,6 +28,7 @@ type BanPrice struct {
 	Qty        int                `json:"qty,omitempty"`
 	QtyFoil    int                `json:"qty_foil,omitempty"`
 	QtyEtched  int                `json:"qty_etched,omitempty"`
+	QtySealed  int                `json:"qty_sealed,omitempty"`
 	Conditions map[string]float64 `json:"conditions,omitempty"`
 }
 
@@ -351,7 +352,7 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 				out[id][sellerTag].Sealed = inventory[cardId][0].Price
 				if shouldQty {
 					for i := range inventory[cardId] {
-						out[id][sellerTag].Qty += inventory[cardId][i].Quantity
+						out[id][sellerTag].QtySealed += inventory[cardId][i].Quantity
 					}
 				}
 			} else if co.Etched {
@@ -474,7 +475,7 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 				out[id][vendorTag].Sealed = buylist[cardId][0].BuyPrice
 				if qty && !vendor.Info().MetadataOnly {
 					for i := range buylist[cardId] {
-						out[id][vendorTag].Qty += buylist[cardId][i].Quantity
+						out[id][vendorTag].QtySealed += buylist[cardId][i].Quantity
 					}
 				}
 			} else if co.Etched {
@@ -589,8 +590,8 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 			}
 		}
 		for scraper, entry := range pm[id] {
-			var regular, foil, etched string
-			var regularQty, foilQty, etchedQty string
+			var regular, foil, etched, sealedPrice string
+			var regularQty, foilQty, etchedQty, sealedQty string
 
 			if entry.Regular != 0 {
 				regular = fmt.Sprintf("%0.2f", entry.Regular)
@@ -609,6 +610,14 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 				if shouldQty && entry.QtyEtched != 0 {
 					etchedQty = fmt.Sprintf("%d", entry.QtyEtched)
 				}
+			}
+			if entry.Sealed != 0 {
+				sealedPrice = fmt.Sprintf("%0.2f", entry.Sealed)
+				if shouldQty && entry.QtySealed != 0 {
+					sealedQty = fmt.Sprintf("%d", entry.QtySealed)
+				}
+				regular = sealedPrice
+				qty = sealedQty
 			}
 
 			record := []string{id}
