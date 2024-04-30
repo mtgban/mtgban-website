@@ -864,8 +864,8 @@ func loadSellers(newSellers []mtgban.Seller) {
 				log.Println(err)
 			}
 		} else {
-			shorthand := ScraperMap[newSellers[i].Info().Shorthand]
-			opts := ScraperOptions[shorthand]
+			shorthand := newSellers[i].Info().Shorthand
+			opts := ScraperOptions[ScraperMap[shorthand]]
 
 			// If the old scraper data is old enough, pull from the new scraper
 			// and update it in the global slice
