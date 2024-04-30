@@ -79,6 +79,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	pageVars.Nav = insertNavBar("Sets", pageVars.Nav, []NavElem{
+		NavElem{
+			Name:   "Sealed",
+			Short:  "🧱",
+			Link:   "/sealed",
+			Active: pageVars.IsSealed,
+			Class:  "selected",
+		},
+	})
+
 	page := r.FormValue("page")
 	if page == "options" {
 		pageVars.Title = "Options"
@@ -128,16 +138,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
 	pageVars.CanDownloadCSV = canDownloadCSV
-
-	pageVars.Nav = insertNavBar("Sets", pageVars.Nav, []NavElem{
-		NavElem{
-			Name:   "Sealed",
-			Short:  "🧱",
-			Link:   "/sealed",
-			Active: pageVars.IsSealed,
-			Class:  "selected",
-		},
-	})
 
 	if len(query) > MaxSearchQueryLen {
 		pageVars.ErrorMessage = TooLongMessage
