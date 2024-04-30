@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"golang.org/x/exp/slices"
 )
@@ -321,7 +322,6 @@ func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
 
 func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty bool, conds bool, sealed bool) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
-	idFunc := getIdFunc(mode)
 	for _, seller := range Sellers {
 		if seller == nil {
 			continue
@@ -346,101 +346,18 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 			continue
 		}
 
-		// Loop through cards
-		for cardId := range inventory {
-			// No price no dice
-			if len(inventory[cardId]) == 0 || inventory[cardId][0].Price == 0 {
-				continue
-			}
+		// Determine whether the response should include qty information
+		// Needs to be explicitly requested, all the index prices are skipped,
+		// TCG is too due to how quantities are stored in mtgban (FIXME?)
+		// (only for retail).
+		shouldQty := qty && !seller.Info().MetadataOnly && sellerTag != "TCG Player" && sellerTag != "TCG Direct"
 
-			co, err := mtgmatcher.GetUUID(cardId)
-			if err != nil {
-				continue
-			}
-
-			if filterByEdition != "" && co.SetCode != filterByEdition {
-				continue
-			}
-			if filterByHash != nil && !slices.Contains(filterByHash, cardId) {
-				continue
-			}
-			if !sealed && filterByFinish != "" && checkFinish(co, filterByFinish) {
-				continue
-			}
-
-			id := idFunc(co)
-			if id == "" {
-				continue
-			}
-
-			_, found := out[id]
-			if !found {
-				out[id] = map[string]*BanPrice{}
-			}
-			if out[id][sellerTag] == nil {
-				out[id][sellerTag] = &BanPrice{}
-			}
-
-			// Determine whether the response should include qty information
-			// Needs to be explicitly requested, all the index prices are skipped,
-			// TCG is too due to how quantities are stored in mtgban (FIXME?)
-			// (only for retail).
-			shouldQty := qty && !seller.Info().MetadataOnly && sellerTag != "TCG Player" && sellerTag != "TCG Direct"
-
-			if co.Sealed {
-				out[id][sellerTag].Sealed = inventory[cardId][0].Price
-				if shouldQty {
-					for i := range inventory[cardId] {
-						out[id][sellerTag].QtySealed += inventory[cardId][i].Quantity
-					}
-				}
-			} else if co.Etched {
-				out[id][sellerTag].Etched = inventory[cardId][0].Price
-				if shouldQty {
-					for i := range inventory[cardId] {
-						out[id][sellerTag].QtyEtched += inventory[cardId][i].Quantity
-					}
-				}
-				if conds {
-					if out[id][sellerTag].Conditions == nil {
-						out[id][sellerTag].Conditions = map[string]float64{}
-					}
-					for i := range inventory[cardId] {
-						condTag := inventory[cardId][i].Conditions
-						out[id][sellerTag].Conditions[condTag+"_etched"] = inventory[cardId][i].Price
-					}
-				}
-			} else if co.Foil {
-				out[id][sellerTag].Foil = inventory[cardId][0].Price
-				if shouldQty {
-					for i := range inventory[cardId] {
-						out[id][sellerTag].QtyFoil += inventory[cardId][i].Quantity
-					}
-				}
-				if conds {
-					if out[id][sellerTag].Conditions == nil {
-						out[id][sellerTag].Conditions = map[string]float64{}
-					}
-					for i := range inventory[cardId] {
-						condTag := inventory[cardId][i].Conditions
-						out[id][sellerTag].Conditions[condTag+"_foil"] = inventory[cardId][i].Price
-					}
-				}
-			} else {
-				out[id][sellerTag].Regular = inventory[cardId][0].Price
-				if shouldQty {
-					for i := range inventory[cardId] {
-						out[id][sellerTag].Qty += inventory[cardId][i].Quantity
-					}
-				}
-				if conds {
-					if out[id][sellerTag].Conditions == nil {
-						out[id][sellerTag].Conditions = map[string]float64{}
-					}
-					for i := range inventory[cardId] {
-						out[id][sellerTag].Conditions[inventory[cardId][i].Conditions] = inventory[cardId][i].Price
-					}
-				}
+		for _, cardId := range filterByHash {
+			processSellerEntry(inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, out, shouldQty, conds)
+		}
+		if filterByHash == nil {
+			for cardId := range inventory {
+				processSellerEntry(inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, out, shouldQty, conds)
 			}
 		}
 	}
@@ -448,9 +365,92 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 	return out
 }
 
+func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByEdition, filterByFinish, sellerTag string, out map[string]map[string]*BanPrice, qty, conds bool) {
+	if len(entries) == 0 || entries[0].Price == 0 {
+		return
+	}
+	co, err := mtgmatcher.GetUUID(cardId)
+	if err != nil {
+		return
+	}
+	if filterByEdition != "" && co.SetCode != filterByEdition {
+		return
+	}
+	if !co.Sealed && filterByFinish != "" && checkFinish(co, filterByFinish) {
+		return
+	}
+	id := getIdFunc(mode)(co)
+	if id == "" {
+		return
+	}
+
+	_, found := out[id]
+	if !found {
+		out[id] = map[string]*BanPrice{}
+	}
+	if out[id][sellerTag] == nil {
+		out[id][sellerTag] = &BanPrice{}
+	}
+
+	if co.Sealed {
+		out[id][sellerTag].Sealed = entries[0].Price
+		if qty {
+			for i := range entries {
+				out[id][sellerTag].QtySealed += entries[i].Quantity
+			}
+		}
+	} else if co.Etched {
+		out[id][sellerTag].Etched = entries[0].Price
+		if qty {
+			for i := range entries {
+				out[id][sellerTag].QtyEtched += entries[i].Quantity
+			}
+		}
+		if conds {
+			if out[id][sellerTag].Conditions == nil {
+				out[id][sellerTag].Conditions = map[string]float64{}
+			}
+			for i := range entries {
+				condTag := entries[i].Conditions
+				out[id][sellerTag].Conditions[condTag+"_etched"] = entries[i].Price
+			}
+		}
+	} else if co.Foil {
+		out[id][sellerTag].Foil = entries[0].Price
+		if qty {
+			for i := range entries {
+				out[id][sellerTag].QtyFoil += entries[i].Quantity
+			}
+		}
+		if conds {
+			if out[id][sellerTag].Conditions == nil {
+				out[id][sellerTag].Conditions = map[string]float64{}
+			}
+			for i := range entries {
+				condTag := entries[i].Conditions
+				out[id][sellerTag].Conditions[condTag+"_foil"] = entries[i].Price
+			}
+		}
+	} else {
+		out[id][sellerTag].Regular = entries[0].Price
+		if qty {
+			for i := range entries {
+				out[id][sellerTag].Qty += entries[i].Quantity
+			}
+		}
+		if conds {
+			if out[id][sellerTag].Conditions == nil {
+				out[id][sellerTag].Conditions = map[string]float64{}
+			}
+			for i := range entries {
+				out[id][sellerTag].Conditions[entries[i].Conditions] = entries[i].Price
+			}
+		}
+	}
+}
+
 func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty bool, conds bool, sealed bool) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
-	idFunc := getIdFunc(mode)
 	for _, vendor := range Vendors {
 		if vendor == nil {
 			continue
@@ -476,100 +476,105 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		}
 
 		// Loop through cards
-		for cardId := range buylist {
-			// No price no dice
-			if len(buylist[cardId]) == 0 || buylist[cardId][0].BuyPrice == 0 {
-				continue
-			}
-
-			co, err := mtgmatcher.GetUUID(cardId)
-			if err != nil {
-				continue
-			}
-
-			if filterByEdition != "" && co.SetCode != filterByEdition {
-				continue
-			}
-			if filterByHash != nil && !slices.Contains(filterByHash, cardId) {
-				continue
-			}
-			if !sealed && filterByFinish != "" && checkFinish(co, filterByFinish) {
-				continue
-			}
-
-			id := idFunc(co)
-			if id == "" {
-				continue
-			}
-
-			_, found := out[id]
-			if !found {
-				out[id] = map[string]*BanPrice{}
-			}
-			if out[id][vendorTag] == nil {
-				out[id][vendorTag] = &BanPrice{}
-			}
-
-			if co.Sealed {
-				out[id][vendorTag].Sealed = buylist[cardId][0].BuyPrice
-				if qty && !vendor.Info().MetadataOnly {
-					for i := range buylist[cardId] {
-						out[id][vendorTag].QtySealed += buylist[cardId][i].Quantity
-					}
-				}
-			} else if co.Etched {
-				out[id][vendorTag].Etched = buylist[cardId][0].BuyPrice
-				if qty && !vendor.Info().MetadataOnly {
-					for i := range buylist[cardId] {
-						out[id][vendorTag].QtyEtched += buylist[cardId][i].Quantity
-					}
-				}
-				if conds {
-					if out[id][vendorTag].Conditions == nil {
-						out[id][vendorTag].Conditions = map[string]float64{}
-					}
-					for i := range buylist[cardId] {
-						condTag := buylist[cardId][i].Conditions
-						out[id][vendorTag].Conditions[condTag+"_etched"] = buylist[cardId][i].BuyPrice
-					}
-				}
-			} else if co.Foil {
-				out[id][vendorTag].Foil = buylist[cardId][0].BuyPrice
-				if qty && !vendor.Info().MetadataOnly {
-					for i := range buylist[cardId] {
-						out[id][vendorTag].QtyFoil += buylist[cardId][i].Quantity
-					}
-				}
-				if conds {
-					if out[id][vendorTag].Conditions == nil {
-						out[id][vendorTag].Conditions = map[string]float64{}
-					}
-					for i := range buylist[cardId] {
-						condTag := buylist[cardId][i].Conditions
-						out[id][vendorTag].Conditions[condTag+"_foil"] = buylist[cardId][i].BuyPrice
-					}
-				}
-			} else {
-				out[id][vendorTag].Regular = buylist[cardId][0].BuyPrice
-				if qty && !vendor.Info().MetadataOnly {
-					for i := range buylist[cardId] {
-						out[id][vendorTag].Qty += buylist[cardId][i].Quantity
-					}
-				}
-				if conds {
-					if out[id][vendorTag].Conditions == nil {
-						out[id][vendorTag].Conditions = map[string]float64{}
-					}
-					for i := range buylist[cardId] {
-						condTag := buylist[cardId][i].Conditions
-						out[id][vendorTag].Conditions[condTag] = buylist[cardId][i].BuyPrice
-					}
-				}
+		shouldQty := qty && !vendor.Info().MetadataOnly
+		for _, cardId := range filterByHash {
+			processVendorEntry(buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, out, shouldQty, conds)
+		}
+		if filterByHash == nil {
+			for cardId := range buylist {
+				processVendorEntry(buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, out, shouldQty, conds)
 			}
 		}
 	}
 
 	return out
+}
+
+func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdition, filterByFinish, vendorTag string, out map[string]map[string]*BanPrice, qty, conds bool) {
+	// No price no dice
+	if len(entries) == 0 || entries[0].BuyPrice == 0 {
+		return
+	}
+
+	co, err := mtgmatcher.GetUUID(cardId)
+	if err != nil {
+		return
+	}
+	if filterByEdition != "" && co.SetCode != filterByEdition {
+		return
+	}
+	if !co.Sealed && filterByFinish != "" && checkFinish(co, filterByFinish) {
+		return
+	}
+	id := getIdFunc(mode)(co)
+	if id == "" {
+		return
+	}
+
+	_, found := out[id]
+	if !found {
+		out[id] = map[string]*BanPrice{}
+	}
+	if out[id][vendorTag] == nil {
+		out[id][vendorTag] = &BanPrice{}
+	}
+
+	if co.Sealed {
+		out[id][vendorTag].Sealed = entries[0].BuyPrice
+		if qty {
+			for i := range entries {
+				out[id][vendorTag].QtySealed += entries[i].Quantity
+			}
+		}
+	} else if co.Etched {
+		out[id][vendorTag].Etched = entries[0].BuyPrice
+		if qty {
+			for i := range entries {
+				out[id][vendorTag].QtyEtched += entries[i].Quantity
+			}
+		}
+		if conds {
+			if out[id][vendorTag].Conditions == nil {
+				out[id][vendorTag].Conditions = map[string]float64{}
+			}
+			for i := range entries {
+				condTag := entries[i].Conditions
+				out[id][vendorTag].Conditions[condTag+"_etched"] = entries[i].BuyPrice
+			}
+		}
+	} else if co.Foil {
+		out[id][vendorTag].Foil = entries[0].BuyPrice
+		if qty {
+			for i := range entries {
+				out[id][vendorTag].QtyFoil += entries[i].Quantity
+			}
+		}
+		if conds {
+			if out[id][vendorTag].Conditions == nil {
+				out[id][vendorTag].Conditions = map[string]float64{}
+			}
+			for i := range entries {
+				condTag := entries[i].Conditions
+				out[id][vendorTag].Conditions[condTag+"_foil"] = entries[i].BuyPrice
+			}
+		}
+	} else {
+		out[id][vendorTag].Regular = entries[0].BuyPrice
+		if qty {
+			for i := range entries {
+				out[id][vendorTag].Qty += entries[i].Quantity
+			}
+		}
+		if conds {
+			if out[id][vendorTag].Conditions == nil {
+				out[id][vendorTag].Conditions = map[string]float64{}
+			}
+			for i := range entries {
+				condTag := entries[i].Conditions
+				out[id][vendorTag].Conditions[condTag] = entries[i].BuyPrice
+			}
+		}
+	}
 }
 
 func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
