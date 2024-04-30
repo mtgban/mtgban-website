@@ -137,12 +137,19 @@ func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
 		return errors.New("empty inventory")
 	}
 
-	// Save seller in global array, making sure it's _only_ a Seller
-	// and not anything esle, so that filtering works like expected
-	Sellers[i] = mtgban.NewSellerFromInventory(inv, seller.Info())
+	// Make sure the input seller is _only_ a Seller and not anything
+	// else, so that filtering works like expected
+	outSeller := mtgban.NewSellerFromInventory(inv, seller.Info())
+
+	// Save seller in global array
+	if i < 0 {
+		Sellers = append(Sellers, outSeller)
+	} else {
+		Sellers[i] = outSeller
+	}
 
 	targetDir := path.Join(InventoryDir, time.Now().Format("2006-01-02/15"))
-	go uploadSeller(Sellers[i], targetDir)
+	go uploadSeller(outSeller, targetDir)
 	return nil
 }
 

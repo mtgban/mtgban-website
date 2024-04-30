@@ -744,8 +744,10 @@ func loadScrapers() {
 	})
 
 	// Allocate enough space for the global pointers
+	// Sellers are managed a bit differently due to the presence of markets
+	// that break the 1:1 assumption
 	if Sellers == nil {
-		Sellers = make([]mtgban.Seller, len(newSellers))
+		Sellers = make([]mtgban.Seller, 0, len(newSellers))
 	}
 	if Vendors == nil {
 		Vendors = make([]mtgban.Vendor, len(newVendors))
@@ -844,7 +846,16 @@ func loadSellers(newSellers []mtgban.Seller) {
 
 	// Load Sellers
 	for i := range newSellers {
-		log.Println(newSellers[i].Info().Name, newSellers[i].Info().Shorthand, "Inventory")
+		// Find where our seller resides in the global array
+		sellerIndex := -1
+		for j, seller := range Sellers {
+			if seller != nil && newSellers[i].Info().Shorthand == seller.Info().Shorthand {
+				sellerIndex = j
+				break
+			}
+		}
+
+		log.Println(newSellers[i].Info().Name, newSellers[i].Info().Shorthand, "Inventory at position", sellerIndex)
 
 		fname := path.Join(InventoryDir, newSellers[i].Info().Shorthand+"-latest.json")
 		if init && fileExists(fname) {
@@ -853,7 +864,11 @@ func loadSellers(newSellers []mtgban.Seller) {
 				log.Println(err)
 				continue
 			}
-			Sellers[i] = seller
+			if sellerIndex < 0 {
+				Sellers = append(Sellers, seller)
+			} else {
+				Sellers[sellerIndex] = seller
+			}
 
 			inv, _ := seller.Inventory()
 			log.Printf("Loaded from file with %d entries", len(inv))
@@ -863,10 +878,11 @@ func loadSellers(newSellers []mtgban.Seller) {
 
 			// If the old scraper data is old enough, pull from the new scraper
 			// and update it in the global slice
-			if Sellers[i] == nil || time.Since(*Sellers[i].Info().InventoryTimestamp) > SkipRefreshCooldown {
+			if sellerIndex < 0 || // Sellers[] != nil is checked above
+				time.Since(*Sellers[sellerIndex].Info().InventoryTimestamp) > SkipRefreshCooldown {
 				ServerNotify("reload", "Loading from seller "+shorthand)
 				start := time.Now()
-				err := updateSellerAtPosition(newSellers[i], i, true)
+				err := updateSellerAtPosition(newSellers[i], sellerIndex, true)
 				if err != nil {
 					msg := fmt.Sprintf("seller %s %s - %s", newSellers[i].Info().Name, shorthand, err.Error())
 					ServerNotify("reload", msg, true)
@@ -879,14 +895,14 @@ func loadSellers(newSellers []mtgban.Seller) {
 			if opts.StashInventory || (opts.StashMarkets && opts.RDBs[shorthand] != nil) {
 				start := time.Now()
 				log.Println("Stashing", shorthand, "inventory data to DB")
-				inv, _ := Sellers[i].Inventory()
+				inv, _ := newSellers[i].Inventory()
 
 				dbName := "retail"
 				if opts.RDBs[shorthand] != nil {
 					dbName = shorthand
 				}
 
-				key := Sellers[i].Info().InventoryTimestamp.Format("2006-01-02")
+				key := newSellers[i].Info().InventoryTimestamp.Format("2006-01-02")
 				for uuid, entries := range inv {
 					// Adjust price through defaultGradeMap in case NM is not available
 					price := entries[0].Price * defaultGradeMap[entries[0].Conditions]
@@ -901,7 +917,7 @@ func loadSellers(newSellers []mtgban.Seller) {
 				log.Println("Took", time.Since(start))
 			}
 
-			err := dumpInventoryToFile(Sellers[i], currentDir, fname)
+			err := dumpInventoryToFile(newSellers[i], currentDir, fname)
 			if err != nil {
 				log.Println(err)
 				continue
@@ -909,7 +925,7 @@ func loadSellers(newSellers []mtgban.Seller) {
 			opts.Logger.Println("Saved to file")
 
 			targetDir := path.Join(InventoryDir, time.Now().Format("2006-01-02/15"))
-			err = uploadSeller(Sellers[i], targetDir)
+			err = uploadSeller(newSellers[i], targetDir)
 			if err != nil {
 				log.Println(err)
 				continue
