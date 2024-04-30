@@ -646,6 +646,15 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			}
 
 			var subfilters []FilterElem
+			if strings.Contains(code, ":") {
+				codes := strings.Split(code, ":")
+				code = codes[0]
+				subfilters = append(subfilters, FilterElem{
+					Name:   "edition",
+					Values: fixupEditionNG(code),
+				})
+				code = codes[1]
+			}
 			if strings.Contains(code, "-") {
 				codes := strings.Split(code, "-")
 				// Validate that the first element is a number and not a year

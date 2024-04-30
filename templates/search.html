@@ -293,6 +293,7 @@
                                 You can filter by <b>collector number</b> using the Scryfall notation <pre>cn:NUMBER</pre>.
                                 For simple numbers (without any prefix or suffix) you may also filter with <pre>cn&gt;NUMBER</pre> and <pre>cn&lt;NUMBER</pre>, or with a range such as <pre>cn:NUMBER-NUMBER</pre>.
                                 Regular expressions are also supported if you use <pre>cne:REGEXP</pre>.
+                                If you prepend the set code like so <pre>cn:CODE:NUMBER</pre>, then the number pick will operate only on cards from that set, leaving the other results untouched.
                             </li>
                             <li>You can filter by <b>condition</b> with <pre>cond:COND</pre>, accepting <pre>NM</pre>, <pre>SP</pre>, <pre>MP</pre>, <pre>HP</pre>, and <pre>PO</pre>. You can be selective and filter only retail or buylist prices with <pre>condr:COND</pre> and <pre>condb:COND</pre> respectively. For standard values, you can filter with <pre>cond&gt;VALUE</pre>, and <pre>cond&lt;VALUE</pre> too.</li>
                             <li>You can filter by <b>rarity</b> with <pre>r:RARITY</pre>, accepting <pre>mythic</pre>, <pre>rare</pre>, <pre>uncommon</pre>, <pre>common</pre>, <pre>special</pre>, <pre>token</pre>, and <pre>oversize</pre>. You can also use the first letter of the rarity as shorthand. For standard values, you can also use <pre>r&lt;RARITY</pre> and <pre>r&gt;RARITY</pre>.</li>
