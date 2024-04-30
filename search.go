@@ -65,7 +65,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	pageVars.IsSets = r.URL.Path == "/sets"
-	pageVars.PromoTags = mtgmatcher.AllPromoTypes()
+	if query == "" {
+		pageVars.PromoTags = mtgmatcher.AllPromoTypes()
+	}
 
 	pageVars.Nav = insertNavBar("Search", pageVars.Nav, []NavElem{
 		NavElem{
