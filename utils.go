@@ -285,8 +285,8 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	if len(flags) > 1 && flags[1] {
 		// Hack to generate HTML in the template
 		for i, setCode := range co.Printings {
-			set, found := mtgmatcher.GetSets()[setCode]
-			if !found {
+			set, err := mtgmatcher.GetSet(setCode)
+			if err != nil {
 				continue
 			}
 			keyruneCode := strings.ToLower(set.KeyruneCode)

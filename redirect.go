@@ -78,17 +78,25 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 
 func RandomSearch(w http.ResponseWriter, r *http.Request) {
 	var uuid string
+	var setIndex int
 
-	// Reuse the randomness of maps to our advantage
-	sets := mtgmatcher.GetSets()
-	for _, set := range sets {
+	// Find a good set (one that has cards in it)
+	sets := mtgmatcher.GetAllSets()
+	for {
+		setIndex = rand.Intn(len(sets))
+		set, _ := mtgmatcher.GetSet(sets[setIndex])
 		if len(set.Cards) == 0 {
 			continue
 		}
-		index := rand.Intn(len(set.Cards))
-		uuid = set.Cards[index].UUID
 		break
 	}
+
+	// Pick a card at random
+	set, _ := mtgmatcher.GetSet(sets[setIndex])
+	index := rand.Intn(len(set.Cards))
+	uuid = set.Cards[index].UUID
+
+	// Ship it
 	v := r.URL.Query()
 	v.Set("q", uuid)
 	r.URL.RawQuery = v.Encode()
@@ -99,17 +107,25 @@ func RandomSearch(w http.ResponseWriter, r *http.Request) {
 
 func RandomSealedSearch(w http.ResponseWriter, r *http.Request) {
 	var uuid string
+	var setIndex int
 
-	// Reuse the randomness of maps to our advantage
-	sets := mtgmatcher.GetSets()
-	for _, set := range sets {
+	// Find a good set (one that has sealed products in it)
+	sets := mtgmatcher.GetAllSets()
+	for {
+		setIndex = rand.Intn(len(sets))
+		set, _ := mtgmatcher.GetSet(sets[setIndex])
 		if len(set.SealedProduct) == 0 || len(set.Booster) == 0 {
 			continue
 		}
-		index := rand.Intn(len(set.SealedProduct))
-		uuid = set.SealedProduct[index].UUID
 		break
 	}
+
+	// Pick a product at random
+	set, _ := mtgmatcher.GetSet(sets[setIndex])
+	index := rand.Intn(len(set.SealedProduct))
+	uuid = set.SealedProduct[index].UUID
+
+	// Ship it
 	v := r.URL.Query()
 	v.Set("q", uuid)
 	r.URL.RawQuery = v.Encode()

@@ -379,8 +379,8 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 			continue
 		}
 
-		tcgSkuId, found := invEntries[0].CustomFields["TCGSKUID"]
-		if !found {
+		tcgSkuId := invEntries[0].InstanceId
+		if tcgSkuId == "" {
 			continue
 		}
 

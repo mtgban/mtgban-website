@@ -619,12 +619,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	var skipEditions string
 	skipEditionsOpt := readCookie(r, "NewspaperList")
 	if skipEditionsOpt != "" {
-		sets := mtgmatcher.GetSets()
 		filters := strings.Split(skipEditionsOpt, ",")
 		for _, code := range filters {
 			// XXX: is set code available on the db row?
-			set, found := sets[code]
-			if !found {
+			set, err := mtgmatcher.GetSet(code)
+			if err != nil {
 				continue
 			}
 			skipEditions += " AND a.Set <> \"" + set.Name + "\""

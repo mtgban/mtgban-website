@@ -193,8 +193,8 @@ func getBulks(skipEditions []string) map[string]int {
 
 	tiers := map[string]int{}
 
-	sets := mtgmatcher.GetSets()
-	for _, set := range sets {
+	for _, code := range mtgmatcher.GetAllSets() {
+		set, _ := mtgmatcher.GetSet(code)
 		if slices.Contains(skipEditions, set.Code) {
 			continue
 		}

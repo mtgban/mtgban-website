@@ -73,7 +73,9 @@ var sealedEditionSkips = map[string]string{
 	"The Dark Italian":    "",
 }
 
-func makeEditionEntry(set *mtgjson.Set, names ...string) EditionEntry {
+func makeEditionEntry(code string, names ...string) EditionEntry {
+	set, _ := mtgmatcher.GetSet(code)
+
 	date, _ := time.Parse("2006-01-02", set.ReleaseDate)
 	dateAfterMythic, _ := time.Parse("2006-01-02", "2008-10-01")
 
@@ -112,14 +114,14 @@ func makeEditionEntry(set *mtgjson.Set, names ...string) EditionEntry {
 }
 
 func getAllEditions() ([]string, map[string]EditionEntry) {
-	sets := mtgmatcher.GetSets()
+	sets := mtgmatcher.GetAllSets()
 
 	sortedEditions := make([]string, 0, len(sets))
 	listEditions := map[string]EditionEntry{}
-	for _, set := range sets {
-		sortedEditions = append(sortedEditions, set.Code)
+	for _, code := range sets {
+		sortedEditions = append(sortedEditions, code)
 
-		listEditions[set.Code] = makeEditionEntry(set)
+		listEditions[code] = makeEditionEntry(code)
 	}
 
 	sort.Slice(sortedEditions, func(i, j int) bool {
@@ -130,12 +132,14 @@ func getAllEditions() ([]string, map[string]EditionEntry) {
 }
 
 func getTreeEditions() ([]string, map[string][]EditionEntry) {
-	sets := mtgmatcher.GetSets()
+	sets := mtgmatcher.GetAllSets()
 
 	sortedEditions := make([]string, 0, len(sets))
 	listEditions := map[string][]EditionEntry{}
-	for _, set := range sets {
-		entry := makeEditionEntry(set)
+	for _, code := range sets {
+		set, _ := mtgmatcher.GetSet(code)
+
+		entry := makeEditionEntry(code)
 
 		if set.ParentCode == "" {
 			// Skip if it was already added from the other case
@@ -149,15 +153,19 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 		} else {
 			// Find the very fist parent
 			topParentCode := set.ParentCode
-			for sets[topParentCode].ParentCode != "" {
-				topParentCode = sets[topParentCode].ParentCode
+			for {
+				topset, _ := mtgmatcher.GetSet(topParentCode)
+				if topset.ParentCode == "" {
+					break
+				}
+				topParentCode = topset.ParentCode
 			}
 
 			// Check if the head of the tree is already present
 			_, found := listEditions[topParentCode]
 			if !found {
 				// If not, create it
-				headEntry := makeEditionEntry(sets[topParentCode])
+				headEntry := makeEditionEntry(topParentCode)
 				listEditions[topParentCode] = []EditionEntry{headEntry}
 				sortedEditions = append(sortedEditions, topParentCode)
 			}
@@ -194,11 +202,11 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 }
 
 func getSealedEditions() ([]string, map[string][]EditionEntry) {
-	sets := mtgmatcher.GetSets()
-
 	sortedEditions := []string{}
 	listEditions := map[string][]EditionEntry{}
-	for _, set := range sets {
+	for _, code := range mtgmatcher.GetAllSets() {
+		set, _ := mtgmatcher.GetSet(code)
+
 		if set.SealedProduct == nil {
 			continue
 		}
@@ -224,7 +232,7 @@ func getSealedEditions() ([]string, map[string][]EditionEntry) {
 
 		rename = editionRenames[set.Name]
 
-		entry := makeEditionEntry(set, rename)
+		entry := makeEditionEntry(code, rename)
 		listEditions[category] = append(listEditions[category], entry)
 	}
 
@@ -270,7 +278,6 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 		}
 	}
 
-	sets := mtgmatcher.GetSets()
 	uuids := mtgmatcher.GetUUIDs()
 
 	var names []string
@@ -280,8 +287,8 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 	for _, uuid := range uuids {
 		co, _ := mtgmatcher.GetUUID(uuid)
 
-		set, found := sets[co.SetCode]
-		if !found {
+		set, err := mtgmatcher.GetSet(co.SetCode)
+		if err != nil {
 			continue
 		}
 
