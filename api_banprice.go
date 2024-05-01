@@ -315,9 +315,6 @@ func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
 		}
 	}
 	return func(co *mtgmatcher.CardObject) string {
-		if co.Sealed && mode != "sealed_uuid" {
-			return co.Name
-		}
 		return co.UUID
 	}
 }
