@@ -636,24 +636,17 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 }
 
 func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, shouldCond, sealed bool) error {
-	var condKeys []string
+	header := []string{"SKU", "TCG Product Id", "Store", "Name", "Edition"}
+	if !sealed {
+		header = append(header, "Number", "Finish", "Rarity")
+	}
 
-	header := []string{"UUID", "TCG Product Id", "Name", "Edition", "Number", "Rarity"}
-
-	header = append(header, "Store", "Regular Price", "Foil Price", "Etched Price", "Condition")
+	header = append(header, "Price")
+	if shouldCond && !sealed {
+		header = append(header, "Condition")
+	}
 	if shouldQty {
-		header = append(header, "Regular Quantity", "Foil Quantity", "Etched Quantity")
-	}
-	if shouldCond {
-		condKeys = []string{
-			"NM", "SP", "MP", "HP", "PO",
-			"NM_foil", "SP_foil", "MP_foil", "HP_foil", "PO_foil",
-			"NM_etched", "SP_etched", "MP_etched", "HP_etched", "PO_etched",
-		}
-		header = append(header, condKeys...)
-	}
-	if sealed {
-		header = []string{"UUID", "Store", "TCG Product Id", "Name", "Edition", "Price", "Quantity"}
+		header = append(header, "Quantity")
 	}
 
 	err := w.Write(header)
@@ -662,7 +655,6 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 	}
 
 	for id := range pm {
-		var cardName, edition, number, tcgId, rarity string
 		co, err := mtgmatcher.GetUUID(id)
 		if err != nil {
 			co, err = mtgmatcher.GetUUID(mtgmatcher.Scryfall2UUID(id))
@@ -670,65 +662,91 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 				continue
 			}
 		}
-		cardName = co.Name
-		edition = co.Edition
-		number = co.Number
-		rarity = co.Rarity
-		tcgId = co.Identifiers["tcgplayerProductId"]
+
+		tcgId := co.Identifiers["tcgplayerProductId"]
 		if co.Etched {
 			tcgId = co.Identifiers["tcgplayerEtchedProductId"]
 		}
+
 		for scraper, entry := range pm[id] {
-			var regular, foil, etched, sealedPrice string
-			var regularQty, foilQty, etchedQty, sealedQty string
+			prices := []float64{entry.Regular, entry.Foil, entry.Etched, entry.Sealed}
+			qtys := []int{entry.Qty, entry.QtyFoil, entry.QtyEtched, entry.QtySealed}
+			finishes := []string{"nonfoil", "foil", "etched", "sealed"}
 
-			if entry.Regular != 0 {
-				regular = fmt.Sprintf("%0.2f", entry.Regular)
-				if shouldQty && entry.Qty != 0 {
-					regularQty = fmt.Sprintf("%d", entry.Qty)
+			for i, price := range prices {
+				if price == 0 {
+					continue
 				}
-			}
-			if entry.Foil != 0 {
-				foil = fmt.Sprintf("%0.2f", entry.Foil)
-				if shouldQty && entry.QtyFoil != 0 {
-					foilQty = fmt.Sprintf("%d", entry.QtyFoil)
-				}
-			}
-			if entry.Etched != 0 {
-				etched = fmt.Sprintf("%0.2f", entry.Etched)
-				if shouldQty && entry.QtyEtched != 0 {
-					etchedQty = fmt.Sprintf("%d", entry.QtyEtched)
-				}
-			}
-			if entry.Sealed != 0 {
-				sealedPrice = fmt.Sprintf("%0.2f", entry.Sealed)
-				if shouldQty && entry.QtySealed != 0 {
-					sealedQty = fmt.Sprintf("%d", entry.QtySealed)
-				}
-			}
 
-			record := []string{id, tcgId, cardName, edition, number, rarity}
-			record = append(record, scraper, regular, foil, etched, entry.Cond)
-			if shouldQty {
-				record = append(record, regularQty, foilQty, etchedQty)
-			}
-			if shouldCond {
-				for _, tag := range condKeys {
-					var priceStr string
-					price := entry.Conditions[tag]
-					if price != 0 {
-						priceStr = fmt.Sprintf("%0.2f", price)
+				cardData := []string{co.Name, co.SetCode}
+				if !sealed {
+					cardData = append(cardData, co.Number, finishes[i], co.Rarity)
+				}
+
+				priceStr := fmt.Sprintf("%0.2f", price)
+
+				var qtyStr string
+				if shouldQty && qtys[i] != 0 {
+					qtyStr = fmt.Sprintf("%d", qtys[i])
+				}
+
+				if shouldCond && !sealed {
+					for _, tag := range mtgban.FullGradeTags {
+						sku, _ := mtgban.ComputeSKU(co.UUID, tag, finishes[i])
+
+						record := []string{sku, tcgId, scraper}
+						record = append(record, cardData...)
+
+						subtag := tag
+						if finishes[i] == "foil" || finishes[i] == "etched" {
+							subtag += "_" + finishes[i]
+						}
+
+						subPrice := entry.Conditions[subtag]
+						if subPrice == 0 {
+							continue
+						}
+
+						condPriceStr := fmt.Sprintf("%0.2f", subPrice)
+						record = append(record, condPriceStr, tag)
+						if shouldQty {
+							var subQtyStr string
+
+							qty := entry.Quantities[subtag]
+							if qty != 0 {
+								subQtyStr = fmt.Sprintf("%d", qtys[i])
+							}
+
+							record = append(record, subQtyStr)
+						}
+
+						err = w.Write(record)
+						if err != nil {
+							return err
+						}
 					}
-					record = append(record, priceStr)
-				}
-			}
-			if sealed {
-				record = []string{id, scraper, tcgId, cardName, edition, sealedPrice, sealedQty}
-			}
+				} else {
+					sku, _ := mtgban.ComputeSKU(co.UUID, entry.Cond, finishes[i])
 
-			err = w.Write(record)
-			if err != nil {
-				return err
+					var cond string
+					if !sealed {
+						cond = entry.Cond
+					}
+					var qty string
+					if shouldQty {
+						qty = qtyStr
+					}
+
+					record := []string{sku, tcgId, scraper}
+					record = append(record, cardData...)
+					record = append(record, priceStr, cond, qty)
+
+					err = w.Write(record)
+					if err != nil {
+						return err
+					}
+
+				}
 			}
 		}
 		w.Flush()
