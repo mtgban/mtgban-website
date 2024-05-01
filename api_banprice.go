@@ -197,11 +197,12 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only search conditions when a single store is enabled, or if a list of card is requested
+	// Only export conditions when a single store or edition is enabled
+	// or always export them if a list of card is requested
 	if len(enabledStores) == 1 {
 		conds = true
 	} else if conds {
-		conds = filterByHash != nil
+		conds = filterByHash != nil || filterByEdition != ""
 	}
 
 	start := time.Now()
