@@ -26,6 +26,7 @@ type BanPrice struct {
 	Foil       float64            `json:"foil,omitempty"`
 	Etched     float64            `json:"etched,omitempty"`
 	Sealed     float64            `json:"sealed,omitempty"`
+	Cond       string             `json:"cond,omitempty"`
 	Qty        int                `json:"qty,omitempty"`
 	QtyFoil    int                `json:"qty_foil,omitempty"`
 	QtyEtched  int                `json:"qty_etched,omitempty"`
@@ -393,6 +394,8 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 		out[id][sellerTag] = &BanPrice{}
 	}
 
+	out[id][sellerTag].Cond = entries[0].Conditions
+
 	if co.Sealed {
 		out[id][sellerTag].Sealed = entries[0].Price
 		if qty {
@@ -539,6 +542,8 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 		out[id][vendorTag] = &BanPrice{}
 	}
 
+	out[id][vendorTag].Cond = entries[0].Conditions
+
 	if co.Sealed {
 		out[id][vendorTag].Sealed = entries[0].BuyPrice
 		if qty {
@@ -635,7 +640,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 
 	header := []string{"UUID", "TCG Product Id", "Name", "Edition", "Number", "Rarity"}
 
-	header = append(header, "Store", "Regular Price", "Foil Price", "Etched Price")
+	header = append(header, "Store", "Regular Price", "Foil Price", "Etched Price", "Condition")
 	if shouldQty {
 		header = append(header, "Regular Quantity", "Foil Quantity", "Etched Quantity")
 	}
@@ -703,7 +708,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 			}
 
 			record := []string{id, tcgId, cardName, edition, number, rarity}
-			record = append(record, scraper, regular, foil, etched)
+			record = append(record, scraper, regular, foil, etched, entry.Cond)
 			if shouldQty {
 				record = append(record, regularQty, foilQty, etchedQty)
 			}
