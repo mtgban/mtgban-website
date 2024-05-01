@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -512,4 +513,30 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 		blocklistBuylist = strings.Split(blocklistBuylistOpt, ",")
 	}
 	return blocklistRetail, blocklistBuylist
+}
+
+func randomUUID(sealed bool) string {
+	var setIndex int
+
+	// Find a good set (one that has cards in it)
+	sets := mtgmatcher.GetAllSets()
+	for {
+		setIndex = rand.Intn(len(sets))
+		set, _ := mtgmatcher.GetSet(sets[setIndex])
+		if (!sealed && len(set.Cards) == 0) ||
+			(sealed && len(set.SealedProduct) == 0) {
+			continue
+		}
+		break
+	}
+
+	set, _ := mtgmatcher.GetSet(sets[setIndex])
+
+	if sealed {
+		index := rand.Intn(len(set.SealedProduct))
+		return set.SealedProduct[index].UUID
+	}
+
+	index := rand.Intn(len(set.Cards))
+	return set.Cards[index].UUID
 }

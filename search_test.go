@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"testing"
 
@@ -26,18 +25,16 @@ func TestMain(m *testing.M) {
 	loadScrapersNG()
 	DatabaseLoaded = true
 
-	sets := mtgmatcher.GetSets()
-	for _, set := range sets {
-		if len(set.Cards) == 0 {
-			continue
-		}
-		index := rand.Intn(len(set.Cards))
-		NameToBeFound = set.Cards[index].Name
-		EditionToBeFound = set.Name
-		NumberToBeFound = set.Cards[index].Number
-		log.Println("Looking up", NameToBeFound, "from", set.Name, NumberToBeFound)
-		break
+	uuid := randomUUID(false)
+	co, err := mtgmatcher.GetUUID(uuid)
+	if err != nil {
+		log.Fatalln(err)
 	}
+
+	NameToBeFound = co.Name
+	EditionToBeFound = co.Edition
+	NumberToBeFound = co.Number
+	log.Println("Looking up", NameToBeFound, "from", set.Name, NumberToBeFound)
 
 	os.Exit(m.Run())
 }
