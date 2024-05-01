@@ -137,7 +137,6 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	qty, _ := strconv.ParseBool(r.FormValue("qty"))
 	conds, _ := strconv.ParseBool(r.FormValue("conds"))
 	filterByFinish := r.FormValue("finish")
-	showFullName, _ := strconv.ParseBool(r.FormValue("full"))
 
 	// Filter by user preference, as long as it's listed in the enebled stores
 	filterByVendor := r.FormValue("vendor")
@@ -260,9 +259,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		var err error
 		csvWriter := csv.NewWriter(w)
 		if out.Retail != nil {
-			err = BanPrice2CSV(csvWriter, out.Retail, qty, conds, showFullName, isSealed)
+			err = BanPrice2CSV(csvWriter, out.Retail, qty, conds, isSealed)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(csvWriter, out.Buylist, qty, conds, showFullName, isSealed)
+			err = BanPrice2CSV(csvWriter, out.Buylist, qty, conds, isSealed)
 		}
 		if err != nil {
 			log.Println(err)
@@ -631,13 +630,11 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 	return false
 }
 
-func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, shouldCond, shouldFullName, sealed bool) error {
+func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, shouldCond, sealed bool) error {
 	var condKeys []string
 
-	header := []string{"UUID"}
-	if shouldFullName {
-		header = append(header, "TCG Product Id", "Name", "Edition", "Number", "Rarity")
-	}
+	header := []string{"UUID", "TCG Product Id", "Name", "Edition", "Number", "Rarity"}
+
 	header = append(header, "Store", "Regular Price", "Foil Price", "Etched Price")
 	if shouldQty {
 		header = append(header, "Regular Quantity", "Foil Quantity", "Etched Quantity")
@@ -661,22 +658,20 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 
 	for id := range pm {
 		var cardName, edition, number, tcgId, rarity string
-		if shouldFullName {
-			co, err := mtgmatcher.GetUUID(id)
+		co, err := mtgmatcher.GetUUID(id)
+		if err != nil {
+			co, err = mtgmatcher.GetUUID(mtgmatcher.Scryfall2UUID(id))
 			if err != nil {
-				co, err = mtgmatcher.GetUUID(mtgmatcher.Scryfall2UUID(id))
-				if err != nil {
-					continue
-				}
+				continue
 			}
-			cardName = co.Name
-			edition = co.Edition
-			number = co.Number
-			rarity = co.Rarity
-			tcgId = co.Identifiers["tcgplayerProductId"]
-			if co.Etched {
-				tcgId = co.Identifiers["tcgplayerEtchedProductId"]
-			}
+		}
+		cardName = co.Name
+		edition = co.Edition
+		number = co.Number
+		rarity = co.Rarity
+		tcgId = co.Identifiers["tcgplayerProductId"]
+		if co.Etched {
+			tcgId = co.Identifiers["tcgplayerEtchedProductId"]
 		}
 		for scraper, entry := range pm[id] {
 			var regular, foil, etched, sealedPrice string
@@ -707,10 +702,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 				}
 			}
 
-			record := []string{id}
-			if shouldFullName {
-				record = append(record, tcgId, cardName, edition, number, rarity)
-			}
+			record := []string{id, tcgId, cardName, edition, number, rarity}
 			record = append(record, scraper, regular, foil, etched)
 			if shouldQty {
 				record = append(record, regularQty, foilQty, etchedQty)
