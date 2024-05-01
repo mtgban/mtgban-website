@@ -633,7 +633,11 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 }
 
 func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, shouldCond, sealed bool) error {
-	header := []string{"SKU", "TCG Product Id", "Store", "Name", "Edition"}
+	skuHeader := "SKU"
+	if sealed {
+		skuHeader = "UUID"
+	}
+	header := []string{skuHeader, "TCG Product Id", "Store", "Name", "Edition"}
 	if !sealed {
 		header = append(header, "Number", "Finish", "Rarity")
 	}
@@ -723,8 +727,12 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 						}
 					}
 				} else {
-					sku, _ := mtgban.ComputeSKU(co.UUID, entry.Cond, finishes[i])
-
+					var sku string
+					if sealed {
+						sku = co.UUID
+					} else {
+						sku, _ = mtgban.ComputeSKU(co.UUID, entry.Cond, finishes[i])
+					}
 					var cond string
 					if !sealed {
 						cond = entry.Cond
