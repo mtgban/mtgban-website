@@ -260,9 +260,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		var err error
 		csvWriter := csv.NewWriter(w)
 		if out.Retail != nil {
-			err = BanPrice2CSV(csvWriter, out.Retail, qty, conds, showFullName, false)
+			err = BanPrice2CSV(csvWriter, out.Retail, qty, conds, showFullName, isSealed)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(csvWriter, out.Buylist, qty, conds, showFullName, false)
+			err = BanPrice2CSV(csvWriter, out.Buylist, qty, conds, showFullName, isSealed)
 		}
 		if err != nil {
 			log.Println(err)
