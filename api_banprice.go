@@ -31,6 +31,7 @@ type BanPrice struct {
 	QtyEtched  int                `json:"qty_etched,omitempty"`
 	QtySealed  int                `json:"qty_sealed,omitempty"`
 	Conditions map[string]float64 `json:"conditions,omitempty"`
+	Quantities map[string]int     `json:"quantities,omitempty"`
 }
 
 type PriceAPIOutput struct {
@@ -412,8 +413,14 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 				out[id][sellerTag].Conditions = map[string]float64{}
 			}
 			for i := range entries {
-				condTag := entries[i].Conditions
-				out[id][sellerTag].Conditions[condTag+"_etched"] = entries[i].Price
+				condTag := entries[i].Conditions + "_etched"
+				out[id][sellerTag].Conditions[condTag] = entries[i].Price
+				if qty && entries[i].Quantity > 0 {
+					if out[id][sellerTag].Quantities == nil {
+						out[id][sellerTag].Quantities = map[string]int{}
+					}
+					out[id][sellerTag].Quantities[condTag] = entries[i].Quantity
+				}
 			}
 		}
 	} else if co.Foil {
@@ -428,8 +435,14 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 				out[id][sellerTag].Conditions = map[string]float64{}
 			}
 			for i := range entries {
-				condTag := entries[i].Conditions
-				out[id][sellerTag].Conditions[condTag+"_foil"] = entries[i].Price
+				condTag := entries[i].Conditions + "_foil"
+				out[id][sellerTag].Conditions[condTag] = entries[i].Price
+				if qty && entries[i].Quantity > 0 {
+					if out[id][sellerTag].Quantities == nil {
+						out[id][sellerTag].Quantities = map[string]int{}
+					}
+					out[id][sellerTag].Quantities[condTag] = entries[i].Quantity
+				}
 			}
 		}
 	} else {
@@ -444,7 +457,14 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 				out[id][sellerTag].Conditions = map[string]float64{}
 			}
 			for i := range entries {
-				out[id][sellerTag].Conditions[entries[i].Conditions] = entries[i].Price
+				condTag := entries[i].Conditions
+				out[id][sellerTag].Conditions[condTag] = entries[i].Price
+				if qty && entries[i].Quantity > 0 {
+					if out[id][sellerTag].Quantities == nil {
+						out[id][sellerTag].Quantities = map[string]int{}
+					}
+					out[id][sellerTag].Quantities[condTag] = entries[i].Quantity
+				}
 			}
 		}
 	}
@@ -539,8 +559,14 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 				out[id][vendorTag].Conditions = map[string]float64{}
 			}
 			for i := range entries {
-				condTag := entries[i].Conditions
-				out[id][vendorTag].Conditions[condTag+"_etched"] = entries[i].BuyPrice
+				condTag := entries[i].Conditions + "_etched"
+				out[id][vendorTag].Conditions[condTag] = entries[i].BuyPrice
+				if qty && entries[i].Quantity > 0 {
+					if out[id][vendorTag].Quantities == nil {
+						out[id][vendorTag].Quantities = map[string]int{}
+					}
+					out[id][vendorTag].Quantities[condTag] = entries[i].Quantity
+				}
 			}
 		}
 	} else if co.Foil {
@@ -555,8 +581,14 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 				out[id][vendorTag].Conditions = map[string]float64{}
 			}
 			for i := range entries {
-				condTag := entries[i].Conditions
-				out[id][vendorTag].Conditions[condTag+"_foil"] = entries[i].BuyPrice
+				condTag := entries[i].Conditions + "_foil"
+				out[id][vendorTag].Conditions[condTag] = entries[i].BuyPrice
+				if qty && entries[i].Quantity > 0 {
+					if out[id][vendorTag].Quantities == nil {
+						out[id][vendorTag].Quantities = map[string]int{}
+					}
+					out[id][vendorTag].Quantities[condTag] = entries[i].Quantity
+				}
 			}
 		}
 	} else {
@@ -573,6 +605,12 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 			for i := range entries {
 				condTag := entries[i].Conditions
 				out[id][vendorTag].Conditions[condTag] = entries[i].BuyPrice
+				if qty && entries[i].Quantity > 0 {
+					if out[id][vendorTag].Quantities == nil {
+						out[id][vendorTag].Quantities = map[string]int{}
+					}
+					out[id][vendorTag].Quantities[condTag] = entries[i].Quantity
+				}
 			}
 		}
 	}
