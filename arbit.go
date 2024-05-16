@@ -17,7 +17,6 @@ import (
 const (
 	MaxArbitResults = 450
 	MaxPriceRatio   = 120.0
-	MaxSpread       = 650.0
 	MinSpread       = 10.0
 	MaxSpreadGlobal = 1000
 	MinSpreadGlobal = 200.0

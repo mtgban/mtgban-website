@@ -24,6 +24,7 @@ type Sleeper struct {
 const (
 	SleeperSize = 7
 	MaxSleepers = 34
+	MaxSpread   = 650.0
 
 	SleepersMinPrice = 3.0
 
