@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -66,7 +67,7 @@ func getMoxDeck(url string) (*MoxfieldDeck, error) {
 
 	// Check response status code.
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.New("failed to fetch Moxfield deck")
+		return nil, fmt.Errorf("status code: %d", resp.StatusCode)
 	}
 
 	// Read response body into slice.
@@ -128,10 +129,14 @@ func prepareUploadEntries(MoxCards []MoxCard, maxRows int) ([]UploadEntry, error
 func loadMoxfieldDeck(gdocURL string, maxRows int) ([]UploadEntry, error) {
 	moxURL, err := extractDeckID(gdocURL)
 	if err != nil {
+		log.Println(err)
 		return nil, errors.New("invalid Moxfield deck URL")
 	}
+	log.Println("Querying:", moxURL)
+
 	moxDeck, err := getMoxDeck(moxURL)
 	if err != nil {
+		log.Println(err)
 		return nil, errors.New("failed to fetch Moxfield deck")
 	}
 
