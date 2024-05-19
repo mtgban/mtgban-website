@@ -59,7 +59,15 @@ func extractDeckID(gdocURL string) (string, error) {
 
 func getMoxDeck(url string) (*MoxfieldDeck, error) {
 	// Create request to fetch Moxfield deck data.
-	resp, err := cleanhttp.DefaultClient().Get(url)
+	client := cleanhttp.DefaultClient()
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer undefined")
+	req.Header.Set("User-Agent", "curl/8.4.0")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
