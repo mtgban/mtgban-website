@@ -18,6 +18,7 @@ const (
 	MaxArbitResults = 450
 	MaxPriceRatio   = 120.0
 	MinSpread       = 10.0
+	MinProfitable   = 4.0
 	MaxSpreadGlobal = 1000
 	MinSpreadGlobal = 200.0
 
@@ -29,6 +30,8 @@ const (
 
 	MinSpreadHighYield       = 100
 	MinSpreadHighYieldGlobal = 350
+
+	MinProfConstGlobal = 10
 )
 
 var FilteredEditions = []string{
@@ -56,7 +59,7 @@ var FilterOptKeys = []string{
 	"nocomm",
 	"nononrl",
 	"nononabu4h",
-	"onlyshiny",
+	"onlyprof",
 	"noposi",
 	"nopenny",
 	"nobuypenny",
@@ -124,11 +127,10 @@ var FilterOptConfig = map[string]FilterOpt{
 		BetaFlag:  true,
 		NoSealed:  true,
 	},
-	"onlyshiny": {
-		Title: "only Shinies",
+	"onlyprof": {
+		Title: "only Profitable",
 		Func: func(opts *mtgban.ArbitOpts) {
-			opts.OnlyEditions = ShinyEditions
-			opts.OnlyCollectorNumberRanges = ShinyEditionRanges
+			opts.MinProfitability = MinProfitable
 		},
 		BetaFlag: true,
 		NoSealed: true,
@@ -203,38 +205,6 @@ var ABU4H = []string{
 	"Antiquities",
 	"Legends",
 	"The Dark",
-}
-
-var ShinyEditions = []string{
-	"Seventh Edition",
-	"Zendikar Expeditions",
-	"Kaladesh Inventions",
-	"Amonkhet Invocations",
-	"Mythic Edition",
-	"Ultimate Box Topper",
-	"Secret Lair Drop",
-	"Zendikar Rising Expeditions",
-	"Modern Horizons 1 Timeshifts",
-
-	// Filtered below
-	"Ikoria: Lair of Behemoths",
-	"Commander Legends",
-	"Double Masters",
-	"Time Spiral Remastered",
-	"Strixhaven Mystical Archive",
-}
-
-var ShinyEditionRanges = map[string][2]int{
-	// Godzilla series
-	"Ikoria: Lair of Behemoths": {370, 387},
-	// Etched commanders
-	"Commander Legends": {514, 614},
-	// Box toppers
-	"Double Masters": {333, 372},
-	// Timeshifts
-	"Time Spiral Remastered": {290, 411},
-	// JPN cards
-	"Strixhaven Mystical Archive": {64, 126},
 }
 
 type Arbitrage struct {
@@ -596,6 +566,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	if !pageVars.GlobalMode && source.Info().SealedMode {
 		opts.MinSpread = MinSpreadNegative
 		opts.MinDiff = MinDiffNegative
+		opts.ProfitabilityConstant = MinProfConstGlobal
 	}
 
 	// The pool of scrapers that source will be compared against
@@ -701,6 +672,10 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		case "trade_price":
 			sort.Slice(arbit, func(i, j int) bool {
 				return arbit[i].BuylistEntry.TradePrice > arbit[j].BuylistEntry.TradePrice
+			})
+		case "profitability":
+			sort.Slice(arbit, func(i, j int) bool {
+				return arbit[i].Profitability > arbit[j].Profitability
 			})
 		case "diff":
 			sort.Slice(arbit, func(i, j int) bool {

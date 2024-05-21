@@ -367,6 +367,9 @@
                             </th>
                         {{end}}
                         <th class="stickyHeaderTiny">
+                            <a href="javascript:sortBy('profitability', '{{.Name}}')">Profitability</a>
+                        </th>
+                        <th class="stickyHeaderTiny">
                             <a href="javascript:sortBy('diff', '{{.Name}}')">Difference</a>
                         </th>
                         <th class="stickyHeaderTiny">
@@ -440,6 +443,15 @@
                                     $ {{printf "%.2f" .BuylistEntry.TradePrice}}
                                 </td>
                             {{end}}
+                            <td>
+                                <center>
+                                    {{if gt .Spread 0.0}}
+                                        {{printf "%.2f" .Profitability}}
+                                    {{else}}
+                                        n/a
+                                    {{end}}
+                                </center>
+                            </td>
                             <td>
                                 $ {{printf "%.2f" .Difference}}
                             </td>
