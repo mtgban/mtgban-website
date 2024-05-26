@@ -32,6 +32,8 @@ const (
 	MinSpreadHighYieldGlobal = 350
 
 	MinProfConstGlobal = 10
+
+	DefaultSortingOption = "profitability"
 )
 
 var FilteredEditions = []string{
@@ -650,6 +652,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 
 		// Sort as requested
+		if sorting == "" {
+			sorting = DefaultSortingOption
+		}
 		switch sorting {
 		case "available":
 			sort.Slice(arbit, func(i, j int) bool {
@@ -681,7 +686,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			sort.Slice(arbit, func(i, j int) bool {
 				return arbit[i].Difference > arbit[j].Difference
 			})
-		default:
+		case "spread":
 			sort.Slice(arbit, func(i, j int) bool {
 				return arbit[i].Spread > arbit[j].Spread
 			})
