@@ -1021,7 +1021,7 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 
 	// Load quantity, and skip it if it's present and zero
 	idx, found := indexMap["quantity"]
-	if found {
+	if found && idx < len(record) {
 		num, err := getQuantity(record[idx])
 		if err != nil || num == 0 {
 			// Retry in the second quantity data if present
@@ -1040,34 +1040,35 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	}
 
 	idx, found = indexMap["id"]
-	if found {
+	if found && idx < len(record) {
 		res.Card.Id = record[idx]
 	}
 
 	res.Card.Name = record[indexMap["cardName"]]
 	idx, found = indexMap["edition"]
-	if found {
+	if found && idx < len(record) {
 		res.Card.Edition = record[idx]
 	}
 
 	idx, found = indexMap["variant"]
-	if found {
+	if found && idx < len(record) {
 		res.Card.Variation = record[idx]
 	}
 
 	var sku string
 	idx, found = indexMap["sku"]
-	if found {
+	if found && idx < len(record) {
 		sku = strings.ToLower(record[idx])
 	}
 	var conditions string
 	idx, found = indexMap["conditions"]
-	if found {
+	if found && idx < len(record) {
 		conditions = strings.ToLower(record[idx])
 	}
 	var printing string
 	idx, found = indexMap["printing"]
-	if found {
+	if found && idx < len(record) {
+		log.Printf("%+v", indexMap)
 		printing = strings.ToLower(record[idx])
 	}
 	switch printing {
@@ -1085,7 +1086,7 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	}
 
 	idx, found = indexMap["price"]
-	if found {
+	if found && idx < len(record) {
 		res.OriginalPrice, _ = mtgmatcher.ParsePrice(record[idx])
 	}
 
@@ -1105,7 +1106,7 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	}
 
 	idx, found = indexMap["notes"]
-	if found {
+	if found && idx < len(record) {
 		notes := record[idx]
 		if len(notes) > 1024 {
 			notes = notes[:1024]
