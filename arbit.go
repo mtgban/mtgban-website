@@ -31,6 +31,7 @@ const (
 	MinSpreadHighYield       = 100
 	MinSpreadHighYieldGlobal = 350
 
+	ProfConst       = 2
 	ProfConstGlobal = 10
 
 	DefaultSortingOption = "profitability"
@@ -534,7 +535,8 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	pageVars.Metadata = map[string]GenericCard{}
 
 	opts := &mtgban.ArbitOpts{
-		MinSpread: MinSpread,
+		MinSpread:             MinSpread,
+		ProfitabilityConstant: ProfConst,
 	}
 
 	// Set options
