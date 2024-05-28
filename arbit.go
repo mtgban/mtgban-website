@@ -31,7 +31,7 @@ const (
 	MinSpreadHighYield       = 100
 	MinSpreadHighYieldGlobal = 350
 
-	MinProfConstGlobal = 10
+	ProfConstGlobal = 10
 
 	DefaultSortingOption = "profitability"
 )
@@ -568,7 +568,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	if !pageVars.GlobalMode && source.Info().SealedMode {
 		opts.MinSpread = MinSpreadNegative
 		opts.MinDiff = MinDiffNegative
-		opts.ProfitabilityConstant = MinProfConstGlobal
+		opts.ProfitabilityConstant = ProfConstGlobal
 	}
 
 	// The pool of scrapers that source will be compared against
