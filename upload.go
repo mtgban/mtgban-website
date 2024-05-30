@@ -324,7 +324,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Enabled stores: %+v", enabledStores)
 
 	// Reset the cookie for this preference
-	if cachedGdocURL != gdocURL {
+	if len(hashes) == 0 && cachedGdocURL != gdocURL {
 		setCookie(w, r, "gdocURL", gdocURL)
 		pageVars.RemoteLinkURL = gdocURL
 	}
