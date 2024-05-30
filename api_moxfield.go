@@ -19,7 +19,7 @@ type MoxfieldDeck struct {
 }
 
 type MoxBoard struct {
-	Count int
+	Count int                `json:"count"`
 	Cards map[string]MoxCard `json:"cards"`
 }
 
