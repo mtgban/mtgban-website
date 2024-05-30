@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
@@ -141,5 +142,13 @@ func loadMoxfieldDeck(gdocURL string, maxRows int) ([]UploadEntry, error) {
 	}
 
 	moxCards := extractDecklist(moxDeck)
+
+	// Preserve some sort of ordering
+	sort.Slice(moxCards, func(i, j int) bool {
+		uuidI := mtgmatcher.Scryfall2UUID(moxCards[i].Card.ScryfallID)
+		uuidJ := mtgmatcher.Scryfall2UUID(moxCards[j].Card.ScryfallID)
+		return !sortSetsAlphabeticalSet(uuidI, uuidJ)
+	})
+
 	return prepareUploadEntries(moxCards, maxRows)
 }
