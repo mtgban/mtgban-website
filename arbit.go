@@ -682,6 +682,10 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			})
 		case "profitability":
 			sort.Slice(arbit, func(i, j int) bool {
+				// Profitability is NaN when spread is less than 0
+				if arbit[i].Spread < 0 || arbit[j].Spread < 0 {
+					return arbit[i].Spread > arbit[j].Spread
+				}
 				return arbit[i].Profitability > arbit[j].Profitability
 			})
 		case "diff":
