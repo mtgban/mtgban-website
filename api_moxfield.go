@@ -20,19 +20,15 @@ type MoxfieldDeck struct {
 
 type MoxBoard struct {
 	Count int
-	Cards map[string]struct {
-		Quantity int    `json:"quantity"`
-		Finish   string `json:"finish"`
-		Card     struct {
-			ScryfallID string `json:"scryfall_id"`
-		} `json:"card"`
-	} `json:"cards"`
+	Cards map[string]MoxCard `json:"cards"`
 }
 
 type MoxCard struct {
-	ScryfallID string
-	Finish     string
-	Quantity   int
+	Quantity int    `json:"quantity"`
+	Finish   string `json:"finish"`
+	Card     struct {
+		ScryfallID string `json:"scryfall_id"`
+	} `json:"card"`
 }
 
 func extractDeckID(gdocURL string) (string, error) {
@@ -101,11 +97,7 @@ func extractDecklist(data *MoxfieldDeck) []MoxCard {
 	var cardInfoList []MoxCard
 	for _, board := range data.Boards {
 		for _, card := range board.Cards {
-			cardInfoList = append(cardInfoList, MoxCard{
-				ScryfallID: card.Card.ScryfallID,
-				Finish:     card.Finish,
-				Quantity:   card.Quantity,
-			})
+			cardInfoList = append(cardInfoList, card)
 		}
 	}
 	return cardInfoList
@@ -125,7 +117,7 @@ func prepareUploadEntries(MoxCards []MoxCard, maxRows int) ([]UploadEntry, error
 
 		isfoil := detail.Finish == "foil"
 		isetched := detail.Finish == "etched"
-		cardId, err := mtgmatcher.MatchId(detail.ScryfallID, isfoil, isetched)
+		cardId, err := mtgmatcher.MatchId(detail.Card.ScryfallID, isfoil, isetched)
 		entry.CardId = cardId
 		entry.MismatchError = err
 
