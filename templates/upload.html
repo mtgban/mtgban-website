@@ -43,7 +43,7 @@
         <h1>Welcome to BAN Upload</h1>
         <div class="indent">
             <center>
-                <form enctype="multipart/form-data" action="/upload" method="post" id="upload_form">
+                <form {{if not .CardHashes}}enctype="multipart/form-data"{{end}} action="/upload" method="post" id="upload_form">
                     <input type="radio" id="retail" name="mode" value="false" {{if not .IsBuylist}}checked{{end}} onchange="reloadSelect('retail')">
                     <label for="retail">Retail</label>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                     <input type="radio" id="buylist" name="mode" value="true" {{if .IsBuylist}}checked{{end}} onchange="reloadSelect('buylist')" {{if not .CanBuylist}}disabled{{end}}>
