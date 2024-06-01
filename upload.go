@@ -535,6 +535,18 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	var highestTotal float64
 
+	// Choose the alternative reference pricing source when one is not loaded in
+	// Note that only INDEX types are allowed
+	altPriceSource := r.FormValue("altPrice")
+	switch altPriceSource {
+	default:
+		altPriceSource = TCG_LOW
+	case "market":
+		altPriceSource = TCG_MARKET
+	case "direct":
+		altPriceSource = TCG_DIRECT_LOW
+	}
+
 	optimizedResults := map[string][]OptimizedUploadEntry{}
 	optimizedTotals := map[string]float64{}
 
@@ -644,7 +656,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			// Load comparison price, either the loaded one or tcg low
 			comparePrice := uploadedData[i].OriginalPrice
 			if comparePrice == 0 || skipPrices {
-				comparePrice = getPrice(indexResults[cardId][TCG_LOW], "")
+				comparePrice = getPrice(indexResults[cardId][altPriceSource], "")
 			}
 
 			// Load the single item priceprice

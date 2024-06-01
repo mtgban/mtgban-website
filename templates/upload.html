@@ -175,7 +175,13 @@
                             <br>
                             <label for="noprice">
                                 <input type="checkbox" id="noprice" name="noprice" onClick="javascript:saveCheckbox('noprice')">
-                                <p class="h6inline">Ignore prices when loading data (<i>use TCG Low instead</i>)</p>
+                                <p class="h6inline">Ignore prices when loading data (<i>use
+                                    <select id="altPrice" name="altPrice" onChange="javascript:saveText('altPrice')" style="text-align-last=center;">
+                                        <option value="" selected>&nbsp;TCG Low (no S&H)</option>
+                                        <option value="market">&nbsp;TCG Market (w/ S&H)</option>
+                                        <option value="direct">&nbsp;TCG Direct Low</option>
+                                    </select>
+                                    instead</i>)</p>
                             </label>
                             <br>
                             <label for="customperc">
@@ -241,6 +247,7 @@
                 "margin",
                 "sorting",
                 "custompercmax",
+                "altPrice",
             ];
             textInputs.forEach(element => {
                 var input = localStorage.getItem(element);
