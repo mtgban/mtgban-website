@@ -672,7 +672,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 			// Compute spread (and skip if needed)
 			if comparePrice != 0 {
-				spread = price / comparePrice * 100
+				spread = 100 * (comparePrice - price) / price
 
 				if skipLowValue && spread < percSpread {
 					continue
