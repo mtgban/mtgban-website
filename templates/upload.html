@@ -827,6 +827,10 @@
                                                             {{printf "%.2f%%" .Spread}}
                                                         </h{{if gt .Spread 80.0}}3{{else}}4{{end}}4>
                                                     {{end}}
+                                                    {{if .Profitability}}
+                                                        ({{printf "%.2f" .Profitability}})
+                                                        {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}❗{{end}}
+                                                    {{end}}
                                                 </td>
                                             </tr>
                                         {{end}}

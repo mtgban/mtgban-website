@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/url"
 	"path"
@@ -38,6 +39,7 @@ const (
 	MaxUploadFileSize     = 5 << 20
 
 	DefaultPercentageMargin = 0.1
+	ProfitabilityConstant   = 2
 
 	TooManyEntriesMessage = "Note: you reached the maximum number of entries supported by this tool"
 )
@@ -100,6 +102,9 @@ type OptimizedUploadEntry struct {
 
 	// Price used to display a visual indicator
 	VisualPrice float64
+
+	// Profitability index
+	Profitability float64
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
@@ -647,6 +652,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			bestStore := bestStores[j]
 
 			var spread float64
+			var profitability float64
 			conds := uploadedData[i].OriginalCondition
 			if skipConds {
 				conds = ""
@@ -680,17 +686,25 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				if skipHighValue && percSpreadMax != 0 && spread >= percSpreadMax {
 					continue
 				}
+
+				if spread > 0 {
+					profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log(1+spread)
+					if uploadedData[i].Quantity > 1 {
+						profitability *= math.Pow(float64(uploadedData[i].Quantity), 0.25)
+					}
+				}
 			}
 
 			// Break down by store
 			optimizedResults[bestStore] = append(optimizedResults[bestStore], OptimizedUploadEntry{
-				CardId:      cardId,
-				Condition:   conds,
-				Price:       comparePrice,
-				Spread:      spread,
-				BestPrice:   price,
-				Quantity:    uploadedData[i].Quantity,
-				VisualPrice: comparePrice * visualPerc / 100.0,
+				CardId:        cardId,
+				Condition:     conds,
+				Price:         comparePrice,
+				Spread:        spread,
+				BestPrice:     price,
+				Quantity:      uploadedData[i].Quantity,
+				VisualPrice:   comparePrice * visualPerc / 100.0,
+				Profitability: profitability,
 			})
 
 			// Save totals
