@@ -105,6 +105,9 @@ type OptimizedUploadEntry struct {
 
 	// Profitability index
 	Profitability float64
+
+	// Buylist factor, percentage of the compared price
+	Factor float64
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
@@ -653,6 +656,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 			var spread float64
 			var profitability float64
+			var factor float64
+
 			conds := uploadedData[i].OriginalCondition
 			if skipConds {
 				conds = ""
@@ -693,6 +698,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 						profitability *= math.Pow(float64(uploadedData[i].Quantity), 0.25)
 					}
 				}
+
+				factor = price / comparePrice * 100
 			}
 
 			// Break down by store
@@ -705,6 +712,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				Quantity:      uploadedData[i].Quantity,
 				VisualPrice:   comparePrice * visualPerc / 100.0,
 				Profitability: profitability,
+				Factor:        factor,
 			})
 
 			// Save totals
@@ -728,6 +736,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			case "alphabetical":
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
 					return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId)
+				})
+			case "factor":
+				sort.Slice(optimizedResults[store], func(i, j int) bool {
+					return optimizedResults[store][i].Factor > optimizedResults[store][j].Factor
 				})
 			default:
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
