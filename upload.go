@@ -737,6 +737,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
 					return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId)
 				})
+			case "profitability":
+				sort.Slice(optimizedResults[store], func(i, j int) bool {
+					if optimizedResults[store][i].Spread < 0 || optimizedResults[store][j].Spread < 0 {
+						return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
+					}
+					return optimizedResults[store][i].Profitability > optimizedResults[store][j].Profitability
+				})
 			case "factor":
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
 					return optimizedResults[store][i].Factor > optimizedResults[store][j].Factor
