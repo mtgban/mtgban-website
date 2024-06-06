@@ -1,4 +1,4 @@
-module github.com/kodabb/mtgban-website
+module github.com/mtgban/mtgban-website
 
 go 1.19
 
@@ -15,7 +15,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/mackerelio/go-osstat v0.2.4
-	github.com/mtgban/go-mtgban v0.0.0-20231122061259-f1ccbf9561da
+	github.com/mtgban/go-mtgban v0.0.0-20231127103507-61fdf8a05ef8
 	github.com/xuri/excelize/v2 v2.8.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/oauth2 v0.13.0
