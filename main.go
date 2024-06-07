@@ -31,7 +31,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/mtgban-website/config"
+	"example.com/testmodule"
 )
 
 type PageVars struct {
@@ -297,7 +297,7 @@ func init() {
 	}
 }
 
-var AppConfig = config.Config()
+var Config = config.AppConfig{}
 
 var Port string
 var Secret string
@@ -390,7 +390,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		PatreonId:    PatreonClientId,
 		PatreonURL:   PatreonHost,
 		PatreonLogin: showPatreonLogin,
-		EnableFree:   AppConfig.FreeEnable,
+		EnableFree:   Config.FreeEnable,
 	}
 
 	// Allocate a new navigation bar
@@ -423,23 +423,6 @@ func genPageNav(activeTab, sig string) PageVars {
 	return pageVars
 }
 
-func loadVars(cfg string) (err error) {
-	// Load from command line
-	err = loadConfig(cfg)
-	if err != nil {
-		return err
-	}
-	AppConfig, err = loadGoogleCredentials(os.Getenv("SECRET_NAME"))
-	if err != nil {
-		return err
-	}
-	err = openDBs()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func loadConfig(cfg string) (err error) {
 	file, err := os.Open(cfg)
 	if err != nil {
@@ -448,13 +431,13 @@ func loadConfig(cfg string) (err error) {
 	defer file.Close()
 
 	d := json.NewDecoder(file)
-	err = d.Decode(&AppConfig)
+	err = d.Decode(&Config)
 	if err != nil {
 		return err
 	}
 
-	if AppConfig.Port == "" {
-		AppConfig.Port = DefaultConfigPort
+	if Config.Port == "" {
+		Config.Port = DefaultConfigPort
 	}
 
 	// Load from env
@@ -468,11 +451,11 @@ func loadConfig(cfg string) (err error) {
 }
 
 func openDBs() (err error) {
-	Newspaper3dayDB, err = sql.Open("mysql", AppConfig.DBAddress+"/three_day_newspaper")
+	Newspaper3dayDB, err = sql.Open("mysql", Config.DBAddress+"/three_day_newspaper")
 	if err != nil {
 		return err
 	}
-	Newspaper1dayDB, err = sql.Open("mysql", AppConfig.DBAddress+"/newspaper")
+	Newspaper1dayDB, err = sql.Open("mysql", Config.DBAddress+"/newspaper")
 	if err != nil {
 		return err
 	}
@@ -511,26 +494,30 @@ func main() {
 	LogDir = *logdir
 
 	if *port != "" {
-		AppConfig.Port = *port
+		Config.Port = *port
 	}
 
 	// Cache a  signature
-	if AppConfig.FreeEnable {
-		host := AppConfig.FreeHostname
-		level := AppConfig.FreeLevel
+	if Config.FreeEnable {
+		host := Config.FreeHostname
+		level := Config.FreeLevel
 		if host == "" || level == "" {
 			log.Fatalln("missing parameter for free level")
 		}
-		host += ":" + AppConfig.Port
-		_, found := AppConfig.ACL[level]
+		host += ":" + Config.Port
+		_, found := Config.ACL[level]
 		if !found {
-			log.Fatalln("level", level, "not found in the ACLAppConfig")
+			log.Fatalln("level", level, "not found in the ACLConfig")
 		}
 		FreeSignature = sign(host, level, nil)
 		log.Println("Running in free mode")
 	}
 
-	err := loadVars("AppConfig.json")
+	cfg,  err := config.LoadConfigFromSecretManager(os.Getenv("SECRET_NAME"))
+	if err != nil {
+		log.Fatalln("error loading config from secret manager:", err)
+	}
+	Config = *cfg
 	_, err = os.Stat(LogDir)
 	if errors.Is(err, os.ErrNotExist) {
 		err = os.MkdirAll(LogDir, 0700)
@@ -540,7 +527,7 @@ func main() {
 	}
 	LogPages = map[string]*log.Logger{}
 
-	GoogleDocsClient, err = loadGoogleCredentials(AppConfig.GoogleCredentials)
+	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
 	if err != nil {
 		if DevMode {
 			log.Println("error creating a Google client:", err)
@@ -549,7 +536,7 @@ func main() {
 		}
 	}
 
-	GCSBucketClient, err = storage.NewClient(context.Background(), option.WithCredentialsFile(AppConfig.Uploader.ServiceAccount))
+	GCSBucketClient, err = storage.NewClient(context.Background(), option.WithCredentialsFile(Config.Uploader.ServiceAccount))
 	if err != nil {
 		if DevMode {
 			log.Println("error creating the GCSBucketClient:", err)
@@ -643,7 +630,7 @@ func main() {
 	http.HandleFunc("/random", RandomSearch)
 	http.HandleFunc("/randomsealed", RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, AppConfig.DiscordInviteLink, http.StatusFound)
+		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
 	})
 
 	// when navigating to /home it should serve the home page
@@ -680,7 +667,7 @@ func main() {
 	http.HandleFunc("/auth", Auth)
 
 	srv := &http.Server{
-		Addr: ":" + AppConfig.Port,
+		Addr: ":" + Config.Port,
 	}
 
 	done := make(chan os.Signal, 1)
@@ -729,7 +716,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return fmt.Sprintf("$ %0.2f", n)
 		},
 		"seller_name": func(s string) string {
-			for _, scraperData := range AppConfig.Scrapers["sellers"] {
+			for _, scraperData := range Config.Scrapers["sellers"] {
 				if s == scraperData.Shorthand {
 					return scraperData.Name
 				}
@@ -737,7 +724,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return ""
 		},
 		"vendor_name": func(s string) string {
-			for _, scraperData := range AppConfig.Scrapers["vendors"] {
+			for _, scraperData := range Config.Scrapers["vendors"] {
 				if s == scraperData.Shorthand {
 					return scraperData.Name
 				}
@@ -763,7 +750,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return strings.ToLower(s)
 		},
 		"load_partner": func(s string) string {
-			return AppConfig.Affiliate[s]
+			return Config.Affiliate[s]
 		},
 		"uuid2ckid": func(s string) string {
 			for _, vendor := range Vendors {

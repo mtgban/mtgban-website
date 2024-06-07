@@ -1,4 +1,4 @@
-package Config
+package config
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 // Config struct holds the application's configuration
-type Config struct {
+type AppConfig struct {
 	Port                   string            `json:"port"`
 	DBAddress              string            `json:"db_address"`
 	RedisAddr              string            `json:"redis_addr"`
@@ -61,10 +61,10 @@ type Config struct {
 	} `json:"scrapers"`
 }
 
-var config Config
+var config AppConfig
 
 // Load from google secret manager, managed identity handles the auth
-func LoadConfigFromSecretManager(secretname string) (*Config, error) {
+func LoadConfigFromSecretManager(secretname string) (*AppConfig, error) {
 	ctx := context.Background()
 
 	c, err := secretmanager.NewClient(ctx)
