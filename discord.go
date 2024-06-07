@@ -58,12 +58,12 @@ var dg *discordgo.Session
 func setupDiscord() error {
 	var err error
 
-	if AppConfig.DiscordToken == "" {
+	if Config.DiscordToken == "" {
 		return errors.New("no discord token")
 	}
 
 	// Create a new Discord session using the provided bot token.
-	dg, err = discordgo.New("Bot " + AppConfig.DiscordToken)
+	dg, err = discordgo.New("Bot " + Config.DiscordToken)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func setupDiscord() error {
 	// In this example, we only care about receiving message events.
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuilds | discordgo.IntentsGuildMessages)
 
-	DiscordRetailBlocklist = append(AppConfig.SearchRetailBlockList, TCG_DIRECT_LOW)
+	DiscordRetailBlocklist = append(Config.SearchRetailBlockList, TCG_DIRECT_LOW)
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
@@ -90,7 +90,7 @@ func setupDiscord() error {
 
 // Cleanly close down the Discord session.
 func cleanupDiscord() {
-	if AppConfig.DiscordToken == "" {
+	if Config.DiscordToken == "" {
 		return
 	}
 	log.Println("Closing connection with Discord")
@@ -104,7 +104,7 @@ func guildCreate(s *discordgo.Session, gc *discordgo.GuildCreate) {
 	s.UpdateGameStatus(0, "http://mtgban.com")
 
 	// If guild is authorized, then we can proceed as normal
-	if slices.Contains(AppConfig.DiscordAllowList, gc.Guild.ID) {
+	if slices.Contains(Config.DiscordAllowList, gc.Guild.ID) {
 		return
 	}
 	// Skip this check when running on dev
@@ -180,8 +180,8 @@ var filteredEditions = []string{
 
 func parseMessage(content string) (*searchResult, string) {
 	// Clean up query, no blocklist because we only need keys
-	AppConfig := parseSearchOptionsNG(content, nil, nil)
-	query := AppConfig.CleanQuery
+	Config := parseSearchOptionsNG(content, nil, nil)
+	query := Config.CleanQuery
 
 	// Prevent useless invocations
 	if len(query) < 3 && query != "Ow" && query != "X" {
@@ -191,7 +191,7 @@ func parseMessage(content string) (*searchResult, string) {
 	var editionSearched string
 	// Filter out any undersirable sets, unless explicitly requested
 	filterGoldOut := true
-	for _, filter := range AppConfig.CardFilters {
+	for _, filter := range Config.CardFilters {
 		if filter.Name == "edition" {
 			filterGoldOut = false
 			editionSearched = filter.Values[0]
@@ -199,14 +199,14 @@ func parseMessage(content string) (*searchResult, string) {
 		}
 	}
 	if filterGoldOut {
-		AppConfig.CardFilters = append(AppConfig.CardFilters, FilterElem{
+		Config.CardFilters = append(Config.CardFilters, FilterElem{
 			Name:   "edition",
 			Negate: true,
 			Values: filteredEditions,
 		})
 	}
 
-	uuids, err := searchAndFilter(AppConfig)
+	uuids, err := searchAndFilter(Config)
 	if err != nil {
 		// Not found again, let's provide a meaningful error
 		if editionSearched != "" {
@@ -419,7 +419,7 @@ func grabLastSold(cardId string, lang string) ([]embedField, error) {
 	return fields, nil
 }
 
-type AffiliateAppConfig struct {
+type AffiliateConfig struct {
 	// The text upon which the URL is detected
 	Trigger string
 
@@ -429,10 +429,10 @@ type AffiliateAppConfig struct {
 	// Name of the store (displayed in the title)
 	Name string
 
-	// Key to access the AppConfig.Affiliate map
+	// Key to access the Config.Affiliate map
 	Handle string
 
-	// List of query parameters to be set to the same AppConfig value
+	// List of query parameters to be set to the same Config value
 	DefaultFields []string
 
 	// Any custom query parameters to be set with the associated value
@@ -445,7 +445,7 @@ type AffiliateAppConfig struct {
 	FullURL bool
 }
 
-var AffiliateStores []AffiliateAppConfig = []AffiliateAppConfig{
+var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 	{
 		Trigger:       "cardkingdom.com/mtg",
 		Name:          "Card Kingdom",
@@ -564,7 +564,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// Ignore messages coming from unauthorized discords
-	if !slices.Contains(AppConfig.DiscordAllowList, m.GuildID) {
+	if !slices.Contains(Config.DiscordAllowList, m.GuildID) {
 		return
 	}
 
@@ -586,7 +586,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Parse message, look for bot command
 	if !strings.HasPrefix(m.Content, "!") && !strings.HasPrefix(m.Content, "$$") {
 		// Early exit if not running on the main server
-		if m.GuildID != AppConfig.DiscordAllowList[0] {
+		if m.GuildID != Config.DiscordAllowList[0] {
 			return
 		}
 
@@ -674,7 +674,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					// Add the MTGBAN affiliation
 					v := u.Query()
 					for _, value := range store.DefaultFields {
-						v.Set(value, AppConfig.Affiliate[store.Handle])
+						v.Set(value, Config.Affiliate[store.Handle])
 					}
 					for storeField, value := range store.CustomFields {
 						v.Set(storeField, value)
@@ -724,23 +724,23 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var channel chan *discordgo.MessageEmbed
 
 	if allBls {
-		AppConfig := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, AppConfig.SearchBuylistBlockList)
+		Config := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, Config.SearchBuylistBlockList)
 
 		// Skip any store based outside of the US
-		AppConfig.StoreFilters = append(AppConfig.StoreFilters, FilterStoreElem{
+		Config.StoreFilters = append(Config.StoreFilters, FilterStoreElem{
 			Name:   "region_keep_index",
 			Values: []string{"us"},
 		})
 
 		// Skip non-NM buylist prices
-		AppConfig.EntryFilters = append(AppConfig.EntryFilters, FilterEntryElem{
+		Config.EntryFilters = append(Config.EntryFilters, FilterEntryElem{
 			Name:          "condition",
 			Values:        []string{"NM"},
 			OnlyForVendor: true,
 		})
 
-		cardIds, _ := searchAndFilter(AppConfig)
-		foundSellers, foundVendors := searchParallelNG(cardIds, AppConfig)
+		cardIds, _ := searchAndFilter(Config)
+		foundSellers, foundVendors := searchParallelNG(cardIds, Config)
 
 		searchRes.ResultsIndex = processSellersResults(foundSellers, true)
 		searchRes.ResultsSellers = processSellersResults(foundSellers, false)
@@ -868,7 +868,7 @@ func prepareCard(searchRes *searchResult, ogFields []embedField, guildId string,
 		if co.Etched || co.Foil {
 			printing = "Foil"
 		}
-		link = tcgplayer.TCGPlayerProductURL(productId, printing, AppConfig.Affiliate["TCG"], co.Language)
+		link = tcgplayer.TCGPlayerProductURL(productId, printing, Config.Affiliate["TCG"], co.conditions, co.Language)
 	}
 
 	// Add a tag for ease of debugging
@@ -909,7 +909,7 @@ func prepareCard(searchRes *searchResult, ogFields []embedField, guildId string,
 		embed.Footer.Text += "On MTGStocks Interests page\n"
 	}
 	// Show data source on non-ban servers
-	if len(AppConfig.DiscordAllowList) > 0 && guildId != AppConfig.DiscordAllowList[0] {
+	if len(Config.DiscordAllowList) > 0 && guildId != Config.DiscordAllowList[0] {
 		embed.Footer.IconURL = poweredByFooter.IconURL
 		embed.Footer.Text += poweredByFooter.Text
 	}

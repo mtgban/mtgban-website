@@ -103,7 +103,7 @@ var enabledDatasets = []scraperConfig{
 }
 
 func findScraperDataIndex(group, shorthand string) int {
-	for i, scraperData := range AppConfig.Scrapers[group] {
+	for i, scraperData := range Config.Scrapers[group] {
 		if scraperData.Shorthand == shorthand {
 			return i
 		}
@@ -119,7 +119,7 @@ func rdbClientForScraper(group, shorthand string) (*redis.Client, error) {
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
-		DB:   AppConfig.Scrapers[group][idx].RedisIndex,
+		DB: Config.Scrapers[group][idx].RedisIndex,
 	})
 	_, err := redisClient.Ping(context.Background()).Result()
 	if err != nil {

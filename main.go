@@ -29,9 +29,9 @@ import (
 	"gopkg.in/Iwark/spreadsheet.v2"
 	cron "gopkg.in/robfig/cron.v2"
 
+	config "example.com/testmodule"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"example.com/testmodule"
 )
 
 type PageVars struct {
@@ -297,8 +297,6 @@ func init() {
 	}
 }
 
-var Config = config.AppConfig{}
-
 var Port string
 var Secret string
 
@@ -513,7 +511,7 @@ func main() {
 		log.Println("Running in free mode")
 	}
 
-	cfg,  err := config.LoadConfigFromSecretManager(os.Getenv("SECRET_NAME"))
+	cfg, err := config.LoadConfigFromSecretManager(os.Getenv("SECRET_NAME"))
 	if err != nil {
 		log.Fatalln("error loading config from secret manager:", err)
 	}

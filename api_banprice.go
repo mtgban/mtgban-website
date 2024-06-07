@@ -14,11 +14,14 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"golang.org/x/exp/slices"
+	"example.com/testmodule"
 )
 
 const (
 	APIVersion = "1"
 )
+
+var Config = config.AppConfig{}
 
 type BanPrice struct {
 	Regular    float64            `json:"regular,omitempty"`
@@ -66,12 +69,12 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	switch storesOpt {
 	case "ALL_ACCESS":
 		for _, seller := range Sellers {
-			if seller != nil && !slices.Contains(AppConfig.SearchRetailBlockList, seller.Info().Shorthand) {
+			if seller != nil && !slices.Contains(Config.SearchRetailBlockList, seller.Info().Shorthand) {
 				enabledStores = append(enabledStores, seller.Info().Shorthand)
 			}
 		}
 		for _, vendor := range Vendors {
-			if vendor != nil && !slices.Contains(AppConfig.SearchBuylistBlockList, vendor.Info().Shorthand) {
+			if vendor != nil && !slices.Contains(Config.SearchBuylistBlockList, vendor.Info().Shorthand) {
 				enabledStores = append(enabledStores, vendor.Info().Shorthand)
 			}
 		}

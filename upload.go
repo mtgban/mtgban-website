@@ -246,7 +246,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Force stores if not allowed to change them
 	enabledSellers := readCookie(r, "enabledSellers")
 	if len(enabledSellers) == 0 || !canChangeStores {
-		pageVars.EnabledSellers = AppConfig.AffiliatesList
+		pageVars.EnabledSellers = Config.AffiliatesList
 	} else {
 		pageVars.EnabledSellers = strings.Split(enabledSellers, "|")
 	}
@@ -272,7 +272,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Override in case not allowed to change list
 		if !canChangeStores {
-			stores = AppConfig.AffiliatesList
+			stores = Config.AffiliatesList
 		}
 		for _, store := range stores {
 			if slices.Contains(allSellers, store) {
