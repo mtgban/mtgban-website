@@ -436,24 +436,24 @@ type Notification struct {
 // Log and send the notification for a user action
 func ServerNotify(kind, message string, flags ...bool) {
 	log.Println(message)
-	if Config.DiscordNotifHook == "" {
+	if AppConfig.DiscordNotifHook == "" {
 		return
 	}
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 	}
-	go notify(kind, message, Config.DiscordNotifHook)
+	go notify(kind, message, AppConfig.DiscordNotifHook)
 }
 
 // Only send the notification for a user action
 func UserNotify(kind, message string, flags ...bool) {
-	if Config.DiscordHook == "" {
+	if AppConfig.DiscordHook == "" {
 		return
 	}
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 	}
-	go notify(kind, message, Config.DiscordHook)
+	go notify(kind, message, AppConfig.DiscordHook)
 }
 
 func notify(kind, message, hook string) {
@@ -524,13 +524,13 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 	var blocklistRetail, blocklistBuylist []string
 	blocklistRetailOpt := GetParamFromSig(sig, "SearchDisabled")
 	if blocklistRetailOpt == "" {
-		blocklistRetail = Config.SearchRetailBlockList
+		blocklistRetail = AppConfig.SearchRetailBlockList
 	} else if blocklistRetailOpt != "NONE" {
 		blocklistRetail = strings.Split(blocklistRetailOpt, ",")
 	}
 	blocklistBuylistOpt := GetParamFromSig(sig, "SearchBuylistDisabled")
 	if blocklistBuylistOpt == "" {
-		blocklistBuylist = Config.SearchBuylistBlockList
+		blocklistBuylist = AppConfig.SearchBuylistBlockList
 	} else if blocklistBuylistOpt != "NONE" {
 		blocklistBuylist = strings.Split(blocklistBuylistOpt, ",")
 	}

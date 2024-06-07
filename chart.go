@@ -103,7 +103,7 @@ var enabledDatasets = []scraperConfig{
 }
 
 func findScraperDataIndex(group, shorthand string) int {
-	for i, scraperData := range Config.Scrapers[group] {
+	for i, scraperData := range AppConfig.Scrapers[group] {
 		if scraperData.Shorthand == shorthand {
 			return i
 		}
@@ -119,7 +119,7 @@ func rdbClientForScraper(group, shorthand string) (*redis.Client, error) {
 
 	redisClient := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
-		DB:   Config.Scrapers[group][idx].RedisIndex,
+		DB:   AppConfig.Scrapers[group][idx].RedisIndex,
 	})
 	_, err := redisClient.Ping(context.Background()).Result()
 	if err != nil {
@@ -163,8 +163,8 @@ func getDateAxisValues(cardId string) ([]string, error) {
 	return keys, nil
 }
 
-func getDataset(cardId string, labels []string, config scraperConfig) (*Dataset, error) {
-	db, err := rdbClientForScraper(config.Group, config.Shorthand)
+func getDataset(cardId string, labels []string, AppConfig scraperConfig) (*Dataset, error) {
+	db, err := rdbClientForScraper(AppConfig.Group, AppConfig.Shorthand)
 	if err != nil {
 		return nil, err
 	}
@@ -185,9 +185,9 @@ func getDataset(cardId string, labels []string, config scraperConfig) (*Dataset,
 	}
 
 	return &Dataset{
-		Name:   config.PublicName,
+		Name:   AppConfig.PublicName,
 		Data:   data,
-		Color:  config.Color,
-		Hidden: config.Hidden,
+		Color:  AppConfig.Color,
+		Hidden: AppConfig.Hidden,
 	}, nil
 }

@@ -19,8 +19,8 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgstocks"
 	"github.com/mtgban/go-mtgban/tcgplayer"
-	Config "github.com/mtgban/mtgban-website/config"
-) // Remove the invalid declaration
+	"github.com/mtgban/mtgban-website/config"
+)
 
 type dbElement struct {
 	UUID string
@@ -161,7 +161,7 @@ func loadInventoryFromTable(client *bigquery.Client, tableName string) (mtgban.I
 	inv := mtgban.InventoryRecord{}
 
 	// Load the table and iterate on the rows
-	table := client.Dataset(Config.Uploader.DatasetID).Table(tableName)
+	table := client.Dataset(AppConfig.Uploader.DatasetID).Table(tableName)
 	it := table.Read(context.Background())
 	for {
 		var element dbElement
@@ -188,7 +188,7 @@ func loadBuylistFromTable(client *bigquery.Client, tableName string) (mtgban.Buy
 	}
 
 	bl := mtgban.BuylistRecord{}
-	table := client.Dataset(Config.Uploader.DatasetID).Table(tableName)
+	table := client.Dataset(AppConfig.Uploader.DatasetID).Table(tableName)
 	it := table.Read(context.Background())
 	for {
 		var element dbElement
@@ -212,7 +212,7 @@ func loadBQ() error {
 
 	// Set up a context and a BigQuery client.
 	ctx := context.Background()
-	client, err := bigquery.NewClient(ctx, Config.Uploader.ProjectID, option.WithCredentialsFile(Config.Uploader.ServiceAccount))
+	client, err := bigquery.NewClient(ctx, AppConfig.Uploader.ProjectID, option.WithCredentialsFile(AppConfig.Uploader.ServiceAccount))
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func loadBQ() error {
 		var subWg sync.WaitGroup
 		channel := make(chan mtgban.Seller)
 
-		for _, scraperData := range Config.Scrapers["sellers"] {
+		for _, scraperData := range AppConfig.Scrapers["sellers"] {
 			scraperData := scraperData
 			subWg.Add(1)
 			go func() {
@@ -316,7 +316,7 @@ func loadBQ() error {
 		var subWg sync.WaitGroup
 		channel := make(chan mtgban.Vendor)
 
-		for _, scraperData := range Config.Scrapers["vendors"] {
+		for _, scraperData := range AppConfig.Scrapers["vendors"] {
 			scraperData := scraperData
 			subWg.Add(1)
 			go func() {
@@ -409,8 +409,8 @@ func updateScraper(tableName string) error {
 	var found bool
 	var idx int
 	var group string
-	for group = range Config.Scrapers {
-		for i, scraperData := range Config.Scrapers[group] {
+	for group = range AppConfig.Scrapers {
+		for i, scraperData := range AppConfig.Scrapers[group] {
 			if scraperData.TableName == tableName {
 				idx = i
 				found = true
@@ -426,13 +426,13 @@ func updateScraper(tableName string) error {
 	}
 
 	ctx := context.Background()
-	client, err := bigquery.NewClient(ctx, Config.Uploader.ProjectID, option.WithCredentialsFile(Config.Uploader.ServiceAccount))
+	client, err := bigquery.NewClient(ctx, AppConfig.Uploader.ProjectID, option.WithCredentialsFile(AppConfig.Uploader.ServiceAccount))
 	if err != nil {
 		return err
 	}
 
 	now := time.Now()
-	info := Config.Scrapers[group][idx].ScraperInfo
+	info := AppConfig.Scrapers[group][idx].ScraperInfo
 	if group == "sellers" {
 		inv, err := loadInventoryFromTable(client, tableName)
 		if err != nil {

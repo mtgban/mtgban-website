@@ -46,9 +46,9 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
 	// Expand with any custom list if necessary
-	if Config.SleepersBlockList != nil {
-		blocklistRetail = append(blocklistRetail, Config.SleepersBlockList...)
-		blocklistBuylist = append(blocklistBuylist, Config.SleepersBlockList...)
+	if AppConfig.SleepersBlockList != nil {
+		blocklistRetail = append(blocklistRetail, AppConfig.SleepersBlockList...)
+		blocklistBuylist = append(blocklistBuylist, AppConfig.SleepersBlockList...)
 	}
 
 	skipSellersOpt := readCookie(r, "SleepersSellersList")

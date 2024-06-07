@@ -52,87 +52,87 @@ func BenchmarkRegexp(b *testing.B) {
 }
 
 func BenchmarkSearchExact(b *testing.B) {
-	config := SearchConfig{
+	AppConfig := SearchConfig{
 		CleanQuery: NameToBeFound,
 	}
 
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
-		searchParallelNG(allKeys, config)
+		allKeys, _ := searchAndFilter(AppConfig)
+		searchParallelNG(allKeys, AppConfig)
 	}
 }
 
 func BenchmarkSearchPrefix(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("%s sm:prefix", NameToBeFound), nil, nil)
+	AppConfig := parseSearchOptionsNG(fmt.Sprintf("%s sm:prefix", NameToBeFound), nil, nil)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
-		searchParallelNG(allKeys, config)
+		allKeys, _ := searchAndFilter(AppConfig)
+		searchParallelNG(allKeys, AppConfig)
 	}
 }
 
 func BenchmarkSearchAllFromEdition(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("s:%s", EditionToBeFound), nil, nil)
+	AppConfig := parseSearchOptionsNG(fmt.Sprintf("s:%s", EditionToBeFound), nil, nil)
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
-		searchParallelNG(allKeys, config)
+		allKeys, _ := searchAndFilter(AppConfig)
+		searchParallelNG(allKeys, AppConfig)
 	}
 }
 
 func BenchmarkSearchWithEdition(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("%s s:%s", NameToBeFound, EditionToBeFound), nil, nil)
+	AppConfig := parseSearchOptionsNG(fmt.Sprintf("%s s:%s", NameToBeFound, EditionToBeFound), nil, nil)
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
-		searchParallelNG(allKeys, config)
+		allKeys, _ := searchAndFilter(AppConfig)
+		searchParallelNG(allKeys, AppConfig)
 	}
 }
 
 func BenchmarkSearchWithNumber(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("%s cn:%s", NameToBeFound, NumberToBeFound), nil, nil)
+	AppConfig := parseSearchOptionsNG(fmt.Sprintf("%s cn:%s", NameToBeFound, NumberToBeFound), nil, nil)
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
-		searchParallelNG(allKeys, config)
+		allKeys, _ := searchAndFilter(AppConfig)
+		searchParallelNG(allKeys, AppConfig)
 	}
 }
 
 func BenchmarkSearchWithEditionPrefix(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("%s s:%s sm:prefix", NameToBeFound, EditionToBeFound), nil, nil)
+	AppConfig := parseSearchOptionsNG(fmt.Sprintf("%s s:%s sm:prefix", NameToBeFound, EditionToBeFound), nil, nil)
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
-		searchParallelNG(allKeys, config)
+		allKeys, _ := searchAndFilter(AppConfig)
+		searchParallelNG(allKeys, AppConfig)
 	}
 }
 
 func BenchmarkSearchOnlyRetail(b *testing.B) {
-	config := SearchConfig{
+	AppConfig := SearchConfig{
 		CleanQuery:  NameToBeFound,
 		SkipBuylist: true,
 	}
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
-		searchParallelNG(allKeys, config)
+		allKeys, _ := searchAndFilter(AppConfig)
+		searchParallelNG(allKeys, AppConfig)
 	}
 }
 
 func BenchmarkSearchOnlyBuylist(b *testing.B) {
-	config := SearchConfig{
+	AppConfig := SearchConfig{
 		CleanQuery: NameToBeFound,
 		SkipRetail: true,
 	}
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		allKeys, _ := searchAndFilter(config)
-		searchParallelNG(allKeys, config)
+		allKeys, _ := searchAndFilter(AppConfig)
+		searchParallelNG(allKeys, AppConfig)
 	}
 }

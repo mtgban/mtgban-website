@@ -50,7 +50,7 @@ const (
 
 func getUserToken(code, baseURL, ref string) (string, error) {
 	clientId := PatreonClientId
-	secret := Config.Patreon.Secret["ban"]
+	secret := AppConfig.Patreon.Secret["ban"]
 
 	resp, err := cleanhttp.DefaultClient().PostForm(PatreonTokenURL, url.Values{
 		"code":          {code},
@@ -217,7 +217,7 @@ func getUserTier(tc *http.Client, userId string) (string, error) {
 // by the url since it can be relative and thus empty
 func getBaseURL(r *http.Request) string {
 	host := r.Host
-	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
+	if host == "localhost:"+fmt.Sprint(AppConfig.Port) && !DevMode {
 		host = DefaultHost
 	}
 	baseURL := "http://" + host
@@ -253,7 +253,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tierTitle := ""
-	invite, found := Config.Patreon.Emails[userData.Email]
+	invite, found := AppConfig.Patreon.Emails[userData.Email]
 	if found {
 		tierTitle = invite
 	}
@@ -309,7 +309,7 @@ func signHMACSHA1Base64(key []byte, data []byte) string {
 
 func getSignatureFromCookies(r *http.Request) string {
 	// If no signature is provided, use a default one, with no expiration check
-	if Config.FreeEnable {
+	if AppConfig.FreeEnable {
 		return FreeSignature
 	}
 
@@ -442,7 +442,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		secret := os.Getenv("BAN_SECRET")
 		//apiUsersMutex.RLock()
-		user_secret, found := Config.ApiUserSecrets[v.Get("UserEmail")]
+		user_secret, found := AppConfig.ApiUserSecrets[v.Get("UserEmail")]
 		//apiUsersMutex.RUnlock()
 		if found {
 			secret = user_secret
@@ -650,7 +650,7 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 
 func getValuesForTier(tierTitle string) url.Values {
 	v := url.Values{}
-	tier, found := Config.ACL[tierTitle]
+	tier, found := AppConfig.ACL[tierTitle]
 	if !found {
 		return v
 	}
@@ -681,7 +681,7 @@ func sign(link string, tierTitle string, userData *PatreonUserData) string {
 	}
 
 	duration := DefaultSignatureDuration
-	if Config.FreeEnable {
+	if AppConfig.FreeEnable {
 		duration = FreeSignatureDuration
 	}
 	expires := time.Now().Add(duration)

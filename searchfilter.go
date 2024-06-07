@@ -465,7 +465,7 @@ func init() {
 	re = regexp.MustCompile(regexpOptions)
 }
 
-func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string) (config SearchConfig) {
+func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string) (AppConfig SearchConfig) {
 	var filters []FilterElem
 	var filterStores []FilterStoreElem
 	var filterPrices []FilterPriceElem
@@ -503,32 +503,32 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			}
 
 			// Save the last name found
-			config.CleanQuery = co.Name
+			AppConfig.CleanQuery = co.Name
 			// Rebuild the full query for this card
-			config.FullQuery = co.Name
+			AppConfig.FullQuery = co.Name
 			if !co.Sealed {
-				config.FullQuery += " s:" + co.SetCode + " cn:" + co.Number
+				AppConfig.FullQuery += " s:" + co.SetCode + " cn:" + co.Number
 				if co.Etched {
-					config.FullQuery += " f:etched"
+					AppConfig.FullQuery += " f:etched"
 				} else if co.Foil {
-					config.FullQuery += " f:foil"
+					AppConfig.FullQuery += " f:foil"
 				}
 			}
 
 			// Set the special search mode and its data source
-			config.SearchMode = "hashing"
-			config.UUIDs = append(config.UUIDs, uuid)
+			AppConfig.SearchMode = "hashing"
+			AppConfig.UUIDs = append(AppConfig.UUIDs, uuid)
 		}
 
 		// Early return if hash was found
-		if config.SearchMode != "" {
+		if AppConfig.SearchMode != "" {
 			// When multiple fields are requested it's impossible to rebuild
 			// the query, so just ignore it
-			if len(config.UUIDs) != 1 {
-				config.CleanQuery = ""
-				config.FullQuery = ""
+			if len(AppConfig.UUIDs) != 1 {
+				AppConfig.CleanQuery = ""
+				AppConfig.FullQuery = ""
 			}
-			config.StoreFilters = filterStores
+			AppConfig.StoreFilters = filterStores
 			return
 		}
 	}
@@ -575,26 +575,26 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		switch option {
 		// Options that modify the search engine
 		case "sm":
-			config.SearchMode = strings.ToLower(code)
+			AppConfig.SearchMode = strings.ToLower(code)
 		case "skip":
 			switch strings.ToLower(code) {
 			case "retail":
-				config.SkipRetail = true
+				AppConfig.SkipRetail = true
 			case "buylist":
-				config.SkipBuylist = true
+				AppConfig.SkipBuylist = true
 			case "nosales":
-				config.SkipEmptyRetail = true
+				AppConfig.SkipEmptyRetail = true
 			case "nobuys":
-				config.SkipEmptyBuylist = true
+				AppConfig.SkipEmptyBuylist = true
 			case "empty":
-				config.SkipEmptyRetail = true
-				config.SkipEmptyBuylist = true
+				AppConfig.SkipEmptyRetail = true
+				AppConfig.SkipEmptyBuylist = true
 			}
 		case "sort":
 			code = strings.ToLower(code)
 			switch code {
 			case "chrono", "alpha", "retail", "buylist":
-				config.SortMode = code
+				AppConfig.SortMode = code
 			}
 		// This option loads a specific set of uuids from a deck list, which is similar
 		// to "unpack", but with the difference that identical ids are not skipped
@@ -607,8 +607,8 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			if mtgmatcher.SealedIsRandom(co.SetCode, co.UUID) {
 				continue
 			}
-			config.SearchMode = "hashing"
-			config.UUIDs, _ = mtgmatcher.GetPicksForSealed(co.SetCode, co.UUID)
+			AppConfig.SearchMode = "hashing"
+			AppConfig.UUIDs, _ = mtgmatcher.GetPicksForSealed(co.SetCode, co.UUID)
 
 		// Options that modify the card searches
 		case "s", "edition":
@@ -711,7 +711,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Values: fixupPicks(code),
 			})
 		case "contents":
-			config.SearchMode = "mixed"
+			AppConfig.SearchMode = "mixed"
 			filters = append(filters, FilterElem{
 				Name:   "contents",
 				Negate: negate,
@@ -730,11 +730,11 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			// Skip empty result entries when filtering by either option
 			switch option {
 			case "aseller":
-				config.SkipEmptyRetail = true
+				AppConfig.SkipEmptyRetail = true
 				isSeller = true
 				option = "seller"
 			case "seller":
-				config.SkipEmptyRetail = true
+				AppConfig.SkipEmptyRetail = true
 				isSeller = true
 				option = "seller_keep_index"
 				// When filtering out, use the more generic function
@@ -742,7 +742,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 					option = "seller"
 				}
 			case "buylist":
-				config.SkipEmptyBuylist = true
+				AppConfig.SkipEmptyBuylist = true
 				isVendor = true
 			}
 			filterStores = append(filterStores, FilterStoreElem{
@@ -777,19 +777,19 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			case "price":
 				isSeller = true
 				price4store = price4seller
-				config.SkipEmptyRetail = true
+				AppConfig.SkipEmptyRetail = true
 			case "buy_price":
 				isVendor = true
 				price4store = price4vendor
-				config.SkipEmptyBuylist = true
+				AppConfig.SkipEmptyBuylist = true
 			case "arb_price":
 				isSeller = true
 				price4store = price4vendor
-				config.SkipEmptyRetail = true
+				AppConfig.SkipEmptyRetail = true
 			case "rev_price":
 				isVendor = true
 				price4store = price4seller
-				config.SkipEmptyBuylist = true
+				AppConfig.SkipEmptyBuylist = true
 			}
 			var optName string
 			switch operation {
@@ -843,7 +843,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 	}
 
 	// Support Scryfall bot syntax only when the search mode is not set
-	if config.SearchMode == "" && strings.Contains(query, "|") {
+	if AppConfig.SearchMode == "" && strings.Contains(query, "|") {
 		elements := strings.Split(query, "|")
 		query = elements[0]
 		extraQuery := strings.TrimSpace(elements[0])
@@ -857,11 +857,11 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		filters = append(filters, extraConfig.CardFilters...)
 	}
 
-	config.CleanQuery = strings.TrimSpace(query)
-	config.CardFilters = filters
-	config.StoreFilters = filterStores
-	config.PriceFilters = filterPrices
-	config.EntryFilters = filterEntries
+	AppConfig.CleanQuery = strings.TrimSpace(query)
+	AppConfig.CardFilters = filters
+	AppConfig.StoreFilters = filterStores
+	AppConfig.PriceFilters = filterPrices
+	AppConfig.EntryFilters = filterEntries
 
 	return
 }

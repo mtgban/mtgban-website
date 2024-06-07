@@ -201,13 +201,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 
-	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist)
+	AppConfig := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist)
 	if pageVars.IsSealed {
-		config.SearchMode = "sealed"
+		AppConfig.SearchMode = "sealed"
 	}
 
-	if config.SortMode != "" {
-		pageVars.SearchSort = config.SortMode
+	if AppConfig.SortMode != "" {
+		pageVars.SearchSort = AppConfig.SortMode
 		pageVars.NoSort = true
 	}
 
@@ -219,7 +219,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// Skip promotional entries (unless specified)
 			case "hidePromos":
 				var skipOption bool
-				for _, filter := range config.CardFilters {
+				for _, filter := range AppConfig.CardFilters {
 					if filter.Name == "is" {
 						for _, value := range filter.Values {
 							if value == "promo" && !filter.Negate {
@@ -229,7 +229,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				if !skipOption {
-					config.CardFilters = append(config.CardFilters, FilterElem{
+					AppConfig.CardFilters = append(AppConfig.CardFilters, FilterElem{
 						Name:   "is",
 						Negate: true,
 						Values: []string{"promo"},
@@ -237,15 +237,15 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				}
 			// Skip non-NM buylist prices
 			case "hideBLconds":
-				config.EntryFilters = append(config.EntryFilters, FilterEntryElem{
+				AppConfig.EntryFilters = append(AppConfig.EntryFilters, FilterEntryElem{
 					Name:          "condition",
 					Values:        []string{"NM"},
 					OnlyForVendor: true,
 				})
 			// Skip results with no prices
 			case "skipEmpty":
-				config.SkipEmptyRetail = true
-				config.SkipEmptyBuylist = true
+				AppConfig.SkipEmptyRetail = true
+				AppConfig.SkipEmptyBuylist = true
 			case "noSyp":
 				hideSyp = true
 			}
@@ -256,7 +256,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	downloadCSV := r.FormValue("downloadCSV")
 	if canDownloadCSV && downloadCSV != "" {
 		// Perform the search
-		selectedUUIDs, err := searchAndFilter(config)
+		selectedUUIDs, err := searchAndFilter(AppConfig)
 		if err != nil {
 			UserNotify("search", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
@@ -312,25 +312,25 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allKeys, err := searchAndFilter(config)
+	allKeys, err := searchAndFilter(AppConfig)
 	if err != nil {
 		pageVars.InfoMessage = NoCardsMessage
 		render(w, "search.html", pageVars)
 		return
 	}
 
-	foundSellers, foundVendors := searchParallelNG(allKeys, config)
+	foundSellers, foundVendors := searchParallelNG(allKeys, AppConfig)
 
-	cleanQuery := config.CleanQuery
-	canShowAll := (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
+	cleanQuery := AppConfig.CleanQuery
+	canShowAll := (len(AppConfig.CardFilters) != 0 || len(AppConfig.UUIDs) != 0)
 
 	// Only used in hashing searches, fill in data with what is available
-	if config.FullQuery != "" {
-		pageVars.SearchQuery = config.FullQuery
+	if AppConfig.FullQuery != "" {
+		pageVars.SearchQuery = AppConfig.FullQuery
 	}
 
 	// If SkipEmptyBuylist or SkipEmptyRetail are set, we need to remove ids from allKeys
-	if config.SkipEmptyBuylist {
+	if AppConfig.SkipEmptyBuylist {
 		var filteredKeys []string
 
 		// Skip if nothing was found in buylist
@@ -342,7 +342,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 		allKeys = filteredKeys
 	}
-	if config.SkipEmptyRetail {
+	if AppConfig.SkipEmptyRetail {
 		var filteredKeys []string
 
 		// Skip if nothing was found in retail or only INDEX entries were found
@@ -596,14 +596,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			pageVars.AxisLabels = labels
 			pageVars.ChartID = chartId
 
-			for _, config := range enabledDatasets {
-				if co.Sealed && !config.HasSealed {
+			for _, AppConfig := range enabledDatasets {
+				if co.Sealed && !AppConfig.HasSealed {
 					continue
 				}
-				if !co.Sealed && config.OnlySealed {
+				if !co.Sealed && AppConfig.OnlySealed {
 					continue
 				}
-				dataset, err := getDataset(chartId, labels, config)
+				dataset, err := getDataset(chartId, labels, AppConfig)
 				if err != nil {
 					log.Println(err)
 					continue
@@ -673,13 +673,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry) {
+func searchSellersNG(cardIds []string, AppConfig SearchConfig) (foundSellers map[string]map[string][]SearchEntry) {
 	// Allocate memory
 	foundSellers = map[string]map[string][]SearchEntry{}
 
-	storeFilters := config.StoreFilters
-	priceFilters := config.PriceFilters
-	entryFilters := config.EntryFilters
+	storeFilters := AppConfig.StoreFilters
+	priceFilters := AppConfig.PriceFilters
+	entryFilters := AppConfig.EntryFilters
 
 	// Search sellers
 	for _, seller := range Sellers {
@@ -761,12 +761,12 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 	return
 }
 
-func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[string]map[string][]SearchEntry) {
+func searchVendorsNG(cardIds []string, AppConfig SearchConfig) (foundVendors map[string]map[string][]SearchEntry) {
 	foundVendors = map[string]map[string][]SearchEntry{}
 
-	storeFilters := config.StoreFilters
-	priceFilters := config.PriceFilters
-	entryFilters := config.EntryFilters
+	storeFilters := AppConfig.StoreFilters
+	priceFilters := AppConfig.PriceFilters
+	entryFilters := AppConfig.EntryFilters
 
 	for _, vendor := range Vendors {
 		if shouldSkipStoreNG(vendor, storeFilters) {
@@ -824,13 +824,13 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 	return
 }
 
-func searchAndFilter(config SearchConfig) ([]string, error) {
-	query := config.CleanQuery
-	filters := config.CardFilters
+func searchAndFilter(AppConfig SearchConfig) ([]string, error) {
+	query := AppConfig.CleanQuery
+	filters := AppConfig.CardFilters
 
 	var uuids []string
 	var err error
-	switch config.SearchMode {
+	switch AppConfig.SearchMode {
 	case "exact":
 		uuids, err = mtgmatcher.SearchEquals(query)
 	case "any":
@@ -838,7 +838,7 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 	case "prefix":
 		uuids, err = mtgmatcher.SearchHasPrefix(query)
 	case "hashing":
-		uuids = config.UUIDs
+		uuids = AppConfig.UUIDs
 	case "regexp":
 		uuids, err = mtgmatcher.SearchRegexp(query)
 	case "sealed":
@@ -921,19 +921,19 @@ func attemptMatch(query string) ([]string, error) {
 	return uuids, nil
 }
 
-func searchParallelNG(cardIds []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry, foundVendors map[string]map[string][]SearchEntry) {
+func searchParallelNG(cardIds []string, AppConfig SearchConfig) (foundSellers map[string]map[string][]SearchEntry, foundVendors map[string]map[string][]SearchEntry) {
 	var wg sync.WaitGroup
 	wg.Add(2)
 
 	go func() {
-		if !config.SkipRetail {
-			foundSellers = searchSellersNG(cardIds, config)
+		if !AppConfig.SkipRetail {
+			foundSellers = searchSellersNG(cardIds, AppConfig)
 		}
 		wg.Done()
 	}()
 	go func() {
-		if !config.SkipBuylist {
-			foundVendors = searchVendorsNG(cardIds, config)
+		if !AppConfig.SkipBuylist {
+			foundVendors = searchVendorsNG(cardIds, AppConfig)
 		}
 		wg.Done()
 	}()

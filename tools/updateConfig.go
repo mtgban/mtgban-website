@@ -31,12 +31,12 @@ func downloadScrapersConfig(path string) (map[string]*ScraperConfig, error) {
 	}
 	defer rc.Close()
 
-	var config map[string]*ScraperConfig
-	err = json.NewDecoder(rc).Decode(&config)
-	return config, err
+	var AppConfig map[string]*ScraperConfig
+	err = json.NewDecoder(rc).Decode(&AppConfig)
+	return AppConfig, err
 }
 
-func uploadScrapersConfig(config map[string]*ScraperConfig, path string) error {
+func uploadScrapersConfig(AppConfig map[string]*ScraperConfig, path string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultUploaderTimeout)
 	defer cancel()
 
@@ -44,7 +44,7 @@ func uploadScrapersConfig(config map[string]*ScraperConfig, path string) error {
 	wc.ContentType = "application/json"
 	defer wc.Close()
 
-	return json.NewEncoder(wc).Encode(&config)
+	return json.NewEncoder(wc).Encode(&AppConfig)
 }
 
 var GCSBucketClient *storage.Client
@@ -70,28 +70,28 @@ func update(args Arguments) error {
 	GCSBucketClient = gcsClient
 	BucketName = args.bucketName
 
-	config, err := downloadScrapersConfig(args.target)
+	AppConfig, err := downloadScrapersConfig(args.target)
 	if err != nil {
 		return err
 	}
 
 	if args.deleteEntry {
-		delete(config, args.key)
+		delete(AppConfig, args.key)
 	} else {
-		_, found := config[args.key]
+		_, found := AppConfig[args.key]
 		if !found {
 			if args.name == "" {
 				return errors.New("missing argument")
 			}
-			config[args.key] = &ScraperConfig{
+			AppConfig[args.key] = &ScraperConfig{
 				Name:      args.name,
 				Shorthand: args.key,
 			}
 		}
-		config[args.key].Path = args.path
+		AppConfig[args.key].Path = args.path
 	}
 
-	return uploadScrapersConfig(config, args.target)
+	return uploadScrapersConfig(AppConfig, args.target)
 }
 
 func run() error {

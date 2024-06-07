@@ -53,7 +53,7 @@ func sendCardConduitEstimate(items []CCItem) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+Config.Api["cardconduit"])
+	req.Header.Set("Authorization", "Bearer "+AppConfig.Api["cardconduit"])
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
