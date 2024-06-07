@@ -233,7 +233,6 @@ var OrderNav = []string{
 	"Global",
 	"Arbit",
 	"Reverse",
-	"Admin",
 }
 
 // The Loggers where each page may log to
@@ -293,15 +292,6 @@ func init() {
 			Link:   "/reverse",
 			Handle: Reverse,
 			Page:   "arbit.html",
-		},
-		"Admin": NavElem{
-			Name:   "Admin",
-			Short:  "❌",
-			Link:   "/admin",
-			Handle: Admin,
-			Page:   "admin.html",
-
-			AlwaysOnForDev: true,
 		},
 	}
 }
