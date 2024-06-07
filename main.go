@@ -31,6 +31,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/config"
 )
 
 type PageVars struct {
@@ -296,56 +297,10 @@ func init() {
 	}
 }
 
-var Config struct {
-	Port                   string            `json:"port"`
-	DBAddress              string            `json:"db_address"`
-	RedisAddr              string            `json:"redis_addr"`
-	DiscordHook            string            `json:"discord_hook"`
-	DiscordNotifHook       string            `json:"discord_notif_hook"`
-	DiscordInviteLink      string            `json:"discord_invite_link"`
-	Affiliate              map[string]string `json:"affiliate"`
-	AffiliatesList         []string          `json:"affiliates_list"`
-	Api                    map[string]string `json:"api"`
-	DiscordToken           string            `json:"discord_token"`
-	DiscordAllowList       []string          `json:"discord_allowlist"`
-	DevSellers             []string          `json:"dev_sellers"`
-	ArbitDefaultSellers    []string          `json:"arbit_default_sellers"`
-	ArbitBlockVendors      []string          `json:"arbit_block_vendors"`
-	SearchRetailBlockList  []string          `json:"search_block_list"`
-	SearchBuylistBlockList []string          `json:"search_buylist_block_list"`
-	SleepersBlockList      []string          `json:"sleepers_block_list"`
-	GlobalAllowList        []string          `json:"global_allow_list"`
-	GlobalProbeList        []string          `json:"global_probe_list"`
-	Patreon                struct {
-		Secret map[string]string `json:"secret"`
-		Emails map[string]string `json:"emails"`
-	} `json:"patreon"`
-	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
-	GoogleCredentials string            `json:"google_credentials"`
+var AppConfig = config.Config()
 
-	ACL map[string]map[string]map[string]string `json:"acl"`
-
-	FreeEnable   bool   `json:"free_enable"`
-	FreeLevel    string `json:"free_level"`
-	FreeHostname string `json:"free_hostname"`
-
-	Uploader struct {
-		ServiceAccount string `json:"service_account"`
-		BucketName     string `json:"bucket_name"`
-		ProjectID      string `json:"project_id"`
-		DatasetID      string `json:"dataset_id"`
-	} `json:"uploader"`
-
-	Scrapers map[string][]struct {
-		HasRedis   bool   `json:"has_redis,omitempty"`
-		RedisIndex int    `json:"redis_index,omitempty"`
-		TableName  string `json:"table_name"`
-		mtgban.ScraperInfo
-	} `json:"scrapers"`
-
-	/* The location of the configuation file */
-	filePath string
-}
+var Port string
+var Secret string
 
 var DevMode bool
 var SigCheck bool
@@ -435,7 +390,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		PatreonId:    PatreonClientId,
 		PatreonURL:   PatreonHost,
 		PatreonLogin: showPatreonLogin,
-		EnableFree:   Config.FreeEnable,
+		EnableFree:   AppConfig.FreeEnable,
 	}
 
 	// Allocate a new navigation bar
@@ -468,8 +423,24 @@ func genPageNav(activeTab, sig string) PageVars {
 	return pageVars
 }
 
-func loadVars(cfg string) error {
+func loadVars(cfg string) (err error) {
 	// Load from command line
+	err = loadConfig(cfg)
+	if err != nil {
+		return err
+	}
+	AppConfig, err = loadGoogleCredentials(os.Getenv("SECRET_NAME"))
+	if err != nil {
+		return err
+	}
+	err = openDBs()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func loadConfig(cfg string) (err error) {
 	file, err := os.Open(cfg)
 	if err != nil {
 		return err
@@ -477,15 +448,13 @@ func loadVars(cfg string) error {
 	defer file.Close()
 
 	d := json.NewDecoder(file)
-	err = d.Decode(&Config)
+	err = d.Decode(&AppConfig)
 	if err != nil {
 		return err
 	}
 
-	Config.filePath = cfg
-
-	if Config.Port == "" {
-		Config.Port = DefaultConfigPort
+	if AppConfig.Port == "" {
+		AppConfig.Port = DefaultConfigPort
 	}
 
 	// Load from env
@@ -499,11 +468,11 @@ func loadVars(cfg string) error {
 }
 
 func openDBs() (err error) {
-	Newspaper3dayDB, err = sql.Open("mysql", Config.DBAddress+"/three_day_newspaper")
+	Newspaper3dayDB, err = sql.Open("mysql", AppConfig.DBAddress+"/three_day_newspaper")
 	if err != nil {
 		return err
 	}
-	Newspaper1dayDB, err = sql.Open("mysql", Config.DBAddress+"/newspaper")
+	Newspaper1dayDB, err = sql.Open("mysql", AppConfig.DBAddress+"/newspaper")
 	if err != nil {
 		return err
 	}
@@ -524,10 +493,8 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-const DefaultConfigPath = "config.json"
-
 func main() {
-	config := flag.String("cfg", DefaultConfigPath, "Load configuration file")
+	// Parse command line flags
 	devMode := flag.Bool("dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	skipInitialRefresh := flag.Bool("skip", false, "Skip initial refresh")
@@ -543,31 +510,27 @@ func main() {
 	}
 	LogDir = *logdir
 
-	// load necessary environmental variables
-	err := loadVars(*config)
-	if err != nil {
-		log.Fatalln("unable to load config file:", err)
-	}
 	if *port != "" {
-		Config.Port = *port
+		AppConfig.Port = *port
 	}
 
 	// Cache a  signature
-	if Config.FreeEnable {
-		host := Config.FreeHostname
-		level := Config.FreeLevel
+	if AppConfig.FreeEnable {
+		host := AppConfig.FreeHostname
+		level := AppConfig.FreeLevel
 		if host == "" || level == "" {
 			log.Fatalln("missing parameter for free level")
 		}
-		host += ":" + Config.Port
-		_, found := Config.ACL[level]
+		host += ":" + AppConfig.Port
+		_, found := AppConfig.ACL[level]
 		if !found {
-			log.Fatalln("level", level, "not found in the ACL config")
+			log.Fatalln("level", level, "not found in the ACLAppConfig")
 		}
 		FreeSignature = sign(host, level, nil)
 		log.Println("Running in free mode")
 	}
 
+	err := loadVars("AppConfig.json")
 	_, err = os.Stat(LogDir)
 	if errors.Is(err, os.ErrNotExist) {
 		err = os.MkdirAll(LogDir, 0700)
@@ -577,7 +540,7 @@ func main() {
 	}
 	LogPages = map[string]*log.Logger{}
 
-	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
+	GoogleDocsClient, err = loadGoogleCredentials(AppConfig.GoogleCredentials)
 	if err != nil {
 		if DevMode {
 			log.Println("error creating a Google client:", err)
@@ -586,7 +549,7 @@ func main() {
 		}
 	}
 
-	GCSBucketClient, err = storage.NewClient(context.Background(), option.WithCredentialsFile(Config.Uploader.ServiceAccount))
+	GCSBucketClient, err = storage.NewClient(context.Background(), option.WithCredentialsFile(AppConfig.Uploader.ServiceAccount))
 	if err != nil {
 		if DevMode {
 			log.Println("error creating the GCSBucketClient:", err)
@@ -680,7 +643,7 @@ func main() {
 	http.HandleFunc("/random", RandomSearch)
 	http.HandleFunc("/randomsealed", RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
+		http.Redirect(w, r, AppConfig.DiscordInviteLink, http.StatusFound)
 	})
 
 	// when navigating to /home it should serve the home page
@@ -717,7 +680,7 @@ func main() {
 	http.HandleFunc("/auth", Auth)
 
 	srv := &http.Server{
-		Addr: ":" + Config.Port,
+		Addr: ":" + AppConfig.Port,
 	}
 
 	done := make(chan os.Signal, 1)
@@ -766,7 +729,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return fmt.Sprintf("$ %0.2f", n)
 		},
 		"seller_name": func(s string) string {
-			for _, scraperData := range Config.Scrapers["sellers"] {
+			for _, scraperData := range AppConfig.Scrapers["sellers"] {
 				if s == scraperData.Shorthand {
 					return scraperData.Name
 				}
@@ -774,7 +737,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return ""
 		},
 		"vendor_name": func(s string) string {
-			for _, scraperData := range Config.Scrapers["vendors"] {
+			for _, scraperData := range AppConfig.Scrapers["vendors"] {
 				if s == scraperData.Shorthand {
 					return scraperData.Name
 				}
@@ -800,7 +763,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return strings.ToLower(s)
 		},
 		"load_partner": func(s string) string {
-			return Config.Affiliate[s]
+			return AppConfig.Affiliate[s]
 		},
 		"uuid2ckid": func(s string) string {
 			for _, vendor := range Vendors {

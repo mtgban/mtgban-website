@@ -19,7 +19,8 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgstocks"
 	"github.com/mtgban/go-mtgban/tcgplayer"
-)
+	Config "github.com/mtgban/mtgban-website/config"
+) // Remove the invalid declaration
 
 type dbElement struct {
 	UUID string
@@ -73,8 +74,8 @@ func loadBQcron() {
 	}
 }
 
-const SellersPath = "sellers"
-const VendorsPath = "vendors"
+var SellersPath string = AppConfig.SellersFilePath
+var VendorsPath string = AppConfig.VendorsFilePath
 
 func startup() error {
 	errS, errV := mkDirIfNotExisting(SellersPath), mkDirIfNotExisting(VendorsPath)
