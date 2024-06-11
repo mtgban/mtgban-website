@@ -1015,7 +1015,6 @@ func loadInfos() {
 
 	for _, seller := range []mtgban.Seller{
 		mtgstocks.NewScraper(),
-		mtgstocks.NewScraperIndex(),
 		tcgplayer.NewScraperSYP(),
 	} {
 		loadInfoScraper(seller)

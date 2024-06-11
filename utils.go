@@ -220,9 +220,8 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 
 	var stocksURL string
 	_, sypList := Infos["TCGSYPList"][cardId]
-	_, stocks := Infos["STKS"][cardId]
-	entries, found := Infos["STKSIndex"][cardId]
-	if found {
+	entries, stocks := Infos["STKS"][cardId]
+	if stocks {
 		stocksURL = entries[0].URL
 	}
 
