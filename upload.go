@@ -44,8 +44,11 @@ const (
 	TooManyEntriesMessage = "Note: you reached the maximum number of entries supported by this tool"
 )
 
-// Keep TCG_DIRECT_LOW last so that it can be ignored ranges and used as backup only
+// List of ALL index prices to track
 var UploadIndexKeys = []string{TCG_LOW, TCG_MARKET, TCG_DIRECT, TCG_DIRECT_LOW}
+
+// List of index prices to show by default (must be a subset of UploadIndexKeys)
+var UploadIndexKeysPublic = []string{TCG_LOW, TCG_MARKET, TCG_DIRECT}
 
 var ErrUploadDecklist = errors.New("decklist")
 var ErrReloadFirstRow = errors.New("firstrow")
@@ -499,7 +502,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	indexResults := getSellerPrices("", UploadIndexKeys, "", cardIds, "", false, shouldCheckForConditions, false)
-	pageVars.IndexKeys = UploadIndexKeys[:len(UploadIndexKeys)-1]
+	pageVars.IndexKeys = UploadIndexKeysPublic
 
 	// Orders implies priority of argument search
 	pageVars.Metadata = map[string]GenericCard{}
