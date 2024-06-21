@@ -82,7 +82,7 @@ type UploadEntry struct {
 	// Quantity as found in the source data
 	Quantity int
 
-	// Price as found in the source data
+	// Value exported as-is (up to 1024 characters) from the source data
 	Notes string
 }
 
