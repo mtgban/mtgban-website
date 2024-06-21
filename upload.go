@@ -50,6 +50,9 @@ var UploadIndexKeys = []string{TCG_LOW, TCG_MARKET, TCG_DIRECT, TCG_DIRECT_LOW}
 // List of index prices to show by default (must be a subset of UploadIndexKeys)
 var UploadIndexKeysPublic = []string{TCG_LOW, TCG_MARKET, TCG_DIRECT}
 
+// List of index prices to use for CSVs
+var UploadIndexKeysCSV = []string{TCG_LOW, TCG_MARKET, TCG_DIRECT, MKM_LOW, MKM_TREND}
+
 var ErrUploadDecklist = errors.New("decklist")
 var ErrReloadFirstRow = errors.New("firstrow")
 
@@ -490,6 +493,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_prices.csv\"")
 		csvWriter := csv.NewWriter(w)
+
+		// Search for all csv-specific indexes
+		indexResults := getSellerPrices("", UploadIndexKeysCSV, "", cardIds, "", false, shouldCheckForConditions, false)
+
+		// Copy these index prices in the final results
+		for _, cardId := range cardIds {
+			for _, index := range UploadIndexKeysCSV {
+				if results[cardId] == nil {
+					results[cardId] = map[string]*BanPrice{}
+				}
+				results[cardId][index] = indexResults[cardId][index]
+			}
+		}
 
 		err = SimplePrice2CSV(csvWriter, results, uploadedData)
 		if err != nil {
