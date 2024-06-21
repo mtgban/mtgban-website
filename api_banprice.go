@@ -760,15 +760,13 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 }
 
 func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedDada []UploadEntry) error {
-	allScrapersMap := map[string]int{}
+	var allScrapers []string
 	for id := range pm {
 		for scraper := range pm[id] {
-			allScrapersMap[scraper] = 0
+			if !slices.Contains(allScrapers, scraper) {
+				allScrapers = append(allScrapers, scraper)
+			}
 		}
-	}
-	allScrapers := make([]string, 0, len(allScrapersMap))
-	for scraper := range allScrapersMap {
-		allScrapers = append(allScrapers, scraper)
 	}
 	sort.Slice(allScrapers, func(i, j int) bool {
 		return allScrapers[i] < allScrapers[j]
