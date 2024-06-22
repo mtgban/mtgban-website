@@ -1013,12 +1013,14 @@ func loadVendors(newVendors []mtgban.Vendor) {
 func loadInfos() {
 	log.Println("Loading infos")
 
-	for _, seller := range []mtgban.Seller{
-		mtgstocks.NewScraper(),
-		tcgplayer.NewScraperSYP(),
-	} {
-		loadInfoScraper(seller)
-	}
+	// MTGSTOCKS
+	loadInfoScraper(mtgstocks.NewScraper())
+
+	// TCGSYP
+	scraper := tcgplayer.NewScraperSYP()
+	scraper.Affiliate = Config.Affiliate["TCG"]
+	loadInfoScraper(scraper)
+
 	ServerNotify("refresh", "infos refreshed")
 }
 
