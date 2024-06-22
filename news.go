@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -569,6 +571,13 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			Active: page == "secret",
 			Class:  "selected",
 		},
+		NavElem{
+			Name:   "TCG Syp List",
+			Short:  "📋",
+			Link:   "/newspaper?page=syp",
+			Active: page == "syp",
+			Class:  "selected",
+		},
 	})
 
 	var err error
@@ -602,6 +611,88 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Security-Policy", "frame-ancestors 'self' https://datastudio.google.com;")
 
 		render(w, "news.html", pageVars)
+
+		return
+	case "syp":
+		pageVars.Title = "TCGplayer Store-Your-Products List"
+		pageVars.ScraperShort = "SYP"
+		pageVars.LargeTable = true
+		pageVars.Metadata = map[string]GenericCard{}
+
+		syp, found := Infos["TCGSYPList"]
+		if !found || len(syp) == 0 {
+			pageVars.InfoMessage = "SYP not ready yet, please try again later"
+			render(w, "arbit.html", pageVars)
+			return
+		}
+
+		var cardIds []string
+		for cardId := range syp {
+			cardIds = append(cardIds, cardId)
+		}
+
+		var arbit []mtgban.ArbitEntry
+		for _, cardId := range cardIds {
+
+			for _, entry := range syp[cardId] {
+				arbit = append(arbit, mtgban.ArbitEntry{
+					CardId:         cardId,
+					InventoryEntry: entry,
+					Quantity:       entry.Quantity,
+				})
+			}
+
+			_, found := pageVars.Metadata[cardId]
+			if found {
+				continue
+			}
+			pageVars.Metadata[cardId] = uuid2card(cardId, true)
+			if pageVars.Metadata[cardId].Reserved {
+				pageVars.HasReserved = true
+			}
+			if pageVars.Metadata[cardId].Stocks {
+				pageVars.HasStocks = true
+			}
+		}
+
+		switch sorting {
+		default:
+			sort.Slice(arbit, func(i, j int) bool {
+				if arbit[i].CardId == arbit[j].CardId {
+					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
+				}
+				return sortSets(arbit[i].CardId, arbit[j].CardId)
+			})
+		case "alpha":
+			sort.Slice(arbit, func(i, j int) bool {
+				if arbit[i].CardId == arbit[j].CardId {
+					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
+				}
+				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId)
+			})
+		case "available":
+			sort.Slice(arbit, func(i, j int) bool {
+				return arbit[i].InventoryEntry.Quantity > arbit[j].InventoryEntry.Quantity
+			})
+		case "sell_price":
+			sort.Slice(arbit, func(i, j int) bool {
+				return arbit[i].InventoryEntry.Price > arbit[j].InventoryEntry.Price
+			})
+		}
+		pageVars.SortOption = sorting
+
+		entry := Arbitrage{
+			Name:        "SYP",
+			Key:         "SYP",
+			Arbit:       arbit,
+			HasNoCredit: true,
+			HasNoPrice:  true,
+			HasNoArbit:  true,
+		}
+
+		pageVars.Arb = append(pageVars.Arb, entry)
+
+		render(w, "arbit.html", pageVars)
 
 		return
 	}

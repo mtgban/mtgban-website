@@ -179,33 +179,36 @@
 
         <div class="indent">
             <div class="indent" style="max-width: 85%;">
-                <p>
-                    Jump to
-                    {{if .Arb}}
-                        {{range .Arb}}
-                            <a class="btn normal" href="#{{.Name}}">{{.Name}} ({{len .Arbit}})</a>
-                        {{end}}
+                {{if .LargeTable}}
+                    <br>
                     {{else}}
-                        <a class="btn normal" href="javascript:history.back()">¯\_(ツ)_/¯</a>
-                    {{end}}
-                </p>
-                <p>
-                    Show
-                    {{range $.ArbitOptKeys}}
-                        {{$key := .}}
-                        {{$skipIfTesting := and (index $.ArbitOptConfig .).BetaFlag (not $.CanShowAll)}}
-                        {{$skipIfGlobal := and (index $.ArbitOptConfig .).ArbitOnly $.GlobalMode}}
-                        {{$skipIfSealed := and (index $.ArbitOptConfig .).NoSealed $.IsSealed}}
-                        {{$skipIfNotSealed := and (index $.ArbitOptConfig .).SealedOnly (not $.IsSealed)}}
-                        {{if and (and (not $skipIfTesting) (not $skipIfGlobal)) (and (not $skipIfNotSealed) (not $skipIfSealed))}}
-                            {{$cfg := index $.ArbitOptConfig .}}
-                            {{if $cfg}}
-                                {{$name := $cfg.Title}}
-                                <a class="btn {{if index $.ArbitFilters .}}success{{else}}normal{{end}}" href="?source={{$.ScraperShort}}&sort={{$.SortOption}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{if eq . $key}}{{not $val}}{{else}}{{$val}}{{end}}&{{end}}">{{$name}}</a>
+                    <p>
+                        Jump to
+                        {{if .Arb}}
+                            {{range .Arb}}
+                                <a class="btn normal" href="#{{.Name}}">{{.Name}} ({{len .Arbit}})</a>
+                            {{end}}
+                        {{else}}
+                            <a class="btn normal" href="javascript:history.back()">¯\_(ツ)_/¯</a>
+                        {{end}}
+                    </p>
+                    <p>
+                        Show
+                        {{range $.ArbitOptKeys}}
+                            {{$key := .}}
+                            {{$skipIfTesting := and (index $.ArbitOptConfig .).BetaFlag (not $.CanShowAll)}}
+                            {{$skipIfGlobal := and (index $.ArbitOptConfig .).ArbitOnly $.GlobalMode}}
+                            {{$skipIfSealed := and (index $.ArbitOptConfig .).NoSealed $.IsSealed}}
+                            {{$skipIfNotSealed := and (index $.ArbitOptConfig .).SealedOnly (not $.IsSealed)}}
+                            {{if and (and (not $skipIfTesting) (not $skipIfGlobal)) (and (not $skipIfNotSealed) (not $skipIfSealed))}}
+                                {{$cfg := index $.ArbitOptConfig .}}
+                                {{if $cfg}}
+                                    {{$name := $cfg.Title}}
+                                    <a class="btn {{if index $.ArbitFilters .}}success{{else}}normal{{end}}" href="?source={{$.ScraperShort}}&sort={{$.SortOption}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{if eq . $key}}{{not $val}}{{else}}{{$val}}{{end}}&{{end}}">{{$name}}</a>
+                                {{end}}
                             {{end}}
                         {{end}}
-                    {{end}}
-                </p>
+                    </p>
                 {{end}}
                 <p>
                     Filter by &nbsp; <input type="text" id="filterInput" onkeyup="filterTableByEdition()" placeholder="Edition...">
@@ -218,6 +221,10 @@
 
             <script type='text/javascript'>
                 function sortBy(sort, name) {
+                    {{if eq $.ScraperShort "SYP"}}
+                        window.location.href = "?page=syp&sort=" + sort + "#" + name;
+                        return;
+                    {{end}}
                     window.location.href = "?&source={{$.ScraperShort}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{$val}}&{{end}}sort=" + sort + "#" + name;
                 }
             </script>
@@ -403,7 +410,9 @@
                                 <a href="{{(index $.Metadata .CardId).SearchURL}}">{{(index $.Metadata .CardId).Name}}</a>
                                 {{if (index $.Metadata .CardId).Reserved}} *{{end}}
                                 {{if (index $.Metadata .CardId).Stocks}} •{{end}}
-                                {{if (index $.Metadata .CardId).SypList}} †{{end}}
+                                {{if not (eq $.ScraperShort "SYP")}}
+                                    {{if (index $.Metadata .CardId).SypList}} †{{end}}
+                                {{end}}
                             </td>
                             <td>
                                 <i class="ss {{(index $.Metadata .CardId).Keyrune}} ss-1x ss-fw"></i> {{(index $.Metadata .CardId).Edition}}
