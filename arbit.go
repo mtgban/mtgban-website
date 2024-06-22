@@ -211,12 +211,24 @@ var ABU4H = []string{
 }
 
 type Arbitrage struct {
-	Name       string
-	Key        string
-	Arbit      []mtgban.ArbitEntry
-	HasCredit  bool
-	HasNoQty   bool
+	Name  string
+	Key   string
+	Arbit []mtgban.ArbitEntry
+
+	// Disable the Trade Price column
+	HasNoCredit bool
+
+	// Disable the Quantity column
+	HasNoQty bool
+
+	// Disable the Conditions column
 	HasNoConds bool
+
+	// Disable the Buy Price column
+	HasNoPrice bool
+
+	// Disable the Profitability, Difference, and Spread columns
+	HasNoArbit bool
 }
 
 func Arbit(w http.ResponseWriter, r *http.Request) {
@@ -713,14 +725,14 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 
 		entry := Arbitrage{
-			Name:      name,
-			Key:       scraper.Info().Shorthand,
-			Arbit:     arbit,
-			HasCredit: !scraper.Info().NoCredit,
-			HasNoQty:  scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory,
+			Name:        name,
+			Key:         scraper.Info().Shorthand,
+			Arbit:       arbit,
+			HasNoCredit: scraper.Info().NoCredit,
+			HasNoQty:    scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory,
 		}
 		if pageVars.GlobalMode {
-			entry.HasCredit = false
+			entry.HasNoCredit = true
 			entry.HasNoConds = source.Info().MetadataOnly || source.Info().SealedMode
 		} else if source.Info().SealedMode {
 			entry.HasNoConds = scraper.Info().MetadataOnly

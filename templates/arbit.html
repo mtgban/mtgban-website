@@ -348,36 +348,40 @@
                                 {{end}}
                             </a>
                         </th>
-                        <th class="stickyHeaderTiny">
-                            <a href="javascript:sortBy('buy_price', '{{.Name}}')">
-                                {{if and $.GlobalMode}}
-                                    {{if $.IsSealed}}
-                                        {{$.ScraperShort}}
+                        {{if not .HasNoPrice}}
+                            <th class="stickyHeaderTiny">
+                                <a href="javascript:sortBy('buy_price', '{{.Name}}')">
+                                    {{if and $.GlobalMode}}
+                                        {{if $.IsSealed}}
+                                            {{$.ScraperShort}}
+                                        {{else}}
+                                            {{.Name}}
+                                        {{end}}
                                     {{else}}
-                                        {{.Name}}
+                                        Buy Price
                                     {{end}}
-                                {{else}}
-                                    Buy Price
-                                {{end}}
-                            </a>
-                        </th>
+                                </a>
+                            </th>
+                        {{end}}
                         {{$save := .}}
-                        {{if .HasCredit}}
+                        {{if not .HasNoCredit}}
                             <th class="stickyHeaderTiny">
                                 <a href="javascript:sortBy('trade_price', '{{.Name}}')">Trade Price</a>
                             </th>
                         {{end}}
-                        <th class="stickyHeaderTiny">
-                            <a href="javascript:sortBy('profitability', '{{.Name}}')">Profitability</a>
-                        </th>
-                        <th class="stickyHeaderTiny">
-                            <a href="javascript:sortBy('diff', '{{.Name}}')">Difference</a>
-                        </th>
-                        <th class="stickyHeaderTiny">
-                            <a href="javascript:sortBy('spread', '{{.Name}}')">Spread</a>
-                        </th>
-                        {{if not $.GlobalMode}}
-                            <th class="stickyHeaderTiny">Price Ratio</th>
+                        {{if not .HasNoArbit}}
+                            <th class="stickyHeaderTiny">
+                                <a href="javascript:sortBy('profitability', '{{.Name}}')">Profitability</a>
+                            </th>
+                            <th class="stickyHeaderTiny">
+                                <a href="javascript:sortBy('diff', '{{.Name}}')">Difference</a>
+                            </th>
+                            <th class="stickyHeaderTiny">
+                                <a href="javascript:sortBy('spread', '{{.Name}}')">Spread</a>
+                            </th>
+                            {{if not $.GlobalMode}}
+                                <th class="stickyHeaderTiny">Price Ratio</th>
+                            {{end}}
                         {{end}}
                         <th class="stickyHeaderTiny"><center>Quicklinks</center></th>
                     </tr>
@@ -432,39 +436,43 @@
                             <td>
                                 $ {{printf "%.2f" .InventoryEntry.Price}}
                             </td>
-                            <td>
-                                {{if eq .BuylistEntry.BuyPrice 0.0}}
-                                    $ {{printf "%.2f" .ReferenceEntry.Price}}
-                                {{else}}
-                                    $ {{printf "%.2f" .BuylistEntry.BuyPrice}}
-                                {{end}}
-                            </td>
-                            {{if $save.HasCredit}}
+                            {{if not $save.HasNoPrice}}
+                                <td>
+                                    {{if eq .BuylistEntry.BuyPrice 0.0}}
+                                        $ {{printf "%.2f" .ReferenceEntry.Price}}
+                                    {{else}}
+                                        $ {{printf "%.2f" .BuylistEntry.BuyPrice}}
+                                    {{end}}
+                                </td>
+                            {{end}}
+                            {{if not $save.HasNoCredit}}
                                 <td>
                                     $ {{printf "%.2f" .BuylistEntry.TradePrice}}
                                 </td>
                             {{end}}
-                            <td>
-                                <center>
-                                    {{if gt .Spread 0.0}}
-                                        {{printf "%.2f" .Profitability}}
-                                    {{else}}
-                                        n/a
-                                    {{end}}
-                                </center>
-                            </td>
-                            <td>
-                                $ {{printf "%.2f" .Difference}}
-                            </td>
-                            <td>
-                                {{printf "%.2f" .Spread}} %
-                            </td>
-                            {{if not $.GlobalMode}}
+                            {{if not $save.HasNoArbit}}
                                 <td>
                                     <center>
-                                    {{printf "%.2f" .BuylistEntry.PriceRatio}} %
+                                        {{if gt .Spread 0.0}}
+                                            {{printf "%.2f" .Profitability}}
+                                        {{else}}
+                                            n/a
+                                        {{end}}
                                     </center>
                                 </td>
+                                <td>
+                                    $ {{printf "%.2f" .Difference}}
+                                </td>
+                                <td>
+                                    {{printf "%.2f" .Spread}} %
+                                </td>
+                                {{if not $.GlobalMode}}
+                                    <td>
+                                        <center>
+                                        {{printf "%.2f" .BuylistEntry.PriceRatio}} %
+                                        </center>
+                                    </td>
+                                {{end}}
                             {{end}}
                             <td>
                                 <center>
