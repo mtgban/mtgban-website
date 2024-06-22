@@ -859,7 +859,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 </tr>
                                             {{else if not (eq $conditions "INDEX")}}
                                                 <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
-                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Purchase from{{else}}Conditions: {{$conditions}}{{end}}</i></td>
+                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</i></td>
                                                 </tr>
                                             {{end}}
                                         {{end}}
@@ -941,7 +941,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         {{if ne $conditions "INDEX"}}
                                             {{if $entries }}
                                                 <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});">
-                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Sell to{{else}}Conditions: {{$conditions}}{{end}}</i></td>
+                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Sell to{{else}}Condition: {{$conditions}}{{end}}</i></td>
                                                 </tr>
                                             {{end}}
                                         {{end}}
