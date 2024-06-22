@@ -565,13 +565,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.Nav = insertNavBar("Newspaper", pageVars.Nav, []NavElem{
 		NavElem{
-			Name:   "Lairs",
-			Short:  "🤫",
-			Link:   "/newspaper?page=secret",
-			Active: page == "secret",
-			Class:  "selected",
-		},
-		NavElem{
 			Name:   "TCG Syp List",
 			Short:  "📋",
 			Link:   "/newspaper?page=syp",
@@ -599,16 +592,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		pageVars.Editions = AllEditionsKeys
 		pageVars.EditionsMap = AllEditionsMap
-
-		render(w, "news.html", pageVars)
-
-		return
-	case "secret":
-		pageVars.Title = "Secret Lair Data"
-
-		pageVars.IsSealed = true
-
-		w.Header().Add("Content-Security-Policy", "frame-ancestors 'self' https://datastudio.google.com;")
 
 		render(w, "news.html", pageVars)
 
