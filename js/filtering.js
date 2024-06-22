@@ -1,4 +1,4 @@
-function filterArbitTable() {
+function filterTableByEdition() {
     var input, filter, tables, tr, td, i, j, txtValue;
     input = document.getElementById("filterInput");
     filter = input.value.toUpperCase();
@@ -20,7 +20,7 @@ function filterArbitTable() {
     }
 };
 
-function filterEditionsTable() {
+function filterTableByName() {
     var input, filter, tables, tr, td, i, j, txtValue;
     input = document.getElementById("filterInput");
     filter = input.value.toUpperCase();
