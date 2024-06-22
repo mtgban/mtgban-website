@@ -708,6 +708,20 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			sort.Slice(arbit, func(i, j int) bool {
 				return arbit[i].Spread > arbit[j].Spread
 			})
+		case "edition":
+			sort.Slice(arbit, func(i, j int) bool {
+				if arbit[i].CardId == arbit[j].CardId {
+					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
+				}
+				return sortSets(arbit[i].CardId, arbit[j].CardId)
+			})
+		case "alpha":
+			sort.Slice(arbit, func(i, j int) bool {
+				if arbit[i].CardId == arbit[j].CardId {
+					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
+				}
+				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId)
+			})
 		}
 		pageVars.SortOption = sorting
 

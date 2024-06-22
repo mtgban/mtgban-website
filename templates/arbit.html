@@ -319,8 +319,12 @@
 
                 <table class="filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
                     <tr>
-                        <th class="stickyHeaderTiny">Card Name</th>
-                        <th class="stickyHeaderTiny">Edition</th>
+                        <th class="stickyHeaderTiny">
+                            <a href="javascript:sortBy('alpha', '{{.Name}}')">Card Name</a>
+                        </th>
+                        <th class="stickyHeaderTiny">
+                            <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a>
+                        </th>
                         {{if not $.IsSealed}}
                             <th class="stickyHeaderTiny"><center>#</center></th>
                         {{end}}
