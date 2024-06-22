@@ -548,7 +548,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
 	page := r.FormValue("page")
-	sort := r.FormValue("sort")
+	sorting := r.FormValue("sort")
 	dir := r.FormValue("dir")
 	filter := r.FormValue("filter")
 	rarity := r.FormValue("rarity")
@@ -606,7 +606,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pageVars.SortOption = sort
+	pageVars.SortOption = sorting
 	pageVars.SortDir = dir
 	pageVars.FilterSet = filter
 	pageVars.FilterRarity = rarity
@@ -778,11 +778,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	query += skipEditions
 
 	// Set sorting options
-	if sort != "" {
+	if sorting != "" {
 		// Make sure this field is allowed to be sorted
 		canSort := false
 		for i := range pageVars.Headings {
-			if pageVars.Headings[i].Field == sort {
+			if pageVars.Headings[i].Field == sorting {
 				canSort = pageVars.Headings[i].CanSort
 				if pageVars.Headings[i].ConditionalSort && filter != "" {
 					canSort = true
@@ -792,8 +792,8 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 		if canSort {
 			// Define a custom order for our special scale
-			if sort == "Trending" {
-				sort = `CASE
+			if sorting == "Trending" {
+				sorting = `CASE
                             WHEN Trending = 'S' THEN '7'
                             WHEN Trending = 'A' THEN '6'
                             WHEN Trending = 'B' THEN '5'
@@ -804,7 +804,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
                             ELSE Trending
                         END`
 			}
-			query += " ORDER BY " + sort
+			query += " ORDER BY " + sorting
 			if dir == "asc" {
 				query += " ASC"
 			} else if dir == "desc" {
