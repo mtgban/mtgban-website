@@ -377,7 +377,7 @@
                         {{$save := .}}
                         {{if not .HasNoCredit}}
                             <th class="stickyHeaderTiny">
-                                <a href="javascript:sortBy('trade_price', '{{.Name}}')">Trade Price</a>
+                                <a href="javascript:sortBy('buy_price', '{{.Name}}')">Trade Price</a>
                             </th>
                         {{end}}
                         {{if not .HasNoArbit}}
@@ -460,7 +460,7 @@
                             {{end}}
                             {{if not $save.HasNoCredit}}
                                 <td>
-                                    $ {{printf "%.2f" .BuylistEntry.TradePrice}}
+                                    $ {{printf "%.2f" (mul .BuylistEntry.BuyPrice $.Arb.CreditMultiplier)}}
                                 </td>
                             {{end}}
                             {{if not $save.HasNoArbit}}
@@ -507,9 +507,6 @@
                     <tr style="background-color: var(--background);">
                         <td colspan=13>
                             <a class="btn default" style="float: right;" href="#top"><i class="arrow up"></i> back to top</a>
-                            {{if eq .Name "ABU Games"}}
-                                <a class="btn {{if index $.ArbitFilters "credit"}}success{{else}}warning{{end}}" style="float: right;" href="?source={{$.ScraperShort}}&sort={{$.SortOption}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{if eq . "credit"}}{{not $val}}{{else}}{{$val}}{{end}}&{{end}}">{{if index $.ArbitFilters "credit"}}Return to Cash Arbitrage{{else}}Check Credit Arbitrage{{end}}</a>
-                            {{end}}
                         </td>
                     </tr>
                 </table>

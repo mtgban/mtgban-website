@@ -895,7 +895,7 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 					ScraperName: name,
 					Shorthand:   vendor.Info().Shorthand,
 					Price:       entry.BuyPrice,
-					Credit:      entry.TradePrice,
+					Credit:      entry.BuyPrice * vendor.Info().CreditMultiplier,
 					Ratio:       entry.PriceRatio,
 					Quantity:    entry.Quantity,
 					URL:         entry.URL,

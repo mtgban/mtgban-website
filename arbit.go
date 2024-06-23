@@ -56,7 +56,6 @@ var FilteredEditions = []string{
 
 // Every single boolean option
 var FilterOptKeys = []string{
-	"credit",
 	"nocond",
 	"nofoil",
 	"onlyfoil",
@@ -251,6 +250,9 @@ type Arbitrage struct {
 	Name  string
 	Key   string
 	Arbit []mtgban.ArbitEntry
+
+	// Optional multipler to obtain the store credit value
+	CreditMultiplier float64
 
 	// Disable the Trade Price column
 	HasNoCredit bool
@@ -666,9 +668,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if pageVars.GlobalMode && scraper.Info().Shorthand == TCG_DIRECT {
 			opts.Conditions = BadConditions
 		}
-		if scraper.Info().Shorthand == "ABU" {
-			opts.UseTrades = arbitFilters["credit"]
-		}
 
 		var arbit []mtgban.ArbitEntry
 		var err error
@@ -725,10 +724,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 					return arbit[i].BuylistEntry.BuyPrice > arbit[j].BuylistEntry.BuyPrice
 				})
 			}
-		case "trade_price":
-			sort.Slice(arbit, func(i, j int) bool {
-				return arbit[i].BuylistEntry.TradePrice > arbit[j].BuylistEntry.TradePrice
-			})
 		case "profitability":
 			sort.Slice(arbit, func(i, j int) bool {
 				// Profitability is NaN when spread is less than 0
@@ -776,11 +771,12 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 
 		entry := Arbitrage{
-			Name:        name,
-			Key:         scraper.Info().Shorthand,
-			Arbit:       arbit,
-			HasNoCredit: scraper.Info().NoCredit,
-			HasNoQty:    scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory,
+			Name:             name,
+			Key:              scraper.Info().Shorthand,
+			Arbit:            arbit,
+			HasNoCredit:      scraper.Info().CreditMultiplier == 0,
+			HasNoQty:         scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory,
+			CreditMultiplier: scraper.Info().CreditMultiplier,
 		}
 		if pageVars.GlobalMode {
 			entry.HasNoCredit = true
