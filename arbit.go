@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"golang.org/x/exp/slices"
 )
 
@@ -71,6 +72,8 @@ var FilterOptKeys = []string{
 	"nodiffplus",
 	"noqty",
 	"norand",
+	"nosyp",
+	"nostock",
 }
 
 type FilterOpt struct {
@@ -194,6 +197,40 @@ var FilterOptConfig = map[string]FilterOpt{
 			opts.SealedDecklist = true
 		},
 		SealedOnly: true,
+	},
+	"nosyp": {
+		Title: "only SYP",
+		Func: func(opts *mtgban.ArbitOpts) {
+			oldFunc := opts.CustomCardFilter
+			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
+				_, onSypList := Infos["TCGSYPList"][co.UUID]
+				if !onSypList {
+					return 0, true
+				}
+				if oldFunc != nil {
+					return oldFunc(co)
+				}
+				return 1, false
+			}
+		},
+		NoSealed: true,
+	},
+	"nostock": {
+		Title: "only Stocks",
+		Func: func(opts *mtgban.ArbitOpts) {
+			oldFunc := opts.CustomCardFilter
+			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
+				_, onStocks := Infos["STKS"][co.UUID]
+				if !onStocks {
+					return 0, true
+				}
+				if oldFunc != nil {
+					return oldFunc(co)
+				}
+				return 1, false
+			}
+		},
+		NoSealed: true,
 	},
 }
 
