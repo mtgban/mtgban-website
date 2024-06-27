@@ -670,8 +670,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		for j, bestPrice := range bestPrices {
 			bestStore := bestStores[j]
 
-			var spread float64
-			var profitability float64
 			conds := uploadedData[i].OriginalCondition
 			if skipConds {
 				conds = ""
@@ -695,19 +693,21 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
+			var factor float64
+			var profitability float64
 			// Compute spread (and skip if needed)
 			if comparePrice != 0 {
-				spread = price / comparePrice * 100
+				factor = price / comparePrice * 100
 
-				if skipLowValue && spread < percSpread {
+				if skipLowValue && factor < percSpread {
 					continue
 				}
-				if skipHighValue && percSpreadMax != 0 && spread >= percSpreadMax {
+				if skipHighValue && percSpreadMax != 0 && factor >= percSpreadMax {
 					continue
 				}
 
-				if spread > 0 {
-					profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log(1+spread)
+				if factor > 0 {
+					profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log(1+factor)
 					if uploadedData[i].Quantity > 1 {
 						profitability *= math.Pow(float64(uploadedData[i].Quantity), 0.25)
 					}
@@ -719,7 +719,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				CardId:        cardId,
 				Condition:     conds,
 				Price:         comparePrice,
-				Spread:        spread,
+				Spread:        factor,
 				BestPrice:     price,
 				Quantity:      uploadedData[i].Quantity,
 				VisualPrice:   comparePrice * visualPerc / 100.0,
@@ -753,7 +753,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 					if optimizedResults[store][i].Spread < 0 || optimizedResults[store][j].Spread < 0 {
 						return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
 					}
-					return optimizedResults[store][i].Profitability > optimizedResults[store][j].Profitability
+					// Remember profitability here is computed over the factor to the base price
+					// not from the actual traditional spread, so they are reversed
+					return optimizedResults[store][i].Profitability < optimizedResults[store][j].Profitability
 				})
 			default:
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
