@@ -462,7 +462,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// If results can't fit in one page, chunk response and enable pagination
 	if len(allKeys) > MaxSearchResults {
-		pageVars.TotalIndex = len(allKeys)/MaxSearchResults + 1
+		pageVars.TotalIndex = len(allKeys) / MaxSearchResults
 
 		// Parse the requested input page
 		pageIndex, _ := strconv.Atoi(r.FormValue("p"))
@@ -479,7 +479,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if pageVars.CurrentIndex > 0 {
 			pageVars.PrevIndex = pageVars.CurrentIndex - 1
 		}
-		if pageVars.CurrentIndex < pageVars.TotalIndex {
+		if pageVars.CurrentIndex < pageVars.TotalIndex-1 {
 			pageVars.NextIndex = pageVars.CurrentIndex + 1
 		}
 
