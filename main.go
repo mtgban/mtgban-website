@@ -319,6 +319,7 @@ var Config struct {
 	DiscordInviteLink      string            `json:"discord_invite_link"`
 	Affiliate              map[string]string `json:"affiliate"`
 	AffiliatesList         []string          `json:"affiliates_list"`
+	AffiliatesBuylistList  []string          `json:"affiliates_buylist_list"`
 	Api                    map[string]string `json:"api"`
 	DiscordToken           string            `json:"discord_token"`
 	DiscordAllowList       []string          `json:"discord_allowlist"`

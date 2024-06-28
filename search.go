@@ -130,6 +130,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if skipVendorsOpt != "" {
 		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
 	}
+	// For buylists, if open mode, filter any store except the ones in the AffiliatesBuylistList
+	if sig == "" {
+		for _, vendor := range Vendors {
+			if vendor != nil && !slices.Contains(Config.AffiliatesBuylistList, vendor.Info().Shorthand) {
+				blocklistBuylist = append(blocklistBuylist, vendor.Info().Shorthand)
+			}
+		}
+	}
 
 	pageVars.SearchSort = readCookie(r, "SearchDefaultSort")
 	defaultSortOpt := r.FormValue("sort")
