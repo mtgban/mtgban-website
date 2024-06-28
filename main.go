@@ -119,7 +119,6 @@ type PageVars struct {
 	DiskStatus   string
 	MemoryStatus string
 	LatestHash   string
-	CacheSize    int
 	Tiers        []string
 	DemoKey      string
 
@@ -157,8 +156,6 @@ type PageVars struct {
 	MissingCounts   map[string]int
 	MissingPrices   map[string]float64
 	ResultPrices    map[string]map[string]float64
-
-	OptimizedEditions map[string][]OptimizedUploadEntry
 }
 
 type NavElem struct {
