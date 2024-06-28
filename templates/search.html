@@ -814,7 +814,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 <a href="javascript:getLastSold('{{$cardId}}')" title="Retrieve last sales on TCG" id="lastsolda{{$cardId}}"><span class="emoji">💸</span></a>
                                             </td>
                                         {{end}}
-                                        {{if eq $.ChartID ""}}
+                                        {{if and (not $.DisableChart) (eq $.ChartID "")}}
                                             <td rowspan=2>
                                                 <span class="emoji">
                                                     <a href="?chart={{$cardId}}" title="See historical data">📊</a>

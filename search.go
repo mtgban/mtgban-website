@@ -137,6 +137,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				blocklistBuylist = append(blocklistBuylist, vendor.Info().Shorthand)
 			}
 		}
+		pageVars.DisableChart = true
 	}
 
 	pageVars.SearchSort = readCookie(r, "SearchDefaultSort")
@@ -161,7 +162,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	chartId := r.FormValue("chart")
 	// Check if query is a valid ID
 	co, err := mtgmatcher.GetUUID(chartId)
-	if err != nil {
+	if err != nil || pageVars.DisableChart {
+		// Stay on the same probable query page
+		if query == "" {
+			query = chartId
+		}
 		chartId = ""
 	} else {
 		// Override the query when chart is requested

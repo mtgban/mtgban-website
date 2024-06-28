@@ -122,12 +122,13 @@ type PageVars struct {
 	Tiers        []string
 	DemoKey      string
 
-	AxisLabels  []string
-	Datasets    []*Dataset
-	ChartID     string
-	Alternative string
-	StocksURL   string
-	AltEtchedId string
+	DisableChart bool
+	AxisLabels   []string
+	Datasets     []*Dataset
+	ChartID      string
+	Alternative  string
+	StocksURL    string
+	AltEtchedId  string
 
 	EditionSort []string
 	EditionList map[string][]EditionEntry
