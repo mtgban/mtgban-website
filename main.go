@@ -188,6 +188,9 @@ type NavElem struct {
 
 	// Alternative endpoints connected to this handler
 	SubPages []string
+
+	// Whether authentication is disabled for the endpoint
+	NoAuth bool
 }
 
 var startTime = time.Now()
@@ -443,14 +446,15 @@ func genPageNav(activeTab, sig string) PageVars {
 	copy(pageVars.Nav, DefaultNav)
 
 	// Enable buttons according to the enabled features
-	if expires > time.Now().Unix() || (DevMode && !SigCheck) {
-		for _, feat := range OrderNav {
+	for _, feat := range OrderNav {
+		if expires > time.Now().Unix() || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
 			param := GetParamFromSig(sig, feat)
 			allowed, _ := strconv.ParseBool(param)
 			if DevMode && ExtraNavs[feat].AlwaysOnForDev {
 				allowed = true
 			}
-			if allowed || (DevMode && !SigCheck) {
+
+			if allowed || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
 				pageVars.Nav = append(pageVars.Nav, ExtraNavs[feat])
 			}
 		}
@@ -683,6 +687,9 @@ func main() {
 
 		// Set up the handler
 		handler := enforceSigning(http.HandlerFunc(nav.Handle))
+		if nav.NoAuth {
+			handler = noSigning(http.HandlerFunc(nav.Handle))
+		}
 		http.Handle(nav.Link, handler)
 
 		// Add any additional endpoints to it
