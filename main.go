@@ -185,6 +185,9 @@ type NavElem struct {
 
 	// Allow to receive POST requests
 	CanPOST bool
+
+	// Alternative endpoints connected to this handler
+	SubPages []string
 }
 
 var startTime = time.Now()
@@ -242,11 +245,12 @@ var ExtraNavs map[string]NavElem
 func init() {
 	ExtraNavs = map[string]NavElem{
 		"Search": NavElem{
-			Name:   "Search",
-			Short:  "🔍",
-			Link:   "/search",
-			Handle: Search,
-			Page:   "search.html",
+			Name:     "Search",
+			Short:    "🔍",
+			Link:     "/search",
+			Handle:   Search,
+			Page:     "search.html",
+			SubPages: []string{"/sets", "/sealed"},
 		},
 		"Newspaper": NavElem{
 			Name:   "Newspaper",
@@ -678,11 +682,14 @@ func main() {
 		}
 
 		// Set up the handler
-		http.Handle(nav.Link, enforceSigning(http.HandlerFunc(nav.Handle)))
-	}
+		handler := enforceSigning(http.HandlerFunc(nav.Handle))
+		http.Handle(nav.Link, handler)
 
-	http.Handle("/sets", enforceSigning(http.HandlerFunc(Search)))
-	http.Handle("/sealed", enforceSigning(http.HandlerFunc(Search)))
+		// Add any additional endpoints to it
+		for _, subPage := range nav.SubPages {
+			http.Handle(subPage, handler)
+		}
+	}
 
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
 	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
