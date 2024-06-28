@@ -243,11 +243,11 @@ var OrderNav = []string{
 var LogPages map[string]*log.Logger
 
 // All the page properties
-var ExtraNavs map[string]NavElem
+var ExtraNavs map[string]*NavElem
 
 func init() {
-	ExtraNavs = map[string]NavElem{
-		"Search": NavElem{
+	ExtraNavs = map[string]*NavElem{
+		"Search": {
 			Name:     "Search",
 			Short:    "🔍",
 			Link:     "/search",
@@ -255,21 +255,21 @@ func init() {
 			Page:     "search.html",
 			SubPages: []string{"/sets", "/sealed"},
 		},
-		"Newspaper": NavElem{
+		"Newspaper": {
 			Name:   "Newspaper",
 			Short:  "🗞️",
 			Link:   "/newspaper",
 			Handle: Newspaper,
 			Page:   "news.html",
 		},
-		"Sleepers": NavElem{
+		"Sleepers": {
 			Name:   "Sleepers",
 			Short:  "💤",
 			Link:   "/sleepers",
 			Handle: Sleepers,
 			Page:   "sleep.html",
 		},
-		"Upload": NavElem{
+		"Upload": {
 			Name:    "Upload",
 			Short:   "🚢",
 			Link:    "/upload",
@@ -277,28 +277,28 @@ func init() {
 			Page:    "upload.html",
 			CanPOST: true,
 		},
-		"Global": NavElem{
+		"Global": {
 			Name:   "Global",
 			Short:  "🌍",
 			Link:   "/global",
 			Handle: Global,
 			Page:   "arbit.html",
 		},
-		"Arbit": NavElem{
+		"Arbit": {
 			Name:   "Arbitrage",
 			Short:  "📈",
 			Link:   "/arbit",
 			Handle: Arbit,
 			Page:   "arbit.html",
 		},
-		"Reverse": NavElem{
+		"Reverse": {
 			Name:   "Reverse",
 			Short:  "📉",
 			Link:   "/reverse",
 			Handle: Reverse,
 			Page:   "arbit.html",
 		},
-		"Admin": NavElem{
+		"Admin": {
 			Name:   "Admin",
 			Short:  "❌",
 			Link:   "/admin",
@@ -455,7 +455,7 @@ func genPageNav(activeTab, sig string) PageVars {
 			}
 
 			if allowed || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
-				pageVars.Nav = append(pageVars.Nav, ExtraNavs[feat])
+				pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
 			}
 		}
 	}
