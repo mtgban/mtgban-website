@@ -215,6 +215,9 @@
                 -
                 <small><small><small>
                     {{.TotalUnique}}
+                    {{if .TotalCards}}
+                        / {{.TotalCards}}
+                    {{end}}
                     {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
                     {{if gt .TotalUnique (len .AllKeys)}}
                         ({{len .AllKeys}} shown)

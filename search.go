@@ -24,9 +24,11 @@ const (
 	MaxSearchQueryLen = 200
 	MaxSearchResults  = 100
 	TooLongMessage    = "Your query planeswalked away, try a shorter one"
-	TooManyMessage    = "More results available, try adjusting your filters"
+	TooManyMessage    = "Too many results, try adjusting your filters"
 	NoResultsMessage  = "No results found"
 	NoCardsMessage    = "No cards found"
+
+	MaxSearchTotalResults = 10000
 )
 
 var (
@@ -355,6 +357,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.InfoMessage = NoCardsMessage
 		render(w, "search.html", pageVars)
 		return
+	}
+	if len(allKeys) > MaxSearchTotalResults {
+		pageVars.TotalCards = len(allKeys)
+		pageVars.InfoMessage = TooManyMessage
+		allKeys = allKeys[:MaxSearchTotalResults]
 	}
 
 	foundSellers, foundVendors := searchParallelNG(allKeys, config)
