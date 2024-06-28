@@ -703,6 +703,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	user := GetParamFromSig(sig, "UserEmail")
+	if user == "" {
+		user = "anonymous"
+	}
 	msg := fmt.Sprintf("[%s] from %s by %s (took %v)", query, source, user, time.Since(start))
 	UserNotify(notifyTitle, msg)
 	LogPages["Search"].Println(msg)
