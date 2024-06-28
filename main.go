@@ -685,6 +685,8 @@ func main() {
 			LogPages[key] = log.New(logFile, "", log.LstdFlags)
 		}
 
+		_, ExtraNavs[key].NoAuth = Config.ACL["Any"][key]
+
 		// Set up the handler
 		handler := enforceSigning(http.HandlerFunc(nav.Handle))
 		if nav.NoAuth {
