@@ -786,21 +786,15 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return Config.Affiliate[s]
 		},
 		"uuid2ckid": func(s string) string {
-			for _, vendor := range Vendors {
-				if vendor == nil || vendor.Info().Shorthand != "CK" {
-					continue
-				}
-				bl, err := vendor.Buylist()
-				if err != nil {
-					return ""
-				}
-				entries, found := bl[s]
-				if !found {
-					return ""
-				}
-				return entries[0].CustomFields["CKID"]
+			bl, err := findVendorBuylist("CK")
+			if err != nil {
+				return ""
 			}
-			return ""
+			entries, found := bl[s]
+			if !found {
+				return ""
+			}
+			return entries[0].CustomFields["CKID"]
 		},
 		"uuid2tcgid": func(s string) string {
 			co, err := mtgmatcher.GetUUID(s)

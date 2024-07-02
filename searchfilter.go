@@ -394,20 +394,15 @@ func price4seller(cardId, shorthand string) float64 {
 }
 
 func price4vendor(cardId, shorthand string) float64 {
-	for _, vendor := range Vendors {
-		if vendor != nil && strings.EqualFold(vendor.Info().Shorthand, shorthand) {
-			bl, err := vendor.Buylist()
-			if err != nil {
-				continue
-			}
-			entries, found := bl[cardId]
-			if !found {
-				continue
-			}
-			return entries[0].BuyPrice
-		}
+	bl, err := findVendorBuylist(shorthand)
+	if err != nil {
+		return 0
 	}
-	return 0
+	entries, found := bl[cardId]
+	if !found {
+		return 0
+	}
+	return entries[0].BuyPrice
 }
 
 var re *regexp.Regexp

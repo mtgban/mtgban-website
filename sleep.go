@@ -175,19 +175,12 @@ func getBulks(skipEditions []string) map[string]int {
 			break
 		}
 	}
-	var ckVendor mtgban.Vendor
-	for _, vendor := range Vendors {
-		if vendor != nil && vendor.Info().Shorthand == "CK" {
-			ckVendor = vendor
-			break
-		}
-	}
 
 	inv, err := tcgSeller.Inventory()
 	if err != nil {
 		return nil
 	}
-	bl, err := ckVendor.Buylist()
+	bl, err := findVendorBuylist("CK")
 	if err != nil {
 		return nil
 	}

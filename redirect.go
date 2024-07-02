@@ -46,28 +46,24 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else if kind == "b" {
-			for _, vendor := range Vendors {
-				if vendor != nil && vendor.Info().Shorthand == store {
-					bl, err := vendor.Buylist()
-					if err != nil {
-						http.NotFound(w, r)
-						return
-					}
+			bl, err := findVendorBuylist(store)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
 
-					// Look up the hash: mtgjson, scryfall, and tcgproductid in order
-					entries, found := bl[hash]
-					if !found {
-						entries, found = bl[mtgmatcher.Scryfall2UUID(hash)]
-						if !found {
-							entries = bl[mtgmatcher.Tcg2UUID(hash)]
-						}
-					}
-
-					for _, entry := range entries {
-						http.Redirect(w, r, entry.URL, http.StatusFound)
-						return
-					}
+			// Look up the hash: mtgjson, scryfall, and tcgproductid in order
+			entries, found := bl[hash]
+			if !found {
+				entries, found = bl[mtgmatcher.Scryfall2UUID(hash)]
+				if !found {
+					entries = bl[mtgmatcher.Tcg2UUID(hash)]
 				}
+			}
+
+			for _, entry := range entries {
+				http.Redirect(w, r, entry.URL, http.StatusFound)
+				return
 			}
 		}
 	}

@@ -482,19 +482,8 @@ func runSealedAnalysis() {
 		}
 	}
 
-	var ckBuylist mtgban.BuylistRecord
-	var directNetBuylist mtgban.BuylistRecord
-	for _, vendor := range Vendors {
-		if vendor == nil {
-			continue
-		}
-		switch vendor.Info().Shorthand {
-		case "CK":
-			ckBuylist, _ = vendor.Buylist()
-		case "TCGDirectNet":
-			directNetBuylist, _ = vendor.Buylist()
-		}
-	}
+	ckBuylist, _ := findVendorBuylist("CK")
+	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 
 	runRawSetValue(tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
 }
