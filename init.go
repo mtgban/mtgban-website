@@ -262,8 +262,8 @@ type scraperOption struct {
 	// For Market scrapers, list the sub-sellers that should be preserved
 	Keepers []string
 
-	// For Market scrapers, list the buylists that should be preserved
-	KeepersBL string
+	// For Trader scrapers, list the sub-vendors that should be preserved
+	KeepersBL []string
 
 	// The redis DBs where to stash data
 	// For classic inventory/buylist the key is just "retail" and "buylist",
@@ -278,6 +278,9 @@ type scraperOption struct {
 
 	// Save market data from this scraper to the associated redis DB
 	StashMarkets bool
+
+	// Save trader data from this scraper to the associated redis DB
+	StashTraders bool
 
 	// Log where scrapers... log
 	Logger *log.Logger
@@ -303,13 +306,14 @@ var ScraperOptions = map[string]*scraperOption{
 			scraper.LogCallback = logger.Printf
 			return scraper, nil
 		},
-		StashBuylist: true,
+		StashTraders: true,
 		RDBs: map[string]*redis.Client{
-			"buylist": redis.NewClient(&redis.Options{
+			"ABUGames": redis.NewClient(&redis.Options{
 				Addr: Config.RedisAddr,
 				DB:   DBs["abugames"],
 			}),
 		},
+		KeepersBL: abugames.NewScraper().TraderNames(),
 	},
 	"cardkingdom": &scraperOption{
 		DevEnabled: true,
@@ -386,8 +390,7 @@ var ScraperOptions = map[string]*scraperOption{
 			scraper.MaxConcurrency = 5
 			return scraper, nil
 		},
-		Keepers:   []string{TCG_MAIN, TCG_DIRECT},
-		KeepersBL: TCG_BUYLIST,
+		Keepers: []string{TCG_MAIN, TCG_DIRECT},
 	},
 	"tcg_index": &scraperOption{
 		DevEnabled: true,
@@ -647,8 +650,10 @@ func loadOptions() {
 		}
 
 		// Custom untangling
-		for _, name := range opt.Keepers {
-			ScraperMap[name] = key
+		for _, keepers := range [][]string{opt.Keepers, opt.KeepersBL} {
+			for _, name := range keepers {
+				ScraperMap[name] = key
+			}
 		}
 
 		ScraperMap[scraper.Info().Shorthand] = key
@@ -702,8 +707,11 @@ func loadScrapers() {
 		ScraperMap[scraper.Info().Shorthand] = key
 		ScraperNames[scraper.Info().Shorthand] = scraper.Info().Name
 
-		if len(opt.Keepers) != 0 {
+		if len(opt.Keepers) > 0 || len(opt.KeepersBL) > 0 {
 			if !opt.OnlyVendor {
+				if len(opt.Keepers) == 0 {
+					newbc.RegisterSeller(scraper)
+				}
 				for _, keeper := range opt.Keepers {
 					newbc.RegisterMarket(scraper, keeper)
 					ScraperMap[keeper] = key
@@ -711,7 +719,14 @@ func loadScrapers() {
 				}
 			}
 			if !opt.OnlySeller {
-				newbc.RegisterVendor(scraper)
+				if len(opt.KeepersBL) == 0 {
+					newbc.RegisterVendor(scraper)
+				}
+				for _, keeper := range opt.KeepersBL {
+					newbc.RegisterTrader(scraper, keeper)
+					ScraperMap[keeper] = key
+					ScraperNames[keeper] = keeper
+				}
 			}
 		} else if opt.OnlySeller {
 			newbc.RegisterSeller(scraper)
@@ -744,13 +759,11 @@ func loadScrapers() {
 	})
 
 	// Allocate enough space for the global pointers
-	// Sellers are managed a bit differently due to the presence of markets
-	// that break the 1:1 assumption
 	if Sellers == nil {
 		Sellers = make([]mtgban.Seller, 0, len(newSellers))
 	}
 	if Vendors == nil {
-		Vendors = make([]mtgban.Vendor, len(newVendors))
+		Vendors = make([]mtgban.Vendor, 0, len(newVendors))
 	}
 
 	updateStaticData()
@@ -945,7 +958,16 @@ func loadVendors(newVendors []mtgban.Vendor) {
 
 	// Load Vendors
 	for i := range newVendors {
-		log.Println(newVendors[i].Info().Name, newVendors[i].Info().Shorthand, "Buylist")
+		// Find where our vendor resides in the global array
+		vendorIndex := -1
+		for j, vendor := range Vendors {
+			if vendor != nil && newVendors[i].Info().Shorthand == vendor.Info().Shorthand {
+				vendorIndex = j
+				break
+			}
+		}
+
+		log.Println(newVendors[i].Info().Name, newVendors[i].Info().Shorthand, "Buylist at position", vendorIndex)
 
 		fname := path.Join(BuylistDir, newVendors[i].Info().Shorthand+"-latest.json")
 		if init && fileExists(fname) {
@@ -954,21 +976,26 @@ func loadVendors(newVendors []mtgban.Vendor) {
 				log.Println(err)
 				continue
 			}
-			Vendors[i] = vendor
+			if vendorIndex < 0 {
+				Vendors = append(Vendors, vendor)
+			} else {
+				Vendors[vendorIndex] = vendor
+			}
 
 			bl, _ := vendor.Buylist()
 			log.Printf("Loaded from file with %d entries", len(bl))
 		} else {
-			opts := ScraperOptions[ScraperMap[newVendors[i].Info().Shorthand]]
+			shorthand := newVendors[i].Info().Shorthand
+			opts := ScraperOptions[ScraperMap[shorthand]]
 
 			// If the old scraper data is old enough, pull from the new scraper
 			// and update it in the global slice
-			if Vendors[i] == nil || time.Since(*Vendors[i].Info().BuylistTimestamp) > SkipRefreshCooldown {
-				ServerNotify("reload", "Loading from vendor "+newVendors[i].Info().Shorthand)
+			if vendorIndex < 0 || time.Since(*Vendors[vendorIndex].Info().BuylistTimestamp) > SkipRefreshCooldown {
+				ServerNotify("reload", "Loading from vendor "+shorthand)
 				start := time.Now()
-				err := updateVendorAtPosition(newVendors[i], i, true)
+				err := updateVendorAtPosition(newVendors[i], vendorIndex, true)
 				if err != nil {
-					msg := fmt.Sprintf("vendor %s %s - %s", newVendors[i].Info().Name, newVendors[i].Info().Shorthand, err.Error())
+					msg := fmt.Sprintf("vendor %s %s - %s", newVendors[i].Info().Name, shorthand, err.Error())
 					ServerNotify("reload", msg, true)
 					continue
 				}
@@ -976,13 +1003,19 @@ func loadVendors(newVendors []mtgban.Vendor) {
 			}
 
 			// Stash data to DB if requested
-			if opts.StashBuylist {
+			if opts.StashBuylist || (opts.StashTraders && opts.RDBs[shorthand] != nil) {
 				start := time.Now()
-				log.Println("Stashing", Vendors[i].Info().Shorthand, "buylist data to DB")
+				log.Println("Stashing", shorthand, "buylist data to DB")
 				bl, _ := Vendors[i].Buylist()
+
+				dbName := "buylist"
+				if opts.RDBs[shorthand] != nil {
+					dbName = shorthand
+				}
+
 				key := Vendors[i].Info().BuylistTimestamp.Format("2006-01-02")
 				for uuid, entries := range bl {
-					err := opts.RDBs["buylist"].HSet(context.Background(), uuid, key, entries[0].BuyPrice).Err()
+					err := opts.RDBs[dbName].HSet(context.Background(), uuid, key, entries[0].BuyPrice).Err()
 					if err != nil {
 						ServerNotify("redis", err.Error())
 						break

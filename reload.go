@@ -192,10 +192,17 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
 
 	// Save vendor in global array, making sure it's _only_ a Vendor
 	// and not anything esle, so that filtering works like expected
-	Vendors[i] = mtgban.NewVendorFromBuylist(bl, vendor.Info())
+	outVendor := mtgban.NewVendorFromBuylist(bl, vendor.Info())
+
+	// Save vendor in global array
+	if i < 0 {
+		Vendors = append(Vendors, outVendor)
+	} else {
+		Vendors[i] = outVendor
+	}
 
 	targetDir := path.Join(BuylistDir, time.Now().Format("2006-01-02/15"))
-	go uploadVendor(Vendors[i], targetDir)
+	go uploadVendor(outVendor, targetDir)
 	return nil
 }
 
