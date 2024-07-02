@@ -460,7 +460,7 @@
                             {{end}}
                             {{if not $save.HasNoCredit}}
                                 <td>
-                                    $ {{printf "%.2f" (mul .BuylistEntry.BuyPrice $save.CreditMultiplier)}}
+                                    $ {{printf "%.2f" (mulf .BuylistEntry.BuyPrice $save.CreditMultiplier)}}
                                 </td>
                             {{end}}
                             {{if not $save.HasNoArbit}}
