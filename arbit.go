@@ -80,6 +80,7 @@ type FilterOpt struct {
 	Func  func(*mtgban.ArbitOpts)
 
 	ArbitOnly  bool
+	GlobalOnly bool
 	BetaFlag   bool
 	NoSealed   bool
 	SealedOnly bool
@@ -216,7 +217,8 @@ var FilterOptConfig = map[string]FilterOpt{
 				return 1, false
 			}
 		},
-		NoSealed: true,
+		NoSealed:   true,
+		GlobalOnly: true,
 	},
 	"nostock": {
 		Title: "only Stocks",
@@ -233,7 +235,8 @@ var FilterOptConfig = map[string]FilterOpt{
 				return 1, false
 			}
 		},
-		NoSealed: true,
+		NoSealed:   true,
+		GlobalOnly: true,
 	},
 }
 
