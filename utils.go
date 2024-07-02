@@ -89,7 +89,13 @@ func keyruneForCardSet(cardId string) string {
 
 	set, err := mtgmatcher.GetSet(co.Card.SetCode)
 	if err != nil {
-		return ""
+		// Try again if token is under a related set
+		if co.Card.Rarity == "token" {
+			set, err = mtgmatcher.GetSet(strings.TrimPrefix(co.Card.SetCode, "T"))
+		}
+		if err != nil {
+			return ""
+		}
 	}
 
 	keyrune := set.KeyruneCode
