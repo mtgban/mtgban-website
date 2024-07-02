@@ -377,20 +377,15 @@ func fixupContainer(code string) []string {
 }
 
 func price4seller(cardId, shorthand string) float64 {
-	for _, seller := range Sellers {
-		if seller != nil && strings.EqualFold(seller.Info().Shorthand, shorthand) {
-			inv, err := seller.Inventory()
-			if err != nil {
-				continue
-			}
-			entries, found := inv[cardId]
-			if !found {
-				continue
-			}
-			return entries[0].Price
-		}
+	inv, err := findSellerInventory(shorthand)
+	if err != nil {
+		return 0
 	}
-	return 0
+	entries, found := inv[cardId]
+	if !found {
+		return 0
+	}
+	return entries[0].Price
 }
 
 func price4vendor(cardId, shorthand string) float64 {

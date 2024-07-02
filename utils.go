@@ -220,6 +220,19 @@ const (
 )
 
 // Look up a vendor and return its buylist
+func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
+	for _, seller := range Sellers {
+		if seller == nil {
+			continue
+		}
+		if strings.ToLower(seller.Info().Shorthand) == strings.ToLower(shorthand) {
+			return seller.Inventory()
+		}
+	}
+	return nil, errors.New("seller not found")
+}
+
+// Look up a vendor and return its buylist
 func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 	for _, vendor := range Vendors {
 		if vendor == nil {

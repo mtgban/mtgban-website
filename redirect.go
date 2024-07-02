@@ -22,28 +22,24 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if kind == "r" || kind == "i" {
-			for _, seller := range Sellers {
-				if seller != nil && seller.Info().Shorthand == store {
-					inv, err := seller.Inventory()
-					if err != nil {
-						http.NotFound(w, r)
-						return
-					}
+			inv, err := findSellerInventory(store)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
 
-					// Look up the hash: mtgjson, scryfall, and tcgproductid in order
-					entries, found := inv[hash]
-					if !found {
-						entries, found = inv[mtgmatcher.Scryfall2UUID(hash)]
-						if !found {
-							entries = inv[mtgmatcher.Tcg2UUID(hash)]
-						}
-					}
-
-					for _, entry := range entries {
-						http.Redirect(w, r, entry.URL, http.StatusFound)
-						return
-					}
+			// Look up the hash: mtgjson, scryfall, and tcgproductid in order
+			entries, found := inv[hash]
+			if !found {
+				entries, found = inv[mtgmatcher.Scryfall2UUID(hash)]
+				if !found {
+					entries = inv[mtgmatcher.Tcg2UUID(hash)]
 				}
+			}
+
+			for _, entry := range entries {
+				http.Redirect(w, r, entry.URL, http.StatusFound)
+				return
 			}
 		} else if kind == "b" {
 			bl, err := findVendorBuylist(store)

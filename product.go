@@ -264,19 +264,8 @@ const (
 
 // Produce a map of card : []ReprintEntry containing array reprints sorted by age
 func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
-	var tcgLow mtgban.InventoryRecord
-	var tcgMarket mtgban.InventoryRecord
-	for _, seller := range Sellers {
-		if seller == nil {
-			continue
-		}
-		if seller.Info().Shorthand == TCG_LOW {
-			tcgLow, _ = seller.Inventory()
-		}
-		if seller.Info().Shorthand == TCG_MARKET {
-			tcgMarket, _ = seller.Inventory()
-		}
-	}
+	tcgLow, _ := findSellerInventory(TCG_LOW)
+	tcgMarket, _ := findSellerInventory(TCG_MARKET)
 
 	uuids := mtgmatcher.GetUUIDs()
 
@@ -468,20 +457,8 @@ func bulkBuylist(co *mtgmatcher.CardObject) float64 {
 func runSealedAnalysis() {
 	log.Println("Running set analysis")
 
-	var tcgInventory mtgban.InventoryRecord
-	var tcgDirect mtgban.InventoryRecord
-	for _, seller := range Sellers {
-		if seller == nil {
-			continue
-		}
-		if seller.Info().Shorthand == TCG_LOW {
-			tcgInventory, _ = seller.Inventory()
-		}
-		if seller.Info().Shorthand == TCG_DIRECT {
-			tcgDirect, _ = seller.Inventory()
-		}
-	}
-
+	tcgInventory, _ := findSellerInventory(TCG_LOW)
+	tcgDirect, _ := findSellerInventory(TCG_DIRECT)
 	ckBuylist, _ := findVendorBuylist("CK")
 	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 
