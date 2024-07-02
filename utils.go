@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/exp/slices"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
 )
@@ -218,6 +219,19 @@ const (
 	MaxRuneSymbols = 57
 )
 
+// Look up a vendor and return its buylist
+func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
+	for _, vendor := range Vendors {
+		if vendor == nil {
+			continue
+		}
+		if strings.ToLower(vendor.Info().Shorthand) == strings.ToLower(shorthand) {
+			return vendor.Buylist()
+		}
+	}
+	return nil, errors.New("vendor not found")
+}
+
 func uuid2card(cardId string, flags ...bool) GenericCard {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
@@ -225,7 +239,13 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	}
 
 	var stocksURL string
-	_, sypList := Infos["TCGSYPList"][cardId]
+	var sypList bool
+
+	syp, err := findVendorBuylist("SYP")
+	if err == nil {
+		_, sypList = syp[cardId]
+	}
+
 	entries, stocks := Infos["STKS"][cardId]
 	if stocks {
 		stocksURL = entries[0].URL

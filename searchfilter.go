@@ -1268,7 +1268,8 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 					return false
 				}
 			case "tcgsyp", "syp":
-				_, found := Infos["TCGSYPList"][co.UUID]
+				bl, _ := findVendorBuylist("SYP")
+				_, found := bl[co.UUID]
 				if found {
 					return false
 				}

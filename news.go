@@ -602,9 +602,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.LargeTable = true
 		pageVars.Metadata = map[string]GenericCard{}
 
-		syp, found := Infos["TCGSYPList"]
-		if !found || len(syp) == 0 {
-			pageVars.InfoMessage = "SYP not ready yet, please try again later"
+		syp, err := findVendorBuylist("SYP")
+		if err != nil {
+			pageVars.InfoMessage = "SYP not configured yet"
 			render(w, "arbit.html", pageVars)
 			return
 		}
@@ -616,11 +616,16 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		var arbit []mtgban.ArbitEntry
 		for _, cardId := range cardIds {
-
 			for _, entry := range syp[cardId] {
+				converted := mtgban.InventoryEntry{
+					Price:      entry.BuyPrice,
+					Quantity:   entry.Quantity,
+					Conditions: entry.Conditions,
+					URL:        entry.URL,
+				}
 				arbit = append(arbit, mtgban.ArbitEntry{
 					CardId:         cardId,
-					InventoryEntry: entry,
+					InventoryEntry: converted,
 					Quantity:       entry.Quantity,
 				})
 			}

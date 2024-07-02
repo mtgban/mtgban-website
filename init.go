@@ -601,6 +601,15 @@ var ScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
+	"tcgplayer_syp": {
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := tcgplayer.NewScraperSYP(Config.Api["tcg_auth"])
+			scraper.LogCallback = logger.Printf
+			scraper.Affiliate = Config.Affiliate["TCG"]
+			return scraper, nil
+		},
+	},
 }
 
 // Associate Scraper shorthands to ScraperOptions keys
@@ -1048,11 +1057,6 @@ func loadInfos() {
 
 	// MTGSTOCKS
 	loadInfoScraper(mtgstocks.NewScraper())
-
-	// TCGSYP
-	scraper := tcgplayer.NewScraperSYP()
-	scraper.Affiliate = Config.Affiliate["TCG"]
-	loadInfoScraper(scraper)
 
 	ServerNotify("refresh", "infos refreshed")
 }

@@ -202,7 +202,11 @@ var FilterOptConfig = map[string]FilterOpt{
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
 			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
-				_, onSypList := Infos["TCGSYPList"][co.UUID]
+				syp, err := findVendorBuylist("SYP")
+				if err != nil {
+					return 0, true
+				}
+				_, onSypList := syp[co.UUID]
 				if !onSypList {
 					return 0, true
 				}
