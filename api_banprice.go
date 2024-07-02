@@ -97,7 +97,6 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 				csvWriter.Write([]string{code})
 			}
 			csvWriter.Flush()
-			return
 		}
 		return
 	}
