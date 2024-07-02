@@ -150,6 +150,50 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	default:
 		enabledStores = strings.Split(storesOpt, ",")
 	}
+
+	// Endpoint for retrieving the stores shorthands
+	if strings.HasPrefix(urlPath, "stores") {
+		output := enabledStores
+		filter := r.FormValue("filter")
+		if filter == "singles" {
+			var filtered []string
+			for _, seller := range Sellers {
+				if seller == nil || (seller.Info().SealedMode && filter == "singles") || (!seller.Info().SealedMode && filter == "sealed") {
+					continue
+				}
+				shorthand := seller.Info().Shorthand
+				if slices.Contains(enabledStores, shorthand) && !slices.Contains(filtered, shorthand) {
+					filtered = append(filtered, shorthand)
+				}
+			}
+			for _, vendor := range Vendors {
+				if vendor == nil || (vendor.Info().SealedMode && filter == "singles") || (!vendor.Info().SealedMode && filter == "sealed") {
+					continue
+				}
+				shorthand := vendor.Info().Shorthand
+				if slices.Contains(enabledStores, shorthand) && !slices.Contains(filtered, shorthand) {
+					filtered = append(filtered, shorthand)
+				}
+			}
+			output = filtered
+		}
+
+		sort.Strings(output)
+
+		if strings.HasSuffix(urlPath, ".json") {
+			json.NewEncoder(w).Encode(&output)
+		} else if strings.HasSuffix(urlPath, ".csv") {
+			w.Header().Set("Content-Type", "text/csv")
+			csvWriter := csv.NewWriter(w)
+			csvWriter.Write([]string{"Code"})
+			for _, code := range output {
+				csvWriter.Write([]string{code})
+			}
+			csvWriter.Flush()
+		}
+		return
+	}
+
 	enabledModes := strings.Split(GetParamFromSig(sig, "APImode"), ",")
 	idOpt := r.FormValue("id")
 	qty, _ := strconv.ParseBool(r.FormValue("qty"))
