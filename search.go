@@ -138,6 +138,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		pageVars.DisableChart = true
+		pageVars.InfoMessage = "Join BAN to unlock additional buylists and tools!"
 	}
 
 	pageVars.SearchSort = readCookie(r, "SearchDefaultSort")
