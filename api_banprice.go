@@ -407,9 +407,8 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 
 		// Determine whether the response should include qty information
 		// Needs to be explicitly requested, all the index prices are skipped,
-		// TCG is too due to how quantities are stored in mtgban (FIXME?)
-		// (only for retail).
-		shouldQty := qty && !seller.Info().MetadataOnly && sellerTag != "TCG Player" && sellerTag != "TCG Direct"
+		// and of course any seller without quantity information
+		shouldQty := qty && !seller.Info().MetadataOnly && !seller.Info().NoQuantityInventory
 
 		for _, cardId := range filterByHash {
 			processSellerEntry(inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, out, shouldQty, conds)
