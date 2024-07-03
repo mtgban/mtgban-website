@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/tcgplayer"
 	"golang.org/x/exp/slices"
 )
 
@@ -52,7 +51,7 @@ func reloadTCG() {
 	reloadMarket("tcg_index")
 	reloadMarket("tcg_market")
 
-	loadTCGDirectNet(Vendors)
+	reloadSingle("tcg_directnet")
 
 	ServerNotify("refresh", "tcg fully refreshed")
 }
@@ -204,24 +203,4 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
 	targetDir := path.Join(BuylistDir, time.Now().Format("2006-01-02/15"))
 	go uploadVendor(outVendor, targetDir)
 	return nil
-}
-
-// Load the fake buylist from the TCG Direct data
-func loadTCGDirectNet(newVendors []mtgban.Vendor) {
-	for _, seller := range Sellers {
-		if seller != nil && seller.Info().Name == TCG_DIRECT {
-			for i := range newVendors {
-				if newVendors[i] != nil && newVendors[i].Info().Name == TCG_DIRECT_NET {
-					tcg := tcgplayer.NewTCGDirectNet()
-					tcg.DirectInventory, _ = seller.Inventory()
-					// No error possible
-					tcg.Buylist()
-					// Replace the vendor
-					newVendors[i] = tcg
-					break
-				}
-			}
-			break
-		}
-	}
 }

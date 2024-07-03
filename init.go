@@ -537,10 +537,10 @@ var ScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
-	"tcg_direct_net": &scraperOption{
+	"tcg_directnet": &scraperOption{
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := tcgplayer.NewTCGDirectNet()
+			scraper := tcgplayer.NewTCGDirectNet(Config.Api["ban_api_key"])
 			return scraper, nil
 		},
 	},
@@ -801,8 +801,6 @@ func loadScrapers() {
 	}
 	ServerNotify("init", msgS)
 	loadSellers(newSellers)
-
-	loadTCGDirectNet(newVendors)
 
 	log.Println("Vendors table")
 	var msgV string
