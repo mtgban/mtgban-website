@@ -88,7 +88,7 @@ var enabledDatasets = []scraperConfig{
 	{
 		PublicName:  "ABU Games Buylist",
 		ScraperName: "abugames",
-		KindName:    "buylist",
+		KindName:    "ABUGames",
 		Color:       "rgb(153, 102, 255)",
 	},
 	{
@@ -128,7 +128,10 @@ func getDateAxisValues(cardId string) ([]string, error) {
 }
 
 func getDataset(cardId string, labels []string, config scraperConfig) (*Dataset, error) {
-	db := ScraperOptions[config.ScraperName].RDBs[config.KindName]
+	db, found := ScraperOptions[config.ScraperName].RDBs[config.KindName]
+	if !found {
+		return nil, errors.New("redis database not found")
+	}
 	results, err := db.HGetAll(context.Background(), cardId).Result()
 	if err != nil {
 		return nil, err
