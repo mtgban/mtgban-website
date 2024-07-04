@@ -810,13 +810,28 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 
 func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedDada []UploadEntry) error {
 	var allScrapers []string
+	var isIndex []string
 	for id := range pm {
-		for scraper := range pm[id] {
-			if !slices.Contains(allScrapers, scraper) {
-				allScrapers = append(allScrapers, scraper)
+		for scraperName := range pm[id] {
+			if slices.Contains(allScrapers, scraperName) {
+				continue
+			}
+			allScrapers = append(allScrapers, scraperName)
+
+			// Determine whether scraper is an index and should appear regardless of conditions
+			for _, scraper := range Sellers {
+				if scraper != nil && scraper.Info().Shorthand == scraperName && !slices.Contains(isIndex, scraperName) && scraper.Info().MetadataOnly {
+					isIndex = append(isIndex, scraperName)
+				}
+			}
+			for _, scraper := range Vendors {
+				if scraper != nil && scraper.Info().Shorthand == scraperName && !slices.Contains(isIndex, scraperName) && scraper.Info().MetadataOnly {
+					isIndex = append(isIndex, scraperName)
+				}
 			}
 		}
 	}
+
 	sort.Slice(allScrapers, func(i, j int) bool {
 		return allScrapers[i] < allScrapers[j]
 	})
@@ -856,7 +871,11 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			if !found {
 				continue
 			}
-			price := getPrice(entry, uploadedDada[j].OriginalCondition)
+			condition := uploadedDada[j].OriginalCondition
+			if slices.Contains(isIndex, scraper) {
+				condition = ""
+			}
+			price := getPrice(entry, condition)
 			prices[i] = fmt.Sprintf("%0.2f", price)
 		}
 		ogPrice := ""
