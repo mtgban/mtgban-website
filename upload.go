@@ -466,8 +466,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		cardIds = append(cardIds, uploadedData[i].CardId)
 
 		// Check if conditions should be retrieved
-		if uploadedData[i].OriginalCondition != "" && !skipConds {
-			shouldCheckForConditions = true
+		if uploadedData[i].OriginalCondition != "" {
+			if skipConds {
+				uploadedData[i].OriginalCondition = ""
+			} else {
+				shouldCheckForConditions = true
+			}
 		}
 	}
 
