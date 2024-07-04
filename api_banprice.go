@@ -452,6 +452,10 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 
 	out[id][sellerTag].Cond = entries[0].Conditions
 
+	if conds && out[id][sellerTag].Conditions == nil {
+		out[id][sellerTag].Conditions = map[string]float64{}
+	}
+
 	if co.Sealed {
 		out[id][sellerTag].Sealed = entries[0].Price
 		if qty {
@@ -467,9 +471,6 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 			}
 		}
 		if conds {
-			if out[id][sellerTag].Conditions == nil {
-				out[id][sellerTag].Conditions = map[string]float64{}
-			}
 			for i := range entries {
 				condTag := entries[i].Conditions + "_etched"
 				out[id][sellerTag].Conditions[condTag] = entries[i].Price
@@ -489,9 +490,6 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 			}
 		}
 		if conds {
-			if out[id][sellerTag].Conditions == nil {
-				out[id][sellerTag].Conditions = map[string]float64{}
-			}
 			for i := range entries {
 				condTag := entries[i].Conditions + "_foil"
 				out[id][sellerTag].Conditions[condTag] = entries[i].Price
@@ -511,9 +509,6 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 			}
 		}
 		if conds {
-			if out[id][sellerTag].Conditions == nil {
-				out[id][sellerTag].Conditions = map[string]float64{}
-			}
 			for i := range entries {
 				condTag := entries[i].Conditions
 				out[id][sellerTag].Conditions[condTag] = entries[i].Price
@@ -600,6 +595,10 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 
 	out[id][vendorTag].Cond = entries[0].Conditions
 
+	if conds && out[id][vendorTag].Conditions == nil {
+		out[id][vendorTag].Conditions = map[string]float64{}
+	}
+
 	if co.Sealed {
 		out[id][vendorTag].Sealed = entries[0].BuyPrice
 		if qty {
@@ -615,9 +614,6 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 			}
 		}
 		if conds {
-			if out[id][vendorTag].Conditions == nil {
-				out[id][vendorTag].Conditions = map[string]float64{}
-			}
 			for i := range entries {
 				condTag := entries[i].Conditions + "_etched"
 				out[id][vendorTag].Conditions[condTag] = entries[i].BuyPrice
@@ -637,9 +633,6 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 			}
 		}
 		if conds {
-			if out[id][vendorTag].Conditions == nil {
-				out[id][vendorTag].Conditions = map[string]float64{}
-			}
 			for i := range entries {
 				condTag := entries[i].Conditions + "_foil"
 				out[id][vendorTag].Conditions[condTag] = entries[i].BuyPrice
@@ -659,9 +652,6 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 			}
 		}
 		if conds {
-			if out[id][vendorTag].Conditions == nil {
-				out[id][vendorTag].Conditions = map[string]float64{}
-			}
 			for i := range entries {
 				condTag := entries[i].Conditions
 				out[id][vendorTag].Conditions[condTag] = entries[i].BuyPrice
