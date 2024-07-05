@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
@@ -272,7 +274,7 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 	var names []string
 	listReprints := map[string][]ReprintEntry{}
 
-	dupes := map[string]bool{}
+	var dupes []string
 	for _, uuid := range uuids {
 		co, _ := mtgmatcher.GetUUID(uuid)
 
@@ -304,10 +306,10 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 		}
 
 		// Skip processed cards (using scryfallId to catch foil/nonfoil)
-		if dupes[co.Identifiers["scryfallId"]] {
+		if slices.Contains(dupes, co.Identifiers["scryfallId"]) {
 			continue
 		}
-		dupes[co.Identifiers["scryfallId"]] = true
+		dupes = append(dupes, co.Identifiers["scryfallId"])
 
 		// Load the date for the card
 		releaseDate := set.ReleaseDate
