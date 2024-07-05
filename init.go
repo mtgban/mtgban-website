@@ -775,8 +775,6 @@ func loadScrapers() {
 		Vendors = make([]mtgban.Vendor, 0, len(newVendors))
 	}
 
-	updateStaticData()
-
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
 		return
@@ -814,6 +812,8 @@ func loadScrapers() {
 	}
 	ServerNotify("init", msgV)
 	loadVendors(newVendors)
+
+	updateStaticData()
 
 	if BenchMode {
 		return
