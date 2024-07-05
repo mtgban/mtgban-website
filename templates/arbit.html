@@ -75,6 +75,11 @@
         <script type="text/javascript" src="../js/cookies.js?hash={{.Hash}}"></script>
         <br>
 
+        {{$cookieName := "ArbitVendorsList"}}
+        {{if .ReverseMode}}
+            {{$cookieName = "ReverseVendorsList"}}
+        {{end}}
+
         <div class="indent">
             <h2>Vendors list</h2>
             Select which vendors you <b>don't</b> want to display in your arbit.
@@ -82,7 +87,7 @@
 
             <script type="text/javascript">
                 window.onload = function(e) {
-                    loadForm("ArbitVendorsList", "vendors");
+                    loadForm('{{$cookieName}}', "vendors");
                 }
             </script>
 

@@ -327,15 +327,29 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	if r.FormValue("page") == "opt" {
 		// Load all available vendors
 		var vendorKeys []string
-		for _, vendor := range Vendors {
-			if vendor == nil || slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
-				continue
+		if reverse {
+			for _, seller := range Sellers {
+				if seller == nil || slices.Contains(blocklistVendors, seller.Info().Shorthand) {
+					continue
+				}
+				vendorKeys = append(vendorKeys, seller.Info().Shorthand)
 			}
-			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
+		} else {
+			for _, vendor := range Vendors {
+				if vendor == nil || slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
+					continue
+				}
+				vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
+			}
 		}
 		pageVars.VendorKeys = vendorKeys
 	} else {
-		filters := strings.Split(readCookie(r, "ArbitVendorsList"), ",")
+		cookieName := "ArbitVendorsList"
+		if reverse {
+			cookieName = "ReverseVendorsList"
+		}
+
+		filters := strings.Split(readCookie(r, cookieName), ",")
 		for _, code := range filters {
 			if !slices.Contains(blocklistVendors, code) {
 				blocklistVendors = append(blocklistVendors, code)
@@ -662,10 +676,8 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if scraper.Info().Shorthand == source.Info().Shorthand {
 			continue
 		}
-		if !pageVars.ReverseMode {
-			if slices.Contains(blocklistVendors, scraper.Info().Shorthand) {
-				continue
-			}
+		if slices.Contains(blocklistVendors, scraper.Info().Shorthand) {
+			continue
 		}
 
 		// Set custom scraper options
