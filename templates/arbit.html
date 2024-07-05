@@ -81,63 +81,29 @@
             <br>
 
             <script type="text/javascript">
-                function clearform(){
-                    var checkboxes = document.querySelectorAll('input')
-                    for (var i = 0; i < checkboxes.length; i++) {
-                        if (checkboxes[i].checked) {
-                            checkboxes[i].checked = false;
-                        }
-                    }
-                }
-
-                function save() {
-                    var list = "";
-                    var checkboxes = document.querySelectorAll('input');
-                    for (var i = 0; i < checkboxes.length; i++) {
-                        if (checkboxes[i].checked) {
-                            list += checkboxes[i].name + ',';
-                        }
-                    }
-
-                    setCookie("ArbitVendorsList", list, 1000);
-
-                    window.location.href = "/arbit"
-                }
-
                 window.onload = function(e) {
-                    list = getCookie("ArbitVendorsList");
-                    if (list == "") {
-                        return;
-                    }
-
-                    const sets = list.split(",");
-                    var checkboxes = document.querySelectorAll('input');
-                    for (var i = 0; i < sets.length; i++) {
-                        for (var j = 0; j < checkboxes.length; j++) {
-                            if (checkboxes[j].name == sets[i]) {
-                                checkboxes[j].checked = true;
-                            }
-                        }
-                    }
+                    loadForm("ArbitVendorsList", "vendors");
                 }
             </script>
 
-            <a class="btn warning" onclick="javascript:clearform();"><b>CLEAR</b></a>
-            <a class="btn success" onclick="javascript:save();"><b>SAVE</b></a>
+            <a class="btn warning" onclick="javascript:clearForm('vendors');"><b>CLEAR</b></a>
+            <a class="btn success" onclick="javascript:saveForm('{{$cookieName}}', 'vendors'); window.location.href = '?'"><b>SAVE</b></a>
         </div>
 
         <br>
         <div class="indent">
-            {{range $i, $key := .VendorKeys}}
-                <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                <label for="{{$key}}">
-                    {{scraper_name $key}}
-                    {{if (contains $key "Sealed")}}
-                        <i>(Sealed)</i>
-                    {{end}}
-                </label>
-                <br>
-            {{end}}
+            <div class="column" id="vendors">
+                {{range $i, $key := .VendorKeys}}
+                    <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                    <label for="{{$key}}">
+                        {{scraper_name $key}}
+                        {{if (contains $key "Sealed")}}
+                            <i>(Sealed)</i>
+                        {{end}}
+                    </label>
+                    <br>
+                {{end}}
+            </div>
         </div>
 
     {{else if eq .ScraperShort ""}}
