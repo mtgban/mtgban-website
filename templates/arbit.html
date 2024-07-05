@@ -132,6 +132,9 @@
                 <input type="checkbox" id="{{$key}}" name="{{$key}}">
                 <label for="{{$key}}">
                     {{scraper_name $key}}
+                    {{if (contains $key "Sealed")}}
+                        <i>(Sealed)</i>
+                    {{end}}
                 </label>
                 <br>
             {{end}}

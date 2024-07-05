@@ -99,7 +99,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 		for _, seller := range Sellers {
 			if seller == nil ||
-				seller.Info().SealedMode ||
 				slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 				continue
 			}
@@ -109,7 +108,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 		for _, vendor := range Vendors {
 			if vendor == nil ||
-				vendor.Info().SealedMode ||
 				slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
 				continue
 			}
