@@ -84,53 +84,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	cloud := r.FormValue("cloud")
-	cloud_bl := r.FormValue("cloud_bl")
-	if cloud != "" || cloud_bl != "" {
-		if cloud != "" {
-			configMutex.RLock()
-			config, found := SellersConfigMap[cloud]
-			configMutex.RUnlock()
-			if !found {
-				pageVars.InfoMessage = cloud + " not found"
-			} else {
-				seller, err := downloadSeller(config.Path)
-				if err != nil {
-					v := url.Values{
-						"msg": {cloud + " " + err.Error()},
-					}
-					r.URL.RawQuery = v.Encode()
-				} else {
-					for i := range Sellers {
-						if Sellers[i] != nil && Sellers[i].Info().Shorthand == seller.Info().Shorthand {
-							Sellers[i] = seller
-						}
-					}
-				}
-			}
-		} else {
-			configMutex.RLock()
-			config, found := VendorsConfigMap[cloud_bl]
-			configMutex.RUnlock()
-			if !found {
-				pageVars.InfoMessage = cloud_bl + " not found"
-			} else {
-				vendor, err := downloadVendor(config.Path)
-				if err != nil {
-					v := url.Values{
-						"msg": {cloud_bl + " " + err.Error()},
-					}
-					r.URL.RawQuery = v.Encode()
-				} else {
-					for i := range Vendors {
-						if Vendors[i] != nil && Vendors[i].Info().Shorthand == vendor.Info().Shorthand {
-							Vendors[i] = vendor
-						}
-					}
-				}
-			}
-		}
-	}
 
 	logs := r.FormValue("logs")
 	if logs != "" {
@@ -287,24 +240,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 		if !skip {
 			go loadScrapers()
-		}
-
-	case "cloud":
-		v = url.Values{}
-		v.Set("msg", "Reloading scrapers from the cloud in the background...")
-		doReboot = true
-
-		skip := false
-		for key, opt := range ScraperOptions {
-			if opt.Busy {
-				v.Set("msg", "Cannot reload everything while "+key+" is refreshing")
-				skip = true
-				break
-			}
-		}
-
-		if !skip {
-			go loadScrapersNG()
 		}
 
 	case "server":

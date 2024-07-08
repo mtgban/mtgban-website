@@ -20,12 +20,10 @@ import (
 
 	"database/sql"
 
-	"cloud.google.com/go/storage"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
 	"gopkg.in/Iwark/spreadsheet.v2"
 	cron "gopkg.in/robfig/cron.v2"
 
@@ -342,9 +340,7 @@ var Config struct {
 	ACL map[string]map[string]map[string]string `json:"acl"`
 
 	Uploader struct {
-		ServiceAccount string `json:"service_account"`
-		BucketName     string `json:"bucket_name"`
-		Moxfield       string `json:"moxfield"`
+		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
 	/* The location of the configuation file */
@@ -378,7 +374,6 @@ var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
 
 var GoogleDocsClient *http.Client
-var GCSBucketClient *storage.Client
 
 const (
 	DefaultConfigPort = "8080"
@@ -578,15 +573,6 @@ func main() {
 		}
 	}
 
-	GCSBucketClient, err = storage.NewClient(context.Background(), option.WithCredentialsFile(Config.Uploader.ServiceAccount))
-	if err != nil {
-		if DevMode {
-			log.Println("error creating the GCSBucketClient:", err)
-		} else {
-			log.Fatalln("error creating the GCSBucketClient:", err)
-		}
-	}
-
 	err = openDBs()
 	if err != nil {
 		if DevMode {
@@ -606,11 +592,7 @@ func main() {
 			log.Fatalln("error loading mtgjson:", err)
 		}
 
-		err = loadScrapersNG()
-		if err != nil {
-			log.Println("error loading config:", err)
-			loadScrapers()
-		}
+		loadScrapers()
 
 		DatabaseLoaded = true
 

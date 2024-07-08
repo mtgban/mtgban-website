@@ -109,68 +109,6 @@ func loadSellerFromFile(fname string) (mtgban.Seller, error) {
 	return mtgban.ReadSellerFromJSON(file)
 }
 
-func uploadSeller(seller mtgban.Seller, currentDir string) error {
-	if GCSBucketClient == nil {
-		return errors.New("no bucket configuration")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultUploaderTimeout)
-	defer cancel()
-
-	outName := path.Join(currentDir, seller.Info().Shorthand+".json")
-	wc := GCSBucketClient.Bucket(Config.Uploader.BucketName).Object(outName).NewWriter(ctx)
-	wc.ContentType = "application/json"
-	defer wc.Close()
-
-	err := mtgban.WriteSellerToJSON(seller, wc)
-	if err != nil {
-		return err
-	}
-
-	configMutex.Lock()
-	_, found := SellersConfigMap[seller.Info().Shorthand]
-	if !found {
-		SellersConfigMap[seller.Info().Shorthand] = &ScraperConfig{}
-	}
-	SellersConfigMap[seller.Info().Shorthand].Name = seller.Info().Name
-	SellersConfigMap[seller.Info().Shorthand].Shorthand = seller.Info().Shorthand
-	SellersConfigMap[seller.Info().Shorthand].Path = outName
-	uploadScrapersConfig(SellersConfigMap, "sellers.json")
-	configMutex.Unlock()
-
-	return nil
-}
-
-func uploadVendor(vendor mtgban.Vendor, currentDir string) error {
-	if GCSBucketClient == nil {
-		return errors.New("no bucket configuration")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultUploaderTimeout)
-	defer cancel()
-
-	outName := path.Join(currentDir, vendor.Info().Shorthand+".json")
-	wc := GCSBucketClient.Bucket(Config.Uploader.BucketName).Object(outName).NewWriter(ctx)
-	wc.ContentType = "application/json"
-	defer wc.Close()
-
-	err := mtgban.WriteVendorToJSON(vendor, wc)
-	if err != nil {
-		return err
-	}
-
-	configMutex.Lock()
-	_, found := VendorsConfigMap[vendor.Info().Shorthand]
-	if !found {
-		VendorsConfigMap[vendor.Info().Shorthand] = &ScraperConfig{}
-	}
-	VendorsConfigMap[vendor.Info().Shorthand].Name = vendor.Info().Name
-	VendorsConfigMap[vendor.Info().Shorthand].Shorthand = vendor.Info().Shorthand
-	VendorsConfigMap[vendor.Info().Shorthand].Path = outName
-	uploadScrapersConfig(VendorsConfigMap, "vendors.json")
-	configMutex.Unlock()
-
-	return nil
-}
-
 func dumpInventoryToFile(seller mtgban.Seller, currentDir, fname string) error {
 	outName := path.Join(currentDir, seller.Info().Shorthand+".json")
 
@@ -691,13 +629,6 @@ func loadScrapers() {
 		ScraperNames = map[string]string{}
 	}
 
-	if SellersConfigMap == nil {
-		SellersConfigMap = map[string]*ScraperConfig{}
-	}
-	if VendorsConfigMap == nil {
-		VendorsConfigMap = map[string]*ScraperConfig{}
-	}
-
 	loadOptions()
 
 	for key, opt := range ScraperOptions {
@@ -943,14 +874,6 @@ func loadSellers(newSellers []mtgban.Seller) {
 				continue
 			}
 			opts.Logger.Println("Saved to file")
-
-			targetDir := path.Join(InventoryDir, time.Now().Format("2006-01-02/15"))
-			err = uploadSeller(newSellers[i], targetDir)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			opts.Logger.Println("Uploaded to the cloud")
 		}
 		log.Println("-- OK")
 	}
@@ -1037,14 +960,6 @@ func loadVendors(newVendors []mtgban.Vendor) {
 				continue
 			}
 			opts.Logger.Println("Saved to file")
-
-			targetDir := path.Join(BuylistDir, time.Now().Format("2006-01-02/15"))
-			err = uploadVendor(Vendors[i], targetDir)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			opts.Logger.Println("Uploaded to the cloud")
 		}
 		log.Println("-- OK")
 	}

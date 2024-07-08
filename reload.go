@@ -3,8 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"path"
-	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"golang.org/x/exp/slices"
@@ -147,8 +145,6 @@ func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
 		Sellers[i] = outSeller
 	}
 
-	targetDir := path.Join(InventoryDir, time.Now().Format("2006-01-02/15"))
-	go uploadSeller(outSeller, targetDir)
 	return nil
 }
 
@@ -200,7 +196,5 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
 		Vendors[i] = outVendor
 	}
 
-	targetDir := path.Join(BuylistDir, time.Now().Format("2006-01-02/15"))
-	go uploadVendor(outVendor, targetDir)
 	return nil
 }
