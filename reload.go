@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"path"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -128,6 +130,10 @@ func updateSellers(scraper mtgban.Scraper) {
 			} else {
 				msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, i)
 				ServerNotify("refresh", msg)
+
+				currentDir := path.Join(InventoryDir, fmt.Sprintf("%03d", time.Now().YearDay()))
+				fname := path.Join(InventoryDir, scraper.Info().Shorthand+"-latest.json")
+				dumpInventoryToFile(scraper.(mtgban.Seller), currentDir, fname)
 			}
 			return
 		}
@@ -179,6 +185,10 @@ func updateVendors(scraper mtgban.Scraper) {
 			} else {
 				msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, i)
 				ServerNotify("refresh", msg)
+
+				currentDir := path.Join(BuylistDir, fmt.Sprintf("%03d", time.Now().YearDay()))
+				fname := path.Join(BuylistDir, scraper.Info().Shorthand+"-latest.json")
+				dumpBuylistToFile(scraper.(mtgban.Vendor), currentDir, fname)
 			}
 			return
 		}
