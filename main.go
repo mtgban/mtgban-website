@@ -211,7 +211,6 @@ var OptionalFields = []string{
 	"UserTier",
 	"SearchDisabled",
 	"SearchBuylistDisabled",
-	"SearchSealed",
 	"SearchDownloadCSV",
 	"ArbitEnabled",
 	"ArbitDisabledVendors",
