@@ -283,6 +283,7 @@ var ScraperOptions = map[string]*scraperOption{
 		},
 	},
 	"ninetyfive": &scraperOption{
+		OnlySeller: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper, _ := ninetyfive.NewScraper(false)
 			scraper.LogCallback = logger.Printf
