@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"golang.org/x/exp/slices"
 )
 
 func reloadCK() {
@@ -46,53 +45,75 @@ func reloadSingle(name string) {
 }
 
 func reloadTCG() {
-	reloadMarket("tcg_index")
-	reloadMarket("tcg_market")
+	reloadMarketOrTrader("tcg_index")
+	reloadMarketOrTrader("tcg_market")
 
 	reloadSingle("tcg_directnet")
 
 	ServerNotify("refresh", "tcg fully refreshed")
 }
 
-func reloadMarket(name string) {
+func reloadMarketOrTrader(name string) {
 	defer recoverPanicScraper()
 
 	ServerNotify("refresh", "Reloading "+name)
 
+	opt, found := ScraperOptions[name]
+	if !found {
+		msg := fmt.Sprintf("refresh %s not found", name)
+		ServerNotify("refresh", msg, true)
+		return
+	}
+
 	// Lock because we plan to load both sides of the scraper
-	ScraperOptions[name].Mutex.Lock()
-	ScraperOptions[name].Busy = true
+	opt.Mutex.Lock()
+	opt.Busy = true
 	defer func() {
-		ScraperOptions[name].Busy = false
-		ScraperOptions[name].Mutex.Unlock()
+		opt.Busy = false
+		opt.Mutex.Unlock()
 	}()
 
-	scraper, err := ScraperOptions[name].Init(ScraperOptions[name].Logger)
+	scraper, err := opt.Init(opt.Logger)
 	if err != nil {
 		msg := fmt.Sprintf("error initializing %s: %s", name, err.Error())
 		ServerNotify("refresh", msg, true)
 		return
 	}
 
-	multiSellers, err := mtgban.Seller2Sellers(scraper.(mtgban.Market))
+	newbc := mtgban.NewClient()
+
+	if !ScraperOptions[name].OnlyVendor {
+		if len(opt.Keepers) == 0 {
+			newbc.RegisterSeller(scraper)
+		}
+		for _, keeper := range opt.Keepers {
+			newbc.RegisterMarket(scraper, keeper)
+		}
+	}
+	if !ScraperOptions[name].OnlySeller {
+		if len(opt.KeepersBL) == 0 {
+			newbc.RegisterVendor(scraper)
+		}
+		for _, keeper := range opt.KeepersBL {
+			newbc.RegisterTrader(scraper, keeper)
+		}
+	}
+
+	err = newbc.Load()
 	if err != nil {
-		msg := fmt.Sprintf("error separating %s: %s", name, err.Error())
-		ServerNotify("refresh", msg)
+		msg := fmt.Sprintf("error loading new data for %s: %s", name, err.Error())
+		ServerNotify("refresh", msg, true)
 		return
 	}
 
-	keepers := ScraperOptions[name].Keepers
-	for i := range multiSellers {
-		// Skip subsellers not explicitly enabled
-		if !slices.Contains(keepers, multiSellers[i].Info().Shorthand) {
-			continue
-		}
-		updateSellers(multiSellers[i])
+	sellers := newbc.Sellers()
+	for _, seller := range sellers {
+		updateSellers(seller)
 	}
-
-	// This can be done because only the already-registered scrapers
-	// will be updated, no effect otherwise
-	updateVendors(scraper)
+	vendors := newbc.Vendors()
+	for _, vendor := range vendors {
+		updateVendors(vendor)
+	}
 
 	ServerNotify("refresh", name+" market refresh completed")
 }
