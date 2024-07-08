@@ -31,7 +31,6 @@ import (
 	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/strikezone"
 	"github.com/mtgban/go-mtgban/tcgplayer"
-	"github.com/mtgban/go-mtgban/toamagic"
 	"github.com/mtgban/go-mtgban/trollandtoad"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -466,14 +465,6 @@ var ScraperOptions = map[string]*scraperOption{
 				Addr: Config.RedisAddr,
 				DB:   DBs["mkm_low"],
 			}),
-		},
-	},
-	"toamagic": &scraperOption{
-		OnlyVendor: true,
-		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := toamagic.NewScraper()
-			scraper.LogCallback = logger.Printf
-			return scraper, nil
 		},
 	},
 	"tcg_directnet": &scraperOption{
