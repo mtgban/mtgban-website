@@ -325,7 +325,7 @@ var ScraperOptions = map[string]*scraperOption{
 			scraper := tcgplayer.NewScraperMarket(Config.Api["tcg_public"], Config.Api["tcg_private"])
 			scraper.Affiliate = Config.Affiliate["TCG"]
 			scraper.LogCallback = logger.Printf
-			scraper.MaxConcurrency = 5
+			scraper.MaxConcurrency = 6
 			return scraper, nil
 		},
 		Keepers: []string{TCG_MAIN, TCG_DIRECT},
