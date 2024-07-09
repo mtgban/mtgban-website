@@ -22,6 +22,7 @@ import (
 	"time"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/go-mtgban/mtgban"
 
 	git "github.com/go-git/go-git/v5"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -224,9 +225,10 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}
 
-	case "scrapers":
+	case "scrapers", "sellers", "vendors":
 		v = url.Values{}
-		v.Set("msg", "Reloading scrapers in the background...")
+		v.Set("msg", fmt.Sprintf("Reloading %s in the background...", reboot))
+
 		doReboot = true
 
 		skip := false
@@ -238,8 +240,58 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if !skip {
+		if !skip && reboot == "scrapers" {
 			go loadScrapers()
+		}
+
+		if !skip {
+			go func() {
+				newbc := mtgban.NewClient()
+				for key, opt := range ScraperOptions {
+					if DevMode && !opt.DevEnabled {
+						continue
+					}
+
+					scraper, err := opt.Init(opt.Logger)
+					if err != nil {
+						msg := fmt.Sprintf("error initializing %s: %s", key, err.Error())
+						ServerNotify("init", msg, true)
+						return
+					}
+
+					if len(opt.Keepers) > 0 || len(opt.KeepersBL) > 0 {
+						if !opt.OnlyVendor {
+							if len(opt.Keepers) == 0 {
+								newbc.RegisterSeller(scraper)
+							}
+							for _, keeper := range opt.Keepers {
+								newbc.RegisterMarket(scraper, keeper)
+							}
+						}
+						if !opt.OnlySeller {
+							if len(opt.KeepersBL) == 0 {
+								newbc.RegisterVendor(scraper)
+							}
+							for _, keeper := range opt.KeepersBL {
+								newbc.RegisterTrader(scraper, keeper)
+								ScraperMap[keeper] = key
+								ScraperNames[keeper] = keeper
+							}
+						}
+					} else if opt.OnlySeller {
+						newbc.RegisterSeller(scraper)
+					} else if opt.OnlyVendor {
+						newbc.RegisterVendor(scraper)
+					} else {
+						newbc.Register(scraper)
+					}
+				}
+				if reboot == "sellers" {
+					loadSellers(newbc)
+				} else if reboot == "vendors" {
+					loadVendors(newbc)
+				}
+			}()
 		}
 
 	case "server":
