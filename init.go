@@ -928,14 +928,14 @@ func loadVendors(newVendors []mtgban.Vendor) {
 			if opts.StashBuylist || (opts.StashTraders && opts.RDBs[shorthand] != nil) {
 				start := time.Now()
 				log.Println("Stashing", shorthand, "buylist data to DB")
-				bl, _ := Vendors[i].Buylist()
+				bl, _ := newVendors[i].Buylist()
 
 				dbName := "buylist"
 				if opts.RDBs[shorthand] != nil {
 					dbName = shorthand
 				}
 
-				key := Vendors[i].Info().BuylistTimestamp.Format("2006-01-02")
+				key := newVendors[i].Info().BuylistTimestamp.Format("2006-01-02")
 				for uuid, entries := range bl {
 					err := opts.RDBs[dbName].HSet(context.Background(), uuid, key, entries[0].BuyPrice).Err()
 					if err != nil {
@@ -946,7 +946,7 @@ func loadVendors(newVendors []mtgban.Vendor) {
 				log.Println("Took", time.Since(start))
 			}
 
-			err := dumpBuylistToFile(Vendors[i], currentDir, fname)
+			err := dumpBuylistToFile(newVendors[i], currentDir, fname)
 			if err != nil {
 				log.Println(err)
 				continue
