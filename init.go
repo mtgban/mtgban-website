@@ -684,7 +684,7 @@ func loadScrapers() {
 	loadSellers(newbc)
 	loadVendors(newbc)
 
-	updateStaticData()
+	go updateStaticData()
 
 	if BenchMode {
 		return
