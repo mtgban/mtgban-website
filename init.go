@@ -669,35 +669,6 @@ func loadScrapers() {
 		}
 	}
 
-	// Sort the sellers/vendors arrays by name
-	//
-	// Note that pointers are shared between these two arrays,
-	// things like Price Ratio (bl data depending on inv data)
-	// still work just fine, even if we don't use them in the
-	// global arrays in the end.
-	newSellers := newbc.Sellers()
-	sort.Slice(newSellers, func(i, j int) bool {
-		if newSellers[i].Info().Name == newSellers[j].Info().Name {
-			return newSellers[i].Info().Shorthand < newSellers[j].Info().Shorthand
-		}
-		return newSellers[i].Info().Name < newSellers[j].Info().Name
-	})
-	newVendors := newbc.Vendors()
-	sort.Slice(newVendors, func(i, j int) bool {
-		if newVendors[i].Info().Name == newVendors[j].Info().Name {
-			return newVendors[i].Info().Shorthand < newVendors[j].Info().Shorthand
-		}
-		return newVendors[i].Info().Name < newVendors[j].Info().Name
-	})
-
-	// Allocate enough space for the global pointers
-	if Sellers == nil {
-		Sellers = make([]mtgban.Seller, 0, len(newSellers))
-	}
-	if Vendors == nil {
-		Vendors = make([]mtgban.Vendor, 0, len(newVendors))
-	}
-
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
 		return
@@ -710,31 +681,8 @@ func loadScrapers() {
 	}
 	ServerNotify("init", msgM)
 
-	log.Println("Sellers table")
-	var msgS string
-	for i := range newSellers {
-		msgS += fmt.Sprintf("%d ", i)
-		if newSellers[i] == nil {
-			msgS += "<nil>\n"
-			continue
-		}
-		msgS += fmt.Sprintf("%s %s\n", newSellers[i].Info().Name, newSellers[i].Info().Shorthand)
-	}
-	ServerNotify("init", msgS)
-	loadSellers(newSellers)
-
-	log.Println("Vendors table")
-	var msgV string
-	for i := range newVendors {
-		msgV += fmt.Sprintf("%d ", i)
-		if newVendors[i] == nil {
-			msgV += "<nil>\n"
-			continue
-		}
-		msgV += fmt.Sprintf("%s %s\n", newVendors[i].Info().Name, newVendors[i].Info().Shorthand)
-	}
-	ServerNotify("init", msgV)
-	loadVendors(newVendors)
+	loadSellers(newbc)
+	loadVendors(newbc)
 
 	updateStaticData()
 
@@ -780,7 +728,38 @@ func updateStaticData() {
 	LastUpdate = time.Now().Format(time.RFC3339)
 }
 
-func loadSellers(newSellers []mtgban.Seller) {
+func loadSellers(newbc *mtgban.BanClient) {
+	// Sort the sellers/vendors arrays by name
+	//
+	// Note that pointers are shared between these two arrays,
+	// things like Price Ratio (bl data depending on inv data)
+	// still work just fine, even if we don't use them in the
+	// global arrays in the end.
+	newSellers := newbc.Sellers()
+	sort.Slice(newSellers, func(i, j int) bool {
+		if newSellers[i].Info().Name == newSellers[j].Info().Name {
+			return newSellers[i].Info().Shorthand < newSellers[j].Info().Shorthand
+		}
+		return newSellers[i].Info().Name < newSellers[j].Info().Name
+	})
+
+	// Allocate enough space for the global pointers
+	if Sellers == nil {
+		Sellers = make([]mtgban.Seller, 0, len(newSellers))
+	}
+
+	log.Println("Sellers table")
+	var msgS string
+	for i := range newSellers {
+		msgS += fmt.Sprintf("%d ", i)
+		if newSellers[i] == nil {
+			msgS += "<nil>\n"
+			continue
+		}
+		msgS += fmt.Sprintf("%s %s\n", newSellers[i].Info().Name, newSellers[i].Info().Shorthand)
+	}
+	ServerNotify("init", msgS)
+
 	defer recoverPanicScraper()
 
 	init := !DatabaseLoaded
@@ -871,7 +850,31 @@ func loadSellers(newSellers []mtgban.Seller) {
 	}
 }
 
-func loadVendors(newVendors []mtgban.Vendor) {
+func loadVendors(newbc *mtgban.BanClient) {
+	newVendors := newbc.Vendors()
+	sort.Slice(newVendors, func(i, j int) bool {
+		if newVendors[i].Info().Name == newVendors[j].Info().Name {
+			return newVendors[i].Info().Shorthand < newVendors[j].Info().Shorthand
+		}
+		return newVendors[i].Info().Name < newVendors[j].Info().Name
+	})
+
+	if Vendors == nil {
+		Vendors = make([]mtgban.Vendor, 0, len(newVendors))
+	}
+
+	log.Println("Vendors table")
+	var msgV string
+	for i := range newVendors {
+		msgV += fmt.Sprintf("%d ", i)
+		if newVendors[i] == nil {
+			msgV += "<nil>\n"
+			continue
+		}
+		msgV += fmt.Sprintf("%s %s\n", newVendors[i].Info().Name, newVendors[i].Info().Shorthand)
+	}
+	ServerNotify("init", msgV)
+
 	defer recoverPanicScraper()
 
 	init := !DatabaseLoaded
