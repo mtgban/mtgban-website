@@ -782,7 +782,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			if !found {
 				return ""
 			}
-			return entries[0].CustomFields["CKID"]
+			return entries[0].OriginalId
 		},
 		"uuid2tcgid": func(s string) string {
 			co, err := mtgmatcher.GetUUID(s)
