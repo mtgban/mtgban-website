@@ -32,6 +32,8 @@ import (
 )
 
 type PageVars struct {
+	Pagination
+
 	Nav      []NavElem
 	ExtraNav []NavElem
 
@@ -84,10 +86,6 @@ type PageVars struct {
 	HasSypList   bool
 	IsOneDay     bool
 	CanSwitchDay bool
-	TotalIndex   int
-	CurrentIndex int
-	PrevIndex    int
-	NextIndex    int
 	SortDir      string
 	LargeTable   bool
 	OffsetCards  int

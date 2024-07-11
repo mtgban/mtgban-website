@@ -579,3 +579,51 @@ func randomUUID(sealed bool) string {
 	index := rand.Intn(len(set.Cards))
 	return set.Cards[index].UUID
 }
+
+type Pagination struct {
+	TotalIndex   int
+	CurrentIndex int
+	PrevIndex    int
+	NextIndex    int
+}
+
+// Divide results in sub pages
+// slice - input results
+// pageIndex - the current page being viewed
+// maxResults - how many items can be present in a single page
+// maxTotalResults - how many items can be present in all results
+func Paginate(slice []string, pageIndex, maxResults, maxTotalResults int) ([]string, Pagination) {
+	var page Pagination
+
+	page.TotalIndex = len(slice)/maxResults + 1
+	if page.TotalIndex > maxTotalResults/maxResults {
+		page.TotalIndex = maxTotalResults / maxResults
+	}
+
+	// Parse the requested input page
+	if pageIndex <= 1 {
+		pageIndex = 1
+	} else if pageIndex > page.TotalIndex {
+		pageIndex = page.TotalIndex
+	}
+
+	// Assign the current page index to enable pagination
+	page.CurrentIndex = pageIndex
+
+	// Initialize previous and next pagination links
+	if page.CurrentIndex > 0 {
+		page.PrevIndex = page.CurrentIndex - 1
+	}
+	if page.CurrentIndex < page.TotalIndex {
+		page.NextIndex = page.CurrentIndex + 1
+	}
+
+	// Chop results where needed
+	head := maxResults * (pageIndex - 1)
+	tail := maxResults * pageIndex
+	if tail > len(slice) {
+		tail = len(slice)
+	}
+
+	return slice[head:tail], page
+}
