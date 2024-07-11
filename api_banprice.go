@@ -682,10 +682,7 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 }
 
 func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, shouldCond, sealed bool) error {
-	skuHeader := "SKU"
-	if sealed {
-		skuHeader = "UUID"
-	}
+	skuHeader := "UUID"
 	header := []string{skuHeader, "TCG Product Id", "Store", "Name", "Edition"}
 	if !sealed {
 		header = append(header, "Number", "Finish", "Rarity")
@@ -742,9 +739,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 
 				if shouldCond && !sealed {
 					for _, tag := range mtgban.FullGradeTags {
-						sku, _ := mtgban.ComputeSKU(co.UUID, tag, finishes[i])
-
-						record := []string{sku, tcgId, scraper}
+						record := []string{co.UUID, tcgId, scraper}
 						record = append(record, cardData...)
 
 						subtag := tag
@@ -776,12 +771,6 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 						}
 					}
 				} else {
-					var sku string
-					if sealed {
-						sku = co.UUID
-					} else {
-						sku, _ = mtgban.ComputeSKU(co.UUID, entry.Cond, finishes[i])
-					}
 					var cond string
 					if !sealed {
 						cond = entry.Cond
@@ -791,7 +780,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 						qty = qtyStr
 					}
 
-					record := []string{sku, tcgId, scraper}
+					record := []string{co.UUID, tcgId, scraper}
 					record = append(record, cardData...)
 					record = append(record, priceStr, cond, qty)
 
