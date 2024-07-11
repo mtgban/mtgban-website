@@ -15,6 +15,9 @@ import (
 
 const (
 	newsPageSize = 25
+
+	MaxSYPResults      = 2500
+	MaxSYPTotalResults = 100000
 )
 
 type Heading struct {
@@ -668,6 +671,12 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 		pageVars.SortOption = sorting
+
+		// If results can't fit in one page, chunk response and enable pagination
+		if len(arbit) > MaxSYPResults {
+			pageIndex, _ := strconv.Atoi(r.FormValue("p"))
+			arbit, pageVars.Pagination = Paginate(arbit, pageIndex, MaxSYPResults, MaxSYPTotalResults)
+		}
 
 		entry := Arbitrage{
 			Name:        "SYP",

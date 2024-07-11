@@ -479,6 +479,25 @@
                             </td>
                         </tr>
                     {{end}}
+
+                    {{if $.CurrentIndex}}
+                        <tr style="background-color: var(--headerbackground);">
+                            <td colspan="13" style="text-align: center; vertical-align: middle;">
+                                <p style="display: inline;">
+                                    {{if ne $.CurrentIndex 1}}
+                                        <a class="pagination" href="?page=syp&p=1">&lt;</a>
+                                        <a class="pagination" href="?page=syp&p={{$.PrevIndex}}"><i class="arrow left"></i></a>
+                                    {{end}}
+                                    {{$.CurrentIndex}} / {{$.TotalIndex}}
+                                    {{if ne $.CurrentIndex $.TotalIndex}}
+                                        <a class="pagination" href="?page=syp&p={{$.NextIndex}}"><i class="arrow right"></i></a>
+                                        <a class="pagination" href="?page=syp&p={{$.TotalIndex}}">&gt;</a>
+                                    {{end}}
+                                </p>
+                            </td>
+                        </tr>
+                    {{end}}
+
                     <tr style="background-color: var(--background);">
                         <td colspan=13>
                             <a class="btn default" style="float: right;" href="#top"><i class="arrow up"></i> back to top</a>

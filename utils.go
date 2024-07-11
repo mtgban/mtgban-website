@@ -592,7 +592,7 @@ type Pagination struct {
 // pageIndex - the current page being viewed
 // maxResults - how many items can be present in a single page
 // maxTotalResults - how many items can be present in all results
-func Paginate(slice []string, pageIndex, maxResults, maxTotalResults int) ([]string, Pagination) {
+func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T, Pagination) {
 	var page Pagination
 
 	page.TotalIndex = len(slice)/maxResults + 1
