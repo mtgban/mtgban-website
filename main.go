@@ -331,7 +331,12 @@ var Config struct {
 	GlobalProbeList        []string          `json:"global_probe_list"`
 	Patreon                struct {
 		Secret map[string]string `json:"secret"`
-		Emails map[string]string `json:"emails"`
+		Grants []struct {
+			Category string `json:"category"`
+			Email    string `json:"email"`
+			Name     string `json:"name"`
+			Tier     string `json:"tier"`
+		} `json:"grants"`
 	} `json:"patreon"`
 	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
 	GoogleCredentials string            `json:"google_credentials"`
