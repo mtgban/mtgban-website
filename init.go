@@ -25,7 +25,6 @@ import (
 	"github.com/mtgban/go-mtgban/magiccorner"
 	"github.com/mtgban/go-mtgban/miniaturemarket"
 	"github.com/mtgban/go-mtgban/mtgseattle"
-	"github.com/mtgban/go-mtgban/mtgstocks"
 	"github.com/mtgban/go-mtgban/ninetyfive"
 	"github.com/mtgban/go-mtgban/sealedev"
 	"github.com/mtgban/go-mtgban/starcitygames"
@@ -698,10 +697,6 @@ func loadScrapers() {
 }
 
 func updateStaticData() {
-	if Infos == nil {
-		Infos = map[string]mtgban.InventoryRecord{}
-	}
-
 	SealedEditionsSorted, SealedEditionsList = getSealedEditions()
 	AllEditionsKeys, AllEditionsMap = getAllEditions()
 	TreeEditionsKeys, TreeEditionsMap = getTreeEditions()
@@ -715,9 +710,6 @@ func updateStaticData() {
 	}
 	TotalCards = totalCards
 
-	if !SkipInitialRefresh {
-		go loadInfos()
-	}
 	go runSealedAnalysis()
 
 	// Load prices for API users
@@ -958,25 +950,6 @@ func loadVendors(newbc *mtgban.BanClient) {
 		}
 		log.Println("-- OK")
 	}
-}
-
-func loadInfos() {
-	log.Println("Loading infos")
-
-	// MTGSTOCKS
-	loadInfoScraper(mtgstocks.NewScraper())
-
-	ServerNotify("refresh", "infos refreshed")
-}
-
-func loadInfoScraper(seller mtgban.Seller) {
-	inv, err := seller.Inventory()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	Infos[seller.Info().Shorthand] = inv
-	log.Println("Infos loaded:", seller.Info().Name)
 }
 
 func recoverPanicScraper() {

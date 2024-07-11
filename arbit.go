@@ -225,7 +225,8 @@ var FilterOptConfig = map[string]FilterOpt{
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomCardFilter
 			opts.CustomCardFilter = func(co *mtgmatcher.CardObject) (float64, bool) {
-				_, onStocks := Infos["STKS"][co.UUID]
+				inv, _ := findSellerInventory("STKS")
+				_, onStocks := inv[co.UUID]
 				if !onStocks {
 					return 0, true
 				}

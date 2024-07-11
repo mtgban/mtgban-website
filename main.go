@@ -361,6 +361,8 @@ var LastUpdate string
 var DatabaseLoaded bool
 var Sellers []mtgban.Seller
 var Vendors []mtgban.Vendor
+
+// Contains all the set value computations shown on sealed products
 var Infos map[string]mtgban.InventoryRecord
 
 var SealedEditionsSorted []string

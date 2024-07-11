@@ -117,12 +117,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	doReboot := false
 	var v url.Values
 	switch reboot {
-	case "infos":
-		v = url.Values{}
-		v.Set("msg", "Refreshing Infos in the background...")
-		doReboot = true
-		go loadInfos()
-
 	case "mtgjson":
 		v = url.Values{}
 		v.Set("msg", "Reloading MTGJSON in the background...")

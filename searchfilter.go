@@ -1285,7 +1285,8 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 		for _, value := range filters {
 			switch value {
 			case "mtgstocks":
-				_, found := Infos["STKS"][co.UUID]
+				inv, _ := findSellerInventory("STKS")
+				_, found := inv[co.UUID]
 				if found {
 					return false
 				}

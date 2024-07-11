@@ -259,7 +259,8 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		_, sypList = syp[cardId]
 	}
 
-	entries, stocks := Infos["STKS"][cardId]
+	inv, _ := findSellerInventory("STKS")
+	entries, stocks := inv[co.UUID]
 	if stocks {
 		stocksURL = entries[0].URL
 	}

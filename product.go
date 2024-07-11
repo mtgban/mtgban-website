@@ -540,6 +540,10 @@ func runRawSetValue(tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, d
 		}
 	}
 
+	if Infos == nil {
+		Infos = map[string]mtgban.InventoryRecord{}
+	}
+
 	for i, records := range []map[string]float64{
 		inv,
 		invDirect,

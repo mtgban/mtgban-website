@@ -902,8 +902,9 @@ func prepareCard(searchRes *searchResult, ogFields []embedField, guildId string,
 	if card.Reserved {
 		embed.Footer.Text = "Part of the Reserved List\n"
 	}
-	_, stocks := Infos["STKS"][searchRes.CardId]
-	if stocks {
+	inv, _ := findSellerInventory("STKS")
+	_, onStocks := inv[searchRes.CardId]
+	if onStocks {
 		embed.Footer.Text += "On MTGStocks Interests page\n"
 	}
 	// Show data source on non-ban servers
