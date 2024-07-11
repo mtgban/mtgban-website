@@ -54,6 +54,10 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	if msg != "" {
 		pageVars.InfoMessage = msg
 	}
+	html := r.FormValue("html")
+	if html == "textfield" {
+		pageVars.DisableChart = true
+	}
 
 	refresh := r.FormValue("refresh")
 	if refresh != "" {
@@ -321,6 +325,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		v.Set("msg", msg)
+		v.Set("html", "textfield")
 	}
 	if doReboot {
 		r.URL.RawQuery = v.Encode()
