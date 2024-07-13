@@ -52,6 +52,7 @@ const (
 )
 
 var DiscordRetailBlocklist []string
+var DiscordBuylistBlocklist []string
 
 var dg *discordgo.Session
 
@@ -78,6 +79,7 @@ func setupDiscord() error {
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuilds | discordgo.IntentsGuildMessages)
 
 	DiscordRetailBlocklist = append(Config.SearchRetailBlockList, TCG_DIRECT_LOW)
+	DiscordBuylistBlocklist = append(Config.SearchBuylistBlockList, "ABUCredit")
 
 	// Open a websocket connection to Discord and begin listening.
 	err = dg.Open()
@@ -722,7 +724,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var channel chan *discordgo.MessageEmbed
 
 	if allBls {
-		config := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, Config.SearchBuylistBlockList)
+		config := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, DiscordBuylistBlocklist)
 
 		// Skip any store based outside of the US
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
