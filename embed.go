@@ -65,10 +65,10 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 				})
 			}
 			results = results[:MaxCustomEntries]
-			sort.Slice(results, func(i, j int) bool {
-				return results[i].ScraperName < results[j].ScraperName
-			})
 		}
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].ScraperName < results[j].ScraperName
+		})
 
 		// Alsign to the longest name by appending whitespaces
 		alignLength := longestName(results)
