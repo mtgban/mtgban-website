@@ -4,6 +4,17 @@
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+
+    {{if .OembedURL}}
+        <link rel="alternate" type="application/json+oembed" href="{{.OembedURL}}" title="MTGBAN Price Search"/>
+        <meta property="og:site_name" content="MTGBAN Price Search" />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content="{{.OembedTitle}}" />
+        <meta property="og:description" content="{{.OembedContents}}" />
+        <meta property="og:url" content="{{.Page}}" />
+        <meta property="og:image" content="{{.ImageURL}}" />
+    {{end}}
+
     <title>{{.Title}}</title>
     {{if not .IsSealed}}
         <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>

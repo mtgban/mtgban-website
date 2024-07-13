@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -66,6 +67,24 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
 	query := strings.TrimSpace(r.FormValue("q"))
+
+	oembed := strings.HasPrefix(r.URL.Path, "/search/oembed")
+	if oembed {
+		page := r.FormValue("url")
+		u, err := url.Parse(page)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`Internal Server Error`))
+			return
+		}
+		values := u.Query()
+		query = values.Get("q")
+		if query == "" {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`Not Found`))
+			return
+		}
+	}
 
 	pageVars.IsSealed = r.URL.Path == "/sealed"
 	pageVars.IsSets = r.URL.Path == "/sets"
@@ -220,6 +239,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
+	pageVars.Page = getBaseURL(r) + r.URL.String()
+	pageVars.OembedURL = getBaseURL(r) + "/search/oembed?format=json&url=" + url.QueryEscape(getBaseURL(r)+"/search?q="+query)
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 
@@ -231,6 +252,20 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if config.SortMode != "" {
 		pageVars.SearchSort = config.SortMode
 		pageVars.NoSort = true
+	}
+
+	if oembed {
+		// Skip any store based outside of the US
+		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
+			Name:   "region_keep_index",
+			Values: []string{"us"},
+		})
+		// Skip non-NM buylist prices
+		config.EntryFilters = append(config.EntryFilters, FilterEntryElem{
+			Name:          "condition",
+			Values:        []string{"NM"},
+			OnlyForVendor: true,
+		})
 	}
 
 	var hideSyp bool
@@ -508,7 +543,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Optionally sort according to price
-	if pageVars.SearchBest {
+	if pageVars.SearchBest || oembed {
 		for _, cardId := range allKeys {
 			// This skips INDEX and PO conditions
 			for _, cond := range mtgban.DefaultGradeTags {
@@ -527,6 +562,36 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	embed, err := generateEmbed(allKeys, foundSellers, foundVendors, pageVars.HasStocks, pageVars.HasSypList)
+	if oembed {
+		if len(allKeys) == 0 {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`Not Found`))
+			return
+		}
+
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`Not Found`))
+			return
+		}
+
+		payload, err := json.Marshal(embed)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`Internal Server Error`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(payload)
+		return
+	}
+	if len(allKeys) > 0 {
+		pageVars.ImageURL = scryfallImageURL(allKeys[0], false)
+	}
+	pageVars.OembedTitle = embed.Title
+	pageVars.OembedContents = embed.HTML
 
 	// Readjust array of INDEX entires
 	for _, cardId := range allKeys {
@@ -713,6 +778,71 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry, hasStocks, hasSyplist bool) (*OEmbed, error) {
+	title := "Search Preview"
+	img := ""
+	htmlBody := ""
+	var results []EmbedSearchResult
+
+	for i, cardId := range allKeys {
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			return nil, err
+		}
+
+		if i == 0 {
+			title = co.Name
+			if len(co.Printings) > 0 {
+				htmlBody += fmt.Sprintf("Printed in %s.\n\n", printings2line(co.Printings))
+			}
+			img = scryfallImageURL(cardId, true)
+		}
+
+		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, editionTitle(cardId))
+
+		results = append(results, EmbedSearchResult{
+			CardId:        cardId,
+			ResultsIndex:  ProcessEmbedSearchResultsSellers(foundSellers, true),
+			NamesOverride: []string{fieldName},
+		})
+
+		if i > MaxCustomEntries {
+			break
+		}
+	}
+
+	for _, result := range results {
+		fields := FormatEmbedSearchResult(&result)
+
+		for _, field := range fields {
+			htmlBody += field.Name + "\n"
+			if field.Raw != "" {
+				htmlBody += field.Raw + "\n"
+			}
+
+			for _, value := range field.Values {
+				htmlBody += "• " + value.ScraperName + ": " + value.Price + "\n"
+			}
+			htmlBody += "\n"
+		}
+	}
+
+	// Trim any extra space or carriage feed from the final response
+	htmlBody = strings.TrimSpace(htmlBody)
+
+	return &OEmbed{
+		Version:         "1.0",
+		ProviderName:    "MTGBAN Price Search",
+		ProviderURL:     "https://mtgban.com",
+		Title:           title,
+		Type:            "link",
+		HTML:            htmlBody,
+		ThumbnailURL:    img,
+		ThumbnailWidth:  488,
+		ThumbnailHeight: 680,
+	}, nil
 }
 
 func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry) {

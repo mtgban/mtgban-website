@@ -21,6 +21,18 @@ const (
 	LastSoldTimeout = 30
 )
 
+type OEmbed struct {
+	Version         string `json:"version"`
+	ProviderName    string `json:"provider_name"`
+	ProviderURL     string `json:"provider_url"`
+	Title           string `json:"title"`
+	Type            string `json:"type"`
+	HTML            string `json:"html"`
+	ThumbnailURL    string `json:"thumbnail_url"`
+	ThumbnailWidth  int    `json:"thumbnail_width"`
+	ThumbnailHeight int    `json:"thumbnail_height"`
+}
+
 type EmbedSearchResult struct {
 	Invalid         bool
 	CardId          string
@@ -28,6 +40,7 @@ type EmbedSearchResult struct {
 	ResultsSellers  []SearchEntry
 	ResultsVendors  []SearchEntry
 	EditionSearched string
+	NamesOverride   []string
 }
 
 type EmbedField struct {
@@ -69,8 +82,18 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 	for i, results := range [][]SearchEntry{
 		searchRes.ResultsIndex, searchRes.ResultsSellers, searchRes.ResultsVendors,
 	} {
+		// Skip amepty results
+		if results == nil {
+			continue
+		}
+
+		// Assign name or override
+		fieldName := EmbedFieldsNames[i]
+		if len(searchRes.NamesOverride) > i {
+			fieldName = searchRes.NamesOverride[i]
+		}
 		field := EmbedField{
-			Name: EmbedFieldsNames[i],
+			Name: fieldName,
 		}
 		if EmbedFieldsNames[i] != "Index" {
 			field.Inline = true
@@ -79,11 +102,11 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 		// Results look really bad after MaxCustomEntries, and too much info
 		// does not help, so sort by best price, trim, then sort back to original
 		if len(results) > MaxCustomEntries {
-			if EmbedFieldsNames[i] == "Retail" {
+			if fieldName == "Retail" {
 				sort.Slice(results, func(i, j int) bool {
 					return results[i].Price < results[j].Price
 				})
-			} else if EmbedFieldsNames[i] == "Buylist" {
+			} else if fieldName == "Buylist" {
 				sort.Slice(results, func(i, j int) bool {
 					return results[i].Price > results[j].Price
 				})

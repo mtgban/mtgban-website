@@ -43,6 +43,11 @@ type PageVars struct {
 	ShowPromo    bool
 	Hash         string
 
+	OembedURL      string
+	OembedTitle    string
+	OembedContents string
+	ImageURL       string
+
 	Title          string
 	ErrorMessage   string
 	WarningMessage string
@@ -688,6 +693,7 @@ func main() {
 		}
 	}
 
+	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
 	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
 	http.Handle("/api/tcgplayer/lastsold/", enforceSigning(http.HandlerFunc(TCGLastSoldAPI)))
