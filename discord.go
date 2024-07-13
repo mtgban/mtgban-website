@@ -15,7 +15,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"golang.org/x/exp/slices"
 
-	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 )
@@ -34,16 +33,6 @@ var curlyBracketsRE = regexp.MustCompile(`\{\{.*?\}\}?`)
 const (
 	// Avoid making messages overly long
 	MaxPrintings = 12
-
-	// Overflow prevention for field.Value size
-	MaxCustomEntries = 7
-
-	// Discord API constants
-	MaxEmbedFieldsValueLength = 1024
-	MaxEmbedFieldsNumber      = 25
-
-	// Timeout before cancelling a last sold price request
-	LastSoldTimeout = 30
 
 	// IDs of the channels on the main server
 	DevChannelID   = "769323295526748160"
@@ -126,15 +115,6 @@ func guildCreate(s *discordgo.Session, gc *discordgo.GuildCreate) {
 	s.GuildLeave(gc.Guild.ID)
 }
 
-type searchResult struct {
-	Invalid         bool
-	CardId          string
-	ResultsIndex    []SearchEntry
-	ResultsSellers  []SearchEntry
-	ResultsVendors  []SearchEntry
-	EditionSearched string
-}
-
 var filteredEditions = []string{
 	"30A",
 	"4BB",
@@ -180,14 +160,14 @@ var filteredEditions = []string{
 	"WC99",
 }
 
-func parseMessage(content string) (*searchResult, string) {
+func parseMessage(content string) (*EmbedSearchResult, string) {
 	// Clean up query, no blocklist because we only need keys
 	config := parseSearchOptionsNG(content, nil, nil)
 	query := config.CleanQuery
 
 	// Prevent useless invocations
 	if len(query) < 3 && query != "Ow" && query != "X" {
-		return &searchResult{Invalid: true}, ""
+		return &EmbedSearchResult{Invalid: true}, ""
 	}
 
 	var editionSearched string
@@ -236,139 +216,10 @@ func parseMessage(content string) (*searchResult, string) {
 	})
 	cardId := uuids[0]
 
-	return &searchResult{
+	return &EmbedSearchResult{
 		CardId:          cardId,
 		EditionSearched: editionSearched,
 	}, ""
-}
-
-type embedField struct {
-	Name   string
-	Value  string
-	Inline bool
-}
-
-func search2fields(searchRes *searchResult) (fields []embedField) {
-	// Add two embed fields, one for retail and one for buylist
-	fieldsNames := []string{
-		"Index", "Retail", "Buylist",
-	}
-	for i, results := range [][]SearchEntry{
-		searchRes.ResultsIndex, searchRes.ResultsSellers, searchRes.ResultsVendors,
-	} {
-		field := embedField{
-			Name: fieldsNames[i],
-		}
-		if fieldsNames[i] != "Index" {
-			field.Inline = true
-		}
-
-		// Results look really bad after MaxCustomEntries, and too much info
-		// does not help, so sort by best price, trim, then sort back to original
-		if len(results) > MaxCustomEntries {
-			if fieldsNames[i] == "Retail" {
-				sort.Slice(results, func(i, j int) bool {
-					return results[i].Price < results[j].Price
-				})
-			} else if fieldsNames[i] == "Buylist" {
-				sort.Slice(results, func(i, j int) bool {
-					return results[i].Price > results[j].Price
-				})
-			}
-			results = results[:MaxCustomEntries]
-			sort.Slice(results, func(i, j int) bool {
-				return results[i].ScraperName < results[j].ScraperName
-			})
-		}
-
-		// Alsign to the longest name by appending whitespaces
-		alignLength := longestName(results)
-		for _, entry := range results {
-			extraSpaces := ""
-			for i := len(entry.ScraperName); i < alignLength; i++ {
-				extraSpaces += " "
-			}
-			// Build url for our redirect
-			kind := strings.ToLower(string(fieldsNames[i][0]))
-			store := strings.Replace(entry.Shorthand, " ", "%20", -1)
-			link := "https://" + DefaultHost + "/" + path.Join("go", kind, store, searchRes.CardId)
-
-			// Set the custom field
-			value := fmt.Sprintf("• **[`%s%s`](%s)** $%0.2f", entry.ScraperName, extraSpaces, link, entry.Price)
-			if entry.Ratio > 60 {
-				value += " 🔥"
-			}
-			if fieldsNames[i] == "Index" {
-				// Handle alignment manually
-				extraSpaces = ""
-				// Split the Value string so that we can edit each of them separately
-				subs := strings.Split(field.Value, "\n")
-				// Determine which index we're merging
-				tag := strings.Fields(entry.ScraperName)[0]
-				// Merge status, normally just add the price
-				merged := false
-				for j := range subs {
-					// Check what kind of replacement needs to be done
-					if entry.ScraperName == TCG_DIRECT {
-						extraSpaces = "      "
-					} else if strings.Contains(subs[j], tag) {
-
-						// Adjust the name
-						if tag == "TCG" {
-							subs[j] = strings.Replace(subs[j], "TCG Low", "TCG (Low/Market)", 1)
-						} else if tag == "MKM" {
-							subs[j] = strings.Replace(subs[j], "MKM Low", "MKM (Low/Trend) ", 1)
-						}
-						// Append the other price
-						subs[j] += fmt.Sprintf(" / $%0.2f", entry.Price)
-						merged = true
-					}
-				}
-				if merged {
-					// Rebuild the Value and move to the next item
-					field.Value = strings.Join(subs, "\n")
-					continue
-				}
-				value = fmt.Sprintf("• **[`%s%s`](%s)** $%0.2f", entry.ScraperName, extraSpaces, link, entry.Price)
-			} else if fieldsNames[i] == "Buylist" {
-				alarm := false
-				for _, subres := range searchRes.ResultsSellers {
-					// 90% of sell price is the minimum for arbit
-					if subres.Price < entry.Price*0.9 {
-						alarm = true
-						break
-					}
-				}
-				if alarm {
-					value += " 🚨"
-				}
-			}
-			value += "\n"
-
-			// If we go past the maximum value for embed field values,
-			// make a new field for any spillover, as long as we are within
-			// the limits of the number of embeds allowed
-			if len(field.Value)+len(value) > MaxEmbedFieldsValueLength && len(fields) < MaxEmbedFieldsNumber {
-				fields = append(fields, field)
-				field = embedField{
-					Name:   fieldsNames[i] + " (cont'd)",
-					Inline: true,
-				}
-			}
-			field.Value += value
-		}
-		if len(results) == 0 {
-			field.Value = "N/A"
-			// The very first item is allowed not to have entries
-			if fieldsNames[i] == "Index" {
-				continue
-			}
-		}
-
-		fields = append(fields, field)
-	}
-
-	return
 }
 
 const (
@@ -377,49 +228,6 @@ const (
 	emoteSleep = "(-, – )…zzzZZZ"
 	emoteHappy = "ᕕ( ՞ ᗜ ՞ )ᕗ"
 )
-
-func grabLastSold(cardId string, lang string) ([]embedField, error) {
-	var fields []embedField
-
-	lastSales, err := getLastSold(cardId)
-	if err != nil {
-		return nil, err
-	}
-
-	var hasValues bool
-	for _, entry := range lastSales {
-		// Skip any language non matching the requested language
-		if entry.Language != lang {
-			continue
-		}
-
-		value := "-"
-		if entry.PurchasePrice != 0 {
-			hasValues = true
-			value = fmt.Sprintf("$%0.2f", entry.PurchasePrice)
-			if entry.ShippingPrice != 0 {
-				value += fmt.Sprintf(" (+$%0.2f)", entry.ShippingPrice)
-			}
-		}
-		fields = append(fields, embedField{
-			Name:   entry.OrderDate.Format("2006-01-02"),
-			Value:  value,
-			Inline: true,
-		})
-
-		if len(fields) > 5 {
-			break
-		}
-	}
-
-	// No prices received, this is not an error,
-	// but print a message warning the user
-	if !hasValues {
-		return nil, nil
-	}
-
-	return fields, nil
-}
 
 type AffiliateConfig struct {
 	// The text upon which the URL is detected
@@ -720,7 +528,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	var ogFields []embedField
+	var ogFields []EmbedField
 	var channel chan *discordgo.MessageEmbed
 
 	if allBls {
@@ -742,11 +550,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		cardIds, _ := searchAndFilter(config)
 		foundSellers, foundVendors := searchParallelNG(cardIds, config)
 
-		searchRes.ResultsIndex = processSellersResults(foundSellers, true)
-		searchRes.ResultsSellers = processSellersResults(foundSellers, false)
-		searchRes.ResultsVendors = processVendorsResults(foundVendors)
+		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(foundSellers, true)
+		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(foundSellers, false)
+		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(foundVendors)
 
-		ogFields = search2fields(searchRes)
+		ogFields = FormatEmbedSearchResult(searchRes)
 	} else if lastSold {
 		// Since grabLastSold is slow, spawn a goroutine and wait for the real
 		// results later, after posting a "please wait" message
@@ -810,7 +618,7 @@ func printings2line(printings []string) string {
 	return line
 }
 
-func prepareCard(searchRes *searchResult, ogFields []embedField, guildId string, lastSold bool) *discordgo.MessageEmbed {
+func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId string, lastSold bool) *discordgo.MessageEmbed {
 	// Convert search results into proper fields
 	var fields []*discordgo.MessageEmbedField
 	for _, field := range ogFields {
@@ -921,105 +729,4 @@ func prepareCard(searchRes *searchResult, ogFields []embedField, guildId string,
 	}
 
 	return &embed
-}
-
-// Obtain the length of the scraper with the longest name
-func longestName(results []SearchEntry) (out int) {
-	for _, entry := range results {
-		probe := len(entry.ScraperName)
-		if probe > out {
-			out = probe
-		}
-	}
-	return
-}
-
-// Retrieve cards from Sellers using the very first result
-func processSellersResults(foundSellers map[string]map[string][]SearchEntry, index bool) (results []SearchEntry) {
-	if len(foundSellers) == 0 {
-		return
-	}
-
-	sortedKeysSeller := make([]string, 0, len(foundSellers))
-	for cardId := range foundSellers {
-		sortedKeysSeller = append(sortedKeysSeller, cardId)
-	}
-	if len(sortedKeysSeller) > 1 {
-		sort.Slice(sortedKeysSeller, func(i, j int) bool {
-			return sortSets(sortedKeysSeller[i], sortedKeysSeller[j])
-		})
-	}
-
-	cardId := sortedKeysSeller[0]
-	if index {
-		results = foundSellers[cardId]["INDEX"]
-
-		// Add the TCG_DIRECT to the Index section too, considering conditions
-		for _, cond := range []string{"NM", "SP"} {
-			done := false
-			foundResults := foundSellers[cardId][cond]
-			for _, result := range foundResults {
-				if result.ScraperName == TCG_DIRECT {
-					results = append(results, result)
-					done = true
-					break
-				}
-			}
-			if done {
-				break
-			}
-		}
-	} else {
-		founders := map[string]string{}
-		// Query results with the known (ordered) conditions
-		for _, cond := range mtgban.DefaultGradeTags {
-			foundResults := foundSellers[cardId][cond]
-
-			// Loop through the results, keep track of the precessed
-			// elements in the map (and skip lower condition ones)
-			for _, result := range foundResults {
-				_, found := founders[result.ScraperName]
-				if found {
-					continue
-				}
-				founders[result.ScraperName] = cond
-				// If not NM, add a small tag
-				if cond != "NM" {
-					result.ScraperName += " (" + cond + ")"
-				}
-				results = append(results, result)
-			}
-		}
-	}
-
-	if len(results) > 0 {
-		// Drop duplicates by looking at the last one as they are alredy sorted
-		tmp := append(results[:0], results[0])
-		for i := range results {
-			if results[i].ScraperName != tmp[len(tmp)-1].ScraperName {
-				tmp = append(tmp, results[i])
-			}
-		}
-		results = tmp
-	}
-	return
-}
-
-// Retrieve cards from Vendors using the very first result
-func processVendorsResults(foundVendors map[string]map[string][]SearchEntry) []SearchEntry {
-	if len(foundVendors) == 0 {
-		return nil
-	}
-
-	sortedKeysVendor := make([]string, 0, len(foundVendors))
-	for cardId := range foundVendors {
-		sortedKeysVendor = append(sortedKeysVendor, cardId)
-	}
-	if len(sortedKeysVendor) > 1 {
-		sort.Slice(sortedKeysVendor, func(i, j int) bool {
-			return sortSets(sortedKeysVendor[i], sortedKeysVendor[j])
-		})
-	}
-
-	return foundVendors[sortedKeysVendor[0]]["NM"]
 }
