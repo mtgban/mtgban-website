@@ -898,7 +898,7 @@ func prepareCard(searchRes *searchResult, ogFields []embedField, guildId string,
 		Footer: &discordgo.MessageEmbedFooter{},
 	}
 
-	// Some footer action, RL, stocks, powered by
+	// Some footer action, RL, stocks, syp, powered by
 	if card.Reserved {
 		embed.Footer.Text = "Part of the Reserved List\n"
 	}
@@ -906,6 +906,11 @@ func prepareCard(searchRes *searchResult, ogFields []embedField, guildId string,
 	_, onStocks := inv[searchRes.CardId]
 	if onStocks {
 		embed.Footer.Text += "On MTGStocks Interests page\n"
+	}
+	bl, _ := findVendorBuylist("SYP")
+	_, onSyplist := bl[searchRes.CardId]
+	if onSyplist {
+		embed.Footer.Text += "On TCGplayer SYP list\n"
 	}
 	// Show data source on non-ban servers
 	if len(Config.DiscordAllowList) > 0 && guildId != Config.DiscordAllowList[0] {
