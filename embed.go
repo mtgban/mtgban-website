@@ -32,8 +32,32 @@ type EmbedSearchResult struct {
 
 type EmbedField struct {
 	Name   string
-	Value  string
+	Values []EmbedFieldValue
+	Raw    string
+	Length int
 	Inline bool
+}
+
+type EmbedFieldValue struct {
+	ScraperName string
+	ExtraSpaces string
+	Link        string
+	Price       string
+	HasAlarm    bool
+	HasFire     bool
+}
+
+func embedfieldlength(value EmbedFieldValue) int {
+	// Buffer for formatting
+	extra := 12
+
+	if value.HasAlarm {
+		extra += 2
+	}
+	if value.HasFire {
+		extra += 2
+	}
+	return len(value.ScraperName) + len(value.ExtraSpaces) + len(value.Link) + len(value.Price) + extra
 }
 
 var EmbedFieldsNames = []string{
@@ -73,80 +97,88 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 		// Alsign to the longest name by appending whitespaces
 		alignLength := longestName(results)
 		for _, entry := range results {
-			extraSpaces := ""
+			var value EmbedFieldValue
+
 			for i := len(entry.ScraperName); i < alignLength; i++ {
-				extraSpaces += " "
+				value.ExtraSpaces += " "
 			}
+			value.ScraperName = entry.ScraperName
+			value.Price = fmt.Sprintf("$%0.2f", entry.Price)
+
 			// Build url for our redirect
 			kind := strings.ToLower(string(EmbedFieldsNames[i][0]))
 			store := strings.Replace(entry.Shorthand, " ", "%20", -1)
-			link := "https://" + DefaultHost + "/" + path.Join("go", kind, store, searchRes.CardId)
+			value.Link = "https://" + DefaultHost + "/" + path.Join("go", kind, store, searchRes.CardId)
 
-			// Set the custom field
-			value := fmt.Sprintf("• **[`%s%s`](%s)** $%0.2f", entry.ScraperName, extraSpaces, link, entry.Price)
 			if entry.Ratio > 60 {
-				value += " 🔥"
+				value.HasFire = true
 			}
 			if EmbedFieldsNames[i] == "Index" {
-				// Handle alignment manually
-				extraSpaces = ""
-				// Split the Value string so that we can edit each of them separately
-				subs := strings.Split(field.Value, "\n")
-				// Determine which index we're merging
-				tag := strings.Fields(entry.ScraperName)[0]
-				// Merge status, normally just add the price
-				merged := false
-				for j := range subs {
-					// Check what kind of replacement needs to be done
-					if entry.ScraperName == TCG_DIRECT {
-						extraSpaces = "      "
-					} else if strings.Contains(subs[j], tag) {
-						// Adjust the name
-						if tag == "TCG" {
-							subs[j] = strings.Replace(subs[j], "TCG Low", "TCG (Low/Market)", 1)
-						} else if tag == "MKM" {
-							subs[j] = strings.Replace(subs[j], "MKM Low", "MKM (Low/Trend) ", 1)
-						}
-						// Append the other price
-						subs[j] += fmt.Sprintf(" / $%0.2f", entry.Price)
-						merged = true
-					}
-				}
-				if merged {
-					// Rebuild the Value and move to the next item
-					field.Value = strings.Join(subs, "\n")
+				var j int
+				var newScraperName string
+
+				// Determine which index we're merging (either 'TCG' or 'MKM')
+				// since the scraper names are ('TCG Low' and 'TCG Market')
+				tags := strings.Split(value.ScraperName, " ")
+				if len(tags) < 2 || tags[1] == "Direct" {
 					continue
 				}
-				value = fmt.Sprintf("• **[`%s%s`](%s)** $%0.2f", entry.ScraperName, extraSpaces, link, entry.Price)
-			} else if EmbedFieldsNames[i] == "Buylist" {
-				alarm := false
-				for _, subres := range searchRes.ResultsSellers {
-					// 90% of sell price is the minimum for arbit
-					if subres.Price < entry.Price*0.9 {
-						alarm = true
+
+				// Look if an existing tag is present
+				found := false
+				for j = range field.Values {
+					if strings.HasPrefix(field.Values[j].ScraperName, tags[0]) {
+						newScraperName = fmt.Sprintf("%s (Low/%s)", tags[0], tags[1])
+						found = true
 						break
 					}
 				}
-				if alarm {
-					value += " 🚨"
+
+				// If found, then edit the exiting one instead of appending a new value
+				if found {
+					field.Length -= embedfieldlength(field.Values[j])
+
+					// Rebuild the Value and move to the next item
+					field.Values[j] = EmbedFieldValue{
+						// Update the name
+						ScraperName: newScraperName,
+						// Handle alignment manually
+						ExtraSpaces: "",
+						// Append the second price
+						Price: fmt.Sprintf("%s / %s", field.Values[j].Price, value.Price),
+						// Either is fine
+						Link: value.Link,
+					}
+
+					field.Length += embedfieldlength(field.Values[j])
+					continue
+				}
+			} else if EmbedFieldsNames[i] == "Buylist" {
+				for _, subres := range searchRes.ResultsSellers {
+					// 90% of sell price is the minimum for arbit
+					if subres.Price < entry.Price*0.9 {
+						value.HasAlarm = true
+						break
+					}
 				}
 			}
-			value += "\n"
 
+			length := embedfieldlength(value)
 			// If we go past the maximum value for embed field values,
 			// make a new field for any spillover, as long as we are within
 			// the limits of the number of embeds allowed
-			if len(field.Value)+len(value) > MaxEmbedFieldsValueLength && len(fields) < MaxEmbedFieldsNumber {
+			if field.Length+length > MaxEmbedFieldsValueLength && len(fields) < MaxEmbedFieldsNumber {
 				fields = append(fields, field)
 				field = EmbedField{
 					Name:   EmbedFieldsNames[i] + " (cont'd)",
 					Inline: true,
 				}
 			}
-			field.Value += value
+			field.Values = append(field.Values, value)
+			field.Length += length
 		}
 		if len(results) == 0 {
-			field.Value = "N/A"
+			field.Raw = "N/A"
 			// The very first item is allowed not to have entries
 			if EmbedFieldsNames[i] == "Index" {
 				continue
@@ -195,7 +227,7 @@ func grabLastSold(cardId string, lang string) ([]EmbedField, error) {
 		}
 		fields = append(fields, EmbedField{
 			Name:   entry.OrderDate.Format("2006-01-02"),
-			Value:  value,
+			Raw:    value,
 			Inline: true,
 		})
 

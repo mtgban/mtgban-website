@@ -622,9 +622,20 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	// Convert search results into proper fields
 	var fields []*discordgo.MessageEmbedField
 	for _, field := range ogFields {
+		// Either print the raw field or format the Values slice
+		msg := field.Raw
+		for _, value := range field.Values {
+			msg += fmt.Sprintf("• **[`%s%s`](%s)** %s", value.ScraperName, value.ExtraSpaces, value.Link, value.Price)
+			if value.HasFire {
+				msg += " 🔥"
+			} else if value.HasFire {
+				msg += " 🚨"
+			}
+			msg += "\n"
+		}
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   field.Name,
-			Value:  field.Value,
+			Value:  msg,
 			Inline: field.Inline,
 		})
 	}
