@@ -10,4 +10,5 @@
     <InputEncoding>UTF-8</InputEncoding>
     <Url method="get" rel="results" type="text/html" template="https://mtgban.com/search?q={searchTerms}" />
     <Url rel="self" type="application/opensearchdescription+xml" template="https://mtgban.com/img/opensearch.xml" />
+    <Url rel="suggestions" type="application/json" template="http://mtgban.com/api/suggest?q={searchTerms}" />
 </OpenSearchDescription>

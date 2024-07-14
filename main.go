@@ -701,6 +701,7 @@ func main() {
 	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
 	http.Handle("/api/tcgplayer/lastsold/", enforceSigning(http.HandlerFunc(TCGLastSoldAPI)))
 	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
+	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.HandleFunc("/favicon.ico", Favicon)
 	http.HandleFunc("/auth", Auth)
 
