@@ -13,6 +13,18 @@
         <meta property="og:description" content="{{.OembedContents}}" />
         <meta property="og:url" content="{{.Page}}" />
         <meta property="og:image" content="{{.ImageURL}}" />
+
+        <meta name="twitter:creator" content="@MTG_BAN" />
+        <meta name="twitter:site" content="@MTG_BAN" />
+        <meta name="twitter:domain" content="https://mtgban.com/" />
+        <meta name="twitter:card" content="product" />
+        <meta name="twitter:image" content="{{.ImageURL}}" />
+        <meta name="twitter:title" content="{{.OembedTitle}}" />
+        <meta name="twitter:description" content="{{.OembedDesc}}" />
+        <meta name="twitter:label1" content="TCGplayer Market Price" />
+        <meta name="twitter:data1" content="{{if .RetailPrice}}{{printf "$ %.2f" .RetailPrice}}{{else}}N/A{{end}}" />
+        <meta name="twitter:label2" content="Card Kingdom Buylist" />
+        <meta name="twitter:data2" content="{{if .BuylistPrice}}{{printf "$ %.2f" .BuylistPrice}}{{else}}N/A{{end}}" />
     {{end}}
 
     <title>{{.Title}}</title>

@@ -587,11 +587,18 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		w.Write(payload)
 		return
 	}
-	if len(allKeys) > 0 {
-		pageVars.ImageURL = scryfallImageURL(allKeys[0], false)
-	}
 	pageVars.OembedTitle = embed.Title
 	pageVars.OembedContents = embed.HTML
+	pageVars.OembedDesc = embed.HTML
+	if len(allKeys) > 0 {
+		pageVars.ImageURL = scryfallImageURL(allKeys[0], false)
+		co, err := mtgmatcher.GetUUID(allKeys[0])
+		if err == nil && len(co.Printings) > 0 {
+			pageVars.OembedDesc = fmt.Sprintf("Printed in %s.", printings2line(co.Printings))
+		}
+		pageVars.RetailPrice = price4seller(allKeys[0], TCG_MARKET)
+		pageVars.BuylistPrice = price4seller(allKeys[0], "CK")
+	}
 
 	// Readjust array of INDEX entires
 	for _, cardId := range allKeys {
