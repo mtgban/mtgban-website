@@ -385,7 +385,7 @@ const (
 )
 
 func Favicon(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "img/misc/favicon.ico")
+	http.ServeFile(w, r, "img/favicon/favicon.ico")
 }
 
 // FileSystem custom file system handler
