@@ -25,7 +25,11 @@ func loadNames() {
 		}
 		// Look for alternate names too
 		for _, name := range []string{co.FaceName, co.FlavorName, co.FaceFlavorName} {
-			if name != "" && !slices.Contains(allNames, name) {
+			// Skip empty entries and all those faces that would duplicate the card
+			if name == "" || strings.HasPrefix(co.Name, name) {
+				continue
+			}
+			if !slices.Contains(allNames, name) {
 				allNames = append(allNames, name)
 			}
 		}
@@ -45,6 +49,11 @@ func loadNames() {
 func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	if AllNames == nil {
 		loadNames()
+	}
+
+	if r.FormValue("all") == "true" {
+		json.NewEncoder(w).Encode(&AllNames)
+		return
 	}
 
 	prefix := strings.ToLower(r.FormValue("q"))
