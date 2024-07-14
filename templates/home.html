@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <link rel="stylesheet" type="text/css" href="../css/main.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
     <title>{{.Title}}</title>
@@ -18,11 +18,11 @@
 </head>
 
 <body class="light-theme">
-<script type="text/javascript" src="../js/themechecker.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
     <nav>
     <ul>
-        <li><a href="https://www.patreon.com/ban_community"><img src="img/misc/patreon.png" width=48></a></li>
-        <li><a href="/discord"><img src="img/misc/discord.png" width=48></a></li>
+        <li><a href="https://www.patreon.com/ban_community"><img src="/img/misc/patreon.png" width=48></a></li>
+        <li><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
         {{range .Nav}}
             <li>
                 <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
@@ -37,7 +37,7 @@
                     <input type="checkbox"/>
                     <span class="slider"></span>
                 </div>
-                <script type="text/javascript" src="../js/nightmode.js?hash={{.Hash}}"></script>
+                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
             </label>
         </li>
     </ul>
@@ -71,10 +71,10 @@
             </script>
 
             <a href="javascript:location.replace(getPatreonURL())">
-                <img src="../img/misc/login.png" width=360 height=60>
+                <img src="/img/misc/login.png" width=360 height=60>
             </a>
         {{else}}
-            <a href="/?errmsg=logout"><img src="../img/misc/logout.png" width=236 height=60></a>
+            <a href="/?errmsg=logout"><img src="/img/misc/logout.png" width=236 height=60></a>
         {{end}}
     </div>
 </body>

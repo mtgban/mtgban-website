@@ -778,14 +778,14 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 					name = "TCGplayer"
 				case TCG_DIRECT:
 					name = "TCGplayer Direct"
-					icon = "img/misc/direct.png"
+					icon = "/img/misc/direct.png"
 				case CT_ZERO:
-					icon = "img/misc/zero.png"
+					icon = "/img/misc/zero.png"
 				case CT_STANDARD_SEALED:
 					name = CT_STANDARD
 				case CT_ZERO_SEALED:
 					name = CT_ZERO
-					icon = "img/misc/zero.png"
+					icon = "/img/misc/zero.png"
 				}
 
 				// Prepare all the deets
@@ -857,7 +857,7 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 				name := vendor.Info().Name
 				switch name {
 				case TCG_DIRECT_NET:
-					icon = "img/misc/direct.png"
+					icon = "/img/misc/direct.png"
 				case "TCG Player Market":
 					name = "TCGplayer Trade-In"
 				case "Sealed EV Scraper":

@@ -2,7 +2,7 @@
 <html>
 <head>
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="../css/main.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <title>BAN Admin - {{.Title}}</title>
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
@@ -17,11 +17,11 @@
 </head>
 
 <body class="light-theme">
-<script type="text/javascript" src="../js/themechecker.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
 <nav>
     <ul>
-        <li><a href="https://www.patreon.com/ban_community"><img src="img/misc/patreon.png" width=48></a></li>
-        <li><a href="/discord"><img src="img/misc/discord.png" width=48></a></li>
+        <li><a href="https://www.patreon.com/ban_community"><img src="/img/misc/patreon.png" width=48></a></li>
+        <li><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
         {{range .Nav}}
             <li>
                 <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
@@ -35,7 +35,7 @@
                     <input type="checkbox"/>
                     <span class="slider"></span>
                 </div>
-                <script type="text/javascript" src="../js/nightmode.js?hash={{.Hash}}"></script>
+                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
             </label>
         </li>
     </ul>
