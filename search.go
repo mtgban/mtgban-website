@@ -803,6 +803,13 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 
 		if i == 0 {
 			title = co.Name
+			if co.Sealed {
+				title += " 📦"
+			} else if co.Etched {
+				title += " 💫"
+			} else if co.Foil {
+				title += " ✨"
+			}
 			if len(co.Printings) > 0 {
 				htmlBody += fmt.Sprintf("Printed in %s.\n\n", printings2line(co.Printings))
 			}
