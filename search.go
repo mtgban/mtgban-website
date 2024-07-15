@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/danielgtaylor/unistyle"
+
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
@@ -824,7 +826,7 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 		fields := FormatEmbedSearchResult(&result)
 
 		for _, field := range fields {
-			htmlBody += field.Name + "\n"
+			htmlBody += unistyle.BoldSans(field.Name) + "\n"
 			if field.Raw != "" {
 				htmlBody += field.Raw + "\n"
 			}
