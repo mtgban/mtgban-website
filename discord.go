@@ -160,10 +160,15 @@ var filteredEditions = []string{
 	"WC99",
 }
 
-func parseMessage(content string) (*EmbedSearchResult, string) {
+func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 	// Clean up query, no blocklist because we only need keys
 	config := parseSearchOptionsNG(content, nil, nil)
 	query := config.CleanQuery
+
+	// Enable sealed mode
+	if sealed {
+		config.SearchMode = "sealed"
+	}
 
 	// Prevent useless invocations
 	if len(query) < 3 && query != "Ow" && query != "X" {
@@ -172,7 +177,7 @@ func parseMessage(content string) (*EmbedSearchResult, string) {
 
 	var editionSearched string
 	// Filter out any undersirable sets, unless explicitly requested
-	filterGoldOut := true
+	filterGoldOut := !sealed
 	for _, filter := range config.CardFilters {
 		if filter.Name == "edition" {
 			filterGoldOut = false
@@ -202,6 +207,11 @@ func parseMessage(content string) (*EmbedSearchResult, string) {
 				msg = fmt.Sprintf("%s\n\"%s\" is printed in %s.", msg, query, printings2line(printings))
 			}
 			return nil, msg
+		}
+
+		// Do a quick retry to look through sealed
+		if !sealed {
+			return parseMessage(content, true)
 		}
 		return nil, fmt.Sprintf("No card found for \"%s\" 乁| ･ิ ∧ ･ิ |ㄏ", query)
 	}
@@ -387,7 +397,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 
 	// Parse message, look for bot command
-	if !strings.HasPrefix(m.Content, "!") && !strings.HasPrefix(m.Content, "$$") {
+	if !strings.HasPrefix(m.Content, "!") &&
+		!strings.HasPrefix(m.Content, "?") &&
+		!strings.HasPrefix(m.Content, "$$") {
 		// Early exit if not running on the main server
 		if m.GuildID != Config.DiscordAllowList[0] {
 			return
@@ -504,15 +516,17 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	allBls := strings.HasPrefix(m.Content, "!")
+	allBls := strings.HasPrefix(m.Content, "!") || strings.HasPrefix(m.Content, "?")
+	sealed := strings.HasPrefix(m.Content, "?")
 	lastSold := strings.HasPrefix(m.Content, "$$")
 
 	// Strip away beginning character
 	content := strings.TrimPrefix(m.Content, "!")
+	content = strings.TrimPrefix(content, "?")
 	content = strings.TrimPrefix(content, "$$")
 
 	// Search a single card match
-	searchRes, errMsg := parseMessage(content)
+	searchRes, errMsg := parseMessage(content, sealed)
 	if errMsg != "" {
 		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 			Description: errMsg,
@@ -667,7 +681,11 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 		printings = fmt.Sprintf("%s. Variants in %s are %s", printings, searchRes.EditionSearched, strings.Join(cn, ", "))
 	}
 
-	link := "https://www.mtgban.com/search?q=" + co.UUID + "&utm_source=banbot&utm_affiliate=" + guildId
+	searchEndpoint := "search"
+	if co.Sealed {
+		searchEndpoint = "sealed"
+	}
+	link := "https://www.mtgban.com/" + searchEndpoint + "?q=" + co.UUID + "&utm_source=banbot&utm_affiliate=" + guildId
 
 	// Set title of the main message
 	title := "Prices for " + card.Name
@@ -695,7 +713,9 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 		title = "[DEV] " + title
 	}
 	// Spark-ly
-	if card.Etched {
+	if card.Sealed {
+		title += " 📦"
+	} else if card.Etched {
 		title += " 💫"
 	} else if card.Foil {
 		title += " ✨"
