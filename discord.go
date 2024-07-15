@@ -528,6 +528,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Search a single card match
 	searchRes, errMsg := parseMessage(content, sealed)
 	if errMsg != "" {
+		if DevMode {
+			errMsg = "[DEV] " + errMsg
+		}
 		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 			Description: errMsg,
 		})
