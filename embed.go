@@ -53,6 +53,7 @@ type EmbedField struct {
 
 type EmbedFieldValue struct {
 	ScraperName string
+	Tag         string
 	ExtraSpaces string
 	Link        string
 	Price       string
@@ -70,7 +71,7 @@ func embedfieldlength(value EmbedFieldValue) int {
 	if value.HasFire {
 		extra += 2
 	}
-	return len(value.ScraperName) + len(value.ExtraSpaces) + len(value.Link) + len(value.Price) + extra
+	return len(value.ScraperName) + len(value.Tag) + len(value.ExtraSpaces) + len(value.Link) + len(value.Price) + extra
 }
 
 var EmbedFieldsNames = []string{
@@ -111,7 +112,10 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 					return results[i].Price > results[j].Price
 				})
 			}
-			results = results[:MaxCustomEntries]
+			// Do not crop the first section, indexes are good price indicators
+			if i != 0 {
+				results = results[:MaxCustomEntries]
+			}
 		}
 		sort.Slice(results, func(i, j int) bool {
 			return results[i].ScraperName < results[j].ScraperName
@@ -137,24 +141,51 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 				value.HasFire = true
 			}
 			if EmbedFieldsNames[i] == "Index" {
+				var shouldSkip bool
 				var j int
 				var newScraperName string
+				var newTag string
+
+				isSealed := strings.Contains(value.ScraperName, "EV") || strings.Contains(value.ScraperName, "Sim")
 
 				// Determine which index we're merging (either 'TCG' or 'MKM')
 				// since the scraper names are ('TCG Low' and 'TCG Market')
-				tags := strings.Split(value.ScraperName, " ")
-				if len(tags) < 2 || tags[1] == "Direct" {
+				fields := strings.Fields(value.ScraperName)
+				if len(fields) < 2 || (fields[1] == "Direct" && !isSealed) {
 					continue
 				}
 
-				// Look if an existing tag is present
 				found := false
 				for j = range field.Values {
-					if strings.HasPrefix(field.Values[j].ScraperName, tags[0]) {
-						newScraperName = fmt.Sprintf("%s (Low/%s)", tags[0], tags[1])
-						found = true
-						break
+					// Look if an existing tag is present
+					if (!isSealed && !strings.HasPrefix(field.Values[j].ScraperName, fields[0])) ||
+						(isSealed && !strings.HasPrefix(field.Values[j].ScraperName, strings.Join(fields[0:2], " "))) {
+						continue
 					}
+
+					newScraperName = fields[0]
+					newTag = fmt.Sprintf("Low/%s", fields[1])
+
+					// Sealed case, since results are in order, if one is found, append a new tag
+					if isSealed {
+						// Skip in case Mediam is equal to EV
+						if field.Values[j].Price == value.Price {
+							shouldSkip = true
+							field.Values[j].ExtraSpaces = ""
+							break
+						}
+						newScraperName = field.Values[j].ScraperName
+						newTag = "EV/Sim"
+						if field.Values[j].Tag == newTag {
+							newTag = "EV/Sim/Std"
+						}
+					}
+					found = true
+					break
+				}
+
+				if shouldSkip {
+					continue
 				}
 
 				// If found, then edit the exiting one instead of appending a new value
@@ -165,6 +196,8 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 					field.Values[j] = EmbedFieldValue{
 						// Update the name
 						ScraperName: newScraperName,
+						// Update the tags
+						Tag: newTag,
 						// Handle alignment manually
 						ExtraSpaces: "",
 						// Append the second price
@@ -200,6 +233,14 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 			field.Values = append(field.Values, value)
 			field.Length += length
 		}
+
+		// Rename scrapers, yes the space is intentional
+		for i := range field.Values {
+			if field.Values[i].ScraperName == "TCG Direct (net) EV" {
+				field.Values[i].ScraperName = "Direct EV "
+			}
+		}
+
 		if len(results) == 0 {
 			field.Raw = "N/A"
 			// The very first item is allowed not to have entries

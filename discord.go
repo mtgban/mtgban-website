@@ -642,7 +642,11 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 		// Either print the raw field or format the Values slice
 		msg := field.Raw
 		for _, value := range field.Values {
-			msg += fmt.Sprintf("• **[`%s%s`](%s)** %s", value.ScraperName, value.ExtraSpaces, value.Link, value.Price)
+			tag := ""
+			if value.Tag != "" {
+				tag = fmt.Sprintf(" (%s)", value.Tag)
+			}
+			msg += fmt.Sprintf("• **[`%s%s%s`](%s)** %s", value.ScraperName, tag, value.ExtraSpaces, value.Link, value.Price)
 			if value.HasFire {
 				msg += " 🔥"
 			} else if value.HasFire {

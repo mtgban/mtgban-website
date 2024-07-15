@@ -839,7 +839,11 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 			}
 
 			for _, value := range field.Values {
-				htmlBody += "• " + value.ScraperName + ": " + value.Price + "\n"
+				tag := ""
+				if value.Tag != "" {
+					tag = fmt.Sprintf(" (%s)", value.Tag)
+				}
+				htmlBody += "• " + value.ScraperName + tag + ": " + value.Price + "\n"
 			}
 			htmlBody += "\n"
 		}
