@@ -91,6 +91,9 @@ type FilterPriceElem struct {
 	// Cache of cardId:prices used in the filter
 	PriceCache map[string][]float64
 
+	// List of stores the filter should be applied to
+	ApplyTo []string
+
 	OnlyForSeller bool
 	OnlyForVendor bool
 }
@@ -1559,7 +1562,7 @@ var FilterPriceFuncs = map[string]func(filters []float64, refPrice float64) bool
 	"rev_price_less_than":    priceLessThan,
 }
 
-func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []FilterPriceElem) bool {
+func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []FilterPriceElem, shorthand string) bool {
 	if entry.Pricing() == 0 {
 		return true
 	}
@@ -1572,6 +1575,11 @@ func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []Filte
 		if filters[i].OnlyForSeller && !isSeller {
 			continue
 		} else if filters[i].OnlyForVendor && !isVendor {
+			continue
+		}
+
+		// Filter out any store that wasn't selected
+		if filters[i].ApplyTo != nil && !slices.Contains(filters[i].ApplyTo, shorthand) {
 			continue
 		}
 

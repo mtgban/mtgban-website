@@ -899,7 +899,7 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 				}
 
 				// Skip cards that don't match desired pricing
-				if shouldSkipPriceNG(cardId, entry, priceFilters) {
+				if shouldSkipPriceNG(cardId, entry, priceFilters, seller.Info().Shorthand) {
 					continue
 				}
 
@@ -992,7 +992,7 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 					continue
 				}
 
-				if shouldSkipPriceNG(cardId, entry, priceFilters) {
+				if shouldSkipPriceNG(cardId, entry, priceFilters, vendor.Info().Shorthand) {
 					continue
 				}
 
