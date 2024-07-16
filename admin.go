@@ -31,7 +31,6 @@ import (
 
 const (
 	mtgjsonURL = "https://mtgjson.com/api/v5/AllPrintings.json"
-	GoFullPath = "/usr/local/go/bin/go"
 )
 
 var BuildCommit = func() string {
@@ -177,10 +176,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			log.Println("Building new code")
 			out, err := build()
 			if err != nil {
-				log.Println(err)
+				log.Println("go -", err)
 				return
 			}
 			log.Println(out)
@@ -196,8 +194,11 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		out, err := build()
 		if err != nil {
 			log.Println(err)
+			v.Set("msg", err.Error())
+		} else {
+			log.Println(out)
+			v.Set("msg", out)
 		}
-		v.Set("msg", out)
 
 	case "code":
 		v = url.Values{}
@@ -468,17 +469,26 @@ func pullCode() (string, error) {
 }
 
 func build() (string, error) {
-	cmd := exec.Command(GoFullPath, "build")
-	var out bytes.Buffer
-	cmd.Stderr = &out
-	err := cmd.Run()
+	goExecPath, err := exec.LookPath("go")
 	if err != nil {
-		return "", nil
+		return "", err
 	}
+	log.Println("Found go at", goExecPath)
+
+	var out bytes.Buffer
+	cmd := exec.Command(goExecPath, "build")
+	cmd.Stderr = &out
+
+	err = cmd.Run()
+	if err != nil {
+		return "", err
+	}
+
 	if out.Len() == 0 {
 		return "Build successful", nil
 	}
-	return out.String(), nil
+
+	return "", errors.New(out.String())
 }
 
 func deleteOldCache() {
