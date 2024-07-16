@@ -24,8 +24,6 @@ import (
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/go-mtgban/mtgban"
 
-	git "github.com/go-git/go-git/v5"
-	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/mackerelio/go-osstat/memory"
 )
 
@@ -169,14 +167,14 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		doReboot = true
 
 		go func() {
-			log.Println("Pulling new code")
-			_, err := pullCode()
+			out, err := pullCode()
 			if err != nil {
-				log.Println(err)
+				log.Println("git -", err)
 				return
 			}
+			log.Println(out)
 
-			out, err := build()
+			out, err = build()
 			if err != nil {
 				log.Println("go -", err)
 				return
@@ -202,10 +200,16 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	case "code":
 		v = url.Values{}
-		v.Set("msg", "Pulling from master...")
 		doReboot = true
 
-		go pullCode()
+		out, err := pullCode()
+		if err != nil {
+			log.Println(err)
+			v.Set("msg", err.Error())
+		} else {
+			log.Println(out)
+			v.Set("msg", out)
+		}
 
 	case "cache":
 		v = url.Values{}
@@ -435,37 +439,28 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 }
 
 func pullCode() (string, error) {
-	r, err := git.PlainOpen(".")
+	gitExecPath, err := exec.LookPath("git")
 	if err != nil {
 		return "", err
 	}
+	log.Println("Found git at", gitExecPath)
 
-	// Get the working directory for the repository
-	w, err := r.Worktree()
-	if err != nil {
-		return "", err
+	var out bytes.Buffer
+
+	for _, cmds := range [][]string{
+		[]string{"fetch"}, []string{"rest", "--hard", "origin/master"},
+	} {
+		cmd := exec.Command(gitExecPath, cmds...)
+		cmd.Stdout = &out
+
+		log.Println("Running git", strings.Join(cmds, " "))
+		err = cmd.Run()
+		if err != nil {
+			return "", err
+		}
 	}
 
-	// Pull the latest changes from the origin remote and merge into the current branch
-	err = w.Pull(&git.PullOptions{
-		RemoteName: "origin",
-		Auth: &githttp.BasicAuth{
-			Username: "xxx", // Anything but empty string
-			Password: Config.Api["github_access_token"],
-		},
-		Progress: os.Stdout,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	// Print the latest commit that was just pulled
-	ref, err := r.Head()
-	if err != nil {
-		return "", err
-	}
-
-	return ref.Hash().String(), nil
+	return out.String(), nil
 }
 
 func build() (string, error) {
