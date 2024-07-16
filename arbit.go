@@ -254,6 +254,12 @@ var ABU4H = []string{
 	"The Dark",
 }
 
+func init() {
+	if len(FilterOptKeys) != len(FilterOptConfig) {
+		panic("FilterOptKeys length differs from FilterOptConfig")
+	}
+}
+
 type Arbitrage struct {
 	Name  string
 	Key   string
