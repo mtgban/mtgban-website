@@ -73,6 +73,7 @@ var FilterOptKeys = []string{
 	"norand",
 	"nosyp",
 	"nostock",
+	"nosus",
 }
 
 type FilterOpt struct {
@@ -239,6 +240,24 @@ var FilterOptConfig = map[string]FilterOpt{
 		NoSealed:   true,
 		GlobalOnly: true,
 	},
+	"nosus": {
+		Title: "only Legit",
+		Func: func(opts *mtgban.ArbitOpts) {
+			oldFunc := opts.CustomPriceFilter
+			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
+				marketPrice := getTCGMarketPrice(cardId)
+				if invEntry.Price/2 > marketPrice {
+					return 0, true
+				}
+				if oldFunc != nil {
+					return oldFunc(cardId, invEntry)
+				}
+				return 1, false
+			}
+		},
+		NoSealed:   true,
+		GlobalOnly: true,
+	},
 }
 
 var BadConditions = []string{"MP", "HP", "PO"}
@@ -282,6 +301,9 @@ type Arbitrage struct {
 
 	// Disable the Profitability, Difference, and Spread columns
 	HasNoArbit bool
+
+	// List of cardId:marketPrice that might not have the best prices
+	SussyList map[string]float64
 }
 
 func Arbit(w http.ResponseWriter, r *http.Request) {
@@ -459,6 +481,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	if pageVars.GlobalMode {
 		arbitFilters["nopenny"] = !arbitFilters["nopenny"]
 		arbitFilters["nodiff"] = !arbitFilters["nodiff"]
+		arbitFilters["nosus"] = !arbitFilters["nosus"]
 	}
 
 	for k, v := range r.Form {
@@ -725,6 +748,19 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			}
 		}
 
+		// Gather all the card Ids that might be invalid
+		var sussy map[string]float64
+		if !arbitFilters["nosus"] && scraper.Info().Shorthand == TCG_DIRECT {
+			sussy = map[string]float64{}
+
+			for _, res := range arbit {
+				marketPrice := getTCGMarketPrice(res.CardId)
+				if res.ReferenceEntry.Price/2 > marketPrice {
+					sussy[res.CardId] = marketPrice
+				}
+			}
+		}
+
 		// Sort as requested
 		if sorting == "" {
 			sorting = DefaultSortingOption
@@ -801,6 +837,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			HasNoCredit:      scraper.Info().CreditMultiplier == 0,
 			HasNoQty:         scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory,
 			CreditMultiplier: scraper.Info().CreditMultiplier,
+			SussyList:        sussy,
 		}
 		if pageVars.GlobalMode {
 			entry.HasNoCredit = true

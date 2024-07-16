@@ -627,3 +627,16 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 
 	return slice[head:tail], page
 }
+
+// Retrieve the TCG_MARKET price of any given card
+func getTCGMarketPrice(cardId string) float64 {
+	inv, err := findSellerInventory(TCG_MARKET)
+	if err != nil {
+		return 0
+	}
+	entries, found := inv[cardId]
+	if !found {
+		return 0
+	}
+	return entries[0].Price
+}

@@ -381,6 +381,7 @@
                         {{end}}
                         <th class="stickyHeaderTiny"><center>Quicklinks</center></th>
                     </tr>
+                    {{$arbitContainer := .}}
                     {{range .Arbit}}
                         {{$card := (index $.Metadata .CardId)}}
                         <tr onmouseover="document.getElementById('hoverImage').src='{{(index $.Metadata .CardId).ImageURL}}';">
@@ -438,6 +439,10 @@
                                 <td>
                                     {{if eq .BuylistEntry.BuyPrice 0.0}}
                                         $ {{printf "%.2f" .ReferenceEntry.Price}}
+                                        {{if (isSussy $arbitContainer.SussyList .CardId)}}
+                                            {{$susPrice := (index $arbitContainer.SussyList .CardId)}}
+                                            <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if $susPrice}}${{printf "%.2f" $susPrice}}{{else}}missing{{end}}">‼️ </span>
+                                        {{end}}
                                     {{else}}
                                         $ {{printf "%.2f" .BuylistEntry.BuyPrice}}
                                     {{end}}

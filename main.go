@@ -806,6 +806,10 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			}
 			return tcgId
 		},
+		"isSussy": func(m map[string]float64, s string) bool {
+			_, found := m[s]
+			return found
+		},
 	}
 
 	// Give each template a name
