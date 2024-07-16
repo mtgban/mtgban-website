@@ -1559,6 +1559,12 @@ var FilterPriceFuncs = map[string]func(filters []float64, refPrice float64) bool
 	"arb_price_less_than":    priceLessThan,
 	"rev_price_greater_than": priceGreaterThan,
 	"rev_price_less_than":    priceLessThan,
+
+	// Special function that doubles the check price, filtering out
+	// anything that is twice as much the market price
+	"invalid_direct": func(filters []float64, refPrice float64) bool {
+		return priceLessThan(filters, refPrice/2)
+	},
 }
 
 func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []FilterPriceElem, shorthand string) bool {

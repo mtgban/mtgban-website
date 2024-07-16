@@ -230,6 +230,9 @@
         <br>
         <div class="indent row">
             <div class="column" id="miscOpts">
+                <input type="checkbox" id="noSussy" name="noSussy">
+                <label for="noSussy">Skip invalid TCGplayer Direct prices (2x Market, or no Market)</label>
+                <br>
                 <input type="checkbox" id="hidePromos" name="hidePromos">
                 <label for="hidePromos">Hide Promotional entries (<i>promopack, prerelease, etc</i>)</label>
                 <br>
@@ -941,6 +944,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                     {{end}}
                                                     <td style="text-align: center; vertical-align: middle;">
                                                         $ {{printf "%.2f" .Price}}
+                                                        {{if .IsSussy}}
+                                                            <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if .SusPrice}}${{printf "%.2f" .SusPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                        {{end}}
                                                     </td>
                                                     {{if .IndexCombined}}
                                                         <td style="text-align: center; vertical-align: middle;">
