@@ -53,7 +53,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	}
 	html := r.FormValue("html")
 	if html == "textfield" {
-		pageVars.DisableChart = true
+		pageVars.SelectableField = true
 	}
 
 	refresh := r.FormValue("refresh")

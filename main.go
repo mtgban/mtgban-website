@@ -126,6 +126,8 @@ type PageVars struct {
 	Tiers        []string
 	DemoKey      string
 
+	SelectableField bool
+
 	DisableChart bool
 	AxisLabels   []string
 	Datasets     []*Dataset
