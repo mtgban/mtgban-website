@@ -185,24 +185,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			os.Exit(0)
 		}()
 
-	case "build":
+	case "build", "code":
 		v = url.Values{}
 		doReboot = true
 
-		out, err := build()
-		if err != nil {
-			log.Println(err)
-			v.Set("msg", err.Error())
-		} else {
-			log.Println(out)
-			v.Set("msg", out)
+		var out string
+		var err error
+		if reboot == "build" {
+			out, err = build()
+		} else if reboot == "code" {
+			out, err = pullCode()
 		}
-
-	case "code":
-		v = url.Values{}
-		doReboot = true
-
-		out, err := pullCode()
 		if err != nil {
 			log.Println(err)
 			v.Set("msg", err.Error())
