@@ -864,7 +864,6 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			} else {
 				filter.Stores = fixupStoreCodeNG(code)
 			}
-			filter.PriceCache = map[string][]float64{}
 			filterPrices = append(filterPrices, filter)
 		}
 	}
@@ -1586,6 +1585,10 @@ func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []Filte
 		// Check if we already have prices for this card
 		_, found := filters[i].PriceCache[cardId]
 		if !found {
+			if filters[i].PriceCache == nil {
+				filters[i].PriceCache = map[string][]float64{}
+			}
+
 			// If there is no set value, then look it up with the price4store function
 			if filters[i].Value == 0 {
 				filters[i].PriceCache[cardId] = make([]float64, 0, len(filters[i].Stores))
