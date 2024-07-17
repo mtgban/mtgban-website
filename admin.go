@@ -325,91 +325,93 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pageVars.Headers = []string{
-		"", "Name", "Id+Logs", "Sealed", "Last Update", "Entries", "Status",
-	}
-	for i := range Sellers {
-		if Sellers[i] == nil {
-			row := []string{
-				fmt.Sprintf("Error at Seller %d", i), "", "", "", "", "",
+	{
+		pageVars.Headers = []string{
+			"", "Name", "Id+Logs", "Sealed", "Last Update", "Entries", "Status",
+		}
+		for i := range Sellers {
+			if Sellers[i] == nil {
+				row := []string{
+					fmt.Sprintf("Error at Seller %d", i), "", "", "", "", "",
+				}
+				pageVars.Table = append(pageVars.Table, row)
+				continue
 			}
+
+			scraperOptions, found := ScraperOptions[ScraperMap[Sellers[i].Info().Shorthand]]
+			if !found {
+				continue
+			}
+
+			lastUpdate := Sellers[i].Info().InventoryTimestamp.Format(time.Stamp)
+
+			inv, _ := Sellers[i].Inventory()
+
+			status := "✅"
+			if scraperOptions.Busy {
+				status = "🔶"
+			} else if len(inv) == 0 {
+				status = "🔴"
+			}
+
+			sealed := ""
+			if Sellers[i].Info().SealedMode {
+				sealed = "🎁"
+			}
+
+			row := []string{
+				Sellers[i].Info().Name,
+				Sellers[i].Info().Shorthand,
+				sealed,
+				lastUpdate,
+				fmt.Sprint(len(inv)),
+				status,
+			}
+
 			pageVars.Table = append(pageVars.Table, row)
-			continue
 		}
 
-		scraperOptions, found := ScraperOptions[ScraperMap[Sellers[i].Info().Shorthand]]
-		if !found {
-			continue
-		}
-
-		lastUpdate := Sellers[i].Info().InventoryTimestamp.Format(time.Stamp)
-
-		inv, _ := Sellers[i].Inventory()
-
-		status := "✅"
-		if scraperOptions.Busy {
-			status = "🔶"
-		} else if len(inv) == 0 {
-			status = "🔴"
-		}
-
-		sealed := ""
-		if Sellers[i].Info().SealedMode {
-			sealed = "🎁"
-		}
-
-		row := []string{
-			Sellers[i].Info().Name,
-			Sellers[i].Info().Shorthand,
-			sealed,
-			lastUpdate,
-			fmt.Sprint(len(inv)),
-			status,
-		}
-
-		pageVars.Table = append(pageVars.Table, row)
-	}
-
-	for i := range Vendors {
-		if Vendors[i] == nil {
-			row := []string{
-				fmt.Sprintf("Error at Vendor %d", i), "", "", "", "", "",
+		for i := range Vendors {
+			if Vendors[i] == nil {
+				row := []string{
+					fmt.Sprintf("Error at Vendor %d", i), "", "", "", "", "",
+				}
+				pageVars.OtherTable = append(pageVars.Table, row)
+				continue
 			}
-			pageVars.OtherTable = append(pageVars.Table, row)
-			continue
+
+			scraperOptions, found := ScraperOptions[ScraperMap[Vendors[i].Info().Shorthand]]
+			if !found {
+				continue
+			}
+
+			lastUpdate := Vendors[i].Info().BuylistTimestamp.Format(time.Stamp)
+
+			bl, _ := Vendors[i].Buylist()
+
+			status := "✅"
+			if scraperOptions.Busy {
+				status = "🔶"
+			} else if len(bl) == 0 {
+				status = "🔴"
+			}
+
+			sealed := ""
+			if Vendors[i].Info().SealedMode {
+				sealed = "🎁"
+			}
+
+			row := []string{
+				Vendors[i].Info().Name,
+				Vendors[i].Info().Shorthand,
+				sealed,
+				lastUpdate,
+				fmt.Sprint(len(bl)),
+				status,
+			}
+
+			pageVars.OtherTable = append(pageVars.OtherTable, row)
 		}
-
-		scraperOptions, found := ScraperOptions[ScraperMap[Vendors[i].Info().Shorthand]]
-		if !found {
-			continue
-		}
-
-		lastUpdate := Vendors[i].Info().BuylistTimestamp.Format(time.Stamp)
-
-		bl, _ := Vendors[i].Buylist()
-
-		status := "✅"
-		if scraperOptions.Busy {
-			status = "🔶"
-		} else if len(bl) == 0 {
-			status = "🔴"
-		}
-
-		sealed := ""
-		if Vendors[i].Info().SealedMode {
-			sealed = "🎁"
-		}
-
-		row := []string{
-			Vendors[i].Info().Name,
-			Vendors[i].Info().Shorthand,
-			sealed,
-			lastUpdate,
-			fmt.Sprint(len(bl)),
-			status,
-		}
-
-		pageVars.OtherTable = append(pageVars.OtherTable, row)
 	}
 
 	var tiers []string
