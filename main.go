@@ -117,6 +117,7 @@ type PageVars struct {
 	SleepersColors []string
 
 	Headers      []string
+	OtherHeaders []string
 	OtherTable   [][]string
 	CurrentTime  time.Time
 	Uptime       string
@@ -127,6 +128,7 @@ type PageVars struct {
 	DemoKey      string
 
 	SelectableField bool
+	DisableLinks    bool
 
 	DisableChart bool
 	AxisLabels   []string

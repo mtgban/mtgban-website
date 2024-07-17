@@ -45,7 +45,17 @@ var BuildCommit = func() string {
 func Admin(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
+	page := r.FormValue("page")
 	pageVars := genPageNav("Admin", sig)
+	pageVars.Nav = insertNavBar("Admin", pageVars.Nav, []NavElem{
+		NavElem{
+			Name:   "People",
+			Short:  "👥",
+			Link:   "/admin?page=people",
+			Active: page == "people",
+			Class:  "selected",
+		},
+	})
 
 	msg := r.FormValue("msg")
 	if msg != "" {
@@ -325,10 +335,51 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	{
+	switch page {
+	case "people":
+		pageVars.DisableLinks = true
+
+		pageVars.Headers = []string{
+			"", "#", "Category", "Email", "Name", "Tier",
+		}
+
+		for i, person := range Config.Patreon.Grants {
+			row := []string{
+				fmt.Sprintf("%d", i+1),
+				person.Category,
+				person.Email,
+				person.Name,
+				person.Tier,
+			}
+
+			pageVars.Table = append(pageVars.Table, row)
+		}
+
+		pageVars.OtherHeaders = []string{
+			"", "#", "API User",
+		}
+
+		// Sort before show
+		var emails []string
+		for person := range Config.ApiUserSecrets {
+			emails = append(emails, person)
+		}
+		sort.Strings(emails)
+
+		for i, email := range emails {
+			row := []string{
+				fmt.Sprintf("%d", i+1),
+				email,
+			}
+
+			pageVars.OtherTable = append(pageVars.OtherTable, row)
+		}
+	default:
 		pageVars.Headers = []string{
 			"", "Name", "Id+Logs", "Sealed", "Last Update", "Entries", "Status",
 		}
+		pageVars.OtherHeaders = pageVars.Headers
+
 		for i := range Sellers {
 			if Sellers[i] == nil {
 				row := []string{

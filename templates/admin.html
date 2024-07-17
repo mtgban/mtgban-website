@@ -74,9 +74,17 @@
                         {{range $j, $cell := $row}}
                             <td>
                                 {{if eq $j 0}}
-                                    <a href="?refresh={{index $row 1}}" onclick="return confirm('Are you sure you want to refresh {{$cell}}?')">{{$cell}}</a>
+                                    {{if $.DisableLinks}}
+                                        {{$cell}}
+                                    {{else}}
+                                        <a href="?refresh={{index $row 1}}" onclick="return confirm('Are you sure you want to refresh {{$cell}}?')">{{$cell}}</a>
+                                    {{end}}
                                 {{else if eq $j 1}}
-                                    <a href="?logs={{$cell}}" download="{{$cell}}.txt">{{$cell}}</a>
+                                    {{if $.DisableLinks}}
+                                        {{$cell}}
+                                    {{else}}
+                                        <a href="?logs={{$cell}}" download="{{$cell}}.txt">{{$cell}}</a>
+                                    {{end}}
                                 {{else}}
                                     {{if eq $j 4}}
                                         <center>
@@ -96,7 +104,7 @@
         <div class="indent">
             <table style="float: left;">
                 <tr>
-                    {{range $.Headers}}
+                    {{range $.OtherHeaders}}
                         <th class="wrap stickyHeader" style="top:48px">
                             {{.}}
                         </th>
@@ -110,9 +118,17 @@
                         {{range $j, $cell := $row}}
                             <td>
                                 {{if eq $j 0}}
-                                    <a href="?refresh={{index $row 1}}" onclick="return confirm('Are you sure you want to refresh {{$cell}}?')">{{$cell}}</a>
+                                    {{if $.DisableLinks}}
+                                        {{$cell}}
+                                    {{else}}
+                                        <a href="?refresh={{index $row 1}}" onclick="return confirm('Are you sure you want to refresh {{$cell}}?')">{{$cell}}</a>
+                                    {{end}}
                                 {{else if eq $j 1}}
-                                    <a href="?logs={{$cell}}" download="{{$cell}}.txt">{{$cell}}</a>
+                                    {{if $.DisableLinks}}
+                                        {{$cell}}
+                                    {{else}}
+                                        <a href="?logs={{$cell}}" download="{{$cell}}.txt">{{$cell}}</a>
+                                    {{end}}
                                 {{else}}
                                     {{if eq $j 4}}
                                         <center>
