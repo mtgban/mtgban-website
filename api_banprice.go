@@ -260,9 +260,10 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Only export conditions when a single store or edition is enabled
 	// or always export them if a list of card is requested
+	// or let user decide in case of DEV_ACCESS
 	if len(enabledStores) == 1 {
 		conds = true
-	} else if conds {
+	} else if conds && storesOpt != "DEV_ACCESS" {
 		conds = filterByHash != nil || filterByEdition != ""
 	}
 
