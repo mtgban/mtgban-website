@@ -318,11 +318,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				hideSus = true
 				config.SkipEmptyRetail = true
 				config.PriceFilters = append(config.PriceFilters, FilterPriceElem{
-					Name:          "invalid_direct",
-					OnlyForSeller: true,
-					Price4Store:   price4seller,
-					Stores:        []string{TCG_MARKET},
-					ApplyTo:       []string{TCG_DIRECT},
+					Name:        "invalid_direct",
+					Price4Store: price4seller,
+					Stores:      []string{TCG_MARKET},
+					ApplyTo:     []string{TCG_DIRECT, "TCGDirectNet"},
 				})
 			}
 		}
@@ -711,14 +710,20 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		for _, cardId := range allKeys {
 			marketPrice := getTCGMarketPrice(cardId)
 
-			for cond, entries := range foundSellers[cardId] {
-				for i, entry := range entries {
-					if entry.Shorthand != TCG_DIRECT {
-						continue
-					}
-					if entry.Price/2 > marketPrice {
-						foundSellers[cardId][cond][i].IsSussy = true
-						foundSellers[cardId][cond][i].SusPrice = marketPrice
+			for _, foundScrapers := range []map[string][]SearchEntry{
+				foundSellers[cardId], foundVendors[cardId],
+			} {
+				for cond, entries := range foundScrapers {
+					for i, entry := range entries {
+						switch entry.Shorthand {
+						case TCG_DIRECT, "TCGDirectNet":
+						default:
+							continue
+						}
+						if entry.Price/2 > marketPrice {
+							foundScrapers[cond][i].IsSussy = true
+							foundScrapers[cond][i].SusPrice = marketPrice
+						}
 					}
 				}
 			}
