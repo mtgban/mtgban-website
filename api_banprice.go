@@ -200,9 +200,15 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	filterByFinish := r.FormValue("finish")
 
 	// Filter by user preference, as long as it's listed in the enebled stores
-	filterByVendor := r.FormValue("vendor")
-	if slices.Contains(enabledStores, filterByVendor) {
-		enabledStores = []string{filterByVendor}
+	filterByVendors := r.FormValue("vendor")
+	if filterByVendors != "" {
+		var newEnabledStores []string
+		for _, filtered := range strings.Split(filterByVendors, ",") {
+			if slices.Contains(enabledStores, filtered) {
+				newEnabledStores = append(newEnabledStores, filtered)
+			}
+		}
+		enabledStores = newEnabledStores
 	}
 
 	filterByEdition := ""
