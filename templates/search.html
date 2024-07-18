@@ -853,6 +853,14 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">📝</span>
                                         </td>
                                         {{if not $.IsSealed}}
+                                            {{if $card.CKRestockURL}}
+                                                <td rowspan=2>
+                                                    <a href="{{$card.CKRestockURL}}" title="Set a Restock Notice at CardKingdom" target=_blank>
+                                                        <span class="emoji">🏰</span>
+                                                    </a>
+                                                </td>
+                                            {{end}}
+
                                             <td rowspan=2>
                                                 <a href="https://scryfall.com/card/{{tolower $card.SetCode}}/{{$card.Number}}" title="Check this card on Scryfall.com" target=_blank><img width=28 src="/img/logo/scryfall.svg"></a>
                                             </td>

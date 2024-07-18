@@ -52,6 +52,7 @@ type GenericCard struct {
 	Booster   bool
 	HasDeck   bool
 
+	CKRestockURL string
 	SourceSealed []string
 }
 
@@ -413,6 +414,23 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		tcgId = co.Card.Identifiers["tcgplayerEtchedProductId"]
 	}
 
+	// Retrieve the CK URL from the in memory api list, which uses mtgjson ids
+	var restockURL string
+	CKAPIMutex.RLock()
+	restock, found := CKAPIOutput[co.Identifiers["mtgjsonId"]]
+	CKAPIMutex.RUnlock()
+	if found {
+		if co.Etched {
+			restockURL = restock.Etched.URL
+		} else if co.Foil {
+			restockURL = restock.Foil.URL
+		} else {
+			restockURL = restock.Normal.URL
+		}
+		restockURL = strings.Replace(restockURL, "mtg", "catalog/restock_notice", 1)
+		restockURL += "?partner=" + Config.Affiliate["CK"]
+	}
+
 	return GenericCard{
 		UUID:      co.UUID,
 		Name:      name,
@@ -438,6 +456,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		Booster:   canBoosterGen,
 		HasDeck:   hasDecklist,
 
+		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
 	}
 }
