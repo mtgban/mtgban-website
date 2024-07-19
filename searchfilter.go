@@ -588,9 +588,9 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				config.SkipRetail = true
 			case "buylist":
 				config.SkipBuylist = true
-			case "nosales":
+			case "emptyretail":
 				config.SkipEmptyRetail = true
-			case "nobuys":
+			case "emptybuylist":
 				config.SkipEmptyBuylist = true
 			case "empty":
 				config.SkipEmptyRetail = true
