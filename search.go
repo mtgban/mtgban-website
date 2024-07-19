@@ -330,58 +330,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Hijack for csv download
 	downloadCSV := r.FormValue("downloadCSV")
 	if canDownloadCSV && (downloadCSV == "retail" || downloadCSV == "buylist") {
-		// Perform the search
-		selectedUUIDs, err := searchAndFilter(config)
-		if err != nil {
-			UserNotify("search", err.Error())
-			pageVars.InfoMessage = "Unable to download CSV right now"
-			render(w, "search.html", pageVars)
-			return
-		}
-
-		// Limit results to be processed
-		if len(selectedUUIDs) > MaxUploadProEntries {
-			selectedUUIDs = selectedUUIDs[:MaxUploadProEntries]
-		}
-
-		var enabledStores []string
-		if downloadCSV == "retail" {
-			for _, seller := range Sellers {
-				if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-					enabledStores = append(enabledStores, seller.Info().Shorthand)
-				}
-			}
-		} else if downloadCSV == "buylist" {
-			for _, vendor := range Vendors {
-				if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-					enabledStores = append(enabledStores, vendor.Info().Shorthand)
-				}
-			}
-		}
-
-		var filename string
-		mode := "scryfall"
-		if pageVars.IsSealed {
-			mode = "mtgjson"
-		}
-		var results map[string]map[string]*BanPrice
-		if downloadCSV == "retail" {
-			results = getSellerPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, pageVars.IsSealed)
-			filename = "mtgban_retail_prices.csv"
-		} else if downloadCSV == "buylist" {
-			results = getVendorPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, pageVars.IsSealed)
-			filename = "mtgban_buylist_prices.csv"
-		} else {
-			pageVars.InfoMessage = "Unable to download CSV right now"
-			render(w, "search.html", pageVars)
-			return
-		}
-
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
-		csvWriter := csv.NewWriter(w)
-
-		err = BanPrice2CSV(csvWriter, results, true, true, pageVars.IsSealed)
+		err = downloadSearchCSV(w, downloadCSV, config, blocklistRetail, blocklistBuylist)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
@@ -902,6 +851,57 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 		ThumbnailWidth:  488,
 		ThumbnailHeight: 680,
 	}, nil
+}
+
+func downloadSearchCSV(w http.ResponseWriter, option string, config SearchConfig, blocklistRetail, blocklistBuylist []string) error {
+	// Perform the search
+	selectedUUIDs, err := searchAndFilter(config)
+	if err != nil {
+		return err
+	}
+
+	// Limit results to be processed
+	if len(selectedUUIDs) > MaxUploadProEntries {
+		selectedUUIDs = selectedUUIDs[:MaxUploadProEntries]
+	}
+
+	var enabledStores []string
+	if option == "retail" {
+		for _, seller := range Sellers {
+			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+				enabledStores = append(enabledStores, seller.Info().Shorthand)
+			}
+		}
+	} else if option == "buylist" {
+		for _, vendor := range Vendors {
+			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
+				enabledStores = append(enabledStores, vendor.Info().Shorthand)
+			}
+		}
+	}
+
+	var filename string
+	isSealed := config.SearchMode == "sealed"
+	mode := "scryfall"
+	if isSealed {
+		mode = "mtgjson"
+	}
+	var results map[string]map[string]*BanPrice
+	if option == "retail" {
+		results = getSellerPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed)
+		filename = "mtgban_retail_prices.csv"
+	} else if option == "buylist" {
+		results = getVendorPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed)
+		filename = "mtgban_buylist_prices.csv"
+	} else {
+		return errors.New("invalid option")
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+	csvWriter := csv.NewWriter(w)
+
+	return BanPrice2CSV(csvWriter, results, true, true, isSealed)
 }
 
 func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry) {
