@@ -1047,8 +1047,6 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 				switch name {
 				case TCG_DIRECT_NET:
 					icon = "/img/misc/direct.png"
-				case "TCG Player Market":
-					name = "TCGplayer Trade-In"
 				case "Sealed EV Scraper":
 					name = "CK Buylist for Singles"
 				}
