@@ -22,7 +22,7 @@ func TestMain(m *testing.M) {
 	DevMode = true
 	BenchMode = true
 
-	loadScrapersNG()
+	loadScrapers()
 	DatabaseLoaded = true
 
 	uuid := randomUUID(false)
@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	NameToBeFound = co.Name
 	EditionToBeFound = co.Edition
 	NumberToBeFound = co.Number
-	log.Println("Looking up", NameToBeFound, "from", set.Name, NumberToBeFound)
+	log.Println("Looking up", NameToBeFound, "from", co.SetCode, NumberToBeFound)
 
 	os.Exit(m.Run())
 }
