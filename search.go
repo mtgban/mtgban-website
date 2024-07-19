@@ -386,32 +386,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.SearchQuery = config.FullQuery
 	}
 
-	// If SkipEmptyBuylist or SkipEmptyRetail are set, we need to remove ids from allKeys
-	if config.SkipEmptyBuylist {
-		var filteredKeys []string
-
-		// Skip if nothing was found in buylist
-		for _, cardId := range allKeys {
-			if len(foundVendors[cardId]) == 0 {
-				continue
-			}
-			filteredKeys = append(filteredKeys, cardId)
-		}
-		allKeys = filteredKeys
-	}
-	if config.SkipEmptyRetail {
-		var filteredKeys []string
-
-		// Skip if nothing was found in retail or only INDEX entries were found
-		for _, cardId := range allKeys {
-			if len(foundSellers[cardId]) == 0 ||
-				(len(foundSellers[cardId]) == 1 && len(foundSellers[cardId]["INDEX"]) != 0) {
-				continue
-			}
-			filteredKeys = append(filteredKeys, cardId)
-		}
-		allKeys = filteredKeys
-	}
+	// Filter away any empty result
+	allKeys = filterKeys(allKeys, config, foundSellers, foundVendors)
 
 	// Early exit if there no matches are found
 	if len(allKeys) == 0 {
@@ -775,6 +751,35 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+func filterKeys(allKeys []string, config SearchConfig, foundSellers, foundVendors map[string]map[string][]SearchEntry) []string {
+	if config.SkipEmptyBuylist {
+		var filteredKeys []string
+
+		// Skip if nothing was found in buylist
+		for _, cardId := range allKeys {
+			if len(foundVendors[cardId]) == 0 {
+				continue
+			}
+			filteredKeys = append(filteredKeys, cardId)
+		}
+		allKeys = filteredKeys
+	}
+	if config.SkipEmptyRetail {
+		var filteredKeys []string
+
+		// Skip if nothing was found in retail or only INDEX entries were found
+		for _, cardId := range allKeys {
+			if len(foundSellers[cardId]) == 0 ||
+				(len(foundSellers[cardId]) == 1 && len(foundSellers[cardId]["INDEX"]) != 0) {
+				continue
+			}
+			filteredKeys = append(filteredKeys, cardId)
+		}
+		allKeys = filteredKeys
+	}
+	return allKeys
 }
 
 func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry, hasStocks, hasSyplist bool) (*OEmbed, error) {
