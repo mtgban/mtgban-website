@@ -41,7 +41,7 @@ type SearchConfig struct {
 	StoreFilters []FilterStoreElem
 
 	// Chain of filters to be applied to single prices
-	PriceFilters []FilterPriceElem
+	PriceFilters []*FilterPriceElem
 
 	// Chain of filters to be applied to entries
 	EntryFilters []FilterEntryElem
@@ -472,7 +472,7 @@ func init() {
 func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string) (config SearchConfig) {
 	var filters []FilterElem
 	var filterStores []FilterStoreElem
-	var filterPrices []FilterPriceElem
+	var filterPrices []*FilterPriceElem
 	var filterEntries []FilterEntryElem
 
 	// Apply blocklists as if they were options, need to pass them through
@@ -852,7 +852,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			case "<":
 				optName = option + "_less_than"
 			}
-			filter := FilterPriceElem{
+			filter := &FilterPriceElem{
 				Name:          optName,
 				Negate:        negate,
 				OnlyForSeller: isSeller,
@@ -1571,7 +1571,7 @@ var FilterPriceFuncs = map[string]func(filters []float64, refPrice float64) bool
 	},
 }
 
-func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []FilterPriceElem, shorthand string) bool {
+func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []*FilterPriceElem, shorthand string) bool {
 	if entry.Pricing() == 0 {
 		return true
 	}

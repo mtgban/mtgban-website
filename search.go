@@ -317,7 +317,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			case "noSussy":
 				hideSus = true
 				config.SkipEmptyRetail = true
-				config.PriceFilters = append(config.PriceFilters, FilterPriceElem{
+				config.PriceFilters = append(config.PriceFilters, &FilterPriceElem{
 					Name:        "invalid_direct",
 					Price4Store: price4seller,
 					Stores:      []string{TCG_MARKET},
