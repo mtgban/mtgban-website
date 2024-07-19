@@ -573,30 +573,14 @@ func getDefaultBlocklists(sig string) ([]string, []string) {
 	return blocklistRetail, blocklistBuylist
 }
 
+// Return a random uuid from the pool of singles or sealed uuids
 func randomUUID(sealed bool) string {
-	var setIndex int
-
-	// Find a good set (one that has cards in it)
-	sets := mtgmatcher.GetAllSets()
-	for {
-		setIndex = rand.Intn(len(sets))
-		set, _ := mtgmatcher.GetSet(sets[setIndex])
-		if (!sealed && len(set.Cards) == 0) ||
-			(sealed && len(set.SealedProduct) == 0) {
-			continue
-		}
-		break
-	}
-
-	set, _ := mtgmatcher.GetSet(sets[setIndex])
-
+	uuids := mtgmatcher.GetUUIDs()
 	if sealed {
-		index := rand.Intn(len(set.SealedProduct))
-		return set.SealedProduct[index].UUID
+		uuids = mtgmatcher.GetSealedUUIDs()
 	}
-
-	index := rand.Intn(len(set.Cards))
-	return set.Cards[index].UUID
+	index := rand.Intn(len(uuids))
+	return uuids[index]
 }
 
 type Pagination struct {
