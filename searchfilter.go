@@ -777,6 +777,9 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			var isSeller, isVendor bool
 			// Skip empty result entries when filtering by either option
 			switch option {
+			case "store":
+				config.SkipEmptyRetail = true
+				config.SkipEmptyBuylist = true
 			case "aseller":
 				config.SkipEmptyRetail = true
 				isSeller = true
@@ -789,7 +792,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				if negate {
 					option = "seller"
 				}
-			case "buylist":
+			case "vendor":
 				config.SkipEmptyBuylist = true
 				isVendor = true
 			}
