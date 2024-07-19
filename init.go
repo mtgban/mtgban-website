@@ -274,7 +274,7 @@ var ScraperOptions = map[string]*scraperOption{
 	},
 	"coolstuffinc": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := coolstuffinc.NewScraperOfficial(Config.Api["csi_token"])
+			scraper := coolstuffinc.NewScraper()
 			scraper.LogCallback = logger.Printf
 			scraper.Partner = Config.Affiliate["CSI"]
 			return scraper, nil
