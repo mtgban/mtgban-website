@@ -1601,6 +1601,10 @@ func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []*Filt
 			if filters[i].Value == 0 {
 				for j := range filters[i].Stores {
 					price := filters[i].Price4Store(cardId, filters[i].Stores[j])
+					// In case a store lacks a price
+					if price == 0 {
+						continue
+					}
 					prices = append(prices, price)
 				}
 			} else {
