@@ -866,34 +866,34 @@ func downloadSearchCSV(w http.ResponseWriter, option string, config SearchConfig
 	}
 
 	var enabledStores []string
-	if option == "retail" {
-		for _, seller := range Sellers {
-			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-				enabledStores = append(enabledStores, seller.Info().Shorthand)
-			}
-		}
-	} else if option == "buylist" {
-		for _, vendor := range Vendors {
-			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-				enabledStores = append(enabledStores, vendor.Info().Shorthand)
-			}
-		}
-	}
-
+	var results map[string]map[string]*BanPrice
 	var filename string
 	isSealed := config.SearchMode == "sealed"
 	mode := "scryfall"
 	if isSealed {
 		mode = "mtgjson"
 	}
-	var results map[string]map[string]*BanPrice
-	if option == "retail" {
+
+	switch option {
+	case "retail":
+		for _, seller := range Sellers {
+			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+				enabledStores = append(enabledStores, seller.Info().Shorthand)
+			}
+		}
+
 		results = getSellerPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed)
 		filename = "mtgban_retail_prices.csv"
-	} else if option == "buylist" {
+	case "buylist":
+		for _, vendor := range Vendors {
+			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
+				enabledStores = append(enabledStores, vendor.Info().Shorthand)
+			}
+		}
+
 		results = getVendorPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed)
 		filename = "mtgban_buylist_prices.csv"
-	} else {
+	default:
 		return errors.New("invalid option")
 	}
 
