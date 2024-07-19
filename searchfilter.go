@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -90,6 +91,9 @@ type FilterPriceElem struct {
 
 	// Cache of cardId:prices used in the filter
 	PriceCache map[string][]float64
+
+	// Mutex protecting PriceCache map from concurrent access
+	Mutex sync.RWMutex
 
 	// List of stores the filter should be applied to
 	ApplyTo []string
@@ -1589,26 +1593,33 @@ func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []Filte
 		}
 
 		// Check if we already have prices for this card
-		_, found := filters[i].PriceCache[cardId]
+		filters[i].Mutex.RLock()
+		prices, found := filters[i].PriceCache[cardId]
+		filters[i].Mutex.RUnlock()
 		if !found {
-			if filters[i].PriceCache == nil {
-				filters[i].PriceCache = map[string][]float64{}
-			}
-
 			// If there is no set value, then look it up with the price4store function
 			if filters[i].Value == 0 {
-				filters[i].PriceCache[cardId] = make([]float64, 0, len(filters[i].Stores))
 				for j := range filters[i].Stores {
 					price := filters[i].Price4Store(cardId, filters[i].Stores[j])
-					filters[i].PriceCache[cardId] = append(filters[i].PriceCache[cardId], price)
+					prices = append(prices, price)
 				}
 			} else {
-				// Else fill in the cache with the same price
-				filters[i].PriceCache[cardId] = []float64{filters[i].Value}
+				// Else fill in the cache with the passed in
+				prices = []float64{filters[i].Value}
 			}
+
+			// Update cache
+			go func() {
+				filters[i].Mutex.Lock()
+				if filters[i].PriceCache == nil {
+					filters[i].PriceCache = map[string][]float64{}
+				}
+				filters[i].PriceCache[cardId] = prices
+				filters[i].Mutex.Unlock()
+			}()
 		}
 
-		res := FilterPriceFuncs[filters[i].Name](filters[i].PriceCache[cardId], entry.Pricing())
+		res := FilterPriceFuncs[filters[i].Name](prices, entry.Pricing())
 		if filters[i].Negate {
 			res = !res
 		}
