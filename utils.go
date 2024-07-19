@@ -144,8 +144,15 @@ func scryfallImageURL(cardId string, small bool) string {
 		version = "small"
 	}
 
-	// Support BAN's custom sets
 	number := co.Card.Number
+
+	// Retrieve the original number if present
+	dupe, found := co.Identifiers["originalScryfallNumber"]
+	if found {
+		number = dupe
+	}
+
+	// Support BAN's custom sets
 	code := strings.ToLower(co.SetCode)
 	if strings.HasSuffix(code, "ita") {
 		code = strings.TrimSuffix(code, "ita")
