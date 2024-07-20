@@ -380,10 +380,12 @@
                             <li>You can invert filter results by prepending a <pre>-</pre> to the option name.</li>
                             <li>You can filter by <b>seller/vendor name</b> with <pre>store:shorthand</pre>, or specific types of store with <pre>seller:shorthand</pre> and <pre>vendor:shorthand</pre>.</li>
                             <ul class="indent">
+                                <li>These filters will drop any result where the sepcified scraper is not preset. If you want to see results from a specific scraper, you may prefix the list of stores with <pre>only</pre>, for example <pre>store:only:shorthand</pre>>.</li>
                                 <li>For well known store names, you may use the following self-describing tags: <pre>TCG_LOW</pre>, <pre>TCG_MARKET</pre>, <pre>TCG_PLAYER</pre>, <pre>TCG_DIRECT</pre>, <pre>TCG_DIRECT_NET</pre>, <pre>MKM_LOW</pre>, <pre>MKM_TREND</pre>, <pre>CT</pre> and so on.</li>
-                                <li>You can filter results to include only retail or buylist prices with <pre>skip:retail</pre> and <pre>skip:buylist</pre>. You can also skip results that do not have retail or buylist prices, with <pre>skip:nosales</pre> and <pre>skip:nobuys</pre>, or results that do not have results at all, with <pre>skip:empty</pre>.</li>
+                                <li>You can filter results to include only retail or buylist prices with <pre>skip:retail</pre> and <pre>skip:buylist</pre>.</li>
+                                <li>You can also skip results that do not have retail or buylist prices, with <pre>skip:emptyretail</pre> and <pre>skip:emptybuylist</pre>, or results that do not have results at all, with <pre>skip:empty</pre>.</li>
                                 <li>You may filter by the store <b>region</b> with <pre>region:VALUE</pre> using <pre>us</pre>, <pre>eu</pre>, or <pre>jp</pre> options.</li>
-                                <li>Note that <pre>seller</pre> leave index results availabe - if you only want to look at the selected scraper(s) use the <pre>aseller</pre> option.</li>
+                                <li>Note that these options leave index results availabe - if you to hide them, you can use the <pre>skip:index</pre> option (or be even more specific with <pre>skip:indexretail</pre> and <pre>skip:indexbuylist</pre>).</li>
                             </ul>
                             <li>You can filter by <b>price</b> with <pre>price&gt;VALUE</pre>, or <pre>price&lt;VALUE</pre> to exclude results that are above or below your range.</li>
                             <li>You can check if a cards is on a particular list of card with <b>on</b> supporting <pre>mtgstocks</pre> and <pre>tcgsyp</pre>.</li>
