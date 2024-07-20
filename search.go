@@ -1041,6 +1041,9 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 				}
 
 				conditions := entry.Conditions
+				if vendor.Info().MetadataOnly && !vendor.Info().SealedMode {
+					conditions = "INDEX"
+				}
 
 				icon := ""
 				name := vendor.Info().Name
