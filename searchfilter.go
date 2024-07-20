@@ -52,6 +52,12 @@ type SearchConfig struct {
 	// Skip buylist searches entirely
 	SkipBuylist bool
 
+	// Skip card entry if a seller store did not have it
+	InventorySellers []string
+
+	// Skip card entry if a vendor store did not have it
+	BuylistVendors []string
+
 	// Skip card entry if no retail price was found
 	SkipEmptyRetail bool
 
@@ -609,6 +615,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			case "chrono", "alpha", "retail", "buylist":
 				config.SortMode = code
 			}
+
 		// This option loads a specific set of uuids from a deck list, which is similar
 		// to "unpack", but with the difference that identical ids are not skipped
 		case "decklist":
@@ -783,31 +790,50 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 
 		// Options that modify the searched scrapers
 		case "store", "seller", "vendor":
-			var isSeller, isVendor bool
-			// Skip empty result entries when filtering by either option
-			switch option {
-			case "store":
-				config.SkipEmptyRetail = true
-				config.SkipEmptyBuylist = true
-			case "seller":
-				config.SkipEmptyRetail = true
-				isSeller = true
-			case "vendor":
-				config.SkipEmptyBuylist = true
-				isVendor = true
+			subCodes := strings.Split(code, ":")
+			var subOpt string
+			if len(subCodes) > 1 {
+				code = subCodes[1]
 			}
 
-			// We want to leave the index scrapers be with this filter
-			includeIndex := !negate
+			stores := fixupStoreCodeNG(code)
 
-			filterStores = append(filterStores, FilterStoreElem{
-				Name:          option,
-				Negate:        negate,
-				Values:        fixupStoreCodeNG(code),
-				IncludeIndex:  includeIndex,
-				OnlyForSeller: isSeller,
-				OnlyForVendor: isVendor,
-			})
+			switch subOpt {
+			case "only":
+				// Skip empty result entries when filtering by either option
+				switch option {
+				case "store":
+					config.SkipEmptyRetail = true
+					config.SkipEmptyBuylist = true
+				case "seller":
+					config.SkipEmptyRetail = true
+				case "vendor":
+					config.SkipEmptyBuylist = true
+				}
+
+				// We want to leave the index scrapers be with this filter
+				includeIndex := !negate
+
+				filterStores = append(filterStores, FilterStoreElem{
+					Name:          option,
+					Negate:        negate,
+					Values:        stores,
+					IncludeIndex:  includeIndex,
+					OnlyForSeller: option == "seller",
+					OnlyForVendor: option == "vendor",
+				})
+			default:
+				switch option {
+				case "store":
+					config.InventorySellers = append(config.InventorySellers, stores...)
+					config.BuylistVendors = append(config.BuylistVendors, stores...)
+				case "seller":
+					config.InventorySellers = append(config.InventorySellers, stores...)
+				case "vendor":
+					config.BuylistVendors = append(config.BuylistVendors, stores...)
+				}
+			}
+
 		case "region":
 			filterStores = append(filterStores, FilterStoreElem{
 				Name:   option,

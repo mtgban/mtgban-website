@@ -756,8 +756,49 @@ func Search(w http.ResponseWriter, r *http.Request) {
 func filterKeys(allKeys []string, config SearchConfig, foundSellers, foundVendors map[string]map[string][]SearchEntry) []string {
 	var keepIds []string
 
+	if len(config.BuylistVendors) > 0 {
+		for _, cardId := range allKeys {
+			var shouldSkip bool
+			// Skip if buylist results do not contain one of these scrapers
+			for _, shorthand := range config.BuylistVendors {
+				if price4vendor(cardId, shorthand) == 0 {
+					shouldSkip = true
+					break
+				}
+			}
+			if shouldSkip {
+				continue
+			}
+			keepIds = append(keepIds, cardId)
+		}
+	}
+	if len(config.InventorySellers) > 0 {
+		for _, cardId := range allKeys {
+			// If already found, no need to add this again
+			if slices.Contains(keepIds, cardId) {
+				continue
+			}
+			var shouldSkip bool
+			// Skip if retail results do not contain one of these scrapers
+			for _, shorthand := range config.InventorySellers {
+				if price4seller(cardId, shorthand) == 0 {
+					shouldSkip = true
+					break
+				}
+			}
+			if shouldSkip {
+				continue
+			}
+			keepIds = append(keepIds, cardId)
+		}
+	}
+
 	if config.SkipEmptyBuylist {
 		for _, cardId := range allKeys {
+			// If already found, no need to add this again
+			if slices.Contains(keepIds, cardId) {
+				continue
+			}
 			// Skip if nothing was found in buylist or only INDEX entries were found
 			if len(foundVendors[cardId]) == 0 ||
 				(len(foundVendors[cardId]) == 1 && len(foundVendors[cardId]["INDEX"]) != 0) {
