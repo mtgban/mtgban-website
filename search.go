@@ -757,9 +757,10 @@ func filterKeys(allKeys []string, config SearchConfig, foundSellers, foundVendor
 	if config.SkipEmptyBuylist {
 		var filteredKeys []string
 
-		// Skip if nothing was found in buylist
+		// Skip if nothing was found in buylist or only INDEX entries were found
 		for _, cardId := range allKeys {
-			if len(foundVendors[cardId]) == 0 {
+			if len(foundVendors[cardId]) == 0 ||
+				(len(foundVendors[cardId]) == 1 && len(foundVendors[cardId]["INDEX"]) != 0) {
 				continue
 			}
 			filteredKeys = append(filteredKeys, cardId)
