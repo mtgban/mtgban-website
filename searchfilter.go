@@ -1563,7 +1563,11 @@ func shouldSkipStoreNG(scraper mtgban.Scraper, filters []FilterStoreElem) bool {
 			continue
 		}
 
-		res := FilterStoreFuncs[filters[i].Name](filters[i].Values, scraper, filters[i].IncludeIndex)
+		f, found := FilterStoreFuncs[filters[i].Name]
+		if !found {
+			panic(filters[i].Name + " option not found")
+		}
+		res := f(filters[i].Values, scraper, filters[i].IncludeIndex)
 		if filters[i].Negate {
 			res = !res
 		}
@@ -1663,7 +1667,11 @@ func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []*Filt
 			}()
 		}
 
-		res := FilterPriceFuncs[filters[i].Name](prices, entry.Pricing())
+		f, found := FilterPriceFuncs[filters[i].Name]
+		if !found {
+			panic(filters[i].Name + " option not found")
+		}
+		res := f(prices, entry.Pricing())
 		if filters[i].Negate {
 			res = !res
 		}
@@ -1714,7 +1722,11 @@ func shouldSkipEntryNG(entry mtgban.GenericEntry, filters []FilterEntryElem) boo
 			continue
 		}
 
-		res := FilterEntryFuncs[filters[i].Name](filters[i].Values, entry)
+		f, found := FilterEntryFuncs[filters[i].Name]
+		if !found {
+			panic(filters[i].Name + " option not found")
+		}
+		res := f(filters[i].Values, entry)
 		if filters[i].Negate {
 			res = !res
 		}
