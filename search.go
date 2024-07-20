@@ -754,31 +754,37 @@ func Search(w http.ResponseWriter, r *http.Request) {
 }
 
 func filterKeys(allKeys []string, config SearchConfig, foundSellers, foundVendors map[string]map[string][]SearchEntry) []string {
-	if config.SkipEmptyBuylist {
-		var filteredKeys []string
+	var keepIds []string
 
-		// Skip if nothing was found in buylist or only INDEX entries were found
+	if config.SkipEmptyBuylist {
 		for _, cardId := range allKeys {
+			// Skip if nothing was found in buylist or only INDEX entries were found
 			if len(foundVendors[cardId]) == 0 ||
 				(len(foundVendors[cardId]) == 1 && len(foundVendors[cardId]["INDEX"]) != 0) {
 				continue
 			}
-			filteredKeys = append(filteredKeys, cardId)
+			keepIds = append(keepIds, cardId)
 		}
-		allKeys = filteredKeys
 	}
-	if config.SkipEmptyRetail {
-		var filteredKeys []string
 
-		// Skip if nothing was found in retail or only INDEX entries were found
+	if config.SkipEmptyRetail {
 		for _, cardId := range allKeys {
+			// If already found, no need to add this again
+			if slices.Contains(keepIds, cardId) {
+				continue
+			}
+			// Skip if nothing was found in retail or only INDEX entries were found
 			if len(foundSellers[cardId]) == 0 ||
 				(len(foundSellers[cardId]) == 1 && len(foundSellers[cardId]["INDEX"]) != 0) {
 				continue
 			}
-			filteredKeys = append(filteredKeys, cardId)
+			keepIds = append(keepIds, cardId)
 		}
-		allKeys = filteredKeys
+	}
+
+	// If filtered results return them, otherwise, pass-through
+	if len(keepIds) > 0 {
+		return keepIds
 	}
 	return allKeys
 }
