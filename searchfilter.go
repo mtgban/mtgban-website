@@ -593,6 +593,13 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			case "empty":
 				config.SkipEmptyRetail = true
 				config.SkipEmptyBuylist = true
+			case "index", "indexretail", "indexbuylist":
+				filterStores = append(filterStores, FilterStoreElem{
+					Name:          "index",
+					Negate:        negate,
+					OnlyForSeller: code == "indexretail",
+					OnlyForVendor: code == "indexbuylist",
+				})
 			}
 		case "sort":
 			code = strings.ToLower(code)
@@ -1482,6 +1489,9 @@ func localizeScraper(filters []string, scraper mtgban.Scraper) bool {
 }
 
 var FilterStoreFuncs = map[string]func(filters []string, scraper mtgban.Scraper) bool{
+	"index": func(filters []string, scraper mtgban.Scraper) bool {
+		return scraper.Info().MetadataOnly
+ 	},
 	"store": func(filters []string, scraper mtgban.Scraper) bool {
 		return !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
 	},
