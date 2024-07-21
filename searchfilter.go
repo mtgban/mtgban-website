@@ -74,6 +74,9 @@ type FilterStoreElem struct {
 	Negate bool
 	Values []string
 
+	// Whether or not the filter should treat index scrapers differently
+	IncludeIndex bool
+
 	OnlyForSeller bool
 	OnlyForVendor bool
 }
@@ -444,7 +447,6 @@ var FilterOperations = map[string][]string{
 	"rev_price": []string{">", "<"},
 	"store":     []string{":"},
 	"seller":    []string{":"},
-	"aseller":   []string{":"},
 	"vendor":    []string{":"},
 	"region":    []string{":"},
 }
@@ -780,33 +782,29 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			})
 
 		// Options that modify the searched scrapers
-		case "store", "seller", "aseller", "vendor":
+		case "store", "seller", "vendor":
 			var isSeller, isVendor bool
 			// Skip empty result entries when filtering by either option
 			switch option {
 			case "store":
 				config.SkipEmptyRetail = true
 				config.SkipEmptyBuylist = true
-			case "aseller":
-				config.SkipEmptyRetail = true
-				isSeller = true
-				option = "seller"
 			case "seller":
 				config.SkipEmptyRetail = true
 				isSeller = true
-				option = "seller_keep_index"
-				// When filtering out, use the more generic function
-				if negate {
-					option = "seller"
-				}
 			case "vendor":
 				config.SkipEmptyBuylist = true
 				isVendor = true
 			}
+
+			// We want to leave the index scrapers be with this filter
+			includeIndex := !negate
+
 			filterStores = append(filterStores, FilterStoreElem{
 				Name:          option,
 				Negate:        negate,
 				Values:        fixupStoreCodeNG(code),
+				IncludeIndex:  includeIndex,
 				OnlyForSeller: isSeller,
 				OnlyForVendor: isVendor,
 			})
@@ -1488,30 +1486,34 @@ func localizeScraper(filters []string, scraper mtgban.Scraper) bool {
 	return true
 }
 
-var FilterStoreFuncs = map[string]func(filters []string, scraper mtgban.Scraper) bool{
-	"index": func(filters []string, scraper mtgban.Scraper) bool {
+// Note that generic store functions should always return the index scrapers
+// Those can be filtered out with the explicit index option
+var FilterStoreFuncs = map[string]func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool{
+	"index": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
 		return scraper.Info().MetadataOnly
- 	},
-	"store": func(filters []string, scraper mtgban.Scraper) bool {
+	},
+	"store": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+		if includeIndex && scraper.Info().MetadataOnly {
+			return false
+		}
 		return !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
 	},
-	"seller_keep_index": func(filters []string, scraper mtgban.Scraper) bool {
-		if scraper.Info().MetadataOnly {
+	"seller": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+		if includeIndex && scraper.Info().MetadataOnly {
 			return false
 		}
 		_, ok := scraper.(mtgban.Seller)
 		return ok && !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
 	},
-	"seller": func(filters []string, scraper mtgban.Scraper) bool {
-		_, ok := scraper.(mtgban.Seller)
-		return ok && !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
-	},
-	"vendor": func(filters []string, scraper mtgban.Scraper) bool {
+	"vendor": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+		if includeIndex && scraper.Info().MetadataOnly {
+			return false
+		}
 		_, ok := scraper.(mtgban.Vendor)
 		return ok && !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
 	},
-	"region": func(filters []string, scraper mtgban.Scraper) bool {
-		if scraper.Info().MetadataOnly {
+	"region": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+		if includeIndex && scraper.Info().MetadataOnly {
 			return false
 		}
 		return localizeScraper(filters, scraper)
@@ -1535,7 +1537,7 @@ func shouldSkipStoreNG(scraper mtgban.Scraper, filters []FilterStoreElem) bool {
 			continue
 		}
 
-		res := FilterStoreFuncs[filters[i].Name](filters[i].Values, scraper)
+		res := FilterStoreFuncs[filters[i].Name](filters[i].Values, scraper, filters[i].IncludeIndex)
 		if filters[i].Negate {
 			res = !res
 		}
