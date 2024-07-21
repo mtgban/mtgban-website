@@ -245,8 +245,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
-	pageVars.Page = getBaseURL(r) + r.URL.String()
-	pageVars.OembedURL = getBaseURL(r) + "/search/oembed?format=json&url=" + url.QueryEscape(getBaseURL(r)+"/search?q="+query)
+	pageVars.Embed.PageURL = getBaseURL(r) + r.URL.String()
+	pageVars.Embed.OEmbedURL = getBaseURL(r) + "/search/oembed?format=json&url=" + url.QueryEscape(getBaseURL(r)+"/search?q="+query)
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 
@@ -528,17 +528,17 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		w.Write(payload)
 		return
 	}
-	pageVars.OembedTitle = embed.Title
-	pageVars.OembedContents = embed.HTML
-	pageVars.OembedDesc = embed.HTML
+	pageVars.Embed.Title = embed.Title
+	pageVars.Embed.Contents = embed.HTML
+	pageVars.Embed.Description = embed.HTML
 	if len(allKeys) > 0 {
-		pageVars.ImageURL = scryfallImageURL(allKeys[0], false)
+		pageVars.Embed.ImageURL = scryfallImageURL(allKeys[0], false)
 		co, err := mtgmatcher.GetUUID(allKeys[0])
 		if err == nil && len(co.Printings) > 0 {
-			pageVars.OembedDesc = fmt.Sprintf("Printed in %s.", printings2line(co.Printings))
+			pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", printings2line(co.Printings))
 		}
-		pageVars.RetailPrice = price4seller(allKeys[0], TCG_MARKET)
-		pageVars.BuylistPrice = price4seller(allKeys[0], "CK")
+		pageVars.Embed.RetailPrice = price4seller(allKeys[0], TCG_MARKET)
+		pageVars.Embed.BuylistPrice = price4seller(allKeys[0], "CK")
 	}
 
 	// Readjust array of INDEX entires

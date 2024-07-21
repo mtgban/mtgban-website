@@ -43,13 +43,16 @@ type PageVars struct {
 	ShowPromo    bool
 	Hash         string
 
-	OembedURL      string
-	OembedTitle    string
-	OembedContents string
-	ImageURL       string
-	OembedDesc     string
-	RetailPrice    float64
-	BuylistPrice   float64
+	Embed struct {
+		OEmbedURL    string
+		PageURL      string
+		Title        string
+		Contents     string
+		ImageURL     string
+		Description  string
+		RetailPrice  float64
+		BuylistPrice float64
+	}
 
 	Title          string
 	ErrorMessage   string

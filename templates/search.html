@@ -7,26 +7,26 @@
 
     <link rel="search" type="application/opensearchdescription+xml" title="MTGBAN Price Search" href="https://mtgban.com/img/opensearch.xml" />
 
-    {{if .OembedURL}}
-        <link rel="alternate" type="application/json+oembed" href="{{.OembedURL}}" title="MTGBAN Price Search"/>
+    {{if .Embed.OEmbedURL}}
+        <link rel="alternate" type="application/json+oembed" href="{{.Embed.OEmbedURL}}" title="MTGBAN Price Search"/>
         <meta property="og:site_name" content="MTGBAN Price Search" />
         <meta property="og:type" content="product" />
-        <meta property="og:title" content="{{.OembedTitle}}" />
-        <meta property="og:description" content="{{.OembedContents}}" />
-        <meta property="og:url" content="{{.Page}}" />
-        <meta property="og:image" content="{{.ImageURL}}" />
+        <meta property="og:title" content="{{.Embed.Title}}" />
+        <meta property="og:description" content="{{.Embed.Contents}}" />
+        <meta property="og:url" content="{{.Embed.PageURL}}" />
+        <meta property="og:image" content="{{.Embed.ImageURL}}" />
 
         <meta name="twitter:creator" content="@MTG_BAN" />
         <meta name="twitter:site" content="@MTG_BAN" />
         <meta name="twitter:domain" content="https://mtgban.com/" />
         <meta name="twitter:card" content="product" />
-        <meta name="twitter:image" content="{{.ImageURL}}" />
-        <meta name="twitter:title" content="{{.OembedTitle}}" />
-        <meta name="twitter:description" content="{{.OembedDesc}}" />
+        <meta name="twitter:image" content="{{.Embed.ImageURL}}" />
+        <meta name="twitter:title" content="{{.Embed.Title}}" />
+        <meta name="twitter:description" content="{{.Embed.Description}}" />
         <meta name="twitter:label1" content="TCGplayer Market Price" />
-        <meta name="twitter:data1" content="{{if .RetailPrice}}{{printf "$ %.2f" .RetailPrice}}{{else}}N/A{{end}}" />
+        <meta name="twitter:data1" content="{{if .Embed.RetailPrice}}{{printf "$ %.2f" .Embed.RetailPrice}}{{else}}N/A{{end}}" />
         <meta name="twitter:label2" content="Card Kingdom Buylist" />
-        <meta name="twitter:data2" content="{{if .BuylistPrice}}{{printf "$ %.2f" .BuylistPrice}}{{else}}N/A{{end}}" />
+        <meta name="twitter:data2" content="{{if .Embed.BuylistPrice}}{{printf "$ %.2f" .Embed.BuylistPrice}}{{else}}N/A{{end}}" />
     {{end}}
 
     <title>{{.Title}}</title>
