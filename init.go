@@ -723,19 +723,7 @@ func updateStaticData() {
 }
 
 func loadSellers(newbc *mtgban.BanClient) {
-	// Sort the sellers/vendors arrays by name
-	//
-	// Note that pointers are shared between these two arrays,
-	// things like Price Ratio (bl data depending on inv data)
-	// still work just fine, even if we don't use them in the
-	// global arrays in the end.
 	newSellers := newbc.Sellers()
-	sort.Slice(newSellers, func(i, j int) bool {
-		if newSellers[i].Info().Name == newSellers[j].Info().Name {
-			return newSellers[i].Info().Shorthand < newSellers[j].Info().Shorthand
-		}
-		return newSellers[i].Info().Name < newSellers[j].Info().Name
-	})
 
 	// Allocate enough space for the global pointers
 	if Sellers == nil {
@@ -760,98 +748,125 @@ func loadSellers(newbc *mtgban.BanClient) {
 	currentDir := path.Join(InventoryDir, fmt.Sprintf("%03d", time.Now().YearDay()))
 	mkDirIfNotExisting(currentDir)
 
+	var wg sync.WaitGroup
+
 	// Load Sellers
 	for i := range newSellers {
-		// Find where our seller resides in the global array
-		sellerIndex := -1
-		for j, seller := range Sellers {
-			if seller != nil && newSellers[i].Info().Shorthand == seller.Info().Shorthand {
-				sellerIndex = j
-				break
-			}
-		}
+		wg.Add(1)
 
-		log.Println(newSellers[i].Info().Name, newSellers[i].Info().Shorthand, "Inventory at position", sellerIndex)
+		go func(i int) {
+			defer wg.Done()
 
-		fname := path.Join(InventoryDir, newSellers[i].Info().Shorthand+"-latest.json")
-		if init && fileExists(fname) {
-			seller, err := loadInventoryFromFile(fname)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			if sellerIndex < 0 {
-				Sellers = append(Sellers, seller)
-			} else {
-				Sellers[sellerIndex] = seller
+			// Find where our seller resides in the global array
+			sellerIndex := -1
+			for j, seller := range Sellers {
+				if seller != nil && newSellers[i].Info().Shorthand == seller.Info().Shorthand {
+					sellerIndex = j
+					break
+				}
 			}
 
-			inv, _ := seller.Inventory()
-			log.Printf("Loaded from file with %d entries", len(inv))
-		} else {
-			shorthand := newSellers[i].Info().Shorthand
-			opts := ScraperOptions[ScraperMap[shorthand]]
+			log.Println(newSellers[i].Info().Name, newSellers[i].Info().Shorthand, "Inventory at position", sellerIndex)
 
-			// If the old scraper data is old enough, pull from the new scraper
-			// and update it in the global slice
-			if sellerIndex < 0 || // Sellers[] != nil is checked above
-				time.Since(*Sellers[sellerIndex].Info().InventoryTimestamp) > SkipRefreshCooldown {
-				ServerNotify("reload", "Loading from seller "+shorthand)
-				start := time.Now()
-				err := updateSellerAtPosition(newSellers[i], sellerIndex, true)
+			fname := path.Join(InventoryDir, newSellers[i].Info().Shorthand+"-latest.json")
+			if init && fileExists(fname) {
+				seller, err := loadInventoryFromFile(fname)
 				if err != nil {
-					msg := fmt.Sprintf("seller %s %s - %s", newSellers[i].Info().Name, shorthand, err.Error())
-					ServerNotify("reload", msg, true)
-					continue
+					log.Println(err)
+					return
 				}
-				log.Println("Took", time.Since(start))
-			}
-
-			// Stash data to DB if requested
-			if opts.StashInventory || (opts.StashMarkets && opts.RDBs[shorthand] != nil) {
-				start := time.Now()
-				log.Println("Stashing", shorthand, "inventory data to DB")
-				inv, _ := newSellers[i].Inventory()
-
-				dbName := "retail"
-				if opts.RDBs[shorthand] != nil {
-					dbName = shorthand
+				if sellerIndex < 0 {
+					Sellers = append(Sellers, seller)
+				} else {
+					Sellers[sellerIndex] = seller
 				}
 
-				key := newSellers[i].Info().InventoryTimestamp.Format("2006-01-02")
-				for uuid, entries := range inv {
-					// Adjust price through defaultGradeMap in case NM is not available
-					price := entries[0].Price * defaultGradeMap[entries[0].Conditions]
-					// Use NX because the price might have already been set using more accurate
-					// information (instead of the derivation above)
-					err := opts.RDBs[dbName].HSetNX(context.Background(), uuid, key, price).Err()
+				inv, _ := seller.Inventory()
+				log.Printf("Loaded from file with %d entries", len(inv))
+			} else {
+				shorthand := newSellers[i].Info().Shorthand
+				opts := ScraperOptions[ScraperMap[shorthand]]
+
+				// If the old scraper data is old enough, pull from the new scraper
+				// and update it in the global slice
+				if sellerIndex < 0 || // Sellers[] != nil is checked above
+					time.Since(*Sellers[sellerIndex].Info().InventoryTimestamp) > SkipRefreshCooldown {
+					ServerNotify("reload", "Loading from seller "+shorthand)
+					start := time.Now()
+					err := updateSellerAtPosition(newSellers[i], sellerIndex, true)
 					if err != nil {
-						ServerNotify("redis", err.Error())
-						break
+						msg := fmt.Sprintf("seller %s %s - %s", newSellers[i].Info().Name, shorthand, err.Error())
+						ServerNotify("reload", msg, true)
+						return
 					}
+					log.Println("Took", time.Since(start))
 				}
-				log.Println("Took", time.Since(start))
-			}
 
-			err := dumpInventoryToFile(newSellers[i], currentDir, fname)
-			if err != nil {
-				log.Println(err)
-				continue
+				// Stash data to DB if requested
+				if opts.StashInventory || (opts.StashMarkets && opts.RDBs[shorthand] != nil) {
+					start := time.Now()
+					log.Println("Stashing", shorthand, "inventory data to DB")
+					inv, _ := newSellers[i].Inventory()
+
+					dbName := "retail"
+					if opts.RDBs[shorthand] != nil {
+						dbName = shorthand
+					}
+
+					key := newSellers[i].Info().InventoryTimestamp.Format("2006-01-02")
+					for uuid, entries := range inv {
+						// Adjust price through defaultGradeMap in case NM is not available
+						price := entries[0].Price * defaultGradeMap[entries[0].Conditions]
+						// Use NX because the price might have already been set using more accurate
+						// information (instead of the derivation above)
+						err := opts.RDBs[dbName].HSetNX(context.Background(), uuid, key, price).Err()
+						if err != nil {
+							ServerNotify("redis", err.Error())
+							break
+						}
+					}
+					log.Println("Took", time.Since(start))
+				}
+
+				err := dumpInventoryToFile(newSellers[i], currentDir, fname)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				opts.Logger.Println("Saved to file")
 			}
-			opts.Logger.Println("Saved to file")
+			log.Println(newSellers[i].Info().Name, "seller -- OK")
+		}(i)
+
+		// If not in initilization mode, run the routines sequentially
+		if !init {
+			wg.Wait()
 		}
-		log.Println("-- OK")
+	}
+
+	if init {
+		wg.Wait()
+
+		// Sort the sellers arrays by name
+		//
+		// Note that pointers are shared between these two arrays,
+		// things like Price Ratio (bl data depending on inv data)
+		// still work just fine, even if we don't use them in the
+		// global arrays in the end.
+		//
+		// Also perform it after synchronizing to make sure everything
+		// is loaded up just fine
+		sort.Slice(Sellers, func(i, j int) bool {
+			if Sellers[i].Info().Name == Sellers[j].Info().Name {
+				return Sellers[i].Info().Shorthand < Sellers[j].Info().Shorthand
+			}
+			return Sellers[i].Info().Name < Sellers[j].Info().Name
+		})
 	}
 }
 
 func loadVendors(newbc *mtgban.BanClient) {
 	newVendors := newbc.Vendors()
-	sort.Slice(newVendors, func(i, j int) bool {
-		if newVendors[i].Info().Name == newVendors[j].Info().Name {
-			return newVendors[i].Info().Shorthand < newVendors[j].Info().Shorthand
-		}
-		return newVendors[i].Info().Name < newVendors[j].Info().Name
-	})
 
 	if Vendors == nil {
 		Vendors = make([]mtgban.Vendor, 0, len(newVendors))
@@ -875,82 +890,104 @@ func loadVendors(newbc *mtgban.BanClient) {
 	currentDir := path.Join(BuylistDir, fmt.Sprintf("%03d", time.Now().YearDay()))
 	mkDirIfNotExisting(currentDir)
 
+	var wg sync.WaitGroup
 	// Load Vendors
 	for i := range newVendors {
-		// Find where our vendor resides in the global array
-		vendorIndex := -1
-		for j, vendor := range Vendors {
-			if vendor != nil && newVendors[i].Info().Shorthand == vendor.Info().Shorthand {
-				vendorIndex = j
-				break
-			}
-		}
+		wg.Add(1)
 
-		log.Println(newVendors[i].Info().Name, newVendors[i].Info().Shorthand, "Buylist at position", vendorIndex)
+		go func(i int) {
+			defer wg.Done()
 
-		fname := path.Join(BuylistDir, newVendors[i].Info().Shorthand+"-latest.json")
-		if init && fileExists(fname) {
-			vendor, err := loadBuylistFromFile(fname)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			if vendorIndex < 0 {
-				Vendors = append(Vendors, vendor)
-			} else {
-				Vendors[vendorIndex] = vendor
+			// Find where our vendor resides in the global array
+			vendorIndex := -1
+			for j, vendor := range Vendors {
+				if vendor != nil && newVendors[i].Info().Shorthand == vendor.Info().Shorthand {
+					vendorIndex = j
+					break
+				}
 			}
 
-			bl, _ := vendor.Buylist()
-			log.Printf("Loaded from file with %d entries", len(bl))
-		} else {
-			shorthand := newVendors[i].Info().Shorthand
-			opts := ScraperOptions[ScraperMap[shorthand]]
+			log.Println(newVendors[i].Info().Name, newVendors[i].Info().Shorthand, "Buylist at position", vendorIndex)
 
-			// If the old scraper data is old enough, pull from the new scraper
-			// and update it in the global slice
-			if vendorIndex < 0 || time.Since(*Vendors[vendorIndex].Info().BuylistTimestamp) > SkipRefreshCooldown {
-				ServerNotify("reload", "Loading from vendor "+shorthand)
-				start := time.Now()
-				err := updateVendorAtPosition(newVendors[i], vendorIndex, true)
+			fname := path.Join(BuylistDir, newVendors[i].Info().Shorthand+"-latest.json")
+			if init && fileExists(fname) {
+				vendor, err := loadBuylistFromFile(fname)
 				if err != nil {
-					msg := fmt.Sprintf("vendor %s %s - %s", newVendors[i].Info().Name, shorthand, err.Error())
-					ServerNotify("reload", msg, true)
-					continue
+					log.Println(err)
+					return
 				}
-				log.Println("Took", time.Since(start))
-			}
-
-			// Stash data to DB if requested
-			if opts.StashBuylist || (opts.StashTraders && opts.RDBs[shorthand] != nil) {
-				start := time.Now()
-				log.Println("Stashing", shorthand, "buylist data to DB")
-				bl, _ := newVendors[i].Buylist()
-
-				dbName := "buylist"
-				if opts.RDBs[shorthand] != nil {
-					dbName = shorthand
+				if vendorIndex < 0 {
+					Vendors = append(Vendors, vendor)
+				} else {
+					Vendors[vendorIndex] = vendor
 				}
 
-				key := newVendors[i].Info().BuylistTimestamp.Format("2006-01-02")
-				for uuid, entries := range bl {
-					err := opts.RDBs[dbName].HSet(context.Background(), uuid, key, entries[0].BuyPrice).Err()
+				bl, _ := vendor.Buylist()
+				log.Printf("Loaded from file with %d entries", len(bl))
+			} else {
+				shorthand := newVendors[i].Info().Shorthand
+				opts := ScraperOptions[ScraperMap[shorthand]]
+
+				// If the old scraper data is old enough, pull from the new scraper
+				// and update it in the global slice
+				if vendorIndex < 0 || time.Since(*Vendors[vendorIndex].Info().BuylistTimestamp) > SkipRefreshCooldown {
+					ServerNotify("reload", "Loading from vendor "+shorthand)
+					start := time.Now()
+					err := updateVendorAtPosition(newVendors[i], vendorIndex, true)
 					if err != nil {
-						ServerNotify("redis", err.Error())
-						break
+						msg := fmt.Sprintf("vendor %s %s - %s", newVendors[i].Info().Name, shorthand, err.Error())
+						ServerNotify("reload", msg, true)
+						return
 					}
+					log.Println("Took", time.Since(start))
 				}
-				log.Println("Took", time.Since(start))
-			}
 
-			err := dumpBuylistToFile(newVendors[i], currentDir, fname)
-			if err != nil {
-				log.Println(err)
-				continue
+				// Stash data to DB if requested
+				if opts.StashBuylist || (opts.StashTraders && opts.RDBs[shorthand] != nil) {
+					start := time.Now()
+					log.Println("Stashing", shorthand, "buylist data to DB")
+					bl, _ := newVendors[i].Buylist()
+
+					dbName := "buylist"
+					if opts.RDBs[shorthand] != nil {
+						dbName = shorthand
+					}
+
+					key := newVendors[i].Info().BuylistTimestamp.Format("2006-01-02")
+					for uuid, entries := range bl {
+						err := opts.RDBs[dbName].HSet(context.Background(), uuid, key, entries[0].BuyPrice).Err()
+						if err != nil {
+							ServerNotify("redis", err.Error())
+							break
+						}
+					}
+					log.Println("Took", time.Since(start))
+				}
+
+				err := dumpBuylistToFile(newVendors[i], currentDir, fname)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				opts.Logger.Println("Saved to file")
 			}
-			opts.Logger.Println("Saved to file")
+			log.Println(newVendors[i].Info().Name, "buylist -- OK")
+		}(i)
+
+		if !init {
+			wg.Wait()
 		}
-		log.Println("-- OK")
+	}
+
+	if init {
+		wg.Wait()
+
+		sort.Slice(Vendors, func(i, j int) bool {
+			if Vendors[i].Info().Name == Vendors[j].Info().Name {
+				return Vendors[i].Info().Shorthand < Vendors[j].Info().Shorthand
+			}
+			return Vendors[i].Info().Name < Vendors[j].Info().Name
+		})
 	}
 }
 
