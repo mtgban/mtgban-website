@@ -46,23 +46,14 @@ type SearchConfig struct {
 	// Chain of filters to be applied to entries
 	EntryFilters []FilterEntryElem
 
+	// Chain of filters to be applied after the search
+	PostFilters []FilterPostElem
+
 	// Skip retail searches entirely
 	SkipRetail bool
 
 	// Skip buylist searches entirely
 	SkipBuylist bool
-
-	// Skip card entry if a seller store did not have it
-	InventorySellers []string
-
-	// Skip card entry if a vendor store did not have it
-	BuylistVendors []string
-
-	// Skip card entry if no retail price was found
-	SkipEmptyRetail bool
-
-	// Skip card entry if no buylist price was found
-	SkipEmptyBuylist bool
 }
 
 type FilterElem struct {
@@ -114,6 +105,14 @@ type FilterPriceElem struct {
 type FilterEntryElem struct {
 	Name   string
 	Negate bool
+	Values []string
+
+	OnlyForSeller bool
+	OnlyForVendor bool
+}
+
+type FilterPostElem struct {
+	Name   string
 	Values []string
 
 	OnlyForSeller bool
@@ -482,6 +481,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 	var filterStores []FilterStoreElem
 	var filterPrices []*FilterPriceElem
 	var filterEntries []FilterEntryElem
+	var filterPost []FilterPostElem
 
 	// Apply blocklists as if they were options, need to pass them through
 	// the fixup due to upper/lower casing
@@ -594,13 +594,13 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				config.SkipRetail = true
 			case "buylist":
 				config.SkipBuylist = true
-			case "emptyretail":
-				config.SkipEmptyRetail = true
-			case "emptybuylist":
-				config.SkipEmptyBuylist = true
-			case "empty":
-				config.SkipEmptyRetail = true
-				config.SkipEmptyBuylist = true
+			case "empty", "emptyretail", "emptybuylist":
+				code = strings.ToLower(code)
+				filterPost = append(filterPost, FilterPostElem{
+					Name:          "empty",
+					OnlyForSeller: code == "emptyretail",
+					OnlyForVendor: code == "emptybuylist",
+				})
 			case "index", "indexretail", "indexbuylist":
 				filterStores = append(filterStores, FilterStoreElem{
 					Name:          "index",
@@ -791,26 +791,31 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		// Options that modify the searched scrapers
 		case "store", "seller", "vendor":
 			subCodes := strings.Split(code, ":")
-			var subOpt string
+			subOpt := "any"
 			if len(subCodes) > 1 {
 				code = subCodes[1]
+				subOpt = "empty"
 			}
 
 			stores := fixupStoreCodeNG(code)
 
-			switch subOpt {
-			case "only":
-				// Skip empty result entries when filtering by either option
-				switch option {
-				case "store":
-					config.SkipEmptyRetail = true
-					config.SkipEmptyBuylist = true
-				case "seller":
-					config.SkipEmptyRetail = true
-				case "vendor":
-					config.SkipEmptyBuylist = true
-				}
-
+			// If this option is negated, we assume that users just want to hide a store
+			// ingoring the values-if-present function
+			if negate {
+				filterPost = append(filterPost, FilterPostElem{
+					Name:          "empty",
+					OnlyForSeller: option == "seller",
+					OnlyForVendor: option == "vendor",
+				})
+			} else {
+				filterPost = append(filterPost, FilterPostElem{
+					Name:          subOpt,
+					Values:        stores,
+					OnlyForSeller: option == "seller",
+					OnlyForVendor: option == "vendor",
+				})
+			}
+			if subOpt == "empty" || negate {
 				// We want to leave the index scrapers be with this filter
 				includeIndex := !negate
 
@@ -822,16 +827,6 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 					OnlyForSeller: option == "seller",
 					OnlyForVendor: option == "vendor",
 				})
-			default:
-				switch option {
-				case "store":
-					config.InventorySellers = append(config.InventorySellers, stores...)
-					config.BuylistVendors = append(config.BuylistVendors, stores...)
-				case "seller":
-					config.InventorySellers = append(config.InventorySellers, stores...)
-				case "vendor":
-					config.BuylistVendors = append(config.BuylistVendors, stores...)
-				}
 			}
 
 		case "region":
@@ -865,20 +860,23 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			case "price":
 				isSeller = true
 				price4store = price4seller
-				config.SkipEmptyRetail = true
 			case "buy_price":
 				isVendor = true
 				price4store = price4vendor
-				config.SkipEmptyBuylist = true
 			case "arb_price":
 				isSeller = true
 				price4store = price4vendor
-				config.SkipEmptyRetail = true
 			case "rev_price":
 				isVendor = true
 				price4store = price4seller
-				config.SkipEmptyBuylist = true
 			}
+
+			filterPost = append(filterPost, FilterPostElem{
+				Name:          "empty",
+				OnlyForSeller: isSeller,
+				OnlyForVendor: isVendor,
+			})
+
 			var optName string
 			switch operation {
 			case ">":
@@ -949,6 +947,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 	config.StoreFilters = filterStores
 	config.PriceFilters = filterPrices
 	config.EntryFilters = filterEntries
+	config.PostFilters = filterPost
 
 	return
 }
@@ -1736,4 +1735,71 @@ func shouldSkipEntryNG(entry mtgban.GenericEntry, filters []FilterEntryElem) boo
 	}
 
 	return false
+}
+
+var FilterPostFuncs = map[string]func(filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool{
+	"empty": func(filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool {
+		return len(foundScraper[cardId]) == 0 ||
+			(len(foundScraper[cardId]) == 1 && len(foundScraper[cardId]["INDEX"]) != 0)
+	},
+	"any": func(filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool {
+		for _, cond := range AllConditions {
+			for _, entry := range foundScraper[cardId][cond] {
+				for _, shorthand := range filters {
+					if strings.ToLower(entry.Shorthand) == shorthand {
+						return false
+					}
+				}
+			}
+		}
+		return true
+	},
+}
+
+func shouldSkipPostNG(cardId string, foundSellers, foundVendors map[string]map[string][]SearchEntry, filters []FilterPostElem) bool {
+	for i := range filters {
+		f, found := FilterPostFuncs[filters[i].Name]
+		if !found {
+			panic(filters[i].Name + " option not found")
+		}
+
+		var foundScrapers map[string]map[string][]SearchEntry
+		if filters[i].OnlyForSeller {
+			foundScrapers = foundSellers
+		} else if filters[i].OnlyForVendor {
+			foundScrapers = foundVendors
+		} else {
+			resS := f(filters[i].Values, cardId, foundSellers)
+			resV := f(filters[i].Values, cardId, foundVendors)
+			res := resS && resV
+			if res {
+				return true
+			}
+			continue
+		}
+
+		res := f(filters[i].Values, cardId, foundScrapers)
+		if res {
+			return true
+		}
+	}
+
+	return false
+}
+
+func PostSearchFilter(config SearchConfig, allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry) []string {
+	if len(config.PostFilters) == 0 {
+		return allKeys
+	}
+
+	var keepIds []string
+
+	for _, cardId := range allKeys {
+		if shouldSkipPostNG(cardId, foundSellers, foundVendors, config.PostFilters) {
+			continue
+		}
+		keepIds = append(keepIds, cardId)
+	}
+
+	return keepIds
 }

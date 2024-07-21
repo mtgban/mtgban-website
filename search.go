@@ -308,15 +308,15 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				})
 			// Skip results with no prices
 			case "skipEmpty":
-				config.SkipEmptyRetail = true
-				config.SkipEmptyBuylist = true
+				config.PostFilters = append(config.PostFilters, FilterPostElem{
+					Name: "empty",
+				})
 			case "noSyp":
 				hideSyp = true
 			case "noUpsell":
 				pageVars.ShowPromo = true
 			case "noSussy":
 				hideSus = true
-				config.SkipEmptyRetail = true
 				config.PriceFilters = append(config.PriceFilters, &FilterPriceElem{
 					Name:        "invalid_direct",
 					Price4Store: price4seller,
@@ -387,7 +387,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Filter away any empty result
-	allKeys = filterKeys(allKeys, config, foundSellers, foundVendors)
+	allKeys = PostSearchFilter(config, allKeys, foundSellers, foundVendors)
 
 	// Early exit if there no matches are found
 	if len(allKeys) == 0 {
@@ -751,83 +751,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
-}
-
-func filterKeys(allKeys []string, config SearchConfig, foundSellers, foundVendors map[string]map[string][]SearchEntry) []string {
-	var keepIds []string
-
-	if len(config.BuylistVendors) > 0 {
-		for _, cardId := range allKeys {
-			var shouldSkip bool
-			// Skip if buylist results do not contain one of these scrapers
-			for _, shorthand := range config.BuylistVendors {
-				if price4vendor(cardId, shorthand) == 0 {
-					shouldSkip = true
-					break
-				}
-			}
-			if shouldSkip {
-				continue
-			}
-			keepIds = append(keepIds, cardId)
-		}
-	}
-	if len(config.InventorySellers) > 0 {
-		for _, cardId := range allKeys {
-			// If already found, no need to add this again
-			if slices.Contains(keepIds, cardId) {
-				continue
-			}
-			var shouldSkip bool
-			// Skip if retail results do not contain one of these scrapers
-			for _, shorthand := range config.InventorySellers {
-				if price4seller(cardId, shorthand) == 0 {
-					shouldSkip = true
-					break
-				}
-			}
-			if shouldSkip {
-				continue
-			}
-			keepIds = append(keepIds, cardId)
-		}
-	}
-
-	if config.SkipEmptyBuylist {
-		for _, cardId := range allKeys {
-			// If already found, no need to add this again
-			if slices.Contains(keepIds, cardId) {
-				continue
-			}
-			// Skip if nothing was found in buylist or only INDEX entries were found
-			if len(foundVendors[cardId]) == 0 ||
-				(len(foundVendors[cardId]) == 1 && len(foundVendors[cardId]["INDEX"]) != 0) {
-				continue
-			}
-			keepIds = append(keepIds, cardId)
-		}
-	}
-
-	if config.SkipEmptyRetail {
-		for _, cardId := range allKeys {
-			// If already found, no need to add this again
-			if slices.Contains(keepIds, cardId) {
-				continue
-			}
-			// Skip if nothing was found in retail or only INDEX entries were found
-			if len(foundSellers[cardId]) == 0 ||
-				(len(foundSellers[cardId]) == 1 && len(foundSellers[cardId]["INDEX"]) != 0) {
-				continue
-			}
-			keepIds = append(keepIds, cardId)
-		}
-	}
-
-	// If filtered results return them, otherwise, pass-through
-	if len(keepIds) > 0 {
-		return keepIds
-	}
-	return allKeys
 }
 
 func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry, hasStocks, hasSyplist bool) (*OEmbed, error) {
