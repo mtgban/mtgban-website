@@ -156,9 +156,6 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("Sleepers call by %s with took %v", user, time.Since(start))
 	UserNotify("sleepers", msg)
 	LogPages["Sleepers"].Println(msg)
-	if DevMode {
-		log.Println(msg)
-	}
 
 	if DevMode {
 		start = time.Now()

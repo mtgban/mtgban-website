@@ -740,9 +740,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("[%s] from %s by %s (took %v)", query, source, user, time.Since(start))
 	UserNotify(notifyTitle, msg)
 	LogPages["Search"].Println(msg)
-	if DevMode {
-		log.Println(msg)
-	}
 
 	if DevMode {
 		start = time.Now()
