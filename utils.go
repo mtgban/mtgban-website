@@ -166,6 +166,18 @@ func scryfallImageURL(cardId string, small bool) string {
 	return fmt.Sprintf("https://api.scryfall.com/cards/%s/%s?format=image&version=%s", code, number, version)
 }
 
+func scryfallImageCropURL(cardId string) string {
+	co, err := mtgmatcher.GetUUID(cardId)
+	if err != nil {
+		return ""
+	}
+	scryfallId, found := co.Identifiers["scryfallId"]
+	if !found || len(scryfallId) < 3 {
+		return ""
+	}
+	return fmt.Sprintf("https://cards.scryfall.io/art_crop/front/%s/%s/%s.jpg", scryfallId[0:1], scryfallId[1:2], scryfallId)
+}
+
 func editionTitle(cardId string) string {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {

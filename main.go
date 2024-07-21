@@ -49,6 +49,7 @@ type PageVars struct {
 		Title        string
 		Contents     string
 		ImageURL     string
+		ImageCropURL string
 		Description  string
 		RetailPrice  float64
 		BuylistPrice float64

@@ -533,10 +533,17 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.Embed.Description = embed.HTML
 	if len(allKeys) > 0 {
 		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].ImageURL
+		pageVars.Embed.ImageCropURL = pageVars.Embed.ImageURL
+
 		co, err := mtgmatcher.GetUUID(allKeys[0])
 		if err == nil && len(co.Printings) > 0 {
 			pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", printings2line(co.Printings))
+			imgCrop := scryfallImageCropURL(allKeys[0])
+			if imgCrop != "" {
+				pageVars.Embed.ImageCropURL = imgCrop
+			}
 		}
+
 		pageVars.Embed.RetailPrice = price4seller(allKeys[0], TCG_MARKET)
 		pageVars.Embed.BuylistPrice = price4seller(allKeys[0], "CK")
 	}
