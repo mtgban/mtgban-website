@@ -835,7 +835,10 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Negate: negate,
 				Values: strings.Split(strings.ToLower(code), ","),
 			})
-
+			// Filter away any empty result
+			filterPost = append(filterPost, FilterPostElem{
+				Name: "empty",
+			})
 		// Pricing Options
 		case "cond", "condr", "condb":
 			opt := "condition"
