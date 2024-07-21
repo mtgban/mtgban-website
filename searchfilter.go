@@ -1459,6 +1459,8 @@ func shouldSkipCardNG(cardId string, filters []FilterElem) bool {
 	return false
 }
 
+// Check whether the scraper is in the filtered region
+// Index scrapers are always global
 func localizeScraper(filters []string, scraper mtgban.Scraper) bool {
 	for _, value := range filters {
 		switch value {
@@ -1499,9 +1501,6 @@ var FilterStoreFuncs = map[string]func(filters []string, scraper mtgban.Scraper)
 		return ok && !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
 	},
 	"region": func(filters []string, scraper mtgban.Scraper) bool {
-		return localizeScraper(filters, scraper)
-	},
-	"region_keep_index": func(filters []string, scraper mtgban.Scraper) bool {
 		if scraper.Info().MetadataOnly {
 			return false
 		}

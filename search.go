@@ -263,7 +263,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if oembed {
 		// Skip any store based outside of the US
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
-			Name:   "region_keep_index",
+			Name:   "region",
 			Values: []string{"us"},
 		})
 		// Skip non-NM buylist prices
