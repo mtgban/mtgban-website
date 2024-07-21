@@ -532,7 +532,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.Embed.Contents = embed.HTML
 	pageVars.Embed.Description = embed.HTML
 	if len(allKeys) > 0 {
-		pageVars.Embed.ImageURL = scryfallImageURL(allKeys[0], false)
+		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].ImageURL
 		co, err := mtgmatcher.GetUUID(allKeys[0])
 		if err == nil && len(co.Printings) > 0 {
 			pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", printings2line(co.Printings))
