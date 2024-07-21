@@ -99,6 +99,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 			if vendor == nil ||
 				vendor.Info().CountryFlag != "" ||
 				vendor.Info().SealedMode ||
+				vendor.Info().MetadataOnly ||
 				slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
 				continue
 			}
