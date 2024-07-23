@@ -439,15 +439,17 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	restock, found := CKAPIOutput[co.Identifiers["mtgjsonId"]]
 	CKAPIMutex.RUnlock()
 	if found {
-		if co.Etched {
+		if co.Etched && restock.Etched != nil {
 			restockURL = restock.Etched.URL
-		} else if co.Foil {
+		} else if co.Foil && restock.Foil != nil {
 			restockURL = restock.Foil.URL
-		} else {
+		} else if !co.Etched && !co.Foil && restock.Normal != nil {
 			restockURL = restock.Normal.URL
 		}
-		restockURL = strings.Replace(restockURL, "mtg", "catalog/restock_notice", 1)
-		restockURL += "?partner=" + Config.Affiliate["CK"]
+		if restockURL != "" {
+			restockURL = strings.Replace(restockURL, "mtg", "catalog/restock_notice", 1)
+			restockURL += "?partner=" + Config.Affiliate["CK"]
+		}
 	}
 
 	return GenericCard{
