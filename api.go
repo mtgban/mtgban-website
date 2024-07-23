@@ -100,7 +100,7 @@ func prepareCKAPI() error {
 
 		id, found := co.Identifiers["mtgjsonId"]
 		if !found {
-			id = cardId
+			continue
 		}
 
 		// Allocate memory
