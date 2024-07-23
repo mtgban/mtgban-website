@@ -19,15 +19,15 @@ import (
 	"golang.org/x/exp/maps"
 )
 
-type meta struct {
+type ckMeta struct {
 	Id  int    `json:"id,omitempty"`
 	URL string `json:"url,omitempty"`
 }
 
 type ck2id struct {
-	Normal *meta `json:"normal,omitempty"`
-	Foil   *meta `json:"foil,omitempty"`
-	Etched *meta `json:"etched,omitempty"`
+	Normal *ckMeta `json:"normal,omitempty"`
+	Foil   *ckMeta `json:"foil,omitempty"`
+	Etched *ckMeta `json:"etched,omitempty"`
 }
 
 var CKAPIMutex sync.RWMutex
@@ -110,7 +110,7 @@ func prepareCKAPI() error {
 		}
 
 		// Set data as needed
-		data := &meta{
+		data := &ckMeta{
 			Id:  card.Id,
 			URL: "https://www.cardkingdom.com/" + card.URL,
 		}
