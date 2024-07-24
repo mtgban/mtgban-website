@@ -5,10 +5,10 @@
  * If a user scrolls up and down, selects an entry and presses Enter, or
  * clicks on a field, they will be submitting the form automatically.
  */
-async function autocomplete(form, inp) {
+async function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
-    const arr = await fetchNames();
+    const arr = await fetchNames(sealed);
 
     /* Execute a function when someone writes in the text field: */
     inp.addEventListener("input", function(e) {

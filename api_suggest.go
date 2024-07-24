@@ -4,13 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 func SuggestAPI(w http.ResponseWriter, r *http.Request) {
-	AllNames := mtgmatcher.AllNames("canonical", false)
+	sealed, _ := strconv.ParseBool(r.FormValue("sealed"))
+
+	AllNames := mtgmatcher.AllNames("canonical", sealed)
 	if r.FormValue("all") == "true" {
 		json.NewEncoder(w).Encode(&AllNames)
 		return
