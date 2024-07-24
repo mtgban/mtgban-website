@@ -2,55 +2,15 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"net/url"
-	"sort"
 	"strings"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-var AllNames []string
-var AllLowerCaseNames []string
-
-func loadNames() {
-	var allNames []string
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, _ := mtgmatcher.GetUUID(uuid)
-		if !slices.Contains(allNames, co.Name) {
-			allNames = append(allNames, co.Name)
-		}
-		// Look for alternate names too
-		for _, name := range []string{co.FaceName, co.FlavorName, co.FaceFlavorName} {
-			// Skip empty entries and all those faces that would duplicate the card
-			if name == "" || strings.HasPrefix(co.Name, name) {
-				continue
-			}
-			if !slices.Contains(allNames, name) {
-				allNames = append(allNames, name)
-			}
-		}
-	}
-	sort.Strings(allNames)
-
-	allLowerCaseNames := make([]string, len(allNames))
-	for i := range allNames {
-		allLowerCaseNames[i] = strings.ToLower(allNames[i])
-	}
-	AllNames = allNames
-	AllLowerCaseNames = allLowerCaseNames
-
-	log.Println("AllNames Loaded!")
-}
-
 func SuggestAPI(w http.ResponseWriter, r *http.Request) {
-	if AllNames == nil {
-		loadNames()
-	}
-
+	AllNames := mtgmatcher.AllNames("canonical", false)
 	if r.FormValue("all") == "true" {
 		json.NewEncoder(w).Encode(&AllNames)
 		return
@@ -61,6 +21,8 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	baseURL := getBaseURL(r)
+
+	AllLowerCaseNames := mtgmatcher.AllNames("lowercase", false)
 
 	var suggestions []string
 	var results []string
