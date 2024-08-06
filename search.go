@@ -696,7 +696,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		altId, err := mtgmatcher.Match(&mtgmatcher.Card{
+		altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
 			Id:   chartId,
 			Foil: !co.Foil,
 		})
@@ -704,7 +704,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			pageVars.Alternative = altId
 		}
 
-		altId, err = mtgmatcher.Match(&mtgmatcher.Card{
+		altId, err = mtgmatcher.Match(&mtgmatcher.InputCard{
 			Id:        chartId,
 			Variation: "Etched",
 		})
@@ -1116,7 +1116,7 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 // Try searching for cards usign the Match algorithm
 func attemptMatch(query string) ([]string, error) {
 	var uuids []string
-	uuid, err := mtgmatcher.Match(&mtgmatcher.Card{
+	uuid, err := mtgmatcher.Match(&mtgmatcher.InputCard{
 		Name: query,
 	})
 	if err != nil {
@@ -1134,7 +1134,7 @@ func attemptMatch(query string) ([]string, error) {
 	// Repeat for foil and etched (only add if not previously found)
 	// Add as needed depending on the previous query result
 	for _, tag := range []string{"Foil", "Etched"} {
-		uuid, suberr := mtgmatcher.Match(&mtgmatcher.Card{
+		uuid, suberr := mtgmatcher.Match(&mtgmatcher.InputCard{
 			Name:      query,
 			Variation: tag,
 		})

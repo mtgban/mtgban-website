@@ -1013,7 +1013,7 @@ func findInDeck(sealedUUID, opt string) []string {
 					continue
 				}
 
-				var board []mtgjson.DeckCard
+				var board []mtgmatcher.DeckCard
 				switch opt {
 				case "bonus":
 					board = deck.Bonus
