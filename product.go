@@ -69,12 +69,6 @@ var editionRenames = map[string]string{
 	"Judge Gift Cards 2014": "Judge Gift Cards",
 }
 
-var sealedEditionSkips = map[string]string{
-	"Chronicles Japanese": "",
-	"Legends Italian":     "",
-	"The Dark Italian":    "",
-}
-
 func makeEditionEntry(code string, names ...string) EditionEntry {
 	set, _ := mtgmatcher.GetSet(code)
 
@@ -207,18 +201,13 @@ func getSealedEditions() ([]string, map[string][]EditionEntry) {
 	sortedEditions := []string{}
 	listEditions := map[string][]EditionEntry{}
 	for _, code := range mtgmatcher.GetAllSets() {
+		switch code {
+		case "DRKITA", "LEGITA", "4EDALT":
+			continue
+		}
+
 		set, _ := mtgmatcher.GetSet(code)
-
-		if set.SealedProduct == nil {
-			continue
-		}
-
-		_, found := sealedEditionSkips[set.Name]
-		if found {
-			continue
-		}
-		// Skip Judge promos as they don't have a real product associated, except for 2014
-		if strings.HasPrefix(set.Name, "Judge Gift Cards") && !strings.HasSuffix(set.Name, "2014") {
+		if len(set.SealedProduct) == 0 {
 			continue
 		}
 
