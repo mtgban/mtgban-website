@@ -20,6 +20,7 @@ import (
 	"github.com/mtgban/go-mtgban/abugames"
 	"github.com/mtgban/go-mtgban/cardkingdom"
 	"github.com/mtgban/go-mtgban/cardmarket"
+	"github.com/mtgban/go-mtgban/cardsphere"
 	"github.com/mtgban/go-mtgban/cardtrader"
 	"github.com/mtgban/go-mtgban/coolstuffinc"
 	"github.com/mtgban/go-mtgban/magiccorner"
@@ -537,6 +538,17 @@ var ScraperOptions = map[string]*scraperOption{
 			scraper := tcgplayer.NewScraperSYP(Config.Api["tcg_auth"])
 			scraper.LogCallback = logger.Printf
 			scraper.Affiliate = Config.Affiliate["TCG"]
+			return scraper, nil
+		},
+	},
+	"cardsphere": &scraperOption{
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper, err := cardsphere.NewScraper(Config.Api["csphere_email"], Config.Api["csphere_password"])
+			if err != nil {
+				return nil, err
+			}
+			scraper.LogCallback = logger.Printf
+			scraper.MaxConcurrency = 3
 			return scraper, nil
 		},
 	},
