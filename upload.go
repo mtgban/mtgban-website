@@ -59,7 +59,7 @@ var ErrReloadFirstRow = errors.New("firstrow")
 // Data coming from the user upload
 type UploadEntry struct {
 	// A reference to the parsed card
-	Card mtgmatcher.Card
+	Card mtgmatcher.InputCard
 
 	// The UUID of the card
 	CardId string
