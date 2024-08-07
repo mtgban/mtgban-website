@@ -125,59 +125,6 @@ func keyruneForCardSet(cardId string) string {
 	return out
 }
 
-func scryfallImageURL(cardId string, small bool) string {
-	co, err := mtgmatcher.GetUUID(cardId)
-	if err != nil {
-		return ""
-	}
-
-	if co.Sealed {
-		tcgId, found := co.Identifiers["tcgplayerProductId"]
-		if !found {
-			return ""
-		}
-		return "https://product-images.tcgplayer.com/" + tcgId + ".jpg"
-	}
-
-	version := "normal"
-	if small {
-		version = "small"
-	}
-
-	number := co.Card.Number
-
-	// Retrieve the original number if present
-	dupe, found := co.Identifiers["originalScryfallNumber"]
-	if found {
-		number = dupe
-	}
-
-	// Support BAN's custom sets
-	code := strings.ToLower(co.SetCode)
-	if strings.HasSuffix(code, "ita") {
-		code = strings.TrimSuffix(code, "ita")
-		number += "/it"
-	} else if strings.HasSuffix(code, "jpn") {
-		code = strings.TrimSuffix(code, "jpn")
-		number += "/ja"
-	}
-	code = strings.TrimSuffix(code, "alt")
-
-	return fmt.Sprintf("https://api.scryfall.com/cards/%s/%s?format=image&version=%s", code, number, version)
-}
-
-func scryfallImageCropURL(cardId string) string {
-	co, err := mtgmatcher.GetUUID(cardId)
-	if err != nil {
-		return ""
-	}
-	scryfallId, found := co.Identifiers["scryfallId"]
-	if !found || len(scryfallId) < 3 {
-		return ""
-	}
-	return fmt.Sprintf("https://cards.scryfall.io/art_crop/front/%s/%s/%s.jpg", scryfallId[0:1], scryfallId[1:2], scryfallId)
-}
-
 func editionTitle(cardId string) string {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
@@ -337,9 +284,9 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		}
 	}
 
-	smallImg := false
-	if len(flags) > 0 {
-		smallImg = flags[0]
+	imgURL := co.Images["full"]
+	if len(flags) > 0 && flags[0] {
+		imgURL = co.Images["thumbnail"]
 	}
 	printings := ""
 	if len(flags) > 1 && flags[1] {
@@ -462,7 +409,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		Foil:      co.Foil,
 		Etched:    co.Etched,
 		Keyrune:   keyruneForCardSet(cardId),
-		ImageURL:  scryfallImageURL(cardId, smallImg),
+		ImageURL:  imgURL,
 		Title:     editionTitle(cardId),
 		Reserved:  co.Card.IsReserved,
 		SearchURL: fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query)),

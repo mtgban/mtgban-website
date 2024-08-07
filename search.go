@@ -538,7 +538,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		co, err := mtgmatcher.GetUUID(allKeys[0])
 		if err == nil && len(co.Printings) > 0 {
 			pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", printings2line(co.Printings))
-			imgCrop := scryfallImageCropURL(allKeys[0])
+			imgCrop := co.Images["crop"]
 			if imgCrop != "" {
 				pageVars.Embed.ImageCropURL = imgCrop
 			}
@@ -781,7 +781,7 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 			if len(co.Printings) > 0 {
 				htmlBody += fmt.Sprintf("Printed in %s.\n\n", printings2line(co.Printings))
 			}
-			img = scryfallImageURL(cardId, true)
+			img = co.Images["full"]
 		}
 
 		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, editionTitle(cardId))
