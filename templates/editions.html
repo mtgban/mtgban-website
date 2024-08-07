@@ -97,7 +97,9 @@
                                     <h4 style="display:inline; padding: 0px 10px 0px 10px">&nbsp;</h6>
                                     {{end}}
 
-                                    <i class="ss ss-{{$edition.Keyrune}} ss-1x ss-fw"></i>
+                                    {{if $edition.Keyrune}}
+                                        <i class="ss ss-{{$edition.Keyrune}} ss-1x ss-fw"></i>
+                                    {{end}}
                                     <a class="btn normal" href="/search?q=s:{{$edition.Code}}">
                                         {{.Name}}
                                     </a>

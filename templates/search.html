@@ -806,7 +806,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         <td rowspan=2>
                                             <a href="search?q=s:{{$card.SetCode}}">
                                                 <span class="small-hidden-text" aria-hidden="true">{{$card.SetCode}}</span>
-                                                <i class="ss {{$card.Keyrune}} ss-2x ss-fw"></i>
+                                                {{if $card.Keyrune}}
+                                                    <i class="ss {{$card.Keyrune}} ss-2x ss-fw"></i>
+                                                {{else}}
+                                                    <h3>{{$card.SetCode}}&nbsp;</h3>
+                                                {{end}}
                                             </a>
                                         </td>
                                         <td width=100%>

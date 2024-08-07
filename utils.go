@@ -101,6 +101,9 @@ func keyruneForCardSet(cardId string) string {
 	}
 
 	keyrune := set.KeyruneCode
+	if keyrune == "" {
+		return ""
+	}
 
 	out := "ss-" + strings.ToLower(keyrune)
 	rarity := co.Card.Rarity
@@ -296,8 +299,16 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 			if err != nil {
 				continue
 			}
+			printings += fmt.Sprintf(`<a class="pagination" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
+
 			keyruneCode := strings.ToLower(set.KeyruneCode)
-			printings += fmt.Sprintf(`<a class="pagination" title="%s" href="/search?q=%s"><i class="ss ss-%s ss-2x"></i> </a>`, set.Name, url.QueryEscape(co.Name+" s:"+setCode), keyruneCode)
+			if keyruneCode == "" {
+				printings += fmt.Sprintf(`<h4>[%s] %s</h4>`, setCode, set.Name)
+			} else {
+				printings += fmt.Sprintf(`<i class="ss ss-%s ss-2x"></i>`, keyruneCode)
+			}
+			printings += fmt.Sprintf(`</a>`)
+
 			if i == MaxRuneSymbols && len(co.Printings) > MaxRuneSymbols {
 				printings += "<br>and many more (too many to list)..."
 				break
