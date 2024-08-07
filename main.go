@@ -788,9 +788,6 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		"triple_column_end": func(i int, length int) bool {
 			return i == length/3-1 || i == length*2/3-1 || i == length-1
 		},
-		"tolower": func(s string) string {
-			return strings.ToLower(s)
-		},
 		"load_partner": func(s string) string {
 			return Config.Affiliate[s]
 		},

@@ -52,6 +52,7 @@ type GenericCard struct {
 	Booster   bool
 	HasDeck   bool
 
+	ScryfallURL  string
 	CKRestockURL string
 	SourceSealed []string
 }
@@ -410,6 +411,12 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		}
 	}
 
+	scryfallURL := ""
+	_, found = co.Identifiers["scryfallId"]
+	if found {
+		scryfallURL = "https://scryfall.com/card/" + strings.ToLower(co.SetCode) + "/" + co.Number
+	}
+
 	return GenericCard{
 		UUID:      co.UUID,
 		Name:      name,
@@ -435,6 +442,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		Booster:   canBoosterGen,
 		HasDeck:   hasDecklist,
 
+		ScryfallURL:  scryfallURL,
 		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
 	}
