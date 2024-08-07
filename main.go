@@ -324,6 +324,7 @@ func init() {
 
 var Config struct {
 	Port                   string            `json:"port"`
+	DatastorePath          string            `json:"datastore_path"`
 	DBAddress              string            `json:"db_address"`
 	RedisAddr              string            `json:"redis_addr"`
 	DiscordHook            string            `json:"discord_hook"`
@@ -509,6 +510,10 @@ func loadVars(cfg string) error {
 		Config.Port = DefaultConfigPort
 	}
 
+	if Config.DatastorePath == "" {
+		return errors.New("missing datastore path")
+	}
+
 	// Load from env
 	v := os.Getenv("BAN_SECRET")
 	if v == "" {
@@ -606,10 +611,10 @@ func main() {
 	go func() {
 		var err error
 
-		log.Println("Loading MTGJSONv5")
+		log.Println("Loading", Config.DatastorePath)
 		err = loadDatastore()
 		if err != nil {
-			log.Fatalln("error loading mtgjson:", err)
+			log.Fatalln("error loading datastore:", err)
 		}
 
 		loadScrapers()
