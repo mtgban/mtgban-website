@@ -560,6 +560,7 @@ func main() {
 	noload := flag.Bool("noload", false, "Do not load price data")
 	logdir := flag.String("log", "logs", "Directory for scrapers logs")
 	port := flag.String("port", "", "Override server port")
+	datastore := flag.String("ds", "", "Override datastore path")
 
 	flag.Parse()
 	DevMode = *devMode
@@ -578,6 +579,9 @@ func main() {
 	}
 	if *port != "" {
 		Config.Port = *port
+	}
+	if *datastore != "" {
+		Config.DatastorePath = *datastore
 	}
 
 	_, err = os.Stat(LogDir)
