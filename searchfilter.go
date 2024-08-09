@@ -280,11 +280,16 @@ var colorMap = map[string][]string{
 }
 
 func fixupColorNG(code string) []string {
-	colors, found := colorMap[strings.ToLower(code)]
+	code = strings.ToLower(code)
+	colors, found := colorMap[code]
 	if found {
 		return colors
 	}
-	return strings.Split(strings.ToUpper(code), "")
+	_, found = colorValues[code]
+	if found {
+		return []string{code}
+	}
+	return strings.Split(code, "")
 }
 
 // Validate UUIDs, convert them to mtgban format
@@ -1240,7 +1245,7 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 			return len(co.Colors) <= 1
 		}
 		for _, value := range filters {
-			if !slices.Contains(co.Colors, value) {
+			if !slices.Contains(co.Colors, strings.ToUpper(value)) && !slices.Contains(co.Colors, strings.ToLower(value)) {
 				return true
 			}
 		}
