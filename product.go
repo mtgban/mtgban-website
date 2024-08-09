@@ -147,10 +147,15 @@ func getAllEditions() ([]string, map[string]EditionEntry) {
 func getTreeEditions() ([]string, map[string][]EditionEntry) {
 	sets := mtgmatcher.GetAllSets()
 
-	sortedEditions := make([]string, 0, len(sets))
+	var sortedEditions []string
 	listEditions := map[string][]EditionEntry{}
 	for _, code := range sets {
 		set, _ := mtgmatcher.GetSet(code)
+
+		// Skip empty sets
+		if len(set.Cards) == 0 {
+			continue
+		}
 
 		entry := makeEditionEntry(code)
 
