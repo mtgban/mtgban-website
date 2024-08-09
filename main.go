@@ -820,6 +820,13 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			_, found := m[s]
 			return found
 		},
+		"color2hex": func(s string) string {
+			color, found := colorValues[s]
+			if !found {
+				return "#111111"
+			}
+			return color
+		},
 	}
 
 	// Give each template a name

@@ -137,58 +137,38 @@
                                 {{end}}
                             </td>
                             <td style="display:none;">
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:w" title="White">
-                                    <h6>⚪️</h6>
-                                </a>
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:u" title="Blue">
-                                    <h6>🔵</h6>
-                                </a>
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:b" title="Black">
-                                    <h6>⚫️</h6>
-                                </a>
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:r" title="Red">
-                                    <h6>🔴</h6>
-                                </a>
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:g" title="Green">
-                                    <h6>🟢</h6>
-                                </a>
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:c" title="Colorless">
-                                    <h6>🔘</h6>
-                                </a>
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:m" title="Multicolor">
-                                    <h6>🌕</h6>
-                                </a>
+                                <table>
+                                    <tr style="background-color:rgba(0, 0, 0, 0);">
+                                        {{range $edition.Colors}}
+                                            <td>
+                                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:{{.}}" title="{{.}}">
+                                                    <svg height="18" width="18" xmlns="http://www.w3.org/2000/svg">
+                                                        <defs>
+                                                            <linearGradient id="gradient-{{.}}" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                                <stop offset="0%" stop-color="#708090" />
+                                                                <stop offset="50%" stop-color="{{color2hex .}}" />
+                                                            </linearGradient>
+                                                        </defs>
+                                                        <circle r="9" cx="9" cy="9" fill="url(#gradient-{{.}})" />
+                                                    </svg>
+                                                </a>
+                                            </td>
+                                        {{end}}
+                                    </tr>
+                                </table>
                             </td>
                             <td style="display:none;">
-                                {{if $edition.HasRarityMythic}}
-                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20r:m" title="Mythic">
-                                        <h6>M</h6>
-                                    </a>
-                                {{else}}
-                                    &nbsp;
-                                    &nbsp;
-                                    &nbsp;
-                                    &nbsp;
-                                {{end}}
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20r:r" title="Rare">
-                                    <h6>R</h6>
-                                </a>
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20r:u" title="Uncommon">
-                                    <h6>U</h6>
-                                </a>
-                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20r:c" title="Common">
-                                    <h6>C</h6>
-                                </a>
-                                {{if $edition.HasRaritySpecial}}
-                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20r:s" title="Special">
-                                        <h6>S</h6>
-                                    </a>
-                                {{else}}
-                                    &nbsp;
-                                    &nbsp;
-                                    &nbsp;
-                                    &nbsp;
-                                {{end}}
+                                <table>
+                                    <tr style="background-color:rgba(0, 0, 0, 0);">
+                                        {{range $edition.Rarities}}
+                                            <td>
+                                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20r:{{.}}">
+                                                    <h6>{{.}}</h6>
+                                                </a>
+                                            </td>
+                                        {{end}}
+                                    </tr>
+                                </table>
                             </td>
                             <td>
                                 {{$edition.Size}}

@@ -14,19 +14,18 @@ import (
 )
 
 type EditionEntry struct {
-	Name    string
-	Code    string
-	Date    time.Time
-	Keyrune string
-	Size    int
-	FmtDate string
-	Special bool
-	ShowFin bool
-	HasReg  bool
-	HasFoil bool
-
-	HasRaritySpecial bool
-	HasRarityMythic  bool
+	Name     string
+	Code     string
+	Date     time.Time
+	Keyrune  string
+	Size     int
+	FmtDate  string
+	Special  bool
+	ShowFin  bool
+	HasReg   bool
+	HasFoil  bool
+	Rarities []string
+	Colors   []string
 }
 
 var categoryEdition = map[string]string{
@@ -69,43 +68,61 @@ var editionRenames = map[string]string{
 	"Judge Gift Cards 2014": "Judge Gift Cards",
 }
 
+// Never pick #708090 as it's the gradient base
+var colorValues = map[string]string{
+	"white":      "#FFFAFA",
+	"blue":       "#00BFFF",
+	"black":      "#111111",
+	"red":        "#FF4500",
+	"green":      "#32CD32",
+	"colorless":  "#A9A9A9",
+	"multicolor": "#FFE866",
+	"amber":      "#FF8C00",
+	"amethyst":   "#9932CC",
+	"emerald":    "#22C022",
+	"ruby":       "#FF4500",
+	"sapphire":   "#0000FF",
+	"steel":      "#A9A9A9",
+}
+
 func makeEditionEntry(code string, names ...string) EditionEntry {
 	set, _ := mtgmatcher.GetSet(code)
 
 	date, _ := time.Parse("2006-01-02", set.ReleaseDate)
-	dateAfterMythic, _ := time.Parse("2006-01-02", "2008-10-01")
 
 	name := set.Name
 	if len(names) > 0 && names[0] != "" {
 		name = names[0]
 	}
 	special := false
-	var specialRarity bool
 	switch set.Code {
 	case "H1R",
 		"SCD":
 		special = true
-	case "PLST",
-		"CLB",
-		"CMR",
-		"TSR",
-		"TSB":
-		specialRarity = true
 	}
-	return EditionEntry{
-		Name:    name,
-		Code:    set.Code,
-		Date:    date,
-		Keyrune: strings.ToLower(set.KeyruneCode),
-		Size:    len(set.Cards),
-		FmtDate: set.ReleaseDate,
-		Special: special,
-		ShowFin: !set.IsNonFoilOnly && !set.IsFoilOnly,
-		HasReg:  !set.IsFoilOnly,
-		HasFoil: !set.IsNonFoilOnly,
 
-		HasRaritySpecial: specialRarity,
-		HasRarityMythic:  date.After(dateAfterMythic),
+	var rarities []string
+	if len(set.Rarities) > 1 {
+		rarities = set.Rarities
+	}
+	var colors []string
+	if len(set.Colors) > 1 {
+		colors = set.Colors
+	}
+
+	return EditionEntry{
+		Name:     name,
+		Code:     set.Code,
+		Date:     date,
+		Keyrune:  strings.ToLower(set.KeyruneCode),
+		Size:     len(set.Cards),
+		FmtDate:  set.ReleaseDate,
+		Special:  special,
+		ShowFin:  !set.IsNonFoilOnly && !set.IsFoilOnly,
+		HasReg:   !set.IsFoilOnly,
+		HasFoil:  !set.IsNonFoilOnly,
+		Rarities: rarities,
+		Colors:   colors,
 	}
 }
 
