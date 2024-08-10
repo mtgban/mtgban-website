@@ -800,6 +800,18 @@ Sims are not required for pre-constructed decks and other products where the sam
                         </tr>
                     {{end}}
 
+                    <svg height="0" width="0" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="gradient-foil" x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(45)">
+                                <stop offset="4%"   stop-color="#ea8d66" />
+                                <stop offset="18%"  stop-color="#fdef8a" />
+                                <stop offset="42%"  stop-color="#8bcc93" />
+                                <stop offset="63%"  stop-color="#a6dced" />
+                                <stop offset="100%" stop-color="#e599c2" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+
                     {{range $cardId := .AllKeys}}
                         {{$card := (index $.Metadata $cardId)}}
                         {{if eq $firstImg ""}}
@@ -817,6 +829,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 <span class="small-hidden-text" aria-hidden="true">{{$card.SetCode}}</span>
                                                 {{if $card.Keyrune}}
                                                     <i class="ss {{$card.Keyrune}} ss-2x ss-fw"></i>
+                                                {{else if $card.RarityColor}}
+                                                    <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" style="margin: 4px 0 0 0">
+                                                        <circle r="15" cx="16" cy="16" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
+                                                        <text font-size="20" x="50%" y="60%" text-anchor="middle" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                                    </svg>
                                                 {{else}}
                                                     <h3>{{$card.SetCode}}&nbsp;</h3>
                                                 {{end}}

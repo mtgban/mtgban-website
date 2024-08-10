@@ -27,6 +27,18 @@ var Country2flag = map[string]string{
 	"JP": "🇯🇵",
 }
 
+var colorRarityMap = map[string]map[string]string{
+	"Lorcana": {
+		"common":    "var(--normal)",
+		"uncommon":  "#707883",
+		"rare":      "#CD7F32",
+		"superrare": "#C0C0C0",
+		"legendary": "#FFD700",
+		"special":   "#652978",
+		"enchanted": "#03A9FC",
+	},
+}
+
 type GenericCard struct {
 	UUID      string
 	Name      string
@@ -52,6 +64,7 @@ type GenericCard struct {
 	Booster   bool
 	HasDeck   bool
 
+	RarityColor  string
 	ScryfallURL  string
 	CKRestockURL string
 	SourceSealed []string
@@ -333,7 +346,11 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 
 			keyruneCode := strings.ToLower(set.KeyruneCode)
 			if keyruneCode == "" {
-				printings += fmt.Sprintf(`<h4>[%s] %s</h4>`, setCode, set.Name)
+				printings += fmt.Sprintf(`
+                    <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+                        <circle r="15" cx="16" cy="16" fill="var(--normal)"/>
+                        <text font-size="20" x="50%%" y="60%%" text-anchor="middle" fill="var(--background)">%s</text>
+                    </svg>`, setCode)
 			} else {
 				printings += fmt.Sprintf(`<i class="ss ss-%s ss-2x"></i>`, keyruneCode)
 			}
@@ -443,6 +460,12 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		scryfallURL = "https://scryfall.com/card/" + strings.ToLower(co.SetCode) + "/" + co.Number
 	}
 
+	var rarityColor string
+	keyrune := keyruneForCardSet(cardId)
+	if keyrune == "" {
+		rarityColor = colorRarityMap[Config.Game][co.Rarity]
+	}
+
 	return GenericCard{
 		UUID:      co.UUID,
 		Name:      name,
@@ -468,6 +491,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		Booster:   canBoosterGen,
 		HasDeck:   hasDecklist,
 
+		RarityColor:  rarityColor,
 		ScryfallURL:  scryfallURL,
 		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
