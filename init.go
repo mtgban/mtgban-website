@@ -752,7 +752,9 @@ func updateStaticData() {
 
 	// Load prices for API users
 	if !DevMode {
-		go prepareCKAPI()
+		if Config.Game == "" {
+			go prepareCKAPI()
+		}
 	}
 
 	LastUpdate = time.Now().Format(time.RFC3339)
