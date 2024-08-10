@@ -325,6 +325,7 @@ func init() {
 var Config struct {
 	Port                   string            `json:"port"`
 	DatastorePath          string            `json:"datastore_path"`
+	Game                   string            `json:"game"`
 	DBAddress              string            `json:"db_address"`
 	RedisAddr              string            `json:"redis_addr"`
 	DiscordHook            string            `json:"discord_hook"`

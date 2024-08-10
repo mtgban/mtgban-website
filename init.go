@@ -585,6 +585,9 @@ func loadOptions() {
 		if err != nil {
 			continue
 		}
+		if scraper.Info().Game != Config.Game {
+			continue
+		}
 
 		// Custom untangling
 		for _, keepers := range [][]string{opt.Keepers, opt.KeepersBL} {
@@ -626,13 +629,17 @@ func loadScrapers() {
 			continue
 		}
 
-		log.Println("Initializing " + key)
 		scraper, err := opt.Init(opt.Logger)
 		if err != nil {
 			msg := fmt.Sprintf("error initializing %s: %s", key, err.Error())
 			ServerNotify("init", msg, true)
 			continue
 		}
+		if scraper.Info().Game != Config.Game {
+			continue
+		}
+
+		log.Println("Initialized " + key)
 
 		ScraperMap[scraper.Info().Shorthand] = key
 		ScraperNames[scraper.Info().Shorthand] = scraper.Info().Name
