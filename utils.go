@@ -216,6 +216,24 @@ func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 	return nil, errors.New("vendor not found")
 }
 
+// Look for a TCGproductId in all available places
+func findTCGproductId(cardId string) {
+	co, err := mtgmatcher.GetUUID(cardId)
+	if err != nil {
+		return ""
+	}
+
+	tcgId := co.Identifiers["tcgplayerProductId"]
+	if co.Etched {
+		id, found := co.Identifiers["tcgplayerEtchedProductId"]
+		if found {
+			tcgId = id
+		}
+	}
+
+	return tcgId
+}
+
 func uuid2card(cardId string, flags ...bool) GenericCard {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
@@ -387,10 +405,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		}
 	}
 
-	tcgId := co.Card.Identifiers["tcgplayerProductId"]
-	if co.Etched {
-		tcgId = co.Card.Identifiers["tcgplayerEtchedProductId"]
-	}
+	tcgId := findTCGproductId(co.UUID)
 
 	// Retrieve the CK URL from the in memory api list, which uses mtgjson ids
 	var restockURL string

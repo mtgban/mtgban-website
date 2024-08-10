@@ -345,13 +345,7 @@ func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
 	switch mode {
 	case "tcg":
 		return func(co *mtgmatcher.CardObject) string {
-			if co.Etched {
-				id, found := co.Identifiers["tcgplayerEtchedProductId"]
-				if found {
-					return id
-				}
-			}
-			return co.Identifiers["tcgplayerProductId"]
+			return findTCGproductId(co.UUID)
 		}
 	case "scryfall":
 		return func(co *mtgmatcher.CardObject) string {
@@ -717,10 +711,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 			}
 		}
 
-		tcgId := co.Identifiers["tcgplayerProductId"]
-		if co.Etched {
-			tcgId = co.Identifiers["tcgplayerEtchedProductId"]
-		}
+		tcgId := findTCGproductId(co.UUID)
 
 		for scraper, entry := range pm[id] {
 			prices := []float64{entry.Regular, entry.Foil, entry.Etched, entry.Sealed}

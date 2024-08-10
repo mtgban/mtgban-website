@@ -699,14 +699,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	if lastSold {
 		title = "TCG Last Sold prices for " + card.Name
 
-		tcgId := co.Identifiers["tcgplayerProductId"]
-		if co.Etched {
-			id, found := co.Identifiers["tcgplayerEtchedProductId"]
-			if found {
-				tcgId = id
-			}
-		}
-
+		tcgId := findTCGproductId(co.UUID)
 		productId, _ := strconv.Atoi(tcgId)
 		printing := "Normal"
 		if co.Etched || co.Foil {

@@ -28,7 +28,6 @@ import (
 	cron "gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 type PageVars struct {
@@ -811,18 +810,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return entries[0].OriginalId
 		},
 		"uuid2tcgid": func(s string) string {
-			co, err := mtgmatcher.GetUUID(s)
-			if err != nil {
-				return ""
-			}
-			tcgId := co.Identifiers["tcgplayerProductId"]
-			if co.Etched {
-				id, found := co.Identifiers["tcgplayerEtchedProductId"]
-				if found {
-					tcgId = id
-				}
-			}
-			return tcgId
+			return findTCGproductId(s)
 		},
 		"isSussy": func(m map[string]float64, s string) bool {
 			_, found := m[s]
