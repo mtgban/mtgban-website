@@ -175,7 +175,11 @@ func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
 	outSeller := mtgban.NewSellerFromInventory(inv, seller.Info())
 
 	// Save seller in global array
-	Sellers[i] = outSeller
+	if i < 0 {
+		Sellers = append(Sellers, outSeller)
+	} else {
+		Sellers[i] = outSeller
+	}
 
 	return nil
 }
@@ -235,7 +239,11 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
 	outVendor := mtgban.NewVendorFromBuylist(bl, vendor.Info())
 
 	// Save vendor in global array
-	Vendors[i] = outVendor
+	if i < 0 {
+		Vendors = append(Vendors, outVendor)
+	} else {
+		Vendors[i] = outVendor
+	}
 
 	return nil
 }
