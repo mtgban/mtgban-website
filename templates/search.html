@@ -617,14 +617,16 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 <div id="printings" style="text-align: center; max-width:354px; display: block;"></div>
                             </td>
                         </tr>
-                        <tr>
-                            <td>
-                                <center>
-                                    <h4>Available in</h4>
-                                </center>
-                                <div id="products" style="text-align: center; max-width:354px; display: block;"></div>
-                            </td>
-                        </tr>
+                        {{if .HasAvailable}}
+                            <tr>
+                                <td>
+                                    <center>
+                                        <h4>Available in</h4>
+                                    </center>
+                                    <div id="products" style="text-align: center; max-width:354px; display: block;"></div>
+                                </td>
+                            </tr>
+                        {{end}}
                     {{else}}
                         <tr class="no-hover" style="background-color: var(--background)">
                             <td>
@@ -641,14 +643,16 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 {{end}}
                             </td>
                         </tr>
-                        <tr>
-                            <td>
-                                <center>
-                                    <h4>Available in</h4>
-                                </center>
-                                <div id="products" style="text-align: center; max-width:354px; display: block;"></div>
-                            </td>
-                        </tr>
+                        {{if .HasAvailable}}
+                            <tr>
+                                <td>
+                                    <center>
+                                        <h4>Available in</h4>
+                                    </center>
+                                    <div id="products" style="text-align: center; max-width:354px; display: block;"></div>
+                                </td>
+                            </tr>
+                        {{end}}
                         {{if not (eq .Alternative "")}}
                             <tr>
                                 <td>
@@ -848,7 +852,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             <td rowspan=2>
                                                 <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>
                                             </td>
-                                        {{else}}
+                                        {{else if $.HasAvailable}}
                                             <td rowspan=2>
                                                 <a href='/sealed?q=container:"{{$card.Name}}"' title="Search which products can contain a reprint"><span class="emoji">📖</span></a>
                                             </td>

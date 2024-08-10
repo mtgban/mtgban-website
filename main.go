@@ -70,6 +70,7 @@ type PageVars struct {
 	Metadata     map[string]GenericCard
 	PromoTags    []string
 	NoSort       bool
+	HasAvailable bool
 
 	CanShowAll       bool
 	CleanSearchQuery string

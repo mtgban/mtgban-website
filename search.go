@@ -118,6 +118,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				Class:  "selected",
 			},
 		})
+		pageVars.HasAvailable = true
 	}
 
 	page := r.FormValue("page")
