@@ -538,6 +538,38 @@ var ScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
+
+	/* LORCANA SECTION */
+	"tcg_lorcana_index": &scraperOption{
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper, err := tcgplayer.NewLorcanaIndex(Config.Api["tcg_public"], Config.Api["tcg_private"])
+			if err != nil {
+				return nil, err
+			}
+			scraper.Affiliate = Config.Affiliate["TCG"]
+			scraper.LogCallback = logger.Printf
+			scraper.MaxConcurrency = 4
+			return scraper, nil
+		},
+		Keepers: []string{
+			TCG_LOW,
+			TCG_MARKET,
+		},
+	},
+	"tcg_lorcana": &scraperOption{
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper, err := tcgplayer.NewLorcanaScraper(Config.Api["tcg_public"], Config.Api["tcg_private"])
+			if err != nil {
+				return nil, err
+			}
+			scraper.Affiliate = Config.Affiliate["TCG"]
+			scraper.LogCallback = logger.Printf
+			scraper.MaxConcurrency = 6
+			return scraper, nil
+		},
+	},
 }
 
 // Associate Scraper shorthands to ScraperOptions keys
