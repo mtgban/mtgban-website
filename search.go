@@ -121,6 +121,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.HasAvailable = true
 	}
 
+	if Config.Game != "" {
+		pageVars.DisableChart = true
+	}
+
 	page := r.FormValue("page")
 	if page == "options" {
 		pageVars.Title = "Options"
