@@ -557,10 +557,13 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{end}}
                     document.getElementById('printings').innerHTML = printings;
 
-                    if (products === "") {
-                        products = "n/a"
+                    let productDiv = document.getElementById('products');
+                    if (productDiv) {
+                        if (products === "") {
+                            products = "n/a"
+                        }
+                        productDiv.innerHTML = products;
                     }
-                    document.getElementById('products').innerHTML = products;
                 }
 
                 function getLastSold(uuid) {
