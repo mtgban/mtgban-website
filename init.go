@@ -62,10 +62,10 @@ const (
 
 	SkipRefreshCooldown    = 2 * time.Hour
 	DefaultUploaderTimeout = 60 * time.Second
-
-	InventoryDir = "cache_inv"
-	BuylistDir   = "cache_bl"
 )
+
+var InventoryDir string
+var BuylistDir string
 
 func loadDatastore() error {
 	allPrintingsReader, err := os.Open(Config.DatastorePath)

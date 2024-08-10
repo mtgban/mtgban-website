@@ -522,6 +522,9 @@ func loadVars(cfg string) error {
 		os.Setenv("BAN_SECRET", DefaultSecret)
 	}
 
+	InventoryDir = path.Join("cache_inv", Config.Game)
+	BuylistDir = path.Join("cache_bl", Config.Game)
+
 	return nil
 }
 
