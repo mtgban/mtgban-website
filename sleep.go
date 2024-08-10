@@ -75,13 +75,13 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	page := r.FormValue("page")
 	switch page {
 	default:
-		pageVars.Title = "Index"
+		pageVars.Subtitle = "Index"
 
 		render(w, "sleep.html", pageVars)
 
 		return
 	case "options":
-		pageVars.Title = "Options"
+		pageVars.Subtitle = "Options"
 
 		for _, seller := range Sellers {
 			if seller == nil ||
@@ -114,16 +114,16 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 		return
 	case "bulk":
-		pageVars.Title = "Bulk me up"
+		pageVars.Subtitle = "Bulk me up"
 
 		tiers = getBulks(skipEditions)
 
 	case "reprint":
-		pageVars.Title = "Long time no reprint"
+		pageVars.Subtitle = "Long time no reprint"
 
 		tiers = getReprints(skipEditions)
 	case "mismatch":
-		pageVars.Title = "Market Mismatch"
+		pageVars.Subtitle = "Market Mismatch"
 
 		tiers = getTiers(blocklistRetail, blocklistBuylist, skipEditions)
 	}

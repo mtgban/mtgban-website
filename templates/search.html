@@ -29,7 +29,9 @@
         <meta name="twitter:data2" content="{{if .Embed.BuylistPrice}}{{printf "$ %.2f" .Embed.BuylistPrice}}{{else}}N/A{{end}}" />
     {{end}}
 
-    <title>{{.Title}}</title>
+    <title>
+        {{.Title}}{{if .CleanSearchQuery}}: {{.CleanSearchQuery}}{{end}}
+    </title>
         <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     {{if not (eq .ChartID "")}}
@@ -251,7 +253,7 @@
 
     {{else}}
         <h1>
-            Welcome to BAN {{if .IsSealed}}Sealed{{else}}{{if not (eq .ChartID "")}}Chart{{end}} Search{{end}}
+            Welcome to {{$.Title}}
 
             {{if .TotalUnique}}
                 -

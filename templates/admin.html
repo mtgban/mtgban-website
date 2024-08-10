@@ -3,7 +3,7 @@
 <head>
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
-    <title>BAN Admin - {{.Title}}</title>
+    <title>{{.Title}}</title>
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
@@ -45,7 +45,7 @@
     {{if ne .ErrorMessage ""}}
         <h1>{{.ErrorMessage}}</h1>
     {{else}}
-        <h1>Welcome to BAN Admin</h1>
+        <h1>Welcome to {{.Title}}</h1>
 
         <div class="indent">
             {{if .SelectableField}}

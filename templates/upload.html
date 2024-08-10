@@ -50,7 +50,7 @@
             <img class="center" src="/img/promo/search.jpg">
         {{end}}
     {{else}}
-        <h1>Welcome to BAN Upload</h1>
+        <h1>Welcome to {{.Title}}</h1>
         <div class="indent">
             <center>
                 <form {{if not .CardHashes}}enctype="multipart/form-data"{{end}} action="/upload" method="post" id="upload_form">

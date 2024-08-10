@@ -4,7 +4,7 @@
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
-    <title>BAN {{.Title}}</title>
+    <title>{{.Title}} - {{.Subtitle}}</title>
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
@@ -49,9 +49,8 @@
             <img class="center" src="/img/promo/arbit.jpg">
         {{end}}
 
-    {{else if eq .Title "Index"}}
-
-        <h1>Welcome to BAN Sleepers</h1>
+    {{else if eq .Subtitle "Index"}}
+        <h1>Welcome to {{.Title}}</h1>
         <div class="indent" style="max-width: 85%;">
             <br>
             <h3>
@@ -83,7 +82,7 @@
             </ul>
         </div>
 
-    {{else if eq .Title "Options"}}
+    {{else if eq .Subtitle "Options"}}
         <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
         <br>
 

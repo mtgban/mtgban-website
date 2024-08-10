@@ -88,6 +88,7 @@ type PageVars struct {
 	ReverseMode    bool
 
 	Page         string
+	Subtitle     string
 	ToC          []NewspaperPage
 	Headings     []Heading
 	Cards        []GenericCard

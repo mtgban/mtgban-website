@@ -4,7 +4,7 @@
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
-    <title>BAN Newspaper - {{.Title}}</title>
+    <title>{{.Title}} - {{.Subtitle}}</title>
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
@@ -49,7 +49,7 @@
             <img class="center" src="/img/promo/news.jpg">
         {{end}}
     {{else}}
-        <h1>Welcome to BAN Newspaper{{if .IsOneDay}}, <i>early edition</i>{{end}}</h1>
+        <h1>Welcome to {{.Title}}{{if .IsOneDay}}, <i>early edition</i>{{end}}</h1>
         <p class=indent>Published on {{.LastUpdate}}</p>
         <div class="indent" style="max-width: 1000px;">
             <h2>Table of contents</h2>
@@ -64,7 +64,7 @@
 
         <div style="clear:both;"></div>
 
-        {{if eq .Title "Index"}}
+        {{if eq .Subtitle "Index"}}
             <div class="indent" style="max-width: 900px;">
                 <br>
                 <p class="indent">
@@ -113,7 +113,7 @@
                 <br>
 
             </div>
-        {{else if eq .Title "Options"}}
+        {{else if eq .Subtitle "Options"}}
             <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
             <br>
 
@@ -161,7 +161,7 @@
 
             <div style="clear:both;">
                 <div style="float:left;">
-                    <h1>{{.Title}}</h1>
+                    <h1>{{.Subtitle}}</h1>
                 </div>
                 <div style="float:left; padding:18px 0 0 120px; margin:auto">
                     <form action="newspaper" method="GET">

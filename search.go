@@ -195,17 +195,22 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Override the query when chart is requested
 		query = chartId
+		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
 	}
 
 	// If query is empty there is nothing to do
 	if query == "" {
 		// Hijack sealed list
 		if pageVars.IsSealed {
+			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
+
 			pageVars.EditionSort = SealedEditionsSorted
 			pageVars.EditionList = SealedEditionsList
 			render(w, "search.html", pageVars)
 			return
 		} else if pageVars.IsSets {
+			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Editions", 1)
+
 			pageVars.EditionSort = TreeEditionsKeys
 			pageVars.EditionList = TreeEditionsMap
 			pageVars.TotalSets = TotalSets
@@ -253,6 +258,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
+		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
 	}
 
 	if config.SortMode != "" {
@@ -400,11 +406,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// was searched and no options were specified for it
 	pageVars.CanShowAll = cleanQuery != "" && canShowAll
 	pageVars.CleanSearchQuery = cleanQuery
-
-	// Update page title
-	if cleanQuery != "" {
-		pageVars.Title += ": " + cleanQuery
-	}
 
 	// Save stats
 	pageVars.TotalUnique = len(allKeys)

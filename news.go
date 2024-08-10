@@ -585,13 +585,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	switch page {
 	case "":
-		pageVars.Title = "Index"
-
 		render(w, "news.html", pageVars)
 
 		return
 	case "options":
-		pageVars.Title = "Options"
+		pageVars.Subtitle = "Options"
 
 		pageVars.Editions = AllEditionsKeys
 		pageVars.EditionsMap = AllEditionsMap
@@ -721,7 +719,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	for _, newspage := range NewspaperPages {
 		if newspage.Option == page {
 			pageVars.Page = newspage.Option
-			pageVars.Title = newspage.Title
+			pageVars.Subtitle = newspage.Title
 			pageVars.InfoMessage = newspage.Desc
 			pageVars.Headings = newspage.Head
 			pageVars.LargeTable = newspage.Large
