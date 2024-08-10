@@ -108,15 +108,17 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	pageVars.Nav = insertNavBar("Sets", pageVars.Nav, []NavElem{
-		NavElem{
-			Name:   "Sealed",
-			Short:  "🧱",
-			Link:   "/sealed",
-			Active: pageVars.IsSealed,
-			Class:  "selected",
-		},
-	})
+	if len(mtgmatcher.GetSealedUUIDs()) > 0 {
+		pageVars.Nav = insertNavBar("Sets", pageVars.Nav, []NavElem{
+			NavElem{
+				Name:   "Sealed",
+				Short:  "🧱",
+				Link:   "/sealed",
+				Active: pageVars.IsSealed,
+				Class:  "selected",
+			},
+		})
+	}
 
 	page := r.FormValue("page")
 	if page == "options" {
