@@ -217,7 +217,7 @@ func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 }
 
 // Look for a TCGproductId in all available places
-func findTCGproductId(cardId string) {
+func findTCGproductId(cardId string) string {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
 		return ""
@@ -228,6 +228,17 @@ func findTCGproductId(cardId string) {
 		id, found := co.Identifiers["tcgplayerEtchedProductId"]
 		if found {
 			tcgId = id
+		}
+	}
+	if tcgId == "" {
+		tcgLow, _ := findSellerInventory(TCG_LOW)
+		entries, found := tcgLow[cardId]
+		if !found {
+			tcgMarket, _ := findSellerInventory(TCG_MARKET)
+			entries, found = tcgMarket[co.UUID]
+		}
+		if found {
+			tcgId = entries[0].OriginalId
 		}
 	}
 
