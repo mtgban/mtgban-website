@@ -460,6 +460,11 @@ func genPageNav(activeTab, sig string) PageVars {
 		Hash:         BuildCommit,
 	}
 
+	// Append which game this site is for
+	if Config.Game != "" {
+		pageVars.Title += " - " + Config.Game
+	}
+
 	// Allocate a new navigation bar
 	pageVars.Nav = make([]NavElem, len(DefaultNav))
 	copy(pageVars.Nav, DefaultNav)
