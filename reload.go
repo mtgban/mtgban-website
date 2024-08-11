@@ -52,6 +52,9 @@ func reload(name string) {
 		ServerNotify("refresh", msg, true)
 		return
 	}
+	if scraper.Info().Game != Config.Game {
+		return
+	}
 
 	newbc := mtgban.NewClient()
 
