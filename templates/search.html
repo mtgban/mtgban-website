@@ -1105,7 +1105,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{end}}
                 </table>
                 {{if eq $firstImg ""}}
-                    {{$firstImg = "https://cards.scryfall.io/back.png"}}
+                    {{$firstImg = $.CardBackURL}}
                 {{end}}
                 {{if .IsSealed}}
                     {{$firstImg = $emptyImg}}

@@ -71,6 +71,7 @@ type PageVars struct {
 	PromoTags    []string
 	NoSort       bool
 	HasAvailable bool
+	CardBackURL  string
 
 	CanShowAll       bool
 	CleanSearchQuery string
@@ -467,6 +468,13 @@ func genPageNav(activeTab, sig string) PageVars {
 
 		// Charts are available only for one game
 		pageVars.DisableChart = true
+	}
+
+	switch Config.Game {
+	case mtgban.GameMagic:
+		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
+	case mtgban.GameLorcana:
+		pageVars.CardBackURL = "img/backs/lorcana.webp"
 	}
 
 	// Allocate a new navigation bar
