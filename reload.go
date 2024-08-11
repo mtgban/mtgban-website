@@ -10,52 +10,23 @@ import (
 )
 
 func reloadCK() {
-	reloadSingle("cardkingdom")
+	reload("cardkingdom")
 }
 
 func reloadSCG() {
-	reloadSingle("starcitygames")
-}
-
-func reloadSingle(name string) {
-	defer recoverPanicScraper()
-
-	ServerNotify("refresh", "Reloading "+name)
-
-	// Lock because we plan to load both sides of the scraper
-	ScraperOptions[name].Mutex.Lock()
-	ScraperOptions[name].Busy = true
-	defer func() {
-		ScraperOptions[name].Busy = false
-		ScraperOptions[name].Mutex.Unlock()
-	}()
-
-	scraper, err := ScraperOptions[name].Init(ScraperOptions[name].Logger)
-	if err != nil {
-		msg := fmt.Sprintf("error initializing %s: %s", name, err.Error())
-		ServerNotify("refresh", msg, true)
-		return
-	}
-
-	// These functions will update the global scraper only if it was
-	// previously added to the slice of Sellers or Vendors via the
-	// client Register functions
-	updateSellers(scraper)
-	updateVendors(scraper)
-
-	ServerNotify("refresh", name+" refresh completed")
+	reload("starcitygames")
 }
 
 func reloadTCG() {
-	reloadMarketOrTrader("tcg_index")
-	reloadMarketOrTrader("tcg_market")
+	reload("tcg_index")
+	reload("tcg_market")
 
-	reloadSingle("tcg_directnet")
+	reload("tcg_directnet")
 
 	ServerNotify("refresh", "tcg fully refreshed")
 }
 
-func reloadMarketOrTrader(name string) {
+func reload(name string) {
 	defer recoverPanicScraper()
 
 	ServerNotify("refresh", "Reloading "+name)
@@ -117,7 +88,7 @@ func reloadMarketOrTrader(name string) {
 		updateVendors(vendor)
 	}
 
-	ServerNotify("refresh", name+" market refresh completed")
+	ServerNotify("refresh", name+" refresh completed")
 }
 
 func updateSellers(scraper mtgban.Scraper) {

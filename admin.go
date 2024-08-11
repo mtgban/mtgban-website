@@ -85,10 +85,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 						"msg": {key + " is already being refreshed"},
 					}
 					r.URL.RawQuery = v.Encode()
-				} else if len(ScraperOptions[key].Keepers) > 0 || len(ScraperOptions[key].KeepersBL) > 0 {
-					go reloadMarketOrTrader(key)
 				} else {
-					go reloadSingle(key)
+					go reload(key)
 				}
 
 				http.Redirect(w, r, r.URL.String(), http.StatusFound)
