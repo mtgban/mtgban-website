@@ -461,9 +461,12 @@ func genPageNav(activeTab, sig string) PageVars {
 		Hash:         BuildCommit,
 	}
 
-	// Append which game this site is for
 	if Config.Game != "" {
+		// Append which game this site is for
 		pageVars.Title += " - " + Config.Game
+
+		// Charts are available only for one game
+		pageVars.DisableChart = true
 	}
 
 	// Allocate a new navigation bar
