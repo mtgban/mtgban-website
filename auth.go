@@ -451,7 +451,18 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			q.Set("Expires", exp)
 		}
 
-		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
+		// Allow any subdomain from ban
+		u, err := url.Parse(getBaseURL(r))
+		if err != nil {
+			log.Println("API error, invalid URL", err)
+			w.Write([]byte(`{"error": "invalid URL"}`))
+			return
+		}
+		if !strings.Contains(u.Path, "localhost") && !strings.Contains(u.Path, "www") && strings.Contains(u.Path, "mtgban.com") {
+			u.Path = DefaultHost
+		}
+
+		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, u.String(), q.Encode())
 		valid := signHMACSHA1Base64([]byte(secret), []byte(data))
 
 		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
