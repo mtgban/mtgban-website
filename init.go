@@ -272,7 +272,7 @@ var ScraperOptions = map[string]*scraperOption{
 	},
 	"coolstuffinc": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := coolstuffinc.NewScraper()
+			scraper := coolstuffinc.NewScraper(coolstuffinc.GameMagic)
 			scraper.LogCallback = logger.Printf
 			scraper.Partner = Config.Affiliate["CSI"]
 			return scraper, nil
@@ -288,7 +288,7 @@ var ScraperOptions = map[string]*scraperOption{
 	},
 	"starcitygames": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := starcitygames.NewScraper(Config.Api["scg_guid"], Config.Api["scg_bearer"])
+			scraper := starcitygames.NewScraper(starcitygames.GameMagic, Config.Api["scg_guid"], Config.Api["scg_bearer"])
 			scraper.LogCallback = logger.Printf
 			scraper.Affiliate = Config.Affiliate["SCG"]
 			return scraper, nil
@@ -366,7 +366,7 @@ var ScraperOptions = map[string]*scraperOption{
 	},
 	"cardmarket": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper, err := cardmarket.NewScraperIndex(Config.Api["mkm_app_token"], Config.Api["mkm_app_secret"])
+			scraper, err := cardmarket.NewScraperIndex(cardmarket.GameIdMagic, Config.Api["mkm_app_token"], Config.Api["mkm_app_secret"])
 			if err != nil {
 				return nil, err
 			}
@@ -389,7 +389,7 @@ var ScraperOptions = map[string]*scraperOption{
 	},
 	"cardtrader": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper, err := cardtrader.NewScraperMarket(Config.Api["cardtrader"])
+			scraper, err := cardtrader.NewScraperMarket(cardtrader.GameIdMagic, Config.Api["cardtrader"])
 			if err != nil {
 				return nil, err
 			}
