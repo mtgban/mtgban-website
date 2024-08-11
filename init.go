@@ -570,6 +570,53 @@ var ScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
+	"coolstuffinc_lorcana": &scraperOption{
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := coolstuffinc.NewScraper(coolstuffinc.GameLorcana)
+			scraper.LogCallback = logger.Printf
+			scraper.Partner = Config.Affiliate["CSI"]
+			return scraper, nil
+		},
+	},
+	"starcitygames_lorcana": &scraperOption{
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := starcitygames.NewScraper(starcitygames.GameLorcana, Config.Api["scg_guid"], Config.Api["scg_bearer"])
+			scraper.LogCallback = logger.Printf
+			scraper.Affiliate = Config.Affiliate["SCG"]
+			return scraper, nil
+		},
+	},
+	"cardmarket_lorcana": &scraperOption{
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper, err := cardmarket.NewScraperIndex(cardmarket.GameIdLorcana, Config.Api["mkm_app_token"], Config.Api["mkm_app_secret"])
+			if err != nil {
+				return nil, err
+			}
+			scraper.Affiliate = Config.Affiliate["MKM"]
+			scraper.LogCallback = logger.Printf
+			return scraper, nil
+		},
+		Keepers: []string{MKM_LOW, MKM_TREND},
+	},
+	"cardtrader_lorcana": &scraperOption{
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper, err := cardtrader.NewScraperMarket(cardtrader.GameIdLorcana, Config.Api["cardtrader"])
+			if err != nil {
+				return nil, err
+			}
+			scraper.LogCallback = logger.Printf
+			scraper.ShareCode = Config.Affiliate["CT"]
+			return scraper, nil
+		},
+		Keepers: []string{
+			CT_STANDARD,
+			CT_ZERO,
+		},
+	},
 }
 
 // Associate Scraper shorthands to ScraperOptions keys
