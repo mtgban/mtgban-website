@@ -155,6 +155,8 @@ func fixupStoreCodeNG(code string) []string {
 			filters[i] = CT_STANDARD
 		case "CT0":
 			filters[i] = CT_ZERO
+		case "CT1DR":
+			filters[i] = CT_1DR
 		case "CTSealed":
 			filters[i] = CT_STANDARD_SEALED
 		case "CT0Sealed":

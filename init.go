@@ -57,6 +57,7 @@ const (
 	// from CT
 	CT_STANDARD        = "Card Trader"
 	CT_ZERO            = "Card Trader Zero"
+	CT_1DR             = "Card Trader 1DR"
 	CT_STANDARD_SEALED = "Card Trader Sealed"
 	CT_ZERO_SEALED     = "Card Trader Zero Sealed"
 
@@ -400,6 +401,7 @@ var ScraperOptions = map[string]*scraperOption{
 		Keepers: []string{
 			CT_STANDARD,
 			CT_ZERO,
+			CT_1DR,
 		},
 	},
 	"mtgseattle": &scraperOption{
