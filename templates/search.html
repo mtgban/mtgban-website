@@ -547,6 +547,7 @@ Sims are not required for pre-constructed decks and other products where the sam
 
         {{else}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
+            <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
 
             <script type="text/javascript">
                 function updateSidebar(src, printings, products) {
@@ -902,6 +903,19 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             <td rowspan=2>
                                                 <a href="javascript:getLastSold('{{$cardId}}')" title="Retrieve last sales on TCG" id="lastsolda{{$cardId}}"><span class="emoji">💸</span></a>
                                             </td>
+                                            {{$done := false}}
+                                            {{$condsEntry := (index $.FoundSellers $cardId)}}
+                                            {{range $conditions := $.CondKeys}}
+                                                {{$entries := (index $condsEntry $conditions)}}
+                                                {{range $entries}}
+                                                    {{if and (not $done) (eq .ScraperName "TCGplayer Direct")}}
+                                                        <td rowspan=2>
+                                                            <span class="emoji" style="cursor: pointer;" onclick="getDirectQty(this,'{{$cardId}}')" title="Update quantities for TCG Direct" id="directqty-{{$cardId}}">⚡️</span>
+                                                        </td>
+                                                        {{$done = true}}
+                                                    {{end}}
+                                                {{end}}
+                                            {{end}}
                                         {{end}}
                                         {{if and (not $.DisableChart) (eq $.ChartID "")}}
                                             <td rowspan=2>
@@ -1004,7 +1018,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         {{if not $.IsSealed}}
                                                             <td></td>
                                                         {{end}}
-                                                        <td style="text-align: center; vertical-align: middle;">
+                                                        <td style="text-align: center; vertical-align: middle;" {{if eq .Shorthand "TCG Direct"}}id="qty-{{.Shorthand}}-{{$conditions}}-{{$cardId}}"{{end}}>
                                                             {{if .BundleIcon}}
                                                                 <img style="padding-top:4px;" src="{{.BundleIcon}}">
                                                             {{else if not .NoQuantity}}
