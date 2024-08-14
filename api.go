@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -196,11 +197,39 @@ func getLastSold(cardId string) ([]tcgplayer.LatestSalesData, error) {
 	return latestSales.Data, nil
 }
 
-func TCGLastSoldAPI(w http.ResponseWriter, r *http.Request) {
-	cardId := strings.TrimPrefix(r.URL.Path, "/api/tcgplayer/lastsold/")
-	UserNotify("tcgLastSold", cardId)
+func getDrirectQty(cardId string) ([]tcgplayer.ListingData, error) {
+	tcgProductId := findTCGproductId(cardId)
+	if tcgProductId == "" {
+		return nil, ErrMissingTCGId
+	}
 
-	data, err := getLastSold(cardId)
+	tcgId, err := strconv.Atoi(tcgProductId)
+	if err != nil {
+		return nil, err
+	}
+
+	return tcgplayer.GetDirectQtysForProductId(tcgId, true), nil
+}
+
+func TCGHandler(w http.ResponseWriter, r *http.Request) {
+	isLastSold := strings.Contains(r.URL.Path, "lastsold")
+	isDirectQty := strings.Contains(r.URL.Path, "directqty")
+
+	cardId := r.URL.Path
+	cardId = strings.TrimPrefix(cardId, "/api/tcgplayer/lastsold/")
+	cardId = strings.TrimPrefix(cardId, "/api/tcgplayer/directqty/")
+
+	var data any
+	var err error
+	if isLastSold {
+		UserNotify("tcgLastSold", cardId)
+		data, err = getLastSold(cardId)
+	} else if isDirectQty {
+		UserNotify("tcgDirectQty", cardId)
+		data, err = getDrirectQty(cardId)
+	} else {
+		err = errors.New("invalid endpoint")
+	}
 	if err != nil {
 		log.Println(err)
 		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
