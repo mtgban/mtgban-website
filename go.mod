@@ -14,12 +14,12 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/mackerelio/go-osstat v0.2.4
-	github.com/mtgban/go-mtgban v0.0.0-20240813205238-1040d8aa2d22
+	github.com/mtgban/go-mtgban v0.0.0-20240819044727-0680ae4de971
 	github.com/xuri/excelize/v2 v2.8.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/oauth2 v0.13.0
 	golang.org/x/sys v0.20.0
-	golang.org/x/time v0.3.0
+	golang.org/x/time v0.6.0
 	google.golang.org/api v0.147.0
 	gopkg.in/Iwark/spreadsheet.v2 v2.0.0-20230915040305-7677e8164883
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
@@ -64,6 +64,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
+	github.com/mtgban/go-tcgplayer v0.0.0-20240818123426-d44ea5a8db11 // indirect
 	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
