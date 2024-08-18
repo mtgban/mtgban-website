@@ -308,6 +308,35 @@ func Search(w http.ResponseWriter, r *http.Request) {
 						Values: []string{"promo"},
 					})
 				}
+			case "hidePrelPack":
+				var skipOption bool
+				for _, filter := range config.CardFilters {
+					if (filter.Name == "is" && !filter.Negate) || (filter.Name == "not" && filter.Negate) {
+						for _, value := range filter.Values {
+							switch value {
+							case "promo", "promopack", "prerelease", "playpromo":
+								skipOption = true
+							}
+						}
+					}
+				}
+				if !skipOption {
+					config.CardFilters = append(config.CardFilters, FilterElem{
+						Name:   "is",
+						Negate: true,
+						Values: []string{"prerelease"},
+					})
+					config.CardFilters = append(config.CardFilters, FilterElem{
+						Name:   "is",
+						Negate: true,
+						Values: []string{"promopack"},
+					})
+					config.CardFilters = append(config.CardFilters, FilterElem{
+						Name:   "is",
+						Negate: true,
+						Values: []string{"playpromo"},
+					})
+				}
 			// Skip non-NM buylist prices
 			case "hideBLconds":
 				config.EntryFilters = append(config.EntryFilters, FilterEntryElem{
