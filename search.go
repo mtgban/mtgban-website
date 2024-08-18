@@ -293,9 +293,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			case "hidePromos":
 				var skipOption bool
 				for _, filter := range config.CardFilters {
-					if filter.Name == "is" {
+					if (filter.Name == "is" && !filter.Negate) || (filter.Name == "not" && filter.Negate) {
 						for _, value := range filter.Values {
-							if value == "promo" && !filter.Negate {
+							if value == "promo" {
 								skipOption = true
 							}
 						}
