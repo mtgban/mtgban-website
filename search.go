@@ -29,6 +29,7 @@ const (
 	TooLongMessage    = "Your query planeswalked away, try a shorter one"
 	TooManyMessage    = "Too many results, try adjusting your filters"
 	NoResultsMessage  = "No results found"
+	NoPromosMessage   = "No results found! Remember some promos may be hidden"
 	NoCardsMessage    = "No cards found"
 
 	MaxSearchTotalResults = 10000
@@ -430,6 +431,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Early exit if there no matches are found
 	if len(allKeys) == 0 {
 		pageVars.InfoMessage = NoResultsMessage
+		for _, optName := range strings.Split(miscSearchOpts, ",") {
+			switch optName {
+			case "hidePromos", "hidePrelPack":
+				pageVars.InfoMessage = NoPromosMessage
+			}
+		}
 		render(w, "search.html", pageVars)
 		return
 	}
