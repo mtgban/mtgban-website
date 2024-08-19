@@ -25,7 +25,6 @@ import (
 	"github.com/mtgban/go-mtgban/magiccorner"
 	"github.com/mtgban/go-mtgban/miniaturemarket"
 	"github.com/mtgban/go-mtgban/mtgseattle"
-	"github.com/mtgban/go-mtgban/ninetyfive"
 	"github.com/mtgban/go-mtgban/sealedev"
 	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/strikezone"
@@ -276,14 +275,6 @@ var ScraperOptions = map[string]*scraperOption{
 			scraper := coolstuffinc.NewScraper(coolstuffinc.GameMagic)
 			scraper.LogCallback = logger.Printf
 			scraper.Partner = Config.Affiliate["CSI"]
-			return scraper, nil
-		},
-	},
-	"ninetyfive": &scraperOption{
-		OnlySeller: true,
-		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper, _ := ninetyfive.NewScraper(false)
-			scraper.LogCallback = logger.Printf
 			return scraper, nil
 		},
 	},
