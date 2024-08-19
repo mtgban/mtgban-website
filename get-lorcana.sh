@@ -2,7 +2,7 @@
 
 curl -O "https://lorcanajson.org/files/current/en/allCards.json.zip"
 
-7z x allCards.json.zip
+7z x -y allCards.json.zip
 
 if [[ $? == 0 ]]
 then
