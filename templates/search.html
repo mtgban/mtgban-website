@@ -1069,9 +1069,13 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                     </a>
                                                 </td>
                                                 <td {{if .Credit}}title="Credit: $ {{printf "%.2f" .Credit}}"{{end}}>
-                                                    $ {{printf "%.2f" .Price}}
-                                                    {{if .IsSussy}}
-                                                        <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if .SusPrice}}${{printf "%.2f" .SusPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                    {{if ne .Shorthand "SYP"}}
+                                                        $ {{printf "%.2f" .Price}}
+                                                        {{if .IsSussy}}
+                                                            <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if .SusPrice}}${{printf "%.2f" .SusPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                        {{end}}
+                                                    {{else}}
+                                                        # {{.Quantity}}
                                                     {{end}}
                                                 </td>
                                                 <td style="text-align: center; vertical-align: middle;">
