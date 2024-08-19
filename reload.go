@@ -131,9 +131,6 @@ func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
 	if err != nil {
 		return err
 	}
-	if len(inv) == 0 {
-		return errors.New("empty inventory")
-	}
 
 	// Do not update in case the new inventory wasn't completely loaded
 	// for example due to API problems
@@ -194,9 +191,6 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
 	bl, err := vendor.Buylist()
 	if err != nil {
 		return err
-	}
-	if len(bl) == 0 {
-		return errors.New("empty buylist")
 	}
 
 	// Do not update in case the new inventory wasn't completely loaded
