@@ -610,6 +610,21 @@ var ScraperOptions = map[string]*scraperOption{
 			CT_ZERO,
 		},
 	},
+	"strikezone_lorcana": &scraperOption{
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := strikezone.NewScraper(strikezone.GameLorcana)
+			scraper.LogCallback = logger.Printf
+			return scraper, nil
+		},
+	},
+	"trollandtoad_lorcana": &scraperOption{
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := trollandtoad.NewGenericScraper(trollandtoad.GameLorcana)
+			scraper.LogCallback = logger.Printf
+			return scraper, nil
+		},
+	},
 }
 
 // Associate Scraper shorthands to ScraperOptions keys
