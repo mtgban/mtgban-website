@@ -1392,6 +1392,10 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 				if co.BorderColor == mtgjson.BorderColorBorderless {
 					return false
 				}
+			case "future":
+				if co.FrameVersion == "future" {
+					return false
+				}
 			case "retro", "old":
 				if co.FrameVersion == "1993" || co.FrameVersion == "1997" {
 					return false
