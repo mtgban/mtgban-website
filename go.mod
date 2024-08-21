@@ -14,7 +14,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/mackerelio/go-osstat v0.2.4
-	github.com/mtgban/go-mtgban v0.0.0-20240819231054-bc7bcb85b699
+	github.com/mtgban/go-mtgban v0.0.0-20240821150750-2e081fb80f83
 	github.com/xuri/excelize/v2 v2.8.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/oauth2 v0.13.0
@@ -64,7 +64,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
-	github.com/mtgban/go-tcgplayer v0.0.0-20240818123426-d44ea5a8db11 // indirect
+	github.com/mtgban/go-tcgplayer v0.0.0-20240821150414-caace4f5b3f4 // indirect
 	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect

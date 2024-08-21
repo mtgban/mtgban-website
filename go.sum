@@ -153,10 +153,10 @@ github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd5E/OeU=
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
-github.com/mtgban/go-mtgban v0.0.0-20240819231054-bc7bcb85b699 h1:MUKMgm6oCxrOhYJTppa8H1HQvBfUS3na+6keML66yF0=
-github.com/mtgban/go-mtgban v0.0.0-20240819231054-bc7bcb85b699/go.mod h1:L4SobcN8uk2EFbRTw2a3f7dpw5VrLeZ80qs46pUKV34=
-github.com/mtgban/go-tcgplayer v0.0.0-20240818123426-d44ea5a8db11 h1:NIeu5e5zpo9cjy8j8L2o7kpqnQutkYMryDy8b50XPjQ=
-github.com/mtgban/go-tcgplayer v0.0.0-20240818123426-d44ea5a8db11/go.mod h1:bBKN+PMIyVmjaUP0uVpCEfvKBbC2WzUYS0lZZvvtrlU=
+github.com/mtgban/go-mtgban v0.0.0-20240821150750-2e081fb80f83 h1:QP406Y4j3Nf7Os7opuEs+zZHFAbS4rntOgp8OQKiHEY=
+github.com/mtgban/go-mtgban v0.0.0-20240821150750-2e081fb80f83/go.mod h1:0YMKwBLKOogXJdaTXsfr9sqHr0O0XJgDyGujjcQHbo4=
+github.com/mtgban/go-tcgplayer v0.0.0-20240821150414-caace4f5b3f4 h1:WX0LVwXBac8zcurHDxlLk5mez7ArLe6RmKdEGFs0Kw4=
+github.com/mtgban/go-tcgplayer v0.0.0-20240821150414-caace4f5b3f4/go.mod h1:bBKN+PMIyVmjaUP0uVpCEfvKBbC2WzUYS0lZZvvtrlU=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/onsi/ginkgo v1.16.5 h1:8xi0RTUf59SOSfEtZMvwTvXYMzG4gV23XVHOZiXNtnE=
 github.com/onsi/gomega v1.27.10 h1:naR28SdDFlqrG6kScpT8VWpu1xWY5nJRCF3XaYyBjhI=
