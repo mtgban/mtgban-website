@@ -199,9 +199,9 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 		if editionSearched != "" {
 			set, err := mtgmatcher.GetSet(editionSearched)
 			if err != nil {
-				return nil, fmt.Sprintf("No edition found for \"%s\" 乁| ･ิ ∧ ･ิ |ㄏ", editionSearched)
+				return nil, fmt.Sprintf("No edition found for \"%s\"", editionSearched)
 			}
-			msg := fmt.Sprintf("No card found named \"%s\" in %s 乁| ･ิ ∧ ･ิ |ㄏ", query, set.Name)
+			msg := fmt.Sprintf("No card found named \"%s\" in %s", query, set.Name)
 			printings, err := mtgmatcher.Printings4Card(query)
 			if err == nil {
 				msg = fmt.Sprintf("%s\n\"%s\" is printed in %s.", msg, query, printings2line(printings))
@@ -213,11 +213,11 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 		if !sealed {
 			return parseMessage(content, true)
 		}
-		return nil, fmt.Sprintf("No card found for \"%s\" 乁| ･ิ ∧ ･ิ |ㄏ", query)
+		return nil, fmt.Sprintf("No card found for \"%s\"", query)
 	}
 
 	if len(uuids) == 0 {
-		return nil, fmt.Sprintf("No results found for \"%s\" 乁| ･ิ ∧ ･ิ |ㄏ", query)
+		return nil, fmt.Sprintf("No results found for \"%s\"", query)
 	}
 
 	// Keep the first (most recent) result
@@ -530,10 +530,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if errMsg != "" {
 		if DevMode {
 			errMsg = "[DEV] " + errMsg
+			s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+				Description: errMsg,
+			})
 		}
-		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-			Description: errMsg,
-		})
+		UserNotify("bot", errMsg, false)
 		return
 	}
 	if searchRes.Invalid {
