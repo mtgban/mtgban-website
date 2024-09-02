@@ -229,6 +229,32 @@ func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 	return nil, errors.New("vendor not found")
 }
 
+// Look up a seller with its name and return its inventory
+func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord, error) {
+	for _, seller := range Sellers {
+		if seller == nil {
+			continue
+		}
+		if seller.Info().SealedMode == sealed && strings.ToLower(seller.Info().Shorthand) == strings.ToLower(name) {
+			return seller.Inventory()
+		}
+	}
+	return nil, errors.New("seller not found")
+}
+
+// Look up a vendor with its name and return its inventory
+func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, error) {
+	for _, vendor := range Vendors {
+		if vendor == nil {
+			continue
+		}
+		if vendor.Info().SealedMode == sealed && strings.ToLower(vendor.Info().Name) == strings.ToLower(name) {
+			return vendor.Buylist()
+		}
+	}
+	return nil, errors.New("vendor not found")
+}
+
 // Look for a TCGproductId in all available places
 func findTCGproductId(cardId string) string {
 	co, err := mtgmatcher.GetUUID(cardId)

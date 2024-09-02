@@ -37,8 +37,11 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		if kind == "r" || kind == "i" {
 			inv, err := findSellerInventory(store)
 			if err != nil {
-				http.NotFound(w, r)
-				return
+				inv, err = findSellerInventoryByName(store, co.Sealed)
+				if err != nil {
+					http.NotFound(w, r)
+					return
+				}
 			}
 
 			entries := inv[co.UUID]
@@ -49,8 +52,11 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		} else if kind == "b" {
 			bl, err := findVendorBuylist(store)
 			if err != nil {
-				http.NotFound(w, r)
-				return
+				bl, err = findVendorBuylistByName(store, co.Sealed)
+				if err != nil {
+					http.NotFound(w, r)
+					return
+				}
 			}
 
 			entries := bl[co.UUID]
