@@ -203,7 +203,7 @@ const (
 	MaxRuneSymbols = 57
 )
 
-// Look up a vendor and return its buylist
+// Look up a seller and return its inventory
 func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
 	for _, seller := range Sellers {
 		if seller == nil {
