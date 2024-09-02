@@ -115,7 +115,10 @@ func updateSellers(scraper mtgban.Scraper) {
 }
 
 func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
-	opts := ScraperOptions[ScraperMap[seller.Info().Shorthand]]
+	opts, found := ScraperOptions[ScraperMap[seller.Info().Shorthand]]
+	if !found {
+		panic(fmt.Sprintf("%s not found in ScraperMap", seller.Info().Shorthand))
+	}
 
 	if andLock {
 		opts.Mutex.Lock()
@@ -176,7 +179,10 @@ func updateVendors(scraper mtgban.Scraper) {
 }
 
 func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
-	opts := ScraperOptions[ScraperMap[vendor.Info().Shorthand]]
+	opts, found := ScraperOptions[ScraperMap[vendor.Info().Shorthand]]
+	if !found {
+		panic(fmt.Sprintf("%s not found in ScraperMap", vendor.Info().Shorthand))
+	}
 
 	if andLock {
 		opts.Mutex.Lock()
