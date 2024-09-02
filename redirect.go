@@ -21,6 +21,19 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 			kind = "r"
 		}
 
+		// Look up the hash: mtgjson, scryfall, and tcgproductid in order
+		co, err := mtgmatcher.GetUUID(hash)
+		if err != nil {
+			co, err = mtgmatcher.GetUUID(mtgmatcher.Scryfall2UUID(hash))
+			if err != nil {
+				co, err = mtgmatcher.GetUUID(mtgmatcher.Tcg2UUID(hash))
+				if err != nil {
+					http.NotFound(w, r)
+					return
+				}
+			}
+		}
+
 		if kind == "r" || kind == "i" {
 			inv, err := findSellerInventory(store)
 			if err != nil {
@@ -28,15 +41,7 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Look up the hash: mtgjson, scryfall, and tcgproductid in order
-			entries, found := inv[hash]
-			if !found {
-				entries, found = inv[mtgmatcher.Scryfall2UUID(hash)]
-				if !found {
-					entries = inv[mtgmatcher.Tcg2UUID(hash)]
-				}
-			}
-
+			entries := inv[co.UUID]
 			for _, entry := range entries {
 				http.Redirect(w, r, entry.URL, http.StatusFound)
 				return
@@ -48,15 +53,7 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			// Look up the hash: mtgjson, scryfall, and tcgproductid in order
-			entries, found := bl[hash]
-			if !found {
-				entries, found = bl[mtgmatcher.Scryfall2UUID(hash)]
-				if !found {
-					entries = bl[mtgmatcher.Tcg2UUID(hash)]
-				}
-			}
-
+			entries := bl[co.UUID]
 			for _, entry := range entries {
 				http.Redirect(w, r, entry.URL, http.StatusFound)
 				return
