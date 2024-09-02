@@ -410,13 +410,14 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		// Needs to be explicitly requested, all the index prices are skipped,
 		// and of course any seller without quantity information
 		shouldQty := qty && !seller.Info().MetadataOnly && !seller.Info().NoQuantityInventory
+		shouldBaseCond := !seller.Info().MetadataOnly && !seller.Info().SealedMode
 
 		for _, cardId := range filterByHash {
-			processSellerEntry(inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, out, shouldQty, conds)
+			processSellerEntry(inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, out, shouldQty, conds, shouldBaseCond)
 		}
 		if filterByHash == nil {
 			for cardId := range inventory {
-				processSellerEntry(inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, out, shouldQty, conds)
+				processSellerEntry(inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, out, shouldQty, conds, shouldBaseCond)
 			}
 		}
 	}
@@ -424,7 +425,7 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 	return out
 }
 
-func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByEdition, filterByFinish, sellerTag string, out map[string]map[string]*BanPrice, qty, conds bool) {
+func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByEdition, filterByFinish, sellerTag string, out map[string]map[string]*BanPrice, qty, conds, shouldBaseCond bool) {
 	if len(entries) == 0 || entries[0].Price == 0 {
 		return
 	}
@@ -451,7 +452,9 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 		out[id][sellerTag] = &BanPrice{}
 	}
 
-	out[id][sellerTag].Cond = entries[0].Conditions
+	if shouldBaseCond {
+		out[id][sellerTag].Cond = entries[0].Conditions
+	}
 
 	if conds && out[id][sellerTag].Conditions == nil {
 		out[id][sellerTag].Conditions = map[string]float64{}
@@ -552,12 +555,13 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 
 		// Loop through cards
 		shouldQty := qty && !vendor.Info().MetadataOnly
+		shouldBaseCond := !vendor.Info().MetadataOnly && !vendor.Info().SealedMode
 		for _, cardId := range filterByHash {
-			processVendorEntry(buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, out, shouldQty, conds)
+			processVendorEntry(buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, out, shouldQty, conds, shouldBaseCond)
 		}
 		if filterByHash == nil {
 			for cardId := range buylist {
-				processVendorEntry(buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, out, shouldQty, conds)
+				processVendorEntry(buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, out, shouldQty, conds, shouldBaseCond)
 			}
 		}
 	}
@@ -565,7 +569,7 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 	return out
 }
 
-func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdition, filterByFinish, vendorTag string, out map[string]map[string]*BanPrice, qty, conds bool) {
+func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdition, filterByFinish, vendorTag string, out map[string]map[string]*BanPrice, qty, conds, shouldBaseCond bool) {
 	// No price no dice
 	if len(entries) == 0 || entries[0].BuyPrice == 0 {
 		return
@@ -594,7 +598,9 @@ func processVendorEntry(entries []mtgban.BuylistEntry, mode, cardId, filterByEdi
 		out[id][vendorTag] = &BanPrice{}
 	}
 
-	out[id][vendorTag].Cond = entries[0].Conditions
+	if shouldBaseCond {
+		out[id][vendorTag].Cond = entries[0].Conditions
+	}
 
 	if conds && out[id][vendorTag].Conditions == nil {
 		out[id][vendorTag].Conditions = map[string]float64{}
