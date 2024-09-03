@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/cardkingdom"
-	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"golang.org/x/exp/maps"
@@ -245,19 +244,13 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UUID2CKCSV(w *csv.Writer, ids, qtys []string) error {
-	var buylist mtgban.BuylistRecord
-	for _, vendor := range Vendors {
-		if vendor != nil && vendor.Info().Shorthand == "CK" {
-			buylist, _ = vendor.Buylist()
-			break
-		}
-	}
-	if buylist == nil {
-		return errors.New("CK scraper not found")
+	buylist, err := findVendorBuylist("CK")
+	if err != nil {
+		return err
 	}
 
 	header := []string{"Title", "Edition", "Foil", "Quantity"}
-	err := w.Write(header)
+	err = w.Write(header)
 	if err != nil {
 		return err
 	}
@@ -288,19 +281,13 @@ func UUID2CKCSV(w *csv.Writer, ids, qtys []string) error {
 }
 
 func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
-	var buylist mtgban.BuylistRecord
-	for _, vendor := range Vendors {
-		if vendor != nil && vendor.Info().Shorthand == "SCG" {
-			buylist, _ = vendor.Buylist()
-			break
-		}
-	}
-	if buylist == nil {
-		return errors.New("SCG scraper not found")
+	buylist, err := findVendorBuylist("SCG")
+	if err != nil {
+		return err
 	}
 
 	header := []string{"name", "set_name", "language", "finish", "quantity"}
-	err := w.Write(header)
+	err = w.Write(header)
 	if err != nil {
 		return err
 	}
@@ -350,22 +337,13 @@ var tcgcsvHeader = []string{
 	"Photo URL",
 }
 
-func GetInventoryForSeller(sellerName string) (mtgban.InventoryRecord, error) {
-	for _, seller := range Sellers {
-		if seller != nil && seller.Info().Shorthand == sellerName {
-			return seller.Inventory()
-		}
-	}
-	return nil, errors.New("scraper not found")
-}
-
 func UUID2TCGCSV(w *csv.Writer, ids []string) error {
-	inventory, err := GetInventoryForSeller("TCGPlayer")
+	inventory, err := findSellerInventory("TCGPlayer")
 	if err != nil {
 		return err
 	}
-	direct, _ := GetInventoryForSeller("TCGDirectLow")
-	low, _ := GetInventoryForSeller("TCGLow")
+	direct, _ := findSellerInventory("TCGDirectLow")
+	low, _ := findSellerInventory("TCGLow")
 
 	err = w.Write(tcgcsvHeader)
 	if err != nil {
