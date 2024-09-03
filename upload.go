@@ -480,23 +480,28 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.InfoMessage = TooManyEntriesMessage
 	}
 
+	tagPref := "tags"
+	download, _ := strconv.ParseBool(r.FormValue("download"))
+	if download && canBuylist {
+		tagPref = "names"
+	}
+
 	// Search
 	var results map[string]map[string]*BanPrice
 	if blMode {
-		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false)
+		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	} else {
-		results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false)
+		results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	}
 
 	// Allow downloading data as CSV
-	download, _ := strconv.ParseBool(r.FormValue("download"))
 	if download && canBuylist {
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_prices.csv\"")
 		csvWriter := csv.NewWriter(w)
 
 		// Search for all csv-specific indexes
-		indexResults := getSellerPrices("", UploadIndexKeysCSV, "", cardIds, "", false, shouldCheckForConditions, false)
+		indexResults := getSellerPrices("", UploadIndexKeysCSV, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 
 		// Copy these index prices in the final results
 		for _, cardId := range cardIds {
@@ -518,7 +523,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indexResults := getSellerPrices("", UploadIndexKeys, "", cardIds, "", false, shouldCheckForConditions, false)
+	indexResults := getSellerPrices("", UploadIndexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	pageVars.IndexKeys = UploadIndexKeysPublic
 
 	// Orders implies priority of argument search

@@ -902,7 +902,7 @@ func downloadSearchCSV(w http.ResponseWriter, option string, config SearchConfig
 			}
 		}
 
-		results = getSellerPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed)
+		results = getSellerPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed, "names")
 		filename = "mtgban_retail_prices.csv"
 	case "buylist":
 		for _, vendor := range Vendors {
@@ -911,7 +911,7 @@ func downloadSearchCSV(w http.ResponseWriter, option string, config SearchConfig
 			}
 		}
 
-		results = getVendorPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed)
+		results = getVendorPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed, "names")
 		filename = "mtgban_buylist_prices.csv"
 	default:
 		return errors.New("invalid option")

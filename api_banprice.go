@@ -198,6 +198,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	qty, _ := strconv.ParseBool(r.FormValue("qty"))
 	conds, _ := strconv.ParseBool(r.FormValue("conds"))
 	filterByFinish := r.FormValue("finish")
+	tagName := r.FormValue("tag")
 
 	// Filter by user preference, as long as it's listed in the enebled stores
 	filterByVendors := r.FormValue("vendor")
@@ -286,11 +287,11 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 
 	if ((strings.HasPrefix(urlPath, "retail") || strings.HasPrefix(urlPath, "all")) && canRetail) || isSealed {
 		dumpType += "retail"
-		out.Retail = getSellerPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed)
+		out.Retail = getSellerPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 	}
 	if ((strings.HasPrefix(urlPath, "buylist") || strings.HasPrefix(urlPath, "all")) && canBuylist) || isSealed {
 		dumpType += "buylist"
-		out.Buylist = getVendorPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed)
+		out.Buylist = getVendorPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 	}
 
 	user := GetParamFromSig(sig, "UserEmail")
@@ -380,13 +381,12 @@ func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
 	}
 }
 
-func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty bool, conds bool, sealed bool) map[string]map[string]*BanPrice {
+func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 	for _, seller := range Sellers {
 		if seller == nil {
 			continue
 		}
-		sellerTag := seller.Info().Shorthand
 
 		// Only keep the right product type
 		if (!sealed && seller.Info().SealedMode) ||
@@ -395,7 +395,7 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		}
 
 		// Skip any seller that are not enabled
-		if !slices.Contains(enabledStores, sellerTag) {
+		if !slices.Contains(enabledStores, seller.Info().Shorthand) {
 			continue
 		}
 
@@ -404,6 +404,23 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		if err != nil {
 			log.Println(err)
 			continue
+		}
+
+		var sellerTag string
+		switch tagName {
+		default:
+			// The default version is a compatibility mode that uses store names
+			// when multiple are present
+			shorthand := seller.Info().Shorthand
+			if len(ScraperOptions[ScraperMap[shorthand]].Keepers) > 0 {
+				sellerTag = ScraperNames[shorthand]
+			} else {
+				sellerTag = shorthand
+			}
+		case "names":
+			sellerTag = seller.Info().Name
+		case "tags":
+			sellerTag = seller.Info().Shorthand
 		}
 
 		// Determine whether the response should include qty information
@@ -527,13 +544,12 @@ func processSellerEntry(entries []mtgban.InventoryEntry, mode, cardId, filterByE
 	}
 }
 
-func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty bool, conds bool, sealed bool) map[string]map[string]*BanPrice {
+func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 	for _, vendor := range Vendors {
 		if vendor == nil {
 			continue
 		}
-		vendorTag := vendor.Info().Shorthand
 
 		// Only keep the right proudct type
 		if (!sealed && vendor.Info().SealedMode) ||
@@ -542,7 +558,7 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		}
 
 		// Skip any vendor that are not enabled
-		if !slices.Contains(enabledStores, vendorTag) {
+		if !slices.Contains(enabledStores, vendor.Info().Shorthand) {
 			continue
 		}
 
@@ -551,6 +567,23 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		if err != nil {
 			log.Println(err)
 			continue
+		}
+
+		var vendorTag string
+		switch tagName {
+		default:
+			// The default version is a compatibility mode that uses store names
+			// when multiple are present
+			shorthand := vendor.Info().Shorthand
+			if len(ScraperOptions[ScraperMap[shorthand]].KeepersBL) > 0 {
+				vendorTag = ScraperNames[shorthand]
+			} else {
+				vendorTag = shorthand
+			}
+		case "names":
+			vendorTag = vendor.Info().Name
+		case "tags":
+			vendorTag = vendor.Info().Shorthand
 		}
 
 		// Loop through cards
