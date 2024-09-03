@@ -245,7 +245,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 								newbc.RegisterSeller(scraper)
 							}
 							for _, keeper := range opt.Keepers {
-								newbc.RegisterMarket(scraper, keeper)
+								newbc.RegisterMarket(scraper.(mtgban.Market), keeper)
 							}
 						}
 						if !opt.OnlySeller {
@@ -253,7 +253,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 								newbc.RegisterVendor(scraper)
 							}
 							for _, keeper := range opt.KeepersBL {
-								newbc.RegisterTrader(scraper, keeper)
+								newbc.RegisterTrader(scraper.(mtgban.Trader), keeper)
 								ScraperMap[keeper] = key
 								ScraperNames[keeper] = keeper
 							}

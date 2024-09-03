@@ -189,7 +189,7 @@ func getLastSold(cardId string) ([]tcgplayer.LatestSalesData, error) {
 		return nil, ErrMissingTCGId
 	}
 
-	latestSales, err := tcgplayer.TCGLatestSales(tcgId, co.Foil || co.Etched)
+	latestSales, err := tcgplayer.LatestSales(tcgId, co.Foil || co.Etched)
 	if err != nil {
 		return nil, err
 	}

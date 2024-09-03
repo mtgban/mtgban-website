@@ -706,7 +706,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 		if co.Etched || co.Foil {
 			printing = "Foil"
 		}
-		link = tcgplayer.TCGPlayerProductURL(productId, printing, Config.Affiliate["TCG"], "", co.Language, false)
+		link = tcgplayer.GenerateProductURL(productId, printing, Config.Affiliate["TCG"], "", co.Language, false)
 	}
 
 	// Add a tag for ease of debugging

@@ -737,9 +737,11 @@ func loadScrapers() {
 					newbc.RegisterSeller(scraper)
 				}
 				for _, keeper := range opt.Keepers {
-					newbc.RegisterMarket(scraper, keeper)
-					ScraperMap[keeper] = key
-					ScraperNames[keeper] = keeper
+					multi := scraper.(mtgban.Market)
+					multiInfo := multi.InfoForScraper(keeper)
+					newbc.RegisterMarket(multi, keeper)
+					ScraperMap[multiInfo.Shorthand] = key
+					ScraperNames[multiInfo.Shorthand] = keeper
 				}
 			}
 			if !opt.OnlySeller {
@@ -747,9 +749,11 @@ func loadScrapers() {
 					newbc.RegisterVendor(scraper)
 				}
 				for _, keeper := range opt.KeepersBL {
-					newbc.RegisterTrader(scraper, keeper)
-					ScraperMap[keeper] = key
-					ScraperNames[keeper] = keeper
+					multi := scraper.(mtgban.Trader)
+					multiInfo := multi.InfoForScraper(keeper)
+					newbc.RegisterTrader(multi, keeper)
+					ScraperMap[multiInfo.Shorthand] = key
+					ScraperNames[multiInfo.Shorthand] = keeper
 				}
 			}
 		} else if opt.OnlySeller {

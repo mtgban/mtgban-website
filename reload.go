@@ -63,7 +63,7 @@ func reload(name string) {
 			newbc.RegisterSeller(scraper)
 		}
 		for _, keeper := range opt.Keepers {
-			newbc.RegisterMarket(scraper, keeper)
+			newbc.RegisterMarket(scraper.(mtgban.Market), keeper)
 		}
 	}
 	if !ScraperOptions[name].OnlySeller {
@@ -71,7 +71,7 @@ func reload(name string) {
 			newbc.RegisterVendor(scraper)
 		}
 		for _, keeper := range opt.KeepersBL {
-			newbc.RegisterTrader(scraper, keeper)
+			newbc.RegisterTrader(scraper.(mtgban.Trader), keeper)
 		}
 	}
 
