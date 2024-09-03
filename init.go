@@ -42,9 +42,8 @@ const (
 	TCG_DIRECT_LOW = "TCG Direct Low"
 
 	// from TCGMrkt
-	TCG_MAIN    = "TCG Player"
-	TCG_DIRECT  = "TCG Direct"
-	TCG_BUYLIST = "TCG Player Market"
+	TCG_MAIN   = "TCG Player"
+	TCG_DIRECT = "TCG Direct"
 
 	// from TCGDirectNet
 	TCG_DIRECT_NET = "TCG Direct (net)"
