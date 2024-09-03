@@ -86,7 +86,7 @@ type FilterPriceElem struct {
 	// Function used to derive a store price
 	Price4Store func(string, string) float64
 
-	// All stores sources present in the map
+	// All stores sources (shorthands) present in the map
 	Stores []string
 
 	// Cache of cardId:prices used in the filter
@@ -146,33 +146,31 @@ func fixupEditionNG(code string) []string {
 	return out
 }
 
+// Return a list of shorthands representing the selected stores
 func fixupStoreCodeNG(code string) []string {
-	code = strings.ToUpper(code)
+	code = strings.TrimSpace(code)
+	code = strings.ToLower(code)
+
 	filters := strings.Split(code, ",")
 	for i := range filters {
-		switch filters[i] {
-		case "CT":
-			filters[i] = CT_STANDARD
-		case "CT0":
-			filters[i] = CT_ZERO
-		case "CT1DR":
-			filters[i] = CT_1DR
-		case "MKM_LOW":
-			filters[i] = MKM_LOW
-		case "MKM_TREND":
-			filters[i] = MKM_TREND
-		case "TCG_LOW":
-			filters[i] = TCG_LOW
-		case "TCG_MARKET":
-			filters[i] = TCG_MARKET
-		case "TCG_PLAYER":
-			filters[i] = TCG_MAIN
-		case "TCG_DIRECT":
-			filters[i] = TCG_DIRECT
-		case "TCG_DIRECT_NET":
-			filters[i] = TCG_DIRECT_NET
+		filters[i] = strings.TrimPrefix(filters[i], "\"")
+		filters[i] = strings.TrimSuffix(filters[i], "\"")
+
+		// Validate the input against the registered scrapers
+		for shorthand, name := range ScraperNames {
+			if strings.ToLower(name) == filters[i] ||
+				strings.ToLower(shorthand) == filters[i] {
+				filters[i] = strings.ToLower(shorthand)
+			}
 		}
-		filters[i] = strings.ToLower(filters[i])
+
+		// The manual renames from search.go
+		switch filters[i] {
+		case "TCGplayer":
+			filters[i] = strings.ToLower("TCGPlayer")
+		case "TCGplayer Direct":
+			filters[i] = strings.ToLower("TCGDirect")
+		}
 	}
 	return filters
 }
