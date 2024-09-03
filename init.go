@@ -831,7 +831,7 @@ func loadSellers(newbc *mtgban.BanClient) {
 			msgS += "<nil>\n"
 			continue
 		}
-		msgS += fmt.Sprintf("%s %s\n", newSellers[i].Info().Name, newSellers[i].Info().Shorthand)
+		msgS += fmt.Sprintf("%s - %s\n", newSellers[i].Info().Name, newSellers[i].Info().Shorthand)
 	}
 	ServerNotify("init", msgS)
 
@@ -973,7 +973,7 @@ func loadVendors(newbc *mtgban.BanClient) {
 			msgV += "<nil>\n"
 			continue
 		}
-		msgV += fmt.Sprintf("%s %s\n", newVendors[i].Info().Name, newVendors[i].Info().Shorthand)
+		msgV += fmt.Sprintf("%s - %s\n", newVendors[i].Info().Name, newVendors[i].Info().Shorthand)
 	}
 	ServerNotify("init", msgV)
 
