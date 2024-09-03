@@ -54,11 +54,9 @@ const (
 	MKM_TREND = "MKM Trend"
 
 	// from CT
-	CT_STANDARD        = "Card Trader"
-	CT_ZERO            = "Card Trader Zero"
-	CT_1DR             = "Card Trader 1DR"
-	CT_STANDARD_SEALED = "Card Trader Sealed"
-	CT_ZERO_SEALED     = "Card Trader Zero Sealed"
+	CT_STANDARD = "Card Trader"
+	CT_ZERO     = "Card Trader Zero"
+	CT_1DR      = "Card Trader 1DR"
 
 	SkipRefreshCooldown    = 2 * time.Hour
 	DefaultUploaderTimeout = 60 * time.Second
@@ -495,8 +493,9 @@ var ScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 		Keepers: []string{
-			CT_STANDARD_SEALED,
-			CT_ZERO_SEALED,
+			CT_STANDARD,
+			CT_ZERO,
+			CT_1DR,
 		},
 	},
 	"starcitygames_sealed": &scraperOption{
