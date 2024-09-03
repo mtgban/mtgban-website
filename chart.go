@@ -103,13 +103,21 @@ var enabledDatasets = []scraperConfig{
 
 // Get all the keys that will be used as x asis labels
 func getDateAxisValues(cardId string) ([]string, error) {
-	db := ScraperOptions["tcg_index"].RDBs[TCG_MARKET]
+	db, found := ScraperOptions["tcg_index"].RDBs[TCG_MARKET]
+	if !found {
+		return nil, errors.New("tcg market db not found")
+	}
+
 	keys, err := db.HKeys(context.Background(), cardId).Result()
 	if err != nil {
 		return nil, err
 	}
 	if len(keys) == 0 {
-		db = ScraperOptions["tcg_index"].RDBs[TCG_LOW]
+		db, found = ScraperOptions["tcg_index"].RDBs[TCG_LOW]
+		if !found {
+			return nil, errors.New("tcg low db not found")
+		}
+
 		keys, err = db.HKeys(context.Background(), cardId).Result()
 		if err != nil {
 			return nil, err
