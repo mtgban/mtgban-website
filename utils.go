@@ -270,10 +270,10 @@ func findTCGproductId(cardId string) string {
 		}
 	}
 	if tcgId == "" {
-		tcgLow, _ := findSellerInventory(TCG_LOW)
+		tcgLow, _ := findSellerInventory("TCGLow")
 		entries, found := tcgLow[cardId]
 		if !found {
-			tcgMarket, _ := findSellerInventory(TCG_MARKET)
+			tcgMarket, _ := findSellerInventory("TCGMarket")
 			entries, found = tcgMarket[co.UUID]
 		}
 		if found {
@@ -694,9 +694,9 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 	return slice[head:tail], page
 }
 
-// Retrieve the TCG_MARKET price of any given card
+// Retrieve the TCGplayer Market price of any given card
 func getTCGMarketPrice(cardId string) float64 {
-	inv, err := findSellerInventory(TCG_MARKET)
+	inv, err := findSellerInventory("TCGMarket")
 	if err != nil {
 		return 0
 	}

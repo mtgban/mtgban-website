@@ -134,7 +134,7 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 
 			// Build url for our redirect
 			kind := strings.ToLower(string(EmbedFieldsNames[i][0]))
-			store := strings.Replace(entry.Shorthand, " ", "%20", -1)
+			store := entry.Shorthand
 			value.Link = "https://" + DefaultHost + "/" + path.Join("go", kind, store, searchRes.CardId)
 
 			if entry.Ratio > 60 {
@@ -330,12 +330,12 @@ func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]Searc
 	if index {
 		results = foundSellers[cardId]["INDEX"]
 
-		// Add the TCG_DIRECT to the Index section too, considering conditions
+		// Add the TCGplayer Direct to the Index section too, considering conditions
 		for _, cond := range []string{"NM", "SP"} {
 			done := false
 			foundResults := foundSellers[cardId][cond]
 			for _, result := range foundResults {
-				if result.ScraperName == TCG_DIRECT {
+				if result.ScraperName == "TCGDirect" {
 					results = append(results, result)
 					done = true
 					break

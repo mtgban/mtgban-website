@@ -67,7 +67,7 @@ func setupDiscord() error {
 	// In this example, we only care about receiving message events.
 	dg.Identify.Intents = discordgo.MakeIntent(discordgo.IntentsGuilds | discordgo.IntentsGuildMessages)
 
-	DiscordRetailBlocklist = append(Config.SearchRetailBlockList, TCG_DIRECT_LOW)
+	DiscordRetailBlocklist = append(Config.SearchRetailBlockList, "TCGDirectLow")
 	DiscordBuylistBlocklist = append(Config.SearchBuylistBlockList, "ABUCredit")
 
 	// Open a websocket connection to Discord and begin listening.

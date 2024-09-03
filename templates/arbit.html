@@ -330,7 +330,7 @@
                         </form>
                     {{end}}
 
-                    {{if eq $sourceKey "TCG Direct"}}
+                    {{if eq $sourceKey "TCGDirect"}}
                         <span class="emoji" style="cursor: pointer;" onclick='getAllDirectQuantitiesFor({{$scraperKey}}); this.setAttribute("onclick", "javascript:void(0)")' title="Update ALL quantities for TCG Direct">⚡️</span>
                     {{end}}
 
@@ -420,7 +420,7 @@
                                 </a>&nbsp;
                                 {{else}}
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{(index $.Metadata .CardId).Name}}')" title="Copy to clipboard">📝</span>&nbsp;
-                                    {{if eq $sourceKey "TCG Direct"}}
+                                    {{if eq $sourceKey "TCGDirect"}}
                                         <span class="emoji" style="cursor: pointer;" onclick="getDirectQty(this, '{{.CardId}}')" title="Update quantities for TCG Direct" id="directqty-{{.CardId}}">⚡️</span>
                                     {{end}}
                                 {{end}}
@@ -462,7 +462,7 @@
                                 </td>
                             {{end}}
                             {{if not $save.HasNoQty}}
-                                <td style="text-align: center" {{if eq $sourceKey "TCG Direct"}}id="qty-{{$sourceKey}}-{{.InventoryEntry.Conditions}}-{{.CardId}}"{{end}}>
+                                <td style="text-align: center" {{if eq $sourceKey "TCGDirect"}}id="qty-{{$sourceKey}}-{{.InventoryEntry.Conditions}}-{{.CardId}}"{{end}}>
                                     {{.InventoryEntry.Quantity}}
                                     {{if ne .BuylistEntry.Quantity 0}}
                                         / {{.BuylistEntry.Quantity}}

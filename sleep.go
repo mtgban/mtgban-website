@@ -167,7 +167,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 }
 
 func getBulks(skipEditions []string) map[string]int {
-	inv, err := findSellerInventory(TCG_LOW)
+	inv, err := findSellerInventory("TCGLow")
 	if err != nil {
 		return nil
 	}
@@ -303,7 +303,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 
 	var tcgSeller mtgban.Seller
 	for _, seller := range Sellers {
-		if seller != nil && seller.Info().Shorthand == TCG_LOW {
+		if seller != nil && seller.Info().Shorthand == "TCGLow" {
 			tcgSeller = seller
 			break
 		}
@@ -443,7 +443,7 @@ func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
 	}
 
 	// Sort sleepers by price
-	inv, err := findSellerInventory(TCG_LOW)
+	inv, err := findSellerInventory("TCGLow")
 	if err != nil {
 		return nil, err
 	}

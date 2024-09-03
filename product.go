@@ -277,8 +277,8 @@ const (
 
 // Produce a map of card : []ReprintEntry containing array reprints sorted by age
 func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
-	tcgLow, _ := findSellerInventory(TCG_LOW)
-	tcgMarket, _ := findSellerInventory(TCG_MARKET)
+	tcgLow, _ := findSellerInventory("TCGLow")
+	tcgMarket, _ := findSellerInventory("TCGMarket")
 
 	uuids := mtgmatcher.GetUUIDs()
 
@@ -470,8 +470,8 @@ func bulkBuylist(co *mtgmatcher.CardObject) float64 {
 func runSealedAnalysis() {
 	log.Println("Running set analysis")
 
-	tcgInventory, _ := findSellerInventory(TCG_LOW)
-	tcgDirect, _ := findSellerInventory(TCG_DIRECT)
+	tcgInventory, _ := findSellerInventory("TCGLow")
+	tcgDirect, _ := findSellerInventory("TCGDirect")
 	ckBuylist, _ := findVendorBuylist("CK")
 	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 

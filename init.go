@@ -336,11 +336,11 @@ var ScraperOptions = map[string]*scraperOption{
 		},
 		StashMarkets: true,
 		RDBs: map[string]*redis.Client{
-			TCG_LOW: redis.NewClient(&redis.Options{
+			"TCGLow": redis.NewClient(&redis.Options{
 				Addr: Config.RedisAddr,
 				DB:   DBs["tcg_low"],
 			}),
-			TCG_MARKET: redis.NewClient(&redis.Options{
+			"TCGMarket": redis.NewClient(&redis.Options{
 				Addr: Config.RedisAddr,
 				DB:   DBs["tcg_market"],
 			}),
@@ -369,11 +369,11 @@ var ScraperOptions = map[string]*scraperOption{
 		Keepers:      []string{MKM_LOW, MKM_TREND},
 		StashMarkets: true,
 		RDBs: map[string]*redis.Client{
-			MKM_LOW: redis.NewClient(&redis.Options{
+			"MKMLow": redis.NewClient(&redis.Options{
 				Addr: Config.RedisAddr,
 				DB:   DBs["mkm_low"],
 			}),
-			MKM_TREND: redis.NewClient(&redis.Options{
+			"MKMTrend": redis.NewClient(&redis.Options{
 				Addr: Config.RedisAddr,
 				DB:   DBs["mkm_trend"],
 			}),
@@ -478,7 +478,7 @@ var ScraperOptions = map[string]*scraperOption{
 		Keepers:      sealedev.NewScraper("").MarketNames(),
 		StashMarkets: true,
 		RDBs: map[string]*redis.Client{
-			"TCG Low EV": redis.NewClient(&redis.Options{
+			"TCGLowEV": redis.NewClient(&redis.Options{
 				Addr: Config.RedisAddr,
 				DB:   DBs["tcglow_ev"],
 			}),

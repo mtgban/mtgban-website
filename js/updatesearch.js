@@ -16,7 +16,7 @@ function getDirectQty(obj, uuid) {
 
         if (data) {
             data.forEach(element => {
-                let qtyTd = document.getElementById('qty-TCG Direct-' + element.condition + '-' + uuid);
+                let qtyTd = document.getElementById('qty-TCGDirect-' + element.condition + '-' + uuid);
                 if (qtyTd) {
                     qtyTd.innerHTML = '<b>' + element.direct_inventory + '</b>';
                 }
@@ -24,7 +24,7 @@ function getDirectQty(obj, uuid) {
         } else {
             const conds = ["NM", "SP", "MP", "HP"];
             conds.forEach(element => {
-                let qtyTd = document.getElementById('qty-TCG Direct-' + element + '-' + uuid);
+                let qtyTd = document.getElementById('qty-TCGDirect-' + element + '-' + uuid);
                 if (qtyTd) {
                     qtyTd.innerHTML = '<b>N/A</b>';
                 }

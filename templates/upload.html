@@ -545,14 +545,14 @@
                                 <br>
                                 {{range $.IndexKeys}}
                                     {{$indexName := .}}
-                                    {{if eq $indexName "TCG Direct"}}
+                                    {{if eq $indexName "TCGDirect"}}
                                         {{$cardId = (print $cardId $ogConds)}}
                                     {{end}}
                                     {{$indexEntries := (index $.ResultPrices $cardId)}}
 
                                     {{$price := (index $indexEntries $indexName)}}
-                                    {{if and (not $price) (eq $indexName "TCG Direct")}}
-                                        {{$indexName = "TCG Direct Low"}}
+                                    {{if and (not $price) (eq $indexName "TCGDirect")}}
+                                        {{$indexName = "TCGDirectLow"}}
                                         {{$indexEntries = (index $.ResultPrices $ogCardId)}}
                                         {{$price = (index $indexEntries $indexName)}}
                                     {{end}}

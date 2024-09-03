@@ -40,14 +40,14 @@ var enabledDatasets = []scraperConfig{
 	{
 		PublicName:  "TCGplayer Low",
 		ScraperName: "tcg_index",
-		KindName:    TCG_LOW,
+		KindName:    "TCGLow",
 		Color:       "rgb(255, 99, 132)",
 		HasSealed:   true,
 	},
 	{
 		PublicName:  "TCGplayer Market",
 		ScraperName: "tcg_index",
-		KindName:    TCG_MARKET,
+		KindName:    "TCGMarket",
 		Color:       "rgb(255, 159, 64)",
 		Hidden:      true,
 	},
@@ -68,14 +68,14 @@ var enabledDatasets = []scraperConfig{
 	{
 		PublicName:  "Cardmarket Low",
 		ScraperName: "cardmarket",
-		KindName:    MKM_LOW,
+		KindName:    "MKMLow",
 		Color:       "rgb(235, 205, 86)",
 		HasSealed:   true,
 	},
 	{
 		PublicName:  "Cardmarket Trend",
 		ScraperName: "cardmarket",
-		KindName:    MKM_TREND,
+		KindName:    "MKMTrend",
 		Color:       "rgb(201, 203, 207)",
 		Hidden:      true,
 	},
@@ -94,7 +94,7 @@ var enabledDatasets = []scraperConfig{
 	{
 		PublicName:  "Sealed EV (TCG Low)",
 		ScraperName: "sealed_ev",
-		KindName:    "TCG Low EV",
+		KindName:    "TCGLowEV",
 		Color:       "rgb(201, 203, 207)",
 		HasSealed:   true,
 		OnlySealed:  true,
@@ -103,7 +103,7 @@ var enabledDatasets = []scraperConfig{
 
 // Get all the keys that will be used as x asis labels
 func getDateAxisValues(cardId string) ([]string, error) {
-	db, found := ScraperOptions["tcg_index"].RDBs[TCG_MARKET]
+	db, found := ScraperOptions["tcg_index"].RDBs["TCGMarket"]
 	if !found {
 		return nil, errors.New("tcg market db not found")
 	}
@@ -113,7 +113,7 @@ func getDateAxisValues(cardId string) ([]string, error) {
 		return nil, err
 	}
 	if len(keys) == 0 {
-		db, found = ScraperOptions["tcg_index"].RDBs[TCG_LOW]
+		db, found = ScraperOptions["tcg_index"].RDBs["TCGLow"]
 		if !found {
 			return nil, errors.New("tcg low db not found")
 		}

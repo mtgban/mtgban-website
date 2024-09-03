@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	defaultSellerPriorityOpt = []string{TCG_MARKET, TCG_LOW, "TCGSealed"}
+	defaultSellerPriorityOpt = []string{"TCGMarket", "TCGLow", "TCGSealed"}
 	defaultVendorPriorityOpt = []string{"CK", "SS"}
 )
 
@@ -359,8 +359,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				config.PriceFilters = append(config.PriceFilters, &FilterPriceElem{
 					Name:        "invalid_direct",
 					Price4Store: price4seller,
-					Stores:      []string{TCG_MARKET},
-					ApplyTo:     []string{TCG_DIRECT, "TCGDirectNet"},
+					Stores:      []string{"TCGMarket"},
+					ApplyTo:     []string{"TCGDirect", "TCGDirectNet"},
 				})
 			}
 		}
@@ -584,7 +584,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		pageVars.Embed.RetailPrice = price4seller(allKeys[0], TCG_MARKET)
+		pageVars.Embed.RetailPrice = price4seller(allKeys[0], "TCGMarket")
 		pageVars.Embed.BuylistPrice = price4seller(allKeys[0], "CK")
 	}
 
@@ -688,7 +688,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				for cond, entries := range foundScrapers {
 					for i, entry := range entries {
 						switch entry.Shorthand {
-						case TCG_DIRECT, "TCGDirectNet":
+						case "TCGDirect", "TCGDirectNet":
 						default:
 							continue
 						}

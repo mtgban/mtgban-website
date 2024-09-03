@@ -431,8 +431,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			// These are hardcoded to provide a preview of the tool
-			if seller.Info().Shorthand != TCG_MARKET &&
-				seller.Info().Shorthand != MKM_TREND {
+			if seller.Info().Shorthand != "TCGMarket" && seller.Info().Shorthand != "MKMTrend" {
 				continue
 			}
 			allowlistSellers = append(allowlistSellers, seller.Info().Shorthand)
@@ -712,7 +711,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		// Set custom scraper options
 		opts.Conditions = nil
-		if pageVars.GlobalMode && scraper.Info().Shorthand == TCG_DIRECT {
+		if pageVars.GlobalMode && scraper.Info().Shorthand == "TCGDirect" {
 			opts.Conditions = BadConditions
 		}
 
@@ -750,7 +749,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		// Gather all the card Ids that might be invalid
 		var sussy map[string]float64
-		if !arbitFilters["nosus"] && scraper.Info().Shorthand == TCG_DIRECT {
+		if !arbitFilters["nosus"] && scraper.Info().Shorthand == "TCGDirect" {
 			sussy = map[string]float64{}
 
 			for _, res := range arbit {

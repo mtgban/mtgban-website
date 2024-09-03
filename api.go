@@ -360,12 +360,12 @@ func GetInventoryForSeller(sellerName string) (mtgban.InventoryRecord, error) {
 }
 
 func UUID2TCGCSV(w *csv.Writer, ids []string) error {
-	inventory, err := GetInventoryForSeller(TCG_MAIN)
+	inventory, err := GetInventoryForSeller("TCGPlayer")
 	if err != nil {
 		return err
 	}
-	direct, _ := GetInventoryForSeller(TCG_DIRECT_LOW)
-	low, _ := GetInventoryForSeller(TCG_LOW)
+	direct, _ := GetInventoryForSeller("TCGDirectLow")
+	low, _ := GetInventoryForSeller("TCGLow")
 
 	err = w.Write(tcgcsvHeader)
 	if err != nil {

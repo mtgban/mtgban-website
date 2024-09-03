@@ -45,13 +45,19 @@ const (
 )
 
 // List of ALL index prices to track
-var UploadIndexKeys = []string{TCG_LOW, TCG_MARKET, TCG_DIRECT, TCG_DIRECT_LOW}
+var UploadIndexKeys = []string{
+	"TCGLow", "TCGMarket", "TCGDirect", "TCGDirectLow",
+}
 
 // List of index prices to show by default (must be a subset of UploadIndexKeys)
-var UploadIndexKeysPublic = []string{TCG_LOW, TCG_MARKET, TCG_DIRECT}
+var UploadIndexKeysPublic = []string{
+	"TCGLow", "TCGMarket", "TCGDirect",
+}
 
 // List of index prices to use for CSVs
-var UploadIndexKeysCSV = []string{TCG_LOW, TCG_MARKET, TCG_DIRECT, MKM_LOW, MKM_TREND}
+var UploadIndexKeysCSV = []string{
+	"TCGLow", "TCGMarket", "TCGDirect", "MKMLow", "MKMTrend",
+}
 
 var ErrUploadDecklist = errors.New("decklist")
 var ErrReloadFirstRow = errors.New("firstrow")
@@ -94,7 +100,7 @@ type OptimizedUploadEntry struct {
 	// Condition as found in the source data
 	Condition string
 
-	// Price of the card provided in the source data (or TCG_LOW)
+	// Price of the card provided in the source data (or TCGLow)
 	Price float64
 
 	// Percentage of the store price vs uploaded price
@@ -573,11 +579,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	altPriceSource := r.FormValue("altPrice")
 	switch altPriceSource {
 	default:
-		altPriceSource = TCG_LOW
+		altPriceSource = "TCGLow"
 	case "market":
-		altPriceSource = TCG_MARKET
+		altPriceSource = "TCGMarket"
 	case "direct":
-		altPriceSource = TCG_DIRECT_LOW
+		altPriceSource = "TCGDirectLow"
 	}
 
 	optimizedResults := map[string][]OptimizedUploadEntry{}
@@ -603,15 +609,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			_, found := results[cardId][shorthand]
 			if !found {
 				missingCounts[shorthand]++
-				missingPrices[shorthand] += getPrice(indexResults[cardId][TCG_LOW], "")
+				missingPrices[shorthand] += getPrice(indexResults[cardId]["TCGLow"], "")
 			}
 		}
 
 		// Summary of the index entries
 		for indexKey, indexResult := range indexResults[cardId] {
 			var conds string
-			// TCG_DIRECT is the only index price that varies by condition
-			if indexKey == TCG_DIRECT {
+			// TCG Direct is the only index price that varies by condition
+			if indexKey == "TCGDirect" {
 				conds = uploadedData[i].OriginalCondition
 			}
 			if skipConds {
