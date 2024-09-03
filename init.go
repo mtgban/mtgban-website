@@ -878,7 +878,6 @@ func loadSellers(newbc *mtgban.BanClient) {
 				log.Printf("Loaded from file with %d entries", len(inv))
 			} else {
 				shorthand := newSellers[i].Info().Shorthand
-				opts := ScraperOptions[ScraperMap[shorthand]]
 
 				// If the old scraper data is old enough, pull from the new scraper
 				// and update it in the global slice
@@ -896,6 +895,7 @@ func loadSellers(newbc *mtgban.BanClient) {
 				}
 
 				// Stash data to DB if requested
+				opts := ScraperOptions[ScraperMap[shorthand]]
 				if opts.StashInventory || (opts.StashMarkets && opts.RDBs[shorthand] != nil) {
 					start := time.Now()
 					log.Println("Stashing", shorthand, "inventory data to DB")
@@ -1019,7 +1019,6 @@ func loadVendors(newbc *mtgban.BanClient) {
 				log.Printf("Loaded from file with %d entries", len(bl))
 			} else {
 				shorthand := newVendors[i].Info().Shorthand
-				opts := ScraperOptions[ScraperMap[shorthand]]
 
 				// If the old scraper data is old enough, pull from the new scraper
 				// and update it in the global slice
@@ -1036,6 +1035,7 @@ func loadVendors(newbc *mtgban.BanClient) {
 				}
 
 				// Stash data to DB if requested
+				opts := ScraperOptions[ScraperMap[shorthand]]
 				if opts.StashBuylist || (opts.StashTraders && opts.RDBs[shorthand] != nil) {
 					start := time.Now()
 					log.Println("Stashing", shorthand, "buylist data to DB")
