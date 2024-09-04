@@ -1043,7 +1043,7 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	// Decklist mode
 	if len(record) == 1 {
 		line := record[indexMap["cardName"]]
-		if unicode.IsDigit(rune(line[0])) {
+		if line != "" && unicode.IsDigit(rune(line[0])) {
 			// Parse both "4 x <name>" and "4x <name>"
 			fields := strings.Split(line, " ")
 			field := strings.TrimSuffix(fields[0], "x")
