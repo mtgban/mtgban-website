@@ -455,13 +455,6 @@ var ScraperOptions = map[string]*scraperOption{
 			}),
 		},
 	},
-	"tcg_directnet": &scraperOption{
-		DevEnabled: true,
-		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := tcgplayer.NewTCGDirectNet(Config.Api["ban_api_key"])
-			return scraper, nil
-		},
-	},
 	"sealed_ev": &scraperOption{
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
