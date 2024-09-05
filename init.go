@@ -522,6 +522,14 @@ var ScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
+	"abugames_sealed": &scraperOption{
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := abugames.NewScraperSealed()
+			scraper.LogCallback = logger.Printf
+			return scraper, nil
+		},
+		KeepersBL: abugames.NewScraperSealed().TraderNames(),
+	},
 
 	/* LORCANA SECTION */
 	"tcg_lorcana_index": &scraperOption{
