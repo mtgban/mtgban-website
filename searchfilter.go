@@ -1026,8 +1026,10 @@ func findInDeck(sealedUUID, opt string) []string {
 					board = deck.SideBoard
 				}
 
+				isEtched := strings.HasSuffix(deck.Name, "etched")
+
 				for _, card := range board {
-					uuid, err := mtgmatcher.MatchId(card.UUID, card.IsFoil)
+					uuid, err := mtgmatcher.MatchId(card.UUID, card.IsFoil, isEtched)
 					if err != nil {
 						continue
 					}
