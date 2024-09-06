@@ -307,7 +307,6 @@ var ScraperOptions = map[string]*scraperOption{
 	},
 	"tcg_market": &scraperOption{
 		DevEnabled: true,
-		OnlySeller: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := tcgplayer.NewScraperMarket(Config.Api["tcg_public"], Config.Api["tcg_private"])
 			scraper.Affiliate = Config.Affiliate["TCG"]
@@ -315,7 +314,8 @@ var ScraperOptions = map[string]*scraperOption{
 			scraper.MaxConcurrency = 6
 			return scraper, nil
 		},
-		Keepers: []string{TCG_MAIN, TCG_DIRECT},
+		Keepers:   []string{TCG_MAIN, TCG_DIRECT},
+		KeepersBL: []string{TCG_DIRECT_NET},
 	},
 	"tcg_index": &scraperOption{
 		DevEnabled: true,
