@@ -350,7 +350,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		pageVars.Headers = []string{
-			"", "Name", "Id+Logs", "Sealed", "Last Update", "Entries", "Status",
+			"", "Name", "Id+Logs", "Last Update", "Entries", "Status",
 		}
 		pageVars.OtherHeaders = pageVars.Headers
 
@@ -379,15 +379,14 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				status = "🔴"
 			}
 
-			sealed := ""
+			name := Sellers[i].Info().Name
 			if Sellers[i].Info().SealedMode {
-				sealed = "🎁"
+				name += " 📦"
 			}
 
 			row := []string{
-				Sellers[i].Info().Name,
+				name,
 				Sellers[i].Info().Shorthand,
-				sealed,
 				lastUpdate,
 				fmt.Sprint(len(inv)),
 				status,
@@ -421,15 +420,14 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				status = "🔴"
 			}
 
-			sealed := ""
+			name := Vendors[i].Info().Name
 			if Vendors[i].Info().SealedMode {
-				sealed = "🎁"
+				name += " 📦"
 			}
 
 			row := []string{
-				Vendors[i].Info().Name,
+				name,
 				Vendors[i].Info().Shorthand,
-				sealed,
 				lastUpdate,
 				fmt.Sprint(len(bl)),
 				status,
