@@ -1416,17 +1416,6 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 						return false
 					}
 				}
-			case "sldpromo":
-				if co.SetCode != "SLD" {
-					continue
-				}
-				values := cardobject2sources(co)
-				for _, sealedUUID := range values {
-					res := findInDeck(sealedUUID, "sideboard")
-					if slices.Contains(res, co.UUID) {
-						return false
-					}
-				}
 			case "ampersand":
 				if co.SetCode != "PAFR" {
 					continue
