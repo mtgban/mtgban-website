@@ -1134,7 +1134,6 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	var printing string
 	idx, found = indexMap["printing"]
 	if found && idx < len(record) {
-		log.Printf("%+v", indexMap)
 		printing = strings.ToLower(record[idx])
 	}
 	switch printing {
@@ -1228,7 +1227,6 @@ func loadCollection(link string, maxRows int) ([]UploadEntry, error) {
 		header = append(header, s.Text())
 	})
 
-	log.Println(header)
 	indexMap, err := parseHeader(header)
 	if err != nil {
 		return nil, err
