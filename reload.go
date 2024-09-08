@@ -21,8 +21,6 @@ func reloadTCG() {
 	reload("tcg_index")
 	reload("tcg_market")
 
-	reload("tcg_directnet")
-
 	ServerNotify("refresh", "tcg fully refreshed")
 }
 
