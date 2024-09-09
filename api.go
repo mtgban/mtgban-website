@@ -448,6 +448,13 @@ type OpenSearchURL struct {
 }
 
 func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
+	host := ""
+	gameName := "Magic: the Gathering"
+	if Config.Game == "Lorcana" {
+		host = "lorcana."
+		gameName = "Lorcana"
+	}
+
 	images := []OpenSearchImage{
 		{
 			Text:   "https://mtgban.com/img/favicon/favicon.ico",
@@ -468,27 +475,27 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 			Method:   "get",
 			Rel:      "results",
 			Type:     "text/html",
-			Template: "https://mtgban.com/search?q={searchTerms}",
+			Template: "https://" + host + "mtgban.com/search?q={searchTerms}",
 		},
 		{
 			Rel:      "self",
 			Type:     "application/opensearchdescription+xml",
-			Template: "https://mtgban.com/api/opensearch.xml",
+			Template: "https://" + host + "mtgban.com/api/opensearch.xml",
 		},
 		{
 			Rel:      "suggestions",
 			Type:     "application/json",
-			Template: "http://mtgban.com/api/suggest?q={searchTerms}",
+			Template: "http://" + host + "mtgban.com/api/suggest?q={searchTerms}",
 		},
 	}
 
 	openSearchDescription := OpenSearchDescriptionType{
 		Xmlns:         "http://a9.com/-/spec/opensearch/1.1/",
 		ShortName:     "MTGBAN Price Search",
-		Description:   "Search MTGBAN for Magic: the Gathering prices",
+		Description:   "Search MTGBAN for " + gameName + " prices",
 		Language:      "en",
 		InputEncoding: "UTF-8",
-		Tags:          "MTGBAN Magic the Gathering Price Search",
+		Tags:          "MTGBAN " + gameName + " Price Search",
 		Image:         images,
 		URL:           urls,
 	}
