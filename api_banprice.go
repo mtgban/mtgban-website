@@ -359,6 +359,13 @@ func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
 			}
 			return co.Identifiers["mtgjsonId"]
 		}
+	case "name":
+		return func(co *mtgmatcher.CardObject) string {
+			if co.Sealed {
+				return co.Name
+			}
+			return fmt.Sprintf("%s|%s|%s", co.Name, co.SetCode, co.Number)
+		}
 	case "mkm":
 		return func(co *mtgmatcher.CardObject) string {
 			return co.Identifiers["mcmId"]
