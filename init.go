@@ -530,6 +530,13 @@ var ScraperOptions = map[string]*scraperOption{
 		},
 		KeepersBL: abugames.NewScraperSealed().TraderNames(),
 	},
+	"trollandtoad_sealed": &scraperOption{
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := trollandtoad.NewScraperSealed()
+			scraper.LogCallback = logger.Printf
+			return scraper, nil
+		},
+	},
 
 	/* LORCANA SECTION */
 	"tcg_lorcana_index": &scraperOption{
