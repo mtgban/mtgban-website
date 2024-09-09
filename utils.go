@@ -171,12 +171,12 @@ func editionTitle(cardId string) string {
 	if co.Sealed {
 		subtype := strings.Replace(co.Side, "_", " ", -1)
 		category := strings.Replace(co.Layout, "_", " ", -1)
-		extra = mtgmatcher.Title(subtype + " " + category)
+		extra = mtgmatcher.Title(": " + subtype + ", " + category)
 	} else {
-		extra = "#" + co.Card.Number
+		extra = " #" + co.Card.Number
 	}
 
-	return fmt.Sprintf("%s -%s %s %s", edition, finish, mtgmatcher.Title(co.Card.Rarity), extra)
+	return fmt.Sprintf("%s -%s %s%s", edition, finish, mtgmatcher.Title(co.Card.Rarity), extra)
 }
 
 func insertNavBar(page string, nav []NavElem, extra []NavElem) []NavElem {

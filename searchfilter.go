@@ -215,6 +215,9 @@ func fixupFinishNG(code string) []string {
 func fixupTypeNG(code string) []string {
 	filters := strings.Split(code, ",")
 	for i := range filters {
+		filters[i] = strings.TrimPrefix(filters[i], "\"")
+		filters[i] = strings.TrimSuffix(filters[i], "\"")
+
 		filters[i] = mtgmatcher.Title(filters[i])
 	}
 	return filters
@@ -1226,11 +1229,22 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 		return rarityIndex <= rarityMap[co.Rarity]
 	},
 	"type": func(filters []string, co *mtgmatcher.CardObject) bool {
-		for _, value := range filters {
-			if slices.Contains(co.Subtypes, value) ||
-				slices.Contains(co.Types, value) ||
-				slices.Contains(co.Supertypes, value) {
-				return false
+		if co.Sealed {
+			for _, value := range filters {
+				value = strings.ToLower(strings.Replace(value, " ", "_", -1))
+				if strings.Contains(strings.ToLower(co.Layout), value) ||
+					strings.Contains(strings.ToLower(co.Side), value) ||
+					strings.Contains(strings.ToLower(co.Name), value) {
+					return false
+				}
+			}
+		} else {
+			for _, value := range filters {
+				if slices.Contains(co.Subtypes, value) ||
+					slices.Contains(co.Types, value) ||
+					slices.Contains(co.Supertypes, value) {
+					return false
+				}
 			}
 		}
 		return true
