@@ -862,9 +862,10 @@ func loadSellers(newbc *mtgban.BanClient) {
 				}
 			}
 
-			log.Println(newSellers[i].Info().Name, newSellers[i].Info().Shorthand, "Inventory at position", sellerIndex)
+			shorthand := newSellers[i].Info().Shorthand
+			log.Println("seller", shorthand, "is at position", sellerIndex)
 
-			fname := path.Join(InventoryDir, newSellers[i].Info().Shorthand+"-latest.json")
+			fname := path.Join(InventoryDir, shorthand+"-latest.json")
 			if init && fileExists(fname) {
 				seller, err := loadInventoryFromFile(fname)
 				if err != nil {
@@ -878,10 +879,8 @@ func loadSellers(newbc *mtgban.BanClient) {
 				}
 
 				inv, _ := seller.Inventory()
-				log.Printf("Loaded from file with %d entries", len(inv))
+				log.Printf("seller %s was loaded from file with %d entries", shorthand, len(inv))
 			} else {
-				shorthand := newSellers[i].Info().Shorthand
-
 				// If the old scraper data is old enough, pull from the new scraper
 				// and update it in the global slice
 				if sellerIndex < 0 || // Sellers[] != nil is checked above
@@ -890,11 +889,11 @@ func loadSellers(newbc *mtgban.BanClient) {
 					start := time.Now()
 					err := updateSellerAtPosition(newSellers[i], sellerIndex, true)
 					if err != nil {
-						msg := fmt.Sprintf("seller %s %s - %s", newSellers[i].Info().Name, shorthand, err.Error())
+						msg := fmt.Sprintf("seller %s - %s", shorthand, err.Error())
 						ServerNotify("reload", msg, true)
 						return
 					}
-					log.Println("Took", time.Since(start))
+					log.Println("seller", shorthand, "was loaded from Inventory(), took", time.Since(start))
 				}
 
 				// Stash data to DB if requested
@@ -931,7 +930,7 @@ func loadSellers(newbc *mtgban.BanClient) {
 				}
 				opts.Logger.Println("Saved to file")
 			}
-			log.Println(newSellers[i].Info().Name, "seller -- OK")
+			log.Println(shorthand, "seller -- OK")
 		}(i)
 
 		// If not in initilization mode, run the routines sequentially
@@ -1003,9 +1002,10 @@ func loadVendors(newbc *mtgban.BanClient) {
 				}
 			}
 
-			log.Println(newVendors[i].Info().Name, newVendors[i].Info().Shorthand, "Buylist at position", vendorIndex)
+			shorthand := newVendors[i].Info().Shorthand
+			log.Println("vendor", shorthand, "is at position", vendorIndex)
 
-			fname := path.Join(BuylistDir, newVendors[i].Info().Shorthand+"-latest.json")
+			fname := path.Join(BuylistDir, shorthand+"-latest.json")
 			if init && fileExists(fname) {
 				vendor, err := loadBuylistFromFile(fname)
 				if err != nil {
@@ -1019,9 +1019,8 @@ func loadVendors(newbc *mtgban.BanClient) {
 				}
 
 				bl, _ := vendor.Buylist()
-				log.Printf("Loaded from file with %d entries", len(bl))
+				log.Printf("vendor %s was loaded from file with %d entries", shorthand, len(bl))
 			} else {
-				shorthand := newVendors[i].Info().Shorthand
 
 				// If the old scraper data is old enough, pull from the new scraper
 				// and update it in the global slice
@@ -1030,11 +1029,11 @@ func loadVendors(newbc *mtgban.BanClient) {
 					start := time.Now()
 					err := updateVendorAtPosition(newVendors[i], vendorIndex, true)
 					if err != nil {
-						msg := fmt.Sprintf("vendor %s %s - %s", newVendors[i].Info().Name, shorthand, err.Error())
+						msg := fmt.Sprintf("vendor %s - %s", shorthand, err.Error())
 						ServerNotify("reload", msg, true)
 						return
 					}
-					log.Println("Took", time.Since(start))
+					log.Println("vendor", shorthand, "was loaded from Buylist(), took", time.Since(start))
 				}
 
 				// Stash data to DB if requested
@@ -1067,7 +1066,7 @@ func loadVendors(newbc *mtgban.BanClient) {
 				}
 				opts.Logger.Println("Saved to file")
 			}
-			log.Println(newVendors[i].Info().Name, "buylist -- OK")
+			log.Println(shorthand, "vendor -- OK")
 		}(i)
 
 		if !init {
