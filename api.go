@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"log"
@@ -417,4 +418,80 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 		w.Flush()
 	}
 	return nil
+}
+
+type OpenSearchDescriptionType struct {
+	XMLName       xml.Name          `xml:"OpenSearchDescription"`
+	Text          string            `xml:",chardata"`
+	Xmlns         string            `xml:"xmlns,attr"`
+	ShortName     string            `xml:"ShortName"`
+	Description   string            `xml:"Description"`
+	Language      string            `xml:"Language"`
+	InputEncoding string            `xml:"InputEncoding"`
+	Tags          string            `xml:"Tags"`
+	Image         []OpenSearchImage `xml:"Image"`
+	URL           []OpenSearchURL   `xml:"Url"`
+}
+
+type OpenSearchImage struct {
+	Text   string `xml:",chardata"`
+	Width  string `xml:"width,attr"`
+	Height string `xml:"height,attr"`
+	Type   string `xml:"type,attr"`
+}
+type OpenSearchURL struct {
+	Text     string `xml:",chardata"`
+	Method   string `xml:"method,attr,omitempty"`
+	Rel      string `xml:"rel,attr"`
+	Type     string `xml:"type,attr"`
+	Template string `xml:"template,attr"`
+}
+
+func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
+	images := []OpenSearchImage{
+		{
+			Text:   "https://mtgban.com/img/favicon/favicon.ico",
+			Width:  "32",
+			Height: "32",
+			Type:   "image/x-icon",
+		},
+		{
+			Text:   "https://mtgban.com/img/favicon/apple-touch-icon.png",
+			Width:  "120",
+			Height: "120",
+			Type:   "image/png",
+		},
+	}
+
+	urls := []OpenSearchURL{
+		{
+			Method:   "get",
+			Rel:      "results",
+			Type:     "text/html",
+			Template: "https://mtgban.com/search?q={searchTerms}",
+		},
+		{
+			Rel:      "self",
+			Type:     "application/opensearchdescription+xml",
+			Template: "https://mtgban.com/api/opensearch.xml",
+		},
+		{
+			Rel:      "suggestions",
+			Type:     "application/json",
+			Template: "http://mtgban.com/api/suggest?q={searchTerms}",
+		},
+	}
+
+	openSearchDescription := OpenSearchDescriptionType{
+		Xmlns:         "http://a9.com/-/spec/opensearch/1.1/",
+		ShortName:     "MTGBAN Price Search",
+		Description:   "Search MTGBAN for Magic: the Gathering prices",
+		Language:      "en",
+		InputEncoding: "UTF-8",
+		Tags:          "MTGBAN Magic the Gathering Price Search",
+		Image:         images,
+		URL:           urls,
+	}
+
+	xml.NewEncoder(w).Encode(&openSearchDescription)
 }
