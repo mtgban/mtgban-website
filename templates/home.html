@@ -71,6 +71,12 @@
             <a href="javascript:location.replace(getPatreonURL())">
                 <img src="/img/misc/login.png" width=360 height=60>
             </a>
+
+            <noscript>
+                <a href="http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{.PatreonId}}&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members">
+                    Login without JavaScript enabled
+                </a>
+            </noscript>
         {{else}}
             <a href="/?errmsg=logout"><img src="/img/misc/logout.png" width=236 height=60></a>
         {{end}}
