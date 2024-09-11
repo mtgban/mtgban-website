@@ -1304,7 +1304,7 @@ func loadSpreadsheet(link string, maxRows int) ([]UploadEntry, error) {
 		i++
 		if i > maxRows || i >= len(sheet.Rows) {
 			break
-		} else if len(record) != len(sheet.Rows[i]) {
+		} else if len(record) > len(sheet.Rows[i]) {
 			var res UploadEntry
 			res.MismatchError = errors.New("wrong number of fields")
 			uploadEntries = append(uploadEntries, res)
@@ -1365,7 +1365,7 @@ func loadOldXls(reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {
 		i++
 		if i > maxRows || i >= int(sheet.MaxRow) {
 			break
-		} else if len(record) != sheet.Row(i).LastCol() {
+		} else if len(record) > sheet.Row(i).LastCol() {
 			var res UploadEntry
 			res.MismatchError = errors.New("wrong number of fields")
 			uploadEntries = append(uploadEntries, res)
@@ -1430,7 +1430,7 @@ func loadXlsx(reader io.Reader, maxRows int) ([]UploadEntry, error) {
 		i++
 		if i > maxRows || i >= len(rows) {
 			break
-		} else if len(rows[i]) != len(rows[0]) {
+		} else if len(rows[i]) > len(rows[0]) {
 			var res UploadEntry
 			res.MismatchError = errors.New("wrong number of fields")
 			uploadEntries = append(uploadEntries, res)
