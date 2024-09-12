@@ -637,13 +637,29 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		ProfitabilityConstant: ProfConst,
 	}
 
-	// Set options
+	// Set options (if they apply to the right page mode)
 	for _, key := range FilterOptKeys {
 		isSet := arbitFilters[key]
-		_, hasFunc := FilterOptConfig[key]
-		if isSet && hasFunc {
-			FilterOptConfig[key].Func(opts)
+		if !isSet {
+			continue
 		}
+		config, found := FilterOptConfig[key]
+		if !found {
+			continue
+		}
+		if config.ArbitOnly && pageVars.GlobalMode {
+			continue
+		}
+		if config.NoSealed && pageVars.IsSealed {
+			continue
+		}
+		if config.SealedOnly && !pageVars.IsSealed {
+			continue
+		}
+		if config.BetaFlag && !anyOptionEnabled {
+			continue
+		}
+		FilterOptConfig[key].Func(opts)
 	}
 
 	// Customize opts for Globals
