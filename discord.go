@@ -444,6 +444,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		// Check if the message contains potential links
 		default:
+			// Only for the main game
+			if Config.Game != "" {
+				break
+			}
+
 			for _, store := range AffiliateStores {
 				if !strings.Contains(m.Content, store.Trigger) {
 					continue
