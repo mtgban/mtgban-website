@@ -601,6 +601,13 @@ Sims are not required for pre-constructed decks and other products where the sam
                             let condText = document.createTextNode(element.condition.replace(/[^A-Z]/g, '').replace('LP', 'SP'));
                             condCell.appendChild(condText);
 
+                            if (element.language !== "English") {
+                                let langCell = newRow.insertCell();
+                                langCell.style.textAlign = "center";
+                                let langText = document.createTextNode(element.language);
+                                langCell.appendChild(langText);
+                            }
+
                             let priceCell = newRow.insertCell();
                             priceCell.style.textAlign = "center";
                             let priceText = document.createTextNode("$ " + (element.purchasePrice + element.shippingPrice).toFixed(2));
