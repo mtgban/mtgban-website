@@ -539,7 +539,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				Description: errMsg,
 			})
 		}
-		UserNotify("bot", errMsg, false)
 		return
 	}
 	if searchRes.Invalid {
