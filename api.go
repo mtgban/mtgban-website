@@ -194,6 +194,14 @@ func getLastSold(cardId string) ([]tcgplayer.LatestSalesData, error) {
 		return nil, err
 	}
 
+	// If we got an empty response, try again with all the possible languages
+	if len(latestSales.Data) == 0 {
+		latestSales, err = tcgplayer.LatestSales(tcgId, co.Foil || co.Etched, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return latestSales.Data, nil
 }
 
