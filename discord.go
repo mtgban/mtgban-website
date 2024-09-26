@@ -339,7 +339,7 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 	},
 	{
 		Trigger:       "starcitygames.com/",
-		Skip:          []string{"sellyourcards"},
+		Skip:          []string{"sellyourcards", "articles"},
 		Name:          "Star City Games",
 		Handle:        "SCG",
 		DefaultFields: []string{"aff"},
