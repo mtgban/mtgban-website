@@ -845,6 +845,14 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			}
 			return color
 		},
+		"credit_factor": func(s string) float64 {
+			for _, vendor := range Vendors {
+				if vendor != nil && vendor.Info().Shorthand == s {
+					return vendor.Info().CreditMultiplier
+				}
+			}
+			return 0
+		},
 	}
 
 	// Give each template a name
