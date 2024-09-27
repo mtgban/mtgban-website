@@ -252,14 +252,20 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	hideSyp := slices.Contains(miscSearchOpts, "noSyp")
+	hideSus := slices.Contains(miscSearchOpts, "noSussy")
+	hidePromos := slices.Contains(miscSearchOpts, "hidePromos") || slices.Contains(miscSearchOpts, "hidePrelPack")
+
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
 	pageVars.Embed.PageURL = getBaseURL(r) + r.URL.String()
 	pageVars.Embed.OEmbedURL = getBaseURL(r) + "/search/oembed?format=json&url=" + url.QueryEscape(getBaseURL(r)+"/search?q="+query)
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
+	pageVars.ShowPromo = !slices.Contains(miscSearchOpts, "noUpsell")
 
-	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist)
+	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	if pageVars.IsSealed {
 		config.SearchMode = "sealed"
 		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
@@ -282,88 +288,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			Values:        []string{"NM"},
 			OnlyForVendor: true,
 		})
-	}
-
-	var hideSus bool
-	var hideSyp bool
-	miscSearchOpts := readCookie(r, "SearchMiscOpts")
-	if miscSearchOpts != "" {
-		for _, optName := range strings.Split(miscSearchOpts, ",") {
-			switch optName {
-			// Skip promotional entries (unless specified)
-			case "hidePromos":
-				var skipOption bool
-				for _, filter := range config.CardFilters {
-					if (filter.Name == "is" && !filter.Negate) || (filter.Name == "not" && filter.Negate) {
-						for _, value := range filter.Values {
-							if value == "promo" {
-								skipOption = true
-							}
-						}
-					}
-				}
-				if !skipOption {
-					config.CardFilters = append(config.CardFilters, FilterElem{
-						Name:   "is",
-						Negate: true,
-						Values: []string{"promo"},
-					})
-				}
-			case "hidePrelPack":
-				var skipOption bool
-				for _, filter := range config.CardFilters {
-					if (filter.Name == "is" && !filter.Negate) || (filter.Name == "not" && filter.Negate) {
-						for _, value := range filter.Values {
-							switch value {
-							case "promo", "promopack", "prerelease", "playpromo":
-								skipOption = true
-							}
-						}
-					}
-				}
-				if !skipOption {
-					config.CardFilters = append(config.CardFilters, FilterElem{
-						Name:   "is",
-						Negate: true,
-						Values: []string{"prerelease"},
-					})
-					config.CardFilters = append(config.CardFilters, FilterElem{
-						Name:   "is",
-						Negate: true,
-						Values: []string{"promopack"},
-					})
-					config.CardFilters = append(config.CardFilters, FilterElem{
-						Name:   "is",
-						Negate: true,
-						Values: []string{"playpromo"},
-					})
-				}
-			// Skip non-NM buylist prices
-			case "hideBLconds":
-				config.EntryFilters = append(config.EntryFilters, FilterEntryElem{
-					Name:          "condition",
-					Values:        []string{"NM"},
-					OnlyForVendor: true,
-				})
-			// Skip results with no prices
-			case "skipEmpty":
-				config.PostFilters = append(config.PostFilters, FilterPostElem{
-					Name: "empty",
-				})
-			case "noSyp":
-				hideSyp = true
-			case "noUpsell":
-				pageVars.ShowPromo = true
-			case "noSussy":
-				hideSus = true
-				config.PriceFilters = append(config.PriceFilters, &FilterPriceElem{
-					Name:        "invalid_direct",
-					Price4Store: price4seller,
-					Stores:      []string{"TCGMarket"},
-					ApplyTo:     []string{"TCGDirect", "TCGDirectNet"},
-				})
-			}
-		}
 	}
 
 	// Perform search
@@ -431,11 +355,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Early exit if there no matches are found
 	if len(allKeys) == 0 {
 		pageVars.InfoMessage = NoResultsMessage
-		for _, optName := range strings.Split(miscSearchOpts, ",") {
-			switch optName {
-			case "hidePromos", "hidePrelPack":
-				pageVars.InfoMessage = NoPromosMessage
-			}
+		if hidePromos {
+			pageVars.InfoMessage = NoPromosMessage
 		}
 		render(w, "search.html", pageVars)
 		return
@@ -709,7 +630,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// CHART ALL THE THINGS
 	if chartId != "" {
 		// Rebuild the search query by faking a uuid lookup
-		cfg := parseSearchOptionsNG(chartId, nil, nil)
+		cfg := parseSearchOptionsNG(chartId, nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data

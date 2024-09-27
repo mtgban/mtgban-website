@@ -45,7 +45,7 @@ func TestMain(m *testing.M) {
 }
 
 func parseSearchOptionsWrapper(input string) SearchConfig {
-	return parseSearchOptionsNG(input, nil, nil)
+	return parseSearchOptionsNG(input, nil, nil, nil)
 }
 
 func BenchmarkRegexp(b *testing.B) {

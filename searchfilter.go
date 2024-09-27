@@ -480,7 +480,7 @@ func init() {
 	re = regexp.MustCompile(regexpOptions)
 }
 
-func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string) (config SearchConfig) {
+func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) (config SearchConfig) {
 	var filters []FilterElem
 	var filterStores []FilterStoreElem
 	var filterPrices []*FilterPriceElem
@@ -945,8 +945,82 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		if len(elements) > 2 {
 			extraQuery += " cn:" + strings.TrimSpace(elements[2])
 		}
-		extraConfig := parseSearchOptionsNG(extraQuery, nil, nil)
+		extraConfig := parseSearchOptionsNG(extraQuery, nil, nil, miscSearchOpts)
 		filters = append(filters, extraConfig.CardFilters...)
+	}
+
+	// Apply any search not coming from the query itself
+	for _, optName := range miscSearchOpts {
+		switch optName {
+		// Skip promotional entries (unless specified)
+		case "hidePromos":
+			var skipOption bool
+			for _, filter := range filters {
+				if (filter.Name == "is" && !filter.Negate) || (filter.Name == "not" && filter.Negate) {
+					for _, value := range filter.Values {
+						if value == "promo" {
+							skipOption = true
+						}
+					}
+				}
+			}
+			if !skipOption {
+				filters = append(filters, FilterElem{
+					Name:   "is",
+					Negate: true,
+					Values: []string{"promo"},
+				})
+			}
+		case "hidePrelPack":
+			var skipOption bool
+			for _, filter := range filters {
+				if (filter.Name == "is" && !filter.Negate) || (filter.Name == "not" && filter.Negate) {
+					for _, value := range filter.Values {
+						switch value {
+						case "promo", "promopack", "prerelease", "playpromo":
+							skipOption = true
+						}
+					}
+				}
+			}
+			if !skipOption {
+				filters = append(filters, FilterElem{
+					Name:   "is",
+					Negate: true,
+					Values: []string{"prerelease"},
+				})
+				filters = append(filters, FilterElem{
+					Name:   "is",
+					Negate: true,
+					Values: []string{"promopack"},
+				})
+				filters = append(filters, FilterElem{
+					Name:   "is",
+					Negate: true,
+					Values: []string{"playpromo"},
+				})
+			}
+		// Skip non-NM buylist prices
+		case "hideBLconds":
+			filterEntries = append(filterEntries, FilterEntryElem{
+				Name:          "condition",
+				Values:        []string{"NM"},
+				OnlyForVendor: true,
+			})
+		// Skip results with no prices
+		case "skipEmpty":
+			filterPost = append(filterPost, FilterPostElem{
+				Name: "empty",
+			})
+		// Skip results with suspicious prices
+		case "noSussy":
+			filterPrices = append(filterPrices, &FilterPriceElem{
+				Name:        "invalid_direct",
+				Price4Store: price4seller,
+				Stores:      []string{"TCGMarket"},
+				ApplyTo:     []string{"TCGDirect", "TCGDirectNet"},
+			})
+		}
 	}
 
 	config.CleanQuery = strings.TrimSpace(query)

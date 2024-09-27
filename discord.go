@@ -162,7 +162,7 @@ var filteredEditions = []string{
 
 func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 	// Clean up query, no blocklist because we only need keys
-	config := parseSearchOptionsNG(content, nil, nil)
+	config := parseSearchOptionsNG(content, nil, nil, nil)
 	query := config.CleanQuery
 
 	// Enable sealed mode
@@ -554,7 +554,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var channel chan *discordgo.MessageEmbed
 
 	if allBls {
-		config := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, DiscordBuylistBlocklist)
+		config := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
 
 		// Skip any store based outside of the US
 		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
