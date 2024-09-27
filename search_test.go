@@ -44,12 +44,16 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func parseSearchOptionsWrapper(input string) SearchConfig {
+	return parseSearchOptionsNG(input, nil, nil)
+}
+
 func BenchmarkRegexp(b *testing.B) {
 	input := fmt.Sprintf("%s sm:prefix cn:%s f:foil vendor:CK date>%s", NameToBeFound, NumberToBeFound, EditionToBeFound)
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		parseSearchOptionsNG(input, nil, nil)
+		parseSearchOptionsWrapper(input)
 	}
 }
 
@@ -65,7 +69,7 @@ func BenchmarkSearchExact(b *testing.B) {
 }
 
 func BenchmarkSearchPrefix(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("%s sm:prefix", NameToBeFound), nil, nil)
+	config := parseSearchOptionsWrapper(fmt.Sprintf("%s sm:prefix", NameToBeFound))
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(config)
@@ -74,7 +78,7 @@ func BenchmarkSearchPrefix(b *testing.B) {
 }
 
 func BenchmarkSearchAllFromEdition(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("s:%s", EditionToBeFound), nil, nil)
+	config := parseSearchOptionsWrapper(fmt.Sprintf("s:%s", EditionToBeFound))
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -84,7 +88,7 @@ func BenchmarkSearchAllFromEdition(b *testing.B) {
 }
 
 func BenchmarkSearchWithEdition(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("%s s:%s", NameToBeFound, EditionToBeFound), nil, nil)
+	config := parseSearchOptionsWrapper(fmt.Sprintf("%s s:%s", NameToBeFound, EditionToBeFound))
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -94,7 +98,7 @@ func BenchmarkSearchWithEdition(b *testing.B) {
 }
 
 func BenchmarkSearchWithNumber(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("%s cn:%s", NameToBeFound, NumberToBeFound), nil, nil)
+	config := parseSearchOptionsWrapper(fmt.Sprintf("%s cn:%s", NameToBeFound, NumberToBeFound))
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
@@ -104,7 +108,7 @@ func BenchmarkSearchWithNumber(b *testing.B) {
 }
 
 func BenchmarkSearchWithEditionPrefix(b *testing.B) {
-	config := parseSearchOptionsNG(fmt.Sprintf("%s s:%s sm:prefix", NameToBeFound, EditionToBeFound), nil, nil)
+	config := parseSearchOptionsWrapper(fmt.Sprintf("%s s:%s sm:prefix", NameToBeFound, EditionToBeFound))
 
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
