@@ -366,10 +366,18 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Perform search
+	allKeys, err := searchAndFilter(config)
+	if err != nil {
+		pageVars.InfoMessage = NoCardsMessage
+		render(w, "search.html", pageVars)
+		return
+	}
+
 	// Hijack for csv download
 	downloadCSV := r.FormValue("downloadCSV")
 	if canDownloadCSV && (downloadCSV == "retail" || downloadCSV == "buylist") {
-		err = downloadSearchCSV(w, downloadCSV, config, blocklistRetail, blocklistBuylist)
+		err = downloadSearchCSV(w, allKeys, downloadCSV, blocklistRetail, blocklistBuylist, pageVars.IsSealed)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
@@ -379,20 +387,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	} else if downloadCSV == "decklist" {
-		// Perform the search
-		selectedUUIDs, err := searchAndFilter(config)
-		if err != nil {
-			UserNotify("search", err.Error())
-			pageVars.InfoMessage = "Unable to download CSV right now"
-			render(w, "search.html", pageVars)
-			return
-		}
-
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+config.PrivateData+".csv\"")
 		csvWriter := csv.NewWriter(w)
 
-		err = UUID2TCGCSV(csvWriter, selectedUUIDs)
+		err = UUID2TCGCSV(csvWriter, allKeys)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
@@ -403,12 +402,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allKeys, err := searchAndFilter(config)
-	if err != nil {
-		pageVars.InfoMessage = NoCardsMessage
-		render(w, "search.html", pageVars)
-		return
-	}
 	if len(allKeys) > MaxSearchTotalResults {
 		pageVars.TotalCards = len(allKeys)
 		pageVars.InfoMessage = TooManyMessage
@@ -873,13 +866,7 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 	}, nil
 }
 
-func downloadSearchCSV(w http.ResponseWriter, option string, config SearchConfig, blocklistRetail, blocklistBuylist []string) error {
-	// Perform the search
-	selectedUUIDs, err := searchAndFilter(config)
-	if err != nil {
-		return err
-	}
-
+func downloadSearchCSV(w http.ResponseWriter, selectedUUIDs []string, option string, blocklistRetail, blocklistBuylist []string, isSealed bool) error {
 	// Limit results to be processed
 	if len(selectedUUIDs) > MaxUploadProEntries {
 		selectedUUIDs = selectedUUIDs[:MaxUploadProEntries]
@@ -888,7 +875,6 @@ func downloadSearchCSV(w http.ResponseWriter, option string, config SearchConfig
 	var enabledStores []string
 	var results map[string]map[string]*BanPrice
 	var filename string
-	isSealed := config.SearchMode == "sealed"
 	mode := "scryfall"
 	if isSealed {
 		mode = "mtgjson"
