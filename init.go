@@ -722,6 +722,10 @@ func loadScrapers() {
 			continue
 		}
 
+		if BenchMode && strings.Contains(key, "lorcana") {
+			continue
+		}
+
 		scraper, err := opt.Init(opt.Logger)
 		if err != nil {
 			msg := fmt.Sprintf("error initializing %s: %s", key, err.Error())
@@ -786,11 +790,11 @@ func loadScrapers() {
 	loadSellers(newbc)
 	loadVendors(newbc)
 
-	go updateStaticData()
-
 	if BenchMode {
 		return
 	}
+
+	go updateStaticData()
 
 	if init {
 		ServerNotify("init", "loading completed")

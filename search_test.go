@@ -14,6 +14,11 @@ var EditionToBeFound string
 var NumberToBeFound string
 
 func TestMain(m *testing.M) {
+	InventoryDir = "cache_inv"
+	BuylistDir = "cache_bl"
+	LogDir = "logs"
+	Config.DatastorePath = "allprintings5.json"
+
 	err := loadDatastore()
 	if err != nil {
 		log.Fatalln(err)
