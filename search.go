@@ -376,28 +376,29 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Hijack for csv download
 	downloadCSV := r.FormValue("downloadCSV")
-	if canDownloadCSV && (downloadCSV == "retail" || downloadCSV == "buylist") {
-		filename := "mtgban_" + downloadCSV + "_prices"
+	switch downloadCSV {
+	case "retail", "buylist", "decklist":
+		filename := config.PrivateData
+		switch downloadCSV {
+		case "retail", "buylist":
+			if !canDownloadCSV {
+				pageVars.InfoMessage = "Unable to download CSV (unauthorized)"
+				render(w, "search.html", pageVars)
+				return
+			}
+			filename = "mtgban_" + downloadCSV + "_prices"
+		}
 
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+".csv\"")
 		csvWriter := csv.NewWriter(w)
 
-		err = downloadSearchCSV(csvWriter, allKeys, downloadCSV, blocklistRetail, blocklistBuylist, pageVars.IsSealed)
-		if err != nil {
-			w.Header().Del("Content-Type")
-			w.Header().Del("Content-Disposition")
-			UserNotify("search", err.Error())
-			pageVars.InfoMessage = "Unable to download CSV right now"
-			render(w, "search.html", pageVars)
+		switch downloadCSV {
+		case "retail", "buylist":
+			err = downloadSearchCSV(csvWriter, allKeys, downloadCSV, blocklistRetail, blocklistBuylist, pageVars.IsSealed)
+		case "decklist":
+			err = UUID2TCGCSV(csvWriter, allKeys)
 		}
-		return
-	} else if downloadCSV == "decklist" {
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+config.PrivateData+".csv\"")
-		csvWriter := csv.NewWriter(w)
-
-		err = UUID2TCGCSV(csvWriter, allKeys)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
