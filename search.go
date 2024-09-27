@@ -454,7 +454,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	embed, err := generateEmbed(allKeys, foundSellers, foundVendors, pageVars.HasStocks, pageVars.HasSypList)
+	embed := generateEmbed(allKeys, foundSellers, foundVendors, pageVars.HasStocks, pageVars.HasSypList)
 	if oembed {
 		if len(allKeys) == 0 {
 			w.WriteHeader(http.StatusNotFound)
@@ -707,7 +707,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry, hasStocks, hasSyplist bool) (*OEmbed, error) {
+func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry, hasStocks, hasSyplist bool) *OEmbed {
 	title := "Search Preview"
 	img := ""
 	htmlBody := ""
@@ -716,7 +716,7 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 	for i, cardId := range allKeys {
 		co, err := mtgmatcher.GetUUID(cardId)
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		if i == 0 {
@@ -780,7 +780,7 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 		ThumbnailURL:    img,
 		ThumbnailWidth:  488,
 		ThumbnailHeight: 680,
-	}, nil
+	}
 }
 
 func downloadSearchCSV(csvWriter *csv.Writer, selectedUUIDs []string, option string, blocklistRetail, blocklistBuylist []string, isSealed bool) error {
