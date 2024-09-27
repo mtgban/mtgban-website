@@ -454,7 +454,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	embed := generateEmbed(allKeys, foundSellers, foundVendors, pageVars.HasStocks, pageVars.HasSypList)
+	embed := generateEmbed(allKeys, foundSellers, foundVendors)
 	if oembed {
 		if len(allKeys) == 0 {
 			w.WriteHeader(http.StatusNotFound)
@@ -707,7 +707,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry, hasStocks, hasSyplist bool) *OEmbed {
+func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry) *OEmbed {
 	title := "Search Preview"
 	img := ""
 	htmlBody := ""
