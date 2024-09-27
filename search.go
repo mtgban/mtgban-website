@@ -256,6 +256,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	hideSyp := slices.Contains(miscSearchOpts, "noSyp")
 	hideSus := slices.Contains(miscSearchOpts, "noSussy")
 	hidePromos := slices.Contains(miscSearchOpts, "hidePromos") || slices.Contains(miscSearchOpts, "hidePrelPack")
+	if oembed {
+		miscSearchOpts = append(miscSearchOpts, "oembed")
+	}
 
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
@@ -274,20 +277,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if config.SortMode != "" {
 		pageVars.SearchSort = config.SortMode
 		pageVars.NoSort = true
-	}
-
-	if oembed {
-		// Skip any store based outside of the US
-		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
-			Name:   "region",
-			Values: []string{"us"},
-		})
-		// Skip non-NM buylist prices
-		config.EntryFilters = append(config.EntryFilters, FilterEntryElem{
-			Name:          "condition",
-			Values:        []string{"NM"},
-			OnlyForVendor: true,
-		})
 	}
 
 	// Perform search

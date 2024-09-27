@@ -1020,6 +1020,18 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Stores:      []string{"TCGMarket"},
 				ApplyTo:     []string{"TCGDirect", "TCGDirectNet"},
 			})
+		case "oembed":
+			// Skip any store based outside of the US
+			filterStores = append(filterStores, FilterStoreElem{
+				Name:   "region",
+				Values: []string{"us"},
+			})
+			// Skip non-NM buylist prices
+			filterEntries = append(filterEntries, FilterEntryElem{
+				Name:          "condition",
+				Values:        []string{"NM"},
+				OnlyForVendor: true,
+			})
 		}
 	}
 
