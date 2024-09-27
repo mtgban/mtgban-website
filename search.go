@@ -377,7 +377,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Hijack for csv download
 	downloadCSV := r.FormValue("downloadCSV")
 	if canDownloadCSV && (downloadCSV == "retail" || downloadCSV == "buylist") {
-		err = downloadSearchCSV(w, allKeys, downloadCSV, blocklistRetail, blocklistBuylist, pageVars.IsSealed)
+		filename := "mtgban_" + downloadCSV + "_prices"
+
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+".csv\"")
+		csvWriter := csv.NewWriter(w)
+
+		err = downloadSearchCSV(csvWriter, allKeys, downloadCSV, blocklistRetail, blocklistBuylist, pageVars.IsSealed)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
@@ -866,7 +872,7 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 	}, nil
 }
 
-func downloadSearchCSV(w http.ResponseWriter, selectedUUIDs []string, option string, blocklistRetail, blocklistBuylist []string, isSealed bool) error {
+func downloadSearchCSV(csvWriter *csv.Writer, selectedUUIDs []string, option string, blocklistRetail, blocklistBuylist []string, isSealed bool) error {
 	// Limit results to be processed
 	if len(selectedUUIDs) > MaxUploadProEntries {
 		selectedUUIDs = selectedUUIDs[:MaxUploadProEntries]
@@ -874,7 +880,6 @@ func downloadSearchCSV(w http.ResponseWriter, selectedUUIDs []string, option str
 
 	var enabledStores []string
 	var results map[string]map[string]*BanPrice
-	var filename string
 	mode := "scryfall"
 	if isSealed {
 		mode = "mtgjson"
@@ -889,7 +894,6 @@ func downloadSearchCSV(w http.ResponseWriter, selectedUUIDs []string, option str
 		}
 
 		results = getSellerPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed, "names")
-		filename = "mtgban_retail_prices.csv"
 	case "buylist":
 		for _, vendor := range Vendors {
 			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
@@ -898,14 +902,9 @@ func downloadSearchCSV(w http.ResponseWriter, selectedUUIDs []string, option str
 		}
 
 		results = getVendorPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed, "names")
-		filename = "mtgban_buylist_prices.csv"
 	default:
 		return errors.New("invalid option")
 	}
-
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
-	csvWriter := csv.NewWriter(w)
 
 	return BanPrice2CSV(csvWriter, results, true, true, isSealed)
 }
