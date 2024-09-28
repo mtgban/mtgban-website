@@ -1013,8 +1013,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                     {{end}}
                                                     <td style="text-align: center; vertical-align: middle;">
                                                         $ {{printf "%.2f" .Price}}
-                                                        {{if .IsSussy}}
-                                                            <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if .SusPrice}}${{printf "%.2f" .SusPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                        {{if eq .Shorthand "TCGDirect"}}
+                                                            {{$marketPrice := tcg_market_price $cardId}}
+                                                            {{if gt .Price (mul $marketPrice 2)}}
+                                                                <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if $marketPrice}}${{printf "%.2f" $marketPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                            {{end}}
                                                         {{end}}
                                                     </td>
                                                     {{if .IndexCombined}}
@@ -1078,8 +1081,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 <td style="text-align: center; vertical-align: middle;" {{if .Credit}}title="Credit: $ {{printf "%.2f" .Credit}}"{{end}}>
                                                     {{if ne .Shorthand "SYP"}}
                                                         $ {{printf "%.2f" .Price}}
-                                                        {{if .IsSussy}}
-                                                            <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if .SusPrice}}${{printf "%.2f" .SusPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                        {{if eq .Shorthand "TCGDirectNet"}}
+                                                            {{$marketPrice := tcg_market_price $cardId}}
+                                                            {{if gt .Price (mul $marketPrice 2)}}
+                                                                <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if $marketPrice}}${{printf "%.2f" $marketPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                            {{end}}
                                                         {{end}}
                                                     {{else}}
                                                         # {{.Quantity}}

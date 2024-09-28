@@ -58,10 +58,6 @@ type SearchEntry struct {
 
 	// Cannot use slices or pointers to remain compatible with Comparable
 	Tertiary float64
-
-	// Price does not look correct
-	IsSussy  bool
-	SusPrice float64
 }
 
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
@@ -254,7 +250,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	hideSyp := slices.Contains(miscSearchOpts, "noSyp")
-	hideSus := slices.Contains(miscSearchOpts, "noSussy")
 	hidePromos := slices.Contains(miscSearchOpts, "hidePromos") || slices.Contains(miscSearchOpts, "hidePrelPack")
 	if oembed {
 		miscSearchOpts = append(miscSearchOpts, "oembed")
@@ -585,31 +580,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		foundSellers[cardId]["INDEX"] = tmp
-	}
-
-	// Mark suspicious prices from TCG Direct
-	if !hideSus {
-		for _, cardId := range allKeys {
-			marketPrice := getTCGMarketPrice(cardId)
-
-			for _, foundScrapers := range []map[string][]SearchEntry{
-				foundSellers[cardId], foundVendors[cardId],
-			} {
-				for cond, entries := range foundScrapers {
-					for i, entry := range entries {
-						switch entry.Shorthand {
-						case "TCGDirect", "TCGDirectNet":
-						default:
-							continue
-						}
-						if entry.Price/2 > marketPrice {
-							foundScrapers[cond][i].IsSussy = true
-							foundScrapers[cond][i].SusPrice = marketPrice
-						}
-					}
-				}
-			}
-		}
 	}
 
 	pageVars.FoundSellers = foundSellers

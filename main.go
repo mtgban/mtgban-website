@@ -853,6 +853,9 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			}
 			return 0
 		},
+		"tcg_market_price": func(s string) float64 {
+			return getTCGMarketPrice(s)
+		},
 	}
 
 	// Give each template a name
