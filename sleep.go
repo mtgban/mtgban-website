@@ -66,7 +66,6 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	if skipEditionsOpt != "" {
 		skipEditions = strings.Split(skipEditionsOpt, ",")
 	}
-	skipEditions = append(skipEditions, "PMIC")
 
 	var tiers map[string]int
 

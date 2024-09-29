@@ -296,9 +296,8 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 
 		// Skip very old stuff
 		switch set.Code {
-		case "PVAN", "OARC", "PCEL", "PDCI",
+		case "PCEL",
 			"LEG", "DRK", "ATQ", "ARN", "PTK",
-			"OPCA", "OHOP",
 			"FBB", "4BB", "DRKITA", "LEGITA", "RIN", "4EDALT", "BCHR":
 			continue
 		}
@@ -306,6 +305,7 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 		// Skip strange stuff
 		if co.IsReserved || co.Sealed || co.IsFunny || mtgmatcher.IsToken(co.Name) ||
 			co.BorderColor == "gold" || co.BorderColor == "silver" ||
+			co.Rarity == "oversize" ||
 			co.HasPromoType(mtgjson.PromoTypePromoPack) ||
 			co.HasPromoType(mtgjson.PromoTypePrerelease) {
 			continue
