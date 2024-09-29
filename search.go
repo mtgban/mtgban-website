@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -176,15 +175,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
 	pageVars.CanDownloadCSV = canDownloadCSV
-	downloadCSV := r.FormValue("downloadCSV")
-	switch downloadCSV {
-	case "retail", "buylist":
-		if !canDownloadCSV {
-			pageVars.ErrorMessage = "Unable to download CSV (unauthorized)"
-			render(w, "search.html", pageVars)
-			return
-		}
-	}
 
 	if len(query) > MaxSearchQueryLen {
 		pageVars.ErrorMessage = TooLongMessage
@@ -292,26 +282,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hijack for csv download
-	switch downloadCSV {
-	case "retail", "buylist":
-		filename := "mtgban_" + downloadCSV + "_prices"
-
-		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+".csv\"")
-		csvWriter := csv.NewWriter(w)
-
-		err = downloadSearchCSV(csvWriter, allKeys, downloadCSV, blocklistRetail, blocklistBuylist, pageVars.IsSealed)
-		if err != nil {
-			w.Header().Del("Content-Type")
-			w.Header().Del("Content-Disposition")
-			UserNotify("search", err.Error())
-			pageVars.InfoMessage = "Unable to download CSV right now"
-			render(w, "search.html", pageVars)
-		}
-		return
-	}
-
 	// Limit results to avoid hogging the website with large queries
 	if len(allKeys) > MaxSearchTotalResults {
 		pageVars.TotalCards = len(allKeys)
@@ -349,9 +319,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.TotalUnique = len(allKeys)
 
 	// Needed to load search in Upload
-	if canDownloadCSV {
-		pageVars.CardHashes = allKeys
-	}
+	pageVars.CardHashes = allKeys
 
 	// Sort sets as requested, default to chronological
 	switch pageVars.SearchSort {
@@ -740,43 +708,6 @@ func generateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[s
 		ThumbnailWidth:  488,
 		ThumbnailHeight: 680,
 	}
-}
-
-func downloadSearchCSV(csvWriter *csv.Writer, selectedUUIDs []string, option string, blocklistRetail, blocklistBuylist []string, isSealed bool) error {
-	// Limit results to be processed
-	if len(selectedUUIDs) > MaxUploadProEntries {
-		selectedUUIDs = selectedUUIDs[:MaxUploadProEntries]
-	}
-
-	var enabledStores []string
-	var results map[string]map[string]*BanPrice
-	mode := "scryfall"
-	if isSealed {
-		mode = "mtgjson"
-	}
-
-	switch option {
-	case "retail":
-		for _, seller := range Sellers {
-			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-				enabledStores = append(enabledStores, seller.Info().Shorthand)
-			}
-		}
-
-		results = getSellerPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed, "names")
-	case "buylist":
-		for _, vendor := range Vendors {
-			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-				enabledStores = append(enabledStores, vendor.Info().Shorthand)
-			}
-		}
-
-		results = getVendorPrices(mode, enabledStores, "", selectedUUIDs, "", true, true, isSealed, "names")
-	default:
-		return errors.New("invalid option")
-	}
-
-	return BanPrice2CSV(csvWriter, results, true, true, isSealed)
 }
 
 func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry) {

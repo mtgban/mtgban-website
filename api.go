@@ -18,6 +18,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"golang.org/x/exp/maps"
+	"golang.org/x/exp/slices"
 )
 
 type ckMeta struct {
@@ -542,4 +543,91 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 	}
 
 	xml.NewEncoder(w).Encode(&openSearchDescription)
+}
+
+func SearchAPI(w http.ResponseWriter, r *http.Request) {
+	sig := getSignatureFromCookies(r)
+
+	// Load whether a user can download CSV and validate the query parameter
+	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
+	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
+	if !canDownloadCSV {
+		pageVars := genPageNav("Error", sig)
+		pageVars.Title = "Unauthorized"
+		pageVars.ErrorMessage = "Unable to download CSV"
+		render(w, "home.html", pageVars)
+		return
+	}
+
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+
+	isRetail := strings.Contains(r.URL.Path, "/retail/")
+	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
+	isSealed := strings.Contains(r.URL.Path, "/sealed/")
+
+	query := r.URL.Path
+	query = strings.TrimPrefix(query, "/api/search/retail/")
+	query = strings.TrimPrefix(query, "/api/search/buylist/")
+	query = strings.TrimPrefix(query, "sealed/")
+
+	mode := "scryfall"
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	if isSealed {
+		config.SearchMode = "sealed"
+		mode = "mtgjson"
+	}
+
+	// Perform search
+	allKeys, _ := searchAndFilter(config)
+
+	// Limit results to be processed
+	if len(allKeys) > MaxUploadProEntries {
+		allKeys = allKeys[:MaxUploadProEntries]
+	}
+
+	// Retrieve prices
+	var results map[string]map[string]*BanPrice
+	var filename string
+	if isRetail {
+		filename = "mtgban_retail_prices"
+
+		var enabledStores []string
+		for _, seller := range Sellers {
+			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+				enabledStores = append(enabledStores, seller.Info().Shorthand)
+			}
+		}
+
+		results = getSellerPrices(mode, enabledStores, "", allKeys, "", true, true, isSealed, "names")
+	} else if isBuylist {
+		filename = "mtgban_buylist_prices"
+
+		var enabledStores []string
+		for _, vendor := range Vendors {
+			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
+				enabledStores = append(enabledStores, vendor.Info().Shorthand)
+			}
+		}
+
+		results = getVendorPrices(mode, enabledStores, "", allKeys, "", true, true, isSealed, "names")
+	}
+	if isSealed {
+		filename += "_sealed"
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+".csv\"")
+	csvWriter := csv.NewWriter(w)
+	err := BanPrice2CSV(csvWriter, results, true, true, isSealed)
+	if err != nil {
+		w.Header().Del("Content-Type")
+		w.Header().Del("Content-Disposition")
+		UserNotify("search", err.Error())
+		pageVars := genPageNav("Error", sig)
+		pageVars.Title = "Error"
+		pageVars.InfoMessage = "Unable to download CSV right now"
+		render(w, "home.html", pageVars)
+		return
+	}
 }

@@ -739,6 +739,7 @@ func main() {
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
 	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
 	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
+	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
 	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
