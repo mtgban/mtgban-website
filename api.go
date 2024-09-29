@@ -395,7 +395,7 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 		}
 
 		cond := "Near Mint"
-		if co.Foil {
+		if co.Foil || co.Etched {
 			cond = "Near Mint Foil"
 		}
 
