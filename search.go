@@ -317,6 +317,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit results to avoid hogging the website with large queries
 	if len(allKeys) > MaxSearchTotalResults {
 		pageVars.TotalCards = len(allKeys)
 		pageVars.InfoMessage = TooManyMessage
@@ -324,14 +325,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	foundSellers, foundVendors := searchParallelNG(allKeys, config)
-
-	cleanQuery := config.CleanQuery
-	canShowAll := (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
-
-	// Only used in hashing searches, fill in data with what is available
-	if config.FullQuery != "" {
-		pageVars.SearchQuery = config.FullQuery
-	}
 
 	// Filter away any empty result
 	allKeys = PostSearchFilter(config, allKeys, foundSellers, foundVendors)
@@ -346,10 +339,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Only used in hashing searches, fill in data with what is available
+	if config.FullQuery != "" {
+		pageVars.SearchQuery = config.FullQuery
+	}
+
 	// Allow displaying the "search all" link only when something
 	// was searched and no options were specified for it
-	pageVars.CanShowAll = cleanQuery != "" && canShowAll
-	pageVars.CleanSearchQuery = cleanQuery
+	canShowAll := config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
+	pageVars.CanShowAll = canShowAll
+	pageVars.CleanSearchQuery = config.CleanQuery
 
 	// Save stats
 	pageVars.TotalUnique = len(allKeys)
