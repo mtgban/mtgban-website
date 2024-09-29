@@ -219,28 +219,61 @@ func getDrirectQty(cardId string) ([]tcgplayer.ListingData, error) {
 	return tcgplayer.GetDirectQtysForProductId(tcgId, true), nil
 }
 
+func tcgDecklist(uuid string) ([]string, error) {
+	co, err := mtgmatcher.GetUUID(uuid)
+	if err != nil {
+		return nil, err
+	}
+
+	return mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+}
+
 func TCGHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	isLastSold := strings.Contains(r.URL.Path, "lastsold")
 	isDirectQty := strings.Contains(r.URL.Path, "directqty")
+	isDecklist := strings.Contains(r.URL.Path, "decklist")
 
 	cardId := r.URL.Path
 	cardId = strings.TrimPrefix(cardId, "/api/tcgplayer/lastsold/")
 	cardId = strings.TrimPrefix(cardId, "/api/tcgplayer/directqty/")
+	cardId = strings.TrimPrefix(cardId, "/api/tcgplayer/decklist/")
 
 	var data any
 	var err error
+	var useCSV bool
 	if isLastSold {
 		UserNotify("tcgLastSold", cardId)
 		data, err = getLastSold(cardId)
 	} else if isDirectQty {
 		UserNotify("tcgDirectQty", cardId)
 		data, err = getDrirectQty(cardId)
+	} else if isDecklist {
+		UserNotify("tcgDecklist", cardId)
+		data, err = tcgDecklist(cardId)
+		useCSV = true
 	} else {
 		err = errors.New("invalid endpoint")
 	}
 	if err != nil {
 		log.Println(err)
 		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		return
+	}
+
+	if useCSV {
+		co, _ := mtgmatcher.GetUUID(cardId)
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
+
+		csvWriter := csv.NewWriter(w)
+		err = UUID2TCGCSV(csvWriter, data.([]string))
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+			return
+		}
 		return
 	}
 

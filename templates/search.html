@@ -875,7 +875,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{end}}
                                             {{if $card.HasDeck}}
                                                 <td rowspan=2>
-                                                    <a href='/search?downloadCSV=decklist&q=decklist:"{{$card.Name}}"' title="Download a TCGplayer-formatted decklist">
+                                                    <a href='/api/tcgplayer/decklist/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist">
                                                         <img width=28 src="/img/misc/decklist.png">
                                                     </a>
                                                 </td>
