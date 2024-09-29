@@ -863,7 +863,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{if $card.Stocks}}
                                                 •
                                             {{end}}
-                                            {{if $card.SypList}}
+                                            {{if and $.ShowSYP $card.SypList}}
                                                 †
                                             {{end}}
                                         </td>

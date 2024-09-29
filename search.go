@@ -172,9 +172,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") == "prices")
 
+	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
 	pageVars.CanDownloadCSV = canDownloadCSV
+	downloadCSV := r.FormValue("downloadCSV")
+	switch downloadCSV {
+	case "retail", "buylist":
+		if !canDownloadCSV {
+			pageVars.ErrorMessage = "Unable to download CSV (unauthorized)"
+			render(w, "search.html", pageVars)
+			return
+		}
+	}
 
 	if len(query) > MaxSearchQueryLen {
 		pageVars.ErrorMessage = TooLongMessage
@@ -249,7 +259,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
-	hideSyp := slices.Contains(miscSearchOpts, "noSyp")
 	hidePromos := slices.Contains(miscSearchOpts, "hidePromos") || slices.Contains(miscSearchOpts, "hidePrelPack")
 	if oembed {
 		miscSearchOpts = append(miscSearchOpts, "oembed")
@@ -262,6 +271,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowPromo = !slices.Contains(miscSearchOpts, "noUpsell")
+	pageVars.ShowSYP = !slices.Contains(miscSearchOpts, "noSyp")
 
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	if pageVars.IsSealed {
@@ -283,14 +293,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Hijack for csv download
-	downloadCSV := r.FormValue("downloadCSV")
 	switch downloadCSV {
 	case "retail", "buylist":
-		if !canDownloadCSV {
-			pageVars.InfoMessage = "Unable to download CSV (unauthorized)"
-			render(w, "search.html", pageVars)
-			return
-		}
 		filename := "mtgban_" + downloadCSV + "_prices"
 
 		w.Header().Set("Content-Type", "text/csv")
@@ -401,11 +405,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		_, found := pageVars.Metadata[cardId]
 		if !found {
 			pageVars.Metadata[cardId] = uuid2card(cardId, false, true)
-			if hideSyp {
-				meta := pageVars.Metadata[cardId]
-				meta.SypList = false
-				pageVars.Metadata[cardId] = meta
-			}
 		}
 		if pageVars.Metadata[cardId].Reserved {
 			pageVars.HasReserved = true
