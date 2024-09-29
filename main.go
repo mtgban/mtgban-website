@@ -765,16 +765,17 @@ func main() {
 	// Close any zombie connection and perform any extra cleanup
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
+		ServerNotify("shutdown", "Server cleaning up...")
 		cleanupDiscord()
 		cancel()
-		log.Println("BAN Server shut down")
 	}()
 
 	err = srv.Shutdown(ctx)
 	if err != nil {
-		log.Fatalf("Server Shutdown Failed: %s", err.Error())
+		ServerNotify("shutdown", "Server shutdown failed: "+err.Error())
+		return
 	}
-	log.Println("BAN Server shutting down...")
+	ServerNotify("shutdown", "Server shutdown correctly")
 }
 
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
