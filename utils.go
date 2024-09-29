@@ -544,7 +544,7 @@ func ServerNotify(kind, message string, flags ...bool) {
 // Only send the notification for a user action
 func UserNotify(kind, message string, flags ...bool) {
 	if DevMode {
-		log.Println(message)
+		log.Println(kind, "-", message)
 	}
 	if Config.DiscordHook == "" {
 		return
