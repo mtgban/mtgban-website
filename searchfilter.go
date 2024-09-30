@@ -1516,6 +1516,10 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 						return false
 					}
 				}
+			case "productless":
+				if cardobject2sources(co) == nil {
+					return false
+				}
 			case "ampersand":
 				if co.SetCode != "PAFR" {
 					continue
