@@ -53,6 +53,7 @@ var categoryEdition = map[string]string{
 var categoryOverrides = map[string]string{
 	"CMB1": "masters",
 	"CMB2": "masters",
+	"MB2":  "masters",
 	"PTG":  "box",
 	"SS1":  "arsenal",
 	"SS2":  "arsenal",
