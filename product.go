@@ -303,7 +303,7 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 		}
 
 		// Skip strange stuff
-		if co.IsReserved || co.Sealed || co.IsFunny || mtgmatcher.IsToken(co.Name) ||
+		if co.IsReserved || mtgmatcher.IsToken(co.Name) ||
 			co.BorderColor == "gold" || co.BorderColor == "silver" ||
 			co.Rarity == "oversize" ||
 			co.HasPromoType(mtgjson.PromoTypePromoPack) ||
