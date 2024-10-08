@@ -446,7 +446,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		default:
 			// Only for the main game
 			if Config.Game != "" {
-				break
+				return
 			}
 
 			for _, store := range AffiliateStores {
