@@ -849,36 +849,47 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 	return nil
 }
 
+// Convert uploadedData to CSV, using the associated map of uuid->keys->prices
 func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedDada []UploadEntry) error {
+	var allScraperNames []string
 	var allScrapers []string
 	var isIndex []string
 	for id := range pm {
-		for scraperName := range pm[id] {
-			if slices.Contains(allScrapers, scraperName) {
+		for scraperKey := range pm[id] {
+			// If this scraper is already known, continue
+			if slices.Contains(allScrapers, scraperKey) {
 				continue
 			}
-			allScrapers = append(allScrapers, scraperName)
+			// If this scraper doesn't have a name (usually due to dev) skip it
+			name, found := ScraperNames[scraperKey]
+			if !found {
+				continue
+			}
+
+			// Add to the arrays
+			allScraperNames = append(allScraperNames, name)
+			allScrapers = append(allScrapers, scraperKey)
 
 			// Determine whether scraper is an index and should appear regardless of conditions
 			for _, scraper := range Sellers {
-				if scraper != nil && scraper.Info().Shorthand == scraperName && !slices.Contains(isIndex, scraperName) && scraper.Info().MetadataOnly {
-					isIndex = append(isIndex, scraperName)
+				if scraper != nil && scraper.Info().Shorthand == scraperKey && !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
+					isIndex = append(isIndex, scraperKey)
 				}
 			}
 			for _, scraper := range Vendors {
-				if scraper != nil && scraper.Info().Shorthand == scraperName && !slices.Contains(isIndex, scraperName) && scraper.Info().MetadataOnly {
-					isIndex = append(isIndex, scraperName)
+				if scraper != nil && scraper.Info().Shorthand == scraperKey && !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
+					isIndex = append(isIndex, scraperKey)
 				}
 			}
 		}
 	}
 
-	sort.Slice(allScrapers, func(i, j int) bool {
-		return allScrapers[i] < allScrapers[j]
-	})
+	// Keep alphabetical order
+	sort.Strings(allScrapers)
+	sort.Strings(allScraperNames)
 
 	header := []string{"UUID", "Card Name", "Set Code", "Number", "Finish"}
-	header = append(header, allScrapers...)
+	header = append(header, allScraperNames...)
 	header = append(header, "Loaded Price", "Loaded Condition", "Loaded Quantity", "Notes")
 	err := w.Write(header)
 	if err != nil {

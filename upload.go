@@ -488,9 +488,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	tagPref := "tags"
 	download, _ := strconv.ParseBool(r.FormValue("download"))
-	if download && canBuylist {
-		tagPref = "names"
-	}
 
 	// Search
 	var results map[string]map[string]*BanPrice
