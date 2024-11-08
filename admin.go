@@ -350,7 +350,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		pageVars.Headers = []string{
-			"", "Name", "Id+Logs", "Last Update", "Entries", "Status",
+			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Status",
 		}
 		pageVars.OtherHeaders = pageVars.Headers
 
@@ -387,6 +387,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			row := []string{
 				name,
 				Sellers[i].Info().Shorthand,
+				ScraperMap[Sellers[i].Info().Shorthand],
 				lastUpdate,
 				fmt.Sprint(len(inv)),
 				status,
@@ -428,6 +429,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			row := []string{
 				name,
 				Vendors[i].Info().Shorthand,
+				ScraperMap[Vendors[i].Info().Shorthand],
 				lastUpdate,
 				fmt.Sprint(len(bl)),
 				status,
