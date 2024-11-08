@@ -383,6 +383,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			if Sellers[i].Info().SealedMode {
 				name += " 📦"
 			}
+			if Sellers[i].Info().MetadataOnly {
+				name += " 🎯"
+			}
 
 			row := []string{
 				name,
@@ -424,6 +427,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			name := Vendors[i].Info().Name
 			if Vendors[i].Info().SealedMode {
 				name += " 📦"
+			}
+			if Vendors[i].Info().MetadataOnly {
+				name += " 🎯"
 			}
 
 			row := []string{
