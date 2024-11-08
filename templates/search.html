@@ -610,7 +610,7 @@ Sims are not required for pre-constructed decks and other products where the sam
 
                             let priceCell = newRow.insertCell();
                             priceCell.style.textAlign = "center";
-                            let priceText = document.createTextNode("$ " + (element.purchasePrice + element.shippingPrice).toFixed(2));
+                            let priceText = document.createTextNode("$ " + (element.purchasePrice + (element.shippingPrice / element.quantity)).toFixed(2));
                             priceCell.appendChild(priceText);
 
                             let qtyCell = newRow.insertCell();
