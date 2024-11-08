@@ -230,7 +230,14 @@ var DBs = map[string]int{
 	"tcglow_ev":     8,
 }
 
-var ScraperOptions = map[string]*scraperOption{
+var ScraperOptions map[string]*scraperOption
+
+var allScraperOptions = map[string]map[string]*scraperOption{
+	"":        mtgScraperOptions,
+	"Lorcana": lorcanaScraperOptions,
+}
+
+var mtgScraperOptions = map[string]*scraperOption{
 	"abugames": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := abugames.NewScraper()
@@ -537,8 +544,9 @@ var ScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
+}
 
-	/* LORCANA SECTION */
+var lorcanaScraperOptions = map[string]*scraperOption{
 	"tcg_lorcana_index": &scraperOption{
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
@@ -713,6 +721,9 @@ func loadScrapers() {
 	}
 	if ScraperNames == nil {
 		ScraperNames = map[string]string{}
+	}
+	if ScraperOptions == nil {
+		ScraperOptions = allScraperOptions[Config.Game]
 	}
 
 	loadOptions()
