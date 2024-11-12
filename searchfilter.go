@@ -1045,19 +1045,27 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 	return
 }
 
+const LargestIntValue = int(^uint(0) >> 1)
+
 func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc func(a, b int) bool) bool {
 	if filters == nil {
 		return false
 	}
-	value := filters[0]
+	var values [2]int
 
-	ref, errR := strconv.Atoi(co.Number)
-	num, errN := strconv.Atoi(value)
-	if errR != nil || errN != nil {
-		return true
+	for i, num := range []string{filters[0], co.Number} {
+		ref, err := strconv.Atoi(num)
+		if err != nil {
+			ref, err = strconv.Atoi(mtgmatcher.ExtractNumericalValue(num))
+			if err != nil {
+				// Exclude card in case the number is all letters
+				ref = LargestIntValue
+			}
+		}
+		values[i] = ref
 	}
 
-	return cmpFunc(num, ref)
+	return cmpFunc(values[0], values[1])
 }
 
 func parseCardDate(co *mtgmatcher.CardObject) (time.Time, error) {
