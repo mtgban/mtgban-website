@@ -886,6 +886,7 @@ func loadSellers(newbc *mtgban.BanClient) {
 
 			shorthand := newSellers[i].Info().Shorthand
 			log.Println("seller", shorthand, "is at position", sellerIndex)
+			opts := ScraperOptions[ScraperMap[shorthand]]
 
 			fname := path.Join(InventoryDir, shorthand+"-latest.json")
 			if init && fileExists(fname) {
@@ -915,11 +916,13 @@ func loadSellers(newbc *mtgban.BanClient) {
 						ServerNotify("reload", msg, true)
 						return
 					}
-					log.Println("seller", shorthand, "was loaded from Inventory(), took", time.Since(start))
+					log.Println("seller", shorthand, "was loaded from scraper, took", time.Since(start))
+					opts.Logger.Println("Loaded from scraper")
+				} else {
+					opts.Logger.Println("Data is recent enough, skipping scraping")
 				}
 
 				// Stash data to DB if requested
-				opts := ScraperOptions[ScraperMap[shorthand]]
 				if opts.StashInventory || (opts.StashMarkets && opts.RDBs[shorthand] != nil) {
 					start := time.Now()
 					log.Println("Stashing", shorthand, "inventory data to DB")
@@ -950,7 +953,7 @@ func loadSellers(newbc *mtgban.BanClient) {
 					log.Println(err)
 					return
 				}
-				opts.Logger.Println("Saved to file")
+				opts.Logger.Println("Saved to file", fname)
 			}
 			log.Println(shorthand, "seller -- OK")
 		}(i)
@@ -1026,6 +1029,7 @@ func loadVendors(newbc *mtgban.BanClient) {
 
 			shorthand := newVendors[i].Info().Shorthand
 			log.Println("vendor", shorthand, "is at position", vendorIndex)
+			opts := ScraperOptions[ScraperMap[shorthand]]
 
 			fname := path.Join(BuylistDir, shorthand+"-latest.json")
 			if init && fileExists(fname) {
@@ -1042,8 +1046,8 @@ func loadVendors(newbc *mtgban.BanClient) {
 
 				bl, _ := vendor.Buylist()
 				log.Printf("vendor %s was loaded from file with %d entries", shorthand, len(bl))
+				opts.Logger.Println("Loaded from file")
 			} else {
-
 				// If the old scraper data is old enough, pull from the new scraper
 				// and update it in the global slice
 				if vendorIndex < 0 || time.Since(*Vendors[vendorIndex].Info().BuylistTimestamp) > SkipRefreshCooldown {
@@ -1055,11 +1059,13 @@ func loadVendors(newbc *mtgban.BanClient) {
 						ServerNotify("reload", msg, true)
 						return
 					}
-					log.Println("vendor", shorthand, "was loaded from Buylist(), took", time.Since(start))
+					log.Println("vendor", shorthand, "was loaded from scraper, took", time.Since(start))
+					opts.Logger.Println("Loaded from scraper")
+				} else {
+					opts.Logger.Println("Data is recent enough, skipping scraping")
 				}
 
 				// Stash data to DB if requested
-				opts := ScraperOptions[ScraperMap[shorthand]]
 				if opts.StashBuylist || (opts.StashTraders && opts.RDBs[shorthand] != nil) {
 					start := time.Now()
 					log.Println("Stashing", shorthand, "buylist data to DB")
@@ -1086,7 +1092,7 @@ func loadVendors(newbc *mtgban.BanClient) {
 					log.Println(err)
 					return
 				}
-				opts.Logger.Println("Saved to file")
+				opts.Logger.Println("Saved to file", fname)
 			}
 			log.Println(shorthand, "vendor -- OK")
 		}(i)
