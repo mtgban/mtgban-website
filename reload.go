@@ -107,7 +107,11 @@ func updateSellers(scraper mtgban.Scraper) {
 				mkDirIfNotExisting(currentDir)
 
 				fname := path.Join(InventoryDir, scraper.Info().Shorthand+"-latest.json")
-				dumpInventoryToFile(scraper.(mtgban.Seller), currentDir, fname)
+				err = dumpInventoryToFile(scraper.(mtgban.Seller), currentDir, fname)
+				if err != nil {
+					msg := fmt.Sprintf("%s seller dump failed: %s", scraper.Info().Shorthand, err.Error())
+					ServerNotify("refresh", msg, true)
+				}
 			}
 			return
 		}
@@ -173,7 +177,11 @@ func updateVendors(scraper mtgban.Scraper) {
 				mkDirIfNotExisting(currentDir)
 
 				fname := path.Join(BuylistDir, scraper.Info().Shorthand+"-latest.json")
-				dumpBuylistToFile(scraper.(mtgban.Vendor), currentDir, fname)
+				err = dumpBuylistToFile(scraper.(mtgban.Vendor), currentDir, fname)
+				if err != nil {
+					msg := fmt.Sprintf("%s buylist dump failed: %s", scraper.Info().Shorthand, err.Error())
+					ServerNotify("refresh", msg, true)
+				}
 			}
 			return
 		}
