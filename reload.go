@@ -104,6 +104,8 @@ func updateSellers(scraper mtgban.Scraper) {
 				ServerNotify("refresh", msg)
 
 				currentDir := path.Join(InventoryDir, fmt.Sprintf("%03d", time.Now().YearDay()))
+				mkDirIfNotExisting(currentDir)
+
 				fname := path.Join(InventoryDir, scraper.Info().Shorthand+"-latest.json")
 				dumpInventoryToFile(scraper.(mtgban.Seller), currentDir, fname)
 			}
@@ -168,6 +170,8 @@ func updateVendors(scraper mtgban.Scraper) {
 				ServerNotify("refresh", msg)
 
 				currentDir := path.Join(BuylistDir, fmt.Sprintf("%03d", time.Now().YearDay()))
+				mkDirIfNotExisting(currentDir)
+
 				fname := path.Join(BuylistDir, scraper.Info().Shorthand+"-latest.json")
 				dumpBuylistToFile(scraper.(mtgban.Vendor), currentDir, fname)
 			}
