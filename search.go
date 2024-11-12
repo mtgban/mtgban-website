@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
 	"golang.org/x/exp/slices"
 )
 
@@ -1030,16 +1028,12 @@ func getSortingData(uuid string) (*SortingData, error) {
 	}, nil
 }
 
-const charactersToStrip = "abcdefgsp" + mtgjson.SuffixSpecial + mtgjson.SuffixVariant
-
-var reSort = regexp.MustCompile(`\d+`)
-
 func sortByNumberAndFinish(cI, cJ *mtgmatcher.CardObject, strip bool) bool {
 	numI := cI.Card.Number
 	numJ := cJ.Card.Number
 	if strip {
-		numI = reSort.FindString(cI.Card.Number)
-		numJ = reSort.FindString(cJ.Card.Number)
+		numI = mtgmatcher.ExtractNumericalValue(cI.Card.Number)
+		numJ = mtgmatcher.ExtractNumericalValue(cJ.Card.Number)
 	}
 
 	// If their number is the same, check for foiling status
