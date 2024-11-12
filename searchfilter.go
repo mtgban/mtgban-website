@@ -1573,17 +1573,7 @@ func shouldSkipCardNG(cardId string, filters []FilterElem) bool {
 	}
 
 	for i := range filters {
-		skip := false
-		for _, subfilter := range filters[i].Subfilters {
-			subres := FilterCardFuncs[subfilter.Name](subfilter.Values, co)
-			if subfilter.Negate {
-				subres = !subres
-			}
-			if subres {
-				skip = true
-				break
-			}
-		}
+		skip := shouldSkipCardNG(cardId, filters[i].Subfilters)
 		if skip {
 			continue
 		}
