@@ -1588,7 +1588,11 @@ func shouldSkipCardNG(cardId string, filters []FilterElem) bool {
 			continue
 		}
 
-		res := FilterCardFuncs[filters[i].Name](filters[i].Values, co)
+		f, found := FilterCardFuncs[filters[i].Name]
+		if !found {
+			panic(filters[i].Name + " option not found")
+		}
+		res := f(filters[i].Values, co)
 		if filters[i].Negate {
 			res = !res
 		}
