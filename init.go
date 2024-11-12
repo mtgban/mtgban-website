@@ -733,7 +733,7 @@ func loadScrapers() {
 			continue
 		}
 
-		if BenchMode && strings.Contains(key, "lorcana") {
+		if BenchMode && Config.Game != "" {
 			continue
 		}
 
