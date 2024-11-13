@@ -64,6 +64,9 @@ type FilterElem struct {
 	// List of additional filters that are run *before* the main filter
 	// and determine whether to run it or not
 	Subfilters []FilterElem
+
+	// List of SetCode the filter should be applied to
+	ApplyTo []string
 }
 
 type FilterStoreElem struct {
@@ -662,14 +665,11 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				opt = "number_less_than"
 			}
 
+			var applyToSets []string
 			var subfilters []FilterElem
 			if strings.Contains(code, ":") {
 				codes := strings.Split(code, ":")
-				code = codes[0]
-				subfilters = append(subfilters, FilterElem{
-					Name:   "edition",
-					Values: fixupEditionNG(code),
-				})
+				applyToSets = fixupEditionNG(codes[0])
 				code = codes[1]
 			}
 			if strings.Contains(code, "-") {
@@ -681,9 +681,9 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 					code = codes[0]
 					opt = "number_greater_than"
 					subfilters = append(subfilters, FilterElem{
-						Name:       opt,
-						Values:     fixupNumberNG(code),
-						Subfilters: subfilters,
+						Name:    opt,
+						Values:  fixupNumberNG(code),
+						ApplyTo: applyToSets,
 					})
 					// Reset options to reuse the filter addition below
 					code = codes[1]
@@ -696,6 +696,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Negate:     negate,
 				Values:     fixupNumberNG(code),
 				Subfilters: subfilters,
+				ApplyTo:    applyToSets,
 			})
 		case "cne":
 			filters = append(filters, FilterElem{
@@ -1575,6 +1576,11 @@ func shouldSkipCardNG(cardId string, filters []FilterElem) bool {
 	for i := range filters {
 		skip := shouldSkipCardNG(cardId, filters[i].Subfilters)
 		if skip {
+			return true
+		}
+
+		// Filter out any SetCode that wasn't selected
+		if filters[i].ApplyTo != nil && !slices.Contains(filters[i].ApplyTo, co.SetCode) {
 			continue
 		}
 
