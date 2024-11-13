@@ -89,6 +89,7 @@ func reload(name string) {
 		updateVendors(vendor)
 	}
 
+	ScraperOptions[name].Logger.Println("Reload saved to file")
 	ServerNotify("refresh", name+" refresh completed")
 }
 
