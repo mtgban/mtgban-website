@@ -38,8 +38,7 @@ const (
 	MaxUploadTotalEntries = 10000
 	MaxUploadFileSize     = 5 << 20
 
-	DefaultPercentageMargin = 0.1
-	ProfitabilityConstant   = 2
+	ProfitabilityConstant = 2
 
 	TooManyEntriesMessage = "Note: you reached the maximum number of entries supported by this tool"
 )
@@ -178,14 +177,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Enable optimizer customization
 	var skipLowValue, skipLowValueAbs, skipHighValue, skipHighValueAbs bool
-	var skipMargin, skipConds, skipPrices bool
+	var skipConds, skipPrices bool
+	var useMargin bool
 	var visualIndicator bool
 	if blMode {
 		skipLowValue = r.FormValue("lowval") != ""
 		skipLowValueAbs = r.FormValue("lowvalabs") != ""
 		skipHighValue = r.FormValue("highval") != ""
 		skipHighValueAbs = r.FormValue("highvalabs") != ""
-		skipMargin = r.FormValue("minmargin") != ""
+		useMargin = r.FormValue("minmargin") != ""
 		skipConds = r.FormValue("nocond") != ""
 		skipPrices = r.FormValue("noprice") != ""
 		visualIndicator = r.FormValue("customperc") != ""
@@ -217,8 +217,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	percMargin := 1.0
-	if !skipMargin {
-		percMargin = 1 - DefaultPercentageMargin
+	if useMargin {
 		customMargin, err := strconv.ParseFloat(r.FormValue("margin"), 64)
 		if err == nil && customMargin >= 0 {
 			percMargin = 1 - customMargin/100.0
