@@ -643,9 +643,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                             </tr>
                         {{end}}
                     {{else}}
-                        <tr class="no-hover" style="background-color: var(--background)">
+                        <tr class="no-hover" style="background-color: var(--background)" >
                             <td>
-                                <img id="cardImage" src="" width="354" height="493"/>
+                                <img id="cardImage" src="" width="354" height="493" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
                             </td>
                         </tr>
                         <tr>
