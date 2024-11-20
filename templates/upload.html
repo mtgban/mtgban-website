@@ -710,7 +710,7 @@
                             {{$factor := credit_factor $scraperKey}}
                             {{$total := index $.OptimizedTotals $scraperKey}}
                             {{if $entries}}
-                                <a class="btn default" href="#{{$scraperKey}}">
+                                <a class="btn default" href="#{{$scraperKey}}-opt">
                                     {{len $entries}} cards {{if $.IsBuylist}}to{{else}}at{{end}} <b>{{scraper_name $scraperKey}}</b>: $ {{printf "%.2f" $total}}
                                     {{if $factor}}
                                         {{$credit := mulf $total $factor}}
@@ -728,7 +728,7 @@
                             {{$entries := index $.Optimized $scraperKey}}
                             {{if $entries}}
                                 <tr>
-                                    <span class="anchor" id="{{$scraperKey}}"></span>
+                                    <span class="anchor" id="{{$scraperKey}}-opt"></span>
                                     <a class="btn default" href="#top">
                                         <b>{{scraper_name $scraperKey}}</b> - $ {{printf "%.2f" (index $.OptimizedTotals $scraperKey)}}
                                     </a>
