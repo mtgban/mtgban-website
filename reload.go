@@ -94,29 +94,33 @@ func reload(name string) {
 }
 
 func updateSellers(scraper mtgban.Scraper) {
-	for i := range Sellers {
-		if Sellers[i] != nil && Sellers[i].Info().Shorthand == scraper.Info().Shorthand {
-			err := updateSellerAtPosition(scraper.(mtgban.Seller), i, false)
-			if err != nil {
-				msg := fmt.Sprintf("seller %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
-				ServerNotify("refresh", msg, true)
-			} else {
-				msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, i)
-				ServerNotify("refresh", msg)
-
-				currentDir := path.Join(InventoryDir, fmt.Sprintf("%03d", time.Now().YearDay()))
-				mkDirIfNotExisting(currentDir)
-
-				fname := path.Join(InventoryDir, scraper.Info().Shorthand+"-latest.json")
-				err = dumpInventoryToFile(scraper.(mtgban.Seller), currentDir, fname)
-				if err != nil {
-					msg := fmt.Sprintf("%s seller dump failed: %s", scraper.Info().Shorthand, err.Error())
-					ServerNotify("refresh", msg, true)
-				}
-			}
-			return
+	sellerIndex := -1
+	for i, seller := range Sellers {
+		if seller != nil && seller.Info().Shorthand == scraper.Info().Shorthand {
+			sellerIndex = i
+			break
 		}
 	}
+
+	err := updateSellerAtPosition(scraper.(mtgban.Seller), sellerIndex, false)
+	if err != nil {
+		msg := fmt.Sprintf("seller %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
+		ServerNotify("refresh", msg, true)
+	} else {
+		msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
+		ServerNotify("refresh", msg)
+
+		currentDir := path.Join(InventoryDir, fmt.Sprintf("%03d", time.Now().YearDay()))
+		mkDirIfNotExisting(currentDir)
+
+		fname := path.Join(InventoryDir, scraper.Info().Shorthand+"-latest.json")
+		err = dumpInventoryToFile(scraper.(mtgban.Seller), currentDir, fname)
+		if err != nil {
+			msg := fmt.Sprintf("%s seller dump failed: %s", scraper.Info().Shorthand, err.Error())
+			ServerNotify("refresh", msg, true)
+		}
+	}
+	return
 }
 
 func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
@@ -164,29 +168,33 @@ func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
 }
 
 func updateVendors(scraper mtgban.Scraper) {
-	for i := range Vendors {
-		if Vendors[i] != nil && Vendors[i].Info().Shorthand == scraper.Info().Shorthand {
-			err := updateVendorAtPosition(scraper.(mtgban.Vendor), i, false)
-			if err != nil {
-				msg := fmt.Sprintf("vendor %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
-				ServerNotify("refresh", msg, true)
-			} else {
-				msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, i)
-				ServerNotify("refresh", msg)
-
-				currentDir := path.Join(BuylistDir, fmt.Sprintf("%03d", time.Now().YearDay()))
-				mkDirIfNotExisting(currentDir)
-
-				fname := path.Join(BuylistDir, scraper.Info().Shorthand+"-latest.json")
-				err = dumpBuylistToFile(scraper.(mtgban.Vendor), currentDir, fname)
-				if err != nil {
-					msg := fmt.Sprintf("%s buylist dump failed: %s", scraper.Info().Shorthand, err.Error())
-					ServerNotify("refresh", msg, true)
-				}
-			}
-			return
+	vendorIndex := -1
+	for i, vendor := range Vendors {
+		if vendor != nil && Vendors[i].Info().Shorthand == scraper.Info().Shorthand {
+			vendorIndex = i
+			break
 		}
 	}
+
+	err := updateVendorAtPosition(scraper.(mtgban.Vendor), vendorIndex, false)
+	if err != nil {
+		msg := fmt.Sprintf("vendor %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
+		ServerNotify("refresh", msg, true)
+	} else {
+		msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
+		ServerNotify("refresh", msg)
+
+		currentDir := path.Join(BuylistDir, fmt.Sprintf("%03d", time.Now().YearDay()))
+		mkDirIfNotExisting(currentDir)
+
+		fname := path.Join(BuylistDir, scraper.Info().Shorthand+"-latest.json")
+		err = dumpBuylistToFile(scraper.(mtgban.Vendor), currentDir, fname)
+		if err != nil {
+			msg := fmt.Sprintf("%s buylist dump failed: %s", scraper.Info().Shorthand, err.Error())
+			ServerNotify("refresh", msg, true)
+		}
+	}
+	return
 }
 
 func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
