@@ -1140,10 +1140,10 @@ func sortSetsAlphabeticalSet(uuidI, uuidJ string) bool {
 	if err != nil {
 		return false
 	}
-	cI, setDateI := sortingI.co, sortingI.releaseDate
-	cJ, setDateJ := sortingJ.co, sortingJ.releaseDate
+	cI := sortingI.co
+	cJ := sortingJ.co
 
-	if setDateI.Equal(setDateJ) {
+	if cI.SetCode == cJ.SetCode {
 		return sortSetsAlphabetical(uuidI, uuidJ)
 	}
 
