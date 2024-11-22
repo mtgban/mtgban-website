@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/leemcloughlin/logfile"
+	"golang.org/x/exp/maps"
 
 	"github.com/mtgban/go-mtgban/abugames"
 	"github.com/mtgban/go-mtgban/cardkingdom"
@@ -791,12 +792,13 @@ func loadScrapers() {
 		return
 	}
 
-	log.Println("Scraper Map table")
-	var msgM string
-	for key, val := range ScraperMap {
-		msgM += fmt.Sprintf("%s -> %s\n", key, val)
+	msg := fmt.Sprintln("Scraper Map table:")
+	keys := maps.Keys(ScraperMap)
+	sort.Strings(keys)
+	for _, key := range keys {
+		msg += fmt.Sprintf("- %s -> `%s`\n", key, ScraperMap[key])
 	}
-	ServerNotify("init", msgM)
+	ServerNotify("init", msg)
 
 	loadSellers(newbc)
 	loadVendors(newbc)
