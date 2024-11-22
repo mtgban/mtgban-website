@@ -161,10 +161,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.InfoMessage = "Join BAN to unlock additional buylists and tools!"
 	}
 
+	// Load sort option from preferences, merge the alpha query parameter if needed
 	pageVars.SearchSort = readCookie(r, "SearchDefaultSort")
 	defaultSortOpt := r.FormValue("sort")
 	if defaultSortOpt != "" {
+		preferredSort := pageVars.SearchSort
 		pageVars.SearchSort = defaultSortOpt
+		// If a user prefers alpha sort grouped by set preserve that option
+		if preferredSort == "hybrid" && defaultSortOpt == "alpha" {
+			pageVars.SearchSort = "hybrid"
+		}
 	}
 
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") == "prices")
@@ -324,6 +330,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	case "alpha":
 		sort.Slice(allKeys, func(i, j int) bool {
 			return sortSetsAlphabetical(allKeys[i], allKeys[j])
+		})
+	case "hybrid":
+		sort.Slice(allKeys, func(i, j int) bool {
+			return sortSetsAlphabeticalSet(allKeys[i], allKeys[j])
 		})
 	case "retail":
 		retSellers := defaultSellerPriorityOpt

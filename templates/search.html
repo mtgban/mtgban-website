@@ -152,6 +152,9 @@
                 <input type="radio" id="chrono" name="sort" value="chrono" checked>
                 <label for="chrono">By chronological order</label>
                 <br>
+                <input type="radio" id="hybrid" name="sort" value="hybrid" checked>
+                <label for="hybrid">By alphabetical order, grouping sets by chronological order</label>
+                <br>
                 <input type="radio" id="alpha" name="sort" value="alpha">
                 <label for="alpha">By alphabetical order</label>
                 <br>
@@ -294,18 +297,22 @@
                             {{if or (eq .SearchSort "chrono") (not .SearchSort)}}
                                 <a href="?q={{.SearchQuery}}&sort=&reverse={{not .ReverseMode}}" title="Sort by reverse chronological order">🔄</a>
                             {{end}}
-                            <a class="btn info" href="?q={{.SearchQuery}}&sort=alpha" title="Sort by alphabetical order">
-                                {{if eq .SearchSort "alpha"}}<b>{{end}}alpha{{if eq .SearchSort "alpha"}}</b>{{end}}
+
+                            {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
+                            <a class="btn info" href="?q={{.SearchQuery}}&sort=alpha" title="Sort by alphabetical order{{if eq .SearchSort "hybrid"}} (keeping sets grouped){{end}}">
+                                {{if $isAlphaSorted}}<b>{{end}}alpha{{if $isAlphaSorted}}</b>{{end}}
                             </a>
-                            {{if eq .SearchSort "alpha"}}
-                                <a href="?q={{.SearchQuery}}&sort=alpha&reverse={{not .ReverseMode}}" title="Sort by reverse alphabetical order">🔄</a>
+                            {{if $isAlphaSorted}}
+                                <a href="?q={{.SearchQuery}}&sort=alpha&reverse={{not .ReverseMode}}" title="Sort by reverse alphabetical order{{if eq .SearchSort "hybrid"}} (keeping sets grouped){{end}}">🔄</a>
                             {{end}}
+
                             <a class="btn info" href="?q={{.SearchQuery}}&sort=retail" title="Sort by best retail price (off TCGplayer)">
                                 {{if eq .SearchSort "retail"}}<b>{{end}}retail{{if eq .SearchSort "retail"}}</b>{{end}}
                             </a>
                             {{if eq .SearchSort "retail"}}
                                 <a href="?q={{.SearchQuery}}&sort=retail&reverse={{not .ReverseMode}}" title="Sort by lowest retail price (off TCGplayer)">🔄</a>
                             {{end}}
+
                             <a class="btn info" href="?q={{.SearchQuery}}&sort=buylist" title="Sort by best buylits price (off Card Kingdom)">
                                 {{if eq .SearchSort "buylist"}}<b>{{end}}buylist{{if eq .SearchSort "buylist"}}</b>{{end}}
                             </a>
@@ -377,7 +384,7 @@
                                 <li>If you search in in <b>regexp</b> mode, you will get all the cards names matching the regular expresion.
                                     <br>For example <pre>Cluestone$</pre> will return the card that end with Cluestone in their name. Note this search mode is case sensitive.</li>
                             </ul>
-                            <li>You can change the <b>sort mode</b> with <pre>sort:VALUE</pre>, accepting <pre>chrono</pre> (chonologically by print date, default), <pre>alpha</pre> (for alphabetical order), <pre>retail</pre> (for TCG price order), or <pre>buylist</pre> (for CK buylist price order). Note that when this option is set, the sort UI will be disabled.<</li>
+                            <li>You can change the <b>sort mode</b> with <pre>sort:VALUE</pre>, accepting <pre>chrono</pre> (chonologically by print date, default), <pre>hybrid</pre> (for alphabetical order grouped by sets), <pre>alpha</pre> (for alphabetical order), <pre>retail</pre> (for TCG price order), or <pre>buylist</pre> (for CK buylist price order). Note that when this option is set, the sort UI will be disabled.<</li>
                             <li>You can set any option in any order, in any amount. When filtering for a group of values you can use a comma <pre>,</pre> to separate values.</li>
                             <li>You can invert filter results by prepending a <pre>-</pre> to the option name.</li>
                             <li>You can filter by <b>seller/vendor name</b> with <pre>store:shorthand</pre>, or specific types of store with <pre>seller:shorthand</pre> and <pre>vendor:shorthand</pre>.</li>
