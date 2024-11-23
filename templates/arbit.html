@@ -81,18 +81,20 @@
         {{if .ShowPromo}}
             <img class="center" src="/img/promo/global.jpg">
         {{end}}
-    {{else if len $.VendorKeys}}
+    {{else if eq .Title "Options"}}
         <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
         <br>
 
         {{$cookieName := "ArbitVendorsList"}}
         {{if .ReverseMode}}
             {{$cookieName = "ReverseVendorsList"}}
+        {{else if .GlobalMode}}
+            {{$cookieName = "GlobalVendorsList"}}
         {{end}}
 
         <div class="indent">
             <h2>Vendors list</h2>
-            Select which vendors you <b>don't</b> want to display in your arbit.
+            Select which vendors you <b>don't</b> want to display in your global tool.
             <br>
 
             <script type="text/javascript">
@@ -106,7 +108,7 @@
         </div>
 
         <br>
-        <div class="indent">
+        <div class="indent row">
             <div class="column" id="vendors">
                 {{range $i, $key := .VendorKeys}}
                     <input type="checkbox" id="{{$key}}" name="{{$key}}">
@@ -121,6 +123,45 @@
             </div>
         </div>
 
+        <br>
+        <div class="indent">
+            <h2>Edition list</h2>
+            Select which editions you <b>don't</b> want to display in your global tool.
+            <br>
+
+            <script type="text/javascript">
+                window.onload = function(e) {
+                    loadForm("GlobalEditionList", "editions");
+                }
+            </script>
+
+            <a class="btn warning" onclick="javascript:clearForm('editions');"><b>CLEAR</b></a>
+            <a class="btn success" onclick="javascript:selectAll('editions');"><b>SELECT ALL</b></a>
+            <a class="btn success" onclick="javascript:saveForm('GlobalEditionList', 'editions'); window.location.href = '/global'"><b>SAVE</b></a>
+        </div>
+
+        <div class="indent row" id="editions">
+            {{range $i, $key := .Editions}}
+                {{if triple_column_start $i (len $.Editions)}}
+                    <div class="column">
+                {{end}}
+
+                {{$edition := index $.EditionsMap $key}}
+                {{if $edition}}
+                <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                <label for="{{$key}}">
+                    <i class="ss ss-{{$edition.Keyrune}} ss-2x ss-fw"></i>
+                    {{$edition.Name}}
+                </label>
+                <br>
+                {{end}}
+
+                {{if triple_column_end $i (len $.Editions)}}
+                    </div>
+                {{end}}
+            {{end}}
+        </div>
+
     {{else if eq .ScraperShort ""}}
         <h1>Welcome to {{.Title}}<a name="top">&nbsp;</a></h1>
         <div class="indent">
@@ -128,11 +169,11 @@
                 <p>Please use the top bar to choose the index to compare from.</p>
             {{else if .ReverseMode}}
                 <p>Please use the top bar to choose the vendor to sell to.</p>
-                <p><a href="?page=opt">Set options</a></p>
             {{else}}
                 <p>Please use the top bar to choose the seller to buy from.</p>
-                <p><a href="?page=opt">Set options</a></p>
             {{end}}
+            <p><a href="?page=options">Set options</a></p>
+
             <h2>Instructions</h2>
             <ul class="indent">
                 <li>Data is refreshed periodically over the day.</li>

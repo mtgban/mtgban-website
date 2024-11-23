@@ -353,7 +353,12 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 		blocklistVendors = strings.Split(blocklistVendorsOpt, ",")
 	}
 
-	if r.FormValue("page") == "opt" {
+	if r.FormValue("page") == "options" {
+		pageVars.Title = "Options"
+		// Load editions
+		pageVars.Editions = AllEditionsKeys
+		pageVars.EditionsMap = AllEditionsMap
+
 		// Load all available vendors
 		var vendorKeys []string
 		if reverse {
@@ -448,6 +453,32 @@ func Global(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		blocklistVendors = append(blocklistVendors, seller.Info().Shorthand)
+	}
+
+	if r.FormValue("page") == "options" {
+		pageVars.Title = "Options"
+		// Load editions
+		pageVars.Editions = AllEditionsKeys
+		pageVars.EditionsMap = AllEditionsMap
+
+		// Load all available vendors
+		var vendorKeys []string
+		for _, vendor := range Vendors {
+			if vendor == nil || slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
+				continue
+			}
+			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
+		}
+		pageVars.VendorKeys = vendorKeys
+	} else {
+		cookieName := "GlobalVendorsList"
+
+		filters := strings.Split(readCookie(r, cookieName), ",")
+		for _, code := range filters {
+			if !slices.Contains(blocklistVendors, code) {
+				blocklistVendors = append(blocklistVendors, code)
+			}
+		}
 	}
 
 	// Inform the render this is Global
@@ -685,6 +716,12 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		opts.MinSpread = MinSpreadNegative
 		opts.MinDiff = MinDiffNegative
 		opts.ProfitabilityConstant = ProfConstGlobal
+	}
+
+	// Override the edition list if set
+	skipEditionsOpt := readCookie(r, "GlobalEditionList")
+	if skipEditionsOpt != "" {
+		opts.Editions = strings.Split(skipEditionsOpt, ",")
 	}
 
 	// The pool of scrapers that source will be compared against
