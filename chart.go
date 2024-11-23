@@ -145,15 +145,17 @@ func getDataset(cardId string, labels []string, config scraperConfig) (*Dataset,
 		return nil, err
 	}
 
-	// Fill in missing points with NaNs so that the values
-	// can be mapped consistently on the chart
-	data := make([]string, len(labels))
-	for i := range labels {
-		val, found := results[labels[i]]
-		if !found {
-			val = "Number.NaN"
+	var data []string
+	if len(results) > 0 {
+		// Fill in missing points with NaNs so that the values
+		// can be mapped consistently on the chart
+		data = make([]string, len(labels))
+		for i := range labels {
+			data[i], found = results[labels[i]]
+			if !found {
+				data[i] = "Number.NaN"
+			}
 		}
-		data[i] = val
 	}
 
 	return &Dataset{
