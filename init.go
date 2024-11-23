@@ -229,6 +229,7 @@ var DBs = map[string]int{
 	"starcitygames": 6,
 	"abugames":      7,
 	"tcglow_ev":     8,
+	"csi_buylist":   9,
 }
 
 var ScraperOptions map[string]*scraperOption
@@ -281,6 +282,12 @@ var mtgScraperOptions = map[string]*scraperOption{
 			scraper.LogCallback = logger.Printf
 			scraper.Partner = Config.Affiliate["CSI"]
 			return scraper, nil
+		},
+		RDBs: map[string]*redis.Client{
+			"buylist": redis.NewClient(&redis.Options{
+				Addr: Config.RedisAddr,
+				DB:   DBs["csi_buylist"],
+			}),
 		},
 	},
 	"starcitygames": &scraperOption{

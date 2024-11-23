@@ -99,6 +99,12 @@ var enabledDatasets = []scraperConfig{
 		HasSealed:   true,
 		OnlySealed:  true,
 	},
+	{
+		PublicName:  "Cool Stuff Inc Buylist",
+		ScraperName: "coolstuffinc",
+		KindName:    "buylist",
+		Color:       "rgb(124, 211, 224)",
+	},
 }
 
 // Get all the keys that will be used as x asis labels
