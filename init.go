@@ -283,6 +283,7 @@ var mtgScraperOptions = map[string]*scraperOption{
 			scraper.Partner = Config.Affiliate["CSI"]
 			return scraper, nil
 		},
+		StashBuylist: true,
 		RDBs: map[string]*redis.Client{
 			"buylist": redis.NewClient(&redis.Options{
 				Addr: Config.RedisAddr,
