@@ -18,6 +18,9 @@ async function autocomplete(form, inp, sealed) {
         if (!val) {
             return false;
         }
+        /* Clean up input string */
+        val = val.trim();
+
         /* Prompt suggestions only if input is longer than three characters */
         if (val.length < minlen) {
             return false;
