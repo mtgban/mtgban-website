@@ -900,6 +900,12 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">📝</span>
                                         </td>
 
+                                        {{if not $card.Sealed}}
+                                            <td rowspan=2>
+                                                <a href="https://deckbox.org/mtg/{{$card.Name}}" title="Open the Dropbox page for this card" target=_blank><img width=22 src="/img/logo/deckbox.webp"></a>
+                                            </td>
+                                        {{end}}
+
                                         {{if $card.CKRestockURL}}
                                             <td rowspan=2>
                                                 <a href="{{$card.CKRestockURL}}" title="Set a Restock Notice at CardKingdom" target=_blank>
