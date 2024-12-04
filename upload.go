@@ -571,7 +571,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var highestTotal float64
 
 	// Choose the alternative reference pricing source when one is not loaded in
-	// Note that only INDEX types are allowed
+	var backupResults map[string]map[string]*BanPrice
 	altPriceSource := r.FormValue("altPrice")
 	switch altPriceSource {
 	default:
@@ -580,6 +580,27 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		altPriceSource = "TCGMarket"
 	case "direct":
 		altPriceSource = "TCGDirectLow"
+	case "cardtrader", "cardtraderZero", "mkmLow", "mkmTrend":
+		switch altPriceSource {
+		case "cardtrader":
+			altPriceSource = "CT"
+		case "cardtraderZero":
+			altPriceSource = "CT0"
+		case "mkmLow":
+			altPriceSource = "MKMLow"
+		case "mkmTrend":
+			altPriceSource = "MKMTrend"
+		}
+		backupResults = results
+		if blMode {
+			backupResults = getSellerPrices("", []string{altPriceSource}, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		}
+	case "directNet":
+		altPriceSource = "TCGDirectNet"
+		backupResults = results
+		if !blMode {
+			backupResults = getVendorPrices("", []string{altPriceSource}, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		}
 	}
 
 	optimizedResults := map[string][]OptimizedUploadEntry{}
@@ -687,10 +708,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			cardId := uploadedData[i].CardId
 
-			// Load comparison price, either the loaded one or tcg low
+			// Load comparison price, either the loaded one or one of the alternatives
 			comparePrice := uploadedData[i].OriginalPrice
 			if comparePrice == 0 || skipPrices {
-				comparePrice = getPrice(indexResults[cardId][altPriceSource], "")
+				compareConds := ""
+				prices, found := indexResults[cardId][altPriceSource]
+				if !found {
+					compareConds = conds
+					prices = backupResults[cardId+conds][altPriceSource]
+				}
+
+				// Normally index has no conditions to check, but the price might be coming
+				// from a regular store (in which case we attempt to match it)
+				comparePrice = getPrice(prices, compareConds)
 			}
 
 			// Load the single item priceprice
