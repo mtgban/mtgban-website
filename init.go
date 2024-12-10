@@ -969,13 +969,15 @@ func loadSellers(newbc *mtgban.BanClient) {
 		}(i)
 
 		// If not in initilization mode, run the routines sequentially
-		if !init {
+		if !init || Config.SlowStart {
 			wg.Wait()
 		}
 	}
 
 	if init {
-		wg.Wait()
+		if !Config.SlowStart {
+			wg.Wait()
+		}
 
 		// Sort the sellers arrays by name
 		//
@@ -1107,13 +1109,15 @@ func loadVendors(newbc *mtgban.BanClient) {
 			log.Println(shorthand, "vendor -- OK")
 		}(i)
 
-		if !init {
+		if !init || Config.SlowStart {
 			wg.Wait()
 		}
 	}
 
 	if init {
-		wg.Wait()
+		if !Config.SlowStart {
+			wg.Wait()
+		}
 
 		sort.Slice(Vendors, func(i, j int) bool {
 			if Vendors[i].Info().Name == Vendors[j].Info().Name {
