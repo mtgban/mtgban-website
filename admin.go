@@ -512,6 +512,9 @@ func build() (string, error) {
 	return "", errors.New(out.String())
 }
 
+const fifteenDays = 15 * 24 * time.Hour
+
+// Delete cache of inventory and buylist files older than 15 days
 func deleteOldCache() {
 	var size int64
 
@@ -531,9 +534,7 @@ func deleteOldCache() {
 		}
 
 		for _, subdir := range dirFiles {
-			// Skip most recent entries
-			dayTag := fmt.Sprintf("%03d", time.Now().YearDay()-1)[:2]
-			if strings.HasPrefix(subdir.Name(), dayTag) {
+			if time.Since(subdir.ModTime()) < fifteenDays {
 				continue
 			}
 
