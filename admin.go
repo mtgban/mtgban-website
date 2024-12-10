@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -553,13 +554,25 @@ func deleteOldCache() {
 
 			// Loop over the directory's files and remove them
 			for _, files := range subDirFiles {
-				size += files.Size()
 				fullPath := path.Join(directory, subdir.Name(), files.Name())
+
+				// Skip deleting if there is a reference
+				storeTagExt := filepath.Base(fullPath)
+				storeBaseName := strings.Replace(storeTagExt, ".json", "-latest.json", 1)
+				link, err := os.Readlink(path.Join(directory, storeBaseName))
+				if err != nil {
+					continue
+				}
+				if link == fullPath {
+					continue
+				}
+
 				log.Println("Deleting", fullPath)
 				os.Remove(fullPath)
+				size += files.Size()
 			}
 
-			// Remove containing directory
+			// Remove containing directory (if empty)
 			log.Println("Deleting", subPath)
 			os.Remove(subPath)
 		}
