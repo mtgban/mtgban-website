@@ -80,27 +80,27 @@ func getMoxDeck(url string) (*MoxfieldDeck, error) {
 	}
 	defer resp.Body.Close()
 
+	// Read response body into slice.
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
 	// Check response status code.
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("status code: %d", resp.StatusCode)
 	}
 
-	// Read response body into slice.
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	// Parse deck data from response body.
-	var data MoxfieldDeck
-	err = json.Unmarshal(body, &data)
+	var deck MoxfieldDeck
+	err = json.Unmarshal(data, &deck)
 
 	if err != nil {
 		return nil, err
 	}
 
 	// Return deck data.
-	return &data, nil
+	return &deck, nil
 }
 
 // Extract card details, flattening deck data into a single slice
