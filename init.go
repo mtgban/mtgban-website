@@ -25,6 +25,7 @@ import (
 	"github.com/mtgban/go-mtgban/coolstuffinc"
 	"github.com/mtgban/go-mtgban/magiccorner"
 	"github.com/mtgban/go-mtgban/miniaturemarket"
+	"github.com/mtgban/go-mtgban/mintcard"
 	"github.com/mtgban/go-mtgban/mtgseattle"
 	"github.com/mtgban/go-mtgban/sealedev"
 	"github.com/mtgban/go-mtgban/starcitygames"
@@ -549,6 +550,13 @@ var mtgScraperOptions = map[string]*scraperOption{
 	"trollandtoad_sealed": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := trollandtoad.NewScraperSealed()
+			scraper.LogCallback = logger.Printf
+			return scraper, nil
+		},
+	},
+	"mintcard": &scraperOption{
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := mintcard.NewScraper()
 			scraper.LogCallback = logger.Printf
 			return scraper, nil
 		},
