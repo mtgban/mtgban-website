@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/corpix/uarand"
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
@@ -57,12 +59,20 @@ func extractDeckID(gdocURL string) (string, error) {
 func getMoxDeck(url string) (*MoxfieldDeck, error) {
 	// Create request to fetch Moxfield deck data.
 	client := cleanhttp.DefaultClient()
+
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS13,
+		},
+	}
+	client.Transport = transport
+
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer undefined")
-	req.Header.Set("User-Agent", "curl/8.4.0")
+	req.Header.Set("User-Agent", uarand.GetRandom())
 
 	resp, err := client.Do(req)
 	if err != nil {
