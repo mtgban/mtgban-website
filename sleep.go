@@ -183,15 +183,9 @@ func getBulks(skipEditions []string) map[string]int {
 			continue
 		}
 
-		// Commander sets would pollute results too much
 		switch set.Code {
-		case "OPCA", "PLIST", "MB1", "30A":
+		case "OPCA", "PLST", "MB2", "30A":
 			continue
-		case "40K":
-		default:
-			if set.Type == "commander" {
-				continue
-			}
 		}
 
 		// Skip anything older than 5 years
