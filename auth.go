@@ -600,7 +600,6 @@ func enforceSigning(next http.Handler) http.Handler {
 					pageVars = genPageNav(nav.Name, sig)
 					pageVars.Title = "This feature is BANned"
 					pageVars.ErrorMessage = ErrMsgPlus
-					pageVars.ShowPromo = true
 
 					render(w, nav.Page, pageVars)
 					return
