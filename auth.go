@@ -399,9 +399,10 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		w.Header().Add("Content-Type", "application/json")
 
 		sig := r.FormValue("sig")
-		if SigCheck && sig == "" {
-			log.Println("API error, empty signature")
-			w.Write([]byte(`{"error": "empty signature"}`))
+
+		// If signature is empty let it pass through
+		if sig == "" {
+			gziphandler.GzipHandler(next).ServeHTTP(w, r)
 			return
 		}
 

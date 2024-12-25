@@ -338,6 +338,7 @@ var Config struct {
 	AffiliatesList         []string          `json:"affiliates_list"`
 	AffiliatesBuylistList  []string          `json:"affiliates_buylist_list"`
 	Api                    map[string]string `json:"api"`
+	ApiDemoStores          []string          `json:"api_demo_stores"`
 	DiscordToken           string            `json:"discord_token"`
 	DiscordAllowList       []string          `json:"discord_allowlist"`
 	DevSellers             []string          `json:"dev_sellers"`

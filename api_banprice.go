@@ -105,6 +105,16 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	if DevMode && !SigCheck && storesOpt == "" {
 		storesOpt = "DEV_ACCESS"
 	}
+	if sig == "" && storesOpt == "" {
+		storesOpt = strings.Join(Config.ApiDemoStores, ",")
+		// Disable a few endpoints for this specific mode
+		if strings.Contains(urlPath, "all.") || strings.Contains(urlPath, "retail.") || strings.Contains(urlPath, "buylist.") {
+			out.Error = "Invalid endpoint or missing signature"
+			json.NewEncoder(w).Encode(&out)
+			return
+		}
+	}
+
 	var enabledStores []string
 	switch storesOpt {
 	case "ALL_ACCESS":
@@ -199,6 +209,12 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	conds, _ := strconv.ParseBool(r.FormValue("conds"))
 	filterByFinish := r.FormValue("finish")
 	tagName := r.FormValue("tag")
+	if sig == "" {
+		enabledModes = []string{"all"}
+		if tagName == "" {
+			tagName = "tags"
+		}
+	}
 
 	// Filter by user preference, as long as it's listed in the enebled stores
 	filterByVendors := r.FormValue("vendor")
@@ -295,6 +311,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := GetParamFromSig(sig, "UserEmail")
+	if sig == "" && user == "" {
+		user = "DEMO"
+	}
 	msg := fmt.Sprintf("[%v] %s requested a '%s' API dump ('%s','%q','%s')", time.Since(start), user, dumpType, filterByEdition, filterByHash, filterByFinish)
 	if qty {
 		msg += " with quantities"
