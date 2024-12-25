@@ -49,17 +49,10 @@
         </div>
     </div>
 
-    <div class="footer">&copy; 2019-2025 MTGBAN Inc<br>
-        <br><hr width=30% style="border: 1px dotted;">
-        Cookies may be in use to ensure correct functionality of the platform.<br>
-        Content is provided for informational purpose only.<br>
-    </div>
-
     {{if ne .ErrorMessage ""}}
         <h1>{{.ErrorMessage}}</h1>
     {{end}}
 
-    <br>
     <div class="indent">
         {{if .PatreonLogin}}
             <script type="text/javascript">
@@ -80,6 +73,13 @@
         {{else}}
             <a href="/?errmsg=logout"><img src="/img/misc/logout.png" width=236 height=60></a>
         {{end}}
+    </div>
+
+    <br>
+    <div class="footer">&copy; 2019-2025 MTGBAN Inc<br>
+        <br><hr width=30% style="border: 1px dotted;">
+        Cookies may be in use to ensure correct functionality of the platform.<br>
+        Content is provided for informational purpose only.<br>
     </div>
 </body>
 </html>
