@@ -512,6 +512,17 @@ func genPageNav(activeTab, sig string) PageVars {
 	}
 	pageVars.Nav[mainNavIndex].Active = true
 	pageVars.Nav[mainNavIndex].Class = "active"
+
+	// Add extra warning message if needed
+	if pageVars.Nav[mainNavIndex].NoAuth {
+		extra := *&NavElem{
+			Active: true,
+			Class:  "beta",
+			Short:  "Beta Public Access",
+			Link:   "javascript:void(0)",
+		}
+		pageVars.Nav = append(pageVars.Nav, extra)
+	}
 	return pageVars
 }
 

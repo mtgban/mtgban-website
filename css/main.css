@@ -388,6 +388,11 @@ nav li a:hover {
 a.active:hover{
     color: var(--activetext);
 }
+a.beta {
+    color: var(--background);
+    font-weight: bold;
+    pointer-events: none;
+}
 
 .selected {
     background-color: var(--activetext);
