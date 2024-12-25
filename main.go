@@ -39,7 +39,6 @@ type PageVars struct {
 	PatreonId    string
 	PatreonURL   string
 	PatreonLogin bool
-	ShowPromo    bool
 	Hash         string
 
 	Embed struct {
@@ -72,6 +71,7 @@ type PageVars struct {
 	NoSort       bool
 	HasAvailable bool
 	CardBackURL  string
+	ShowUpsell   bool
 
 	CanShowAll       bool
 	CleanSearchQuery string

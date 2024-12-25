@@ -264,7 +264,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.Embed.OEmbedURL = getBaseURL(r) + "/search/oembed?format=json&url=" + url.QueryEscape(getBaseURL(r)+"/search?q="+query)
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
-	pageVars.ShowPromo = !slices.Contains(miscSearchOpts, "noUpsell")
+	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
 	pageVars.ShowSYP = !slices.Contains(miscSearchOpts, "noSyp")
 
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
