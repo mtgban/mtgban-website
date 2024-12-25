@@ -15,6 +15,11 @@
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
     <meta name="theme-color" content="#ff0000">
+
+    {{if .PatreonLogin}}
+        <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    {{end}}
 </head>
 
 <body class="light-theme">
@@ -45,7 +50,17 @@
 
     <div class="bg">
         <div class="mainbody">
-            <h1>LAMBDA</h1>
+            {{if .PatreonLogin}}
+                <div class="indent">
+                    <form class="search autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+                        <input id="searchbox" class="w3-input w3-border w3-round-small search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
+                    </form>
+                </div>
+
+                <script type="text/javascript">
+                    autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
+                </script>
+            {{end}}
         </div>
     </div>
 
