@@ -480,6 +480,8 @@ func genPageNav(activeTab, sig string) PageVars {
 		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
 	case mtgban.GameLorcana:
 		pageVars.CardBackURL = "img/backs/lorcana.webp"
+	default:
+		panic("no pageVars.CardBackURL set")
 	}
 
 	// Allocate a new navigation bar
