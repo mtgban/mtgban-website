@@ -514,7 +514,7 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars.Nav[mainNavIndex].Class = "active"
 
 	// Add extra warning message if needed
-	if pageVars.Nav[mainNavIndex].NoAuth {
+	if showPatreonLogin && pageVars.Nav[mainNavIndex].NoAuth {
 		extra := *&NavElem{
 			Active: true,
 			Class:  "beta",
