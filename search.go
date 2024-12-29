@@ -467,7 +467,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		tmp := indexArray[:0]
 		mkmIndex := -1
 		tcgIndex := -1
-		sealedEVindexes := map[string]int{}
+		var sealedEVindexes map[string]int
 
 		// Iterate on array, always passthrough, except for specific entries
 		for i := range indexArray {
@@ -511,6 +511,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				continue
 			default:
 				if slices.Contains(ScraperOptions["sealed_ev"].Keepers, indexArray[i].ScraperName) {
+					if sealedEVindexes == nil {
+						sealedEVindexes = map[string]int{}
+					}
+
 					// Determine an identifiers from the name (the second word)
 					fields := strings.Fields(indexArray[i].ScraperName)
 					if len(fields) < 2 {
