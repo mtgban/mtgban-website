@@ -521,6 +521,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				continue
 			default:
 				if slices.Contains(ScraperOptions["sealed_ev"].Keepers, indexArray[i].ScraperName) {
+					if getTCGSimulationIQR(cardId) > IQRThreshold {
+						pageVars.InfoMessage = "CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values"
+					}
+
 					if sealedEVindexes == nil {
 						sealedEVindexes = map[string]int{}
 					}

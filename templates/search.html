@@ -489,6 +489,14 @@ Sims are not required for pre-constructed decks and other products where the sam
                         </ul>
                     </li>
                     <li>
+                        <h4>Why are some products tagged with high IQR?</h4>
+                        <ul class="indent">
+                            Simplifying a bit, IQR is a statistical method to find how many outliers are present in the data. This value basically tells you how your data is distributed and how many prices deviate from the typical range (and by how much). A high IQR indicates thate there are a lot of cards with very high prices, meaning the chances of hitting this cards is lower than the norm, but when performing box simulations, even in high number, they may skew the final prospect value.
+                            In order to warn BAN users that something may be off, either due to an unlucky simulation, or due to plain bad data, we tag those products accordingly, and exclude them when appropriate. The computation is proportional to the market condition, meaning it accounts for both older sealed product with cards in the thousands of dollars, as well as recent product with a small number of chase cards (as reminder, serialized cards are not used in any of our computations).
+                            Always make sure to understand the data well and perform your own research, before making any financial decision, and doubly more so for any product tagged with high IQR.
+                        </ul>
+                    </li>
+                    <li>
                         <h4>How do you emulate booster openings?</h4>
                         <ul class="indent">
                             We use data from multiple projects, in paritcular we derive the collation information from the <a href="https://www.lethe.xyz/mtg/collation/">Lethe project</a>, the distribution of cards in the boosters from <a href="https://github.com/taw/magic-search-engine">mtg.wft search engine</a>, the contents description from <a href="https://github.com/mtgjson/mtg-sealed-content">MTGJSON</a>, and the decklists come from <a href="https://github.com/taw/magic-preconstructed-decks">this repository</a>. Please refer to each project website to know more how estimations works (and to help out with data ingestion).<br>
@@ -1011,6 +1019,10 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                     <td style="text-align: center; vertical-align: middle;">
                                                         {{if .Secondary}}
                                                             $ {{printf "%.2f" .Secondary}}
+                                                            {{$iqr := index .ExtraValues "iqr"}}
+                                                            {{if gt $iqr 150.0}}
+                                                                <span title="High Simulation IQR: {{printf "%.2f" $iqr}}">‼️</span>
+                                                            {{end}}
                                                         {{else}}
                                                             n/a
                                                         {{end}}
