@@ -706,3 +706,16 @@ func getTCGMarketPrice(cardId string) float64 {
 	}
 	return entries[0].Price
 }
+
+// Retrieve the IQR of the simulation using TCGplayer Low as base
+func getTCGSimulationIQR(productId string) float64 {
+	inv, err := findSellerInventory("TCGLowSim")
+	if err != nil {
+		return 0
+	}
+	entries, found := inv[productId]
+	if !found {
+		return 0
+	}
+	return entries[0].ExtraValues["iqr"]
+}

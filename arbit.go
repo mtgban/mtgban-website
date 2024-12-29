@@ -36,6 +36,9 @@ const (
 	ProfConstGlobal = 10
 
 	DefaultSortingOption = "profitability"
+
+	// For sealed simulations
+	IQRThreshold = 150
 )
 
 var FilteredEditions = []string{
@@ -245,9 +248,16 @@ var FilterOptConfig = map[string]FilterOpt{
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomPriceFilter
 			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
-				marketPrice := getTCGMarketPrice(cardId)
-				if invEntry.Price/2 > marketPrice {
-					return 0, true
+				co, err := mtgmatcher.GetUUID(cardId)
+				if err == nil && co.Sealed {
+					if getTCGSimulationIQR(cardId) > IQRThreshold {
+						return 0, true
+					}
+				} else {
+					marketPrice := getTCGMarketPrice(cardId)
+					if invEntry.Price/2 > marketPrice {
+						return 0, true
+					}
 				}
 				if oldFunc != nil {
 					return oldFunc(cardId, invEntry)
@@ -255,7 +265,6 @@ var FilterOptConfig = map[string]FilterOpt{
 				return 1, false
 			}
 		},
-		NoSealed:   true,
 		GlobalOnly: true,
 	},
 }
@@ -809,6 +818,16 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 				marketPrice := getTCGMarketPrice(res.CardId)
 				if res.ReferenceEntry.Price/2 > marketPrice {
 					sussy[res.CardId] = marketPrice
+				}
+			}
+		}
+		if !arbitFilters["nosus"] && scraper.Info().SealedMode {
+			sussy = map[string]float64{}
+
+			for _, res := range arbit {
+				iqr := getTCGSimulationIQR(res.CardId)
+				if iqr > 150 {
+					sussy[res.CardId] = iqr
 				}
 			}
 		}

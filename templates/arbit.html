@@ -516,7 +516,7 @@
                                         $ {{printf "%.2f" .ReferenceEntry.Price}}
                                         {{if (isSussy $arbitContainer.SussyList .CardId)}}
                                             {{$susPrice := (index $arbitContainer.SussyList .CardId)}}
-                                            <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if $susPrice}}${{printf "%.2f" $susPrice}}{{else}}missing{{end}}">‼️ </span>
+                                            <span class=emoji title="CAUTION - This price looks a bit off, {{if $.IsSealed}}the contents of this product have a very uneven distribution, and simulation or data may be wrong (IQR: {{printf "%.2f" $susPrice}}){{else}}TCG Market is {{if $susPrice}}${{printf "%.2f" $susPrice}}{{else}}missing{{end}}{{end}}">‼️ </span>
                                         {{end}}
                                     {{else}}
                                         $ {{printf "%.2f" .BuylistEntry.BuyPrice}}
