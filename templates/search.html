@@ -1009,11 +1009,20 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         $ {{printf "%.2f" .Price}}
                                                     </td>
                                                     <td style="text-align: center; vertical-align: middle;">
-                                                        $ {{printf "%.2f" .Secondary}}
+                                                        {{if .Secondary}}
+                                                            $ {{printf "%.2f" .Secondary}}
+                                                        {{else}}
+                                                            n/a
+                                                        {{end}}
                                                     </td>
                                                     <td style="text-align: center; vertical-align: middle;">
-                                                        {{if .Tertiary}}
-                                                            $ {{printf "%.2f" .Tertiary}}
+                                                        {{if .Secondary}}
+                                                            {{$stdDev := index .ExtraValues "stdDev"}}
+                                                            {{if $stdDev}}
+                                                                $ {{printf "%.2f" $stdDev}}
+                                                            {{else}}
+                                                                n/a
+                                                            {{end}}
                                                         {{else}}
                                                             n/a
                                                         {{end}}

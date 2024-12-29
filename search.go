@@ -52,8 +52,20 @@ type SearchEntry struct {
 
 	Secondary float64
 
-	// Cannot use slices or pointers to remain compatible with Comparable
-	Tertiary float64
+	ExtraValues map[string]float64
+}
+
+func isSame(a, b SearchEntry) bool {
+	if a.Shorthand != b.Shorthand {
+		return false
+	}
+	if a.Price != b.Price {
+		return false
+	}
+	if a.Quantity != b.Quantity {
+		return false
+	}
+	return true
 }
 
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
@@ -473,10 +485,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		for i := range indexArray {
 			// Set index for sealed reuse
 			evIndex := 0
-			if strings.Contains(indexArray[i].ScraperName, "Median") {
+			if strings.Contains(indexArray[i].ScraperName, " Sim") {
 				evIndex = 1
-			} else if strings.Contains(indexArray[i].ScraperName, "StdDev") {
-				evIndex = 2
 			}
 
 			switch indexArray[i].ScraperName {
@@ -536,8 +546,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 						tmp[idx].Price = indexArray[i].Price
 					case 1:
 						tmp[idx].Secondary = indexArray[i].Price
-					case 2:
-						tmp[idx].Tertiary = indexArray[i].Price
+						tmp[idx].ExtraValues = indexArray[i].ExtraValues
 					}
 				} else {
 					tmp = append(tmp, indexArray[i])
@@ -799,10 +808,17 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 					NoQuantity:  seller.Info().NoQuantityInventory || seller.Info().MetadataOnly,
 					BundleIcon:  icon,
 					Country:     Country2flag[seller.Info().CountryFlag],
+					ExtraValues: entry.ExtraValues,
 				}
 
 				// Do not add the same data twice
-				if slices.Contains(foundSellers[cardId][conditions], res) {
+				skip := false
+				for i := range foundSellers[cardId][conditions] {
+					if isSame(foundSellers[cardId][conditions][i], res) {
+						skip = true
+					}
+				}
+				if skip {
 					continue
 				}
 
@@ -878,7 +894,13 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 					Country:     Country2flag[vendor.Info().CountryFlag],
 				}
 
-				if slices.Contains(foundVendors[cardId][conditions], res) {
+				skip := false
+				for i := range foundVendors[cardId][conditions] {
+					if isSame(foundVendors[cardId][conditions][i], res) {
+						skip = true
+					}
+				}
+				if skip {
 					continue
 				}
 
