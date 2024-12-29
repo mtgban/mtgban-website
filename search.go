@@ -50,8 +50,7 @@ type SearchEntry struct {
 
 	Country string
 
-	IndexCombined bool
-	Secondary     float64
+	Secondary float64
 
 	// Cannot use slices or pointers to remain compatible with Comparable
 	Tertiary float64
@@ -491,7 +490,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				if mkmIndex >= 0 {
 					tmp[mkmIndex].Secondary = indexArray[i].Price
 					tmp[mkmIndex].ScraperName = "MKM (Low / Trend)"
-					tmp[mkmIndex].IndexCombined = true
 				} else {
 					tmp = append(tmp, indexArray[i])
 				}
@@ -505,7 +503,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				if tcgIndex >= 0 {
 					tmp[tcgIndex].Secondary = indexArray[i].Price
 					tmp[tcgIndex].ScraperName = "TCG (Low / Market)"
-					tmp[tcgIndex].IndexCombined = true
 				} else {
 					tmp = append(tmp, indexArray[i])
 				}
