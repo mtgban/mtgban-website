@@ -389,14 +389,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			uploadedData, err = loadCsv(file, ',', maxRows)
 		}
 	} else if gdocURL != "" {
-		if strings.HasPrefix(gdocURL, "https://store.tcgplayer.com/collection/view/") {
-			uploadedData, err = loadCollection(gdocURL, maxRows)
-		} else if strings.HasPrefix(gdocURL, "https://www.moxfield.com/decks/") {
-			uploadedData, err = loadMoxfieldDeck(gdocURL, maxRows)
-		} else if strings.HasPrefix(gdocURL, "https://docs.google.com/spreadsheets/") {
-			uploadedData, err = loadSpreadsheet(gdocURL, maxRows)
-		} else {
-			err = errors.New("unsupported URL")
+		var u *url.URL
+		u, err = url.Parse(gdocURL)
+		if err == nil {
+			switch u.Host {
+			case "store.tcgplayer.com":
+				uploadedData, err = loadCollection(gdocURL, maxRows)
+			case "www.moxfield.com":
+				uploadedData, err = loadMoxfieldDeck(u.Path, maxRows)
+			case "docs.google.com":
+				uploadedData, err = loadSpreadsheet(u.Path, maxRows)
+			default:
+				err = errors.New("unsupported URL")
+			}
 		}
 	}
 	if err != nil {
@@ -1237,6 +1242,10 @@ func loadHashes(hashes []string) ([]UploadEntry, error) {
 }
 
 func loadCollection(link string, maxRows int) ([]UploadEntry, error) {
+	if !strings.Contains(link, "/collection/view/") {
+		return nil, errors.New("unsupported URL")
+	}
+
 	resp, err := cleanhttp.DefaultClient().Get(link)
 	if err != nil {
 		return nil, err
@@ -1281,15 +1290,10 @@ func loadCollection(link string, maxRows int) ([]UploadEntry, error) {
 	return uploadEntries, nil
 }
 
-func loadSpreadsheet(link string, maxRows int) ([]UploadEntry, error) {
-	u, err := url.Parse(link)
-	if err != nil {
-		return nil, err
-	}
-
+func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
 	service := spreadsheet.NewServiceWithClient(GoogleDocsClient)
 
-	hash := path.Base(strings.TrimSuffix(u.Path, "/edit"))
+	hash := path.Base(strings.TrimSuffix(urlPath, "/edit"))
 	spreadsheet, err := service.FetchSpreadsheet(hash)
 	if err != nil {
 		return nil, err

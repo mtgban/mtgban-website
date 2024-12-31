@@ -8,9 +8,8 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/url"
+	"path"
 	"sort"
-	"strings"
 
 	"github.com/corpix/uarand"
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
@@ -34,29 +33,10 @@ type MoxCard struct {
 	} `json:"card"`
 }
 
-func extractDeckID(gdocURL string) (string, error) {
-	// Parse the provided URL.
-	parsedURL, err := url.Parse(gdocURL)
-	if err != nil {
-		return "", err
-	}
+func getMoxDeck(deckID string) (*MoxfieldDeck, error) {
+	moxURL := fmt.Sprintf("%s/%s", Config.Uploader.Moxfield, deckID)
+	log.Println("Querying:", moxURL)
 
-	// Extract the deck ID from the URL.
-	pathSegments := strings.Split(parsedURL.Path, "/")
-
-	if len(pathSegments) < 2 || pathSegments[1] != "decks" {
-		return "", errors.New("invalid Moxfield deck URL")
-	}
-
-	deckID := pathSegments[2]
-	if deckID == "" {
-		return "", errors.New("no deck ID found in URL")
-	}
-
-	return fmt.Sprintf("%s/%s", Config.Uploader.Moxfield, deckID), nil
-}
-
-func getMoxDeck(url string) (*MoxfieldDeck, error) {
 	// Create request to fetch Moxfield deck data.
 	client := cleanhttp.DefaultClient()
 
@@ -67,7 +47,7 @@ func getMoxDeck(url string) (*MoxfieldDeck, error) {
 	}
 	client.Transport = transport
 
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, moxURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -137,15 +117,13 @@ func prepareUploadEntries(MoxCards []MoxCard, maxRows int) ([]UploadEntry, error
 	return uploadEntries, nil
 }
 
-func loadMoxfieldDeck(gdocURL string, maxRows int) ([]UploadEntry, error) {
-	moxURL, err := extractDeckID(gdocURL)
-	if err != nil {
-		log.Println(err)
+func loadMoxfieldDeck(urlPath string, maxRows int) ([]UploadEntry, error) {
+	deckID := path.Base(urlPath)
+	if deckID == "" {
 		return nil, errors.New("invalid Moxfield deck URL")
 	}
-	log.Println("Querying:", moxURL)
 
-	moxDeck, err := getMoxDeck(moxURL)
+	moxDeck, err := getMoxDeck(deckID)
 	if err != nil {
 		log.Println(err)
 		return nil, errors.New("failed to fetch Moxfield deck")
