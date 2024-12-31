@@ -332,7 +332,7 @@
             };
             window.askForURL = function(){
                 let url = prompt("Please enter your URL here", "{{.RemoteLinkURL}}");
-                if (url != null && (url.startsWith("https://docs.google.com/spreadsheets/") || url.startsWith("https://store.tcgplayer.com/collection/view/") || url.startsWith("https://www.moxfield.com/decks/") || url == "")) {
+                if (url != null && (url.includes("docs.google.com") || url.includes("store.tcgplayer.com") || url.includes("moxfield.com") || url == "")) {
                     if (url == "") {
                         urlLabel.innerHTML = "Load remote URL";
                     } else {

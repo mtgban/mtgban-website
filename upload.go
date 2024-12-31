@@ -395,7 +395,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			switch u.Host {
 			case "store.tcgplayer.com":
 				uploadedData, err = loadCollection(gdocURL, maxRows)
-			case "www.moxfield.com":
+			case "www.moxfield.com", "moxfield.com":
 				uploadedData, err = loadMoxfieldDeck(u.Path, maxRows)
 			case "docs.google.com":
 				uploadedData, err = loadSpreadsheet(u.Path, maxRows)
