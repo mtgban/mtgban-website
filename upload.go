@@ -355,6 +355,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	estimate, _ := strconv.ParseBool(r.FormValue("estimate"))
+	deckbox, _ := strconv.ParseBool(r.FormValue("deckbox"))
 
 	start := time.Now()
 
@@ -369,7 +370,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	// Allow a larger upload limit if set, if dev, or if it's an external call
 	limitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
-	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate
+	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate || deckbox
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
 	}
@@ -461,6 +462,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		http.Redirect(w, r, link, http.StatusFound)
+		return
+	}
+	if deckbox && canBuylist {
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_deckbox.csv\"")
+		csvWriter := csv.NewWriter(w)
+
+		err = deckboxIdConvert(csvWriter, uploadedData)
+		if err != nil {
+			w.Header().Del("Content-Type")
+			UserNotify("upload", err.Error())
+			pageVars.InfoMessage = "Unable to download CSV right now"
+			render(w, "upload.html", pageVars)
+		}
 		return
 	}
 

@@ -103,7 +103,7 @@
 
                     <script type="text/javascript">
                         const hiddenBools = [
-                            "upload", "download", "estimate",
+                            "upload", "download", "estimate", "deckbox"
                         ];
                         function submitForm(field, newWindow) {
                             hiddenBools.forEach(element => {
@@ -128,10 +128,12 @@
 
                     <input type="hidden" id="download" name="download" value="false"/>
                     <input type="hidden" id="estimate" name="estimate" value="false"/>
+                    <input type="hidden" id="deckbox" name="deckbox" value="false"/>
                     <input type="submit" id="submit_default" value="&nbsp;&nbsp;Upload&nbsp;&nbsp;" onclick="javascript:submitForm('upload', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:inline">
                     {{if .CanBuylist}}
                         <input type="submit" id="submit_download" value="&nbsp;&nbsp;Get CSV&nbsp;&nbsp;" onclick="javascript:submitForm('download', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
                         <input type="submit" id="submit_estimate" value="&nbsp;CardConduit&nbsp;" onclick="javascript:submitForm('estimate', true);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                        <input type="submit" id="submit_deckbox" value="&nbsp;Deckbox&nbsp;" onclick="javascript:submitForm('deckbox', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
                     {{end}}
                     {{if .Optimized}}
                         <input type="button" value="&nbsp;&nbsp;Optimizer&nbsp;&nbsp;" onclick="window.location.href = '#top';" style="display:inline">
@@ -272,7 +274,9 @@
             window.reloadSelect = function(mode) {
                 var selectBox = document.getElementById('storesBox');
                 if (selectBox) {
-                    const fields = ['submit_download', 'submit_estimate'];
+                    const fields = [
+                        'submit_download', 'submit_estimate', 'submit_deckbox'
+                    ];
                     if (mode == "buylist") {
                         selectBox.innerHTML = " \
                             {{range .VendorKeys}} \
@@ -320,7 +324,9 @@
                     var url = document.getElementById('urlLabel');
                     url.innerHTML = "Select spreadsheet";
 
-                    const fields = ['submit_default', 'submit_download', 'submit_estimate'];
+                    const fields = [
+                        'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
+                    ];
 
                     fields.forEach(element => {
                         var btn = document.getElementById(element);
@@ -349,7 +355,9 @@
                     var input = document.getElementById('gdocURL');
                     input.value = url;
 
-                    const fields = ['submit_default', 'submit_download', 'submit_estimate'];
+                    const fields = [
+                        'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
+                    ];
 
                     fields.forEach(element => {
                         var btn = document.getElementById(element);
@@ -365,7 +373,9 @@
                 var textArea = document.getElementById('textArea');
                 textArea.style.display = "block";
 
-                const fields = ['submit_default', 'submit_download', 'submit_estimate'];
+                const fields = [
+                    'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
+                ];
 
                 fields.forEach(element => {
                     var btn = document.getElementById(element);
