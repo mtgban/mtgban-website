@@ -66,6 +66,7 @@ type GenericCard struct {
 
 	RarityColor  string
 	ScryfallURL  string
+	DeckboxURL   string
 	CKRestockURL string
 	SourceSealed []string
 }
@@ -486,6 +487,12 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		scryfallURL = "https://scryfall.com/card/" + strings.ToLower(co.SetCode) + "/" + co.Number
 	}
 
+	deckboxURL := "https://deckbox.org/mtg/" + url.QueryEscape(co.Name) + "?fromqs=true"
+	deckboxId, found := co.Identifiers["deckboxId"]
+	if found {
+		deckboxURL += "&printing=" + deckboxId
+	}
+
 	var rarityColor string
 	keyrune := keyruneForCardSet(cardId)
 	if keyrune == "" {
@@ -519,6 +526,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 
 		RarityColor:  rarityColor,
 		ScryfallURL:  scryfallURL,
+		DeckboxURL:   deckboxURL,
 		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
 	}
