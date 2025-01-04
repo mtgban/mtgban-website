@@ -30,12 +30,12 @@ func deckboxIdConvert(w *csv.Writer, uploadedData []UploadEntry) error {
 			continue
 		}
 
-		deckboxId := co.Identifiers["deckboxId"]
+		deckboxId, found := co.Identifiers["deckboxId"]
 		cardName := co.Name
 		tags := ""
 
 		// If id is missing instead tag the cards with the information available
-		if deckboxId == "" || deckboxId == "None" {
+		if !found {
 			deckboxId = ""
 			tags = co.SetCode + "\\t" + co.Number
 		}
