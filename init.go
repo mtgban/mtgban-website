@@ -24,6 +24,7 @@ import (
 	"github.com/mtgban/go-mtgban/cardtrader"
 	"github.com/mtgban/go-mtgban/coolstuffinc"
 	"github.com/mtgban/go-mtgban/magiccorner"
+	"github.com/mtgban/go-mtgban/manapool"
 	"github.com/mtgban/go-mtgban/miniaturemarket"
 	"github.com/mtgban/go-mtgban/mintcard"
 	"github.com/mtgban/go-mtgban/mtgseattle"
@@ -558,6 +559,14 @@ var mtgScraperOptions = map[string]*scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := mintcard.NewScraper()
 			scraper.LogCallback = logger.Printf
+			return scraper, nil
+		},
+	},
+	"manapool": &scraperOption{
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := manapool.NewScraper()
+			scraper.LogCallback = logger.Printf
+			scraper.Partner = Config.Affiliate["MP"]
 			return scraper, nil
 		},
 	},
