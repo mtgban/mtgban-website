@@ -63,6 +63,7 @@ type GenericCard struct {
 	Sealed    bool
 	Booster   bool
 	HasDeck   bool
+	Flag      string
 
 	RarityColor  string
 	ScryfallURL  string
@@ -285,6 +286,19 @@ func findTCGproductId(cardId string) string {
 	return tcgId
 }
 
+var allLanguageFlags = map[string]string{
+	"Chinese Simplified":  "🇨🇳",
+	"Chinese Traditional": "🇹🇼",
+	"French":              "🇫🇷",
+	"German":              "🇩🇪",
+	"Italian":             "🇮🇹",
+	"Japanese":            "🇯🇵",
+	"Korean":              "🇰🇷",
+	"Portuguese (Brazil)": "🇧🇷",
+	"Russian":             "🇷🇺",
+	"Spanish":             "🇪🇸",
+}
+
 func uuid2card(cardId string, flags ...bool) GenericCard {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
@@ -323,11 +337,6 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != mtgjson.PromoTypeBoosterfun {
 			variant += mtgmatcher.Title(promoType) + " "
 		}
-	}
-
-	isJPN := co.Language == mtgjson.LanguageJapanese
-	if isJPN {
-		variant = "JPN " + variant
 	}
 	variant = strings.TrimSpace(variant)
 
@@ -523,6 +532,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		Sealed:    co.Sealed,
 		Booster:   canBoosterGen,
 		HasDeck:   hasDecklist,
+		Flag:      allLanguageFlags[co.Language],
 
 		RarityColor:  rarityColor,
 		ScryfallURL:  scryfallURL,

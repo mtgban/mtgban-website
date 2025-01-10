@@ -870,6 +870,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{if ne $card.Variant ""}}
                                                 <i>({{$card.Variant}})</i>
                                             {{end}}
+                                            {{if $card.Flag}}
+                                                &nbsp;<span class="emoji" style="line-height:0">{{$card.Flag}}</span>
+                                            {{end}}
                                             {{if $card.Reserved}}
                                                 *
                                             {{end}}
