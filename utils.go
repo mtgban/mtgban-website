@@ -299,6 +299,26 @@ var allLanguageFlags = map[string]string{
 	"Spanish":             "🇪🇸",
 }
 
+func showVariant(cardId string) bool {
+	co, err := mtgmatcher.GetUUID(cardId)
+	if err != nil {
+		return false
+	}
+	set, err := mtgmatcher.GetSet(co.SetCode)
+	if err != nil {
+		return false
+	}
+	releaseDate := set.ReleaseDate
+	if co.OriginalReleaseDate != "" {
+		releaseDate = co.OriginalReleaseDate
+	}
+	setDate, err := time.Parse("2006-01-02", releaseDate)
+	if err != nil {
+		return false
+	}
+	return setDate.After(mtgmatcher.PromosForEverybodyYay)
+}
+
 func uuid2card(cardId string, flags ...bool) GenericCard {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
@@ -320,7 +340,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	}
 
 	variant := ""
-	if co.HasPromoType(mtgjson.PromoTypeBoosterfun) {
+	if showVariant(cardId) {
 		switch {
 		case co.HasFrameEffect(mtgjson.FrameEffectShowcase):
 			variant = "Showcase "
