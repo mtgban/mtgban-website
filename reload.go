@@ -24,6 +24,14 @@ func reloadTCG() {
 	ServerNotify("refresh", "tcg fully refreshed")
 }
 
+func reloadCSI() {
+	reload("coolstuffinc")
+}
+
+func reloadMP() {
+	reload("manapool")
+}
+
 func reload(name string) {
 	defer recoverPanicScraper()
 

@@ -682,6 +682,9 @@ func main() {
 		c.AddFunc("45 */3 * * *", reloadTCG)
 		// Refresh SCG at every 8th hour, 50 minutes past the hour (3 times in total)
 		c.AddFunc("50 */6 * * *", reloadSCG)
+		// Refresh CSI & MP a second time
+		c.AddFunc("25 23 * * *", reloadCSI)
+		c.AddFunc("20 23 * * *", reloadMP)
 
 		// MTGJSON builds go live 7am EST, pull the update 30 minutes after
 		c.AddFunc("30 11 * * *", func() {
