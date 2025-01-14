@@ -332,6 +332,30 @@
                             </noscript>
                         </form>
                     {{end}}
+                    {{if eq $sourceKey "MP"}}
+                        {{$deck := ""}}
+                        {{range $entries}}
+                            {{$card := (index $.Metadata .CardId)}}
+                            {{$qty := 1}}
+                            {{if .Quantity}}
+                                {{$qty = .Quantity}}
+                            {{end}}
+                            {{$entry := printf "%d %s [%s] %s" $qty $card.Name $card.SetCode $card.Number}}
+                            {{if eq $deck ""}}
+                                {{$deck = $entry}}
+                            {{else}}
+                                {{$deck = printf "%s\n%s" $deck $entry}}
+                            {{end}}
+                        {{end}}
+                        <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
+                            <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
+                            <input type="hidden" name="deck" value="{{base64enc $deck}}"/>
+                            <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at Manapool</a>
+                            <noscript>
+                                <input type="submit" value="Load at Manapool"/>
+                            </noscript>
+                        </form>
+                    {{end}}
 
                     {{if eq $scraperKey "CK"}}
                         <form action="https://www.cardkingdom.com/sellcart/partner_import" method="post" id="{{$scraperKey}}blhashes" style="display: inline;" target="_blank">

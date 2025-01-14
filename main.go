@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -878,6 +879,9 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		},
 		"tcg_market_price": func(s string) float64 {
 			return getTCGMarketPrice(s)
+		},
+		"base64enc": func(s string) string {
+			return base64.StdEncoding.EncodeToString([]byte(s))
 		},
 	}
 
