@@ -832,6 +832,23 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.EditionsMap = AllEditionsMap
 	}
 
+	switch sorting {
+	case "highprice":
+		sort.Slice(uploadedData, func(i, j int) bool {
+			return uploadedData[i].OriginalPrice > uploadedData[j].OriginalPrice
+		})
+	case "alphabetical":
+		sort.Slice(uploadedData, func(i, j int) bool {
+			return sortSetsAlphabeticalSet(uploadedData[i].CardId, uploadedData[j].CardId)
+		})
+	case "setnum":
+		sort.Slice(uploadedData, func(i, j int) bool {
+			return sortSets(uploadedData[i].CardId, uploadedData[j].CardId)
+		})
+	default:
+		// Leave input order
+	}
+
 	pageVars.MissingCounts = missingCounts
 	pageVars.MissingPrices = missingPrices
 	pageVars.ResultPrices = resultPrices
