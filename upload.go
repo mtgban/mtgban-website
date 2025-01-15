@@ -129,9 +129,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// See if we need to download the ck csv only
 	hashTag := r.FormValue("tag")
 	switch hashTag {
-	case "CK", "SCG":
+	case "CK", "SCG", "TCG":
 		hashes := r.Form[hashTag+"hashes"]
 		hashesQtys := r.Form[hashTag+"hashesQtys"]
+		hashesCond := r.Form[hashTag+"hashesCond"]
 		if hashes != nil {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_"+strings.ToLower(hashTag)+".csv\"")
@@ -143,6 +144,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				err = UUID2CKCSV(csvWriter, hashes, hashesQtys)
 			case "SCG":
 				err = UUID2SCGCSV(csvWriter, hashes, hashesQtys)
+			case "TCG":
+				err = UUID2TCGCSV(csvWriter, hashes, hashesQtys, hashesCond)
 			}
 			if err != nil {
 				w.Header().Del("Content-Type")

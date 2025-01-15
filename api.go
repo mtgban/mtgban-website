@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/cardkingdom"
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"golang.org/x/exp/slices"
@@ -268,7 +269,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
 		csvWriter := csv.NewWriter(w)
-		err = UUID2TCGCSV(csvWriter, data.([]string))
+		err = UUID2TCGCSV(csvWriter, data.([]string), nil, nil)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
 			w.Write([]byte(`{"error": "` + err.Error() + `"}`))
@@ -379,8 +380,22 @@ var tcgcsvHeader = []string{
 	"Photo URL",
 }
 
-func UUID2TCGCSV(w *csv.Writer, ids []string) error {
-	inventory, err := findSellerInventory("TCGPlayer")
+var tcgConditionMap = map[string]string{
+	"NM": "Near Mint",
+	"SP": "Lightly Played",
+	"MP": "Moderately Played",
+	"HP": "Heavily Played",
+	"PO": "Damaged",
+}
+
+// Convert a slice of ids (BAN uuids) to a list of TCG product SKUs on a CSV
+//
+// If present, qtys and conds need to be the same size of ids.
+// If absent, quantity will be computed on the fly and entries will be merged
+// in a single entry (tcgplayer does not support csv operations with identical
+// items) and conditions will be set to NM.
+func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
+	market, err := findSellerInventory("TCGPlayer")
 	if err != nil {
 		return err
 	}
@@ -394,26 +409,36 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 
 	// Track total quantity, and skip repeats
 	qty := map[string]int{}
-	for _, id := range ids {
-		qty[id]++
+	for i, id := range ids {
+		quantity := 1
+		if qtys != nil {
+			q, err := strconv.Atoi(qtys[i])
+			if err == nil {
+				quantity = q
+			}
+		}
+		cond := "NM"
+		if conds != nil {
+			cond = conds[i]
+		}
+		qty[id+cond] += quantity
 	}
 
-	for _, id := range ids {
-		price := 0.0
-		lowPrice := 0.0
-		directPrice := 0.0
+	for i, id := range ids {
+		var prices [3]float64
 
-		invEntries, found := inventory[id]
-		if found {
-			price = invEntries[0].Price
+		cond := "NM"
+		if conds != nil {
+			cond = conds[i]
 		}
-		directEntries, found := direct[id]
-		if found {
-			directPrice = directEntries[0].Price
-		}
-		lowEntries, found := low[id]
-		if found {
-			lowPrice = lowEntries[0].Price
+
+		for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
+			for _, entry := range inv[id] {
+				if entry.Conditions == cond {
+					prices[j] = entry.Price
+					break
+				}
+			}
 		}
 
 		co, err := mtgmatcher.GetUUID(id)
@@ -421,11 +446,11 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 			continue
 		}
 
-		tcgSkuId := findTCGproductSKU(id, "NM")
+		tcgSkuId := findTCGproductSKU(id, cond)
 
-		cond := "Near Mint"
+		condLong := tcgConditionMap[cond]
 		if co.Foil || co.Etched {
-			cond += " Foil"
+			condLong += " Foil"
 		}
 
 		record := make([]string, 0, len(tcgcsvHeader))
@@ -437,13 +462,13 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 		record = append(record, "")
 		record = append(record, co.Number)
 		record = append(record, strings.ToUpper(co.Rarity[:1]))
-		record = append(record, cond)
-		record = append(record, fmt.Sprintf("%0.2f", price))
-		record = append(record, fmt.Sprintf("%0.2f", directPrice))
+		record = append(record, condLong)
+		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
+		record = append(record, fmt.Sprintf("%0.2f", prices[1]))
 		record = append(record, "")
-		record = append(record, fmt.Sprintf("%0.2f", lowPrice))
+		record = append(record, fmt.Sprintf("%0.2f", prices[2]))
 		record = append(record, "")
-		record = append(record, fmt.Sprint(qty[id]))
+		record = append(record, fmt.Sprint(qty[id+cond]))
 		record = append(record, "")
 		record = append(record, "")
 

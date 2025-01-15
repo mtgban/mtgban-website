@@ -802,6 +802,8 @@
                                         </form>
                                     {{end}}
 
+                                    |
+
                                     {{if and $.IsBuylist (eq $scraperKey "CK")}}
                                         <form action="https://www.cardkingdom.com/sellcart/partner_import" method="post" id="{{$scraperKey}}blhashes" style="display: inline;" target="_blank">
                                             <input type="hidden" name="json" value='
@@ -836,6 +838,22 @@
                                             </noscript>
                                         </form>
                                     {{end}}
+
+                                    |&nbsp;&nbsp;
+
+                                    <form action="/upload" method="post" id="TCG{{$scraperKey}}hashes" style="display: inline;">
+                                        <input type="hidden" name="tag" value="TCG"/>
+                                        {{range $entries}}
+                                            <input type="hidden" name="TCGhashes" value="{{.CardId}}"/>
+                                            <input type="hidden" name="TCGhashesQtys" value="-{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}"/>
+                                            <input type="hidden" name="TCGhashesCond" value="{{.Condition}}"/>
+                                        {{end}}
+                                        Remove from:<a class="btn danger" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();'>TCGplayer CSV</a>
+                                        <noscript>
+                                            <input type="submit" value="TCGplayer CSV"/>
+                                        </noscript>
+                                    </form>
+
                                     <br>
                                     <table onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
                                         {{range $entries}}
