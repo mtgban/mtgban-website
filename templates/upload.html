@@ -221,6 +221,11 @@
                                     <option value="profitability">&nbsp;profitability</option>
                                 </select>
                             </label>
+                            <br>
+                            <label for="multiplier">
+                                <p class="h6inline">Set a quantity multiplier for operations on loaded data:</p>
+                                <input type="text" class="w3-border w3-round-small" id="multiplier" name="multiplier" value=1 size=1 style="text-align:center;" onchange="javascript:saveText('multiplier')">
+                            </label>
                         </div>
                     </div>
                 </form>
@@ -264,6 +269,7 @@
                 "sorting",
                 "custompercmax",
                 "altPrice",
+                "multiplier",
             ];
             textInputs.forEach(element => {
                 var input = localStorage.getItem(element);
@@ -456,6 +462,7 @@
                     <li>It is possible to skip low value offerings (less than 60% spread or less than $ 1) by selecting the checkboxes at the top.</li>
                     <li>A visual indicator will appear next to entries above a certain customizable threshold.</li>
                     <li>By default, when multiple stores offer a similar price within a certain range (10% by default) they will be all selected, and found in the list result.</li>
+                    <li>It is possible to set a custom quantity multiplier for operations on optimized results, meaning loaded data will stay untouched, but loading external tools (ie buylist or CSV download) will take this value in consideration.</li>
                     <li>The above options can be modified by selecting "Show optimizer options".</li>
                 </ul>
              </div>

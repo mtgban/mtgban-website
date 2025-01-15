@@ -234,6 +234,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	pageVars.CanFilterByPrice = visualIndicator
 
+	multiplier := 1
+	customMultiplier, err := strconv.Atoi(r.FormValue("multiplier"))
+	if err == nil && customMultiplier > 1 {
+		multiplier = customMultiplier
+	}
+
 	// Set flags needed to show elements on the page ui
 	pageVars.IsBuylist = blMode
 	pageVars.CanBuylist = canBuylist
@@ -446,6 +452,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
+			qty *= multiplier
 
 			items = append(items, CCItem{
 				ScryfallID: scryfallId,
@@ -674,7 +681,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
-			indexPrice *= float64(qty)
+			indexPrice *= float64(qty * multiplier)
 			pageVars.TotalEntries[indexKey] += indexPrice
 		}
 
@@ -683,7 +690,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if uploadedData[i].HasQuantity {
 			qty = uploadedData[i].Quantity
 		}
-		pageVars.TotalQuantity += qty
+		pageVars.TotalQuantity += qty * multiplier
 
 		// Run summaries for each vendor
 		for shorthand, banPrice := range results[cardId] {
@@ -709,7 +716,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
-			price *= float64(qty)
+			price *= float64(qty * multiplier)
 
 			// Add to totals (unless it was an index, since it was already added)
 			_, found := indexResults[cardId][shorthand]
@@ -735,6 +742,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
+			qty *= multiplier
 
 			conds := uploadedData[i].OriginalCondition
 			if skipConds {
