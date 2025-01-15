@@ -17,7 +17,6 @@ import (
 	"github.com/mtgban/go-mtgban/cardkingdom"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
-	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 )
 
@@ -399,16 +398,15 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 		qty[id]++
 	}
 
-	for _, id := range maps.Keys(qty) {
+	for _, id := range ids {
 		price := 0.0
 		lowPrice := 0.0
 		directPrice := 0.0
 
 		invEntries, found := inventory[id]
-		if !found {
-			continue
+		if found {
+			price = invEntries[0].Price
 		}
-		price = invEntries[0].Price
 		directEntries, found := direct[id]
 		if found {
 			directPrice = directEntries[0].Price
@@ -423,14 +421,11 @@ func UUID2TCGCSV(w *csv.Writer, ids []string) error {
 			continue
 		}
 
-		tcgSkuId := invEntries[0].InstanceId
-		if tcgSkuId == "" {
-			continue
-		}
+		tcgSkuId := findTCGproductSKU(id, "NM")
 
 		cond := "Near Mint"
 		if co.Foil || co.Etched {
-			cond = "Near Mint Foil"
+			cond += " Foil"
 		}
 
 		record := make([]string, 0, len(tcgcsvHeader))

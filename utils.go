@@ -286,6 +286,17 @@ func findTCGproductId(cardId string) string {
 	return tcgId
 }
 
+// Look for a the SKU of a tcgplayer listing
+func findTCGproductSKU(cardId string, cond string) string {
+	tcgplayer, _ := findSellerInventory("TCGPlayer")
+	for _, entry := range tcgplayer[cardId] {
+		if entry.Conditions == cond {
+			return entry.InstanceId
+		}
+	}
+	return ""
+}
+
 var allLanguageFlags = map[string]string{
 	"Chinese Simplified":  "🇨🇳",
 	"Chinese Traditional": "🇹🇼",
