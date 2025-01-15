@@ -442,7 +442,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 					"PO": "dmg",
 				}[uploadedData[i].OriginalCondition]
 			}
-			var qty int
+			qty := 1
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
@@ -670,16 +670,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			resultPrices[cardId+conds][indexKey] = indexPrice
 
+			qty := 1
 			if uploadedData[i].HasQuantity {
-				indexPrice *= float64(uploadedData[i].Quantity)
+				qty = uploadedData[i].Quantity
 			}
+			indexPrice *= float64(qty)
 			pageVars.TotalEntries[indexKey] += indexPrice
 		}
 
 		// Quantity summary
+		qty := 1
 		if uploadedData[i].HasQuantity {
-			pageVars.TotalQuantity += uploadedData[i].Quantity
+			qty = uploadedData[i].Quantity
 		}
+		pageVars.TotalQuantity += qty
 
 		// Run summaries for each vendor
 		for shorthand, banPrice := range results[cardId] {
@@ -701,9 +705,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Adjust for quantity
+			qty := 1
 			if uploadedData[i].HasQuantity {
-				price *= float64(uploadedData[i].Quantity)
+				qty = uploadedData[i].Quantity
 			}
+			price *= float64(qty)
 
 			// Add to totals (unless it was an index, since it was already added)
 			_, found := indexResults[cardId][shorthand]
@@ -724,6 +730,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		for j, bestPrice := range bestPrices {
 			bestStore := bestStores[j]
+
+			qty := 1
+			if uploadedData[i].HasQuantity {
+				qty = uploadedData[i].Quantity
+			}
 
 			conds := uploadedData[i].OriginalCondition
 			if skipConds {
@@ -772,8 +783,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 				if factor > 0 {
 					profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log(1+factor)
-					if uploadedData[i].Quantity > 1 {
-						profitability *= math.Pow(float64(uploadedData[i].Quantity), 0.25)
+					if qty > 1 {
+						profitability *= math.Pow(float64(qty), 0.25)
 					}
 				}
 			}
@@ -785,7 +796,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				Price:         comparePrice,
 				Spread:        factor,
 				BestPrice:     price,
-				Quantity:      uploadedData[i].Quantity,
+				Quantity:      qty,
 				VisualPrice:   comparePrice * visualPerc / 100.0,
 				Profitability: profitability,
 			})

@@ -750,7 +750,7 @@
                                     {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
                                         <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                             <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                            <input type="hidden" name="c" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardId).Name}}||{{end}}"/>
+                                            <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}||{{end}}"/>
                                             <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                                             <noscript>
                                                 <input type="submit" value="Load at {{$sourceKey}}"/>
@@ -760,7 +760,7 @@
                                     {{if and (not $.IsBuylist) (eq $sourceKey "CSI")}}
                                         <form action="https://www.coolstuffinc.com/main_deckBuilder.php" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                             <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                            <input type="hidden" name="sList" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}} {{(index $.Metadata .CardId).Name}}|{{end}}"/>
+                                            <input type="hidden" name="sList" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}|{{end}}"/>
                                             <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                                             <noscript>
                                                 <input type="submit" value="Load at {{$sourceKey}}"/>
@@ -770,7 +770,7 @@
                                     {{if and (not $.IsBuylist) (has_prefix $sourceKey "TCG")}}
                                         <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                             <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
-                                            <input type="hidden" name="c" value="{{range $entries}}{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}-{{uuid2tcgid .CardId}}||{{end}}"/>
+                                            <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{uuid2tcgid .CardId}}||{{end}}"/>
                                             <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at TCG</a>
                                             <noscript>
                                                 <input type="submit" value="Load at TCG"/>
@@ -781,11 +781,7 @@
                                         {{$deck := ""}}
                                         {{range $entries}}
                                             {{$card := (index $.Metadata .CardId)}}
-                                            {{$qty := 1}}
-                                            {{if .Quantity}}
-                                                {{$qty = .Quantity}}
-                                            {{end}}
-                                            {{$entry := printf "%d %s [%s] %s" $qty $card.Name $card.SetCode $card.Number}}
+                                            {{$entry := printf "%d %s [%s] %s" .Quantity $card.Name $card.SetCode $card.Number}}
                                             {{if eq $deck ""}}
                                                 {{$deck = $entry}}
                                             {{else}}
@@ -811,7 +807,7 @@
                                                     {{range $entries}}
                                                     {
                                                        "id": {{uuid2ckid .CardId}},
-                                                        "qty": {{if .Quantity}}{{.Quantity}}{{else}}1{{end}}
+                                                        "qty": {{.Quantity}}
                                                     },
                                                     {{end}}
                                                     {}
@@ -830,7 +826,7 @@
                                             <input type="hidden" name="mode" value="false"/>
                                             {{range $entries}}
                                                 <input type="hidden" name="{{$scraperKey}}hashes" value="{{.CardId}}"/>
-                                                <input type="hidden" name="{{$scraperKey}}hashesQtys" value="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}"/>
+                                                <input type="hidden" name="{{$scraperKey}}hashesQtys" value="{{.Quantity}}"/>
                                             {{end}}
                                             <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}hashes").submit();'>Download {{$scraperKey}} CSV</a>
                                             <noscript>
@@ -845,7 +841,7 @@
                                         <input type="hidden" name="tag" value="TCG"/>
                                         {{range $entries}}
                                             <input type="hidden" name="TCGhashes" value="{{.CardId}}"/>
-                                            <input type="hidden" name="TCGhashesQtys" value="-{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}"/>
+                                            <input type="hidden" name="TCGhashesQtys" value="-{{.Quantity}}"/>
                                             <input type="hidden" name="TCGhashesCond" value="{{.Condition}}"/>
                                         {{end}}
                                         Remove from:<a class="btn danger" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();'>TCGplayer CSV</a>
