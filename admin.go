@@ -24,6 +24,7 @@ import (
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"golang.org/x/exp/slices"
 
 	"github.com/mackerelio/go-osstat/memory"
 )
@@ -351,7 +352,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		pageVars.Headers = []string{
-			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Status",
+			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
 		}
 		pageVars.OtherHeaders = pageVars.Headers
 
@@ -388,12 +389,19 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				name += " 🎯"
 			}
 
+			ref := ""
+			if slices.Contains(Config.AffiliatesList, Sellers[i].Info().Shorthand) ||
+				slices.Contains(Config.AffiliatesList, ScraperMap[Sellers[i].Info().Shorthand]) {
+				ref = "👍"
+			}
+
 			row := []string{
 				name,
 				Sellers[i].Info().Shorthand,
 				ScraperMap[Sellers[i].Info().Shorthand],
 				lastUpdate,
 				fmt.Sprint(len(inv)),
+				ref,
 				status,
 			}
 
@@ -433,12 +441,19 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				name += " 🎯"
 			}
 
+			ref := ""
+			if slices.Contains(Config.AffiliatesBuylistList, Vendors[i].Info().Shorthand) ||
+				slices.Contains(Config.AffiliatesBuylistList, ScraperMap[Vendors[i].Info().Shorthand]) {
+				ref = "👍"
+			}
+
 			row := []string{
 				name,
 				Vendors[i].Info().Shorthand,
 				ScraperMap[Vendors[i].Info().Shorthand],
 				lastUpdate,
 				fmt.Sprint(len(bl)),
+				ref,
 				status,
 			}
 
