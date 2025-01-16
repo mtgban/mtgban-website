@@ -475,7 +475,7 @@ func pullCode() (string, error) {
 	var out bytes.Buffer
 
 	for _, cmds := range [][]string{
-		[]string{"fetch"}, []string{"rest", "--hard", "origin/master"},
+		[]string{"fetch"}, []string{"reset", "--hard", "origin/master"},
 	} {
 		cmd := exec.Command(gitExecPath, cmds...)
 		cmd.Stdout = &out
