@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -55,6 +56,13 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			Short:  "👥",
 			Link:   "/admin?page=people",
 			Active: page == "people",
+			Class:  "selected",
+		},
+		NavElem{
+			Name:   "Config",
+			Short:  "🗒️",
+			Link:   "/admin?page=config",
+			Active: page == "config",
 			Class:  "selected",
 		},
 	})
@@ -350,6 +358,25 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 			pageVars.OtherTable = append(pageVars.OtherTable, row)
 		}
+	case "config":
+		newConfig := r.FormValue("textArea")
+		if newConfig != "" {
+			var config ConfigType
+			err := json.Unmarshal([]byte(newConfig), &config)
+			if err != nil {
+				pageVars.InfoMessage = err.Error()
+				pageVars.CleanSearchQuery = newConfig
+				break
+			}
+			pageVars.InfoMessage = "Config updated"
+			Config = config
+		}
+		var out bytes.Buffer
+		err := writeConfigFile(&out)
+		if err != nil {
+			pageVars.InfoMessage = err.Error()
+		}
+		pageVars.CleanSearchQuery = out.String()
 	default:
 		pageVars.Headers = []string{
 			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
@@ -625,6 +652,14 @@ func getDemoKey(link string) string {
 
 var apiUsersMutex sync.RWMutex
 
+func writeConfigFile(writer io.Writer) error {
+	e := json.NewEncoder(writer)
+	// Avoids & -> \u0026 and similar
+	e.SetEscapeHTML(false)
+	e.SetIndent("", "    ")
+	return e.Encode(&Config)
+}
+
 func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 	if user == "" {
 		return "", errors.New("missing user")
@@ -646,11 +681,7 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 		}
 		defer file.Close()
 
-		e := json.NewEncoder(file)
-		// Avoids & -> \u0026 and similar
-		e.SetEscapeHTML(false)
-		e.SetIndent("", "    ")
-		err = e.Encode(&Config)
+		err = writeConfigFile(file)
 		if err != nil {
 			return "", err
 		}

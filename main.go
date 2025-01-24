@@ -321,12 +321,15 @@ func init() {
 			Handle: Admin,
 			Page:   "admin.html",
 
+			CanPOST:        true,
 			AlwaysOnForDev: true,
 		},
 	}
 }
 
-var Config struct {
+var Config ConfigType
+
+type ConfigType struct {
 	Port                   string            `json:"port"`
 	DatastorePath          string            `json:"datastore_path"`
 	Game                   string            `json:"game"`
