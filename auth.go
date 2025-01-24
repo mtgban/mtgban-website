@@ -572,7 +572,7 @@ func enforceSigning(next http.Handler) http.Handler {
 			return
 		}
 
-		if !DatabaseLoaded {
+		if !DatabaseLoaded && r.URL.Path != "/admin" {
 			page := "home.html"
 			for _, navName := range OrderNav {
 				nav := ExtraNavs[navName]
