@@ -872,7 +872,7 @@ func loadSellers(newbc *mtgban.BanClient) {
 
 	// Allocate enough space for the global pointers
 	if Sellers == nil {
-		Sellers = make([]mtgban.Seller, 0, len(newSellers))
+		Sellers = newSellers
 	}
 
 	log.Println("Sellers table")
@@ -1018,7 +1018,7 @@ func loadVendors(newbc *mtgban.BanClient) {
 	newVendors := newbc.Vendors()
 
 	if Vendors == nil {
-		Vendors = make([]mtgban.Vendor, 0, len(newVendors))
+		Vendors = newVendors
 	}
 
 	log.Println("Vendors table")
