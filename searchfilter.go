@@ -554,7 +554,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 
 	// Clean any special characters from the main query, handle it later
 	var lastChar string
-	if strings.HasSuffix(query, "&") || strings.HasSuffix(query, "*") || strings.HasSuffix(query, "&") {
+	if strings.HasSuffix(query, "&") || strings.HasSuffix(query, "*") || strings.HasSuffix(query, "~") {
 		lastChar = query[len(query)-1:]
 		query = strings.TrimRight(query, "&*~")
 	}
