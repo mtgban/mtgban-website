@@ -1128,6 +1128,14 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	// Decklist mode
 	if len(record) == 1 {
 		line := record[indexMap["cardName"]]
+
+		// Support setting a card foil
+		if strings.HasSuffix(line, "*F*") {
+			res.Card.Foil = true
+			line = strings.TrimSuffix(line, "*F*")
+			line = strings.TrimSpace(line)
+		}
+
 		if line != "" && unicode.IsDigit(rune(line[0])) {
 			// Parse both "4 x <name>" and "4x <name>"
 			fields := strings.Split(line, " ")
