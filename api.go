@@ -409,6 +409,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 
 	// Track total quantity, and skip repeats
 	qty := map[string]int{}
+	var cleanedIds []string
 	for i, id := range ids {
 		quantity := 1
 		if qtys != nil {
@@ -422,9 +423,14 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 			cond = conds[i]
 		}
 		qty[id+cond] += quantity
+
+		if slices.Contains(cleanedIds, id) {
+			continue
+		}
+		cleanedIds = append(cleanedIds, id)
 	}
 
-	for i, id := range ids {
+	for i, id := range cleanedIds {
 		var prices [3]float64
 
 		cond := "NM"
