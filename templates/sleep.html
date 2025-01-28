@@ -82,17 +82,18 @@
         <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
         <br>
 
+        <script type="text/javascript">
+            window.onload = function(e) {
+                loadForm("SleepersSellersList", "sellers");
+                loadForm("SleepersVendorsList", "vendors");
+                loadForm("SleepersEditionList", "editions");
+            }
+        </script>
+
         <div class="indent">
             <h2>Vendors list</h2>
             Select which sellers or vendors you <b>don't</b> want to display in your sleep(ers).
             <br>
-
-            <script type="text/javascript">
-                window.onload = function(e) {
-                    loadForm("SleepersSellersList", "sellers");
-                    loadForm("SleepersVendorsList", "vendors");
-                }
-            </script>
 
             <a class="btn warning" onclick="javascript:clearForm('sellers'); clearForm('vendors');"><b>CLEAR</b></a>
             <a class="btn success" onclick="javascript:selectAll('sellers');"><b>SELECT ALL</b></a>
@@ -126,12 +127,6 @@
             <h2>Edition list</h2>
                 Select which editions you <b>don't</b> want to display in your sleep(ers).
             <br>
-
-            <script type="text/javascript">
-                window.onload = function(e) {
-                    loadForm("SleepersEditionList", "editions");
-                }
-            </script>
 
             <a class="btn warning" onclick="javascript:clearForm('editions');"><b>CLEAR</b></a>
             <a class="btn success" onclick="javascript:selectAll('editions');"><b>SELECT ALL</b></a>

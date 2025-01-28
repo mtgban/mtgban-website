@@ -89,16 +89,17 @@
             {{$cookieName = "GlobalVendorsList"}}
         {{end}}
 
+        <script type="text/javascript">
+            window.onload = function(e) {
+                loadForm("GlobalEditionList", "editions");
+                loadForm("{{$cookieName}}", "vendors");
+            }
+        </script>
+
         <div class="indent">
             <h2>Vendors list</h2>
             Select which vendors you <b>don't</b> want to display in your global tool.
             <br>
-
-            <script type="text/javascript">
-                window.onload = function(e) {
-                    loadForm('{{$cookieName}}', "vendors");
-                }
-            </script>
 
             <a class="btn warning" onclick="javascript:clearForm('vendors');"><b>CLEAR</b></a>
             <a class="btn success" onclick="javascript:saveForm('{{$cookieName}}', 'vendors'); window.location.href = '?'"><b>SAVE</b></a>
@@ -125,12 +126,6 @@
             <h2>Edition list</h2>
             Select which editions you <b>don't</b> want to display in your global tool.
             <br>
-
-            <script type="text/javascript">
-                window.onload = function(e) {
-                    loadForm("GlobalEditionList", "editions");
-                }
-            </script>
 
             <a class="btn warning" onclick="javascript:clearForm('editions');"><b>CLEAR</b></a>
             <a class="btn success" onclick="javascript:selectAll('editions');"><b>SELECT ALL</b></a>
