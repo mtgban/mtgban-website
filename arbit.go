@@ -346,8 +346,6 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 		}
 		// Enable any option with BetaFlag
 		anyOptionEnabled = true
-	} else if allowlistSellersOpt == "DEV" {
-		allowlistSellers = append(Config.ArbitDefaultSellers, Config.DevSellers...)
 	} else if allowlistSellersOpt == "" {
 		allowlistSellers = Config.ArbitDefaultSellers
 	} else {
@@ -438,9 +436,6 @@ func Global(w http.ResponseWriter, r *http.Request) {
 				if !anyExperiment && slices.Contains(Config.SearchRetailBlockList, seller.Info().Shorthand) {
 					continue
 				}
-				allowlistSellers = append(allowlistSellers, seller.Info().Shorthand)
-			} else if anyExperiment && slices.Contains(Config.DevSellers, seller.Info().Shorthand) {
-				// Append any experimental ones if enabled
 				allowlistSellers = append(allowlistSellers, seller.Info().Shorthand)
 			}
 		} else {
