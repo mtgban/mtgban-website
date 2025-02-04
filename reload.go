@@ -55,6 +55,7 @@ func reload(name string) {
 	scraper, err := opt.Init(opt.Logger)
 	if err != nil {
 		msg := fmt.Sprintf("error initializing %s: %s", name, err.Error())
+		opt.Logger.Println(msg)
 		ServerNotify("refresh", msg, true)
 		return
 	}
@@ -84,9 +85,11 @@ func reload(name string) {
 	err = newbc.Load()
 	if err != nil {
 		msg := fmt.Sprintf("error loading new data for %s: %s", name, err.Error())
+		opt.Logger.Println(msg)
 		ServerNotify("refresh", msg, true)
 		return
 	}
+	opt.Logger.Println("Data update successful, updating cache")
 
 	sellers := newbc.Sellers()
 	for _, seller := range sellers {
@@ -97,7 +100,7 @@ func reload(name string) {
 		updateVendors(vendor)
 	}
 
-	ScraperOptions[name].Logger.Println("Reload saved to file")
+	opt.Logger.Println("Reload completed")
 	ServerNotify("refresh", name+" refresh completed")
 }
 
