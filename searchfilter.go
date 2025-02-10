@@ -484,6 +484,7 @@ func init() {
 }
 
 func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) (config SearchConfig) {
+	rawQuery := query
 	var filters []FilterElem
 	var filterStores []FilterStoreElem
 	var filterPrices []*FilterPriceElem
@@ -910,6 +911,13 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			}
 			filterPrices = append(filterPrices, filter)
 		}
+	}
+
+	// Leave as much as possible intact and ignore what was parsed
+	if config.SearchMode == "scryfall" {
+		query = strings.Replace(rawQuery, "sm:scryfall", "", -1)
+		config.FullQuery = rawQuery
+		filters = nil
 	}
 
 	// Check if we can apply a finish filter through the custom syntax
