@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -29,6 +30,21 @@ import (
 	cron "gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/mtgban-website/auth/models"
+	"github.com/mtgban/mtgban-website/auth/repo"
+	"github.com/mtgban/mtgban-website/auth/service"
+)
+
+const (
+	ErrTooMany    = "Too many requests"
+	ErrUnauth     = "Unauthorized"
+	ErrBanned     = "This feature is BANned"
+	ErrMsg        = "Please sign in to access this feature"
+	ErrMsgPlus    = "You need higher permissions to access this feature"
+	ErrMsgDenied  = "Something went wrong while accessing this page"
+	ErrMsgExpired = "Your session has expired, please sign in again"
+	ErrMsgRestart = "Website is restarting, please try again in a few minutes"
+	ErrMsgUseAPI  = "Slow down, you're making too many requests! For heavy data use consider the BAN API"
 )
 
 type PageVars struct {
@@ -37,10 +53,7 @@ type PageVars struct {
 	Nav      []NavElem
 	ExtraNav []NavElem
 
-	PatreonId    string
-	PatreonURL   string
-	PatreonLogin bool
-	Hash         string
+	Hash string
 
 	Embed struct {
 		OEmbedURL    string
@@ -212,6 +225,8 @@ type NavElem struct {
 
 var startTime = time.Now()
 
+var authService *service.AuthService
+
 var DefaultNav = []NavElem{
 	NavElem{
 		Name:  "Home",
@@ -345,6 +360,7 @@ type ConfigType struct {
 	ApiDemoStores          []string          `json:"api_demo_stores"`
 	DiscordToken           string            `json:"discord_token"`
 	DiscordAllowList       []string          `json:"discord_allowlist"`
+	DevSellers             []string          `json:"dev_sellers"`
 	ArbitDefaultSellers    []string          `json:"arbit_default_sellers"`
 	ArbitBlockVendors      []string          `json:"arbit_block_vendors"`
 	SearchRetailBlockList  []string          `json:"search_block_list"`
@@ -352,19 +368,10 @@ type ConfigType struct {
 	SleepersBlockList      []string          `json:"sleepers_block_list"`
 	GlobalAllowList        []string          `json:"global_allow_list"`
 	GlobalProbeList        []string          `json:"global_probe_list"`
-	Patreon                struct {
-		Secret map[string]string `json:"secret"`
-		Grants []struct {
-			Category string `json:"category"`
-			Email    string `json:"email"`
-			Name     string `json:"name"`
-			Tier     string `json:"tier"`
-		} `json:"grants"`
-	} `json:"patreon"`
-	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
-	GoogleCredentials string            `json:"google_credentials"`
+	ApiUserSecrets         map[string]string `json:"api_user_secrets"`
+	GoogleCredentials      string            `json:"google_credentials"`
 
-	ACL map[string]map[string]map[string]string `json:"acl"`
+	ACL map[string]models.UserRole `json:"acl"`
 
 	Uploader struct {
 		Moxfield string `json:"moxfield"`
@@ -412,6 +419,161 @@ const (
 	DefaultSecret     = "NotVerySecret!"
 )
 
+func recoverPanic(r *http.Request, w http.ResponseWriter) {
+	errPanic := recover()
+	if errPanic != nil {
+		log.Println("panic occurred:", errPanic)
+
+		// Restrict stack size to fit into discord message
+		buf := make([]byte, 1<<16)
+		runtime.Stack(buf, true)
+		if len(buf) > 1024 {
+			buf = buf[:1024]
+		}
+
+		var msg string
+		err, ok := errPanic.(error)
+		if ok {
+			msg = err.Error()
+		} else {
+			msg = "unknown error"
+		}
+		ServerNotify("panic", msg, true)
+		ServerNotify("panic", string(buf))
+		ServerNotify("panic", "source request: "+r.URL.String())
+
+		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func noSigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func enforceAPISigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+
+		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
+		w.Header().Add("Content-Type", "application/json")
+
+		token := extractToken(r)
+		if token == "" {
+			http.Error(w, `{"error": "missing token"}`, http.StatusUnauthorized)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		user, err := authService.GetUserFromToken(ctx, token)
+		if err != nil {
+			http.Error(w, `{"error": "invalid or expired token"}`, http.StatusUnauthorized)
+			return
+		}
+
+		if !authService.HasRequiredRole(user.Role, models.RoleApi) {
+			http.Error(w, `{"error": "insufficient permissions"}`, http.StatusForbidden)
+			return
+		}
+
+		ctx = context.WithValue(ctx, models.UserContextKey, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func enforceSigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+
+		token := extractToken(r)
+		pageVars := genPageNav("Error", token)
+
+		if !UserRateLimiter.allow(getUserEmail(token)) && r.URL.Path != "/admin" {
+			pageVars.Title = ErrTooMany
+			pageVars.ErrorMessage = ErrMsgUseAPI
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+
+		user, err := authService.GetUserFromToken(ctx, token)
+		if err != nil {
+			pageVars.Title = ErrUnauth
+			pageVars.ErrorMessage = ErrMsg
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		for _, navName := range OrderNav {
+			nav := ExtraNavs[navName]
+			if r.URL.Path == nav.Link {
+				if !authService.HasRequiredRole(user.Role, getRequiredRole(navName)) {
+					pageVars = genPageNav(nav.Name, token)
+					pageVars.Title = ErrBanned
+					pageVars.ErrorMessage = ErrMsgPlus
+					render(w, nav.Page, pageVars)
+					return
+				}
+				break
+			}
+		}
+
+		ctx = context.WithValue(ctx, models.UserContextKey, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// Helper functions for auth
+func extractToken(r *http.Request) string {
+	token := r.Header.Get("Authorization")
+	if token != "" {
+		return strings.TrimPrefix(token, "Bearer ")
+	}
+
+	token = r.URL.Query().Get("token")
+	if token != "" {
+		return token
+	}
+
+	cookie, err := r.Cookie("MTGBAN")
+	if err == nil {
+		return cookie.Value
+	}
+
+	return ""
+}
+
+func getUserEmail(token string) string {
+	if token == "" {
+		return ""
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	user, err := authService.GetUserFromToken(ctx, token)
+	if err != nil {
+		return ""
+	}
+
+	return user.Email
+}
+
+func getRequiredRole(navName string) models.UserRole {
+	role, exists := Config.ACL[navName]
+	if !exists {
+		return models.RoleFree
+	}
+	return role
+}
+
 func Favicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "img/favicon/favicon.ico")
 }
@@ -443,38 +605,15 @@ func (fs *FileSystem) Open(path string) (http.File, error) {
 	return f, nil
 }
 
-func genPageNav(activeTab, sig string) PageVars {
-	exp := GetParamFromSig(sig, "Expires")
-	expires, _ := strconv.ParseInt(exp, 10, 64)
-	msg := ""
-	showPatreonLogin := false
-	if sig != "" {
-		if expires < time.Now().Unix() {
-			msg = ErrMsgExpired
-		}
-	} else {
-		showPatreonLogin = true
-	}
-
-	// These values need to be set for every rendered page
-	// In particular the Patreon variables are needed because the signature
-	// could expire in any page, and the button url needs these parameters
+func genPageNav(activeTab, token string) PageVars {
 	pageVars := PageVars{
-		Title:        "BAN " + activeTab,
-		ErrorMessage: msg,
-		LastUpdate:   LastUpdate,
-
-		PatreonId:    PatreonClientId,
-		PatreonURL:   PatreonHost,
-		PatreonLogin: showPatreonLogin,
-		Hash:         BuildCommit,
+		Title:      "BAN " + activeTab,
+		LastUpdate: LastUpdate,
+		Hash:       BuildCommit,
 	}
 
 	if Config.Game != "" {
-		// Append which game this site is for
 		pageVars.Title += " - " + Config.Game
-
-		// Charts are available only for one game
 		pageVars.DisableChart = true
 	}
 
@@ -491,16 +630,13 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars.Nav = make([]NavElem, len(DefaultNav))
 	copy(pageVars.Nav, DefaultNav)
 
-	// Enable buttons according to the enabled features
-	for _, feat := range OrderNav {
-		if expires > time.Now().Unix() || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
-			param := GetParamFromSig(sig, feat)
-			allowed, _ := strconv.ParseBool(param)
-			if DevMode && ExtraNavs[feat].AlwaysOnForDev {
-				allowed = true
-			}
-
-			if allowed || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
+	ctx := context.Background()
+	user, err := authService.GetUserFromToken(ctx, token)
+	if err == nil && user != nil {
+		for _, feat := range OrderNav {
+			if authService.HasRequiredRole(user.Role, getRequiredRole(feat)) ||
+				(DevMode && !SigCheck) ||
+				ExtraNavs[feat].NoAuth {
 				pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
 			}
 		}
@@ -516,16 +652,6 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars.Nav[mainNavIndex].Active = true
 	pageVars.Nav[mainNavIndex].Class = "active"
 
-	// Add extra warning message if needed
-	if showPatreonLogin && pageVars.Nav[mainNavIndex].NoAuth {
-		extra := *&NavElem{
-			Active: true,
-			Class:  "beta",
-			Short:  "Beta Public Access",
-			Link:   "javascript:void(0)",
-		}
-		pageVars.Nav = append(pageVars.Nav, extra)
-	}
 	return pageVars
 }
 
@@ -603,6 +729,8 @@ func main() {
 	logdir := flag.String("log", "logs", "Directory for scrapers logs")
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
+	supabaseURL := os.Getenv("SUPABASE_URL")
+	supabaseKey := os.Getenv("SUPABASE_ANON_KEY")
 
 	flag.Parse()
 	DevMode = *devMode
@@ -650,6 +778,16 @@ func main() {
 			log.Println("error opening databases:", err)
 		} else {
 			log.Fatalln("error opening databases:", err)
+		}
+	}
+
+	client := repo.InitSupabaseClient(supabaseURL, supabaseKey)
+	authService, err = service.NewAuthService(client, nil, nil)
+	if err != nil {
+		if DevMode {
+			log.Println("Failed to initialize auth service:", err)
+		} else {
+			log.Fatalln("Failed to initialize auth service:", err)
 		}
 	}
 
@@ -743,7 +881,8 @@ func main() {
 			LogPages[key] = log.New(logFile, "", log.LstdFlags)
 		}
 
-		_, ExtraNavs[key].NoAuth = Config.ACL["Any"][key]
+		role, hasRole := Config.ACL[key]
+		ExtraNavs[key].NoAuth = !hasRole || role == models.RoleFree
 
 		// Set up the handler
 		handler := enforceSigning(http.HandlerFunc(nav.Handle))
@@ -757,7 +896,6 @@ func main() {
 			http.Handle(subPage, handler)
 		}
 	}
-
 	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
 	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
@@ -770,7 +908,6 @@ func main() {
 	http.Handle("/img/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 
 	http.HandleFunc("/favicon.ico", Favicon)
-	http.HandleFunc("/auth", Auth)
 
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
@@ -791,6 +928,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		ServerNotify("shutdown", "Server cleaning up...")
+		if err := authService.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down auth service: %v", err)
+		}
 		cleanupDiscord()
 		cancel()
 	}()
