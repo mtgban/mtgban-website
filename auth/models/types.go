@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -34,17 +35,13 @@ type WebhookPayload struct {
 }
 
 type AuthConfig struct {
-	JWTSecret        []byte
-	ContextTimeout   time.Duration
-	RefreshInterval  time.Duration
-	WebhookSecretKey string
-}
-
-func DefaultAuthConfig() *AuthConfig {
-	return &AuthConfig{
-		ContextTimeout:  5 * time.Second,
-		RefreshInterval: 5 * time.Minute,
-	}
+	ACL          map[string]string                       `json:"acl"`
+	FeatureFlags map[string]map[string]map[string]string `json:"feature_flags"`
+	Auth         struct {
+		ContextTimeout   time.Duration `json:"context_timeout"`
+		RefreshInterval  time.Duration `json:"refresh_interval"`
+		WebhookSecretKey string        `json:"webhook_secret_key"`
+	} `json:"auth"`
 }
 
 type AuthError struct {
@@ -58,4 +55,31 @@ func (e *AuthError) Error() string {
 		return fmt.Sprintf("%s: %v", e.Message, e.Err)
 	}
 	return e.Message
+}
+
+func LoadAuthConfigFromJSON(data []byte) (*AuthConfig, error) {
+	var config AuthConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal auth config: %w", err)
+	}
+
+	for feature, role := range config.ACL {
+		if !UserRole(role).IsValid() {
+			return nil, fmt.Errorf("invalid role '%s' for feature '%s'", role, feature)
+		}
+	}
+
+	if config.Auth.ContextTimeout > 0 {
+		if _, err := time.ParseDuration(config.Auth.ContextTimeout.String()); err != nil {
+			return nil, fmt.Errorf("invalid context timeout: %w", err)
+		}
+	}
+
+	if config.Auth.RefreshInterval > 0 {
+		if _, err := time.ParseDuration(fmt.Sprintf("%dms", config.Auth.RefreshInterval)); err != nil {
+			return nil, fmt.Errorf("invalid refresh interval: %w", err)
+		}
+	}
+
+	return &config, nil
 }

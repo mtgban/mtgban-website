@@ -11,7 +11,7 @@ import (
 
 func (s *AuthService) backgroundRefresh() {
 	defer s.wg.Done()
-	ticker := time.NewTicker(s.config.RefreshInterval)
+	ticker := time.NewTicker(s.config.Auth.RefreshInterval)
 	defer ticker.Stop()
 
 	for {

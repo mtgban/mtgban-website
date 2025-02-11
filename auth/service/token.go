@@ -35,7 +35,7 @@ func (s *AuthService) GetUserFromToken(ctx context.Context, tokenString string) 
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return s.config.JWTSecret, nil
+		return s.config.Auth.WebhookSecretKey, nil
 	})
 
 	if err != nil {

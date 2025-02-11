@@ -24,7 +24,7 @@ type AuthService struct {
 
 func NewAuthService(client repo.SupabaseClient, config *models.AuthConfig, logger *log.Logger) (*AuthService, error) {
 	if config == nil {
-		config = models.DefaultAuthConfig()
+		config = &models.AuthConfig{}
 	}
 
 	jwtSecret := os.Getenv("SUPABASE_JWT_SECRET")
@@ -32,7 +32,7 @@ func NewAuthService(client repo.SupabaseClient, config *models.AuthConfig, logge
 		return nil, fmt.Errorf("SUPABASE_JWT_SECRET environment variable not set")
 	}
 
-	config.JWTSecret = []byte(jwtSecret)
+	config.Auth.WebhookSecretKey = jwtSecret
 	if logger == nil {
 		logger = log.New(os.Stdout, "[AUTH] ", log.LstdFlags)
 	}
@@ -55,7 +55,7 @@ func NewAuthService(client repo.SupabaseClient, config *models.AuthConfig, logge
 	}
 
 	// Start background refresh if interval is set
-	if config.RefreshInterval > 0 {
+	if config.Auth.RefreshInterval > 0 {
 		service.wg.Add(1)
 		go service.backgroundRefresh()
 	}

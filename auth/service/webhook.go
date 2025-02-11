@@ -22,10 +22,10 @@ func (s *AuthService) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.config.WebhookSecretKey != "" {
+	if s.config.Auth.WebhookSecretKey != "" {
 		if !cryptoSecureCompare(
 			[]byte(r.Header.Get("X-Webhook-Secret")),
-			[]byte(s.config.WebhookSecretKey),
+			[]byte(s.config.Auth.WebhookSecretKey),
 		) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
