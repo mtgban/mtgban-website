@@ -29,7 +29,7 @@ func NewAuthService(client repo.SupabaseClient, config *models.AuthConfig, logge
 
 	jwtSecret := os.Getenv("SUPABASE_JWT_SECRET")
 	if jwtSecret == "" {
-		return nil, fmt.Errorf("SUPABASE_JWT_SECRET environment variable not set")
+		log.Fatal("SUPABASE_JWT_SECRET environment variable is not set")
 	}
 
 	config.Auth.WebhookSecretKey = jwtSecret
