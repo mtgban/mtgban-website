@@ -327,7 +327,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			"", "#", "Category", "Email", "Name", "Tier",
 		}
 
-		for i, person := range Config.Patreon.Grants {
+		/*	for i, person := range Config.Patreon.Grants {
 			row := []string{
 				fmt.Sprintf("%d", i+1),
 				person.Category,
@@ -337,7 +337,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			}
 
 			pageVars.Table = append(pageVars.Table, row)
-		}
+		}*/
 
 		pageVars.OtherHeaders = []string{
 			"", "#", "API User",
