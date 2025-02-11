@@ -35,7 +35,7 @@ type WebhookPayload struct {
 }
 
 type AuthConfig struct {
-	ACL          map[string]string                       `json:"acl"`
+	ACL          map[string]UserRole                     `json:"acl"`
 	FeatureFlags map[string]map[string]map[string]string `json:"feature_flags"`
 	Auth         struct {
 		ContextTimeout   time.Duration `json:"context_timeout"`
@@ -64,7 +64,7 @@ func LoadAuthConfigFromJSON(data []byte) (*AuthConfig, error) {
 	}
 
 	for feature, role := range config.ACL {
-		if !UserRole(role).IsValid() {
+		if !role.IsValid() {
 			return nil, fmt.Errorf("invalid role '%s' for feature '%s'", role, feature)
 		}
 	}

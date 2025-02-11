@@ -36,15 +36,11 @@ import (
 )
 
 const (
-	ErrTooMany    = "Too many requests"
-	ErrUnauth     = "Unauthorized"
-	ErrBanned     = "This feature is BANned"
-	ErrMsg        = "Please sign in to access this feature"
-	ErrMsgPlus    = "You need higher permissions to access this feature"
-	ErrMsgDenied  = "Something went wrong while accessing this page"
-	ErrMsgExpired = "Your session has expired, please sign in again"
-	ErrMsgRestart = "Website is restarting, please try again in a few minutes"
-	ErrMsgUseAPI  = "Slow down, you're making too many requests! For heavy data use consider the BAN API"
+	ErrTooMany   = "Too many requests"
+	ErrUnauth    = "Unauthorized"
+	ErrBanned    = "This feature is BANned"
+	ErrMsg       = "You are not authorized to access this page."
+	ErrMsgDenied = "You are not authorized to access this feature."
 )
 
 type PageVars struct {
@@ -371,7 +367,8 @@ type ConfigType struct {
 	ApiUserSecrets         map[string]string `json:"api_user_secrets"`
 	GoogleCredentials      string            `json:"google_credentials"`
 
-	ACL map[string]models.UserRole `json:"acl"`
+	ACL        map[string]models.UserRole `json:"acl"`
+	AuthConfig *models.AuthConfig         `json:"auth_config"`
 
 	Uploader struct {
 		Moxfield string `json:"moxfield"`
@@ -494,8 +491,8 @@ func enforceSigning(next http.Handler) http.Handler {
 		pageVars := genPageNav("Error", token)
 
 		if !UserRateLimiter.allow(getUserEmail(token)) && r.URL.Path != "/admin" {
-			pageVars.Title = ErrTooMany
-			pageVars.ErrorMessage = ErrMsgUseAPI
+			pageVars.Title = "Rate Limit Exceeded"
+			pageVars.ErrorMessage = "You have made too many requests. Please try again later."
 			render(w, "home.html", pageVars)
 			return
 		}
@@ -505,8 +502,8 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		user, err := authService.GetUserFromToken(ctx, token)
 		if err != nil {
-			pageVars.Title = ErrUnauth
-			pageVars.ErrorMessage = ErrMsg
+			pageVars.Title = "Unauthorized"
+			pageVars.ErrorMessage = "You are not authorized to access this page."
 			render(w, "home.html", pageVars)
 			return
 		}
@@ -516,8 +513,8 @@ func enforceSigning(next http.Handler) http.Handler {
 			if r.URL.Path == nav.Link {
 				if !authService.HasRequiredRole(user.Role, getRequiredRole(navName)) {
 					pageVars = genPageNav(nav.Name, token)
-					pageVars.Title = ErrBanned
-					pageVars.ErrorMessage = ErrMsgPlus
+					pageVars.Title = "Unauthorized"
+					pageVars.ErrorMessage = "You are not authorized to access this page."
 					render(w, nav.Page, pageVars)
 					return
 				}
@@ -567,11 +564,11 @@ func getUserEmail(token string) string {
 }
 
 func getRequiredRole(navName string) models.UserRole {
-	role, exists := Config.ACL[navName]
+	role, exists := Config.AuthConfig.ACL[navName]
 	if !exists {
 		return models.RoleFree
 	}
-	return role
+	return models.UserRole(role)
 }
 
 func Favicon(w http.ResponseWriter, r *http.Request) {
@@ -688,6 +685,11 @@ func loadVars(cfg string) error {
 
 	InventoryDir = path.Join("cache_inv", Config.Game)
 	BuylistDir = path.Join("cache_bl", Config.Game)
+
+	// Sync ACLs
+	if Config.AuthConfig != nil {
+		Config.ACL = Config.AuthConfig.ACL
+	}
 
 	return nil
 }
