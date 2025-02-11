@@ -430,7 +430,8 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		}
 		// Shrink icons to fit more of them
 		if len(co.Printings) > MaxBeforeShrink {
-			printings = strings.Replace(printings, "ss-2x", "ss-1x", -1)
+			// Make sure not to capture the 2X2 set code
+			printings = strings.Replace(printings, "ss-2x\"", "ss-1x\"", -1)
 		}
 	}
 
