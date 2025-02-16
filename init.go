@@ -29,6 +29,7 @@ import (
 	"github.com/mtgban/go-mtgban/mintcard"
 	"github.com/mtgban/go-mtgban/mtgseattle"
 	"github.com/mtgban/go-mtgban/ninetyfive"
+	"github.com/mtgban/go-mtgban/purplemana"
 	"github.com/mtgban/go-mtgban/sealedev"
 	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/strikezone"
@@ -578,6 +579,13 @@ var mtgScraperOptions = map[string]*scraperOption{
 			if err != nil {
 				return nil, err
 			}
+			scraper.LogCallback = logger.Printf
+			return scraper, nil
+		},
+	},
+	"purplemana": &scraperOption{
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := purplemana.NewScraper(purplemana.GameMagic)
 			scraper.LogCallback = logger.Printf
 			return scraper, nil
 		},
