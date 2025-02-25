@@ -173,8 +173,8 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 			// Find the very fist parent
 			topParentCode := set.ParentCode
 			for {
-				topset, _ := mtgmatcher.GetSet(topParentCode)
-				if topset.ParentCode == "" {
+				topset, err := mtgmatcher.GetSet(topParentCode)
+				if err != nil || topset.ParentCode == "" {
 					break
 				}
 				topParentCode = topset.ParentCode
