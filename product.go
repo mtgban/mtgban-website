@@ -151,10 +151,9 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 	var sortedEditions []string
 	listEditions := map[string][]EditionEntry{}
 	for _, code := range sets {
-		set, _ := mtgmatcher.GetSet(code)
-
 		// Skip empty sets
-		if len(set.Cards) == 0 {
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil || len(set.Cards) == 0 {
 			continue
 		}
 
@@ -229,8 +228,8 @@ func getSealedEditions() ([]string, map[string][]EditionEntry) {
 			continue
 		}
 
-		set, _ := mtgmatcher.GetSet(code)
-		if len(set.SealedProduct) == 0 {
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil || len(set.SealedProduct) == 0 {
 			continue
 		}
 

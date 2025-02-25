@@ -70,7 +70,10 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		if filter == "singles" {
 			var filtered []string
 			for _, code := range sets {
-				set, _ := mtgmatcher.GetSet(code)
+				set, err := mtgmatcher.GetSet(code)
+				if err != nil {
+					continue
+				}
 				if len(set.Cards) > 0 {
 					filtered = append(filtered, code)
 				}
@@ -79,7 +82,10 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		} else if filter == "sealed" {
 			var filtered []string
 			for _, code := range sets {
-				set, _ := mtgmatcher.GetSet(code)
+				set, err := mtgmatcher.GetSet(code)
+				if err != nil {
+					continue
+				}
 				if len(set.SealedProduct) > 0 {
 					filtered = append(filtered, code)
 				}
