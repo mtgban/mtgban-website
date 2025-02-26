@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -145,79 +146,68 @@ func getAllEditions() ([]string, map[string]EditionEntry) {
 	return sortedEditions, listEditions
 }
 
-func getTreeEditions() ([]string, map[string][]EditionEntry) {
+func getTreeEditions() ([]string, map[string][]EditionEntry, error) {
 	sets := mtgmatcher.GetAllSets()
+	listEditions := make(map[string][]EditionEntry, len(sets))
+	sortedEditions := make([]string, 0, len(sets))
 
-	var sortedEditions []string
-	listEditions := map[string][]EditionEntry{}
 	for _, code := range sets {
-		set, _ := mtgmatcher.GetSet(code)
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get set: %s: %w", code, err)
+		}
 
-		// Skip empty sets
-		if len(set.Cards) == 0 {
+		if set == nil || len(set.Cards) == 0 {
 			continue
 		}
 
 		entry := makeEditionEntry(code)
 
 		if set.ParentCode == "" {
-			// Skip if it was already added from the other case
-			_, found := listEditions[set.Code]
-			if found {
-				continue
+			if _, found := listEditions[set.Code]; !found {
+				listEditions[set.Code] = []EditionEntry{entry}
+				sortedEditions = append(sortedEditions, set.Code)
 			}
-			// Create the head, list in the slice to be sorted
-			listEditions[set.Code] = []EditionEntry{entry}
-			sortedEditions = append(sortedEditions, set.Code)
-		} else {
-			// Find the very fist parent
-			topParentCode := set.ParentCode
-			for {
-				topset, _ := mtgmatcher.GetSet(topParentCode)
-				if topset.ParentCode == "" {
-					break
-				}
-				topParentCode = topset.ParentCode
-			}
+			continue
+		}
 
-			// Check if the head of the tree is already present
-			_, found := listEditions[topParentCode]
-			if !found {
-				// If not, create it
-				headEntry := makeEditionEntry(topParentCode)
-				listEditions[topParentCode] = []EditionEntry{headEntry}
-				sortedEditions = append(sortedEditions, topParentCode)
+		topParentCode := set.ParentCode
+		seenSets := make(map[string]bool)
+		for {
+			if seenSets[topParentCode] {
+				return nil, nil, fmt.Errorf("infinite loop detected while processing set: %s", set.Code)
 			}
-			// Append the new entry
+			seenSets[topParentCode] = true
+
+			topset, err := mtgmatcher.GetSet(topParentCode)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get set: %s: %w", topParentCode, err)
+			}
+			if topset == nil || len(topset.Cards) == 0 {
+				return nil, nil, fmt.Errorf("set is empty: %s", topParentCode)
+			}
+			if topset.ParentCode == "" {
+				break
+			}
+			topParentCode = topset.ParentCode
+		}
+
+		if _, found := listEditions[topParentCode]; !found {
+			listEditions[topParentCode] = []EditionEntry{entry}
+			sortedEditions = append(sortedEditions, topParentCode)
+		} else {
 			listEditions[topParentCode] = append(listEditions[topParentCode], entry)
 		}
 	}
 
-	// Sort main list by date
 	sort.Slice(sortedEditions, func(i, j int) bool {
-		// Sort by name in case date is the same
-		if listEditions[sortedEditions[i]][0].Date == listEditions[sortedEditions[j]][0].Date {
+		if listEditions[sortedEditions[i]][0].Date.Equal(listEditions[sortedEditions[j]][0].Date) {
 			return listEditions[sortedEditions[i]][0].Name < listEditions[sortedEditions[j]][0].Name
 		}
 		return listEditions[sortedEditions[i]][0].Date.After(listEditions[sortedEditions[j]][0].Date)
 	})
 
-	// Sort sublists by date
-	for _, key := range sortedEditions {
-		sort.Slice(listEditions[key], func(i, j int) bool {
-			// Keep the first element always first
-			if j == 0 {
-				return false
-			}
-			// Sort by name in case date is the same
-			if listEditions[key][i].Date == listEditions[key][j].Date {
-				return listEditions[key][i].Name < listEditions[key][j].Name
-			}
-			return listEditions[key][i].Date.After(listEditions[key][j].Date)
-		})
-	}
-
-	return sortedEditions, listEditions
+	return sortedEditions, listEditions, nil
 }
 
 func getSealedEditions() ([]string, map[string][]EditionEntry) {

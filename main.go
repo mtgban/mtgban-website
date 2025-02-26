@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -30,9 +29,7 @@ import (
 	cron "gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/mtgban-website/auth/models"
-	"github.com/mtgban/mtgban-website/auth/repo"
-	"github.com/mtgban/mtgban-website/auth/service"
+	"github.com/mtgban/mtgban-website/auth"
 )
 
 const (
@@ -83,22 +80,22 @@ type PageVars struct {
 	CardBackURL  string
 	ShowUpsell   bool
 
-	CanShowAll       bool
+	CanShowAll       bool // Feature Flag
 	CleanSearchQuery string
 
 	ScraperShort   string
 	HasAffiliate   bool
-	CanDownloadCSV bool
+	CanDownloadCSV bool // Feature Flag
 	ShowSYP        bool
 
-	Arb            []Arbitrage
+	Arb            []Arbitrage // Feature Flag
 	ArbitOptKeys   []string
 	ArbitOptConfig map[string]FilterOpt
 	ArbitFilters   map[string]bool
 	ArbitOptTests  map[string]bool
 	SortOption     string
-	GlobalMode     bool
-	ReverseMode    bool
+	GlobalMode     bool // Feature Flag
+	ReverseMode    bool // Feature Flag
 
 	Page         string
 	Subtitle     string
@@ -109,8 +106,8 @@ type PageVars struct {
 	HasReserved  bool
 	HasStocks    bool
 	HasSypList   bool
-	IsOneDay     bool
-	CanSwitchDay bool
+	IsOneDay     bool // Feature Flag
+	CanSwitchDay bool // Feature Flag
 	SortDir      string
 	LargeTable   bool
 	OffsetCards  int
@@ -121,15 +118,15 @@ type PageVars struct {
 	CardHashes   []string
 	EditionsMap  map[string]EditionEntry
 
-	CanFilterByPrice bool
+	CanFilterByPrice bool // Feature Flag
 	FilterMinPrice   float64
 	FilterMaxPrice   float64
 
-	CanFilterByPercentage bool
+	CanFilterByPercentage bool // Feature Flag
 	FilterMinPercChange   float64
 	FilterMaxPercChange   float64
 
-	Sleepers       map[string][]string
+	Sleepers       map[string][]string // Feature Flag
 	SleepersKeys   []string
 	SleepersColors []string
 
@@ -172,8 +169,8 @@ type PageVars struct {
 	TotalEntries    map[string]float64
 	EnabledSellers  []string
 	EnabledVendors  []string
-	CanBuylist      bool
-	CanChangeStores bool
+	CanBuylist      bool // Feature Flag
+	CanChangeStores bool // Feature Flag
 	RemoteLinkURL   string
 	TotalQuantity   int
 	Optimized       map[string][]OptimizedUploadEntry
@@ -221,7 +218,7 @@ type NavElem struct {
 
 var startTime = time.Now()
 
-var authService *service.AuthService
+var authService *auth.AuthService
 
 var DefaultNav = []NavElem{
 	NavElem{
@@ -367,8 +364,8 @@ type ConfigType struct {
 	ApiUserSecrets         map[string]string `json:"api_user_secrets"`
 	GoogleCredentials      string            `json:"google_credentials"`
 
-	ACL        map[string]models.UserRole `json:"acl"`
-	AuthConfig *models.AuthConfig         `json:"auth_config"`
+	ACL          map[string]auth.AuthConfig `json:"acl"`
+	AuthSettings *auth.AuthSettings         `json:"auth"`
 
 	Uploader struct {
 		Moxfield string `json:"moxfield"`
@@ -417,161 +414,6 @@ const (
 	DefaultConfigPath    = "config.json"
 	DefaultSecret        = "NotVerySecret!"
 )
-
-func recoverPanic(r *http.Request, w http.ResponseWriter) {
-	errPanic := recover()
-	if errPanic != nil {
-		log.Println("panic occurred:", errPanic)
-
-		// Restrict stack size to fit into discord message
-		buf := make([]byte, 1<<16)
-		runtime.Stack(buf, true)
-		if len(buf) > 1024 {
-			buf = buf[:1024]
-		}
-
-		var msg string
-		err, ok := errPanic.(error)
-		if ok {
-			msg = err.Error()
-		} else {
-			msg = "unknown error"
-		}
-		ServerNotify("panic", msg, true)
-		ServerNotify("panic", string(buf))
-		ServerNotify("panic", "source request: "+r.URL.String())
-
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-}
-
-func noSigning(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
-		next.ServeHTTP(w, r)
-	})
-}
-
-func enforceAPISigning(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
-
-		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
-		w.Header().Add("Content-Type", "application/json")
-
-		token := extractToken(r)
-		if token == "" {
-			http.Error(w, `{"error": "missing token"}`, http.StatusUnauthorized)
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-
-		user, err := authService.GetUserFromToken(ctx, token)
-		if err != nil {
-			http.Error(w, `{"error": "invalid or expired token"}`, http.StatusUnauthorized)
-			return
-		}
-
-		if !authService.HasRequiredRole(user.Role, models.RoleApi) {
-			http.Error(w, `{"error": "insufficient permissions"}`, http.StatusForbidden)
-			return
-		}
-
-		ctx = context.WithValue(ctx, models.UserContextKey, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-func enforceSigning(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
-
-		token := extractToken(r)
-		pageVars := genPageNav("Error", token)
-
-		if !UserRateLimiter.allow(getUserEmail(token)) && r.URL.Path != "/admin" {
-			pageVars.Title = "Rate Limit Exceeded"
-			pageVars.ErrorMessage = "You have made too many requests. Please try again later."
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-		defer cancel()
-
-		user, err := authService.GetUserFromToken(ctx, token)
-		if err != nil {
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = "You are not authorized to access this page."
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		for _, navName := range OrderNav {
-			nav := ExtraNavs[navName]
-			if r.URL.Path == nav.Link {
-				if !authService.HasRequiredRole(user.Role, getRequiredRole(navName)) {
-					pageVars = genPageNav(nav.Name, token)
-					pageVars.Title = "Unauthorized"
-					pageVars.ErrorMessage = "You are not authorized to access this page."
-					render(w, nav.Page, pageVars)
-					return
-				}
-				break
-			}
-		}
-
-		ctx = context.WithValue(ctx, models.UserContextKey, user)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// Helper functions for auth
-func extractToken(r *http.Request) string {
-	token := r.Header.Get("Authorization")
-	if token != "" {
-		return strings.TrimPrefix(token, "Bearer ")
-	}
-
-	token = r.URL.Query().Get("token")
-	if token != "" {
-		return token
-	}
-
-	cookie, err := r.Cookie("MTGBAN")
-	if err == nil {
-		return cookie.Value
-	}
-
-	return ""
-}
-
-func getUserEmail(token string) string {
-	if token == "" {
-		return ""
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	user, err := authService.GetUserFromToken(ctx, token)
-	if err != nil {
-		return ""
-	}
-
-	return user.Email
-}
-
-func getRequiredRole(navName string) models.UserRole {
-	role, exists := Config.AuthConfig.ACL[navName]
-	if !exists {
-		return models.RoleFree
-	}
-	return models.UserRole(role)
-}
 
 func Favicon(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "img/favicon/favicon.ico")
@@ -630,10 +472,10 @@ func genPageNav(activeTab, token string) PageVars {
 	copy(pageVars.Nav, DefaultNav)
 
 	ctx := context.Background()
-	user, err := authService.GetUserFromToken(ctx, token)
+	user, err := authService.GetUserFromContext(ctx)
 	if err == nil && user != nil {
 		for _, feat := range OrderNav {
-			if authService.HasRequiredRole(user.Role, getRequiredRole(feat)) ||
+			if authService.CanAccessFeature(user, auth.Feature(feat)) ||
 				(DevMode && !SigCheck) ||
 				ExtraNavs[feat].NoAuth {
 				pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
@@ -697,11 +539,6 @@ func loadVars(cfg, port, datastore string) error {
 	InventoryDir = path.Join("cache_inv", Config.Game)
 	BuylistDir = path.Join("cache_bl", Config.Game)
 
-	// Sync ACLs
-	if Config.AuthConfig != nil {
-		Config.ACL = Config.AuthConfig.ACL
-	}
-
 	return nil
 }
 
@@ -735,9 +572,6 @@ func main() {
 	flag.StringVar(&Config.filePath, "cfg", DefaultConfigPath, "Load configuration file")
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
-	supabaseURL := os.Getenv("SUPABASE_URL")
-	supabaseKey := os.Getenv("SUPABASE_ANON_KEY")
-
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	skipInitialRefresh := flag.Bool("skip", true, "Skip initial refresh")
@@ -787,8 +621,16 @@ func main() {
 		}
 	}
 
-	client := repo.InitSupabaseClient(supabaseURL, supabaseKey)
-	authService, err = service.NewAuthService(client, nil, nil)
+	AuthConfig, err := auth.LoadDefaultAuthConfig()
+	if err != nil {
+		log.Println("error loading auth config:", err)
+	}
+
+	client, err := auth.InitSupabaseClient(AuthConfig.SBase.SupabaseURL, AuthConfig.SBase.SupabaseKey)
+	if err != nil {
+		log.Fatalln("error initializing supabase client:", err)
+	}
+	authService, err = auth.NewAuthService(client, AuthConfig, auth.WithLogger(log.New(os.Stdout, "[AUTH] ", log.LstdFlags)))
 	if err != nil {
 		if DevMode {
 			log.Println("Failed to initialize auth service:", err)
@@ -888,7 +730,7 @@ func main() {
 		}
 
 		role, hasRole := Config.ACL[key]
-		ExtraNavs[key].NoAuth = !hasRole || role == models.RoleFree
+		ExtraNavs[key].NoAuth = !hasRole || slices.Contains(role.TierACL[key], auth.TierFree)
 
 		// Set up the handler
 		handler := enforceSigning(http.HandlerFunc(nav.Handle))
@@ -934,9 +776,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		ServerNotify("shutdown", "Server cleaning up...")
-		if err := authService.Shutdown(ctx); err != nil {
-			log.Printf("Error shutting down auth service: %v", err)
-		}
+		authService.Shutdown(ctx)
 		cleanupDiscord()
 		cancel()
 	}()

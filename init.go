@@ -864,9 +864,13 @@ func loadScrapers() {
 }
 
 func updateStaticData() {
+	var err error
 	SealedEditionsSorted, SealedEditionsList = getSealedEditions()
 	AllEditionsKeys, AllEditionsMap = getAllEditions()
-	TreeEditionsKeys, TreeEditionsMap = getTreeEditions()
+	TreeEditionsKeys, TreeEditionsMap, err = getTreeEditions()
+	if err != nil {
+		log.Println("Error getting tree editions:", err)
+	}
 	ReprintsKeys, ReprintsMap = getReprintsGlobal()
 
 	TotalSets = len(AllEditionsKeys)
