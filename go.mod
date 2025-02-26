@@ -6,7 +6,6 @@ toolchain go1.23.5
 
 require (
 	cloud.google.com/go/bigquery v1.56.0
-	github.com/NYTimes/gziphandler v1.1.1
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/bwmarrin/discordgo v0.27.1
 	github.com/corpix/uarand v0.2.0
@@ -19,7 +18,7 @@ require (
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/mackerelio/go-osstat v0.2.4
 	github.com/mtgban/go-mtgban v0.5.4
-	github.com/supabase-community/postgrest-go v0.0.11
+	github.com/mtgban/mtgban-website/auth v0.0.0-00010101000000-000000000000
 	github.com/xuri/excelize/v2 v2.8.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/oauth2 v0.13.0
@@ -75,7 +74,7 @@ require (
 	github.com/richardlehane/mscfb v1.0.4 // indirect
 	github.com/richardlehane/msoleps v1.0.3 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
+	github.com/supabase-community/postgrest-go v0.0.11 // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	github.com/xuri/efp v0.0.0-20230802181842-ad255f2331ca // indirect
 	github.com/xuri/nfp v0.0.0-20230919160717-d98342af3f05 // indirect
@@ -95,3 +94,5 @@ require (
 	google.golang.org/grpc v1.58.3 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 )
+
+replace github.com/mtgban/mtgban-website/auth => ./auth
