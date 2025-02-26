@@ -39,7 +39,7 @@ var UserRateLimiter = &rateLimiter{
 }
 
 // Allow checks if given ip has not exceeded rate limit
-func (l *rateLimiter) allow(ip string) bool {
+func (l *rateLimiter) Allow(ip string) bool {
 	l.RLock()
 	v, exists := l.visitors[ip]
 	l.RUnlock()
