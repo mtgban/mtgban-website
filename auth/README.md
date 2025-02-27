@@ -272,7 +272,6 @@ Flags provide fine-grained control over specific functionality within features:
 ```
 ## Caching System
 
-### Cache Structure
 The system implements an in-memory cache for user data:
 
 ```go
@@ -285,10 +284,31 @@ type UserCache struct {
     defaultTTL      time.Duration
     gracePeriod     time.Duration
 }
+
+// GetUser retrieves a user from cache
+func (c *UserCache) GetUser(id string) (*UserData, error) {
+    entry, ok := c.users.Load(userID(id))
+    if !ok {
+        return nil, nil
+    }
+    
+    cacheEntry := entry.(*cacheEntry)
+    if cacheEntry.isExpired() {
+        // Grace period logic
+        if c.gracePeriod > 0 && time.Now().Sub(cacheEntry.expiry) <= c.gracePeriod {
+            return cacheEntry.data, nil
+        }
+        
+        c.DeleteUser(id)
+        return nil, ErrEntryExpired
+    }
+    
+    return cacheEntry.data, nil
+}
 ```
+this eliminates the need for database queries on each request and provides features like TTL and grace periods.
 
 ### Cache Operations
-
 - **GetUser**: Retrieves user data from cache
 - **SetUser**: Stores user data in cache with TTL
 - **DeleteUser**: Removes user data from cache
@@ -296,13 +316,10 @@ type UserCache struct {
 - **ForceRefresh**: Manually refreshes cache data
 
 ### Cache Maintenance
-
 The cache automatically maintains itself through:
-
 - **Periodic Cleanup**: Removes expired entries
 - **Periodic Refresh**: Refreshes data from the database
 - **TTL with Grace Period**: Entries expire after TTL but can still be used during grace period
-
 
 ### Hookers Pt2: The Hookening
 ## Registration
@@ -318,7 +335,6 @@ func RegisterWebhookHandlers(router *http.ServeMux, authService *AuthService) {
 ```
 
 ## Event Processing
-
 The system handles three webhook event types:
 
 - **INSERT**: New user or subscription
@@ -326,7 +342,6 @@ The system handles three webhook event types:
 - **DELETE**: Removed user or subscription
 
 ## Security
-
 Webhooks are secured through:
 
 - **Secret Validation**: Checks webhook signature
@@ -335,7 +350,6 @@ Webhooks are secured through:
 - **Content Validation**: Verifies payload structure
 
 # Middlewares
-
 ### Authentication Middleware
 
 ```go
@@ -377,8 +391,7 @@ type UserData struct {
 }
 ```
 `UserData` is the core of the permission system and is populated from Supabase data.
-
-technically has (and does use) 3 methods of checking access, but only 1 is exposed:
+it technically has 3 methods of checking access, but only 1 is exposed:
 
 ```go
 // Check role-based access
@@ -459,63 +472,7 @@ func (u *UserData) HasAccess(accessType AccessType, required interface{}) bool {
 }
 ```
 
-```go
-// In handlers file
-func SearchPage(w http.ResponseWriter, r *http.Request) {
-    // Get user from context (already authenticated by middleware)
-    user := r.Context().Value(auth.UserContextKey).(*auth.UserData)
-    
-    // Prepare page variables
-    pageVars := map[string]interface{}{
-        "Title": "Search",
-        // other variables
-    }
-    
-    // Apply auth-specific variables to template context
-    authService.ApplyAuthVarsToPageVars(user, pageVars)
-    
-    // Render the template with permissions
-    renderTemplate(w, "search.html", pageVars)
-}
-```
-
-### UserCache Implementation
-
-```go
-type UserCache struct {
-    users           sync.Map
-    lastSync        time.Time
-    mu              sync.RWMutex
-    logger          *log.Logger
-    cleanupInterval time.Duration
-    defaultTTL      time.Duration
-    gracePeriod     time.Duration
-}
-
-// GetUser retrieves a user from cache
-func (c *UserCache) GetUser(id string) (*UserData, error) {
-    entry, ok := c.users.Load(userID(id))
-    if !ok {
-        return nil, nil
-    }
-    
-    cacheEntry := entry.(*cacheEntry)
-    if cacheEntry.isExpired() {
-        // Grace period logic
-        if c.gracePeriod > 0 && time.Now().Sub(cacheEntry.expiry) <= c.gracePeriod {
-            return cacheEntry.data, nil
-        }
-        
-        c.DeleteUser(id)
-        return nil, ErrEntryExpired
-    }
-    
-    return cacheEntry.data, nil
-}
-```
-The cache eliminates the need for database queries on each request and provides features like TTL and grace periods.
-
-
+## AuthVars, baby!
 
 ```go
 type AuthVars struct {
@@ -739,7 +696,7 @@ func (cfg *MiddlewareConfig) FeatureAccessMiddleware(feature string) func(http.H
 }
 ```
 
-### 3.2 Route Handler Implementation
+### Route Handler Implementations
 
 Route handlers retrieve the authenticated user from the context and use `ApplyAuthVarsToPageVars` to prepare the template data:
 
@@ -779,7 +736,7 @@ func SearchPage(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-### 3.3 Fine-Grained Access Control in Handlers
+### Fine-Grained Access Control in Handlers
 
 Handlers can implement additional checks for specific actions (though probably not needed atm, not sure):
 
@@ -875,8 +832,7 @@ func setupRoutes(mux *http.ServeMux, authService *auth.AuthService, mwConfig *Mi
 
 ### Template Integration
 
-In templates, the PageVars are used to control UI elements:
-
+Templates should be pretty much the same. Though also probably on the way out... :eyes"
 ```html
 <nav>
   <ul>
