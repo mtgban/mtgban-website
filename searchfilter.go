@@ -1465,6 +1465,14 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 	"is": func(filters []string, co *mtgmatcher.CardObject) bool {
 		for _, value := range filters {
 			switch value {
+			case "foil":
+				if co.Foil || co.Etched {
+					return false
+				}
+			case "nonfoil":
+				if !co.Foil && !co.Etched {
+					return false
+				}
 			case "reserved":
 				if co.IsReserved {
 					return false
