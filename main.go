@@ -179,6 +179,7 @@ type PageVars struct {
 	MissingCounts   map[string]int
 	MissingPrices   map[string]float64
 	ResultPrices    map[string]map[string]float64
+	PatreonLogin    string
 }
 
 type NavElem struct {
