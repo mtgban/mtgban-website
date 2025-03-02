@@ -16,10 +16,8 @@
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
     <meta name="theme-color" content="#ff0000">
 
-    {{if .PatreonLogin}}
         <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
-    {{end}}
 </head>
 
 <body class="light-theme">
@@ -27,7 +25,7 @@
     <nav>
     <ul>
         <li><a href="https://www.patreon.com/ban_community"><img src="/img/misc/patreon.png" width=48></a></li>
-        <li {{if .PatreonLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
+        <li><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
         {{range .Nav}}
             <li>
                 <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
@@ -50,17 +48,15 @@
 
     <div class="bg">
         <div class="mainbody">
-            {{if .PatreonLogin}}
-                <div class="indent">
-                    <form class="search autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
-                        <input id="searchbox" class="w3-input w3-border w3-round-small search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
-                    </form>
-                </div>
+            <div class="indent">
+                <form class="search autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+                    <input id="searchbox" class="w3-input w3-border w3-round-small search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
+                </form>
+            </div>
 
-                <script type="text/javascript">
-                    autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
-                </script>
-            {{end}}
+            <script type="text/javascript">
+                autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
+            </script>
         </div>
     </div>
 
@@ -69,10 +65,9 @@
     {{end}}
 
     <div class="indent">
-        {{if .PatreonLogin}}
             <script type="text/javascript">
                 function getPatreonURL () {
-                    return "http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{.PatreonId}}&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href)
+                    return "" + encodeURIComponent(window.location.href)
                 }
             </script>
 
@@ -81,13 +76,10 @@
             </a>
 
             <noscript>
-                <a href="http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{.PatreonId}}&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members">
+                <a href="">
                     Login without JavaScript enabled
                 </a>
             </noscript>
-        {{else}}
-            <a href="/?errmsg=logout"><img src="/img/misc/logout.png" width=236 height=60></a>
-        {{end}}
     </div>
 
     <br>
