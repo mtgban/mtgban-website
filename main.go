@@ -29,7 +29,6 @@ import (
 	cron "gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/mtgban-website/auth"
 )
 
 const (
@@ -219,8 +218,6 @@ type NavElem struct {
 
 var startTime = time.Now()
 
-var authService *auth.AuthService
-
 var DefaultNav = []NavElem{
 	NavElem{
 		Name:  "Home",
@@ -365,8 +362,8 @@ type ConfigType struct {
 	ApiUserSecrets         map[string]string `json:"api_user_secrets"`
 	GoogleCredentials      string            `json:"google_credentials"`
 
-	ACL          map[string]auth.AuthConfig `json:"acl"`
-	AuthSettings *auth.AuthSettings         `json:"auth"`
+	ACL          map[string]AuthConfig `json:"acl"`
+	AuthSettings *AuthSettings         `json:"auth"`
 
 	Uploader struct {
 		Moxfield string `json:"moxfield"`
@@ -410,7 +407,7 @@ var Newspaper1dayDB *sql.DB
 var GoogleDocsClient *http.Client
 
 const (
-	DefaultConfigPort    = "8080"
+	DefaultConfigPort    = "8089"
 	DefaultDatastorePath = "allprintings5.json"
 	DefaultConfigPath    = "config.json"
 	DefaultSecret        = "NotVerySecret!"
@@ -447,7 +444,7 @@ func (fs *FileSystem) Open(path string) (http.File, error) {
 	return f, nil
 }
 
-func genPageNav(activeTab, token string) PageVars {
+func genPageNav(activeTab, token string, authService *Authservice) PageVars {
 	pageVars := PageVars{
 		Title:      "BAN " + activeTab,
 		LastUpdate: LastUpdate,
@@ -473,10 +470,10 @@ func genPageNav(activeTab, token string) PageVars {
 	copy(pageVars.Nav, DefaultNav)
 
 	ctx := context.Background()
-	user, err := authService.GetUserFromContext(ctx)
+	user, err := authService.cache.GetUserFromContext(ctx)
 	if err == nil && user != nil {
 		for _, feat := range OrderNav {
-			if authService.CanAccessFeature(user, auth.Feature(feat)) ||
+			if authService.CanAccessFeature(user, Feature(feat)) ||
 				(DevMode && !SigCheck) ||
 				ExtraNavs[feat].NoAuth {
 				pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
@@ -600,7 +597,7 @@ func main() {
 		err = os.MkdirAll(LogDir, 0700)
 	}
 	if err != nil {
-		log.Fatalln("unable to create necessary folders", err)
+		log.Println("unable to create necessary folders", err)
 	}
 	LogPages = map[string]*log.Logger{}
 
@@ -622,22 +619,26 @@ func main() {
 		}
 	}
 
-	AuthConfig, err := auth.LoadDefaultAuthConfig()
-	if err != nil {
-		log.Println("error loading auth config:", err)
+	// Set BAN_SECRET env var if not set (for auth testing)
+	if os.Getenv("BAN_SECRET") == "" {
+		os.Setenv("BAN_SECRET", "local-dev-secret")
 	}
 
-	client, err := auth.InitSupabaseClient(AuthConfig.SBase.SupabaseURL, AuthConfig.SBase.SupabaseKey)
+	authConfig, err := LoadAuthConfig(&Config.filePath)
 	if err != nil {
-		log.Fatalln("error initializing supabase client:", err)
+		log.Fatalln("error loading auth config:", err)
 	}
-	authService, err = auth.NewAuthService(client, AuthConfig, auth.WithLogger(log.New(os.Stdout, "[AUTH] ", log.LstdFlags)))
+
+	client, err := InitSupabaseClient(authConfig.DBConfig.SupabaseURL, authConfig.DBConfig.SupabaseSecret)
 	if err != nil {
-		if DevMode {
-			log.Println("Failed to initialize auth service:", err)
-		} else {
-			log.Fatalln("Failed to initialize auth service:", err)
-		}
+		log.Fatalln("error creating supabase client:", err)
+	}
+
+	authService, err := NewAuthService(client, authConfig,
+		WithLogger(log.New(os.Stdout, "", log.LstdFlags)))
+
+	if err != nil {
+		log.Fatalln("error creating auth service:", err)
 	}
 
 	// load website up
@@ -729,15 +730,7 @@ func main() {
 		} else {
 			LogPages[key] = log.New(logFile, "", log.LstdFlags)
 		}
-
-		role, hasRole := Config.ACL[key]
-		ExtraNavs[key].NoAuth = !hasRole || slices.Contains(role.TierACL[key], auth.TierFree)
-
-		// Set up the handler
-		handler := enforceSigning(http.HandlerFunc(nav.Handle))
-		if nav.NoAuth {
-			handler = noSigning(http.HandlerFunc(nav.Handle))
-		}
+		handler := enforceSigning(http.HandlerFunc(nav.Handle), authService)
 		http.Handle(nav.Link, handler)
 
 		// Add any additional endpoints to it
@@ -745,11 +738,12 @@ func main() {
 			http.Handle(subPage, handler)
 		}
 	}
+
 	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
-	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
-	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
-	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
-	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
+	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI), authService))
+	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API), authService))
+	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler), authService))
+	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI), authService))
 	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
@@ -777,7 +771,6 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		ServerNotify("shutdown", "Server cleaning up...")
-		authService.Shutdown(ctx)
 		cleanupDiscord()
 		cancel()
 	}()
@@ -788,6 +781,7 @@ func main() {
 		return
 	}
 	ServerNotify("shutdown", "Server shutdown correctly")
+
 }
 
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
@@ -885,6 +879,9 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		log.Print("template parsing error: ", err)
 		return
 	}
+
+	log.Printf("[AUTH-FLOW] Rendering %s with PageVars: CanDownload=%v, CanBuylist=%v, CanShowAll=%v",
+		tmpl, pageVars.CanDownloadCSV, pageVars.CanBuylist, pageVars.CanShowAll)
 
 	// Execute the template and pass in the variables to fill the gaps
 	err = t.Execute(w, pageVars)
