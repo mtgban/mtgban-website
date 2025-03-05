@@ -28,7 +28,6 @@ import (
 	"github.com/mtgban/go-mtgban/miniaturemarket"
 	"github.com/mtgban/go-mtgban/mintcard"
 	"github.com/mtgban/go-mtgban/mtgseattle"
-	"github.com/mtgban/go-mtgban/ninetyfive"
 	"github.com/mtgban/go-mtgban/purplemana"
 	"github.com/mtgban/go-mtgban/sealedev"
 	"github.com/mtgban/go-mtgban/starcitygames"
@@ -572,17 +571,6 @@ var mtgScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
-	"ninetyfive": &scraperOption{
-		OnlyVendor: true,
-		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper, err := ninetyfive.NewScraper(ninetyfive.GameMagic)
-			if err != nil {
-				return nil, err
-			}
-			scraper.LogCallback = logger.Printf
-			return scraper, nil
-		},
-	},
 	"purplemana": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := purplemana.NewScraper(purplemana.GameMagic)
@@ -681,16 +669,6 @@ var lorcanaScraperOptions = map[string]*scraperOption{
 	"trollandtoad_lorcana": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := trollandtoad.NewGenericScraper(trollandtoad.GameLorcana)
-			scraper.LogCallback = logger.Printf
-			return scraper, nil
-		},
-	},
-	"ninetyfive_lorcana": &scraperOption{
-		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper, err := ninetyfive.NewScraper(ninetyfive.GameLorcana)
-			if err != nil {
-				return nil, err
-			}
 			scraper.LogCallback = logger.Printf
 			return scraper, nil
 		},
