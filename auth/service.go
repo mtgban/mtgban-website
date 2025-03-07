@@ -8,8 +8,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-
 )
 
 type AuthFlags interface {
@@ -113,8 +111,6 @@ func WithRepository(repo UserRepo) AuthServiceOption {
 }
 
 func WithRealtime(realtime *RealtimeService) AuthServiceOption {
-	
-	}
 }
 
 // NewAuthService creates a new AuthService with options

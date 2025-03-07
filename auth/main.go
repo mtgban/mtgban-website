@@ -15,10 +15,6 @@ import (
 
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
-	"github.com/mtgban/mtgban-website/auth/cache"
-	"github.com/mtgban/mtgban-website/auth/config"
-	"github.com/mtgban/mtgban-website/auth/realtime"
-	"github.com/mtgban/mtgban-website/auth/supabase"
 )
 
 // AuthServer handles authentication and authorization
@@ -719,22 +715,19 @@ func (a *App) apiDataHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-
 func main() {
 
-	func main() {
-		// Example usage of the imported modules
-		authService := auth.NewAuthService()
-		configService := config.NewConfigService()
-		cacheService := cache.NewCacheService()
-		modelsService := models.NewModelsService()
-		serviceService := service.NewServiceService()
-		realtimeService := realtime.NewRealtimeService()
-		webhookService := webhook.NewWebhookService()
-		appService := app.NewAppService()
-	
-		log.Println(authService, configService, cacheService, modelsService, serviceService, realtimeService, webhookService, appService)
-	}
+	// Example usage of the imported modules
+	authService := auth.NewAuthService()
+	configService := config.NewConfigService()
+	cacheService := cache.NewCacheService()
+	modelsService := models.NewModelsService()
+	serviceService := service.NewServiceService()
+	realtimeService := realtime.NewRealtimeService()
+	webhookService := webhook.NewWebhookService()
+	appService := app.NewAppService()
+
+	log.Println(authService, configService, cacheService, modelsService, serviceService, realtimeService, webhookService, appService)
 	// Initialize database
 	configPath := "config.json"
 
@@ -757,12 +750,12 @@ func main() {
 
 	// Initialize auth server
 	authServer, err := NewAuthServer(AuthOptions{
-		DB:           client,
-		SupabaseURL:  authConfig.SupabaseURL,
-		SupabaseKey:  authConfig.SupabaseKey,
-		JWTSecret:    authConfig.JWTSecret,
-		Logger:       logger,
-		CacheTTL:     10 * time.Minute,
+		DB:          client,
+		SupabaseURL: authConfig.SupabaseURL,
+		SupabaseKey: authConfig.SupabaseKey,
+		JWTSecret:   authConfig.JWTSecret,
+		Logger:      logger,
+		CacheTTL:    10 * time.Minute,
 	})
 
 	if err != nil {
@@ -773,8 +766,7 @@ func main() {
 	app := NewApp(authServer, client)
 	logger.Printf("Starting server on %s", authConfig.ServerAddress)
 	app.Run(authConfig.ServerAddress)
-}
-	
+
 	return &config.Config{
 		ServerAddress: ":8080",
 		SupabaseURL:   os.Getenv("SUPABASE_URL"),
