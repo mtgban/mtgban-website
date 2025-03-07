@@ -15,10 +15,10 @@ import (
 
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
-	"auth/cache"
-	"auth/config"
-	"auth/realtime"
-	"auth/supabase"
+	"github.com/mtgban/mtgban-website/auth/cache"
+	"github.com/mtgban/mtgban-website/auth/config"
+	"github.com/mtgban/mtgban-website/auth/realtime"
+	"github.com/mtgban/mtgban-website/auth/supabase"
 )
 
 // AuthServer handles authentication and authorization
