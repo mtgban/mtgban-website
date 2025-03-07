@@ -172,14 +172,14 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 		switch payload.Type {
 		case "INSERT", "UPDATE":
-			if err := h.handleUserUpsert(ctx, payload.Record); err != nil {
+			if err := h.handleUserUpsert(payload.Record); err != nil {
 				h.service.logger.Printf("Failed to handle user upsert: %v", err)
 				http.Error(w, "Failed to process user data", http.StatusBadRequest)
 				return
 			}
 
 		case "DELETE":
-			if err := h.handleUserDelete(ctx, payload.Record); err != nil {
+			if err := h.handleUserDelete(payload.Record); err != nil {
 				h.service.logger.Printf("Failed to handle user delete: %v", err)
 				http.Error(w, "Failed to process deletion", http.StatusBadRequest)
 				return
@@ -191,7 +191,7 @@ func (h *WebhookHandler) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUserUpsert processes a user insert or update webhook
-func (h *WebhookHandler) handleUserUpsert(ctx context.Context, record map[string]interface{}) error {
+func (h *WebhookHandler) handleUserUpsert(record map[string]interface{}) error {
 
 	userData, err := h.service.parseUserData(record)
 	if err != nil {
@@ -208,7 +208,7 @@ func (h *WebhookHandler) handleUserUpsert(ctx context.Context, record map[string
 }
 
 // handleUserDelete processes a user deletion webhook
-func (h *WebhookHandler) handleUserDelete(ctx context.Context, record map[string]interface{}) error {
+func (h *WebhookHandler) handleUserDelete(record map[string]interface{}) error {
 	// Try to extract user ID from various keys
 	var userID string
 	for _, key := range []string{"id", "uuid", "user_id"} {

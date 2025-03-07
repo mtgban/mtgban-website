@@ -19,10 +19,8 @@ type UserRepo interface {
 	// GetSubscribedUsers retrieves all users who are subscribed to a product
 	// Returns a slice of all subscribed users or an error if the operation fails
 	GetSubscribedUsers(ctx context.Context) ([]UserData, error)
-
 	// GetUserByID retrieves a user by their ID
 	GetUserByID(ctx context.Context, id string) (*UserData, error)
-
 	// GetAllUserIDs retrieves all user IDs
 	GetAllUserIDs(ctx context.Context) ([]string, error)
 }
@@ -64,14 +62,11 @@ type AuthProvider interface {
 	GetFeatureFlags(user *UserData, feature Feature) map[string]string
 	GetFeatureFlag(user *UserData, feature Feature, flagName string) string
 	IsFeatureFlagEnabled(user *UserData, feature Feature, flagName string) bool
-
 	// User features management
 	GetUserFeatures(ctx context.Context, userID string) (map[string]map[string]map[string]string, error)
 	UpdateUserFeatures(ctx context.Context, userID string, features map[string]map[string]map[string]string) error
-
 	// UI integration
 	ApplyAuthVarsToPageVars(user *UserData, pageVars map[string]interface{})
-
 	// Lifecycle management
 	LoadInitialData(ctx context.Context) error
 	RefreshCache(ctx context.Context) error

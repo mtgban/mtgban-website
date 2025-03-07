@@ -30,10 +30,6 @@ const (
 	API           AccessType = "api"
 )
 
-//
-// Role System - Administrative Permissions
-//
-
 type Role string
 
 // Roles grant permissions without the need for a subscription.
@@ -140,10 +136,6 @@ func (t Tier) IsValid() bool {
 	return exists || t == ""
 }
 
-//
-// Features - Application Pages/Functionality
-//
-
 // Feature represents a high-level application feature (typically a page)
 type Feature string
 
@@ -178,10 +170,6 @@ func (f Feature) IsValid() bool {
 	return slices.Contains(AllFeatures(), f) || f == ""
 }
 
-//
-// Subscription Status
-//
-
 type Status string
 
 const (
@@ -189,10 +177,6 @@ const (
 	StatusInactive  Status = "inactive"
 	StatusCancelled Status = "cancelled"
 )
-
-//
-// Feature Flags
-//
 
 // FeatureFlags is a type alias for feature flags map
 type FeatureFlags map[string]string
@@ -344,10 +328,6 @@ func (u *UserData) GetFeature(category, feature, setting string) string {
 
 	return ""
 }
-
-//
-// Configuration Types
-//
 
 // AuthConfig holds the complete authorization configuration
 type AuthConfig struct {
