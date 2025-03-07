@@ -638,6 +638,9 @@ func main() {
 			log.Fatalln("Failed to initialize auth service:", err)
 		}
 	}
+	mux := http.NewServeMux()
+
+	auth.RegisterWebhookHandlers(mux, authService)
 
 	// load website up
 	go func() {
@@ -699,20 +702,20 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	// serve everything in known folders as a file
-	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(&FileSystem{http.Dir("css")})))
-	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(&FileSystem{http.Dir("img")})))
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(&FileSystem{http.Dir("js")})))
+	mux.Handle("/css/", http.StripPrefix("/css/", http.FileServer(&FileSystem{http.Dir("css")})))
+	mux.Handle("/img/", http.StripPrefix("/img/", http.FileServer(&FileSystem{http.Dir("img")})))
+	mux.Handle("/js/", http.StripPrefix("/js/", http.FileServer(&FileSystem{http.Dir("js")})))
 
 	// custom redirector
-	http.HandleFunc("/go/", Redirect)
-	http.HandleFunc("/random", RandomSearch)
-	http.HandleFunc("/randomsealed", RandomSealedSearch)
-	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/go/", Redirect)
+	mux.HandleFunc("/random", RandomSearch)
+	mux.HandleFunc("/randomsealed", RandomSealedSearch)
+	mux.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
 	})
 
 	// when navigating to /home it should serve the home page
-	http.Handle("/", noSigning(http.HandlerFunc(Home)))
+	mux.Handle("/", noSigning(http.HandlerFunc(Home)))
 
 	for key, nav := range ExtraNavs {
 		// Set up logging
@@ -744,18 +747,18 @@ func main() {
 			http.Handle(subPage, handler)
 		}
 	}
-	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
-	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
-	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
-	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
-	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
-	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
-	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
-	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
+	mux.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
+	mux.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
+	mux.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
+	mux.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
+	mux.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
+	mux.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
+	mux.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
+	mux.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	// compat
-	http.Handle("/img/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
+	mux.Handle("/img/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 
-	http.HandleFunc("/favicon.ico", Favicon)
+	mux.HandleFunc("/favicon.ico", Favicon)
 
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
@@ -764,7 +767,7 @@ func main() {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		err := srv.ListenAndServe()
+		err := http.ListenAndServe(":"+Config.Port, mux)
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
