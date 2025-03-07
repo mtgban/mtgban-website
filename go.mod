@@ -48,6 +48,7 @@ require (
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/gocolly/colly v1.2.0 // indirect
 	github.com/gocolly/colly/v2 v2.1.0 // indirect
+	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -57,12 +58,14 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.1 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.17.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
+	github.com/lib/pq v1.10.9 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
@@ -94,5 +97,3 @@ require (
 	google.golang.org/grpc v1.58.3 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 )
-
-replace github.com/mtgban/mtgban-website/auth => ./auth
