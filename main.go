@@ -37,10 +37,8 @@ type PageVars struct {
 	Nav      []NavElem
 	ExtraNav []NavElem
 
-	PatreonId    string
-	PatreonURL   string
-	PatreonLogin bool
-	Hash         string
+	ShowLogin bool
+	Hash      string
 
 	Embed struct {
 		OEmbedURL    string
@@ -111,6 +109,9 @@ type PageVars struct {
 	Rarities     []string
 	CardHashes   []string
 	EditionsMap  map[string]EditionEntry
+
+	PageMessage string
+	PageType    string
 
 	CanFilterByPrice bool
 	FilterMinPrice   float64
@@ -352,15 +353,14 @@ type ConfigType struct {
 	SleepersBlockList      []string          `json:"sleepers_block_list"`
 	GlobalAllowList        []string          `json:"global_allow_list"`
 	GlobalProbeList        []string          `json:"global_probe_list"`
-	Patreon                struct {
-		Secret map[string]string `json:"secret"`
-		Grants []struct {
-			Category string `json:"category"`
-			Email    string `json:"email"`
-			Name     string `json:"name"`
-			Tier     string `json:"tier"`
+	Supabase               struct {
+		SupabaseTokenSecret map[string]string `json:"secret"`
+		Grants              []struct {
+			Id   string `json:"id"`
+			Role string `json:"role"`
+			Tier string `json:"tier"`
 		} `json:"grants"`
-	} `json:"patreon"`
+	} `json:"supabase"`
 	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
 	GoogleCredentials string            `json:"google_credentials"`
 
@@ -449,13 +449,13 @@ func genPageNav(activeTab, sig string) PageVars {
 	exp := GetParamFromSig(sig, "Expires")
 	expires, _ := strconv.ParseInt(exp, 10, 64)
 	msg := ""
-	showPatreonLogin := false
+	showLogin := false
 	if sig != "" {
 		if expires < time.Now().Unix() {
 			msg = ErrMsgExpired
 		}
 	} else {
-		showPatreonLogin = true
+		showLogin = true
 	}
 
 	// These values need to be set for every rendered page
@@ -466,10 +466,8 @@ func genPageNav(activeTab, sig string) PageVars {
 		ErrorMessage: msg,
 		LastUpdate:   LastUpdate,
 
-		PatreonId:    PatreonClientId,
-		PatreonURL:   PatreonHost,
-		PatreonLogin: showPatreonLogin,
-		Hash:         BuildCommit,
+		ShowLogin: showLogin,
+		Hash:      BuildCommit,
 	}
 
 	if Config.Game != "" {
@@ -519,7 +517,7 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars.Nav[mainNavIndex].Class = "active"
 
 	// Add extra warning message if needed
-	if showPatreonLogin && pageVars.Nav[mainNavIndex].NoAuth {
+	if showLogin && pageVars.Nav[mainNavIndex].NoAuth {
 		extra := *&NavElem{
 			Active: true,
 			Class:  "beta",
@@ -708,6 +706,8 @@ func main() {
 		c.Start()
 	}()
 
+	InitAuth("auth_config.json")
+
 	err = setupDiscord()
 	if err != nil {
 		log.Println("Error connecting to discord", err)
@@ -771,9 +771,9 @@ func main() {
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	// compat
+	http.HandleFunc("/favicon.ico", Favicon)
 	http.Handle("/img/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 
-	http.HandleFunc("/favicon.ico", Favicon)
 	http.HandleFunc("/auth", Auth)
 
 	srv := &http.Server{

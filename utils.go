@@ -769,3 +769,109 @@ func getTCGSimulationIQR(productId string) float64 {
 	}
 	return entries[0].ExtraValues["iqr"]
 }
+
+// generateTestEmail generates a unique email for testing
+func generateTestEmail() string {
+	return "test_" + time.Now().Format("20060102150405") + "@example.com"
+}
+
+// maskURL masks sensitive parts of a URL for logging
+func maskURL(url string) string {
+	parts := strings.Split(url, "/")
+	if len(parts) > 2 {
+		parts[2] = "****"
+	}
+	return strings.Join(parts, "/")
+}
+
+// getClientIP extracts the client IP address from a request
+func getClientIP(r *http.Request) string {
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		ips := strings.Split(forwarded, ",")
+		return strings.TrimSpace(ips[0])
+	}
+
+	ip := r.RemoteAddr
+	if i := strings.LastIndex(ip, ":"); i != -1 {
+		ip = ip[:i]
+	}
+
+	return ip
+}
+
+// maskEmail masks an email address for logging
+func maskEmail(email string) string {
+	if email == "" {
+		return "empty_email"
+	}
+
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return "invalid_email_format"
+	}
+
+	username := parts[0]
+	domain := parts[1]
+
+	if len(username) > 1 {
+		maskedUsername := username[:1] + strings.Repeat("*", len(username)-1)
+		return maskedUsername + "@" + domain
+	}
+
+	return "*@" + domain
+}
+
+// checkPasswordStrength evaluates password strength
+func checkPasswordStrength(password string) string {
+	score := 0
+
+	// Length check
+	if len(password) >= 8 {
+		score++
+	}
+	if len(password) >= 12 {
+		score++
+	}
+
+	// Complexity checks
+	hasUpper := false
+	hasLower := false
+	hasDigit := false
+	hasSpecial := false
+
+	for _, char := range password {
+		if 'A' <= char && char <= 'Z' {
+			hasUpper = true
+		} else if 'a' <= char && char <= 'z' {
+			hasLower = true
+		} else if '0' <= char && char <= '9' {
+			hasDigit = true
+		} else {
+			hasSpecial = true
+		}
+	}
+
+	if hasUpper {
+		score++
+	}
+	if hasLower {
+		score++
+	}
+	if hasDigit {
+		score++
+	}
+	if hasSpecial {
+		score++
+	}
+
+	// Evaluate score
+	switch {
+	case score <= 2:
+		return "weak"
+	case score <= 4:
+		return "medium"
+	default:
+		return "strong"
+	}
+}

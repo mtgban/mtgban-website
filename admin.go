@@ -327,12 +327,11 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			"", "#", "Category", "Email", "Name", "Tier",
 		}
 
-		for i, person := range Config.Patreon.Grants {
+		for i, person := range Config.Supabase.Grants {
 			row := []string{
 				fmt.Sprintf("%d", i+1),
-				person.Category,
-				person.Email,
-				person.Name,
+				person.Role,
+				person.Id,
 				person.Tier,
 			}
 

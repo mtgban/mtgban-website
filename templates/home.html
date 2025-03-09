@@ -1,11 +1,15 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="/css/home.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
     <title>{{.Title}}</title>
-
+    
+    <!-- Favicon links -->
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
@@ -14,92 +18,84 @@
     <link rel="shortcut icon" href="/img/favicon/favicon.ico">
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
-    <meta name="theme-color" content="#ff0000">
-
-    {{if .PatreonLogin}}
-        <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
-    {{end}}
+    
+    <!-- Scripts -->
+    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    
 </head>
 
-<body class="light-theme">
-<script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
-    <nav>
-    <ul>
-        <li><a href="https://www.patreon.com/ban_community"><img src="/img/misc/patreon.png" width=48></a></li>
-        <li {{if .PatreonLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
-        {{range .Nav}}
-            <li>
-                <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
-                    <span>{{.Short}} {{.Name}}</span>
-                </a>
-            </li>
-        {{end}}
-        <li style="display:none"><!--If you're reading this, and would like to help, join our Discord, it's the right place for any talented developer with a passion for mtg!--></li>
-        <li>
-            <label class="switch">
-                <div>
-                    <input type="checkbox"/>
-                    <span class="slider"></span>
+<body class="dark-theme">
+    <script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
+    
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">MTGBAN</a>
+                
+                <nav>
+                    <ul>
+                        <li>
+                            <a href="/discord">
+                                <img src="/img/misc/discord.png" class="nav-icon" alt="Discord">
+                                <span>Discord</span>
+                            </a>
+                        </li>
+                        {{range .Nav}}
+                            <li>
+                                <a {{if .Active}}class="active"{{end}} href="{{.Link}}">
+                                    <span>{{.Short}} {{.Name}}</span>
+                                </a>
+                            </li>
+                        {{end}}
+                    </ul>
+                </nav>
+                
+                <div class="auth-buttons">
+                    <a href="/login" class="login-btn">Log in</a>
+                    <a href="mtgban-stripe-payments.vercel.app" class="signup-btn">Subscribe</a>
+                    
+                    <div class="theme-toggle">
+                        <label class="switch">
+                            <input type="checkbox"/>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
                 </div>
-                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
-            </label>
-        </li>
-    </ul>
-    </nav>
-
-    <div class="bg">
-        <div class="mainbody">
-            {{if .PatreonLogin}}
-                <div class="indent">
-                    <form class="search autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
-                        <input id="searchbox" class="w3-input w3-border w3-round-small search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
-                    </form>
-                </div>
-
-                <script type="text/javascript">
-                    autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
-                </script>
+            </div>
+        </div>
+    </header>
+    
+    <div class="search-container">
+        <form class="search-form autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+            <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
+        </form>
+    </div>
+    
+    <script type="text/javascript">
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
+    </script>
+    
+    <div class="container">
+        <div class="main-content">
+            {{if ne .ErrorMessage ""}}
+                <h1 class="error-message">{{.ErrorMessage}}</h1>
             {{end}}
+            
+            <div class="quick-links">
+                Jump to 
+                <a href="https://mtgban.com">Magic: the Gathering</a> | 
+                <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
+            </div>
         </div>
     </div>
-
-    {{if ne .ErrorMessage ""}}
-        <h1>{{.ErrorMessage}}</h1>
-    {{end}}
-
-    <div class="indent">
-        {{if .PatreonLogin}}
-            <script type="text/javascript">
-                function getPatreonURL () {
-                    return "http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{.PatreonId}}&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href)
-                }
-            </script>
-
-            <a href="javascript:location.replace(getPatreonURL())">
-                <img src="/img/misc/login.png" width=360 height=60>
-            </a>
-
-            <noscript>
-                <a href="http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{.PatreonId}}&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members">
-                    Login without JavaScript enabled
-                </a>
-            </noscript>
-        {{else}}
-            <a href="/?errmsg=logout"><img src="/img/misc/logout.png" width=236 height=60></a>
-        {{end}}
-    </div>
-
-    <br>
-    <div class="indent">
-    Jump to &nbsp;<a href="https://mtgban.com">Magic: the Gathering</a> &nbsp;|&nbsp; <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
-    </div>
-
-    <br>
-    <div class="footer">&copy; 2019-2025 MTGBAN Inc<br>
-        <br><hr width=30% style="border: 1px dotted;">
+    
+    <footer class="footer">
+        &copy; 2019-2025 MTGBAN Inc
+        <hr>
         Cookies may be in use to ensure correct functionality of the platform.<br>
-        Content is provided for informational purpose only.<br>
-    </div>
+        Content is provided for informational purpose only.
+    </footer>
 </body>
 </html>
