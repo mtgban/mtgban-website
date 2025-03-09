@@ -419,7 +419,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 			}
 		}
 		cond := "NM"
-		if conds != nil {
+		if conds != nil && conds[i] != "" {
 			cond = conds[i]
 		}
 		qty[id+cond] += quantity
@@ -434,7 +434,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		var prices [3]float64
 
 		cond := "NM"
-		if conds != nil {
+		if conds != nil && conds[i] != "" {
 			cond = conds[i]
 		}
 
