@@ -333,6 +333,11 @@ func cardobject2sources(co *mtgmatcher.CardObject) []string {
 		values = co.SourceProducts["sealed"]
 	} else if co.Etched {
 		values = co.SourceProducts["etched"]
+		// Due to how `card` is represented in mtg-sealed-content,
+		// some etched cards get mapped to plain foil finish
+		if values == nil {
+			values = co.SourceProducts["foil"]
+		}
 	} else if co.Foil {
 		values = co.SourceProducts["foil"]
 	} else {
