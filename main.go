@@ -174,6 +174,22 @@ type PageVars struct {
 	MissingCounts   map[string]int
 	MissingPrices   map[string]float64
 	ResultPrices    map[string]map[string]float64
+
+	AuthErrorMessage string
+	FormTitle        string
+	FormInstructions string
+	FormAction       string
+	FormContent      string
+	SubmitButtonText string
+	FormLinks        string
+	ShowForm         bool
+	MessageTitle     string
+	MessageIconClass string
+	PrimaryMessage   string
+	SecondaryMessage string
+	SmallMessage     string
+	ActionLink       string
+	ActionText       string
 }
 
 type NavElem struct {
@@ -706,7 +722,10 @@ func main() {
 		c.Start()
 	}()
 
-	InitAuth("auth_config.json")
+	a, err := NewAuth("auth_config.json")
+	if err != nil {
+		log.Println("Error initializing auth:", err)
+	}
 
 	err = setupDiscord()
 	if err != nil {
@@ -730,7 +749,7 @@ func main() {
 	})
 
 	// when navigating to /home it should serve the home page
-	http.Handle("/", noSigning(http.HandlerFunc(Home)))
+	http.Handle("/", NoSigning(http.HandlerFunc(Home)))
 
 	for key, nav := range ExtraNavs {
 		// Set up logging
@@ -750,9 +769,9 @@ func main() {
 		_, ExtraNavs[key].NoAuth = Config.ACL["Any"][key]
 
 		// Set up the handler
-		handler := enforceSigning(http.HandlerFunc(nav.Handle))
+		handler := EnforceSigning(http.HandlerFunc(nav.Handle))
 		if nav.NoAuth {
-			handler = noSigning(http.HandlerFunc(nav.Handle))
+			handler = NoSigning(http.HandlerFunc(nav.Handle))
 		}
 		http.Handle(nav.Link, handler)
 
@@ -762,19 +781,37 @@ func main() {
 		}
 	}
 
-	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
-	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
-	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
-	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
-	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
-	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
-	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
-	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
-	// compat
-	http.HandleFunc("/favicon.ico", Favicon)
-	http.Handle("/img/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
+	apiRoutes := map[string]Route{
+		"/search/oembed":                  {Search, NoSigning},
+		"/api/mtgban/":                    {PriceAPI, a.EnforceAPISigning},
+		"/api/mtgjson/ck.json":            {API, a.EnforceAPISigning},
+		"/api/tcgplayer/":                 {TCGHandler, EnforceSigning},
+		"/api/search/":                    {SearchAPI, EnforceSigning},
+		"/api/cardkingdom/pricelist.json": {CKMirrorAPI, NoSigning},
+		"/api/suggest":                    {SuggestAPI, NoSigning},
+		"/api/opensearch.xml":             {OpenSearchDesc, NoSigning},
+		"/img/opensearch.xml":             {OpenSearchDesc, NoSigning},
+	}
 
-	http.HandleFunc("/auth", Auth)
+	for path, route := range apiRoutes {
+		http.Handle(path, route.Middleware(http.HandlerFunc(route.Handler)))
+	}
+
+	authRoutes := map[string]Route{
+		"/login":                  {a.HandleAuthPage, NoSigning},
+		"/signup":                 {a.HandleAuthPage, NoSigning},
+		"/login-submit":           {a.HandleLogin, NoSigning},
+		"/signup-submit":          {a.HandleSignup, NoSigning},
+		"/forgot-password-submit": {a.HandleForgotPasswordSubmit, EnforceSigning},
+		"/logout":                 {a.HandleLogout, EnforceSigning},
+		"/auth/callback":          {a.HandleCallback, NoSigning},
+		"/refresh-token":          {a.HandleRefreshToken, NoSigning},
+		"/auth":                   {a.HandleCallback, NoSigning},
+	}
+
+	for path, route := range authRoutes {
+		http.Handle(path, route.Middleware(http.HandlerFunc(route.Handler)))
+	}
 
 	srv := &http.Server{
 		Addr: ":" + Config.Port,

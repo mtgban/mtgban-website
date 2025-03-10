@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -874,4 +877,11 @@ func checkPasswordStrength(password string) string {
 	default:
 		return "strong"
 	}
+}
+
+// signHMACSHA1Base64 signs the data with the key using HMAC SHA1 and returns the base64 encoded string
+func signHMACSHA1Base64(key []byte, data []byte) string {
+	h := hmac.New(sha1.New, key)
+	h.Write(data)
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }

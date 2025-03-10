@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -19,24 +19,25 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/golang-jwt/jwt/v5"
 	supabase "github.com/nedpals/supabase-go"
 )
 
-var DebugMode = true
-
-var AuthHost = "localhost:19283"
+var (
+	DebugMode       = false // Default to false for security
+	Host            = "localhost"
+	AuthPort        = 19283
+	AuthHost        = Host + ":" + fmt.Sprint(AuthPort)
+	SupabaseUrl     = os.Getenv("SUPABASE_URL")
+	SupabaseAnonKey = os.Getenv("SUPABASE_ANON_KEY")
+)
 
 const (
 	DefaultHost              = "www.mtgban.com"
 	DefaultSignatureDuration = 11 * 24 * time.Hour
-)
-
-const (
-	SupabaseUrl     = "https://cnqdgapyhionjgvzpasv.supabase.co"
-	SupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNucWRnYXB5aGlvbmpndnpwYXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgyNzc4MjcsImV4cCI6MjA1Mzg1MzgyN30.YvJogdMuXMPE4_VzhoX5u-nsBhI-ydkDyNAV2KFNjOE"
 )
 
 const (
@@ -48,14 +49,102 @@ const (
 	ErrMsgUseAPI  = "Slow down, you're making too many requests! For heavy data use consider the BAN API"
 )
 
+// Route defines a single route with its handler and middleware
+type Route struct {
+	Handler    http.HandlerFunc
+	Middleware func(http.Handler) http.Handler
+}
+
+// JWT handles all token-related operations
+type JWT struct {
+	SupabaseSecret string
+	Logger         *log.Logger
+}
+
+// NewJWT creates a new JWT handler
+func NewJWT(secret string, logger *log.Logger) *JWT {
+	return &JWT{
+		SupabaseSecret: secret,
+		Logger:         logger,
+	}
+}
+
+// GetUserData extracts user data from a JWT token
+func (j *JWT) GetUserData(jwtToken string) (*MtgbanUserData, error) {
+	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
+		// Validate the alg is what you expect
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(j.SupabaseSecret), nil
+	})
+	if err != nil {
+		j.Logger.Printf("JWT parsing error: %v", err)
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		j.Logger.Printf("Invalid JWT token")
+		return nil, errors.New("invalid JWT token")
+	}
+
+	userId, ok := claims["sub"].(string)
+	if !ok {
+		j.Logger.Printf("JWT missing 'sub' claim")
+		return nil, errors.New("jwt missing user id")
+	}
+
+	email, ok := claims["email"].(string)
+	if !ok {
+		j.Logger.Printf("JWT missing 'email' claim")
+		return nil, errors.New("jwt missing email")
+	}
+
+	userData := &MtgbanUserData{
+		UserId: userId,
+		Email:  strings.ToLower(email),
+	}
+	return userData, nil
+}
+
+// GetUserTier extracts the user tier from the JWT token
+func (j *JWT) GetUserTier(jwtToken string) (string, error) {
+	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(j.SupabaseSecret), nil
+	})
+	if err != nil {
+		j.Logger.Printf("JWT parsing error when getting tier: %v", err)
+		return "", err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		j.Logger.Printf("Invalid JWT token when getting tier")
+		return "", errors.New("invalid JWT token")
+	}
+
+	tierTitle, ok := claims["tier"].(string)
+	if !ok {
+		j.Logger.Printf("JWT missing 'tier' claim")
+		return "", errors.New("no tier in webtoken")
+	}
+	return tierTitle, nil
+}
+
 // AuthService handles all authentication related functionality
 type AuthService struct {
-	Logger      *log.Logger
-	Supabase    *supabase.Client
-	SupabaseURL string
-	SupabaseKey string
-	DebugMode   bool
-	BaseAuthURL string
+	Logger         *log.Logger
+	Supabase       *supabase.Client
+	SupabaseURL    string
+	SupabaseKey    string
+	SupabaseSecret string
+	DebugMode      bool
+	BaseAuthURL    string
+	JWT            *JWT
 }
 
 // Config holds the configuration for the authentication service
@@ -73,64 +162,113 @@ type MtgbanUserData struct {
 	Email  string
 }
 
-// Initialize auth service from configuration file
-func InitAuth(configFile string) (*AuthService, error) {
-	// Set default config
+// loadAuthConfig loads the authentication configuration from a file
+func loadAuthConfig(configFile string) *AuthConfig {
 	config := AuthConfig{
 		SupabaseURL:     SupabaseUrl,
 		SupabaseAnonKey: SupabaseAnonKey,
 		DebugMode:       DebugMode,
 		LogPrefix:       "[AUTH] ",
 	}
-
-	// Try to load from config file if provided
 	if configFile != "" {
 		file, err := os.Open(configFile)
 		if err == nil {
 			defer file.Close()
 			if err := json.NewDecoder(file).Decode(&config); err != nil {
-				return nil, fmt.Errorf("failed to parse config file: %w", err)
+				log.Printf("failed to parse config file: %v", err)
+				return &config
 			}
 		} else if !os.IsNotExist(err) && !DevMode {
-			return nil, fmt.Errorf("failed to open config file: %w", err)
+			log.Printf("failed to open config file: %v", err)
+			return &config
 		}
 	}
-	// Create a new Supabase client
-	log.Printf("Creating Supabase client with URL: %s", config.SupabaseURL)
+	return &config
+}
+
+// NewAuth creates a new authentication service
+func NewAuth(configFile string) (*AuthService, error) {
+	if configFile == "" {
+		configFile = "auth_config.json"
+	}
+	config := loadAuthConfig(configFile)
+
+	// Create logger
+	logger := log.New(os.Stdout, config.LogPrefix, log.Ldate|log.Ltime|log.Lshortfile)
+	logger.Printf("Creating Supabase client with URL: %s", config.SupabaseURL)
+
+	// Create Supabase client
 	supabase := supabase.CreateClient(config.SupabaseURL, config.SupabaseAnonKey)
-	if supabase != nil {
-		log.Printf("Supabase client created successfully")
-	} else {
+	if supabase == nil {
 		return nil, fmt.Errorf("failed to create Supabase client")
 	}
+
+	logger.Printf("Supabase client created successfully")
+
+	// Create JWT handler
+	jwtHandler := NewJWT(config.SupabaseSecret, logger)
+
 	// Create the service
 	service := &AuthService{
-		Logger:      log.New(os.Stdout, config.LogPrefix, log.Ldate|log.Ltime|log.Lshortfile),
-		Supabase:    supabase,
-		DebugMode:   config.DebugMode,
-		BaseAuthURL: config.SupabaseURL + "/auth/v1",
+		Logger:         logger,
+		Supabase:       supabase,
+		SupabaseURL:    config.SupabaseURL,
+		SupabaseKey:    config.SupabaseAnonKey,
+		SupabaseSecret: config.SupabaseSecret,
+		DebugMode:      config.DebugMode,
+		BaseAuthURL:    config.SupabaseURL + "/auth/v1",
+		JWT:            jwtHandler,
 	}
-
-	// Initialize the service
-	service.Logger.Printf("Initializing authentication service")
-	service.Logger.Printf("Supabase URL: %s", config.SupabaseURL)
-
-	// Run full authentication flow test in debug mode
-	if service.DebugMode {
-		service.Logger.Printf("Running comprehensive authentication flow test")
-
-		// Run a complete authentication flow test
-		if err := service.testFullAuthFlow(); err != nil {
-			service.Logger.Printf("Authentication flow test failed: %v", err)
-			return nil, fmt.Errorf("authentication flow test failed: %w", err)
-		}
-		service.Logger.Printf("Authentication flow test completed successfully")
-	}
-
-	service.registerRoutes()
-	service.Logger.Printf("Authentication service initialized successfully")
-
+	service.Logger.Printf("Auth service initialized")
 	return service, nil
+}
+
+// routeLogger logs a message asynchronously
+func routeLogger(message string) {
+	go func() {
+		logger := log.New(os.Stdout, "", log.LstdFlags)
+		logger.Println(message)
+	}()
+}
+
+func requiresAuth(path string) bool {
+	// First check ExtraNavs for NoAuth flag
+	for _, navName := range OrderNav {
+		nav := ExtraNavs[navName]
+		if nav.Link == path && nav.NoAuth {
+			return false
+		}
+
+		for _, subPage := range nav.SubPages {
+			if subPage == path && nav.NoAuth {
+				return false
+			}
+		}
+	}
+
+	// Then check against protected paths
+	authPaths := []string{
+		"/account",
+		"/profile",
+		"/settings",
+		"/admin",
+	}
+
+	for _, authPath := range authPaths {
+		if strings.HasPrefix(path, authPath) {
+			return true
+		}
+	}
+
+	// Check if the path is in ExtraNavs and not marked as NoAuth
+	for _, navName := range OrderNav {
+		nav := ExtraNavs[navName]
+		if (nav.Link == path || contains(nav.SubPages, path)) && !nav.NoAuth {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Test full authentication flow: connection, account creation, and login
@@ -140,10 +278,9 @@ func (a *AuthService) testFullAuthFlow() error {
 
 	// Test DB connection with a simple query
 	var testName []interface{}
-	err := a.Supabase.DB.From("testing").Select("name").Limit(1).Execute(&testName)
+	err := a.Supabase.DB.From("active_products").Select("product_name").Limit(1).Execute(&testName)
 	if err != nil {
 		a.Logger.Printf("DB connection test: %v", err)
-		// Even if this fails (table might not exist), we continue to auth tests
 	} else {
 		a.Logger.Printf("DB connection successful")
 	}
@@ -151,8 +288,8 @@ func (a *AuthService) testFullAuthFlow() error {
 	// Step 2: Create a test user
 	testEmail := fmt.Sprintf("test_%s@gmail.com", generateRandomString(8))
 	testPassword := "Test" + generateRandomString(10) + "123!"
+	a.Logger.Printf("Creating test user with email: %s", maskEmail(testEmail))
 
-	a.Logger.Printf("Creating test user with email: %s", testEmail)
 	user, err := a.Supabase.Auth.SignUp(context.Background(), supabase.UserCredentials{
 		Email:    testEmail,
 		Password: testPassword,
@@ -167,6 +304,9 @@ func (a *AuthService) testFullAuthFlow() error {
 	authDetails, err := a.Supabase.Auth.SignIn(context.Background(), supabase.UserCredentials{
 		Email:    testEmail,
 		Password: testPassword,
+		Data: map[string]interface{}{
+			"RedirectTo": a.BaseAuthURL + "/auth/v1/callback",
+		},
 	})
 	if err != nil {
 		return fmt.Errorf("test user login failed: %w", err)
@@ -184,38 +324,6 @@ func (a *AuthService) testFullAuthFlow() error {
 	return nil
 }
 
-// Generate a random string for unique test emails
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	result := make([]byte, length)
-
-	for i := range result {
-		result[i] = charset[rand.Intn(len(charset))]
-	}
-
-	return string(result)
-}
-
-// registerRoutes registers all authentication-related routes with http
-func (a *AuthService) registerRoutes() {
-	a.Logger.Printf("Registering authentication routes")
-
-	// Authentication pages
-	http.HandleFunc("/login", a.HandleAuthPage)
-	http.HandleFunc("/signup", a.HandleAuthPage)
-	http.HandleFunc("/forgot-password", a.HandleForgotPassword)
-	http.HandleFunc("/reset-password-sent", a.HandleResetPasswordSent)
-	http.HandleFunc("/signup-success", a.HandleSignupSuccess)
-
-	// Authentication form submissions
-	http.HandleFunc("/login-submit", a.HandleLogin)
-	http.HandleFunc("/signup-submit", a.HandleSignup)
-	http.HandleFunc("/forgot-password-submit", a.HandleForgotPasswordSubmit)
-	http.HandleFunc("/logout", a.HandleLogout)
-
-	a.Logger.Printf("Authentication routes registered successfully")
-}
-
 // HandleAuthPage renders the authentication page
 func (a *AuthService) HandleAuthPage(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
@@ -223,13 +331,42 @@ func (a *AuthService) HandleAuthPage(w http.ResponseWriter, r *http.Request) {
 
 	a.Logger.Printf("Auth page request from %s: %s", clientIP, path)
 
+	// Initialize base page variables
 	pageVars := genPageNav("Authentication", "")
+	pageVars.ShowForm = true // Both login and signup show forms
 	pageVars.ErrorMessage = r.FormValue("errmsg")
 
 	// Check if the request is for login or signup
 	if strings.HasSuffix(path, "/signup") {
 		pageVars.Title = "Sign Up - MTGBAN"
 		pageVars.PageType = "signup"
+		pageVars.FormTitle = "Create Your Account"
+		pageVars.FormInstructions = "Fill in the form below to create your account."
+		pageVars.FormAction = "/signup-submit"
+		pageVars.FormContent = `
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group">
+                <label for="confirm-password">Confirm Password:</label>
+                <input type="password" id="confirm-password" name="confirm-password" required>
+            </div>
+            <div class="form-group">
+                <label for="fullname">Full Name:</label>
+                <input type="text" id="fullname" name="fullname" required>
+            </div>
+            <div class="form-group">
+                <input type="checkbox" id="terms" name="terms">
+                <label for="terms">I accept the Terms of Service</label>
+            </div>
+        `
+		pageVars.SubmitButtonText = "Sign Up"
+		pageVars.FormLinks = `<a href="/login">Already have an account? Log in</a>`
 
 		// Process error messages for signup
 		switch pageVars.ErrorMessage {
@@ -262,10 +399,32 @@ func (a *AuthService) HandleAuthPage(w http.ResponseWriter, r *http.Request) {
 			a.Logger.Printf("Signup error shown to %s: general failure", clientIP)
 		}
 	} else {
+		// Login page configuration
 		pageVars.Title = "Login - MTGBAN"
 		pageVars.PageType = "login"
+		pageVars.FormTitle = "Log In to Your Account"
+		pageVars.FormInstructions = "Enter your credentials to access your account."
+		pageVars.FormAction = "/login-submit"
+		pageVars.FormContent = `
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <div class="form-group remember-me">
+                <input type="checkbox" id="remember" name="remember">
+                <label for="remember">Remember me</label>
+            </div>
+        `
+		pageVars.SubmitButtonText = "Log In"
+		pageVars.FormLinks = `
+            <a href="/forgot-password">Forgot password?</a>
+            <a href="/signup">Don't have an account? Sign up</a>
+        `
 
-		// Process error messages for login
 		switch pageVars.ErrorMessage {
 		case "invalid":
 			pageVars.ErrorMessage = "Invalid email or password."
@@ -273,6 +432,13 @@ func (a *AuthService) HandleAuthPage(w http.ResponseWriter, r *http.Request) {
 		case "empty":
 			pageVars.ErrorMessage = "Please enter both email and password."
 			a.Logger.Printf("Login error shown to %s: empty fields", clientIP)
+		}
+	}
+
+	// Pass return_to parameter if present
+	if returnTo := r.FormValue("return_to"); returnTo != "" {
+		if pageVars.FormAction == "/login-submit" {
+			pageVars.FormContent += `<input type="hidden" name="return_to" value="` + returnTo + `">`
 		}
 	}
 
@@ -305,13 +471,11 @@ func (a *AuthService) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Connect to Supabase and authenticate the user
-	a.Logger.Printf("Connecting to Supabase for authentication: %s", maskedEmail)
-	supabaseClient := supabase.CreateClient(a.SupabaseURL, a.SupabaseKey)
 	ctx := context.Background()
 
 	// Use the Supabase client to authenticate with email/password
 	startTime := time.Now()
-	authResponse, err := supabaseClient.Auth.SignIn(ctx, supabase.UserCredentials{
+	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
 		Email:    email,
 		Password: password,
 	})
@@ -333,8 +497,7 @@ func (a *AuthService) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		maskedEmail, clientIP, authDuration, tokenLength, refreshTokenLength)
 
 	// Get user data from the token
-	a.Logger.Printf("Getting user data from token for %s", maskedEmail)
-	userData, err := getUserIds(jwtToken)
+	userData, err := a.JWT.GetUserData(jwtToken)
 	if err != nil {
 		a.Logger.Printf("Failed to get user data for %s: %v", maskedEmail, err)
 		http.Redirect(w, r, "/login?errmsg=invalid", http.StatusSeeOther)
@@ -342,8 +505,7 @@ func (a *AuthService) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user tier from token or set default
-	a.Logger.Printf("Getting user tier for %s", maskedEmail)
-	tierTitle, err := getUserTier(jwtToken)
+	tierTitle, err := a.JWT.GetUserTier(jwtToken)
 	if err != nil {
 		// If tier not found in token, set a default tier
 		tierTitle = "free"
@@ -435,52 +597,24 @@ func (a *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check password strength
-	passwordStrength := checkPasswordStrength(password)
-	a.Logger.Printf("Password strength for %s: %s", maskedEmail, passwordStrength)
-
-	if len(password) < 8 {
-		a.Logger.Printf("Signup validation failed for %s from %s: password too short", maskedEmail, clientIP)
+	if !isPasswordStrong(password) {
+		a.Logger.Printf("Signup validation failed for %s from %s: password not strong enough", maskedEmail, clientIP)
 		http.Redirect(w, r, "/signup?errmsg=weak_password", http.StatusSeeOther)
 		return
 	}
 
-	// Connect to Supabase
-	a.Logger.Printf("Connecting to Supabase for signup: %s", maskedEmail)
-	a.Logger.Printf("Supabase URL being used: %s", maskURL(a.SupabaseURL))
-	a.Logger.Printf("API key length: %d characters", len(a.SupabaseKey))
-
-	// Create a raw HTTP request to test connectivity
-	testReq, err := http.NewRequest("GET", a.SupabaseURL+"/auth/v1/health", nil)
-	if err != nil {
-		a.Logger.Printf("Failed to create test request: %v", err)
-	} else {
-		testReq.Header.Set("apikey", a.SupabaseKey)
-		client := &http.Client{Timeout: 5 * time.Second}
-		testResp, testErr := client.Do(testReq)
-		if testErr != nil {
-			a.Logger.Printf("Connection test failed: %v", testErr)
-		} else {
-			a.Logger.Printf("Connection test status: %d", testResp.StatusCode)
-			testResp.Body.Close()
-		}
-	}
-
 	// Create user metadata
-	// IMPORTANT: Keep metadata structure simple to avoid JSONB parsing issues
 	userMetadata := map[string]interface{}{
 		"full_name": fullName,
 	}
 
-	// Log the exact structure being sent to Supabase
 	a.Logger.Printf("Creating user with email: %s, password length: %d, metadata: %+v",
 		maskedEmail, len(password), userMetadata)
 
-	// Try first with the supabase-go library
-	supabaseClient := supabase.CreateClient(a.SupabaseURL, a.SupabaseKey)
+	// Create user with Supabase
 	ctx := context.Background()
-
 	startTime := time.Now()
-	user, err := supabaseClient.Auth.SignUp(ctx, supabase.UserCredentials{
+	user, err := a.Supabase.Auth.SignUp(ctx, supabase.UserCredentials{
 		Email:    email,
 		Password: password,
 		Data:     userMetadata,
@@ -488,57 +622,17 @@ func (a *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	signupDuration := time.Since(startTime)
 
 	if err != nil {
-		a.Logger.Printf("Library signup failed for %s from %s: %v (took %v)",
+		a.Logger.Printf("Signup failed for %s from %s: %v (took %v)",
 			maskedEmail, clientIP, err, signupDuration)
 
-		// Try a direct HTTP request to get more details about the error
-		a.Logger.Printf("Attempting direct HTTP signup request for better diagnostics")
-
-		// Construct manual request
-		directSignupData := map[string]interface{}{
-			"email":    email,
-			"password": password,
-			"data":     userMetadata,
-		}
-
-		jsonData, jsonErr := json.Marshal(directSignupData)
-		if jsonErr != nil {
-			a.Logger.Printf("JSON marshaling error: %v", jsonErr)
-		} else {
-			directReq, reqErr := http.NewRequest("POST", a.SupabaseURL+"/auth/v1/signup", bytes.NewBuffer(jsonData))
-			if reqErr != nil {
-				a.Logger.Printf("Failed to create direct request: %v", reqErr)
-			} else {
-				directReq.Header.Set("apikey", a.SupabaseKey)
-				directReq.Header.Set("Content-Type", "application/json")
-
-				directClient := &http.Client{Timeout: 10 * time.Second}
-				directResp, directErr := directClient.Do(directReq)
-
-				if directErr != nil {
-					a.Logger.Printf("Direct request failed: %v", directErr)
-				} else {
-					body, _ := io.ReadAll(directResp.Body)
-					a.Logger.Printf("Direct signup response status: %d, body: %s",
-						directResp.StatusCode, string(body))
-					directResp.Body.Close()
-				}
-			}
-		}
-
-		// Check for common errors and redirect appropriately
+		// Handle common errors
 		errMsg := err.Error()
-		a.Logger.Printf("Detailed error message: %s", errMsg)
-
 		if strings.Contains(strings.ToLower(errMsg), "already") ||
 			strings.Contains(strings.ToLower(errMsg), "taken") {
-			a.Logger.Printf("Email already taken: %s", maskedEmail)
 			http.Redirect(w, r, "/signup?errmsg=email_taken", http.StatusSeeOther)
 		} else if strings.Contains(strings.ToLower(errMsg), "database") {
-			a.Logger.Printf("Database error: %v", err)
 			http.Redirect(w, r, "/signup?errmsg=database_error", http.StatusSeeOther)
 		} else {
-			a.Logger.Printf("General signup error: %v", err)
 			http.Redirect(w, r, "/signup?errmsg=signup_failed", http.StatusSeeOther)
 		}
 		return
@@ -553,7 +647,7 @@ func (a *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 
 		// Auto-login the user after signup
 		startLoginTime := time.Now()
-		authResponse, err := supabaseClient.Auth.SignIn(ctx, supabase.UserCredentials{
+		authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
 			Email:    email,
 			Password: password,
 		})
@@ -567,7 +661,7 @@ func (a *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 			refreshToken := authResponse.RefreshToken
 
 			// Get user data
-			userData, err := getUserIds(jwtToken)
+			userData, err := a.JWT.GetUserData(jwtToken)
 			if err != nil {
 				a.Logger.Printf("Error getting user data during auto-login: %v", err)
 			}
@@ -607,20 +701,36 @@ func (a *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 
 // HandleForgotPassword renders the forgot password page
 func (a *AuthService) HandleForgotPassword(w http.ResponseWriter, r *http.Request) {
-	errmsg := r.FormValue("errmsg")
-	message := ""
+	clientIP := getClientIP(r)
+	a.Logger.Printf("Forgot password page request from %s", clientIP)
 
+	pageVars := genPageNav("Forgot Password - MTGBAN", "")
+	pageVars.ShowForm = true
+	pageVars.FormTitle = "Reset Your Password"
+	pageVars.FormInstructions = "Enter your email address and we'll send you instructions to reset your password."
+	pageVars.FormAction = "/forgot-password-submit"
+	pageVars.FormContent = `
+		<div class="form-group">
+			<label for="email">Email:</label>
+			<input type="email" id="email" name="email" required>
+		</div>
+	`
+	pageVars.SubmitButtonText = "Send Reset Instructions"
+	pageVars.FormLinks = `<a href="/login">Back to login</a>`
+
+	// Process error messages
+	errmsg := r.FormValue("errmsg")
 	switch errmsg {
 	case "empty_email":
-		message = "Please enter your email address."
+		pageVars.ErrorMessage = "Please enter your email address."
+		a.Logger.Printf("Forgot password error shown to %s: empty email", clientIP)
 	case "failed":
-		message = "Failed to process your request. Please try again later."
+		pageVars.ErrorMessage = "Failed to process your request. Please try again later."
+		a.Logger.Printf("Forgot password error shown to %s: request failed", clientIP)
 	}
 
-	pageVars := genPageNav("Forgot Password", "")
-	pageVars.ErrorMessage = message
-
-	render(w, "forgot-password.html", pageVars)
+	a.Logger.Printf("Rendering forgot password page for %s with error: %s", clientIP, errmsg)
+	render(w, "auth.html", pageVars)
 }
 
 // HandleForgotPasswordSubmit initiates the password reset process
@@ -645,13 +755,10 @@ func (a *AuthService) HandleForgotPasswordSubmit(w http.ResponseWriter, r *http.
 
 	a.Logger.Printf("Processing password reset for %s from %s", maskedEmail, clientIP)
 
-	// Connect to Supabase
-	supabaseClient := supabase.CreateClient(a.SupabaseURL, a.SupabaseKey)
-	ctx := context.Background()
-
 	// Request password recovery
+	ctx := context.Background()
 	startTime := time.Now()
-	err := supabaseClient.Auth.ResetPasswordForEmail(ctx, email, "/reset-password-sent")
+	err := a.Supabase.Auth.ResetPasswordForEmail(ctx, email, "/reset-password-sent")
 	resetDuration := time.Since(startTime)
 
 	if err != nil {
@@ -672,18 +779,40 @@ func (a *AuthService) HandleForgotPasswordSubmit(w http.ResponseWriter, r *http.
 
 // HandleResetPasswordSent renders the reset password confirmation page
 func (a *AuthService) HandleResetPasswordSent(w http.ResponseWriter, r *http.Request) {
-	pageVars := genPageNav("Reset Password", "")
-	pageVars.PageMessage = "If an account exists with that email, we've sent password reset instructions."
+	clientIP := getClientIP(r)
+	a.Logger.Printf("Reset password confirmation page request from %s", clientIP)
 
-	render(w, "reset-password-sent.html", pageVars)
+	pageVars := genPageNav("Reset Password - MTGBAN", "")
+	pageVars.ShowForm = false
+	pageVars.MessageTitle = "Check Your Email"
+	pageVars.MessageIconClass = "success"
+	pageVars.PrimaryMessage = "If an account exists with that email, we've sent password reset instructions."
+	pageVars.SecondaryMessage = "Please check your inbox and follow the instructions to reset your password. The link will expire in 24 hours."
+	pageVars.SmallMessage = "Didn't receive an email? Check your spam folder or <a href=\"/forgot-password\">try again</a>."
+	pageVars.ActionLink = "/login"
+	pageVars.ActionText = "Return to Login"
+
+	a.Logger.Printf("Rendering reset password sent page for %s", clientIP)
+	render(w, "auth.html", pageVars)
 }
 
 // HandleSignupSuccess renders the signup success page
 func (a *AuthService) HandleSignupSuccess(w http.ResponseWriter, r *http.Request) {
-	pageVars := genPageNav("Registration Successful", "")
-	pageVars.PageMessage = "Your account has been created. Please check your email to verify your account."
+	clientIP := getClientIP(r)
+	a.Logger.Printf("Signup success page request from %s", clientIP)
 
-	render(w, "signup-success.html", pageVars)
+	pageVars := genPageNav("Registration Successful - MTGBAN", "")
+	pageVars.ShowForm = false
+	pageVars.MessageTitle = "Registration Successful!"
+	pageVars.MessageIconClass = "success"
+	pageVars.PrimaryMessage = "Your account has been created. Please check your email to verify your account."
+	pageVars.SecondaryMessage = "We've sent a confirmation link to your email address. Please click the link to activate your account and gain full access to MTGBAN."
+	pageVars.SmallMessage = "Didn't receive an email? Check your spam folder or contact our support team."
+	pageVars.ActionLink = "/login"
+	pageVars.ActionText = "Go to Login"
+
+	a.Logger.Printf("Rendering signup success page for %s", clientIP)
+	render(w, "auth.html", pageVars)
 }
 
 // HandleLogout handles logging out by clearing cookies
@@ -693,7 +822,7 @@ func (a *AuthService) HandleLogout(w http.ResponseWriter, r *http.Request) {
 
 	// Clear all auth cookies
 	http.SetCookie(w, &http.Cookie{
-		Name:     "signature",
+		Name:     "MTGBAN",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
@@ -749,7 +878,7 @@ func (a *AuthService) HandleRefreshToken(w http.ResponseWriter, r *http.Request)
 	// Send request
 	a.Logger.Printf("Sending refresh token request to Supabase from %s", clientIP)
 	startTime := time.Now()
-	client := &http.Client{}
+	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	refreshDuration := time.Since(startTime)
 
@@ -762,8 +891,9 @@ func (a *AuthService) HandleRefreshToken(w http.ResponseWriter, r *http.Request)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		a.Logger.Printf("Token refresh failed from %s with status %d (took %v)",
-			clientIP, resp.StatusCode, refreshDuration)
+		body, _ := io.ReadAll(resp.Body)
+		a.Logger.Printf("Token refresh failed from %s with status %d: %s (took %v)",
+			clientIP, resp.StatusCode, string(body), refreshDuration)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
@@ -795,7 +925,7 @@ func (a *AuthService) HandleRefreshToken(w http.ResponseWriter, r *http.Request)
 		clientIP, tokenLength, newRefreshTokenLength)
 
 	// Update user session with new tokens
-	userData, err := getUserIds(accessToken)
+	userData, err := a.JWT.GetUserData(accessToken)
 	if err != nil {
 		a.Logger.Printf("Failed to extract user data from refreshed token for %s: %v", clientIP, err)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -804,7 +934,7 @@ func (a *AuthService) HandleRefreshToken(w http.ResponseWriter, r *http.Request)
 
 	a.Logger.Printf("User data extracted from refreshed token for %s", clientIP)
 
-	tierTitle, err := getUserTier(accessToken)
+	tierTitle, err := a.JWT.GetUserTier(accessToken)
 	if err != nil || tierTitle == "" {
 		tierTitle = "free"
 		a.Logger.Printf("No tier found in refreshed token for %s, defaulting to 'free'", clientIP)
@@ -831,9 +961,76 @@ func (a *AuthService) HandleRefreshToken(w http.ResponseWriter, r *http.Request)
 	a.Logger.Printf("Updated refresh token cookie for %s", clientIP)
 
 	// Redirect to the original request URL or home
-	originalURL := r.URL.String()
-	a.Logger.Printf("Redirecting %s to original URL after token refresh: %s", clientIP, originalURL)
+	originalURL := r.URL.Query().Get("redirect_to")
+	if originalURL == "" {
+		originalURL = "/home"
+	}
+	a.Logger.Printf("Redirecting %s to %s after token refresh", clientIP, originalURL)
 	http.Redirect(w, r, originalURL, http.StatusSeeOther)
+}
+
+// HandleCallback handles the OAuth callback after user authenticates with Supabase
+func (a *AuthService) HandleCallback(w http.ResponseWriter, r *http.Request) {
+	clientIP := getClientIP(r)
+	a.Logger.Printf("Auth callback request from %s", clientIP)
+
+	baseURL := getBaseURL(r)
+	code := r.FormValue("code")
+	if code == "" {
+		a.Logger.Printf("No auth code found in callback from %s", clientIP)
+		http.Redirect(w, r, baseURL, http.StatusFound)
+		return
+	}
+
+	// Exchange code for token
+	a.Logger.Printf("Exchanging auth code for token from %s", clientIP)
+	startTime := time.Now()
+	jwt, err := getUserToken(code, baseURL, r.FormValue("state"))
+	tokenDuration := time.Since(startTime)
+
+	if err != nil {
+		a.Logger.Printf("Failed to get user token from %s: %v (took %v)",
+			clientIP, err, tokenDuration)
+		http.Redirect(w, r, baseURL+"?errmsg=TokenNotFound", http.StatusFound)
+		return
+	}
+	a.Logger.Printf("Successfully exchanged auth code for token from %s (took %v)",
+		clientIP, tokenDuration)
+
+	// Get user data from token
+	userData, err := a.JWT.GetUserData(jwt)
+	if err != nil {
+		a.Logger.Printf("Failed to get user data from token for %s: %v", clientIP, err)
+		http.Redirect(w, r, baseURL+"?errmsg=UserNotFound", http.StatusFound)
+		return
+	}
+
+	maskedEmail := maskEmail(userData.Email)
+	a.Logger.Printf("Got user data for %s: %s", clientIP, maskedEmail)
+
+	// Get user tier from token
+	tierTitle, err := a.JWT.GetUserTier(jwt)
+	if err != nil {
+		a.Logger.Printf("Failed to get user tier from token for %s: %v", clientIP, err)
+		tierTitle = "free" // Default to free tier
+	}
+	a.Logger.Printf("User tier for %s: %s", maskedEmail, tierTitle)
+
+	// Sign our base URL with our tier and other data
+	sig := sign(baseURL, tierTitle, userData)
+
+	// Set cookies
+	putSignatureInCookies(w, r, sig)
+	a.Logger.Printf("Set signature cookie for %s", maskedEmail)
+
+	// Redirect to the URL indicated in this query param, or go to homepage
+	redir := r.FormValue("state")
+	if redir == "" {
+		redir = getBaseURL(r)
+	}
+
+	a.Logger.Printf("Redirecting %s to %s after successful authentication", maskedEmail, redir)
+	http.Redirect(w, r, redir, http.StatusFound)
 }
 
 // WrapAuthMiddleware wraps a handler with authentication middleware
@@ -845,7 +1042,7 @@ func (a *AuthService) WrapAuthMiddleware(handler http.HandlerFunc) http.HandlerF
 		a.Logger.Printf("Auth check for %s accessing %s", clientIP, path)
 
 		// Check if user is authenticated
-		_, err := r.Cookie("signature")
+		_, err := r.Cookie("MTGBAN")
 		if err != nil {
 			a.Logger.Printf("No signature cookie found for %s accessing %s", clientIP, path)
 
@@ -855,13 +1052,18 @@ func (a *AuthService) WrapAuthMiddleware(handler http.HandlerFunc) http.HandlerF
 				refreshTokenLength := len(refreshCookie.Value)
 				a.Logger.Printf("Found refresh token for %s (length=%d), attempting refresh",
 					clientIP, refreshTokenLength)
-				a.HandleRefreshToken(w, r)
+
+				// Add the current URL as a redirect target after refresh
+				q := r.URL.Query()
+				q.Set("redirect_to", r.URL.Path)
+				refreshURL := "/refresh-token?" + q.Encode()
+
+				http.Redirect(w, r, refreshURL, http.StatusSeeOther)
 				return
 			}
 
 			a.Logger.Printf("No refresh token found for %s, redirecting to login", clientIP)
 
-			// If we can't refresh, redirect to login
 			redirectURL := "/login"
 			if r.URL.Path != "/" && r.URL.Path != "/login" && r.URL.Path != "/signup" {
 				redirectURL = "/login?return_to=" + r.URL.Path
@@ -879,138 +1081,8 @@ func (a *AuthService) WrapAuthMiddleware(handler http.HandlerFunc) http.HandlerF
 	}
 }
 
-// getUseroken exchanges the authorization code for a JWT token
-func getUserToken(code, baseURL, ref string) (string, error) {
-	supabaseClient := supabase.CreateClient(SupabaseUrl, SupabaseAnonKey)
-
-	ctx := context.Background()
-	resp, err := supabaseClient.Auth.ExchangeCode(ctx, supabase.ExchangeCodeOpts{
-		AuthCode: code,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	jwt := resp.AccessToken
-	if jwt == "" {
-		return "", errors.New("no jwt in response")
-	}
-
-	return jwt, nil
-}
-
-// getUserIds returns the user ID and email from the JWT token
-func getUserIds(jwtToken string) (*MtgbanUserData, error) {
-	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-		return []byte(SupabaseAnonKey), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		return nil, errors.New("invalid JWT token")
-	}
-
-	userData := &MtgbanUserData{
-		UserId: claims["sub"].(string),
-		Email:  strings.ToLower(claims["email"].(string)),
-	}
-	return userData, nil
-}
-
-// getUserTier returns the user tier from the JWT token
-func getUserTier(jwtToken string) (string, error) {
-	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-		return []byte(SupabaseAnonKey), nil
-	})
-	if err != nil {
-		return "", err
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		return "", errors.New("invalid JWT token")
-	}
-
-	tierTitle, ok := claims["tier"].(string)
-	if !ok {
-		return "", errors.New("no tier in webtoken")
-	}
-	return tierTitle, nil
-}
-
-// getBaseURL returns the base URL of the request
-func getBaseURL(r *http.Request) string {
-	host := r.Host
-	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
-		host = DefaultHost
-	}
-	baseURL := "http://" + host
-	if r.TLS != nil {
-		baseURL = strings.Replace(baseURL, "http", "https", 1)
-	}
-	return baseURL
-}
-
-// signHMACSHA1Base64 signs the data with the key using HMAC SHA1 and returns the base64 encoded string
-func signHMACSHA1Base64(key []byte, data []byte) string {
-	h := hmac.New(sha1.New, key)
-	h.Write(data)
-	return base64.StdEncoding.EncodeToString(h.Sum(nil))
-}
-
-// getSignatureFromCookies returns the signature from the cookies
-func getSignatureFromCookies(r *http.Request) string {
-	var sig string
-	for _, cookie := range r.Cookies() {
-		if cookie.Name == "MTGBAN" {
-			sig = cookie.Value
-			break
-		}
-	}
-
-	querySig := r.FormValue("sig")
-	if sig == "" && querySig != "" {
-		sig = querySig
-	}
-
-	exp := GetParamFromSig(sig, "Expires")
-	if exp == "" {
-		return ""
-	}
-	expires, err := strconv.ParseInt(exp, 10, 64)
-	if err != nil || expires < time.Now().Unix() {
-		return ""
-	}
-
-	return sig
-}
-
-// putSignatureInCookies sets the signature in the cookies
-func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
-	baseURL := getBaseURL(r)
-
-	year, month, _ := time.Now().Date()
-	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
-	domain := "mtgban.com"
-	if strings.Contains(baseURL, "localhost") {
-		domain = "localhost"
-	}
-	cookie := http.Cookie{
-		Name:    "MTGBAN",
-		Domain:  domain,
-		Path:    "/",
-		Expires: endOfThisMonth,
-		Value:   sig,
-	}
-
-	http.SetCookie(w, &cookie)
-}
-
-// noSigning is a middleware that does not enforce any signing
-func noSigning(next http.Handler) http.Handler {
+// NoSigning is a middleware that does not enforce any signing
+func NoSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
@@ -1027,8 +1099,8 @@ func noSigning(next http.Handler) http.Handler {
 	})
 }
 
-// enforceAPISigning is a middleware that enforces API signing
-func enforceAPISigning(next http.Handler) http.Handler {
+// EnforceAPISigning is a middleware that enforces API signing
+func (a *AuthService) EnforceAPISigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
@@ -1062,14 +1134,14 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		raw, err := base64.StdEncoding.DecodeString(sig)
 		if SigCheck && err != nil {
-			log.Println("API error, no sig", err)
+			a.Logger.Printf("API error, invalid signature: %v", err)
 			w.Write([]byte(`{"error": "invalid signature"}`))
 			return
 		}
 
 		v, err := url.ParseQuery(string(raw))
 		if SigCheck && err != nil {
-			log.Println("API error, no b64", err)
+			a.Logger.Printf("API error, invalid base64: %v", err)
 			w.Write([]byte(`{"error": "invalid b64 signature"}`))
 			return
 		}
@@ -1099,7 +1171,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		if exp != "" {
 			expires, err = strconv.ParseInt(exp, 10, 64)
 			if err != nil {
-				log.Println("API error", err.Error())
+				a.Logger.Printf("API error, invalid expires: %v", err)
 				w.Write([]byte(`{"error": "invalid or expired signature"}`))
 				return
 			}
@@ -1107,10 +1179,10 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		}
 
 		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
-		valid := signHMACSHA1Base64([]byte(secret), []byte(data))
+		valid := signHMACSHA256Base64([]byte(secret), []byte(data))
 
 		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
-			log.Println("API error, invalid", data)
+			a.Logger.Printf("API error, invalid signature or expired")
 			w.Write([]byte(`{"error": "invalid or expired signature"}`))
 			return
 		}
@@ -1119,8 +1191,8 @@ func enforceAPISigning(next http.Handler) http.Handler {
 	})
 }
 
-// enforceSigning is a middleware that enforces signing
-func enforceSigning(next http.Handler) http.Handler {
+// EnforceSigning is a middleware that enforces signing
+func EnforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
@@ -1198,7 +1270,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		exp := v.Get("Expires")
 
 		data := fmt.Sprintf("GET%s%s%s", exp, getBaseURL(r), q.Encode())
-		valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+		valid := signHMACSHA256Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 		expires, err := strconv.ParseInt(exp, 10, 64)
 		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
 			if r.Method != "GET" {
@@ -1266,33 +1338,108 @@ func enforceSigning(next http.Handler) http.Handler {
 	})
 }
 
-// recoverPanic recovers from a panic and sends an error response
-func recoverPanic(r *http.Request, w http.ResponseWriter) {
-	errPanic := recover()
-	if errPanic != nil {
-		log.Println("panic occurred:", errPanic)
+// Generate a random string for unique test emails
+func generateRandomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	result := make([]byte, length)
 
-		// Restrict stack size to fit into discord message
-		buf := make([]byte, 1<<16)
-		runtime.Stack(buf, true)
-		if len(buf) > 1024 {
-			buf = buf[:1024]
-		}
-
-		var msg string
-		err, ok := errPanic.(error)
-		if ok {
-			msg = err.Error()
-		} else {
-			msg = "unknown error"
-		}
-		ServerNotify("panic", msg, true)
-		ServerNotify("panic", string(buf))
-		ServerNotify("panic", "source request: "+r.URL.String())
-
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
-		return
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := range result {
+		result[i] = charset[r.Intn(len(charset))]
 	}
+
+	return string(result)
+}
+
+// getUserToken exchanges the authorization code for a JWT token
+func getUserToken(code, baseURL, ref string) (string, error) {
+	supabaseClient := supabase.CreateClient(SupabaseUrl, SupabaseAnonKey)
+
+	ctx := context.Background()
+	resp, err := supabaseClient.Auth.ExchangeCode(ctx, supabase.ExchangeCodeOpts{
+		AuthCode: code,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	jwt := resp.AccessToken
+	if jwt == "" {
+		return "", errors.New("no jwt in response")
+	}
+
+	return jwt, nil
+}
+
+// getBaseURL returns the base URL of the request
+func getBaseURL(r *http.Request) string {
+	host := r.Host
+	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
+		host = DefaultHost
+	}
+	baseURL := "http://" + host
+	if r.TLS != nil {
+		baseURL = strings.Replace(baseURL, "http", "https", 1)
+	}
+	return baseURL
+}
+
+// signHMACSHA256Base64 signs the data with the key using HMAC SHA256 and returns the base64 encoded string
+func signHMACSHA256Base64(key []byte, data []byte) string {
+	h := hmac.New(sha256.New, key)
+	h.Write(data)
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+// getSignatureFromCookies returns the signature from the cookies
+func getSignatureFromCookies(r *http.Request) string {
+	var sig string
+	for _, cookie := range r.Cookies() {
+		if cookie.Name == "MTGBAN" {
+			sig = cookie.Value
+			break
+		}
+	}
+
+	querySig := r.FormValue("sig")
+	if sig == "" && querySig != "" {
+		sig = querySig
+	}
+
+	exp := GetParamFromSig(sig, "Expires")
+	if exp == "" {
+		return ""
+	}
+	expires, err := strconv.ParseInt(exp, 10, 64)
+	if err != nil || expires < time.Now().Unix() {
+		return ""
+	}
+
+	return sig
+}
+
+// putSignatureInCookies sets the signature in the cookies
+func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
+	baseURL := getBaseURL(r)
+
+	year, month, _ := time.Now().Date()
+	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
+	domain := "mtgban.com"
+	if strings.Contains(baseURL, "localhost") {
+		domain = "localhost"
+	}
+	cookie := http.Cookie{
+		Name:     "MTGBAN",
+		Domain:   domain,
+		Path:     "/",
+		Expires:  endOfThisMonth,
+		Value:    sig,
+		HttpOnly: true,                    // Added for security
+		Secure:   r.TLS != nil,            // Secure if using HTTPS
+		SameSite: http.SameSiteStrictMode, // Added for security
+	}
+
+	http.SetCookie(w, &cookie)
 }
 
 // getValuesForTier is used to generate the query parameters for signing
@@ -1331,7 +1478,7 @@ func sign(link string, tierTitle string, userData *MtgbanUserData) string {
 	expires := time.Now().Add(DefaultSignatureDuration)
 	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
 	key := os.Getenv("BAN_SECRET")
-	sig := signHMACSHA1Base64([]byte(key), []byte(data))
+	sig := signHMACSHA256Base64([]byte(key), []byte(data))
 
 	v.Set("Expires", fmt.Sprintf("%d", expires.Unix()))
 	v.Set("Signature", sig)
@@ -1353,51 +1500,66 @@ func GetParamFromSig(sig, param string) string {
 	return v.Get(param)
 }
 
-// Auth handles the authentication process
-func Auth(w http.ResponseWriter, r *http.Request) {
-	baseURL := getBaseURL(r)
-	code := r.FormValue("code")
-	if code == "" {
-		http.Redirect(w, r, baseURL, http.StatusFound)
+// isPasswordStrong checks if a password is strong enough
+func isPasswordStrong(password string) bool {
+	if len(password) < 8 {
+		return false
+	}
+
+	hasLetter := false
+	hasDigit := false
+	hasSpecial := false
+
+	for _, c := range password {
+		switch {
+		case unicode.IsLetter(c):
+			hasLetter = true
+		case unicode.IsDigit(c):
+			hasDigit = true
+		case unicode.IsPunct(c) || unicode.IsSymbol(c):
+			hasSpecial = true
+		}
+	}
+
+	return (hasLetter && hasDigit) || (hasLetter && hasSpecial) || (hasDigit && hasSpecial)
+}
+
+// recoverPanic recovers from a panic and sends an error response
+func recoverPanic(r *http.Request, w http.ResponseWriter) {
+	errPanic := recover()
+	if errPanic != nil {
+		log.Println("panic occurred:", errPanic)
+
+		// Restrict stack size to fit into discord message
+		buf := make([]byte, 1<<16)
+		runtime.Stack(buf, true)
+		if len(buf) > 1024 {
+			buf = buf[:1024]
+		}
+
+		var msg string
+		err, ok := errPanic.(error)
+		if ok {
+			msg = err.Error()
+		} else {
+			msg = "unknown error"
+		}
+
+		// Log the error
+		log.Printf("PANIC: %s\nStack trace: %s\nRequest: %s",
+			msg, string(buf), r.URL.String())
+
+		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+}
 
-	jwt, err := getUserToken(code, baseURL, r.FormValue("state"))
-	if err != nil {
-		LogPages["Admin"].Println("getUserToken", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=TokenNotFound", http.StatusFound)
-		return
+// contains checks if a string slice contains a specific string
+func contains(slice []string, str string) bool {
+	for _, item := range slice {
+		if item == str {
+			return true
+		}
 	}
-
-	userData, err := getUserIds(jwt)
-	if err != nil {
-		LogPages["Admin"].Println("getUserId", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=UserNotFound", http.StatusFound)
-		return
-	}
-
-	tierTitle, err := getUserTier(jwt)
-	if err != nil {
-		LogPages["Admin"].Println("getUserTier", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=TierNotFound", http.StatusFound)
-		return
-	}
-
-	LogPages["Admin"].Println(userData)
-	LogPages["Admin"].Println(tierTitle)
-
-	// Sign our base URL with our tier and other data
-	sig := sign(baseURL, tierTitle, userData)
-
-	// Keep it secret. Keep it safe.
-	putSignatureInCookies(w, r, sig)
-
-	// Redirect to the URL indicated in this query param, or go to homepage
-	redir := r.FormValue("state")
-	if redir == "" {
-		redir = getBaseURL(r)
-	}
-
-	// Redirect, we're done here
-	http.Redirect(w, r, redir, http.StatusFound)
+	return false
 }
