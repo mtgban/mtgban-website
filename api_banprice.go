@@ -814,7 +814,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 	sort.Strings(allScrapers)
 	sort.Strings(allScraperNames)
 
-	header := []string{"UUID", "Card Name", "Set Code", "Number", "Finish"}
+	header := []string{"Scryfall ID", "Card Name", "Set Code", "Number", "Finish"}
 	header = append(header, allScraperNames...)
 	header = append(header, "Loaded Price", "Loaded Condition", "Loaded Quantity", "Notes")
 	err := w.Write(header)
@@ -841,6 +841,11 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 		cardName = co.Name
 		code = co.SetCode
 		number = co.Number
+
+		scryfallID, found := co.Identifiers["scryfallId"]
+		if found {
+			id = scryfallID
+		}
 
 		prices := make([]string, len(allScrapers))
 
