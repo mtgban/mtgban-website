@@ -1445,23 +1445,32 @@ func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 // getValuesForTier is used to generate the query parameters for signing
 func getValuesForTier(tierTitle string) url.Values {
 	v := url.Values{}
-	tier, found := Config.ACL[tierTitle]
+
+	featuresForTier, found := Config.ACL.Tiers[tierTitle]
 	if !found {
 		return v
 	}
+
 	for _, page := range OrderNav {
-		options, found := tier[page]
-		if !found {
+		pageEnabled := contains(featuresForTier, page)
+		if !pageEnabled {
 			continue
 		}
+
 		v.Set(page, "true")
 
-		for _, key := range OptionalFields {
-			val, found := options[key]
-			if !found {
+		if featureOptions, ok := Config.ACL.Features[page]; ok {
+			options, ok := featureOptions.(map[string]interface{})
+			if !ok {
 				continue
 			}
-			v.Set(key, val)
+
+			for _, key := range OptionalFields {
+				if val, found := options[key]; found {
+					strVal := fmt.Sprint(val)
+					v.Set(key, strVal)
+				}
+			}
 		}
 	}
 	return v

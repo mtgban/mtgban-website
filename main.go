@@ -346,6 +346,9 @@ func init() {
 
 var Config ConfigType
 
+type FeatureMap map[string]interface{}
+type TierMap map[string][]string
+type RoleMap map[string][]string
 type ConfigType struct {
 	Port                   string            `json:"port"`
 	DatastorePath          string            `json:"datastore_path"`
@@ -370,18 +373,22 @@ type ConfigType struct {
 	GlobalAllowList        []string          `json:"global_allow_list"`
 	GlobalProbeList        []string          `json:"global_probe_list"`
 	Supabase               struct {
-		SupabaseTokenSecret map[string]string `json:"secret"`
-		Grants              []struct {
-			Id   string `json:"id"`
-			Role string `json:"role"`
-			Tier string `json:"tier"`
-		} `json:"grants"`
-	} `json:"supabase"`
+		Secret map[string]string `json:"secret"`
+		Grants []string          `json:"grants"`
+	}
 	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
 	GoogleCredentials string            `json:"google_credentials"`
-
-	ACL map[string]map[string]map[string]string `json:"acl"`
-
+	ACL               struct {
+		Roles    RoleMap    `json:"roles"`
+		Tiers    TierMap    `json:"tiers"`
+		Features FeatureMap `json:"features"`
+	} `json:"acl"`
+	DB struct {
+		SupabaseURL       string `json:"supabase_url"`
+		SupabaseJWTSecret string `json:"supabase_jwt_secret"`
+		SupabaseAnonKey   string `json:"supabase_anon_key"`
+		RoleKey           string `json:"role_key"`
+	} `json:"db"`
 	Uploader struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
@@ -766,7 +773,7 @@ func main() {
 			LogPages[key] = log.New(logFile, "", log.LstdFlags)
 		}
 
-		_, ExtraNavs[key].NoAuth = Config.ACL["Any"][key]
+		_, ExtraNavs[key].NoAuth = Config.ACL.Tiers[nav.Name]
 
 		// Set up the handler
 		handler := EnforceSigning(http.HandlerFunc(nav.Handle))

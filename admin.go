@@ -327,7 +327,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			"", "#", "Category", "Email", "Name", "Tier",
 		}
 
-		for i, person := range Config.Supabase.Grants {
+		for i, person := range Config.ApiUserSecrets {
 			row := []string{
 				fmt.Sprintf("%d", i+1),
 				person.Role,
@@ -488,7 +488,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tiers []string
-	for tierName := range Config.ACL {
+	for tierName := range Config.ACL.Tiers {
 		tiers = append(tiers, tierName)
 	}
 	sort.Slice(tiers, func(i, j int) bool {
