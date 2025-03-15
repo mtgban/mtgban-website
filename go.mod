@@ -1,6 +1,8 @@
 module github.com/mtgban/mtgban-website
 
-go 1.19
+go 1.23.0
+
+toolchain go1.24.0
 
 require (
 	cloud.google.com/go/bigquery v1.56.0
@@ -16,12 +18,12 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/mackerelio/go-osstat v0.2.4
-	github.com/mtgban/go-mtgban v0.5.7
+	github.com/mtgban/go-mtgban v0.5.8
 	github.com/xuri/excelize/v2 v2.8.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/oauth2 v0.13.0
-	golang.org/x/sys v0.28.0
-	golang.org/x/time v0.6.0
+	golang.org/x/sys v0.30.0
+	golang.org/x/time v0.11.0
 	google.golang.org/api v0.147.0
 	gopkg.in/Iwark/spreadsheet.v2 v2.0.0-20230915040305-7677e8164883
 	gopkg.in/robfig/cron.v2 v2.0.0-20150107220207-be2e0b0deed5
@@ -68,7 +70,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
-	github.com/mtgban/go-tcgplayer v0.0.0-20240821150414-caace4f5b3f4 // indirect
+	github.com/mtgban/go-tcgplayer v0.0.0-20250314170048-a37ce47d0d4a // indirect
 	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/pierrec/lz4/v4 v4.1.18 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
@@ -81,11 +83,11 @@ require (
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
