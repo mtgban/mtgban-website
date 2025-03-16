@@ -179,7 +179,7 @@ func API(w http.ResponseWriter, r *http.Request) {
 
 var ErrMissingTCGId = errors.New("tcg id not found")
 
-func getLastSold(cardId string) ([]tcgplayer.LatestSalesData, error) {
+func getLastSold(cardId string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
 		return nil, err
@@ -190,17 +190,14 @@ func getLastSold(cardId string) ([]tcgplayer.LatestSalesData, error) {
 		return nil, ErrMissingTCGId
 	}
 
-	latestSales, err := tcgplayer.LatestSales(tcgId, co.Foil || co.Etched)
+	latestSales, err := tcgplayer.LatestSales(tcgId, co.Foil || co.Etched, anyLang)
 	if err != nil {
 		return nil, err
 	}
 
 	// If we got an empty response, try again with all the possible languages
-	if len(latestSales.Data) == 0 {
-		latestSales, err = tcgplayer.LatestSales(tcgId, co.Foil || co.Etched, true)
-		if err != nil {
-			return nil, err
-		}
+	if len(latestSales.Data) == 0 && !anyLang {
+		return getLastSold(cardId, true)
 	}
 
 	return latestSales.Data, nil
@@ -246,7 +243,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	var useCSV bool
 	if isLastSold {
 		UserNotify("tcgLastSold", cardId)
-		data, err = getLastSold(cardId)
+		data, err = getLastSold(cardId, false)
 	} else if isDirectQty {
 		UserNotify("tcgDirectQty", cardId)
 		data, err = getDrirectQty(cardId)
