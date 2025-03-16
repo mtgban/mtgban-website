@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,6 +23,8 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
 )
+
+var authService *AuthService
 
 var Country2flag = map[string]string{
 	"EU": "🇪🇺",
@@ -775,53 +779,6 @@ func generateTestEmail() string {
 	return "test_" + time.Now().Format("20060102150405") + "@example.com"
 }
 
-// maskURL masks sensitive parts of a URL for logging
-func maskURL(url string) string {
-	parts := strings.Split(url, "/")
-	if len(parts) > 2 {
-		parts[2] = "****"
-	}
-	return strings.Join(parts, "/")
-}
-
-// getClientIP extracts the client IP address from a request
-func getClientIP(r *http.Request) string {
-	forwarded := r.Header.Get("X-Forwarded-For")
-	if forwarded != "" {
-		ips := strings.Split(forwarded, ",")
-		return strings.TrimSpace(ips[0])
-	}
-
-	ip := r.RemoteAddr
-	if i := strings.LastIndex(ip, ":"); i != -1 {
-		ip = ip[:i]
-	}
-
-	return ip
-}
-
-// maskEmail masks an email address for logging
-func maskEmail(email string) string {
-	if email == "" {
-		return "empty_email"
-	}
-
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return "invalid_email_format"
-	}
-
-	username := parts[0]
-	domain := parts[1]
-
-	if len(username) > 1 {
-		maskedUsername := username[:1] + strings.Repeat("*", len(username)-1)
-		return maskedUsername + "@" + domain
-	}
-
-	return "*@" + domain
-}
-
 // checkPasswordStrength evaluates password strength
 func checkPasswordStrength(password string) string {
 	score := 0
@@ -874,4 +831,85 @@ func checkPasswordStrength(password string) string {
 	default:
 		return "strong"
 	}
+}
+
+// getClientIP extracts the client IP from a request
+func getClientIP(r *http.Request) string {
+	// Check for X-Forwarded-For header (common with proxies)
+	forwardedFor := r.Header.Get("X-Forwarded-For")
+	if forwardedFor != "" {
+		// The first IP in the list is the client IP
+		ips := strings.Split(forwardedFor, ",")
+		return strings.TrimSpace(ips[0])
+	}
+
+	// Check for X-Real-IP header (used by some proxies)
+	realIP := r.Header.Get("X-Real-IP")
+	if realIP != "" {
+		return realIP
+	}
+
+	// Fall back to RemoteAddr
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		// If parsing fails, return the whole RemoteAddr
+		return r.RemoteAddr
+	}
+	return ip
+}
+
+// maskEmail masks parts of an email address for logging
+func maskEmail(email string) string {
+	if email == "" {
+		return ""
+	}
+
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		// Not a valid email, just return masked version
+		if len(email) <= 3 {
+			return "***"
+		}
+		return email[:2] + "***"
+	}
+
+	username := parts[0]
+	domain := parts[1]
+
+	// Mask username
+	var maskedUsername string
+	if len(username) <= 3 {
+		maskedUsername = "***"
+	} else {
+		maskedUsername = username[:2] + "***"
+		if len(username) > 5 {
+			maskedUsername += username[len(username)-1:]
+		}
+	}
+
+	// Keep domain visible for debugging but mask subdomains
+	domainParts := strings.Split(domain, ".")
+	if len(domainParts) > 2 {
+		// For subdomains, mask them except the main domain
+		for i := 0; i < len(domainParts)-2; i++ {
+			domainParts[i] = "***"
+		}
+		domain = strings.Join(domainParts, ".")
+	}
+
+	return maskedUsername + "@" + domain
+}
+
+// maskID masks parts of an ID for logging
+func maskID(id string) string {
+	if len(id) <= 8 {
+		return "***" + id[len(id)-2:]
+	}
+	return id[:4] + "***" + id[len(id)-4:]
+}
+
+// Helper function to check if a file exists in the filesystem
+func authFileExists(fsys fs.FS, path string) bool {
+	_, err := fs.Stat(fsys, path)
+	return err == nil
 }

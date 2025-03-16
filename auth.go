@@ -1,44 +1,44 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/sha1"
+	"crypto/rand"
+	"crypto/sha256"
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+	"unicode"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/golang-jwt/jwt/v5"
 	supabase "github.com/nedpals/supabase-go"
+	"golang.org/x/time/rate"
 )
 
-var DebugMode = true
-
-var AuthHost = "localhost:19283"
+// ============================================================================================
+// Constants and Types
+// ============================================================================================
 
 const (
 	DefaultHost              = "www.mtgban.com"
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
 
-const (
-	SupabaseUrl     = "https://cnqdgapyhionjgvzpasv.supabase.co"
-	SupabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNucWRnYXB5aGlvbmpndnpwYXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgyNzc4MjcsImV4cCI6MjA1Mzg1MzgyN30.YvJogdMuXMPE4_VzhoX5u-nsBhI-ydkDyNAV2KFNjOE"
-)
-
+// Error messages used throughout the application
 const (
 	ErrMsg        = "Join the BAN Community and gain access to exclusive tools!"
 	ErrMsgPlus    = "Increase your pledge to gain access to this feature!"
@@ -48,358 +48,1055 @@ const (
 	ErrMsgUseAPI  = "Slow down, you're making too many requests! For heavy data use consider the BAN API"
 )
 
+//go:embed all:nextAuth/out
+var authAssets embed.FS
+
+// AuthError represents a standardized authentication error
+type AuthError struct {
+	Code       string
+	Message    string
+	StatusCode int
+	Internal   error
+}
+
+// Error returns the string representation of the error
+func (e AuthError) Error() string {
+	if e.Internal != nil {
+		return fmt.Sprintf("%s: %v", e.Message, e.Internal)
+	}
+	return e.Message
+}
+
+// Common authentication errors
+var (
+	ErrInvalidCredentials = AuthError{
+		Code:       "INVALID_CREDENTIALS",
+		Message:    "Invalid email or password",
+		StatusCode: http.StatusUnauthorized,
+	}
+
+	ErrSessionExpired = AuthError{
+		Code:       "SESSION_EXPIRED",
+		Message:    "Your session has expired. Please log in again.",
+		StatusCode: http.StatusUnauthorized,
+	}
+
+	ErrEmailTaken = AuthError{
+		Code:       "EMAIL_TAKEN",
+		Message:    "Email address is already in use",
+		StatusCode: http.StatusBadRequest,
+	}
+
+	ErrWeakPassword = AuthError{
+		Code:       "WEAK_PASSWORD",
+		Message:    "Password does not meet strength requirements",
+		StatusCode: http.StatusBadRequest,
+	}
+
+	ErrCSRFValidation = AuthError{
+		Code:       "INVALID_CSRF_TOKEN",
+		Message:    "Invalid security token",
+		StatusCode: http.StatusForbidden,
+	}
+
+	ErrRateLimitExceeded = AuthError{
+		Code:       "RATE_LIMIT_EXCEEDED",
+		Message:    "Too many requests. Please try again later.",
+		StatusCode: http.StatusTooManyRequests,
+	}
+
+	ErrMissingToken = AuthError{
+		Code:       "MISSING_TOKEN",
+		Message:    "Authentication required",
+		StatusCode: http.StatusUnauthorized,
+	}
+
+	ErrInvalidToken = AuthError{
+		Code:       "INVALID_TOKEN",
+		Message:    "Invalid authentication token",
+		StatusCode: http.StatusUnauthorized,
+	}
+
+	ErrServerError = AuthError{
+		Code:       "SERVER_ERROR",
+		Message:    "An unexpected error occurred",
+		StatusCode: http.StatusInternalServerError,
+	}
+)
+
+// APIResponse represents a standardized API response
+type APIResponse struct {
+	Success    bool        `json:"success"`
+	Message    string      `json:"message,omitempty"`
+	Error      string      `json:"error,omitempty"`
+	Code       string      `json:"code,omitempty"`
+	Data       interface{} `json:"data,omitempty"`
+	RedirectTo string      `json:"redirectTo,omitempty"`
+}
+
 // AuthService handles all authentication related functionality
 type AuthService struct {
-	Logger      *log.Logger
-	Supabase    *supabase.Client
-	SupabaseURL string
-	SupabaseKey string
-	DebugMode   bool
-	BaseAuthURL string
+	Logger         *log.Logger
+	Supabase       *supabase.Client
+	SupabaseURL    string
+	SupabaseKey    string
+	SupabaseSecret string
+	DebugMode      bool
+	BaseAuthURL    string
+	CSRFSecret     []byte
+	AuthConfig     AuthConfig
+
+	// Rate limiters
+	LoginLimiter    *rate.Limiter
+	SignupLimiter   *rate.Limiter
+	ResetPwdLimiter *rate.Limiter
+	IPLimiters      sync.Map // map[string]*rate.Limiter
 }
 
-// Config holds the configuration for the authentication service
+// AuthConfig holds the configuration for the authentication service
 type AuthConfig struct {
-	SupabaseURL     string `json:"supabase_url"`
-	SupabaseAnonKey string `json:"supabase_anon_key"`
-	SupabaseSecret  string `json:"supabase_jwt_secret"`
-	DebugMode       bool   `json:"debug_mode"`
-	LogPrefix       string `json:"log_prefix"`
+	SupabaseURL     string   `json:"supabase_url"`
+	SupabaseAnonKey string   `json:"supabase_anon_key"`
+	SupabaseSecret  string   `json:"supabase_jwt_secret"`
+	DebugMode       bool     `json:"debug_mode"`
+	LogPrefix       string   `json:"log_prefix"`
+	ExemptRoutes    []string `json:"exempt_routes"`
+	ExemptPrefixes  []string `json:"exempt_prefixes"`
+	ExemptSuffixes  []string `json:"exempt_suffixes"`
 }
 
-// MtgbanUserData holds user data for MTGBAN users
-type MtgbanUserData struct {
+// UserData holds user data for MTGBAN users
+type UserData struct {
 	UserId string
 	Email  string
+	Tier   string
 }
 
-// Initialize auth service from configuration file
-func InitAuth(configFile string) (*AuthService, error) {
-	// Set default config
-	config := AuthConfig{
-		SupabaseURL:     SupabaseUrl,
-		SupabaseAnonKey: SupabaseAnonKey,
-		DebugMode:       DebugMode,
-		LogPrefix:       "[AUTH] ",
-	}
-
-	// Try to load from config file if provided
-	if configFile != "" {
-		file, err := os.Open(configFile)
-		if err == nil {
-			defer file.Close()
-			if err := json.NewDecoder(file).Decode(&config); err != nil {
-				return nil, fmt.Errorf("failed to parse config file: %w", err)
-			}
-		} else if !os.IsNotExist(err) && !DevMode {
-			return nil, fmt.Errorf("failed to open config file: %w", err)
-		}
-	}
-	// Create a new Supabase client
-	log.Printf("Creating Supabase client with URL: %s", config.SupabaseURL)
-	supabase := supabase.CreateClient(config.SupabaseURL, config.SupabaseAnonKey)
-	if supabase != nil {
-		log.Printf("Supabase client created successfully")
-	} else {
-		return nil, fmt.Errorf("failed to create Supabase client")
-	}
-	// Create the service
-	service := &AuthService{
-		Logger:      log.New(os.Stdout, config.LogPrefix, log.Ldate|log.Ltime|log.Lshortfile),
-		Supabase:    supabase,
-		DebugMode:   config.DebugMode,
-		BaseAuthURL: config.SupabaseURL + "/auth/v1",
-	}
-
-	// Initialize the service
-	service.Logger.Printf("Initializing authentication service")
-	service.Logger.Printf("Supabase URL: %s", config.SupabaseURL)
-
-	// Run full authentication flow test in debug mode
-	if service.DebugMode {
-		service.Logger.Printf("Running comprehensive authentication flow test")
-
-		// Run a complete authentication flow test
-		if err := service.testFullAuthFlow(); err != nil {
-			service.Logger.Printf("Authentication flow test failed: %v", err)
-			return nil, fmt.Errorf("authentication flow test failed: %w", err)
-		}
-		service.Logger.Printf("Authentication flow test completed successfully")
-	}
-
-	service.registerRoutes()
-	service.Logger.Printf("Authentication service initialized successfully")
-
-	return service, nil
+// LoginRequest represents a login request payload
+type LoginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Remember bool   `json:"remember"`
 }
 
-// Test full authentication flow: connection, account creation, and login
-func (a *AuthService) testFullAuthFlow() error {
-	// Step 1: Test basic connection
-	a.Logger.Printf("Testing connection to Supabase...")
+// SignupRequest represents a signup request payload
+type SignupRequest struct {
+	Email    string                 `json:"email"`
+	Password string                 `json:"password"`
+	UserData map[string]interface{} `json:"userData"`
+}
 
-	// Test DB connection with a simple query
-	var testName []interface{}
-	err := a.Supabase.DB.From("testing").Select("name").Limit(1).Execute(&testName)
-	if err != nil {
-		a.Logger.Printf("DB connection test: %v", err)
-		// Even if this fails (table might not exist), we continue to auth tests
-	} else {
-		a.Logger.Printf("DB connection successful")
+// PasswordResetRequest represents a password reset request payload
+type PasswordResetRequest struct {
+	Email string `json:"email"`
+}
+
+// PasswordUpdateRequest represents a password update request payload
+type PasswordUpdateRequest struct {
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
+// AuthRoute represents a route with its handler and middleware
+type AuthRoute struct {
+	Path        string
+	Method      string
+	Handler     http.HandlerFunc
+	Middlewares MiddlewareChain
+	Description string
+}
+
+// MiddlewareChain is a chain of middleware functions
+type MiddlewareChain []func(http.HandlerFunc) http.HandlerFunc
+
+// Then applies the middleware chain to a handler
+func (c MiddlewareChain) Then(h http.HandlerFunc) http.HandlerFunc {
+	for i := len(c) - 1; i >= 0; i-- {
+		h = c[i](h)
+	}
+	return h
+}
+
+// Append adds more middleware to the chain
+func (c MiddlewareChain) Append(m ...func(http.HandlerFunc) http.HandlerFunc) MiddlewareChain {
+	return append(c, m...)
+}
+
+// ============================================================================================
+// AuthService Initialization
+// ============================================================================================
+
+// DefaultAuthConfig returns the default authentication configuration
+func DefaultAuthConfig() AuthConfig {
+	return AuthConfig{
+		LogPrefix: "[AUTH] ",
+		ExemptRoutes: []string{
+			"/",
+			"/home",
+			"/auth",
+		},
+		ExemptPrefixes: []string{
+			"/auth/",
+			"/next-api/auth/",
+			"/css/",
+			"/js/",
+			"/img/",
+		},
+		ExemptSuffixes: []string{
+			".css",
+			".js",
+			".ico",
+			".png",
+			".jpg",
+			".jpeg",
+			".gif",
+			".svg",
+		},
+	}
+}
+
+// LoadAuthConfig loads auth configuration from a file
+func LoadAuthConfig(filePath string) (AuthConfig, error) {
+	// Start with default configuration
+	config := DefaultAuthConfig()
+
+	if filePath == "" {
+		return config, nil
 	}
 
-	// Step 2: Create a test user
-	testEmail := fmt.Sprintf("test_%s@gmail.com", generateRandomString(8))
-	testPassword := "Test" + generateRandomString(10) + "123!"
-
-	a.Logger.Printf("Creating test user with email: %s", testEmail)
-	user, err := a.Supabase.Auth.SignUp(context.Background(), supabase.UserCredentials{
-		Email:    testEmail,
-		Password: testPassword,
-	})
+	// Try to load from file
+	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("test user creation failed: %w", err)
+		if os.IsNotExist(err) {
+			return config, nil // Use defaults if file doesn't exist
+		}
+		return config, fmt.Errorf("failed to open config file: %w", err)
 	}
-	a.Logger.Printf("Test user created successfully: %s", user.ID)
+	defer file.Close()
 
-	// Step 3: Login with the created user
-	a.Logger.Printf("Testing login with created user...")
-	authDetails, err := a.Supabase.Auth.SignIn(context.Background(), supabase.UserCredentials{
-		Email:    testEmail,
-		Password: testPassword,
-	})
-	if err != nil {
-		return fmt.Errorf("test user login failed: %w", err)
+	// Parse config file
+	if err := json.NewDecoder(file).Decode(&config); err != nil {
+		return config, fmt.Errorf("failed to parse config file: %w", err)
 	}
-	a.Logger.Printf("Test user login successful, received token: %s", authDetails.AccessToken[:10]+"...")
 
-	// Step 4: Verify the token by getting user info
-	a.Logger.Printf("Verifying authentication token...")
-	userInfo, err := a.Supabase.Auth.User(context.Background(), authDetails.AccessToken)
-	if err != nil {
-		return fmt.Errorf("token verification failed: %w", err)
+	return config, nil
+}
+
+// ValidateConfig validates the auth configuration
+func (c AuthConfig) Validate() error {
+	if c.SupabaseURL == "" {
+		return errors.New("SupabaseURL is required")
 	}
-	a.Logger.Printf("Token verified successfully, confirmed user email: %s", userInfo.Email)
+
+	if c.SupabaseAnonKey == "" {
+		return errors.New("SupabaseAnonKey is required")
+	}
 
 	return nil
 }
 
-// Generate a random string for unique test emails
-func generateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	result := make([]byte, length)
-
-	for i := range result {
-		result[i] = charset[rand.Intn(len(charset))]
+// NewAuthService creates a new authentication service
+func NewAuthService(config AuthConfig) (*AuthService, error) {
+	// Validate config
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	return string(result)
-}
+	// Create logger
+	logger := log.New(os.Stdout, config.LogPrefix, log.Ldate|log.Ltime|log.Lshortfile)
 
-// registerRoutes registers all authentication-related routes with http
-func (a *AuthService) registerRoutes() {
-	a.Logger.Printf("Registering authentication routes")
-
-	// Authentication pages
-	http.HandleFunc("/login", a.HandleAuthPage)
-	http.HandleFunc("/signup", a.HandleAuthPage)
-	http.HandleFunc("/forgot-password", a.HandleForgotPassword)
-	http.HandleFunc("/reset-password-sent", a.HandleResetPasswordSent)
-	http.HandleFunc("/signup-success", a.HandleSignupSuccess)
-
-	// Authentication form submissions
-	http.HandleFunc("/login-submit", a.HandleLogin)
-	http.HandleFunc("/signup-submit", a.HandleSignup)
-	http.HandleFunc("/forgot-password-submit", a.HandleForgotPasswordSubmit)
-	http.HandleFunc("/logout", a.HandleLogout)
-
-	a.Logger.Printf("Authentication routes registered successfully")
-}
-
-// HandleAuthPage renders the authentication page
-func (a *AuthService) HandleAuthPage(w http.ResponseWriter, r *http.Request) {
-	path := r.URL.Path
-	clientIP := getClientIP(r)
-
-	a.Logger.Printf("Auth page request from %s: %s", clientIP, path)
-
-	pageVars := genPageNav("Authentication", "")
-	pageVars.ErrorMessage = r.FormValue("errmsg")
-
-	// Check if the request is for login or signup
-	if strings.HasSuffix(path, "/signup") {
-		pageVars.Title = "Sign Up - MTGBAN"
-		pageVars.PageType = "signup"
-
-		// Process error messages for signup
-		switch pageVars.ErrorMessage {
-		case "email_taken":
-			pageVars.ErrorMessage = "This email is already registered."
-			a.Logger.Printf("Signup error shown to %s: email already taken", clientIP)
-		case "weak_password":
-			pageVars.ErrorMessage = "Password is too weak. Please use at least 8 characters with letters, numbers, and special characters."
-			a.Logger.Printf("Signup error shown to %s: weak password", clientIP)
-		case "empty_fields":
-			pageVars.ErrorMessage = "Please fill in all required fields."
-			a.Logger.Printf("Signup error shown to %s: empty fields", clientIP)
-		case "passwords_mismatch":
-			pageVars.ErrorMessage = "Passwords do not match."
-			a.Logger.Printf("Signup error shown to %s: passwords mismatch", clientIP)
-		case "terms_required":
-			pageVars.ErrorMessage = "You must accept the Terms of Service to create an account."
-			a.Logger.Printf("Signup error shown to %s: terms not accepted", clientIP)
-		case "database_error":
-			pageVars.ErrorMessage = "We're having trouble with our database. Please try again later or contact support."
-			a.Logger.Printf("Signup error shown to %s: database error", clientIP)
-		case "connection_error":
-			pageVars.ErrorMessage = "We're having trouble connecting to our servers. Please check your internet connection and try again."
-			a.Logger.Printf("Signup error shown to %s: connection error", clientIP)
-		case "invalid_data":
-			pageVars.ErrorMessage = "Some of the information you provided is invalid. Please check your details and try again."
-			a.Logger.Printf("Signup error shown to %s: invalid data", clientIP)
-		case "signup_failed":
-			pageVars.ErrorMessage = "Sorry, we couldn't create your account. Please try again later or contact support."
-			a.Logger.Printf("Signup error shown to %s: general failure", clientIP)
-		}
-	} else {
-		pageVars.Title = "Login - MTGBAN"
-		pageVars.PageType = "login"
-
-		// Process error messages for login
-		switch pageVars.ErrorMessage {
-		case "invalid":
-			pageVars.ErrorMessage = "Invalid email or password."
-			a.Logger.Printf("Login error shown to %s: invalid credentials", clientIP)
-		case "empty":
-			pageVars.ErrorMessage = "Please enter both email and password."
-			a.Logger.Printf("Login error shown to %s: empty fields", clientIP)
-		}
+	// Create Supabase client
+	logger.Printf("Creating Supabase client with URL: %s", config.SupabaseURL)
+	supabaseClient := supabase.CreateClient(config.SupabaseURL, config.SupabaseAnonKey)
+	if supabaseClient == nil {
+		return nil, errors.New("failed to create Supabase client")
 	}
 
-	render(w, "auth.html", pageVars)
+	// Generate CSRF secret
+	csrfSecret := make([]byte, 32)
+	if _, err := rand.Read(csrfSecret); err != nil {
+		return nil, fmt.Errorf("failed to generate CSRF secret: %w", err)
+	}
+
+	// Create the service
+	service := &AuthService{
+		Logger:          logger,
+		Supabase:        supabaseClient,
+		SupabaseURL:     config.SupabaseURL,
+		SupabaseKey:     config.SupabaseAnonKey,
+		SupabaseSecret:  config.SupabaseSecret,
+		DebugMode:       config.DebugMode,
+		BaseAuthURL:     config.SupabaseURL + "/auth/v1",
+		CSRFSecret:      csrfSecret,
+		AuthConfig:      config,
+		LoginLimiter:    rate.NewLimiter(rate.Every(1*time.Second), 5),
+		SignupLimiter:   rate.NewLimiter(rate.Every(5*time.Second), 3),
+		ResetPwdLimiter: rate.NewLimiter(rate.Every(30*time.Second), 3),
+	}
+
+	return service, nil
 }
 
-// HandleLogin handles the login process
-func (a *AuthService) HandleLogin(w http.ResponseWriter, r *http.Request) {
-	clientIP := getClientIP(r)
-	a.Logger.Printf("Login attempt from %s", clientIP)
+// Initialize sets up the auth service and registers routes
+func (a *AuthService) Initialize() error {
+	a.Logger.Printf("Initializing authentication service")
+	a.Logger.Printf("Supabase URL: %s", a.SupabaseURL)
 
-	if r.Method != "POST" {
-		a.Logger.Printf("Invalid method for login from %s: %s", clientIP, r.Method)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	a.registerRoutes()
+	a.Logger.Printf("Authentication service initialized successfully")
+	return nil
+}
+
+// ============================================================================================
+// Middleware Functions
+// ============================================================================================
+
+// createMiddlewareChains creates standard middleware chains
+func (a *AuthService) createMiddlewareChains() map[string]MiddlewareChain {
+	return map[string]MiddlewareChain{
+		"base": {
+			a.Recover,        // Always first to catch panics
+			a.RequestLogger,  // Log all requests
+			a.PathNormalizer, // Normalize paths
+		},
+		"api": {
+			a.Recover,       // Always first to catch panics
+			a.RequestLogger, // Log all requests
+		},
+		"apiAuth": {
+			a.Recover,
+			a.RequestLogger,
+			a.RateLimitAuth,
+		},
+		"form": {
+			a.Recover,
+			a.RequestLogger,
+			a.PathNormalizer,
+			a.MethodValidator("POST"),
+		},
+		"authRequired": {
+			a.Recover,
+			a.RequestLogger,
+			a.PathNormalizer,
+			a.AuthRequired,   // Check for authentication
+			a.CSRFProtection, // CSRF protection for authenticated requests
+		},
+	}
+}
+
+// Recover middleware to recover from panics
+func (a *AuthService) Recover(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Log stack trace
+				buf := make([]byte, 1<<16)
+				n := runtime.Stack(buf, false)
+				a.logWithContext(r, "PANIC: %v\n%s", err, buf[:n])
+
+				// Create server error
+				serverErr := ErrServerError
+				serverErr.Internal = fmt.Errorf("%v", err)
+
+				// Handle the error
+				a.handleAPIError(w, r, serverErr)
+			}
+		}()
+		next(w, r)
+	}
+}
+
+// RequestLogger logs request information
+func (a *AuthService) RequestLogger(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		a.logWithContext(r, "Request started")
+
+		// Create a response wrapper to capture status code
+		rw := newResponseWriter(w)
+		next(rw, r)
+
+		duration := time.Since(start)
+		a.logWithContext(r, "Request completed: status=%d duration=%v",
+			rw.status, duration)
+	}
+}
+
+// PathNormalizer normalizes request paths
+func (a *AuthService) PathNormalizer(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		originalPath := r.URL.Path
+		normalizedPath := a.normalizeAuthPath(originalPath)
+
+		if normalizedPath != originalPath {
+			query := r.URL.RawQuery
+			if query != "" {
+				normalizedPath += "?" + query
+			}
+			a.logWithContext(r, "Redirecting to normalized path: %s → %s", originalPath, normalizedPath)
+			http.Redirect(w, r, normalizedPath, http.StatusMovedPermanently)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+// MethodValidator validates the request method
+func (a *AuthService) MethodValidator(method string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != method {
+				a.logWithContext(r, "Method not allowed: %s", r.Method)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			next(w, r)
+		}
+	}
+}
+
+// RateLimitAuth provides rate limiting for authentication endpoints
+func (a *AuthService) RateLimitAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip := getClientIP(r)
+
+		// Get or create limiter for this IP
+		limiterI, _ := a.IPLimiters.LoadOrStore(ip, rate.NewLimiter(rate.Every(1*time.Second), 5))
+		limiter := limiterI.(*rate.Limiter)
+
+		if !limiter.Allow() {
+			a.logWithContext(r, "Rate limit exceeded for IP: %s", ip)
+			a.handleAPIError(w, r, ErrRateLimitExceeded)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+// AuthRequired ensures the request is authenticated
+func (a *AuthService) AuthRequired(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if the path is exempt from authentication
+		if a.isExemptPath(r.URL.Path) {
+			next(w, r)
+			return
+		}
+
+		// Check if user is authenticated
+		authCookie, err := r.Cookie("auth_token")
+		if err != nil {
+			a.logWithContext(r, "No auth_token cookie found")
+
+			// Try to refresh token if refresh token exists
+			_, refreshErr := r.Cookie("refresh_token")
+			if refreshErr == nil {
+				a.logWithContext(r, "Found refresh_token, attempting refresh")
+				a.handleAuthRefreshToken(w, r)
+				return
+			}
+
+			// Redirect to login
+			redirectURL := "/auth/login"
+			if r.URL.Path != "/" {
+				redirectURL = fmt.Sprintf("/auth/login?return_to=%s", url.QueryEscape(r.URL.Path))
+			}
+
+			a.logWithContext(r, "Redirecting to login: %s", redirectURL)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+
+		// Validate the token
+		ctx := context.Background()
+		userInfo, err := a.Supabase.Auth.User(ctx, authCookie.Value)
+		if err != nil {
+			a.logWithContext(r, "Invalid auth token: %v", err)
+
+			// Clear cookies and redirect to login
+			a.clearAuthCookies(w)
+			http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+			return
+		}
+
+		// Store user info in request context
+		ctx = context.WithValue(r.Context(), "user", userInfo)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+// CSRFProtection provides CSRF protection for authenticated requests
+func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Skip for GET, HEAD, OPTIONS, TRACE
+		if r.Method == "GET" || r.Method == "HEAD" || r.Method == "OPTIONS" || r.Method == "TRACE" {
+			next(w, r)
+			return
+		}
+
+		// Get user from context
+		userInfo, ok := r.Context().Value("user").(*supabase.User)
+		if !ok {
+			a.logWithContext(r, "No user in context for CSRF check")
+			a.handleAPIError(w, r, ErrMissingToken)
+			return
+		}
+
+		// Check CSRF token
+		csrfToken := r.Header.Get("X-CSRF-Token")
+		if csrfToken == "" {
+			// Try to get from form or cookie
+			csrfToken = r.FormValue("csrf_token")
+			if csrfToken == "" {
+				csrfCookie, err := r.Cookie("csrf_token")
+				if err == nil {
+					csrfToken = csrfCookie.Value
+				}
+			}
+		}
+
+		if !a.validateCSRFToken(csrfToken, userInfo.ID) {
+			a.logWithContext(r, "CSRF validation failed for user %s", userInfo.ID)
+			a.handleAPIError(w, r, ErrCSRFValidation)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+// AuthWrapper is a middleware that handles authentication based on existing middleware
+func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		if a.isExemptPath(path) {
+			// Check if path is exempt from authentication
+			noSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+			return
+		}
+
+		if strings.HasPrefix(path, "/api/mtgban/") ||
+			strings.HasPrefix(path, "/api/mtgjson/") {
+			// Use API-specific middleware for API paths
+			enforceAPISigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+			return
+		}
+
+		// Otherwise use standard enforceSigning middleware
+		enforceSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+	}
+}
+
+// ============================================================================================
+// Authentication Handler Functions
+// ============================================================================================
+
+// handleNextJsAssets serves static assets for Next.js
+func (a *AuthService) handleNextJsAssets(w http.ResponseWriter, r *http.Request) {
+	//a.logWithContext(r, "Next.js static asset request: %s", r.URL.Path)
+
+	// Set content type headers based on file extension
+	if strings.HasSuffix(r.URL.Path, ".js") {
+		w.Header().Set("Content-Type", "application/javascript")
+	} else if strings.HasSuffix(r.URL.Path, ".css") {
+		w.Header().Set("Content-Type", "text/css")
+	} else if strings.HasSuffix(r.URL.Path, ".json") {
+		w.Header().Set("Content-Type", "application/json")
+	} else if strings.HasSuffix(r.URL.Path, ".map") {
+		w.Header().Set("Content-Type", "application/json")
+	}
+
+	// Get embedded files
+	authFS, err := fs.Sub(authAssets, "nextAuth/out")
+	if err != nil {
+		a.logWithContext(r, "Failed to access embedded files: %v", err)
+		http.Error(w, "Server Error", http.StatusInternalServerError)
 		return
 	}
 
+	// Remove leading slash for filesystem access
+	fsPath := strings.TrimPrefix(r.URL.Path, "/")
+
+	// Check if file exists
+	_, err = fs.Stat(authFS, fsPath)
+	if err != nil {
+		a.logWithContext(r, "File not found: %s, error: %v", fsPath, err)
+		http.NotFound(w, r)
+		return
+	}
+
+	// Open the file
+	file, err := authFS.Open(fsPath)
+	if err != nil {
+		a.logWithContext(r, "Error opening file: %s", fsPath)
+		http.Error(w, "Server Error", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	// Stream the file directly to the response
+	io.Copy(w, file)
+}
+
+// handleAuthLogin handles API login requests
+func (a *AuthService) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
+	// Handle GET requests (serve the page)
+	if r.Method == http.MethodGet {
+		a.logWithContext(r, "Login page request")
+
+		// Set content type to HTML
+		w.Header().Set("Content-Type", "text/html")
+
+		// Get embedded files
+		authFS, err := fs.Sub(authAssets, "nextAuth/out")
+		if err != nil {
+			a.logWithContext(r, "Failed to access embedded files: %v", err)
+			http.Error(w, "Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Serve the login HTML file
+		serveFile(http.FileServer(http.FS(authFS)), w, r, "login.html")
+		return
+	}
+
+	// Continue with POST handling for API login
+	if r.Method != http.MethodPost {
+		a.logWithContext(r, "Method not allowed: %s", r.Method)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	a.logWithContext(r, "API login attempt")
+
+	// Parse request
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		a.logWithContext(r, "Failed to parse login request: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Invalid request format",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Basic validation
+	if req.Email == "" || req.Password == "" {
+		a.logWithContext(r, "Login attempt with empty credentials")
+		a.handleAPIError(w, r, AuthError{
+			Code:       "MISSING_CREDENTIALS",
+			Message:    "Email and password are required",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Authenticate with Supabase
+	ctx := context.Background()
+	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+
+	if err != nil {
+		a.logWithContext(r, "Login failed: %v", err)
+		a.handleAPIError(w, r, ErrInvalidCredentials)
+		return
+	}
+
+	// Set cookies
+	a.setAuthCookies(w, r, authResponse.AccessToken, authResponse.RefreshToken, req.Remember)
+
+	// Get user data
+	userInfo, err := a.Supabase.Auth.User(ctx, authResponse.AccessToken)
+	if err != nil {
+		a.logWithContext(r, "Error retrieving user data: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "USER_DATA_ERROR",
+			Message:    "Error retrieving user data",
+			StatusCode: http.StatusInternalServerError,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Get user tier from metadata
+	tier := "free"
+	if userInfo.UserMetadata != nil {
+		if tierVal, ok := userInfo.UserMetadata["tier"].(string); ok && tierVal != "" {
+			tier = tierVal
+		}
+	}
+
+	// Generate CSRF token
+	csrfToken := a.generateCSRFToken(userInfo.ID)
+
+	// Set CSRF cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Path:     "/",
+		HttpOnly: false,        // Accessible to JS
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Generate internal signature for app permissions
+	userData := &UserData{
+		UserId: userInfo.ID,
+		Email:  userInfo.Email,
+		Tier:   tier,
+	}
+
+	baseURL := getBaseURL(r)
+	sig := a.sign(baseURL, tier, userData)
+	a.putSignatureInCookies(w, r, sig)
+
+	// Send success response
+	a.sendAPISuccess(w, "Login successful", map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":             userInfo.ID,
+			"email":          userInfo.Email,
+			"tier":           tier,
+			"emailConfirmed": !userInfo.ConfirmedAt.IsZero(),
+			"user_metadata":  userInfo.UserMetadata,
+		},
+		"session": map[string]interface{}{
+			"expires_at": time.Now().Add(24 * time.Hour).Unix(),
+			"csrf_token": csrfToken,
+		},
+	})
+}
+
+// handleLoginFormSubmit handles form-based login submissions
+func (a *AuthService) handleLoginFormSubmit(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form login attempt")
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		a.logWithContext(r, "Error parsing form data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_FORM",
+			Message:    "Error parsing form data",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		}, "/auth/login")
+		return
+	}
+
+	// Get form values
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 	remember := r.FormValue("remember") == "on"
 
-	// Mask email for logging
-	maskedEmail := maskEmail(email)
-	a.Logger.Printf("Login attempt details: email=%s, remember=%v", maskedEmail, remember)
-
+	// Validate required fields
 	if email == "" || password == "" {
-		a.Logger.Printf("Login failed from %s: empty credentials", clientIP)
-		http.Redirect(w, r, "/login?errmsg=empty", http.StatusSeeOther)
+		a.logWithContext(r, "Login attempt with empty credentials")
+		a.handleFormError(w, r, AuthError{
+			Code:       "MISSING_CREDENTIALS",
+			Message:    "Email and password are required",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/login")
 		return
 	}
 
-	// Connect to Supabase and authenticate the user
-	a.Logger.Printf("Connecting to Supabase for authentication: %s", maskedEmail)
-	supabaseClient := supabase.CreateClient(a.SupabaseURL, a.SupabaseKey)
+	// Authenticate with Supabase
 	ctx := context.Background()
-
-	// Use the Supabase client to authenticate with email/password
-	startTime := time.Now()
-	authResponse, err := supabaseClient.Auth.SignIn(ctx, supabase.UserCredentials{
+	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
 		Email:    email,
 		Password: password,
 	})
-	authDuration := time.Since(startTime)
 
 	if err != nil {
-		a.Logger.Printf("Login failed for %s from %s: %v (took %v)", maskedEmail, clientIP, err, authDuration)
-		http.Redirect(w, r, "/login?errmsg=invalid", http.StatusSeeOther)
+		a.logWithContext(r, "Login failed: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_CREDENTIALS",
+			Message:    "Invalid email or password",
+			StatusCode: http.StatusUnauthorized,
+			Internal:   err,
+		}, "/auth/login")
 		return
 	}
 
-	// Extract the JWT token
+	// Extract tokens
 	jwtToken := authResponse.AccessToken
 	refreshToken := authResponse.RefreshToken
-	tokenLength := len(jwtToken)
-	refreshTokenLength := len(refreshToken)
 
-	a.Logger.Printf("Login successful for %s from %s (took %v, token_length=%d, refresh_token_length=%d)",
-		maskedEmail, clientIP, authDuration, tokenLength, refreshTokenLength)
+	// Set cookies
+	a.setAuthCookies(w, r, jwtToken, refreshToken, remember)
 
-	// Get user data from the token
-	a.Logger.Printf("Getting user data from token for %s", maskedEmail)
-	userData, err := getUserIds(jwtToken)
+	// Get user data
+	userInfo, err := a.Supabase.Auth.User(ctx, jwtToken)
 	if err != nil {
-		a.Logger.Printf("Failed to get user data for %s: %v", maskedEmail, err)
-		http.Redirect(w, r, "/login?errmsg=invalid", http.StatusSeeOther)
+		a.logWithContext(r, "Error getting user data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "USER_DATA_ERROR",
+			Message:    "Error retrieving user data",
+			StatusCode: http.StatusInternalServerError,
+			Internal:   err,
+		}, "/auth/login")
 		return
 	}
 
-	// Get user tier from token or set default
-	a.Logger.Printf("Getting user tier for %s", maskedEmail)
-	tierTitle, err := getUserTier(jwtToken)
-	if err != nil {
-		// If tier not found in token, set a default tier
-		tierTitle = "free"
-		a.Logger.Printf("No tier found for %s, defaulting to 'free'", maskedEmail)
-	} else {
-		a.Logger.Printf("User tier for %s: %s", maskedEmail, tierTitle)
+	// Set user tier
+	tierTitle := "free"
+	if userInfo.UserMetadata != nil {
+		if tier, ok := userInfo.UserMetadata["tier"].(string); ok && tier != "" {
+			tierTitle = tier
+		}
 	}
 
-	// Create a signed cookie using the sign function
+	// Generate signature
+	userData := &UserData{
+		UserId: userInfo.ID,
+		Email:  userInfo.Email,
+		Tier:   tierTitle,
+	}
+
 	baseURL := getBaseURL(r)
-	sig := sign(baseURL, tierTitle, userData)
+	sig := a.sign(baseURL, tierTitle, userData)
+	a.putSignatureInCookies(w, r, sig)
 
-	// Set the formatted cookie with appropriate expiration
-	expiration := time.Hour * 24 // Default to 24 hours
-	if remember {
-		expiration = time.Hour * 24 * 30 // 30 days if "remember me" is checked
-		a.Logger.Printf("Setting long-term cookie expiration (30 days) for %s", maskedEmail)
-	} else {
-		a.Logger.Printf("Setting standard cookie expiration (24 hours) for %s", maskedEmail)
-	}
+	// Generate CSRF token
+	csrfToken := a.generateCSRFToken(userInfo.ID)
 
-	a.Logger.Printf("Setting auth cookies for %s", maskedEmail)
-	putSignatureInCookies(w, r, sig)
-
-	// Store refresh token in HTTP-only cookie
-	refreshCookie := http.Cookie{
-		Name:     "refresh_token",
-		Value:    refreshToken,
+	// Set CSRF cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
 		Path:     "/",
-		HttpOnly: true,
-		Secure:   r.TLS != nil, // Set secure flag if using HTTPS
-		MaxAge:   int(expiration.Seconds()),
+		HttpOnly: false,        // Accessible to JS
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   r.TLS != nil,
 		SameSite: http.SameSiteStrictMode,
-	}
-	http.SetCookie(w, &refreshCookie)
+	})
 
-	// Redirect to home page or original destination
-	redirectURL := "/home"
-	if returnTo := r.FormValue("return_to"); returnTo != "" {
-		redirectURL = returnTo
-		a.Logger.Printf("Redirecting %s to originally requested URL: %s", maskedEmail, redirectURL)
-	} else {
-		a.Logger.Printf("Redirecting %s to home page", maskedEmail)
+	// Redirect after successful login
+	returnTo := r.FormValue("return_to")
+	if returnTo == "" {
+		returnTo = "/home"
 	}
 
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	// Redirect to success page with proper parameters
+	successURL := fmt.Sprintf("/auth/success?redirectTo=%s&message=%s",
+		url.QueryEscape(returnTo),
+		url.QueryEscape("You have successfully logged in"))
+
+	a.logWithContext(r, "Login successful, redirecting to: %s", successURL)
+	http.Redirect(w, r, successURL, http.StatusSeeOther)
 }
 
-// HandleSignup handles the signup process
-func (a *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
-	clientIP := getClientIP(r)
-	a.Logger.Printf("Signup attempt from %s", clientIP)
+// handleAuthSignup handles API signup requests
+func (a *AuthService) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
+	// Handle GET requests (serve the page)
+	if r.Method == http.MethodGet {
+		a.logWithContext(r, "Signup page request")
 
-	if r.Method != "POST" {
-		a.Logger.Printf("Invalid method for signup from %s: %s", clientIP, r.Method)
-		http.Redirect(w, r, "/signup", http.StatusSeeOther)
+		// Set content type to HTML
+		w.Header().Set("Content-Type", "text/html")
+
+		// Get embedded files
+		authFS, err := fs.Sub(authAssets, "nextAuth/out")
+		if err != nil {
+			a.logWithContext(r, "Failed to access embedded files: %v", err)
+			http.Error(w, "Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Serve the signup HTML file
+		serveFile(http.FileServer(http.FS(authFS)), w, r, "signup.html")
+		return
+	}
+
+	// Continue with POST handling for API signup
+	if r.Method != http.MethodPost {
+		a.logWithContext(r, "Method not allowed: %s", r.Method)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	a.logWithContext(r, "API signup attempt")
+
+	// Read request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		a.logWithContext(r, "Error reading request body: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Error reading request body",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Parse request
+	var req SignupRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		a.logWithContext(r, "Error parsing signup request: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Invalid request format",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Validate required fields
+	if req.Email == "" || req.Password == "" {
+		a.logWithContext(r, "Signup attempt with empty credentials")
+		a.handleAPIError(w, r, AuthError{
+			Code:       "MISSING_CREDENTIALS",
+			Message:    "Email and password are required",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Validate password strength
+	isValid, errorMsg := a.validatePassword(req.Password)
+	if !isValid {
+		a.logWithContext(r, "Password validation failed: %s", errorMsg)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "WEAK_PASSWORD",
+			Message:    errorMsg,
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Ensure user data has tier set
+	if req.UserData == nil {
+		req.UserData = make(map[string]interface{})
+	}
+	if _, ok := req.UserData["tier"]; !ok {
+		req.UserData["tier"] = "free"
+	}
+
+	// Sign up with Supabase
+	ctx := context.Background()
+	user, err := a.Supabase.Auth.SignUp(ctx, supabase.UserCredentials{
+		Email:    req.Email,
+		Password: req.Password,
+		Data:     req.UserData,
+	})
+
+	if err != nil {
+		a.logWithContext(r, "Signup failed: %v", err)
+
+		// Check for common errors
+		errMsg := err.Error()
+		if strings.Contains(strings.ToLower(errMsg), "already") ||
+			strings.Contains(strings.ToLower(errMsg), "taken") {
+			a.handleAPIError(w, r, ErrEmailTaken)
+		} else {
+			a.handleAPIError(w, r, AuthError{
+				Code:       "SIGNUP_FAILED",
+				Message:    "Failed to create account",
+				StatusCode: http.StatusBadRequest,
+				Internal:   err,
+			})
+		}
+		return
+	}
+
+	// Check if email confirmation is required
+	if user.ConfirmedAt.IsZero() {
+		// Email confirmation required
+		a.logWithContext(r, "Signup successful, email confirmation required: %s", req.Email)
+		a.sendAPISuccess(w, "Account created successfully. Please check your email to verify your account.", map[string]interface{}{
+			"user": map[string]interface{}{
+				"id":             user.ID,
+				"email":          user.Email,
+				"emailConfirmed": false,
+			},
+			"emailConfirmationRequired": true,
+		})
+		return
+	}
+
+	// If email already confirmed, log in the user automatically
+	a.logWithContext(r, "Signup successful with pre-confirmed email: %s", req.Email)
+	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+
+	if err != nil {
+		// Return partial success without session
+		a.sendAPISuccess(w, "Account created successfully. Please log in.", map[string]interface{}{
+			"user": map[string]interface{}{
+				"id":             user.ID,
+				"email":          user.Email,
+				"emailConfirmed": true,
+			},
+		})
+		return
+	}
+
+	// Set cookies for the frontend
+	a.setAuthCookies(w, r, authResponse.AccessToken, authResponse.RefreshToken, false)
+
+	// Generate MTGBAN signature for internal auth
+	userData := &UserData{
+		UserId: user.ID,
+		Email:  user.Email,
+		Tier:   "free", // Default tier, can be updated later
+	}
+
+	baseURL := getBaseURL(r)
+	sig := a.sign(baseURL, userData.Tier, userData)
+	a.putSignatureInCookies(w, r, sig)
+
+	// Generate CSRF token
+	csrfToken := a.generateCSRFToken(user.ID)
+
+	// Set CSRF cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Path:     "/",
+		HttpOnly: false,        // Accessible to JS
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Return full success response with session
+	a.sendAPISuccess(w, "Account created successfully", map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":             user.ID,
+			"email":          user.Email,
+			"emailConfirmed": true,
+			"tier":           "free",
+			"user_metadata":  user.UserMetadata,
+		},
+		"session": map[string]interface{}{
+			"expires_at": time.Now().Add(24 * time.Hour).Unix(),
+			"csrf_token": csrfToken,
+		},
+	})
+}
+
+// handleSignupFormSubmit handles form-based signup submissions
+func (a *AuthService) handleSignupFormSubmit(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form signup attempt")
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		a.logWithContext(r, "Error parsing form data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_FORM",
+			Message:    "Error parsing form data",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		}, "/auth/signup")
 		return
 	}
 
@@ -412,539 +1109,883 @@ func (a *AuthService) HandleSignup(w http.ResponseWriter, r *http.Request) {
 
 	// Mask email for logging
 	maskedEmail := maskEmail(email)
-	a.Logger.Printf("Signup attempt details: email=%s, name_provided=%v, terms_accepted=%v",
-		maskedEmail, fullName != "", termsAccepted)
 
 	// Validate inputs
 	if email == "" || password == "" || fullName == "" {
-		a.Logger.Printf("Signup validation failed for %s from %s: empty fields", maskedEmail, clientIP)
-		http.Redirect(w, r, "/signup?errmsg=empty_fields", http.StatusSeeOther)
+		a.logWithContext(r, "Signup validation failed for %s: empty fields", maskedEmail)
+		a.handleFormError(w, r, AuthError{
+			Code:       "MISSING_FIELDS",
+			Message:    "All fields are required",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/signup")
 		return
 	}
 
 	if password != confirmPassword {
-		a.Logger.Printf("Signup validation failed for %s from %s: passwords don't match", maskedEmail, clientIP)
-		http.Redirect(w, r, "/signup?errmsg=passwords_mismatch", http.StatusSeeOther)
+		a.logWithContext(r, "Signup validation failed for %s: passwords don't match", maskedEmail)
+		a.handleFormError(w, r, AuthError{
+			Code:       "PASSWORD_MISMATCH",
+			Message:    "Passwords do not match",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/signup")
 		return
 	}
 
 	if !termsAccepted {
-		a.Logger.Printf("Signup validation failed for %s from %s: terms not accepted", maskedEmail, clientIP)
-		http.Redirect(w, r, "/signup?errmsg=terms_required", http.StatusSeeOther)
+		a.logWithContext(r, "Signup validation failed for %s: terms not accepted", maskedEmail)
+		a.handleFormError(w, r, AuthError{
+			Code:       "TERMS_REQUIRED",
+			Message:    "You must accept the Terms of Service",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/signup")
 		return
 	}
 
-	// Check password strength
-	passwordStrength := checkPasswordStrength(password)
-	a.Logger.Printf("Password strength for %s: %s", maskedEmail, passwordStrength)
-
-	if len(password) < 8 {
-		a.Logger.Printf("Signup validation failed for %s from %s: password too short", maskedEmail, clientIP)
-		http.Redirect(w, r, "/signup?errmsg=weak_password", http.StatusSeeOther)
+	// Validate password strength
+	isValid, errorMsg := a.validatePassword(password)
+	if !isValid {
+		a.logWithContext(r, "Password validation failed for %s: %s", maskedEmail, errorMsg)
+		a.handleFormError(w, r, AuthError{
+			Code:       "WEAK_PASSWORD",
+			Message:    errorMsg,
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/signup")
 		return
-	}
-
-	// Connect to Supabase
-	a.Logger.Printf("Connecting to Supabase for signup: %s", maskedEmail)
-	a.Logger.Printf("Supabase URL being used: %s", maskURL(a.SupabaseURL))
-	a.Logger.Printf("API key length: %d characters", len(a.SupabaseKey))
-
-	// Create a raw HTTP request to test connectivity
-	testReq, err := http.NewRequest("GET", a.SupabaseURL+"/auth/v1/health", nil)
-	if err != nil {
-		a.Logger.Printf("Failed to create test request: %v", err)
-	} else {
-		testReq.Header.Set("apikey", a.SupabaseKey)
-		client := &http.Client{Timeout: 5 * time.Second}
-		testResp, testErr := client.Do(testReq)
-		if testErr != nil {
-			a.Logger.Printf("Connection test failed: %v", testErr)
-		} else {
-			a.Logger.Printf("Connection test status: %d", testResp.StatusCode)
-			testResp.Body.Close()
-		}
 	}
 
 	// Create user metadata
-	// IMPORTANT: Keep metadata structure simple to avoid JSONB parsing issues
 	userMetadata := map[string]interface{}{
 		"full_name": fullName,
+		"tier":      "free",
 	}
 
-	// Log the exact structure being sent to Supabase
-	a.Logger.Printf("Creating user with email: %s, password length: %d, metadata: %+v",
-		maskedEmail, len(password), userMetadata)
-
-	// Try first with the supabase-go library
-	supabaseClient := supabase.CreateClient(a.SupabaseURL, a.SupabaseKey)
+	// Create user in Supabase
 	ctx := context.Background()
-
-	startTime := time.Now()
-	user, err := supabaseClient.Auth.SignUp(ctx, supabase.UserCredentials{
+	user, err := a.Supabase.Auth.SignUp(ctx, supabase.UserCredentials{
 		Email:    email,
 		Password: password,
 		Data:     userMetadata,
 	})
-	signupDuration := time.Since(startTime)
 
 	if err != nil {
-		a.Logger.Printf("Library signup failed for %s from %s: %v (took %v)",
-			maskedEmail, clientIP, err, signupDuration)
-
-		// Try a direct HTTP request to get more details about the error
-		a.Logger.Printf("Attempting direct HTTP signup request for better diagnostics")
-
-		// Construct manual request
-		directSignupData := map[string]interface{}{
-			"email":    email,
-			"password": password,
-			"data":     userMetadata,
-		}
-
-		jsonData, jsonErr := json.Marshal(directSignupData)
-		if jsonErr != nil {
-			a.Logger.Printf("JSON marshaling error: %v", jsonErr)
-		} else {
-			directReq, reqErr := http.NewRequest("POST", a.SupabaseURL+"/auth/v1/signup", bytes.NewBuffer(jsonData))
-			if reqErr != nil {
-				a.Logger.Printf("Failed to create direct request: %v", reqErr)
-			} else {
-				directReq.Header.Set("apikey", a.SupabaseKey)
-				directReq.Header.Set("Content-Type", "application/json")
-
-				directClient := &http.Client{Timeout: 10 * time.Second}
-				directResp, directErr := directClient.Do(directReq)
-
-				if directErr != nil {
-					a.Logger.Printf("Direct request failed: %v", directErr)
-				} else {
-					body, _ := io.ReadAll(directResp.Body)
-					a.Logger.Printf("Direct signup response status: %d, body: %s",
-						directResp.StatusCode, string(body))
-					directResp.Body.Close()
-				}
-			}
-		}
-
-		// Check for common errors and redirect appropriately
+		// Error handling
 		errMsg := err.Error()
-		a.Logger.Printf("Detailed error message: %s", errMsg)
+		a.logWithContext(r, "Signup failed for %s: %v", maskedEmail, err)
 
 		if strings.Contains(strings.ToLower(errMsg), "already") ||
 			strings.Contains(strings.ToLower(errMsg), "taken") {
-			a.Logger.Printf("Email already taken: %s", maskedEmail)
-			http.Redirect(w, r, "/signup?errmsg=email_taken", http.StatusSeeOther)
+			a.handleFormError(w, r, ErrEmailTaken, "/auth/signup")
 		} else if strings.Contains(strings.ToLower(errMsg), "database") {
-			a.Logger.Printf("Database error: %v", err)
-			http.Redirect(w, r, "/signup?errmsg=database_error", http.StatusSeeOther)
+			a.handleFormError(w, r, AuthError{
+				Code:       "DATABASE_ERROR",
+				Message:    "Database error occurred",
+				StatusCode: http.StatusInternalServerError,
+				Internal:   err,
+			}, "/auth/signup")
 		} else {
-			a.Logger.Printf("General signup error: %v", err)
-			http.Redirect(w, r, "/signup?errmsg=signup_failed", http.StatusSeeOther)
+			a.handleFormError(w, r, AuthError{
+				Code:       "SIGNUP_FAILED",
+				Message:    "Failed to create account",
+				StatusCode: http.StatusBadRequest,
+				Internal:   err,
+			}, "/auth/signup")
 		}
 		return
 	}
 
-	a.Logger.Printf("Signup successful for %s from %s (took %v)", maskedEmail, clientIP, signupDuration)
-	a.Logger.Printf("User details: ID=%s, Email confirmed=%v", user.ID, !user.ConfirmedAt.IsZero())
+	a.logWithContext(r, "Signup successful for %s", maskedEmail)
 
-	// If email confirmation is NOT required in Supabase settings (user is already confirmed)
+	// If email confirmation is NOT required (user is already confirmed)
 	if !user.ConfirmedAt.IsZero() {
-		a.Logger.Printf("Auto-login for new user %s", maskedEmail)
+		a.logWithContext(r, "Auto-login for new user %s", maskedEmail)
 
 		// Auto-login the user after signup
-		startLoginTime := time.Now()
-		authResponse, err := supabaseClient.Auth.SignIn(ctx, supabase.UserCredentials{
+		authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
 			Email:    email,
 			Password: password,
 		})
-		autoLoginDuration := time.Since(startLoginTime)
 
 		if err == nil {
-			a.Logger.Printf("Auto-login successful for %s (took %v)", maskedEmail, autoLoginDuration)
+			a.logWithContext(r, "Auto-login successful for %s", maskedEmail)
 
-			// Extract the JWT token
+			// Extract tokens
 			jwtToken := authResponse.AccessToken
 			refreshToken := authResponse.RefreshToken
 
+			// Set cookies
+			a.setAuthCookies(w, r, jwtToken, refreshToken, false)
+
 			// Get user data
-			userData, err := getUserIds(jwtToken)
-			if err != nil {
-				a.Logger.Printf("Error getting user data during auto-login: %v", err)
+			userData := &UserData{
+				UserId: user.ID,
+				Email:  user.Email,
+				Tier:   "free", // Default tier for new users
 			}
 
-			tierTitle := "free" // Default tier for new users
-			a.Logger.Printf("Setting new user %s to 'free' tier", maskedEmail)
-
-			// Create and set cookies
+			// Generate internal signature
 			baseURL := getBaseURL(r)
-			sig := sign(baseURL, tierTitle, userData)
-			putSignatureInCookies(w, r, sig)
+			sig := a.sign(baseURL, userData.Tier, userData)
+			a.putSignatureInCookies(w, r, sig)
 
-			// Set refresh token cookie
-			refreshCookie := http.Cookie{
-				Name:     "refresh_token",
-				Value:    refreshToken,
+			// Generate CSRF token
+			csrfToken := a.generateCSRFToken(user.ID)
+
+			// Set CSRF cookie
+			http.SetCookie(w, &http.Cookie{
+				Name:     "csrf_token",
+				Value:    csrfToken,
 				Path:     "/",
-				HttpOnly: true,
+				HttpOnly: false,        // Accessible to JS
+				MaxAge:   24 * 60 * 60, // 24 hours
 				Secure:   r.TLS != nil,
-				MaxAge:   int((time.Hour * 24).Seconds()),
 				SameSite: http.SameSiteStrictMode,
-			}
-			http.SetCookie(w, &refreshCookie)
+			})
 
-			a.Logger.Printf("Redirecting new user %s to home page", maskedEmail)
-			http.Redirect(w, r, "/home", http.StatusSeeOther)
+			// Redirect to success page instead of directly to home
+			successURL := fmt.Sprintf("/auth/success?redirectTo=%s&message=%s",
+				url.QueryEscape("/home"),
+				url.QueryEscape("Your account has been created successfully!"))
+
+			a.logWithContext(r, "Redirecting new user %s to success page", maskedEmail)
+			http.Redirect(w, r, successURL, http.StatusSeeOther)
 			return
 		} else {
-			a.Logger.Printf("Auto-login failed for new user %s: %v", maskedEmail, err)
+			a.logWithContext(r, "Auto-login failed for new user %s: %v", maskedEmail, err)
 		}
 	}
 
-	// Redirect to a confirmation page if email verification is required
-	a.Logger.Printf("Redirecting %s to signup success page (email verification pending)", maskedEmail)
-	http.Redirect(w, r, "/signup-success", http.StatusSeeOther)
+	// Redirect to confirmation page if email verification is required
+	a.logWithContext(r, "Redirecting %s to confirmation page (email verification pending)", maskedEmail)
+	confirmationURL := fmt.Sprintf("/auth/confirmation?email=%s&message=%s",
+		url.QueryEscape(email),
+		url.QueryEscape("Your account has been created. Please check your email to verify your account."))
+
+	http.Redirect(w, r, confirmationURL, http.StatusSeeOther)
 }
 
-// HandleForgotPassword renders the forgot password page
-func (a *AuthService) HandleForgotPassword(w http.ResponseWriter, r *http.Request) {
-	errmsg := r.FormValue("errmsg")
-	message := ""
+// handleAuthForgotPassword handles API password reset requests
+func (a *AuthService) handleAuthForgotPassword(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API password reset request")
 
-	switch errmsg {
-	case "empty_email":
-		message = "Please enter your email address."
-	case "failed":
-		message = "Failed to process your request. Please try again later."
-	}
-
-	pageVars := genPageNav("Forgot Password", "")
-	pageVars.ErrorMessage = message
-
-	render(w, "forgot-password.html", pageVars)
-}
-
-// HandleForgotPasswordSubmit initiates the password reset process
-func (a *AuthService) HandleForgotPasswordSubmit(w http.ResponseWriter, r *http.Request) {
-	clientIP := getClientIP(r)
-	a.Logger.Printf("Password reset request from %s", clientIP)
-
-	if r.Method != "POST" {
-		a.Logger.Printf("Invalid method for password reset from %s: %s", clientIP, r.Method)
-		http.Redirect(w, r, "/forgot-password", http.StatusSeeOther)
+	// Parse request
+	var req PasswordResetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		a.logWithContext(r, "Error parsing password reset request: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Invalid request format",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
 		return
 	}
 
+	if req.Email == "" {
+		a.logWithContext(r, "Password reset request with empty email")
+		a.handleAPIError(w, r, AuthError{
+			Code:       "MISSING_EMAIL",
+			Message:    "Email is required",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Request password reset from Supabase
+	ctx := context.Background()
+	err := a.Supabase.Auth.ResetPasswordForEmail(ctx, req.Email, "/auth/reset-password")
+
+	// For security reasons, don't reveal if the email exists
+	if err != nil {
+		a.logWithContext(r, "Password reset request failed: %v", err)
+	} else {
+		a.logWithContext(r, "Password reset request sent to: %s", maskEmail(req.Email))
+	}
+
+	// Return success response regardless to prevent email enumeration
+	a.sendAPISuccess(w, "If an account exists with that email, we've sent password reset instructions.", nil)
+}
+
+// handleForgotPasswordFormSubmit handles form-based password reset requests
+func (a *AuthService) handleForgotPasswordFormSubmit(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form password reset request")
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		a.logWithContext(r, "Error parsing form data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_FORM",
+			Message:    "Error parsing form data",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		}, "/auth/forgot-password")
+		return
+	}
+
+	// Get form values
 	email := r.FormValue("email")
 	maskedEmail := maskEmail(email)
 
 	if email == "" {
-		a.Logger.Printf("Password reset validation failed from %s: empty email", clientIP)
-		http.Redirect(w, r, "/forgot-password?errmsg=empty_email", http.StatusSeeOther)
+		a.logWithContext(r, "Password reset request with empty email")
+		a.handleFormError(w, r, AuthError{
+			Code:       "MISSING_EMAIL",
+			Message:    "Email is required",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/forgot-password")
 		return
 	}
 
-	a.Logger.Printf("Processing password reset for %s from %s", maskedEmail, clientIP)
-
-	// Connect to Supabase
-	supabaseClient := supabase.CreateClient(a.SupabaseURL, a.SupabaseKey)
+	// Request password reset from Supabase
 	ctx := context.Background()
+	err := a.Supabase.Auth.ResetPasswordForEmail(ctx, email, "/auth/reset-password")
 
-	// Request password recovery
-	startTime := time.Now()
-	err := supabaseClient.Auth.ResetPasswordForEmail(ctx, email, "/reset-password-sent")
-	resetDuration := time.Since(startTime)
-
+	// For security reasons, don't reveal if the email exists
 	if err != nil {
-		a.Logger.Printf("Password reset failed for %s from %s: %v (took %v)",
-			maskedEmail, clientIP, err, resetDuration)
-		http.Redirect(w, r, "/forgot-password?errmsg=failed", http.StatusSeeOther)
+		a.logWithContext(r, "Password reset request failed: %v", err)
+	} else {
+		a.logWithContext(r, "Password reset request sent to: %s", maskedEmail)
+	}
+
+	// Redirect to confirmation page
+	confirmationURL := fmt.Sprintf("/auth/reset-password-sent?email=%s&message=%s",
+		url.QueryEscape(email),
+		url.QueryEscape("If an account exists with that email, we've sent password reset instructions."))
+
+	http.Redirect(w, r, confirmationURL, http.StatusSeeOther)
+}
+
+// handleAuthResetPassword handles API password reset completions
+func (a *AuthService) handleAuthResetPassword(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API password reset completion")
+
+	// Parse request
+	var req PasswordUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		a.logWithContext(r, "Error parsing password update request: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Invalid request format",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
 		return
 	}
 
-	a.Logger.Printf("Password reset request successful for %s from %s (took %v)",
-		maskedEmail, clientIP, resetDuration)
+	// Validate required fields
+	if req.Password == "" || req.Token == "" {
+		a.logWithContext(r, "Password update request with missing fields")
+		a.handleAPIError(w, r, AuthError{
+			Code:       "MISSING_FIELDS",
+			Message:    "Password and token are required",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
 
-	// Always redirect to success page, even if email doesn't exist
-	// for security reasons (prevents email enumeration)
-	a.Logger.Printf("Redirecting %s to reset confirmation page", maskedEmail)
-	http.Redirect(w, r, "/reset-password-sent", http.StatusSeeOther)
+	// Validate password strength
+	isValid, errorMsg := a.validatePassword(req.Password)
+	if !isValid {
+		a.logWithContext(r, "Password validation failed: %s", errorMsg)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "WEAK_PASSWORD",
+			Message:    errorMsg,
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Update user's password with token
+	ctx := context.Background()
+	updateData := map[string]interface{}{
+		"password": req.Password,
+	}
+
+	user, err := a.Supabase.Auth.UpdateUser(ctx, req.Token, updateData)
+	if err != nil {
+		a.logWithContext(r, "Password reset failed: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "RESET_FAILED",
+			Message:    "Failed to reset password",
+			StatusCode: http.StatusInternalServerError,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Log the successful password reset
+	a.logWithContext(r, "Password reset successful for user ID: %s", user.ID)
+
+	// Return success response with redirect to login page
+	a.sendAPISuccess(w, "Your password has been reset successfully. You can now log in with your new password.", map[string]interface{}{
+		"redirectTo": "/auth/login",
+	})
 }
 
-// HandleResetPasswordSent renders the reset password confirmation page
-func (a *AuthService) HandleResetPasswordSent(w http.ResponseWriter, r *http.Request) {
-	pageVars := genPageNav("Reset Password", "")
-	pageVars.PageMessage = "If an account exists with that email, we've sent password reset instructions."
+// handleResetPasswordFormSubmit handles form-based password reset completions
+func (a *AuthService) handleResetPasswordFormSubmit(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form password reset completion")
 
-	render(w, "reset-password-sent.html", pageVars)
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		a.logWithContext(r, "Error parsing form data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_FORM",
+			Message:    "Error parsing form data",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		}, "/auth/reset-password")
+		return
+	}
+
+	// Get form values
+	password := r.FormValue("password")
+	confirmPassword := r.FormValue("confirm-password")
+	token := r.FormValue("token") // This is the reset token from the URL
+
+	// Validate inputs
+	if password == "" || token == "" {
+		a.logWithContext(r, "Password reset with empty fields")
+		a.handleFormError(w, r, AuthError{
+			Code:       "MISSING_FIELDS",
+			Message:    "Password and token are required",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/reset-password")
+		return
+	}
+
+	if password != confirmPassword {
+		a.logWithContext(r, "Password reset passwords don't match")
+		a.handleFormError(w, r, AuthError{
+			Code:       "PASSWORD_MISMATCH",
+			Message:    "Passwords do not match",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/reset-password")
+		return
+	}
+
+	// Validate password strength
+	isValid, errorMsg := a.validatePassword(password)
+	if !isValid {
+		a.logWithContext(r, "Password validation failed: %s", errorMsg)
+		a.handleFormError(w, r, AuthError{
+			Code:       "WEAK_PASSWORD",
+			Message:    errorMsg,
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/reset-password")
+		return
+	}
+
+	// Update user's password with token
+	ctx := context.Background()
+	updateData := map[string]interface{}{
+		"password": password,
+	}
+
+	user, err := a.Supabase.Auth.UpdateUser(ctx, token, updateData)
+	if err != nil {
+		a.logWithContext(r, "Password reset failed: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "RESET_FAILED",
+			Message:    "Failed to reset password",
+			StatusCode: http.StatusInternalServerError,
+			Internal:   err,
+		}, "/auth/reset-password")
+		return
+	}
+
+	// Log the successful password reset
+	a.logWithContext(r, "Password reset successful for user ID: %s", user.ID)
+
+	// Redirect to success page
+	successURL := fmt.Sprintf("/auth/success?redirectTo=%s&message=%s",
+		url.QueryEscape("/auth/login"),
+		url.QueryEscape("Your password has been reset successfully. You can now log in with your new password."))
+
+	http.Redirect(w, r, successURL, http.StatusSeeOther)
 }
 
-// HandleSignupSuccess renders the signup success page
-func (a *AuthService) HandleSignupSuccess(w http.ResponseWriter, r *http.Request) {
-	pageVars := genPageNav("Registration Successful", "")
-	pageVars.PageMessage = "Your account has been created. Please check your email to verify your account."
+// handleAuthLogout handles API logout requests
+func (a *AuthService) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API logout request")
 
-	render(w, "signup-success.html", pageVars)
+	// Get token from cookie
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil && authCookie.Value != "" {
+		// Sign out from Supabase
+		err := a.Supabase.Auth.SignOut(context.Background(), authCookie.Value)
+		if err != nil {
+			a.logWithContext(r, "Supabase logout error: %v", err)
+		}
+	}
+
+	// Clear auth cookies
+	a.clearAuthCookies(w)
+
+	// Return success response
+	a.sendAPISuccess(w, "Logout successful", nil)
 }
 
-// HandleLogout handles logging out by clearing cookies
-func (a *AuthService) HandleLogout(w http.ResponseWriter, r *http.Request) {
-	clientIP := getClientIP(r)
-	a.Logger.Printf("Logout request from %s", clientIP)
+// handleLogoutForm handles form-based logout requests
+func (a *AuthService) handleLogoutForm(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form logout request")
+
+	// Get token from cookie
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil && authCookie.Value != "" {
+		// Sign out from Supabase
+		err := a.Supabase.Auth.SignOut(context.Background(), authCookie.Value)
+		if err != nil {
+			a.logWithContext(r, "Supabase logout error: %v", err)
+		}
+	}
 
 	// Clear all auth cookies
-	http.SetCookie(w, &http.Cookie{
-		Name:     "signature",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-	})
+	a.clearAuthCookies(w)
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-	})
-
-	a.Logger.Printf("All auth cookies cleared for %s", clientIP)
+	// Redirect to home page
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// HandleRefreshToken attempts to get a new access token using the refresh token
-func (a *AuthService) HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
-	clientIP := getClientIP(r)
-	a.Logger.Printf("Token refresh attempt from %s", clientIP)
+// handleAuthGetUser handles API requests to get user information
+func (a *AuthService) handleAuthGetUser(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API get user request")
 
-	// Get refresh token from cookie
-	cookie, err := r.Cookie("refresh_token")
-	if err != nil {
-		a.Logger.Printf("Token refresh failed from %s: no refresh token cookie", clientIP)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+	// Get auth token and refresh token from cookies
+	authCookie, authErr := r.Cookie("auth_token")
+	refreshCookie, refreshErr := r.Cookie("refresh_token")
 
-	refreshToken := cookie.Value
-	tokenLength := len(refreshToken)
-	a.Logger.Printf("Found refresh token from %s (length=%d)", clientIP, tokenLength)
+	var userInfo *supabase.User
+	var err error
 
-	// Prepare refresh token request
-	data := map[string]string{
-		"grant_type":    "refresh_token",
-		"refresh_token": refreshToken,
-	}
-
-	jsonData, _ := json.Marshal(data)
-	req, err := http.NewRequest("POST", a.SupabaseURL+"/auth/v1/token", bytes.NewBuffer(jsonData))
-	if err != nil {
-		a.Logger.Printf("Failed to create refresh token request from %s: %v", clientIP, err)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("apikey", a.SupabaseKey)
-
-	// Send request
-	a.Logger.Printf("Sending refresh token request to Supabase from %s", clientIP)
-	startTime := time.Now()
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	refreshDuration := time.Since(startTime)
-
-	if err != nil {
-		a.Logger.Printf("Token refresh network error from %s: %v (took %v)",
-			clientIP, err, refreshDuration)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		a.Logger.Printf("Token refresh failed from %s with status %d (took %v)",
-			clientIP, resp.StatusCode, refreshDuration)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Parse response
-	var result map[string]interface{}
-	err = json.NewDecoder(resp.Body).Decode(&result)
-	if err != nil {
-		a.Logger.Printf("Failed to parse refresh token response from %s: %v", clientIP, err)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	a.Logger.Printf("Token refresh successful from %s (took %v)", clientIP, refreshDuration)
-
-	// Update tokens and user session
-	accessToken, _ := result["access_token"].(string)
-	newRefreshToken, _ := result["refresh_token"].(string)
-
-	if accessToken == "" {
-		a.Logger.Printf("No access token in refresh response from %s", clientIP)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	tokenLength = len(accessToken)
-	newRefreshTokenLength := len(newRefreshToken)
-	a.Logger.Printf("New tokens received from %s: token_length=%d, refresh_token_length=%d",
-		clientIP, tokenLength, newRefreshTokenLength)
-
-	// Update user session with new tokens
-	userData, err := getUserIds(accessToken)
-	if err != nil {
-		a.Logger.Printf("Failed to extract user data from refreshed token for %s: %v", clientIP, err)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	a.Logger.Printf("User data extracted from refreshed token for %s", clientIP)
-
-	tierTitle, err := getUserTier(accessToken)
-	if err != nil || tierTitle == "" {
-		tierTitle = "free"
-		a.Logger.Printf("No tier found in refreshed token for %s, defaulting to 'free'", clientIP)
-	} else {
-		a.Logger.Printf("User tier from refreshed token for %s: %s", clientIP, tierTitle)
-	}
-
-	baseURL := getBaseURL(r)
-	sig := sign(baseURL, tierTitle, userData)
-	putSignatureInCookies(w, r, sig)
-	a.Logger.Printf("Updated signature cookie for %s", clientIP)
-
-	// Update refresh token cookie
-	refreshCookie := http.Cookie{
-		Name:     "refresh_token",
-		Value:    newRefreshToken,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   r.TLS != nil,
-		MaxAge:   int((time.Hour * 24 * 30).Seconds()),
-		SameSite: http.SameSiteStrictMode,
-	}
-	http.SetCookie(w, &refreshCookie)
-	a.Logger.Printf("Updated refresh token cookie for %s", clientIP)
-
-	// Redirect to the original request URL or home
-	originalURL := r.URL.String()
-	a.Logger.Printf("Redirecting %s to original URL after token refresh: %s", clientIP, originalURL)
-	http.Redirect(w, r, originalURL, http.StatusSeeOther)
-}
-
-// WrapAuthMiddleware wraps a handler with authentication middleware
-func (a *AuthService) WrapAuthMiddleware(handler http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		clientIP := getClientIP(r)
-		path := r.URL.Path
-
-		a.Logger.Printf("Auth check for %s accessing %s", clientIP, path)
-
-		// Check if user is authenticated
-		_, err := r.Cookie("signature")
-		if err != nil {
-			a.Logger.Printf("No signature cookie found for %s accessing %s", clientIP, path)
-
-			// Try to refresh token if signature is missing but refresh token exists
-			refreshCookie, refreshErr := r.Cookie("refresh_token")
-			if refreshErr == nil {
-				refreshTokenLength := len(refreshCookie.Value)
-				a.Logger.Printf("Found refresh token for %s (length=%d), attempting refresh",
-					clientIP, refreshTokenLength)
-				a.HandleRefreshToken(w, r)
-				return
-			}
-
-			a.Logger.Printf("No refresh token found for %s, redirecting to login", clientIP)
-
-			// If we can't refresh, redirect to login
-			redirectURL := "/login"
-			if r.URL.Path != "/" && r.URL.Path != "/login" && r.URL.Path != "/signup" {
-				redirectURL = "/login?return_to=" + r.URL.Path
-				a.Logger.Printf("Setting return_to=%s for %s", r.URL.Path, clientIP)
-			}
-
-			a.Logger.Printf("Redirecting unauthenticated user %s to %s", clientIP, redirectURL)
-			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	// Check if we have a valid auth token
+	if authErr != nil || authCookie.Value == "" {
+		// No auth token, check if we have refresh token
+		if refreshErr != nil || refreshCookie.Value == "" {
+			a.logWithContext(r, "No auth token and no refresh token found")
+			a.handleAPIError(w, r, ErrMissingToken)
 			return
 		}
 
-		a.Logger.Printf("User %s authenticated, proceeding to %s", clientIP, path)
-		// Continue to the protected handler
-		handler(w, r)
+		// Try to refresh using refresh token
+		a.logWithContext(r, "No auth token but refresh token found, attempting token refresh")
+
+		newAuthToken, newRefreshToken, refreshedUser, refreshErr := a.refreshTokenInternal("", refreshCookie.Value)
+		if refreshErr != nil {
+			a.logWithContext(r, "Token refresh failed: %v", refreshErr)
+			a.clearAuthCookies(w)
+			a.handleAPIError(w, r, ErrSessionExpired)
+			return
+		}
+
+		// Set new cookies
+		a.setAuthCookies(w, r, newAuthToken, newRefreshToken, true)
+
+		// Use the refreshed user info
+		userInfo = refreshedUser
+	} else {
+		// We have an auth token, try to get user info
+		ctx := context.Background()
+		userInfo, err = a.Supabase.Auth.User(ctx, authCookie.Value)
+
+		if err != nil {
+			// Auth token is invalid, try to refresh if we have a refresh token
+			if refreshErr == nil && refreshCookie.Value != "" {
+				a.logWithContext(r, "Invalid auth token, attempting refresh")
+
+				newAuthToken, newRefreshToken, refreshedUser, refreshErr := a.refreshTokenInternal(authCookie.Value, refreshCookie.Value)
+				if refreshErr != nil {
+					a.logWithContext(r, "Token refresh failed: %v", refreshErr)
+					a.clearAuthCookies(w)
+					a.handleAPIError(w, r, ErrSessionExpired)
+					return
+				}
+
+				// Set new cookies
+				a.setAuthCookies(w, r, newAuthToken, newRefreshToken, true)
+
+				// Use the refreshed user info
+				userInfo = refreshedUser
+			} else {
+				a.logWithContext(r, "Invalid auth token and no refresh token found")
+				a.clearAuthCookies(w)
+				a.handleAPIError(w, r, ErrInvalidToken)
+				return
+			}
+		}
 	}
+
+	// If we still don't have valid user info after all attempts
+	if userInfo == nil {
+		a.logWithContext(r, "Failed to get user info after token refresh")
+		a.clearAuthCookies(w)
+		a.handleAPIError(w, r, ErrInvalidToken)
+		return
+	}
+
+	// Extract user metadata and tier information
+	var userMetadata map[string]interface{}
+	tier := "free" // Default tier
+
+	if userInfo.UserMetadata != nil {
+		userMetadata = userInfo.UserMetadata
+
+		// Extract tier from metadata if available
+		if tierVal, ok := userInfo.UserMetadata["tier"].(string); ok && tierVal != "" {
+			tier = tierVal
+		}
+	}
+
+	// Get current user tier from internal cookie if available
+	signature, err := r.Cookie("MTGBAN")
+	if err == nil && signature.Value != "" {
+		sigTier := GetParamFromSig(signature.Value, "UserTier")
+		if sigTier != "" {
+			tier = sigTier
+		}
+	}
+
+	// Update internal signature with latest user data
+	userData := &UserData{
+		UserId: userInfo.ID,
+		Email:  userInfo.Email,
+		Tier:   tier,
+	}
+
+	baseURL := getBaseURL(r)
+	sig := a.sign(baseURL, tier, userData)
+	a.putSignatureInCookies(w, r, sig)
+
+	// Generate new CSRF token
+	csrfToken := a.generateCSRFToken(userInfo.ID)
+
+	// Set CSRF cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Path:     "/",
+		HttpOnly: false,        // Accessible to JS
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Return comprehensive user data
+	a.sendAPISuccess(w, "User data retrieved successfully", map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":             userInfo.ID,
+			"email":          userInfo.Email,
+			"tier":           tier,
+			"emailConfirmed": !userInfo.ConfirmedAt.IsZero(),
+			"user_metadata":  userMetadata,
+		},
+		"csrf_token": csrfToken,
+	})
 }
 
-// getUseroken exchanges the authorization code for a JWT token
-func getUserToken(code, baseURL, ref string) (string, error) {
-	supabaseClient := supabase.CreateClient(SupabaseUrl, SupabaseAnonKey)
-
+// refreshTokenInternal handles the internal logic for refreshing tokens
+func (a *AuthService) refreshTokenInternal(authToken, refreshToken string) (string, string, *supabase.User, error) {
 	ctx := context.Background()
-	resp, err := supabaseClient.Auth.ExchangeCode(ctx, supabase.ExchangeCodeOpts{
-		AuthCode: code,
-	})
+
+	// Refresh token with Supabase
+	authResponse, err := a.Supabase.Auth.RefreshUser(ctx, authToken, refreshToken)
 	if err != nil {
-		return "", err
+		return "", "", nil, err
 	}
 
-	jwt := resp.AccessToken
-	if jwt == "" {
-		return "", errors.New("no jwt in response")
+	// Extract new tokens
+	newJwtToken := authResponse.AccessToken
+	newRefreshToken := authResponse.RefreshToken
+
+	// Get user data if token was refreshed successfully
+	var userInfo *supabase.User
+	if newJwtToken != "" {
+		userInfo, _ = a.Supabase.Auth.User(ctx, newJwtToken)
 	}
 
-	return jwt, nil
+	return newJwtToken, newRefreshToken, userInfo, nil
 }
 
-// getUserIds returns the user ID and email from the JWT token
-func getUserIds(jwtToken string) (*MtgbanUserData, error) {
-	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-		return []byte(SupabaseAnonKey), nil
-	})
+// handleAuthRefreshToken handles API requests to refresh tokens
+func (a *AuthService) handleAuthRefreshToken(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API token refresh request")
+
+	// Get refresh token from cookie
+	refreshCookie, refreshErr := r.Cookie("refresh_token")
+	authCookie, authErr := r.Cookie("auth_token")
+
+	if refreshErr != nil || refreshCookie.Value == "" {
+		a.logWithContext(r, "No refresh token found")
+		a.handleAPIError(w, r, ErrMissingToken)
+		return
+	}
+
+	// Get tokens from cookies
+	var authToken string
+	if authErr == nil && authCookie.Value != "" {
+		authToken = authCookie.Value
+	}
+	refreshToken := refreshCookie.Value
+
+	// Refresh the token using our internal function
+	newAuthToken, newRefreshToken, userInfo, err := a.refreshTokenInternal(authToken, refreshToken)
 	if err != nil {
-		return nil, err
+		a.logWithContext(r, "Token refresh failed: %v", err)
+		a.clearAuthCookies(w)
+		a.handleAPIError(w, r, ErrSessionExpired)
+		return
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		return nil, errors.New("invalid JWT token")
+	// Set new cookies
+	a.setAuthCookies(w, r, newAuthToken, newRefreshToken, true)
+
+	// Prepare the response
+	response := map[string]interface{}{
+		"expires_at":      time.Now().Add(24 * time.Hour).Unix(),
+		"token_refreshed": true,
 	}
 
-	userData := &MtgbanUserData{
-		UserId: claims["sub"].(string),
-		Email:  strings.ToLower(claims["email"].(string)),
+	// Only proceed with user data if we have a valid user
+	if userInfo != nil {
+		// Update signature cookie with latest user data
+		tier := "free"
+		if userInfo.UserMetadata != nil {
+			if tierVal, ok := userInfo.UserMetadata["tier"].(string); ok && tierVal != "" {
+				tier = tierVal
+			}
+		}
+
+		userData := &UserData{
+			UserId: userInfo.ID,
+			Email:  userInfo.Email,
+			Tier:   tier,
+		}
+
+		baseURL := getBaseURL(r)
+		sig := a.sign(baseURL, tier, userData)
+		a.putSignatureInCookies(w, r, sig)
+
+		// Generate new CSRF token
+		csrfToken := a.generateCSRFToken(userInfo.ID)
+
+		// Set CSRF cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "csrf_token",
+			Value:    csrfToken,
+			Path:     "/",
+			HttpOnly: false,        // Accessible to JS
+			MaxAge:   24 * 60 * 60, // 24 hours
+			Secure:   r.TLS != nil,
+			SameSite: http.SameSiteStrictMode,
+		})
+
+		// Add user info and CSRF token to response
+		response["csrf_token"] = csrfToken
+		response["user"] = map[string]interface{}{
+			"id":    userInfo.ID,
+			"email": userInfo.Email,
+			"tier":  tier,
+		}
 	}
-	return userData, nil
+
+	// Send the response
+	a.sendAPISuccess(w, "Token refreshed successfully", response)
 }
 
-// getUserTier returns the user tier from the JWT token
-func getUserTier(jwtToken string) (string, error) {
-	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-		return []byte(SupabaseAnonKey), nil
-	})
-	if err != nil {
-		return "", err
+// ============================================================================================
+// Helper Functions
+// ============================================================================================
+
+// logWithContext logs messages with request context
+func (a *AuthService) logWithContext(r *http.Request, format string, v ...interface{}) {
+	clientIP := getClientIP(r)
+	method := r.Method
+	path := r.URL.Path
+
+	// Get user ID if authenticated
+	userID := "anonymous"
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil && authCookie.Value != "" {
+		// Extract user ID from JWT without full verification
+		parts := strings.Split(authCookie.Value, ".")
+		if len(parts) == 3 {
+			payload, _ := base64.RawURLEncoding.DecodeString(parts[1])
+			var claims map[string]interface{}
+			if json.Unmarshal(payload, &claims) == nil {
+				if sub, ok := claims["sub"].(string); ok {
+					userID = maskID(sub) // Mask for security
+				}
+			}
+		}
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		return "", errors.New("invalid JWT token")
-	}
+	contextMsg := fmt.Sprintf("[%s][%s %s][User:%s] %s",
+		clientIP, method, path, userID, format)
 
-	tierTitle, ok := claims["tier"].(string)
-	if !ok {
-		return "", errors.New("no tier in webtoken")
-	}
-	return tierTitle, nil
+	a.Logger.Printf(contextMsg, v...)
 }
 
-// getBaseURL returns the base URL of the request
+// normalizeAuthPath normalizes authentication paths
+func (a *AuthService) normalizeAuthPath(path string) string {
+	// Define base auth paths
+	authPaths := map[string]bool{
+		"/login":                  true,
+		"/signup":                 true,
+		"/forgot-password":        true,
+		"/reset-password":         true,
+		"/confirmation":           true,
+		"/success":                true,
+		"/signup-success":         true,
+		"/reset-password-sent":    true,
+		"/login-submit":           true,
+		"/signup-submit":          true,
+		"/forgot-password-submit": true,
+		"/reset-password-submit":  true,
+		"/logout":                 true,
+	}
+
+	// Remove trailing slash if present
+	if len(path) > 1 && path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
+	// Handle duplicate /auth/auth/ prefix
+	if strings.HasPrefix(path, "/auth/auth/") {
+		path = "/auth/" + strings.TrimPrefix(path, "/auth/auth/")
+		return path
+	}
+
+	// Add /auth/ prefix for known auth paths if missing
+	if authPaths[path] && !strings.HasPrefix(path, "/auth") {
+		return "/auth" + path
+	}
+
+	return path
+}
+
+// isExemptPath checks if a path is exempt from authentication
+func (a *AuthService) isExemptPath(path string) bool {
+	// Check exact routes
+	for _, route := range a.AuthConfig.ExemptRoutes {
+		if path == route {
+			return true
+		}
+	}
+
+	// Check prefixes
+	for _, prefix := range a.AuthConfig.ExemptPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+
+	// Check suffixes
+	for _, suffix := range a.AuthConfig.ExemptSuffixes {
+		if strings.HasSuffix(path, suffix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// validatePassword checks password strength
+func (a *AuthService) validatePassword(password string) (bool, string) {
+	if len(password) < 8 {
+		return false, "Password must be at least 8 characters long"
+	}
+
+	hasLetter := false
+	hasDigit := false
+
+	for _, c := range password {
+		if unicode.IsLetter(c) {
+			hasLetter = true
+		} else if unicode.IsDigit(c) {
+			hasDigit = true
+		}
+	}
+
+	if !hasLetter {
+		return false, "Password must contain at least one letter"
+	}
+
+	if !hasDigit {
+		return false, "Password must contain at least one number"
+	}
+
+	return true, ""
+}
+
+// serveFile serves a file with a modified request path
+func serveFile(fileServer http.Handler, w http.ResponseWriter, r *http.Request, path string) {
+	// Create a new request with the modified path
+	newReq := &http.Request{
+		Method:     r.Method,
+		URL:        &url.URL{Path: "/" + path},
+		Proto:      r.Proto,
+		ProtoMajor: r.ProtoMajor,
+		ProtoMinor: r.ProtoMinor,
+		Header:     r.Header,
+		Body:       r.Body,
+		Host:       r.Host,
+	}
+
+	if DevMode {
+		log.Printf("Serving auth asset: %s", path)
+	}
+
+	// Set the content type based on the file extension
+	if strings.HasSuffix(path, ".html") {
+		w.Header().Set("Content-Type", "text/html")
+	} else if strings.HasSuffix(path, ".js") {
+		w.Header().Set("Content-Type", "application/javascript")
+	} else if strings.HasSuffix(path, ".json") {
+		w.Header().Set("Content-Type", "application/json")
+	} else if strings.HasSuffix(path, ".svg") {
+		w.Header().Set("Content-Type", "image/svg+xml")
+	} else if strings.HasSuffix(path, ".png") {
+		w.Header().Set("Content-Type", "image/png")
+	} else if strings.HasSuffix(path, ".jpg") || strings.HasSuffix(path, ".jpeg") {
+		w.Header().Set("Content-Type", "image/jpeg")
+	} else if strings.HasSuffix(path, ".ico") {
+		w.Header().Set("Content-Type", "image/x-icon")
+	} else if strings.HasSuffix(path, ".css") {
+		w.Header().Set("Content-Type", "text/css")
+	} else if strings.HasSuffix(path, ".woff") {
+		w.Header().Set("Content-Type", "font/woff")
+	} else if strings.HasSuffix(path, ".woff2") {
+		w.Header().Set("Content-Type", "font/woff2")
+	} else if strings.HasSuffix(path, ".ttf") {
+		w.Header().Set("Content-Type", "font/ttf")
+	}
+
+	// Serve the file
+	fileServer.ServeHTTP(w, newReq)
+}
+
+// generateCSRFToken generates a CSRF token for a user
+func (a *AuthService) generateCSRFToken(userID string) string {
+	h := hmac.New(sha256.New, a.CSRFSecret)
+	h.Write([]byte(userID))
+	h.Write([]byte(time.Now().Format("2006-01-02"))) // Daily rotation
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+// validateCSRFToken validates a CSRF token
+func (a *AuthService) validateCSRFToken(token, userID string) bool {
+	// If no token provided, validation fails
+	if token == "" {
+		return false
+	}
+
+	expected := a.generateCSRFToken(userID)
+	return token == expected
+}
+
+// getBaseURL gets the base URL for the request
 func getBaseURL(r *http.Request) string {
 	host := r.Host
-	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
+	if host == "localhost:8080" && !DevMode {
 		host = DefaultHost
 	}
 	baseURL := "http://" + host
@@ -954,42 +1995,73 @@ func getBaseURL(r *http.Request) string {
 	return baseURL
 }
 
-// signHMACSHA1Base64 signs the data with the key using HMAC SHA1 and returns the base64 encoded string
-func signHMACSHA1Base64(key []byte, data []byte) string {
-	h := hmac.New(sha1.New, key)
+// signHMACSHA256Base64 signs data with HMAC-SHA256
+func (a *AuthService) signHMACSHA256Base64(key []byte, data []byte) string {
+	h := hmac.New(sha256.New, key)
 	h.Write(data)
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-// getSignatureFromCookies returns the signature from the cookies
-func getSignatureFromCookies(r *http.Request) string {
-	var sig string
-	for _, cookie := range r.Cookies() {
-		if cookie.Name == "MTGBAN" {
-			sig = cookie.Value
-			break
-		}
+// sign signs data for permission granting
+func (a *AuthService) sign(link string, tierTitle string, userData *UserData) string {
+	v := a.getValuesForTier(tierTitle)
+	if userData != nil {
+		v.Set("UserEmail", userData.Email)
+		v.Set("UserTier", tierTitle)
 	}
 
-	querySig := r.FormValue("sig")
-	if sig == "" && querySig != "" {
-		sig = querySig
-	}
+	expires := time.Now().Add(DefaultSignatureDuration)
+	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
+	key := os.Getenv("BAN_SECRET")
+	sig := a.signHMACSHA256Base64([]byte(key), []byte(data))
 
-	exp := GetParamFromSig(sig, "Expires")
-	if exp == "" {
-		return ""
-	}
-	expires, err := strconv.ParseInt(exp, 10, 64)
-	if err != nil || expires < time.Now().Unix() {
-		return ""
-	}
+	v.Set("Expires", fmt.Sprintf("%d", expires.Unix()))
+	v.Set("Signature", sig)
+	str := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
 
-	return sig
+	return str
 }
 
-// putSignatureInCookies sets the signature in the cookies
-func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
+// getValuesForTier gets values for a specific tier
+func (a *AuthService) getValuesForTier(tierTitle string) url.Values {
+	v := url.Values{}
+	tier, found := Config.ACL[tierTitle]
+	if !found {
+		return v
+	}
+	for _, page := range OrderNav {
+		options, found := tier[page]
+		if !found {
+			continue
+		}
+		v.Set(page, "true")
+
+		for _, key := range OptionalFields {
+			val, found := options[key]
+			if !found {
+				continue
+			}
+			v.Set(key, val)
+		}
+	}
+	return v
+}
+
+// GetParamFromSig gets a parameter from a signature
+func GetParamFromSig(sig, param string) string {
+	raw, err := base64.StdEncoding.DecodeString(sig)
+	if err != nil {
+		return ""
+	}
+	v, err := url.ParseQuery(string(raw))
+	if err != nil {
+		return ""
+	}
+	return v.Get(param)
+}
+
+// putSignatureInCookies puts a signature in cookies
+func (a *AuthService) putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	baseURL := getBaseURL(r)
 
 	year, month, _ := time.Now().Date()
@@ -998,6 +2070,7 @@ func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	if strings.Contains(baseURL, "localhost") {
 		domain = "localhost"
 	}
+
 	cookie := http.Cookie{
 		Name:    "MTGBAN",
 		Domain:  domain,
@@ -1009,25 +2082,735 @@ func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	http.SetCookie(w, &cookie)
 }
 
-// noSigning is a middleware that does not enforce any signing
+// setAuthCookies sets authentication cookies
+func (a *AuthService) setAuthCookies(w http.ResponseWriter, r *http.Request, token, refreshToken string, remember bool) {
+	// Set the token expiration time
+	maxAge := 24 * 60 * 60 // 24 hours
+	if remember {
+		maxAge = 30 * 24 * 60 * 60 // 30 days
+	}
+
+	// Determine security settings
+	isSecure := r.TLS != nil || !a.DebugMode
+	sameSiteMode := http.SameSiteStrictMode
+	if a.DebugMode {
+		sameSiteMode = http.SameSiteLaxMode
+	}
+
+	// Set auth token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   maxAge,
+		Secure:   isSecure,
+		SameSite: sameSiteMode,
+	})
+
+	// Set refresh token cookie (longer expiry)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   60 * 24 * 60 * 60, // 60 days
+		Secure:   isSecure,
+		SameSite: sameSiteMode,
+	})
+}
+
+// clearAuthCookies clears authentication cookies
+func (a *AuthService) clearAuthCookies(w http.ResponseWriter) {
+	// Clear auth token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Clear refresh token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Clear CSRF token
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: false,
+		MaxAge:   -1,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Clear MTGBAN signature
+	http.SetCookie(w, &http.Cookie{
+		Name:     "MTGBAN",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+}
+
+// sendAPISuccess sends a successful API response
+func (a *AuthService) sendAPISuccess(w http.ResponseWriter, message string, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: message,
+		Data:    data,
+	})
+}
+
+// handleAPIError handles API errors
+func (a *AuthService) handleAPIError(w http.ResponseWriter, r *http.Request, err AuthError) {
+	// Log internal error if present
+	if err.Internal != nil {
+		a.logWithContext(r, "API error (%s): %v", err.Code, err.Internal)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(err.StatusCode)
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: false,
+		Error:   err.Message,
+		Code:    err.Code,
+	})
+}
+
+// handleFormError handles form errors with redirects
+func (a *AuthService) handleFormError(w http.ResponseWriter, r *http.Request, err AuthError, returnPath string) {
+	// Log internal error if present
+	if err.Internal != nil {
+		a.logWithContext(r, "Form error (%s): %v", err.Code, err.Internal)
+	}
+
+	// Redirect with error message
+	redirectURL := fmt.Sprintf("%s?error=%s&message=%s",
+		returnPath,
+		url.QueryEscape(err.Code),
+		url.QueryEscape(err.Message))
+
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+}
+
+// ============================================================================================
+// Route Registration
+// ============================================================================================
+
+// registerRoutes registers authentication routes
+func (a *AuthService) registerRoutes() {
+	a.Logger.Printf("Registering authentication routes")
+
+	// Next.js static assets handler - this must be registered first
+	http.HandleFunc("/_next/", a.handleNextJsAssets)
+
+	// Create middleware chains
+	chains := a.createMiddlewareChains()
+
+	// Define routes with their middlewares
+	routes := []AuthRoute{
+		// Base routes
+		{
+			Path:        "/auth/login",
+			Method:      "GET",
+			Handler:     a.handleAuthLogin,
+			Middlewares: chains["base"],
+			Description: "Login page",
+		},
+		{
+			Path:        "/auth/signup",
+			Method:      "GET",
+			Handler:     a.handleAuthSignup,
+			Middlewares: chains["base"],
+			Description: "Signup page",
+		},
+		// API Routes
+		{
+			Path:        "/next-api/auth/login",
+			Method:      "POST",
+			Handler:     a.handleAuthLogin,
+			Middlewares: chains["apiAuth"],
+			Description: "API login endpoint",
+		},
+		{
+			Path:        "/next-api/auth/signup",
+			Method:      "POST",
+			Handler:     a.handleAuthSignup,
+			Middlewares: chains["apiAuth"],
+			Description: "API signup endpoint",
+		},
+		{
+			Path:        "/next-api/auth/logout",
+			Method:      "POST",
+			Handler:     a.handleAuthLogout,
+			Middlewares: chains["api"],
+			Description: "API logout endpoint",
+		},
+		{
+			Path:        "/next-api/auth/me",
+			Method:      "GET",
+			Handler:     a.handleAuthGetUser,
+			Middlewares: chains["api"],
+			Description: "API get current user endpoint",
+		},
+		{
+			Path:        "/next-api/auth/refresh-token",
+			Method:      "POST",
+			Handler:     a.handleAuthRefreshToken,
+			Middlewares: chains["api"],
+			Description: "API refresh token endpoint",
+		},
+		{
+			Path:        "/next-api/auth/forgot-password",
+			Method:      "POST",
+			Handler:     a.handleAuthForgotPassword,
+			Middlewares: chains["apiAuth"],
+			Description: "API forgot password endpoint",
+		},
+		{
+			Path:        "/next-api/auth/reset-password",
+			Method:      "POST",
+			Handler:     a.handleAuthResetPassword,
+			Middlewares: chains["apiAuth"],
+			Description: "API reset password endpoint",
+		},
+
+		// Form submission routes
+		{
+			Path:        "/auth/login-submit",
+			Method:      "POST",
+			Handler:     a.handleLoginFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Login form submission",
+		},
+		{
+			Path:        "/auth/signup-submit",
+			Method:      "POST",
+			Handler:     a.handleSignupFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Signup form submission",
+		},
+		{
+			Path:        "/auth/forgot-password-submit",
+			Method:      "POST",
+			Handler:     a.handleForgotPasswordFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Forgot password form submission",
+		},
+		{
+			Path:        "/auth/reset-password-submit",
+			Method:      "POST",
+			Handler:     a.handleResetPasswordFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Reset password form submission",
+		},
+		{
+			Path:        "/auth/logout",
+			Method:      "GET",
+			Handler:     a.handleLogoutForm,
+			Middlewares: chains["base"],
+			Description: "Logout form submission",
+		},
+	}
+
+	// Register routes
+	for _, route := range routes {
+		handler := route.Handler
+
+		// Apply middlewares
+		handler = route.Middlewares.Then(handler)
+
+		// Register with method checking
+		http.HandleFunc(route.Path, func(w http.ResponseWriter, r *http.Request) {
+			if route.Method != "" && r.Method != route.Method {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			handler(w, r)
+		})
+
+		a.Logger.Printf("Registered route: %s %s", route.Method, route.Path)
+	}
+
+	// Set up path normalizer for /auth/auth/ redirects
+	pathNormalizerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/auth/auth/") {
+			newPath := "/auth/" + strings.TrimPrefix(path, "/auth/auth/")
+			query := r.URL.RawQuery
+			if query != "" {
+				newPath += "?" + query
+			}
+			a.Logger.Printf("Redirecting from duplicate auth path: %s → %s", path, newPath)
+			http.Redirect(w, r, newPath, http.StatusMovedPermanently)
+			return
+		}
+
+		// Continue to next handler
+		http.NotFound(w, r)
+	})
+
+	// Handle path normalization before serving static files
+	http.Handle("/auth/auth/", pathNormalizerHandler)
+
+	// Serve static files and React components from embedded Next.js app
+	authFS, err := fs.Sub(authAssets, "nextAuth/out")
+	if err != nil {
+		a.Logger.Printf("Failed to load embedded auth assets: %v", err)
+		return
+	}
+
+	http.Handle("/auth/", http.StripPrefix("/auth", a.createStaticFileServer(authFS)))
+
+	a.Logger.Printf("Authentication routes registered successfully")
+}
+
+// createStaticFileServer creates a file server for static auth assets
+func (a *AuthService) createStaticFileServer(authFS fs.FS) http.Handler {
+	fileServer := http.FileServer(http.FS(authFS))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Log the requested path for debugging
+		if a.DebugMode {
+			a.logWithContext(r, "Auth asset request: %s", r.URL.Path)
+		}
+
+		// Handle special paths like confirmation, success, etc.
+		switch r.URL.Path {
+		case "/confirmation":
+			a.serveConfirmationPage(w, r)
+			return
+		case "/signup-success":
+			a.serveSignupSuccessPage(w, r)
+			return
+		case "/success":
+			a.serveSuccessPage(w, r)
+			return
+		case "/reset-password-sent":
+			a.serveResetPasswordSentPage(w, r)
+			return
+		}
+
+		// Get the clean path for route matching
+		path := r.URL.Path
+		cleanPath := strings.TrimPrefix(strings.Trim(path, "/"), "auth/")
+
+		// Try to serve the file directly
+		filePath := cleanPath
+		if filepath.Ext(cleanPath) == "" {
+			// If no extension and not a directory, try adding .html
+			htmlPath := cleanPath + ".html"
+			if authFileExists(authFS, htmlPath) {
+				w.Header().Set("Content-Type", "text/html")
+				serveFile(fileServer, w, r, htmlPath)
+				return
+			}
+		}
+
+		if authFileExists(authFS, filePath) {
+			serveFile(fileServer, w, r, filePath)
+			return
+		}
+
+		// Handle Next.js static files
+		if strings.HasPrefix(path, "/_next/") {
+			nextPath := strings.TrimPrefix(path, "/")
+			if authFileExists(authFS, nextPath) {
+				serveFile(fileServer, w, r, nextPath)
+				return
+			}
+		}
+
+		// If all else fails for login-related paths, try to serve login.html
+		if strings.Contains(path, "login") {
+			if authFileExists(authFS, "login.html") {
+				w.Header().Set("Content-Type", "text/html")
+				serveFile(fileServer, w, r, "login.html")
+				return
+			}
+		}
+
+		// Last resort - serve index.html for SPA navigation
+		if !strings.Contains(path, ".") {
+			if authFileExists(authFS, "index.html") {
+				w.Header().Set("Content-Type", "text/html")
+				serveFile(fileServer, w, r, "index.html")
+				return
+			}
+		}
+
+		a.Logger.Printf("Auth file not found: %s", path)
+		http.NotFound(w, r)
+	})
+}
+
+func (a *AuthService) serveConfirmationPage(w http.ResponseWriter, r *http.Request) {
+	// Extract query parameters
+	email := r.URL.Query().Get("email")
+	message := r.URL.Query().Get("message")
+
+	if message == "" {
+		message = "Please check your email to verify your account."
+	}
+
+	// Create email message paragraph if email is present
+	var emailHTML string
+	if email != "" {
+		emailHTML = "<p>We've sent a verification email to <strong>" + email + "</strong></p>"
+	}
+
+	// Serve a simple static HTML confirmation page
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Confirm Your Email | MTGBAN</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="auth.css">
+    <style>
+        .auth-container {
+            max-width: 450px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .auth-title {
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .auth-message {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+        }
+        .success-message {
+            background-color: rgba(52, 211, 153, 0.2);
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+        .auth-links {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+        .auth-links a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .auth-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="auth-title">Check Your Email</h1>
+        <div class="auth-message success-message">
+            ` + message + `
+        </div>
+        ` + emailHTML + `
+        <div class="auth-links">
+            <p>Return to <a href="login">Login</a></p>
+        </div>
+    </div>
+</body>
+</html>
+	`))
+}
+
+// serveSignupSuccessPage serves the signup success page
+func (a *AuthService) serveSignupSuccessPage(w http.ResponseWriter, r *http.Request) {
+	// Serve a simple static HTML success page
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Signup Successful | MTGBAN</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="auth.css">
+    <style>
+        .auth-container {
+            max-width: 450px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .auth-title {
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .auth-message {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+        }
+        .success-message {
+            background-color: rgba(52, 211, 153, 0.2);
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+        .auth-links {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+        .auth-links a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .auth-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="auth-title">Account Created</h1>
+        <div class="auth-message success-message">
+            Your account has been created. Please check your email to verify your account.
+        </div>
+        <div class="auth-links">
+            <p>Return to <a href="login">Login</a></p>
+        </div>
+    </div>
+</body>
+</html>
+	`))
+}
+
+// serveSuccessPage serves the success page
+func (a *AuthService) serveSuccessPage(w http.ResponseWriter, r *http.Request) {
+	// Extract query parameters
+	redirectTo := r.URL.Query().Get("redirectTo")
+	message := r.URL.Query().Get("message")
+
+	if message == "" {
+		message = "Your action was completed successfully."
+	}
+
+	// Default redirect if none provided
+	if redirectTo == "" {
+		redirectTo = "login"
+	}
+
+	// Serve a simple static HTML success page
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Success | MTGBAN</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="auth.css">
+    <style>
+        .auth-container {
+            max-width: 450px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .auth-title {
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .auth-message {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+        }
+        .success-message {
+            background-color: rgba(52, 211, 153, 0.2);
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+        .auth-subtitle {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.375rem;
+            font-weight: 500;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            width: 100%;
+            text-align: center;
+            margin-top: 1rem;
+        }
+        .auth-links {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+    </style>
+    <!-- Auto redirect after 3 seconds -->
+    <meta http-equiv="refresh" content="3;url=` + redirectTo + `">
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="auth-title">Success</h1>
+        <div class="auth-message success-message">
+            ` + message + `
+        </div>
+        <p class="auth-subtitle">
+            Redirecting you automatically in 3 seconds...
+        </p>
+        <a href="` + redirectTo + `" class="btn">
+            Continue Now
+        </a>
+    </div>
+</body>
+</html>
+	`))
+}
+
+// serveResetPasswordSentPage serves the reset password sent page
+func (a *AuthService) serveResetPasswordSentPage(w http.ResponseWriter, r *http.Request) {
+	// Extract query parameters
+	email := r.URL.Query().Get("email")
+
+	// Create email message if provided
+	var emailHTML string
+	if email != "" {
+		emailHTML = "<p>We've sent password reset instructions to <strong>" + email + "</strong></p>"
+	}
+
+	// Serve a simple static HTML page
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Reset Password | MTGBAN</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="auth.css">
+    <style>
+        .auth-container {
+            max-width: 450px;
+            margin: 2rem auto;
+            padding: 2rem;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .auth-title {
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        .auth-message {
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+        }
+        .info-message {
+            background-color: rgba(59, 130, 246, 0.2);
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+        .auth-info {
+            margin: 1.5rem 0;
+        }
+        .auth-links {
+            margin-top: 1.5rem;
+            text-align: center;
+        }
+        .auth-links a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .auth-links a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="auth-title">Check Your Email</h1>
+        <div class="auth-message info-message">
+            If an account exists with that email, we've sent password reset instructions.
+        </div>
+        ` + emailHTML + `
+        <div class="auth-info">
+            <p>Please check your inbox and follow the instructions in the email to reset your password.</p>
+            <p>If you don't see the email, check your spam folder.</p>
+        </div>
+        <div class="auth-links">
+            <p>Return to <a href="login">Login</a></p>
+        </div>
+    </div>
+</body>
+</html>
+	`))
+}
+
+// ============================================================================================
+// Custom Types
+// ============================================================================================
+
+// responseWriter wraps http.ResponseWriter to capture the status code
+type responseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+// newResponseWriter creates a new response writer
+func newResponseWriter(w http.ResponseWriter) *responseWriter {
+	return &responseWriter{w, http.StatusOK}
+}
+
+// WriteHeader overrides the original WriteHeader to capture the status code
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+// ============================================================================================
+// InitAuth - Legacy Compatibility Function
+// ============================================================================================
+
 func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		if AuthHost == "" {
-			AuthHost = getBaseURL(r) + "/auth"
-		}
-
 		querySig := r.FormValue("sig")
 		if querySig != "" {
-			putSignatureInCookies(w, r, querySig)
+			authService.putSignatureInCookies(w, r, querySig)
 		}
 
 		next.ServeHTTP(w, r)
 	})
 }
 
-// enforceAPISigning is a middleware that enforces API signing
+// enforceAPISigning is a middleware that enforces API signing (legacy compatibility)
 func enforceAPISigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
@@ -1107,7 +2890,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		}
 
 		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
-		valid := signHMACSHA1Base64([]byte(secret), []byte(data))
+		valid := authService.signHMACSHA256Base64([]byte(secret), []byte(data))
 
 		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
 			log.Println("API error, invalid", data)
@@ -1119,19 +2902,20 @@ func enforceAPISigning(next http.Handler) http.Handler {
 	})
 }
 
-// enforceSigning is a middleware that enforces signing
+// enforceSigning is a middleware that enforces signing (legacy compatibility)
 func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
-
+		var AuthHost = "localhost:8081"
 		if AuthHost == "" {
 			AuthHost = getBaseURL(r) + "/auth"
 		}
+
 		sig := getSignatureFromCookies(r)
 		querySig := r.FormValue("sig")
 		if querySig != "" {
 			sig = querySig
-			putSignatureInCookies(w, r, querySig)
+			authService.putSignatureInCookies(w, r, querySig)
 		}
 
 		switch r.Method {
@@ -1198,7 +2982,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		exp := v.Get("Expires")
 
 		data := fmt.Sprintf("GET%s%s%s", exp, getBaseURL(r), q.Encode())
-		valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+		valid := authService.signHMACSHA256Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 		expires, err := strconv.ParseInt(exp, 10, 64)
 		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
 			if r.Method != "GET" {
@@ -1266,7 +3050,79 @@ func enforceSigning(next http.Handler) http.Handler {
 	})
 }
 
-// recoverPanic recovers from a panic and sends an error response
+// InitAuth initializes the auth service (legacy compatibility function)
+func InitAuth(params ...string) (*AuthService, error) {
+	// Set default config
+	config := AuthConfig{
+		SupabaseURL:     Config.DB.Url,
+		SupabaseAnonKey: Config.DB.Key,
+		SupabaseSecret:  Config.DB.Secret,
+		DebugMode:       DevMode,
+		LogPrefix:       "[AUTH] ",
+		ExemptRoutes:    []string{"/", "/home"},
+		ExemptPrefixes:  []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
+		ExemptSuffixes:  []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
+	}
+
+	var configFile string
+	if len(params) > 0 {
+		configFile = params[0]
+	}
+
+	// Try to load from config file if provided
+	if configFile != "" {
+		log.Printf("Loading configuration from file: %s", configFile)
+		// Check if the file exists and is not empty
+		file, err := os.Open(configFile)
+		if err == nil {
+			defer file.Close()
+			if err := json.NewDecoder(file).Decode(&config); err != nil {
+				return nil, fmt.Errorf("failed to parse config file: %w", err)
+			}
+		} else if !os.IsNotExist(err) && !DevMode {
+			return nil, fmt.Errorf("failed to open config file: %w", err)
+		}
+	}
+
+	service, err := NewAuthService(config)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := service.Initialize(); err != nil {
+		return nil, err
+	}
+
+	return service, nil
+}
+
+// getSignatureFromCookies returns the signature from the cookies
+func getSignatureFromCookies(r *http.Request) string {
+	var sig string
+	for _, cookie := range r.Cookies() {
+		if cookie.Name == "MTGBAN" {
+			sig = cookie.Value
+			break
+		}
+	}
+
+	querySig := r.FormValue("sig")
+	if sig == "" && querySig != "" {
+		sig = querySig
+	}
+
+	exp := GetParamFromSig(sig, "Expires")
+	if exp == "" {
+		return ""
+	}
+	expires, err := strconv.ParseInt(exp, 10, 64)
+	if err != nil || expires < time.Now().Unix() {
+		return ""
+	}
+
+	return sig
+}
+
 func recoverPanic(r *http.Request, w http.ResponseWriter) {
 	errPanic := recover()
 	if errPanic != nil {
@@ -1274,8 +3130,8 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 
 		// Restrict stack size to fit into discord message
 		buf := make([]byte, 1<<16)
-		runtime.Stack(buf, true)
-		if len(buf) > 1024 {
+		n := runtime.Stack(buf, true)
+		if n > 1024 {
 			buf = buf[:1024]
 		}
 
@@ -1284,120 +3140,14 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 		if ok {
 			msg = err.Error()
 		} else {
-			msg = "unknown error"
+			msg = fmt.Sprintf("%v", errPanic)
 		}
+
+		// Notify server administrators
 		ServerNotify("panic", msg, true)
-		ServerNotify("panic", string(buf))
+		ServerNotify("panic", string(buf[:n]))
 		ServerNotify("panic", "source request: "+r.URL.String())
 
 		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
-		return
 	}
-}
-
-// getValuesForTier is used to generate the query parameters for signing
-func getValuesForTier(tierTitle string) url.Values {
-	v := url.Values{}
-	tier, found := Config.ACL[tierTitle]
-	if !found {
-		return v
-	}
-	for _, page := range OrderNav {
-		options, found := tier[page]
-		if !found {
-			continue
-		}
-		v.Set(page, "true")
-
-		for _, key := range OptionalFields {
-			val, found := options[key]
-			if !found {
-				continue
-			}
-			v.Set(key, val)
-		}
-	}
-	return v
-}
-
-// sign signs the link with the given tier and user data
-func sign(link string, tierTitle string, userData *MtgbanUserData) string {
-	v := getValuesForTier(tierTitle)
-	if userData != nil {
-		v.Set("UserEmail", userData.Email)
-		v.Set("UserTier", tierTitle)
-	}
-
-	expires := time.Now().Add(DefaultSignatureDuration)
-	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
-	key := os.Getenv("BAN_SECRET")
-	sig := signHMACSHA1Base64([]byte(key), []byte(data))
-
-	v.Set("Expires", fmt.Sprintf("%d", expires.Unix()))
-	v.Set("Signature", sig)
-	str := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
-
-	return str
-}
-
-// GetParamFromSig returns the value of a parameter from the signature
-func GetParamFromSig(sig, param string) string {
-	raw, err := base64.StdEncoding.DecodeString(sig)
-	if err != nil {
-		return ""
-	}
-	v, err := url.ParseQuery(string(raw))
-	if err != nil {
-		return ""
-	}
-	return v.Get(param)
-}
-
-// Auth handles the authentication process
-func Auth(w http.ResponseWriter, r *http.Request) {
-	baseURL := getBaseURL(r)
-	code := r.FormValue("code")
-	if code == "" {
-		http.Redirect(w, r, baseURL, http.StatusFound)
-		return
-	}
-
-	jwt, err := getUserToken(code, baseURL, r.FormValue("state"))
-	if err != nil {
-		LogPages["Admin"].Println("getUserToken", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=TokenNotFound", http.StatusFound)
-		return
-	}
-
-	userData, err := getUserIds(jwt)
-	if err != nil {
-		LogPages["Admin"].Println("getUserId", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=UserNotFound", http.StatusFound)
-		return
-	}
-
-	tierTitle, err := getUserTier(jwt)
-	if err != nil {
-		LogPages["Admin"].Println("getUserTier", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=TierNotFound", http.StatusFound)
-		return
-	}
-
-	LogPages["Admin"].Println(userData)
-	LogPages["Admin"].Println(tierTitle)
-
-	// Sign our base URL with our tier and other data
-	sig := sign(baseURL, tierTitle, userData)
-
-	// Keep it secret. Keep it safe.
-	putSignatureInCookies(w, r, sig)
-
-	// Redirect to the URL indicated in this query param, or go to homepage
-	redir := r.FormValue("state")
-	if redir == "" {
-		redir = getBaseURL(r)
-	}
-
-	// Redirect, we're done here
-	http.Redirect(w, r, redir, http.StatusFound)
 }

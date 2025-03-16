@@ -215,10 +215,11 @@ var startTime = time.Now()
 
 var DefaultNav = []NavElem{
 	NavElem{
-		Name:  "Home",
-		Short: "🏡",
-		Link:  "/",
-		Page:  "home.html",
+		Name:    "Home",
+		Short:   "🏡",
+		Link:    "/",
+		Page:    "home.html",
+		CanPOST: true,
 	},
 }
 
@@ -353,17 +354,24 @@ type ConfigType struct {
 	SleepersBlockList      []string          `json:"sleepers_block_list"`
 	GlobalAllowList        []string          `json:"global_allow_list"`
 	GlobalProbeList        []string          `json:"global_probe_list"`
-	Supabase               struct {
-		SupabaseTokenSecret map[string]string `json:"secret"`
-		Grants              []struct {
-			Id   string `json:"id"`
-			Role string `json:"role"`
-			Tier string `json:"tier"`
+	Patreon                struct {
+		Secret map[string]string `json:"secret"`
+		Grants []struct {
+			Category string `json:"category"`
+			Email    string `json:"email"`
+			Name     string `json:"name"`
+			Tier     string `json:"tier"`
 		} `json:"grants"`
-	} `json:"supabase"`
+	} `json:"patreon"`
 	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
 	GoogleCredentials string            `json:"google_credentials"`
-
+	DB                struct {
+		Prefix  string `json:"log_prefix"`
+		Key     string `json:"supabase_anon_key"`
+		RoleKey string `json:"role_key"`
+		Secret  string `json:"supabase_jwt_secret"`
+		Url     string `json:"supabase_url"`
+	} `json:"db"`
 	ACL map[string]map[string]map[string]string `json:"acl"`
 
 	Uploader struct {
@@ -605,7 +613,6 @@ func main() {
 	flag.StringVar(&Config.filePath, "cfg", DefaultConfigPath, "Load configuration file")
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
-
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	skipInitialRefresh := flag.Bool("skip", true, "Skip initial refresh")
@@ -622,12 +629,13 @@ func main() {
 		SkipInitialRefresh = *skipInitialRefresh
 	}
 
-	// load necessary environmental variables
+	// Load necessary environmental variables
 	err := loadVars(Config.filePath, *port, *datastore)
 	if err != nil {
 		log.Fatalln("unable to load config file:", err)
 	}
 
+	// Create necessary directories
 	_, err = os.Stat(LogDir)
 	if errors.Is(err, os.ErrNotExist) {
 		err = os.MkdirAll(LogDir, 0700)
@@ -637,6 +645,7 @@ func main() {
 	}
 	LogPages = map[string]*log.Logger{}
 
+	// Initialize Google client
 	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
 	if err != nil {
 		if DevMode {
@@ -646,6 +655,7 @@ func main() {
 		}
 	}
 
+	// Open databases
 	err = openDBs()
 	if err != nil {
 		if DevMode {
@@ -655,7 +665,29 @@ func main() {
 		}
 	}
 
-	// load website up
+	// Initialize the auth service with proper configuration
+	authConfig := AuthConfig{
+		SupabaseURL:     Config.DB.Url,
+		SupabaseAnonKey: Config.DB.Key,
+		SupabaseSecret:  Config.DB.Secret,
+		DebugMode:       DevMode,
+		LogPrefix:       "[AUTH] ",
+		// Set exempt routes that don't require authentication
+		ExemptRoutes:   []string{"/", "/home"},
+		ExemptPrefixes: []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
+		ExemptSuffixes: []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
+	}
+
+	authService, err := NewAuthService(authConfig)
+	if err != nil {
+		log.Fatalf("Failed to create auth service: %v", err)
+	}
+
+	if err := authService.Initialize(); err != nil {
+		log.Fatalf("Failed to initialize auth service: %v", err)
+	}
+
+	// Start background data loading
 	go func() {
 		var err error
 
@@ -700,13 +732,11 @@ func main() {
 			}
 		})
 
-		// Slean up the csv cache every 3 days
+		// Clean up the csv cache every 3 days
 		c.AddFunc("0 0 */3 * *", deleteOldCache)
 
 		c.Start()
 	}()
-
-	InitAuth("auth_config.json")
 
 	err = setupDiscord()
 	if err != nil {
@@ -716,12 +746,12 @@ func main() {
 	// Set seed in case we need to do random operations
 	rand.Seed(time.Now().UnixNano())
 
-	// serve everything in known folders as a file
+	// Serve static files
 	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(&FileSystem{http.Dir("css")})))
 	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(&FileSystem{http.Dir("img")})))
 	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(&FileSystem{http.Dir("js")})))
 
-	// custom redirector
+	// Custom redirects
 	http.HandleFunc("/go/", Redirect)
 	http.HandleFunc("/random", RandomSearch)
 	http.HandleFunc("/randomsealed", RandomSealedSearch)
@@ -729,9 +759,10 @@ func main() {
 		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
 	})
 
-	// when navigating to /home it should serve the home page
-	http.Handle("/", noSigning(http.HandlerFunc(Home)))
+	// Home page - no authentication required
+	http.Handle("/", authService.AuthWrapper(http.HandlerFunc(Home)))
 
+	// Register routes for each navigation item
 	for key, nav := range ExtraNavs {
 		// Set up logging
 		logFile, err := logfile.New(&logfile.LogFile{
@@ -749,11 +780,16 @@ func main() {
 
 		_, ExtraNavs[key].NoAuth = Config.ACL["Any"][key]
 
-		// Set up the handler
-		handler := enforceSigning(http.HandlerFunc(nav.Handle))
+		// Use the new auth service for handling routes
+		var handler http.Handler
 		if nav.NoAuth {
-			handler = noSigning(http.HandlerFunc(nav.Handle))
+			// No authentication required
+			handler = http.HandlerFunc(nav.Handle)
+		} else {
+			// Use AuthWrapper middleware
+			handler = http.HandlerFunc(authService.AuthWrapper(nav.Handle))
 		}
+
 		http.Handle(nav.Link, handler)
 
 		// Add any additional endpoints to it
@@ -762,24 +798,26 @@ func main() {
 		}
 	}
 
-	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
-	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
-	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
-	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
-	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
-	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
-	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
-	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
-	// compat
+	// API endpoints
+	http.Handle("/search/oembed", authService.AuthWrapper(http.HandlerFunc(Search)))
+	http.Handle("/api/mtgban/", authService.AuthWrapper(http.HandlerFunc(PriceAPI)))
+	http.Handle("/api/mtgjson/ck.json", authService.AuthWrapper(http.HandlerFunc(API)))
+	http.Handle("/api/tcgplayer/", authService.AuthWrapper(authService.AuthWrapper(TCGHandler)))
+	http.Handle("/api/search/", authService.AuthWrapper(authService.AuthWrapper(SearchAPI)))
+	http.Handle("/api/cardkingdom/pricelist.json", authService.AuthWrapper(http.HandlerFunc(CKMirrorAPI)))
+	http.Handle("/api/suggest", authService.AuthWrapper(http.HandlerFunc(SuggestAPI)))
+	http.Handle("/api/opensearch.xml", authService.AuthWrapper(http.HandlerFunc(OpenSearchDesc)))
+
+	// Favicon handler
 	http.HandleFunc("/favicon.ico", Favicon)
-	http.Handle("/img/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
+	http.Handle("/img/opensearch.xml", authService.AuthWrapper(http.HandlerFunc(OpenSearchDesc)))
 
-	http.HandleFunc("/auth", Auth)
-
+	// Create and start the server
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
 	}
 
+	// Handle graceful shutdown
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	go func() {

@@ -119,10 +119,10 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	spoof := r.FormValue("spoof")
 	if spoof != "" {
 		baseURL := getBaseURL(r)
-		sig := sign(baseURL, spoof, nil)
+		sig := authService.sign(baseURL, spoof, nil)
 
 		// Overwrite the current signature
-		putSignatureInCookies(w, r, sig)
+		authService.putSignatureInCookies(w, r, sig)
 
 		http.Redirect(w, r, baseURL, http.StatusFound)
 		return
@@ -327,12 +327,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			"", "#", "Category", "Email", "Name", "Tier",
 		}
 
-		for i, person := range Config.Supabase.Grants {
+		for i, person := range Config.Patreon.Grants {
 			row := []string{
 				fmt.Sprintf("%d", i+1),
-				person.Role,
-				person.Id,
-				person.Tier,
+				person.Email,
+				person.Category,
+				person.Name,
 			}
 
 			pageVars.Table = append(pageVars.Table, row)
@@ -699,7 +699,7 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 	}
 
 	data := fmt.Sprintf("GET%s%s%s", exp, link, v.Encode())
-	sig := signHMACSHA1Base64([]byte(key), []byte(data))
+	sig := authService.signHMACSHA256Base64([]byte(key), []byte(data))
 
 	v.Set("Signature", sig)
 	return base64.StdEncoding.EncodeToString([]byte(v.Encode())), nil
