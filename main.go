@@ -353,6 +353,7 @@ type ConfigType struct {
 	GlobalAllowList        []string          `json:"global_allow_list"`
 	GlobalProbeList        []string          `json:"global_probe_list"`
 	Patreon                struct {
+		Client map[string]string `json:"client"`
 		Secret map[string]string `json:"secret"`
 		Grants []struct {
 			Category string `json:"category"`
@@ -466,7 +467,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		ErrorMessage: msg,
 		LastUpdate:   LastUpdate,
 
-		PatreonId:    PatreonClientId,
+		PatreonId:    Config.Patreon.Client["ban"],
 		PatreonURL:   PatreonHost,
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,

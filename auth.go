@@ -30,8 +30,6 @@ const (
 )
 
 const (
-	PatreonClientId = "VrjStFvhtp7HhF1xItHm83FMY7PK3nptpls1xVkYL5IDufXNVW4Xb-pHPXBIuWZ4"
-
 	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
 	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
 	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/"
@@ -48,7 +46,7 @@ const (
 )
 
 func getUserToken(code, baseURL, ref string) (string, error) {
-	clientId := PatreonClientId
+	clientId := Config.Patreon.Client["ban"]
 	secret := Config.Patreon.Secret["ban"]
 
 	resp, err := cleanhttp.DefaultClient().PostForm(PatreonTokenURL, url.Values{
