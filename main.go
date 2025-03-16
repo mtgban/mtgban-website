@@ -37,7 +37,7 @@ type PageVars struct {
 	Nav      []NavElem
 	ExtraNav []NavElem
 
-	PatreonId    string
+	PatreonIds   map[string]string
 	PatreonURL   string
 	PatreonLogin bool
 	Hash         string
@@ -467,7 +467,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		ErrorMessage: msg,
 		LastUpdate:   LastUpdate,
 
-		PatreonId:    Config.Patreon.Client["ban"],
+		PatreonIds:   Config.Patreon.Client,
 		PatreonURL:   PatreonHost,
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,
