@@ -46,8 +46,22 @@ const (
 )
 
 func getUserToken(code, baseURL, ref string) (string, error) {
-	clientId := Config.Patreon.Client["ban"]
-	secret := Config.Patreon.Secret["ban"]
+	source := "ban"
+
+	// ref might point to a different patreon configuration
+	refs := strings.Split(ref, ";")
+	if len(refs) > 1 {
+		source = refs[1]
+	}
+
+	clientId, found := Config.Patreon.Client[source]
+	if !found {
+		return "", fmt.Errorf("missing client id for %s", source)
+	}
+	secret, found := Config.Patreon.Secret[source]
+	if !found {
+		return "", fmt.Errorf("missing secret for %s", source)
+	}
 
 	resp, err := cleanhttp.DefaultClient().PostForm(PatreonTokenURL, url.Values{
 		"code":          {code},
@@ -292,7 +306,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	putSignatureInCookies(w, r, sig)
 
 	// Redirect to the URL indicated in this query param, or go to homepage
-	redir := r.FormValue("state")
+	redir := strings.Split(r.FormValue("state"), ";")[0]
 	if redir == "" {
 		redir = getBaseURL(r)
 	}
