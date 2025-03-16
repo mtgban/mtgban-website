@@ -307,7 +307,9 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect to the URL indicated in this query param, or go to homepage
 	redir := strings.Split(r.FormValue("state"), ";")[0]
-	if redir == "" {
+
+	// Go back home if empty or if coming back from a logout
+	if redir == "" || strings.Contains(redir, "errmsg=logout") {
 		redir = getBaseURL(r)
 	}
 
