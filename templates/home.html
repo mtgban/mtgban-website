@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
-    <link rel="stylesheet" type="text/css" href="/css/home.css">
+    <link rel="stylesheet" type="text/css" href="/css/home.css?hash={{.Hash}}">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
     <title>{{.Title}}</title>
-    
+
     <!-- Favicon links -->
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
@@ -18,21 +19,21 @@
     <link rel="shortcut icon" href="/img/favicon/favicon.ico">
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
-    
+
     <!-- Scripts -->
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
-    
+
 </head>
 
 <body class="dark-theme">
     <script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
-    
+
     <header>
         <div class="container">
             <div class="header-content">
                 <a href="/" class="logo">MTGBAN</a>
-                
+
                 <nav>
                     <ul>
                         <li>
@@ -42,55 +43,58 @@
                             </a>
                         </li>
                         {{range .Nav}}
-                            <li>
-                                <a {{if .Active}}class="active"{{end}} href="{{.Link}}">
-                                    <span>{{.Short}} {{.Name}}</span>
-                                </a>
-                            </li>
+                        <li>
+                            <a {{if .Active}}class="active" {{end}} href="{{.Link}}">
+                                <span>{{.Short}} {{.Name}}</span>
+                            </a>
+                        </li>
                         {{end}}
                     </ul>
                 </nav>
-                
-                <div class="auth-buttons">
-                    <a href="/login" class="login-btn">Log in</a>
-                    <a href="mtgban-stripe-payments.vercel.app" class="signup-btn">Subscribe</a>
-                    
-                    <div class="theme-toggle">
-                        <label class="switch">
-                            <input type="checkbox"/>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+                <div class="theme-toggle">
+                    <label class="switch">
+                        <input type="checkbox" />
+                        <span class="slider"></span>
+                    </label>
                 </div>
+                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
             </div>
         </div>
+        </div>
     </header>
-    
+
     <div class="search-container">
         <form class="search-form autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
-            <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
+            <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)"
+                type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
         </form>
     </div>
-    
+
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
     </script>
-    
+
     <div class="container">
         <div class="main-content">
+            <div class="auth-container">
+                <div class="auth-box">
+                    <a href="/auth/login" class="auth-button">Log in</a>
+                    <a href="/auth/signup" class="auth-button">Sign up</a>
+                    <a href="mtgban-stripe-payments.vercel.app" class="auth-button">Subscribe</a>
+                </div>
+            </div>
             {{if ne .ErrorMessage ""}}
-                <h1 class="error-message">{{.ErrorMessage}}</h1>
+            <h1 class="error-message">{{.ErrorMessage}}</h1>
             {{end}}
-            
+
             <div class="quick-links">
-                Jump to 
-                <a href="https://mtgban.com">Magic: the Gathering</a> | 
+                Jump to
+                <a href="https://mtgban.com">Magic: the Gathering</a> |
                 <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
             </div>
         </div>
     </div>
-    
+
     <footer class="footer">
         &copy; 2019-2025 MTGBAN Inc
         <hr>
@@ -98,4 +102,5 @@
         Content is provided for informational purpose only.
     </footer>
 </body>
+
 </html>
