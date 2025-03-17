@@ -842,11 +842,6 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 		code = co.SetCode
 		number = co.Number
 
-		scryfallID, found := co.Identifiers["scryfallId"]
-		if found {
-			id = scryfallID
-		}
-
 		prices := make([]string, len(allScrapers))
 
 		for i, scraper := range allScrapers {
@@ -876,6 +871,11 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 		prices = append(prices, qty)
 
 		prices = append(prices, uploadedDada[j].Notes)
+
+		scryfallID, found := co.Identifiers["scryfallId"]
+		if found {
+			id = scryfallID
+		}
 
 		record := []string{id, cardName, code, number}
 		if co.Etched {
