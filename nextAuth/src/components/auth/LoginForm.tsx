@@ -1,7 +1,7 @@
 // src/components/auth/LoginForm.tsx
 import React, { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { LogIn, MailIcon, LockIcon } from 'lucide-react';
+import { MailIcon, LockIcon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import AuthLink from './AuthLink';
 

@@ -76,11 +76,12 @@
 
     <div class="container">
         <div class="main-content">
-            <div class="auth-container">
-                <div class="auth-box">
+            <div class="auth-container" style="display: flex; flex-direction:column; 
+            position: relative; transform: translate(20rem);">
+                <div class="auth-box" style="justify-items: space-between;">
                     <a href="/auth/login" class="auth-button">Log in</a>
                     <a href="/auth/signup" class="auth-button">Sign up</a>
-                    <a href="mtgban-stripe-payments.vercel.app" class="auth-button">Subscribe</a>
+                    <a href="https://billing.stripe.com/p/login/aEU2avfDB9cC4eY3cc" class="auth-button">Subscribe</a>
                 </div>
             </div>
             {{if ne .ErrorMessage ""}}
