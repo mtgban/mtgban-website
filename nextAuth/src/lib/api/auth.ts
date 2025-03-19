@@ -16,13 +16,18 @@ export interface SignupRequest {
 }
 
 export interface AuthResponse {
+  [x: string]: any;
   success: boolean;
   user?: User;
+  session?: {
+    csrf_token?: string;
+    expires_at?: number;
+    [key: string]: any; 
+  };
   error?: string;
-  emailConfirmationRequired?: boolean;
 }
 
-// Default API endpoints - can be configured via environment variables
+// Default API endpoints
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 const AUTH_API = `${API_BASE}/next-api/auth`;
 
@@ -35,23 +40,29 @@ async function handleResponse<T>(response: Response): Promise<T> {
       throw new Error("Authentication required");
     }
     
-    // Try to parse error message from response
     try {
       const errorData = await response.json();
       throw new Error(errorData.error || response.statusText);
     } catch (e) {
-      // If JSON parsing fails, use status text
       throw new Error(`Request failed: ${response.status} ${response.statusText}`);
     }
   }
-  
-  // Return JSON data or empty object if no content
+
   if (response.status === 204) {
     return {} as T;
   }
+  const jsonData = await response.json();
+
+  if (jsonData.success && jsonData.data && jsonData.data.user) {
+    return {
+      success: jsonData.success,
+      user: jsonData.data.user,
+      session: jsonData.data.session
+    } as T;
+  }
   
-  return await response.json() as T;
-}
+  return jsonData as T;
+};
 
 // Authentication API
 export const authApi = {

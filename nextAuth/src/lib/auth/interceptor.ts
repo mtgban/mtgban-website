@@ -2,7 +2,7 @@ import { Request as UndiciRequest } from 'undici';
 import { authService } from './authService';
 
 /**
- * TypeScript declaration for the fetch function to ensure compatibility with undici
+ * TypeScript declaration to ensure compatibility with undici
  */
 declare global {
   interface Request extends Omit<UndiciRequest, 'duplex'> {
@@ -27,28 +27,40 @@ export function createFetchInterceptor() {
     return () => {};
   }
 
-  // Replace global fetch with intercepted version that preserves the function's structure
+  // helper function
+  const isOnAuthPage = () => {
+    const path = window.location.pathname;
+    return path.includes('/auth/login') || 
+           path.includes('/auth/signup') || 
+           path.includes('/auth/reset-password') ||
+           path.includes('/auth/forgot-password') ||
+           path.includes('/auth/confirmation');
+  };
+
+  // Replace global fetch with intercepted version
   const fetchWithAuth = async function(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
     try {
       // Make the request
       const response = await originalFetch(input, init);
       
-      // For signup and login pages, don't try to refresh tokens on 401 errors
-      const currentPath = window.location.pathname;
-      const isAuthPage = currentPath.includes('/auth/login') || 
-            currentPath.includes('/auth/signup') || 
-            currentPath.includes('/auth/forgot-password');  
+      // Don't try to refresh tokens on auth API endpoints or when on auth pages
+      const url = input instanceof Request ? input.url : input.toString();
+      const isAuthApiCall = url.includes('/next-api/auth/');
       
-      // Check for auth errors (but only refresh if not on auth pages)
-      if ((response.status === 401 || response.status === 403) && !isAuthPage) {
-        // If not already on auth page
-        if (!window.location.pathname.includes('/auth/login')) {
-          // Try refreshing the token
+      // Handle auth errors (status 401/403)
+      if (response.status === 401 || response.status === 403) {
+        // Skip token refresh for auth endpoints and when on auth pages
+        if (!isAuthApiCall && !isOnAuthPage()) {
+          console.log('Auth error detected, attempting token refresh');
+          
           try {
+            // Try to refresh the token
             const refreshed = await authService.refreshSession();
             
-            // If refresh succeeded, retry the request
+            // If refresh succeeded, retry the original request
             if (refreshed) {
+              console.log('Token refreshed successfully, retrying request');
+              
               // For Request objects, clone before retrying
               if (input instanceof Request) {
                 try {
@@ -68,17 +80,20 @@ export function createFetchInterceptor() {
               
               // For strings/URLs, retry with original parameters
               return originalFetch(input, init);
+            } else {
+              console.warn('Token refresh failed');
             }
           } catch (refreshError) {
-            // Only redirect if not on an auth page already
-            if (!isAuthPage) {
-              console.warn('Session expired, handling gracefully');
-              // Don't redirect automatically on API requests
-              if (!input.toString().includes('/api/')) {
-                const currentPath = encodeURIComponent(window.location.pathname);
-                window.location.href = `/auth/login?redirectTo=${currentPath}`;
-              }
-            }
+            console.warn('Error during token refresh:', refreshError);
+          }
+          
+          // If we reach here, token refresh failed or the refreshed request failed
+          if (!isAuthApiCall && !url.includes('/api/')) {
+            console.log('Session expired, redirecting to login');
+            // Use history API instead of location.href to avoid reload
+            const returnPath = encodeURIComponent(window.location.pathname);
+            window.history.pushState({}, '', `/auth/login?return_to=${returnPath}`);
+            window.location.reload();
           }
         }
       }
@@ -90,7 +105,7 @@ export function createFetchInterceptor() {
     }
   };
 
-  //preserve all function properties and type signatures
+  // Preserve all function properties and type signatures
   window.fetch = fetchWithAuth as typeof window.fetch;
   
   // Return function to restore original fetch

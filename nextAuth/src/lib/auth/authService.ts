@@ -12,8 +12,6 @@ const AUTH_API_PATH = process.env.NEXT_PUBLIC_AUTH_API_PATH || '/next-api/auth';
 
 /**
  * Core authentication service
- * This version uses environment variables to configure API paths
- * and works in both development and production
  */
 export class AuthService {
   private user: User | null = null;
@@ -50,8 +48,6 @@ export class AuthService {
    */
   public async login(credentials: UserCredentials): Promise<{ success: boolean; user?: User; error?: string }> {
     try {
-      // In development: calls local Next.js API routes
-      // In production: calls Go backend API directly
       const response = await fetch(this.getApiUrl('login'), {
         method: 'POST',
         headers: {
