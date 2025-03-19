@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/exp/slices"
 
@@ -912,4 +914,273 @@ func maskID(id string) string {
 func authFileExists(fsys fs.FS, path string) bool {
 	_, err := fs.Stat(fsys, path)
 	return err == nil
+}
+
+func noSigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+
+		if authService == nil {
+			http.Error(w, "Server is initializing, please try again later", http.StatusServiceUnavailable)
+			return
+		}
+
+		querySig := getSignatureFromCookies(r)
+		if querySig != "" {
+			authService.putSignatureInCookies(w, r, querySig)
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// enforceAPISigning is a middleware that enforces API signing (legacy compatibility)
+func enforceAPISigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+
+		if authService == nil {
+			http.Error(w, "Server is initializing, please try again later", http.StatusServiceUnavailable)
+			return
+		}
+
+		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
+
+		ip, err := IpAddress(r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		if !APIRateLimiter.allow(string(ip)) {
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			return
+		}
+
+		if !DatabaseLoaded {
+			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+
+		sig := r.FormValue("sig")
+
+		// If signature is empty let it pass through
+		if sig == "" {
+			gziphandler.GzipHandler(next).ServeHTTP(w, r)
+			return
+		}
+
+		raw, err := base64.StdEncoding.DecodeString(sig)
+		if SigCheck && err != nil {
+			log.Println("API error, no sig", err)
+			w.Write([]byte(`{"error": "invalid signature"}`))
+			return
+		}
+
+		v, err := url.ParseQuery(string(raw))
+		if SigCheck && err != nil {
+			log.Println("API error, no b64", err)
+			w.Write([]byte(`{"error": "invalid b64 signature"}`))
+			return
+		}
+
+		q := url.Values{}
+		q.Set("API", v.Get("API"))
+
+		for _, optional := range OptionalFields {
+			val := v.Get(optional)
+			if val != "" {
+				q.Set(optional, val)
+			}
+		}
+
+		sig = v.Get("Signature")
+		exp := v.Get("Expires")
+
+		secret := os.Getenv("BAN_SECRET")
+		apiUsersMutex.RLock()
+		user_secret, found := Config.ApiUserSecrets[v.Get("UserEmail")]
+		apiUsersMutex.RUnlock()
+		if found {
+			secret = user_secret
+		}
+
+		var expires int64
+		if exp != "" {
+			expires, err = strconv.ParseInt(exp, 10, 64)
+			if err != nil {
+				log.Println("API error", err.Error())
+				w.Write([]byte(`{"error": "invalid or expired signature"}`))
+				return
+			}
+			q.Set("Expires", exp)
+		}
+
+		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
+		valid := authService.signHMACSHA256Base64([]byte(secret), []byte(data))
+
+		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
+			log.Println("API error, invalid", data)
+			w.Write([]byte(`{"error": "invalid or expired signature"}`))
+			return
+		}
+
+		gziphandler.GzipHandler(next).ServeHTTP(w, r)
+	})
+}
+
+// enforceSigning is a middleware that enforces signing (legacy compatibility)
+func enforceSigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+
+		if authService == nil {
+			http.Error(w, "Server is initializing, please try again later", http.StatusServiceUnavailable)
+			return
+		}
+
+		if authService.isExemptPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		sig := getSignatureFromCookies(r)
+		querySig := r.FormValue("sig")
+		if querySig != "" {
+			sig = querySig
+			authService.putSignatureInCookies(w, r, querySig)
+		}
+
+		switch r.Method {
+		case "GET":
+		case "POST":
+			var ok bool
+			for _, nav := range ExtraNavs {
+				if nav.Link == r.URL.Path {
+					ok = nav.CanPOST
+				}
+			}
+			if !ok {
+				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+				return
+			}
+		default:
+			http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		pageVars := genPageNav("Error", sig)
+
+		if !UserRateLimiter.allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
+			pageVars.Title = "Too Many Requests"
+			pageVars.ErrorMessage = ErrMsgUseAPI
+
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		raw, err := base64.StdEncoding.DecodeString(sig)
+		if SigCheck && err != nil {
+			pageVars.Title = "Unauthorized"
+			pageVars.ErrorMessage = ErrMsg
+			if DevMode {
+				pageVars.ErrorMessage += " - " + err.Error()
+			}
+
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		v, err := url.ParseQuery(string(raw))
+		if SigCheck && err != nil {
+			pageVars.Title = "Unauthorized"
+			pageVars.ErrorMessage = ErrMsg
+			if DevMode {
+				pageVars.ErrorMessage += " - " + err.Error()
+			}
+
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		q := url.Values{}
+		for _, optional := range append(OrderNav, OptionalFields...) {
+			val := v.Get(optional)
+			if val != "" {
+				q.Set(optional, val)
+			}
+		}
+
+		expectedSig := v.Get("Signature")
+		exp := v.Get("Expires")
+
+		data := fmt.Sprintf("GET%s%s%s", exp, getBaseURL(r), q.Encode())
+		valid := authService.signHMACSHA256Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+		expires, err := strconv.ParseInt(exp, 10, 64)
+		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
+			if r.Method != "GET" {
+				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			pageVars.Title = "Unauthorized"
+			pageVars.ErrorMessage = ErrMsg
+			if valid == expectedSig && expires < time.Now().Unix() {
+				pageVars.ErrorMessage = ErrMsgExpired
+				if DevMode {
+					pageVars.ErrorMessage += " - sig expired"
+				}
+			}
+
+			if DevMode {
+				if err != nil {
+					pageVars.ErrorMessage += " - " + err.Error()
+				} else {
+					pageVars.ErrorMessage += " - wrong host"
+				}
+			}
+			// If sig is invalid, redirect to home
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		if !DatabaseLoaded && r.URL.Path != "/admin" {
+			page := "home.html"
+			for _, navName := range OrderNav {
+				nav := ExtraNavs[navName]
+				if r.URL.Path == nav.Link {
+					pageVars = genPageNav(nav.Name, sig)
+					page = nav.Page
+				}
+			}
+			pageVars.Title = "Great things are coming"
+			pageVars.ErrorMessage = ErrMsgRestart
+
+			render(w, page, pageVars)
+			return
+		}
+
+		for _, navName := range OrderNav {
+			nav := ExtraNavs[navName]
+			if r.URL.Path == nav.Link {
+				param := GetParamFromSig(sig, navName)
+				canDo, _ := strconv.ParseBool(param)
+				if DevMode && nav.AlwaysOnForDev {
+					canDo = true
+				}
+				if SigCheck && !canDo {
+					pageVars = genPageNav(nav.Name, sig)
+					pageVars.Title = "This feature is BANned"
+					pageVars.ErrorMessage = ErrMsgPlus
+
+					render(w, nav.Page, pageVars)
+					return
+				}
+				break
+			}
+		}
+
+		gziphandler.GzipHandler(next).ServeHTTP(w, r)
+	})
 }

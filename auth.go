@@ -785,7 +785,7 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// AuthWrapper is a middleware that handles authentication based on existing middleware
+// AuthWrapper wraps handlers with authentication logic
 func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		a.logWithContext(r, "[Go-Auth] %s %s", r.Method, r.URL.Path)
@@ -806,12 +806,16 @@ func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		a.logWithContext(r, "Signature found: %s", sig)
+
 		decodedSig, err := base64.StdEncoding.DecodeString(sig)
 		if err != nil {
 			a.logWithContext(r, "Failed to decode signature: %v", err)
 			http.Error(w, "Invalid signature", http.StatusUnauthorized)
 			return
 		}
+
+		a.logWithContext(r, "Decoded signature: %s", string(decodedSig))
 
 		values, err := url.ParseQuery(string(decodedSig))
 		if err != nil {
@@ -821,6 +825,7 @@ func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 		}
 
 		userEmail := values.Get("UserEmail")
+		a.logWithContext(r, "User email extracted from signature: %s", userEmail)
 
 		userAccess, err := a.getAccessByEmail(userEmail)
 		if DevMode {
@@ -832,26 +837,30 @@ func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
+		a.logWithContext(r, "Checking access for path: %s", path)
 		if _, ok := userAccess[path]; ok {
+			a.logWithContext(r, "Access granted for path: %s", path)
 			handler(w, r)
 			return
 		}
 
-		if a.isExemptPath(path) {
+		a.logWithContext(r, "Access denied for path: %s", path)
 
-			noSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+		if a.isExemptPath(path) {
+			a.logWithContext(r, "Path is exempt, no signing required: %s", path)
+			noSigningWithInstance(a, http.HandlerFunc(handler)).ServeHTTP(w, r)
 			return
 		}
 
 		if strings.HasPrefix(path, "/api/mtgban/") ||
 			strings.HasPrefix(path, "/api/mtgjson/") {
-			// Use API-specific middleware for API paths
-			enforceAPISigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+			a.logWithContext(r, "Path is API, enforcing API signing: %s", path)
+			enforceAPISigningWithInstance(a, http.HandlerFunc(handler)).ServeHTTP(w, r)
 			return
 		}
 
-		// Otherwise use standard enforceSigning middleware
-		enforceSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+		a.logWithContext(r, "Enforcing standard signing for path: %s", path)
+		enforceSigningWithInstance(a, http.HandlerFunc(handler)).ServeHTTP(w, r)
 	}
 }
 
@@ -3061,22 +3070,20 @@ func (rw *responseWriter) WriteHeader(code int) {
 // ============================================================================================
 // InitAuth - Legacy Compatibility Function
 // ============================================================================================
-
-func noSigning(next http.Handler) http.Handler {
+func noSigningWithInstance(a *AuthService, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
 		querySig := getSignatureFromCookies(r)
 		if querySig != "" {
-			authService.putSignatureInCookies(w, r, querySig)
+			a.putSignatureInCookies(w, r, querySig)
 		}
 
 		next.ServeHTTP(w, r)
 	})
 }
 
-// enforceAPISigning is a middleware that enforces API signing (legacy compatibility)
-func enforceAPISigning(next http.Handler) http.Handler {
+func enforceAPISigningWithInstance(a *AuthService, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
@@ -3155,7 +3162,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		}
 
 		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
-		valid := authService.signHMACSHA256Base64([]byte(secret), []byte(data))
+		valid := a.signHMACSHA256Base64([]byte(secret), []byte(data))
 
 		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
 			log.Println("API error, invalid", data)
@@ -3167,12 +3174,12 @@ func enforceAPISigning(next http.Handler) http.Handler {
 	})
 }
 
-// enforceSigning is a middleware that enforces signing (legacy compatibility)
-func enforceSigning(next http.Handler) http.Handler {
+// enforceSigningWithInstance uses the provided AuthService instance
+func enforceSigningWithInstance(a *AuthService, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		if authService.isExemptPath(r.URL.Path) {
+		if a.isExemptPath(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -3181,7 +3188,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		querySig := r.FormValue("sig")
 		if querySig != "" {
 			sig = querySig
-			authService.putSignatureInCookies(w, r, querySig)
+			a.putSignatureInCookies(w, r, querySig)
 		}
 
 		switch r.Method {
@@ -3248,7 +3255,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		exp := v.Get("Expires")
 
 		data := fmt.Sprintf("GET%s%s%s", exp, getBaseURL(r), q.Encode())
-		valid := authService.signHMACSHA256Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+		valid := a.signHMACSHA256Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 		expires, err := strconv.ParseInt(exp, 10, 64)
 		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
 			if r.Method != "GET" {
@@ -3325,7 +3332,7 @@ func InitAuth(params ...string) (*AuthService, error) {
 		SupabaseSecret:  Config.DB.Secret,
 		DebugMode:       DevMode,
 		LogPrefix:       "[AUTH] ",
-		ExemptRoutes:    []string{"/", "/home"},
+		ExemptRoutes:    []string{"/", "/home, /api/suggest"},
 		ExemptPrefixes:  []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
 		ExemptSuffixes:  []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
 	}
