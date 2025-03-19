@@ -1,0 +1,2989 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ban-UX Design System Showcase</title>
+    <style>
+        /* ========== Reset & Base Styles ========== */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.5;
+            -webkit-text-size-adjust: 100%;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            background-color: #f8f9fa;
+            color: #111827;
+            transition: all 0.3s ease;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.1'/%3E%3C/svg%3E");
+        }
+
+        /* ========== Design System Variables ========== */
+        :root {
+            /* Primary Colors */
+            --primary-hue: 220;
+            --primary-50: hsl(var(--primary-hue), 90%, 95%);
+            --primary-100: hsl(var(--primary-hue), 90%, 90%);
+            --primary-200: hsl(var(--primary-hue), 90%, 80%);
+            --primary-300: hsl(var(--primary-hue), 90%, 70%);
+            --primary-400: hsl(var(--primary-hue), 90%, 65%);
+            --primary-500: hsl(var(--primary-hue), 90%, 60%);
+            --primary-600: hsl(var(--primary-hue), 90%, 55%);
+            --primary-700: hsl(var(--primary-hue), 90%, 45%);
+            --primary-800: hsl(var(--primary-hue), 90%, 35%);
+            --primary-900: hsl(var(--primary-hue), 90%, 25%);
+
+            /* Color aliases */
+            --primary-color: var(--primary-500);
+            --primary-light: var(--primary-300);
+            --primary-dark: var(--primary-700);
+
+            /* Accent Colors */
+            --accent-hue: 280;
+            --accent-50: hsl(var(--accent-hue), 90%, 95%);
+            --accent-100: hsl(var(--accent-hue), 90%, 90%);
+            --accent-200: hsl(var(--accent-hue), 90%, 80%);
+            --accent-300: hsl(var(--accent-hue), 90%, 70%);
+            --accent-400: hsl(var(--accent-hue), 90%, 65%);
+            --accent-500: hsl(var(--accent-hue), 90%, 60%);
+            --accent-600: hsl(var(--accent-hue), 90%, 55%);
+            --accent-700: hsl(var(--accent-hue), 90%, 45%);
+            --accent-800: hsl(var(--accent-hue), 90%, 35%);
+            --accent-900: hsl(var(--accent-hue), 90%, 25%);
+
+            /* Accent color aliases */
+            --accent-color: var(--accent-500);
+            --accent-light: var(--accent-300);
+            --accent-dark: var(--accent-700);
+
+            /* Semantic Colors */
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --info-color: #3b82f6;
+
+            /* Background and Surface */
+            --bg-color: rgba(255, 255, 255, 0.95);
+            --bg-light: rgba(255, 255, 255, 0.98);
+            --bg-dark: rgba(240, 240, 240, 0.95);
+            --bg-solid: rgb(255, 255, 255);
+
+            --bg-elevated-1: rgba(255, 255, 255, 0.97);
+            --bg-elevated-2: rgba(255, 255, 255, 0.99);
+            --bg-elevated-3: rgb(255, 255, 255);
+
+            --bg-sunken-1: rgba(245, 245, 247, 0.94);
+            --bg-sunken-2: rgba(240, 240, 245, 0.92);
+            --bg-sunken-3: rgba(235, 235, 240, 0.9);
+
+            /* Glass effect backgrounds */
+            --glass-light: rgba(255, 255, 255, 0.7);
+            --glass-medium: rgba(255, 255, 255, 0.5);
+            --glass-heavy: rgba(255, 255, 255, 0.3);
+
+            /* Text Colors */
+            --text-color: #111827;
+            --text-light: #4b5563;
+            --text-muted: #9ca3af;
+
+            /* Gradients */
+            --primary-gradient: linear-gradient(135deg, var(--primary-400), var(--primary-600));
+            --accent-gradient: linear-gradient(135deg, var(--accent-400), var(--accent-600));
+            --success-gradient: linear-gradient(135deg, #34d399, #10b981);
+            --warning-gradient: linear-gradient(135deg, #fbbf24, #f59e0b);
+            --error-gradient: linear-gradient(135deg, #f87171, #ef4444);
+            --info-gradient: linear-gradient(135deg, #60a5fa, #3b82f6);
+
+            /* Enhanced gradients */
+            --gradient-rainbow: linear-gradient(90deg,
+                    var(--primary-500),
+                    var(--accent-500),
+                    var(--success-color),
+                    var(--info-color));
+
+            --gradient-sunset: linear-gradient(135deg,
+                    var(--warning-color),
+                    var(--error-color),
+                    var(--accent-700));
+
+            /* Border */
+            --border-color: rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+            --border-radius-lg: 12px;
+            --border-radius-xl: 16px;
+            --border-radius-sm: 4px;
+            --border-radius-full: 9999px;
+
+            /* Shadows */
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+            /* Enhanced shadows */
+            --shadow-floating:
+                0 2px 4px -1px rgba(0, 0, 0, 0.06),
+                0 4px 5px 0 rgba(0, 0, 0, 0.06),
+                0 1px 10px 0 rgba(0, 0, 0, 0.08);
+
+            --shadow-hover:
+                0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                0 10px 10px -5px rgba(0, 0, 0, 0.04),
+                0 0 0 1px rgba(0, 0, 0, 0.02);
+
+            /* Transitions */
+            --transition-fast: 0.3s cubic-bezier(0.65, 0, 0.35, 1);
+            --transition-base: 0.5s cubic-bezier(0.65, 0, 0.35, 1);
+            --transition-slow: 0.8s cubic-bezier(0.65, 0, 0.35, 1);
+            --transition-bounce: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+            /* Z-index */
+            --z-index-dropdown: 1000;
+            --z-index-sticky: 1020;
+            --z-index-fixed: 1030;
+            --z-index-modal-backdrop: 1040;
+            --z-index-modal: 1050;
+            --z-index-popover: 1060;
+            --z-index-tooltip: 1070;
+
+            /* Spacing */
+            --space-1: 0.25rem;
+            --space-2: 0.5rem;
+            --space-3: 0.75rem;
+            --space-4: 1rem;
+            --space-5: 1.25rem;
+            --space-6: 1.5rem;
+            --space-8: 2rem;
+            --space-10: 2.5rem;
+            --space-12: 3rem;
+            --space-16: 4rem;
+            --space-20: 5rem;
+            --space-24: 6rem;
+        }
+
+        /* Dark Theme Variables */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: rgba(20, 20, 25, 0.95);
+                --bg-light: rgba(30, 30, 35, 0.95);
+                --bg-dark: rgba(15, 15, 20, 0.95);
+                --bg-solid: rgb(20, 20, 25);
+
+                --bg-elevated-1: rgba(30, 30, 35, 0.97);
+                --bg-elevated-2: rgba(35, 35, 40, 0.99);
+                --bg-elevated-3: rgb(40, 40, 45);
+
+                --bg-sunken-1: rgba(18, 18, 22, 0.94);
+                --bg-sunken-2: rgba(15, 15, 20, 0.92);
+                --bg-sunken-3: rgba(12, 12, 16, 0.9);
+
+                --glass-light: rgba(30, 30, 35, 0.7);
+                --glass-medium: rgba(25, 25, 30, 0.5);
+                --glass-heavy: rgba(20, 20, 25, 0.3);
+
+                --text-color: #f3f4f6;
+                --text-light: #d1d5db;
+                --text-muted: #9ca3af;
+
+                --border-color: rgba(255, 255, 255, 0.1);
+            }
+
+            body {
+                background-color: #111827;
+                color: var(--text-color);
+            }
+        }
+
+        /* ========== Layout Utilities ========== */
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 var(--space-4);
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        .justify-center {
+            justify-content: center;
+        }
+
+        .flex-col {
+            flex-direction: column;
+        }
+
+        .flex-wrap {
+            flex-wrap: wrap;
+        }
+
+        .gap-2 {
+            gap: var(--space-2);
+        }
+
+        .gap-4 {
+            gap: var(--space-4);
+        }
+
+        .gap-6 {
+            gap: var(--space-6);
+        }
+
+        .gap-8 {
+            gap: var(--space-8);
+        }
+
+        .p-2 {
+            padding: var(--space-2);
+        }
+
+        .p-4 {
+            padding: var(--space-4);
+        }
+
+        .p-6 {
+            padding: var(--space-6);
+        }
+
+        .p-8 {
+            padding: var(--space-8);
+        }
+
+        .px-4 {
+            padding-left: var(--space-4);
+            padding-right: var(--space-4);
+        }
+
+        .py-2 {
+            padding-top: var(--space-2);
+            padding-bottom: var(--space-2);
+        }
+
+        .py-4 {
+            padding-top: var(--space-4);
+            padding-bottom: var(--space-4);
+        }
+
+        .py-8 {
+            padding-top: var(--space-8);
+            padding-bottom: var(--space-8);
+        }
+
+        .py-12 {
+            padding-top: var(--space-12);
+            padding-bottom: var(--space-12);
+        }
+
+        .py-16 {
+            padding-top: var(--space-16);
+            padding-bottom: var(--space-16);
+        }
+
+        .py-24 {
+            padding-top: var(--space-24);
+            padding-bottom: var(--space-24);
+        }
+
+        .mb-2 {
+            margin-bottom: var(--space-2);
+        }
+
+        .mb-4 {
+            margin-bottom: var(--space-4);
+        }
+
+        .mb-6 {
+            margin-bottom: var(--space-6);
+        }
+
+        .mb-8 {
+            margin-bottom: var(--space-8);
+        }
+
+        .mt-2 {
+            margin-top: var(--space-2);
+        }
+
+        .mt-4 {
+            margin-top: var(--space-4);
+        }
+
+        .mt-8 {
+            margin-top: var(--space-8);
+        }
+
+        .mr-2 {
+            margin-right: var(--space-2);
+        }
+
+        .ml-2 {
+            margin-left: var(--space-2);
+        }
+
+        .mx-auto {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        .max-w-md {
+            max-width: 28rem;
+        }
+
+        .max-w-lg {
+            max-width: 32rem;
+        }
+
+        .grid {
+            display: grid;
+        }
+
+        .grid-cols-1 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+
+        .grid-cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .grid-cols-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        @media (min-width: 640px) {
+            .sm\:grid-cols-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 768px) {
+            .md\:grid-cols-3 {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .lg\:grid-cols-4 {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+        }
+
+        /* ========== Typography ========== */
+        .text-xs {
+            font-size: 0.75rem;
+        }
+
+        .text-sm {
+            font-size: 0.875rem;
+        }
+
+        .text-base {
+            font-size: 1rem;
+        }
+
+        .text-lg {
+            font-size: 1.125rem;
+        }
+
+        .text-xl {
+            font-size: 1.25rem;
+        }
+
+        .text-2xl {
+            font-size: 1.5rem;
+        }
+
+        .text-3xl {
+            font-size: 1.875rem;
+        }
+
+        .text-4xl {
+            font-size: 2.25rem;
+        }
+
+        .text-5xl {
+            font-size: 3rem;
+        }
+
+        .font-light {
+            font-weight: 300;
+        }
+
+        .font-normal {
+            font-weight: 400;
+        }
+
+        .font-medium {
+            font-weight: 500;
+        }
+
+        .font-semibold {
+            font-weight: 600;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .text-primary {
+            color: var(--primary-color);
+        }
+
+        .text-accent {
+            color: var(--accent-color);
+        }
+
+        .text-white {
+            color: white;
+        }
+
+        .text-muted {
+            color: var(--text-muted);
+        }
+
+        .uppercase {
+            text-transform: uppercase;
+        }
+
+        .leading-tight {
+            line-height: 1.25;
+        }
+
+        .leading-relaxed {
+            line-height: 1.625;
+        }
+
+        .tracking-wide {
+            letter-spacing: 0.025em;
+        }
+
+        /* ========== Components ========== */
+        /* Header */
+        .header {
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: var(--z-index-fixed);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .nav {
+            display: flex;
+            gap: var(--space-6);
+        }
+
+        .nav-link {
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color var(--transition-fast);
+            position: relative;
+        }
+
+        .nav-link::after {
+            content: "";
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary-gradient);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.3s ease;
+        }
+
+        .nav-link:hover {
+            color: var(--text-color);
+        }
+
+        .nav-link:hover::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+
+        /* Hero */
+        .hero {
+            background: linear-gradient(135deg, hsla(var(--primary-hue), 90%, 95%, 0.8) 0%, hsla(var(--primary-hue), 60%, 98%, 0.7) 100%);
+            padding: var(--space-16) 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .hero {
+                background: radial-gradient(ellipse at center, rgba(var(--primary-hue), 70%, 20%, 0.4) 0%, rgba(18, 18, 18, 0.6) 70%, rgba(10, 10, 10, 0.7) 100%);
+            }
+        }
+
+        .hero::before,
+        .hero::after {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: linear-gradient(135deg,
+                    hsla(var(--primary-hue), 90%, 70%, 0.3),
+                    hsla(var(--primary-hue), 90%, 80%, 0.1));
+            filter: blur(40px);
+            z-index: -1;
+            animation: floatAnimation 15s ease-in-out infinite;
+        }
+
+        .hero::before {
+            top: 20%;
+            left: 20%;
+        }
+
+        .hero::after {
+            bottom: 20%;
+            right: 20%;
+            background: linear-gradient(135deg,
+                    hsla(var(--accent-hue), 90%, 70%, 0.3),
+                    hsla(var(--accent-hue), 90%, 80%, 0.1));
+            animation: floatAnimation 18s ease-in-out infinite reverse;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background-image: linear-gradient(115deg,
+                    var(--text-color),
+                    var(--primary-color),
+                    var(--accent-color),
+                    var(--text-color));
+            background-size: 300% auto;
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmerText 8s linear infinite;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Section */
+        .section {
+            padding: var(--space-16) 0;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: var(--space-8);
+            text-align: center;
+        }
+
+        .section-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-light);
+            margin-bottom: var(--space-12);
+            text-align: center;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .divider {
+            height: 1px;
+            background-color: var(--border-color);
+            margin: var(--space-16) 0;
+        }
+
+        /* Cards */
+        .card {
+            background-color: var(--bg-color);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-header {
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .card-body {
+            padding: var(--space-4);
+        }
+
+        .card-footer {
+            padding: var(--space-4);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        /* Card variants */
+        .card-glass {
+            background-color: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-gradient {
+            background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-gradient::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary-gradient);
+            background-size: 200% 200%;
+            animation: gradientFlow 3s ease infinite;
+            z-index: 1;
+        }
+
+        .card-bordered {
+            border: 1px solid var(--border-color);
+            box-shadow: none;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            font-weight: 500;
+            border-radius: var(--border-radius);
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+            z-index: -1;
+        }
+
+        .btn:hover::before {
+            transform: translateX(100%);
+        }
+
+        .btn:active {
+            transform: translateY(2px);
+        }
+
+        .btn-primary {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: 0 4px 6px rgba(var(--primary-hue), 90%, 65%, 0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 12px rgba(var(--primary-hue), 90%, 65%, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-light);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-accent {
+            background: var(--accent-gradient);
+            color: white;
+            box-shadow: 0 4px 6px rgba(var(--accent-hue), 90%, 65%, 0.3);
+        }
+
+        .btn-accent:hover {
+            box-shadow: 0 6px 12px rgba(var(--accent-hue), 90%, 65%, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: var(--success-gradient);
+            color: white;
+        }
+
+        .btn-error {
+            background: var(--error-gradient);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning-gradient);
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .btn-lg {
+            padding: 0.75rem 1.5rem;
+            font-size: 1.125rem;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .btn-outline:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: var(--space-4);
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: var(--space-2);
+            font-weight: 500;
+            color: var(--text-color);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            line-height: 1.5;
+            color: var(--text-color);
+            background-color: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(var(--primary-hue), 90%, 65%, 0.2);
+        }
+
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            line-height: 1.5;
+            color: var(--text-color);
+            background-color: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            transition: all 0.3s ease;
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(var(--primary-hue), 90%, 65%, 0.2);
+        }
+
+        .form-check {
+            display: flex;
+            align-items: center;
+            margin-bottom: var(--space-2);
+        }
+
+        .form-check-input {
+            margin-right: var(--space-2);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            line-height: 1.5;
+            color: var(--text-color);
+            background-color: var(--bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            transition: all 0.3s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1em;
+            padding-right: 2.5rem;
+        }
+
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(var(--primary-hue), 90%, 65%, 0.2);
+        }
+
+        /* Toggle */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 20px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.2);
+            transition: 0.3s;
+            border-radius: 34px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(16px);
+        }
+
+        /* Alerts */
+        .alert {
+            padding: var(--space-4);
+            border-radius: var(--border-radius);
+            margin-bottom: var(--space-4);
+            border-left: 4px solid transparent;
+        }
+
+        .alert-success {
+            background-color: rgba(16, 185, 129, 0.1);
+            border-left-color: var(--success-color);
+            color: var(--text-color);
+        }
+
+        .alert-warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            border-left-color: var(--warning-color);
+            color: var(--text-color);
+        }
+
+        .alert-error {
+            background-color: rgba(239, 68, 68, 0.1);
+            border-left-color: var(--error-color);
+            color: var(--text-color);
+        }
+
+        .alert-info {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left-color: var(--info-color);
+            color: var(--text-color);
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--border-radius-full);
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .badge-primary {
+            background-color: rgba(var(--primary-hue), 90%, 65%, 0.1);
+            color: var(--primary-color);
+        }
+
+        .badge-success {
+            background-color: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .badge-warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .badge-error {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: var(--error-color);
+        }
+
+        .badge-accent {
+            background-color: rgba(var(--accent-hue), 90%, 65%, 0.1);
+            color: var(--accent-color);
+        }
+
+        .badge-outline {
+            background-color: transparent;
+            border: 1px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* Tables */
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: var(--space-4);
+        }
+
+        .table th {
+            background-color: var(--bg-light);
+            color: var(--text-color);
+            font-weight: 600;
+            text-align: left;
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .table td {
+            padding: var(--space-3) var(--space-4);
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+
+        .table-striped tbody tr:nth-child(odd) {
+            background-color: var(--bg-light);
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: var(--bg-light);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: var(--z-index-modal);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background-color: var(--bg-color);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-xl);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(20px) scale(0.95);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.active .modal {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+
+        .modal-header {
+            padding: var(--space-4);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            color: var(--text-light);
+        }
+
+        .modal-body {
+            padding: var(--space-4);
+        }
+
+        .modal-footer {
+            padding: var(--space-4);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: flex-end;
+            gap: var(--space-2);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: var(--space-4);
+        }
+
+        .tab {
+            padding: var(--space-3) var(--space-4);
+            color: var(--text-light);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .tab::after {
+            content: "";
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--primary-gradient);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .tab:hover {
+            color: var(--text-color);
+        }
+
+        .tab.active {
+            color: var(--primary-color);
+        }
+
+        .tab.active::after {
+            transform: scaleX(1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        /* Tooltips */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            text-align: center;
+            padding: var(--space-2) var(--space-3);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md);
+            position: absolute;
+            z-index: var(--z-index-tooltip);
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 0.875rem;
+            pointer-events: none;
+        }
+
+        .tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Code */
+        .code {
+            font-family: monospace;
+            padding: var(--space-3);
+            background-color: var(--bg-light);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+
+        /* ========== Animation Keyframes ========== */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes shimmerText {
+            0% {
+                background-position: -100% 0;
+            }
+
+            100% {
+                background-position: 200% 0;
+            }
+        }
+
+        @keyframes floatAnimation {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes gradientFlow {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        /* ========== Animation Classes ========== */
+        .animate-fade-in {
+            animation: fadeIn 1s ease forwards;
+        }
+
+        .animate-fade-up {
+            animation: fadeInUp 1s ease forwards;
+        }
+
+        .animate-shimmer {
+            background-size: 300% auto;
+            animation: shimmerText 8s linear infinite;
+        }
+
+        .animate-float {
+            animation: floatAnimation 6s ease-in-out infinite;
+        }
+
+        .animate-gradient {
+            background-size: 200% 200%;
+            animation: gradientFlow 3s ease infinite;
+        }
+
+        .animate-pulse {
+            animation: pulse 2s infinite;
+        }
+
+        /* Animation delays */
+        .delay-100 {
+            animation-delay: 100ms;
+        }
+
+        .delay-200 {
+            animation-delay: 200ms;
+        }
+
+        .delay-300 {
+            animation-delay: 300ms;
+        }
+
+        .delay-400 {
+            animation-delay: 400ms;
+        }
+
+        .delay-500 {
+            animation-delay: 500ms;
+        }
+
+        /* ========== Utilities ========== */
+        .relative {
+            position: relative;
+        }
+
+        .overflow-hidden {
+            overflow: hidden;
+        }
+
+        .rounded {
+            border-radius: var(--border-radius);
+        }
+
+        .rounded-lg {
+            border-radius: var(--border-radius-lg);
+        }
+
+        .rounded-full {
+            border-radius: var(--border-radius-full);
+        }
+
+        .shadow {
+            box-shadow: var(--shadow);
+        }
+
+        .shadow-md {
+            box-shadow: var(--shadow-md);
+        }
+
+        .shadow-lg {
+            box-shadow: var(--shadow-lg);
+        }
+
+        .border {
+            border: 1px solid var(--border-color);
+        }
+
+        .bg-primary {
+            background-color: var(--primary-color);
+        }
+
+        .bg-accent {
+            background-color: var(--accent-color);
+        }
+
+        .bg-gradient-primary {
+            background: var(--primary-gradient);
+        }
+
+        .bg-gradient-accent {
+            background: var(--accent-gradient);
+        }
+
+        .bg-gradient-rainbow {
+            background: var(--gradient-rainbow);
+        }
+
+        .bg-gradient-sunset {
+            background: var(--gradient-sunset);
+        }
+
+        .bg-white {
+            background-color: white;
+        }
+
+        .bg-light {
+            background-color: var(--bg-light);
+        }
+
+        /* ========== Dark Mode ========== */
+        .dark-mode-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: var(--bg-color);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 1000;
+            border: none;
+            transition: all 0.3s ease;
+        }
+
+        .dark-mode-toggle:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+
+        /* ========== Code Examples ========== */
+        .code-example {
+            margin-bottom: var(--space-6);
+        }
+
+        .code-preview {
+            padding: var(--space-4);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius) var(--border-radius) 0 0;
+            background-color: var(--bg-color);
+        }
+
+        .code-block {
+            background-color: var(--bg-dark);
+            padding: var(--space-4);
+            border-radius: 0 0 var(--border-radius) var(--border-radius);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            color: var(--text-color);
+            font-family: monospace;
+            overflow-x: auto;
+        }
+
+        /* ========== Responsive ========== */
+        @media (max-width: 768px) {
+            .header .container {
+                flex-direction: column;
+                gap: var(--space-4);
+                padding: var(--space-4);
+            }
+
+            .hero-title {
+                font-size: 2rem;
+            }
+
+            .section {
+                padding: var(--space-8) 0;
+            }
+
+            .section-title {
+                font-size: 1.5rem;
+            }
+
+            .nav {
+                gap: var(--space-3);
+            }
+        }
+
+        @media (max-width: 576px) {
+            .code-block {
+                font-size: 0.75rem;
+            }
+        }
+
+        /* Additional styles for the advanced components section */
+        .feature-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background-color: var(--bg-color);
+            border-radius: var(--border-radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .feature-card-img {
+            width: 100%;
+            height: 180px;
+            background: var(--primary-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            color: white;
+        }
+
+        .feature-card-body {
+            padding: var(--space-4);
+            flex: 1;
+        }
+
+        .feature-card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: var(--space-2);
+        }
+
+        .feature-card-text {
+            color: var(--text-light);
+        }
+
+        .feature-card-footer {
+            padding: var(--space-4);
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* Advanced avatar component styles */
+        .avatar {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background-color: var(--bg-light);
+            color: var(--text-color);
+            font-weight: 600;
+            overflow: hidden;
+        }
+
+        .avatar-sm {
+            width: 32px;
+            height: 32px;
+            font-size: 0.75rem;
+        }
+
+        .avatar-md {
+            width: 48px;
+            height: 48px;
+            font-size: 1rem;
+        }
+
+        .avatar-lg {
+            width: 64px;
+            height: 64px;
+            font-size: 1.5rem;
+        }
+
+        .avatar-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .avatar-group .avatar {
+            border: 2px solid var(--bg-color);
+            margin-left: -8px;
+        }
+
+        .avatar-group .avatar:first-child {
+            margin-left: 0;
+        }
+
+        /* Timeline component */
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 7px;
+            width: 2px;
+            background-color: var(--border-color);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            left: -2rem;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            border: 2px solid var(--bg-color);
+            top: 4px;
+        }
+
+        .timeline-content {
+            padding: 0 0 0 0.5rem;
+        }
+
+        .timeline-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .timeline-date {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Progress steps */
+        .steps {
+            display: flex;
+            counter-reset: step;
+            margin-bottom: 2rem;
+        }
+
+        .step {
+            position: relative;
+            flex: 1;
+            text-align: center;
+            padding-top: 2.5rem;
+        }
+
+        .step::before {
+            counter-increment: step;
+            content: counter(step);
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: var(--bg-light);
+            border: 2px solid var(--border-color);
+            color: var(--text-color);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2;
+        }
+
+        .step::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background-color: var(--border-color);
+            z-index: 1;
+        }
+
+        .step:first-child::after {
+            left: 50%;
+        }
+
+        .step:last-child::after {
+            right: 50%;
+        }
+
+        .step.active::before {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .step.completed::before {
+            background-color: var(--success-color);
+            border-color: var(--success-color);
+            color: white;
+            content: '✓';
+        }
+
+        .step-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        /* Toast notification */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background-color: var(--bg-color);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            margin-top: 1rem;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            min-width: 300px;
+            max-width: 400px;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast-icon {
+            margin-right: 0.75rem;
+            font-size: 1.25rem;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0;
+            margin-left: 0.75rem;
+            color: var(--text-light);
+        }
+
+        /* Progress indicator */
+        .progress {
+            background-color: var(--bg-light);
+            border-radius: var(--border-radius-full);
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--primary-gradient);
+            border-radius: var(--border-radius-full);
+            background-size: 200% 200%;
+            animation: gradientFlow 3s ease infinite;
+        }
+
+        /* Skeleton loading */
+        .skeleton {
+            background: linear-gradient(110deg, var(--bg-light) 8%, var(--bg-dark) 18%, var(--bg-light) 33%);
+            background-size: 200% 100%;
+            animation: shine 1.5s linear infinite;
+            border-radius: var(--border-radius);
+        }
+
+        .skeleton-text {
+            height: 1rem;
+            margin-bottom: 0.5rem;
+            width: 100%;
+        }
+
+        .skeleton-text:last-child {
+            width: 80%;
+        }
+
+        .skeleton-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+        }
+
+        .skeleton-button {
+            height: 38px;
+            width: 80px;
+            border-radius: var(--border-radius);
+        }
+
+        .skeleton-image {
+            height: 180px;
+            width: 100%;
+            border-radius: var(--border-radius) var(--border-radius) 0 0;
+        }
+
+        @keyframes shine {
+            to {
+                background-position-x: -200%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header py-4">
+        <div class="container flex justify-between items-center">
+            <a href="#" class="logo">Ban-UX</a>
+            <nav class="nav">
+                <a href="#components" class="nav-link">Components</a>
+                <a href="#utilities" class="nav-link">Utilities</a>
+                <a href="#animations" class="nav-link">Animations</a>
+                <a href="#examples" class="nav-link">Examples</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">Ban-UX Design System</h1>
+                <p class="hero-subtitle">A comprehensive design system with advanced visual effects, animations, and
+                    components for building modern web interfaces.</p>
+                <div class="flex gap-4 justify-center">
+                    <a href="#components" class="btn btn-primary">Explore Components</a>
+                    <a href="#examples" class="btn btn-outline">View Examples</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Components Section -->
+    <section class="section" id="components">
+        <div class="container">
+            <h2 class="section-title">Components</h2>
+            <p class="section-subtitle">Explore our collection of pre-designed components to build your user interface.
+            </p>
+
+            <!-- Cards -->
+            <h3 class="text-xl font-semibold mb-4">Cards</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Standard Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Standard Card</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>This is a standard card component with header, body, and footer sections.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-sm btn-primary">Action</button>
+                    </div>
+                </div>
+
+                <!-- Glass Card -->
+                <div class="card card-glass">
+                    <div class="card-header">
+                        <h3 class="card-title">Glass Card</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>A card with glassmorphism effect, creating a frosted glass appearance.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-sm btn-primary">Action</button>
+                    </div>
+                </div>
+
+                <!-- Gradient Card -->
+                <div class="card card-gradient">
+                    <div class="card-header">
+                        <h3 class="card-title">Gradient Card</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>This card uses a subtle gradient background with an animated border.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-sm btn-primary">Action</button>
+                    </div>
+                </div>
+
+                <!-- Bordered Card -->
+                <div class="card card-bordered">
+                    <div class="card-header">
+                        <h3 class="card-title">Bordered Card</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>A simple card with border and no shadow, for a cleaner and flatter look.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn btn-sm btn-primary">Action</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <h3 class="text-xl font-semibold mb-4">Buttons</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <h4 class="text-lg font-medium mb-4">Button Variants</h4>
+                <div class="flex flex-wrap gap-4 mb-6">
+                    <button class="btn btn-primary">Primary</button>
+                    <button class="btn btn-secondary">Secondary</button>
+                    <button class="btn btn-accent">Accent</button>
+                    <button class="btn btn-success">Success</button>
+                    <button class="btn btn-warning">Warning</button>
+                    <button class="btn btn-error">Error</button>
+                    <button class="btn btn-outline">Outline</button>
+                </div>
+
+                <h4 class="text-lg font-medium mb-4">Button Sizes</h4>
+                <div class="flex flex-wrap items-center gap-4 mb-6">
+                    <button class="btn btn-sm btn-primary">Small</button>
+                    <button class="btn btn-primary">Default</button>
+                    <button class="btn btn-lg btn-primary">Large</button>
+                </div>
+
+                <h4 class="text-lg font-medium mb-4">Button States</h4>
+                <div class="flex flex-wrap gap-4">
+                    <button class="btn btn-primary">Normal</button>
+                    <button class="btn btn-primary" disabled>Disabled</button>
+                    <button class="btn btn-primary loading">Loading</button>
+                </div>
+            </div>
+
+            <!-- Forms -->
+            <h3 class="text-xl font-semibold mb-4">Form Elements</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div class="bg-light p-6 rounded-lg">
+                    <h4 class="text-lg font-medium mb-4">Input Fields</h4>
+                    <div class="form-group">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" id="name" class="form-input" placeholder="Enter your name">
+                    </div>
+                    <div class="form-group">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" id="email" class="form-input" placeholder="Enter your email">
+                    </div>
+                    <div class="form-group">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" id="password" class="form-input" placeholder="Enter your password">
+                    </div>
+                    <div class="form-group">
+                        <label for="message" class="form-label">Message</label>
+                        <textarea id="message" class="form-textarea" placeholder="Enter your message"></textarea>
+                    </div>
+                </div>
+
+                <div class="bg-light p-6 rounded-lg">
+                    <h4 class="text-lg font-medium mb-4">Select, Checkboxes & Toggles</h4>
+                    <div class="form-group">
+                        <label for="country" class="form-label">Country</label>
+                        <select id="country" class="form-select">
+                            <option value="">Select a country</option>
+                            <option value="us">United States</option>
+                            <option value="ca">Canada</option>
+                            <option value="uk">United Kingdom</option>
+                            <option value="au">Australia</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input type="checkbox" id="terms" class="form-check-input">
+                            <label for="terms" class="form-check-label">I agree to the terms and conditions</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" id="newsletter" class="form-check-input">
+                            <label for="newsletter" class="form-check-label">Subscribe to newsletter</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="flex items-center">
+                            <label class="form-label mr-2">Dark Mode</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="flex items-center mt-2">
+                            <label class="form-label mr-2">Notifications</label>
+                            <label class="toggle-switch">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts & Badges -->
+            <h3 class="text-xl font-semibold mb-4">Alerts & Badges</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div>
+                    <h4 class="text-lg font-medium mb-4">Alerts</h4>
+                    <div class="alert alert-success mb-4">
+                        <strong>Success!</strong> Your action was completed successfully.
+                    </div>
+                    <div class="alert alert-info mb-4">
+                        <strong>Info!</strong> This is an informational message.
+                    </div>
+                    <div class="alert alert-warning mb-4">
+                        <strong>Warning!</strong> This action might cause issues.
+                    </div>
+                    <div class="alert alert-error">
+                        <strong>Error!</strong> Something went wrong.
+                    </div>
+                </div>
+                <div>
+                    <h4 class="text-lg font-medium mb-4">Badges</h4>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <span class="badge badge-primary">Primary</span>
+                        <span class="badge badge-success">Success</span>
+                        <span class="badge badge-warning">Warning</span>
+                        <span class="badge badge-error">Error</span>
+                        <span class="badge badge-accent">Accent</span>
+                    </div>
+                    <h4 class="text-lg font-medium mb-4">Outline Badges</h4>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="badge badge-outline">Default</span>
+                        <span class="badge badge-outline">New</span>
+                        <span class="badge badge-outline">Popular</span>
+                        <span class="badge badge-outline">Featured</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tables -->
+            <h3 class="text-xl font-semibold mb-4">Tables</h3>
+            <div class="overflow-x-auto mb-8">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>1</td>
+                            <td>John Doe</td>
+                            <td>john@example.com</td>
+                            <td>Admin</td>
+                            <td><span class="badge badge-success">Active</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-primary">Edit</button>
+                                <button class="btn btn-sm btn-error">Delete</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>2</td>
+                            <td>Jane Smith</td>
+                            <td>jane@example.com</td>
+                            <td>User</td>
+                            <td><span class="badge badge-warning">Pending</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-primary">Edit</button>
+                                <button class="btn btn-sm btn-error">Delete</button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>3</td>
+                            <td>Bob Johnson</td>
+                            <td>bob@example.com</td>
+                            <td>User</td>
+                            <td><span class="badge badge-error">Inactive</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-primary">Edit</button>
+                                <button class="btn btn-sm btn-error">Delete</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tabs -->
+            <h3 class="text-xl font-semibold mb-4">Tabs</h3>
+            <div class="mb-8">
+                <div class="tabs" id="exampleTabs">
+                    <div class="tab active" data-tab="tab1">First Tab</div>
+                    <div class="tab" data-tab="tab2">Second Tab</div>
+                    <div class="tab" data-tab="tab3">Third Tab</div>
+                </div>
+                <div class="tab-content active" id="tab1">
+                    <div class="bg-light p-6 rounded-lg">
+                        <h4 class="text-lg font-medium mb-2">First Tab Content</h4>
+                        <p>This is the content for the first tab. You can put any content here.</p>
+                    </div>
+                </div>
+                <div class="tab-content" id="tab2">
+                    <div class="bg-light p-6 rounded-lg">
+                        <h4 class="text-lg font-medium mb-2">Second Tab Content</h4>
+                        <p>This is the content for the second tab. You can customize this content as needed.</p>
+                    </div>
+                </div>
+                <div class="tab-content" id="tab3">
+                    <div class="bg-light p-6 rounded-lg">
+                        <h4 class="text-lg font-medium mb-2">Third Tab Content</h4>
+                        <p>This is the content for the third tab. Put your content here.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal -->
+            <h3 class="text-xl font-semibold mb-4">Modal</h3>
+            <div class="mb-8">
+                <button class="btn btn-primary" id="openModalBtn">Open Modal</button>
+
+                <div class="modal-overlay" id="exampleModal">
+                    <div class="modal">
+                        <div class="modal-header">
+                            <h2 class="modal-title">Modal Title</h2>
+                            <button class="modal-close" id="closeModalBtn">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <p>This is a modal dialog. You can include any content here, including forms, text, images,
+                                etc.</p>
+                            <div class="form-group mt-4">
+                                <label for="modalInput" class="form-label">Sample Input</label>
+                                <input type="text" id="modalInput" class="form-input" placeholder="Enter some text">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" id="cancelModalBtn">Cancel</button>
+                            <button class="btn btn-primary">Save</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tooltips -->
+            <h3 class="text-xl font-semibold mb-4">Tooltips</h3>
+            <div class="flex flex-wrap gap-4 mb-8">
+                <div class="tooltip">
+                    <button class="btn btn-secondary">Hover Me</button>
+                    <span class="tooltip-text">This is a tooltip that appears on hover</span>
+                </div>
+                <div class="tooltip">
+                    <button class="btn btn-primary">More Info</button>
+                    <span class="tooltip-text">Tooltips can provide additional information for users</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Utilities Section -->
+    <section class="section" id="utilities">
+        <div class="container">
+            <h2 class="section-title">Utility Classes</h2>
+            <p class="section-subtitle">Discover our utility classes that help you build layouts and style elements
+                quickly without writing custom CSS.</p>
+
+            <!-- Colors -->
+            <h3 class="text-xl font-semibold mb-4">Colors</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="p-4 bg-primary text-white rounded">Primary</div>
+                <div class="p-4 bg-accent text-white rounded">Accent</div>
+                <div class="p-4 bg-light text-primary rounded border">Light</div>
+                <div class="p-4 bg-white text-primary rounded border">White</div>
+            </div>
+
+            <h3 class="text-xl font-semibold mb-4">Gradients</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div class="p-4 bg-gradient-primary text-white rounded">Primary Gradient</div>
+                <div class="p-4 bg-gradient-accent text-white rounded">Accent Gradient</div>
+                <div class="p-4 bg-gradient-rainbow text-white rounded">Rainbow Gradient</div>
+                <div class="p-4 bg-gradient-sunset text-white rounded">Sunset Gradient</div>
+            </div>
+
+            <!-- Spacing -->
+            <h3 class="text-xl font-semibold mb-4">Spacing</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <h4 class="text-lg font-medium mb-4">Margin Examples</h4>
+                <div class="flex flex-wrap gap-2">
+                    <div class="p-2 bg-primary text-white rounded">No margin</div>
+                    <div class="p-2 bg-primary text-white rounded m-2">m-2</div>
+                    <div class="p-2 bg-primary text-white rounded m-4">m-4</div>
+                    <div class="p-2 bg-primary text-white rounded mx-4">mx-4</div>
+                    <div class="p-2 bg-primary text-white rounded my-4">my-4</div>
+                </div>
+
+                <h4 class="text-lg font-medium mb-4 mt-6">Padding Examples</h4>
+                <div class="flex flex-wrap gap-4">
+                    <div class="bg-accent text-white rounded p-2">p-2</div>
+                    <div class="bg-accent text-white rounded p-4">p-4</div>
+                    <div class="bg-accent text-white rounded px-4 py-2">px-4 py-2</div>
+                </div>
+            </div>
+
+            <!-- Flexbox -->
+            <h3 class="text-xl font-semibold mb-4">Flexbox</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <h4 class="text-lg font-medium mb-4">Flex Container Examples</h4>
+                <div class="flex gap-2 mb-4">
+                    <div class="p-2 bg-primary text-white rounded">Item 1</div>
+                    <div class="p-2 bg-primary text-white rounded">Item 2</div>
+                    <div class="p-2 bg-primary text-white rounded">Item 3</div>
+                </div>
+
+                <h4 class="text-lg font-medium mb-4 mt-6">Justify Content</h4>
+                <div class="flex justify-between mb-4">
+                    <div class="p-2 bg-accent text-white rounded">Item 1</div>
+                    <div class="p-2 bg-accent text-white rounded">Item 2</div>
+                    <div class="p-2 bg-accent text-white rounded">Item 3</div>
+                </div>
+
+                <h4 class="text-lg font-medium mb-4 mt-6">Align Items</h4>
+                <div class="flex items-center gap-2" style="height: 100px; background-color: var(--bg-dark);">
+                    <div class="p-2 bg-primary text-white rounded">Item 1</div>
+                    <div class="p-4 bg-primary text-white rounded">Item 2</div>
+                    <div class="p-6 bg-primary text-white rounded">Item 3</div>
+                </div>
+            </div>
+
+            <!-- Grid -->
+            <h3 class="text-xl font-semibold mb-4">Grid</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <h4 class="text-lg font-medium mb-4">Grid Columns</h4>
+                <div class="grid grid-cols-4 gap-2 mb-4">
+                    <div class="p-2 bg-primary text-white rounded text-center">1</div>
+                    <div class="p-2 bg-primary text-white rounded text-center">2</div>
+                    <div class="p-2 bg-primary text-white rounded text-center">3</div>
+                    <div class="p-2 bg-primary text-white rounded text-center">4</div>
+                </div>
+
+                <h4 class="text-lg font-medium mb-4 mt-6">Responsive Grid</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                    <div class="p-2 bg-accent text-white rounded text-center">Item 1</div>
+                    <div class="p-2 bg-accent text-white rounded text-center">Item 2</div>
+                    <div class="p-2 bg-accent text-white rounded text-center">Item 3</div>
+                    <div class="p-2 bg-accent text-white rounded text-center">Item 4</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Animations Section -->
+    <section class="section" id="animations">
+        <div class="container">
+            <h2 class="section-title">Animations</h2>
+            <p class="section-subtitle">Explore our animation utilities that bring your UI to life with subtle motion
+                and effects.</p>
+
+            <!-- Fade Animations -->
+            <h3 class="text-xl font-semibold mb-4">Fade Animations</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+                <div class="card animate-fade-in">
+                    <div class="card-header">
+                        <h3 class="card-title">Fade In</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>This card uses a fade in animation.</p>
+                    </div>
+                </div>
+                <div class="card animate-fade-up delay-200">
+                    <div class="card-header">
+                        <h3 class="card-title">Fade Up</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>This card fades in while moving up, with a slight delay.</p>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Hover Animation</h3>
+                    </div>
+                    <div class="card-body">
+                        <p>This card has a hover animation built into the card component.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Text Animations -->
+            <h3 class="text-xl font-semibold mb-4">Text Animations</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-light p-6 rounded-lg">
+                    <h3 class="text-2xl font-bold mb-4 animate-shimmer" style="background-image: linear-gradient(
+                        115deg,
+                        var(--text-color),
+                        var(--primary-color),
+                        var(--accent-color),
+                        var(--text-color)
+                    );">Shimmer Text Effect</h3>
+                    <p>This text has a gradient background with a shimmer animation effect.</p>
+                </div>
+                <div class="bg-light p-6 rounded-lg animate-float">
+                    <h3 class="text-2xl font-bold mb-4">Floating Animation</h3>
+                    <p>This entire card softly floats up and down continuously.</p>
+                </div>
+            </div>
+
+            <!-- Background Animations -->
+            <h3 class="text-xl font-semibold mb-4">Background Animations</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="bg-gradient-primary text-white p-6 rounded-lg animate-gradient">
+                    <h3 class="text-2xl font-bold mb-4">Gradient Flow</h3>
+                    <p>This background gradient smoothly shifts colors over time.</p>
+                </div>
+                <div class="bg-light p-6 rounded-lg animate-pulse">
+                    <h3 class="text-2xl font-bold mb-4">Pulse Effect</h3>
+                    <p>This container gently pulses to draw attention to it.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Examples Section -->
+    <section class="section" id="examples">
+        <div class="container">
+            <h2 class="section-title">Examples</h2>
+            <p class="section-subtitle">Real-world examples that combine various components and utilities from the
+                Ban-UX Design System.</p>
+
+            <!-- Example 1: Login Form -->
+            <h3 class="text-xl font-semibold mb-4">Login Form Example</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div class="code-example">
+                    <div class="code-preview p-6">
+                        <!-- Login Form -->
+                        <div class="card shadow-lg border-0 mx-auto max-w-md">
+                            <div class="card-header">
+                                <h3 class="card-title">Log In to Your Account</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group">
+                                    <label for="login-email" class="form-label">Email</label>
+                                    <input type="email" id="login-email" class="form-input"
+                                        placeholder="Your email address">
+                                </div>
+                                <div class="form-group">
+                                    <label for="login-password" class="form-label">Password</label>
+                                    <input type="password" id="login-password" class="form-input"
+                                        placeholder="Your password">
+                                </div>
+                                <div class="form-group">
+                                    <div class="form-check">
+                                        <input type="checkbox" id="remember-me" class="form-check-input">
+                                        <label for="remember-me" class="form-check-label">Remember me</label>
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary w-full">Log In</button>
+                            </div>
+                            <div class="card-footer">
+                                <p class="text-center text-sm text-muted">Don't have an account? <a href="#"
+                                        class="text-primary">Sign up</a></p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <pre>&lt;div class="card shadow-lg border-0 mx-auto max-w-md"&gt;
+  &lt;div class="card-header"&gt;
+    &lt;h3 class="card-title"&gt;Log In to Your Account&lt;/h3&gt;
+  &lt;/div&gt;
+  &lt;div class="card-body"&gt;
+    &lt;div class="form-group"&gt;
+      &lt;label for="login-email" class="form-label"&gt;Email&lt;/label&gt;
+      &lt;input type="email" id="login-email" class="form-input" placeholder="Your email address"&gt;
+    &lt;/div&gt;
+    &lt;div class="form-group"&gt;
+      &lt;label for="login-password" class="form-label"&gt;Password&lt;/label&gt;
+      &lt;input type="password" id="login-password" class="form-input" placeholder="Your password"&gt;
+    &lt;/div&gt;
+    &lt;div class="form-group"&gt;
+      &lt;div class="form-check"&gt;
+        &lt;input type="checkbox" id="remember-me" class="form-check-input"&gt;
+        &lt;label for="remember-me" class="form-check-label"&gt;Remember me&lt;/label&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;button class="btn btn-primary w-full"&gt;Log In&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;div class="card-footer"&gt;
+    &lt;p class="text-center text-sm text-muted"&gt;Don't have an account? &lt;a href="#" class="text-primary"&gt;Sign up&lt;/a&gt;&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+                    </div>
+                </div>
+
+                <!-- Example 2: Pricing Cards -->
+                <div class="code-example">
+                    <div class="code-preview p-6">
+                        <div class="flex flex-col gap-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <h3 class="text-xl font-bold">Basic Plan</h3>
+                                        <span class="badge badge-primary">Popular</span>
+                                    </div>
+                                    <p class="text-3xl font-bold mb-2">$9.99<span
+                                            class="text-sm font-normal text-muted">/month</span></p>
+                                    <p class="text-muted mb-4">Perfect for individuals and small teams.</p>
+                                    <ul class="mb-6">
+                                        <li class="mb-2">✓ 5 Projects</li>
+                                        <li class="mb-2">✓ 20GB Storage</li>
+                                        <li class="mb-2">✓ Basic Support</li>
+                                    </ul>
+                                    <button class="btn btn-primary w-full">Get Started</button>
+                                </div>
+                            </div>
+
+                            <div class="card card-gradient">
+                                <div class="card-body">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <h3 class="text-xl font-bold">Pro Plan</h3>
+                                        <span class="badge badge-accent">Best Value</span>
+                                    </div>
+                                    <p class="text-3xl font-bold mb-2">$24.99<span
+                                            class="text-sm font-normal text-muted">/month</span></p>
+                                    <p class="text-muted mb-4">Enhanced features for growing businesses.</p>
+                                    <ul class="mb-6">
+                                        <li class="mb-2">✓ Unlimited Projects</li>
+                                        <li class="mb-2">✓ 100GB Storage</li>
+                                        <li class="mb-2">✓ Priority Support</li>
+                                        <li class="mb-2">✓ Advanced Analytics</li>
+                                    </ul>
+                                    <button class="btn btn-accent w-full">Get Started</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <pre>&lt;div class="card"&gt;
+  &lt;div class="card-body"&gt;
+    &lt;div class="flex justify-between items-center mb-4"&gt;
+      &lt;h3 class="text-xl font-bold"&gt;Basic Plan&lt;/h3&gt;
+      &lt;span class="badge badge-primary"&gt;Popular&lt;/span&gt;
+    &lt;/div&gt;
+    &lt;p class="text-3xl font-bold mb-2"&gt;$9.99&lt;span class="text-sm font-normal text-muted"&gt;/month&lt;/span&gt;&lt;/p&gt;
+    &lt;p class="text-muted mb-4"&gt;Perfect for individuals and small teams.&lt;/p&gt;
+    &lt;ul class="mb-6"&gt;
+      &lt;li class="mb-2"&gt;✓ 5 Projects&lt;/li&gt;
+      &lt;li class="mb-2"&gt;✓ 20GB Storage&lt;/li&gt;
+      &lt;li class="mb-2"&gt;✓ Basic Support&lt;/li&gt;
+    &lt;/ul&gt;
+    &lt;button class="btn btn-primary w-full"&gt;Get Started&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Example 3: Alert Messages -->
+            <h3 class="text-xl font-semibold mb-4">Notification Example</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div class="code-example">
+                    <div class="code-preview p-6">
+                        <div class="flex flex-col gap-4">
+                            <div class="alert alert-success">
+                                <div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="mr-2">
+                                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold">Success!</h4>
+                                    <p>Your profile has been updated successfully.</p>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info">
+                                <div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="mr-2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold">Information</h4>
+                                    <p>Please remember to verify your email address.</p>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-warning">
+                                <div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="mr-2">
+                                        <path
+                                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                                        </path>
+                                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold">Warning!</h4>
+                                    <p>Your subscription will expire in 3 days.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <pre>&lt;div class="alert alert-success"&gt;
+  &lt;div&gt;
+    &lt;svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"&gt;&lt;path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"&gt;&lt;/path&gt;&lt;polyline points="22 4 12 14.01 9 11.01"&gt;&lt;/polyline&gt;&lt;/svg&gt;
+  &lt;/div&gt;
+  &lt;div&gt;
+    &lt;h4 class="font-bold"&gt;Success!&lt;/h4&gt;
+    &lt;p&gt;Your profile has been updated successfully.&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+                    </div>
+                </div>
+
+                <!-- Example 4: User Profile -->
+                <div class="code-example">
+                    <div class="code-preview p-6">
+                        <div class="card p-0">
+                            <div class="bg-gradient-primary text-white p-6 rounded-t-lg">
+                                <div class="flex items-center">
+                                    <div
+                                        class="w-16 h-16 rounded-full bg-white text-primary flex items-center justify-center text-2xl font-bold mr-4">
+                                        JD</div>
+                                    <div>
+                                        <h3 class="text-xl font-bold">John Doe</h3>
+                                        <p>Product Designer</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-6">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <h4 class="text-sm text-muted">Email</h4>
+                                        <p>john.doe@example.com</p>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm text-muted">Phone</h4>
+                                        <p>(123) 456-7890</p>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm text-muted">Location</h4>
+                                        <p>San Francisco, CA</p>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm text-muted">Member Since</h4>
+                                        <p>Jan 15, 2023</p>
+                                    </div>
+                                </div>
+                                <div class="mt-6">
+                                    <h4 class="text-lg font-medium mb-2">Skills</h4>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span class="badge badge-primary">UI Design</span>
+                                        <span class="badge badge-primary">UX Research</span>
+                                        <span class="badge badge-primary">Prototyping</span>
+                                        <span class="badge badge-primary">User Testing</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="code-block">
+                        <pre>&lt;div class="card p-0"&gt;
+  &lt;div class="bg-gradient-primary text-white p-6 rounded-t-lg"&gt;
+    &lt;div class="flex items-center"&gt;
+      &lt;div class="w-16 h-16 rounded-full bg-white text-primary flex items-center justify-center text-2xl font-bold mr-4"&gt;JD&lt;/div&gt;
+      &lt;div&gt;
+        &lt;h3 class="text-xl font-bold"&gt;John Doe&lt;/h3&gt;
+        &lt;p&gt;Product Designer&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+  &lt;div class="p-6"&gt;
+    &lt;div class="grid grid-cols-2 gap-4"&gt;
+      &lt;div&gt;
+        &lt;h4 class="text-sm text-muted"&gt;Email&lt;/h4&gt;
+        &lt;p&gt;john.doe@example.com&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;!-- More profile info --&gt;
+    &lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Advanced Components Section -->
+    <section class="section" id="advanced">
+        <div class="container">
+            <h2 class="section-title">Advanced Components</h2>
+            <p class="section-subtitle">Explore more complex components built with the Ban-UX Design System.</p>
+
+            <!-- Feature Cards -->
+            <h3 class="text-xl font-semibold mb-4">Feature Cards</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-8">
+                <div class="feature-card">
+                    <div class="feature-card-img">🚀</div>
+                    <div class="feature-card-body">
+                        <h3 class="feature-card-title">Quick Setup</h3>
+                        <p class="feature-card-text">Get started in minutes with our simple installation process and
+                            comprehensive documentation.</p>
+                    </div>
+                    <div class="feature-card-footer">
+                        <a href="#" class="btn btn-sm btn-primary">Learn More</a>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card-img">⚡</div>
+                    <div class="feature-card-body">
+                        <h3 class="feature-card-title">High Performance</h3>
+                        <p class="feature-card-text">Optimized for speed and efficiency, ensuring your applications run
+                            smoothly and load quickly.</p>
+                    </div>
+                    <div class="feature-card-footer">
+                        <a href="#" class="btn btn-sm btn-primary">Learn More</a>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-card-img">🎨</div>
+                    <div class="feature-card-body">
+                        <h3 class="feature-card-title">Customizable</h3>
+                        <p class="feature-card-text">Easily adapt the design system to match your brand with
+                            customizable variables and themes.</p>
+                    </div>
+                    <div class="feature-card-footer">
+                        <a href="#" class="btn btn-sm btn-primary">Learn More</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Avatar & User Components -->
+            <h3 class="text-xl font-semibold mb-4">Avatar & User Components</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <h4 class="text-lg font-medium mb-4">Avatar Sizes</h4>
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="avatar avatar-sm">JD</div>
+                    <div class="avatar avatar-md">JD</div>
+                    <div class="avatar avatar-lg">JD</div>
+                </div>
+
+                <h4 class="text-lg font-medium mb-4">Avatar Group</h4>
+                <div class="avatar-group mb-6">
+                    <div class="avatar avatar-md">JD</div>
+                    <div class="avatar avatar-md">AS</div>
+                    <div class="avatar avatar-md">RK</div>
+                    <div class="avatar avatar-md">+3</div>
+                </div>
+
+                <h4 class="text-lg font-medium mb-4">User Card</h4>
+                <div class="card p-4 max-w-md">
+                    <div class="flex items-center">
+                        <div class="avatar avatar-lg mr-4">JD</div>
+                        <div>
+                            <h3 class="text-lg font-semibold">John Doe</h3>
+                            <p class="text-muted">Product Designer</p>
+                            <div class="flex mt-2">
+                                <span class="badge badge-primary mr-2">UI/UX</span>
+                                <span class="badge badge-primary">Design Systems</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Timeline Component -->
+            <h3 class="text-xl font-semibold mb-4">Timeline Component</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">Project Kickoff</h3>
+                            <div class="timeline-date">January 15, 2025</div>
+                            <p>Initial project meeting to define requirements and set goals.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">Design Phase</h3>
+                            <div class="timeline-date">February 1, 2025</div>
+                            <p>Created wireframes and high-fidelity designs based on requirements.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">Development</h3>
+                            <div class="timeline-date">March 10, 2025</div>
+                            <p>Implemented the design into a functional application.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <h3 class="timeline-title">Testing & Launch</h3>
+                            <div class="timeline-date">April 5, 2025</div>
+                            <p>Conducted user testing and officially launched the product.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Steps -->
+            <h3 class="text-xl font-semibold mb-4">Progress Steps</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <div class="steps">
+                    <div class="step completed">
+                        <div class="step-label">Information</div>
+                    </div>
+                    <div class="step completed">
+                        <div class="step-label">Payment</div>
+                    </div>
+                    <div class="step active">
+                        <div class="step-label">Review</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-label">Confirmation</div>
+                    </div>
+                </div>
+
+                <div class="card p-4 border">
+                    <h3 class="font-semibold mb-2">Order Review</h3>
+                    <p class="mb-4">Please review your order details before confirming.</p>
+                    <div class="flex justify-between">
+                        <button class="btn btn-secondary">Back</button>
+                        <button class="btn btn-primary" id="showToastBtn">Continue</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast Notifications -->
+            <h3 class="text-xl font-semibold mb-4">Toast Notifications</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <p class="mb-4">Click the buttons below to show different toast notifications:</p>
+                <div class="flex flex-wrap gap-2">
+                    <button class="btn btn-primary" id="showSuccessToast">Success Toast</button>
+                    <button class="btn btn-warning" id="showWarningToast">Warning Toast</button>
+                    <button class="btn btn-error" id="showErrorToast">Error Toast</button>
+                    <button class="btn btn-info" id="showInfoToast">Info Toast</button>
+                </div>
+            </div>
+
+            <!-- Skeleton Loading -->
+            <h3 class="text-xl font-semibold mb-4">Skeleton Loading</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div class="bg-light p-6 rounded-lg">
+                    <h4 class="text-lg font-medium mb-4">Card Skeleton</h4>
+                    <div class="card">
+                        <div class="skeleton skeleton-image"></div>
+                        <div class="card-body">
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-light p-6 rounded-lg">
+                    <h4 class="text-lg font-medium mb-4">Profile Skeleton</h4>
+                    <div class="flex mb-4">
+                        <div class="skeleton skeleton-circle mr-4"></div>
+                        <div class="flex-1">
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton skeleton-text"></div>
+                    <div class="skeleton skeleton-text"></div>
+                    <div class="skeleton skeleton-text"></div>
+                    <div class="flex justify-end mt-4">
+                        <div class="skeleton skeleton-button"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Indicators -->
+            <h3 class="text-xl font-semibold mb-4">Progress Indicators</h3>
+            <div class="bg-light p-6 rounded-lg mb-8">
+                <h4 class="text-lg font-medium mb-2">Basic Progress</h4>
+                <div class="progress mb-4">
+                    <div class="progress-bar" style="width: 65%;"></div>
+                </div>
+
+                <h4 class="text-lg font-medium mb-2">Progress with Label</h4>
+                <div class="mb-1 flex justify-between">
+                    <span>Download Progress</span>
+                    <span>75%</span>
+                </div>
+                <div class="progress mb-4">
+                    <div class="progress-bar" style="width: 75%;"></div>
+                </div>
+
+                <h4 class="text-lg font-medium mb-2">Multiple Progress Bars</h4>
+                <div class="mb-1">
+                    <span>Task 1: 30%</span>
+                </div>
+                <div class="progress mb-2">
+                    <div class="progress-bar" style="width: 30%;"></div>
+                </div>
+                <div class="mb-1">
+                    <span>Task 2: 60%</span>
+                </div>
+                <div class="progress mb-2">
+                    <div class="progress-bar" style="width: 60%;"></div>
+                </div>
+                <div class="mb-1">
+                    <span>Task 3: 100%</span>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" style="width: 100%;"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Footer -->
+    <footer class="bg-light py-8">
+        <div class="container">
+            <div class="text-center">
+                <h2 class="text-2xl font-bold text-primary mb-4">Ban-UX Design System</h2>
+                <p class="text-muted mb-4">A comprehensive design system with advanced visual effects and components.
+                </p>
+                <p class="text-sm text-muted">&copy; 2025 Ban-UX. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Dark Mode Toggle -->
+    <button class="dark-mode-toggle" id="darkModeToggle">
+        🌓
+    </button>
+
+    <!-- Scripts -->
+    <script>
+        // Tab functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+
+                // Remove active class from all tabs and content
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                // Add active class to clicked tab and its content
+                tab.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // Modal functionality
+        const modal = document.getElementById('exampleModal');
+        const openModalBtn = document.getElementById('openModalBtn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const cancelModalBtn = document.getElementById('cancelModalBtn');
+
+        openModalBtn.addEventListener('click', () => {
+            modal.classList.add('active');
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            modal.classList.remove('active');
+        });
+        cancelModalBtn.addEventListener('click', () => {
+            modal.classList.remove('active');
+        });
+
+        // Close modal when clicking outside of it
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
+
+        // Dark mode toggle
+        const darkModeToggle = document.getElementById('darkModeToggle');
+
+        // Check for saved user preference
+        const isDarkMode = localStorage.getItem('darkMode') === 'true';
+
+        // Apply dark mode if saved preference exists
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark-mode');
+        }
+
+        darkModeToggle.addEventListener('click', () => {
+            document.documentElement.classList.toggle('dark-mode');
+
+            // Save user preference
+            const isDarkMode = document.documentElement.classList.contains('dark-mode');
+            localStorage.setItem('darkMode', isDarkMode);
+        });
+
+        // Toast notifications
+        function showToast(type, title, message) {
+            const toastContainer = document.getElementById('toastContainer');
+
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+
+            // Create toast content
+            toast.innerHTML = `
+                <div class="toast-icon">
+                    ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
+                </div>
+                <div class="toast-content">
+                    <div class="toast-title">${title}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close">&times;</button>
+            `;
+
+            // Add toast to container
+            toastContainer.appendChild(toast);
+
+            // Show toast
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 10);
+
+            // Auto-hide toast
+            setTimeout(() => {
+                hideToast(toast);
+            }, 5000);
+
+            // Close button event
+            toast.querySelector('.toast-close').addEventListener('click', () => {
+                hideToast(toast);
+            });
+        }
+
+        function hideToast(toast) {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }
+
+        // Toast demo buttons
+        document.getElementById('showSuccessToast').addEventListener('click', () => {
+            showToast('success', 'Success!', 'Your action was completed successfully.');
+        });
+
+        document.getElementById('showWarningToast').addEventListener('click', () => {
+            showToast('warning', 'Warning!', 'Please be aware of this important notice.');
+        });
+
+        document.getElementById('showErrorToast').addEventListener('click', () => {
+            showToast('error', 'Error!', 'Something went wrong. Please try again.');
+        });
+
+        document.getElementById('showInfoToast').addEventListener('click', () => {
+            showToast('info', 'Information', 'Here is some useful information for you.');
+        });
+
+        // Progress steps demo
+        document.getElementById('showToastBtn').addEventListener('click', () => {
+            showToast('success', 'Order Confirmed!', 'Your order has been placed successfully.');
+
+            // Update steps
+            const steps = document.querySelectorAll('.step');
+            steps[2].classList.remove('active');
+            steps[2].classList.add('completed');
+            steps[3].classList.add('active');
+        });
+    </script>
+</body>
+
+</html>

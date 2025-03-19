@@ -53,28 +53,7 @@
 <body class="light-theme">
 <script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
-<nav>
-    <ul>
-        <li><a href="https://www.patreon.com/ban_community"><img src="/img/misc/patreon.png" width=48></a></li>
-        <li {{if .ShowLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
-        {{range .Nav}}
-            <li>
-                <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
-                    <span>{{.Short}} {{.Name}}</span>
-                </a>
-            </li>
-        {{end}}
-        <li>
-            <label class="switch">
-                <div>
-                    <input type="checkbox"/>
-                    <span class="slider"></span>
-                </div>
-                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
-            </label>
-        </li>
-    </ul>
-</nav>
+{{template "navbar" .}}
 
 <div class="mainbody">
     {{if ne .ErrorMessage ""}}

@@ -1,0 +1,46 @@
+{{define "navbar"}}
+<nav>
+    <ul>
+        <li {{if .ShowLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
+        {{range .Nav}}
+            <li>
+                <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+                    <span>{{.Short}} {{.Name}}</span>
+                </a>
+            </li>
+        {{end}}
+        
+        <!-- Authentication buttons -->
+        {{if .IsLoggedIn}}
+            <li class="user-info">
+                <span class="user-email" title="{{.UserEmail}}">
+                    {{if gt (len .UserEmail) 20}}
+                        {{slice .UserEmail 0 17}}...
+                    {{else}}
+                        {{.UserEmail}}
+                    {{end}}
+                </span>
+                <span class="user-tier tier-{{.UserTier | lower}}">{{.UserTier}}</span>
+                <a href="/logout" class="logout-btn">Logout</a>
+            </li>
+        {{else}}
+            <li class="auth-buttons">
+                <a href="/auth/login/" class="auth-btn login-btn">Login</a>
+            </li>
+            <li class="auth-buttons">
+                <a href="/auth/signup/" class="auth-btn signup-btn">Sign Up</a>
+            </li>
+        {{end}}
+        
+        <li>
+            <label class="switch">
+                <div>
+                    <input type="checkbox"/>
+                    <span class="slider"></span>
+                </div>
+                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+            </label>
+        </li>
+    </ul>
+</nav>
+{{end}}
