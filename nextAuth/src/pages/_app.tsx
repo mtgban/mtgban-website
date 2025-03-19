@@ -3,7 +3,6 @@ import React, { useEffect } from 'react';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { AuthProvider } from '../context/AuthContext';
-import '../../public/auth.css';
 import  '../../public/globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
@@ -13,8 +12,6 @@ export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     const handleStart = () => {
       // Show loading state on route change start
-
-
       document.body.classList.add('loading');
     };
     

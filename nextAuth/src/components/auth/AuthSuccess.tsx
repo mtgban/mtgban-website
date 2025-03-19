@@ -1,5 +1,4 @@
 import React from 'react';
-import AuthLink from './AuthLink';
 import { useRouter } from 'next/router';
 import { User } from '@/context/AuthContext';
 
@@ -16,7 +15,7 @@ interface AuthSuccessProps {
 export default function AuthSuccess({ 
   user, 
   message, 
-  redirectTo = '/', 
+  redirectTo = '/home/', 
   redirectTimeout = 3000 
 
 }: AuthSuccessProps) {
@@ -71,14 +70,6 @@ export default function AuthSuccess({
         >
           Continue Now
         </button>
-      </div>
-      
-      <div className="auth-links">
-        <p>
-          <AuthLink href="/auth/settings">
-            Manage account settings
-          </AuthLink>
-        </p>
       </div>
     </div>
   );

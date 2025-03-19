@@ -1,6 +1,7 @@
-import React, { useState, FormEvent } from 'react';
+import React, { useState, FormEvent, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { LockIcon, ArrowLeftIcon } from 'lucide-react';
 import AuthLink from './AuthLink';
-import { LockIcon } from 'lucide-react';
 
 interface ResetPasswordFormProps {
   token: string;
@@ -9,6 +10,10 @@ interface ResetPasswordFormProps {
 }
 
 export default function ResetPasswordForm({ token, onSuccess, onError }: ResetPasswordFormProps) {
+  const router = useRouter();
+  const urlError = router.query.error as string | undefined;
+  const urlMessage = router.query.message as string | undefined;
+  
   // Form state
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,12 +22,33 @@ export default function ResetPasswordForm({ token, onSuccess, onError }: ResetPa
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [formVisible, setFormVisible] = useState(false);
   
   // Password validation
   const hasMinLength = password.length >= 8;
   const hasLetter = /[A-Za-z]/.test(password);
   const hasNumber = /\d/.test(password);
   const isPasswordValid = hasMinLength && hasLetter && hasNumber;
+  const passwordsMatch = password === confirmPassword && password !== '';
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFormVisible(true);
+    }, 100);
+    
+    if (urlError || urlMessage) {
+      setError(urlMessage || 'An error occurred. Please try again.');
+    }
+    
+    return () => clearTimeout(timer);
+  }, [urlError, urlMessage]);
+  
+  // Clear error when form fields change
+  useEffect(() => {
+    if (error) {
+      setError(null);
+    }
+  }, [password, confirmPassword, error]);
   
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -33,8 +59,15 @@ export default function ResetPasswordForm({ token, onSuccess, onError }: ResetPa
     setError(null);
     
     // Validation
-    if (!password || !confirmPassword) {
-      const errorMsg = 'Please fill in all fields';
+    if (!password) {
+      const errorMsg = 'Please enter a new password';
+      setError(errorMsg);
+      if (onError) onError(errorMsg);
+      return;
+    }
+    
+    if (!confirmPassword) {
+      const errorMsg = 'Please confirm your new password';
       setError(errorMsg);
       if (onError) onError(errorMsg);
       return;
@@ -90,7 +123,7 @@ export default function ResetPasswordForm({ token, onSuccess, onError }: ResetPa
   // If we have a success message, show only that
   if (successMessage) {
     return (
-      <div className="auth-container">
+      <div className={`auth-container ${formVisible ? 'visible' : ''}`}>
         <h1 className="auth-title">Password Reset Complete</h1>
         <div className="auth-message success-message" role="status">
           {successMessage}
@@ -109,7 +142,14 @@ export default function ResetPasswordForm({ token, onSuccess, onError }: ResetPa
   }
   
   return (
-    <div className="auth-container">
+    <div className={`auth-container ${formVisible ? 'visible' : ''}`}>
+      <div className="auth-back-container">
+        <AuthLink href="/auth/login" className="back-link">
+          <ArrowLeftIcon size={16} />
+          Back to Login
+        </AuthLink>
+      </div>
+      
       <h1 className="auth-title">Reset Your Password</h1>
       <p className="auth-subtitle">Create a new password for your account</p>
       
@@ -138,15 +178,14 @@ export default function ResetPasswordForm({ token, onSuccess, onError }: ResetPa
             />
           </div>
           <div className="form-hint">
-            Password must:
-            <ul style={{ margin: '0.5rem 0 0 1.5rem', padding: 0 }}>
-              <li style={{ color: hasMinLength ? 'var(--success-color)' : 'var(--text-light)' }}>
+            <ul className="password-requirements">
+              <li className={hasMinLength ? 'met' : ''}>
                 Be at least 8 characters
               </li>
-              <li style={{ color: hasLetter ? 'var(--success-color)' : 'var(--text-light)' }}>
+              <li className={hasLetter ? 'met' : ''}>
                 Include at least one letter
               </li>
-              <li style={{ color: hasNumber ? 'var(--success-color)' : 'var(--text-light)' }}>
+              <li className={hasNumber ? 'met' : ''}>
                 Include at least one number
               </li>
             </ul>
@@ -162,7 +201,7 @@ export default function ResetPasswordForm({ token, onSuccess, onError }: ResetPa
             <input
               id="confirmPassword"
               type="password"
-              className={`form-input ${confirmPassword && password !== confirmPassword ? 'error' : ''}`}
+              className={`form-input ${confirmPassword && !passwordsMatch ? 'error' : ''}`}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••••"
@@ -170,13 +209,18 @@ export default function ResetPasswordForm({ token, onSuccess, onError }: ResetPa
               disabled={isSubmitting}
             />
           </div>
+          {confirmPassword && !passwordsMatch && (
+            <div className="form-hint" style={{ color: 'var(--error-color)' }}>
+              Passwords do not match
+            </div>
+          )}
         </div>
         
         <div className="form-group">
           <button 
             type="submit" 
             className="btn btn-primary btn-block" 
-            disabled={isSubmitting || !isPasswordValid || password !== confirmPassword}
+            disabled={isSubmitting || !isPasswordValid || !passwordsMatch}
           >
             {isSubmitting ? (
               <>

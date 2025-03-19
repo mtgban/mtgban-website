@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import AuthLayout from '../components/auth/AuthLayout';
 import LoginForm from '../components/auth/LoginForm';
 import { useAuth } from '../context/AuthContext';
+import AuthLayout from '@/components/auth/AuthLayout';
 
 export interface LoginPageProps {
   redirectTo?: string;
@@ -18,7 +18,7 @@ export default function LoginPage() {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !loading) {
-      const destination = redirectTo || '/';
+      const destination = redirectTo || '/home';
       router.push(destination);
     }
   }, [user, loading, router, redirectTo]);
@@ -26,14 +26,12 @@ export default function LoginPage() {
   // Don't render the form if already logged in or still loading
   if (loading || user) {
     return (
-      <AuthLayout title="Login">
         <div className="auth-container visible">
           <div className="auth-loading">
             <div className="spinner large"></div>
             <p>{user ? 'Redirecting...' : 'Loading...'}</p>
           </div>
         </div>
-      </AuthLayout>
     );
   }
   

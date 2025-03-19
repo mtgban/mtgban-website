@@ -1,26 +1,39 @@
-// src/components/auth/ResetPasswordForm.tsx
-import React, { useState, FormEvent } from 'react';
+import React, { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { MailIcon, ArrowLeftIcon } from 'lucide-react';
 import AuthLink from './AuthLink';
 
-export default function ResetPasswordForm() {
+export default function ForgotPasswordForm() {
   const router = useRouter();
-  const { token } = router.query;
+  const urlError = router.query.error as string | undefined;
+  const urlMessage = router.query.message as string | undefined;
   
   // Form state
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [email, setEmail] = useState('');
   
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formVisible, setFormVisible] = useState(false);
   
-  // Password validation
-  const hasMinLength = password.length >= 8;
-  const hasLetter = /[A-Za-z]/.test(password);
-  const hasNumber = /\d/.test(password);
-  const isPasswordValid = hasMinLength && hasLetter && hasNumber;
-  const passwordsMatch = password === confirmPassword;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFormVisible(true);
+    }, 100);
+    
+    if (urlError || urlMessage) {
+      setError(urlMessage || 'An error occurred. Please try again.');
+    }
+    
+    return () => clearTimeout(timer);
+  }, [urlError, urlMessage]);
+  
+  // Clear error when email changes
+  useEffect(() => {
+    if (error && email) {
+      setError(null);
+    }
+  }, [email, error]);
   
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -28,23 +41,8 @@ export default function ResetPasswordForm() {
     if (isSubmitting) return;
     
     // Validation
-    if (!password || !confirmPassword) {
-      setError('Both fields are required');
-      return;
-    }
-    
-    if (!isPasswordValid) {
-      setError('Please ensure your password meets all requirements');
-      return;
-    }
-    
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    
-    if (!token) {
-      setError('Invalid or missing reset token');
+    if (!email) {
+      setError('Please enter your email address');
       return;
     }
     
@@ -52,64 +50,45 @@ export default function ResetPasswordForm() {
     setError(null);
     
     try {
-      // Use the API endpoint directly here
-      const response = await fetch('/next-api/auth/reset-password', {
+      // Send reset password request
+      const response = await fetch('/next-api/auth/forgot-password', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          password,
-          token: token
-        })
+        body: JSON.stringify({ email }),
       });
       
-      const result = await response.json();
+      const data = await response.json();
       
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to reset password');
+      if (data.success) {
+        // Navigate to reset password sent page
+        router.push({
+          pathname: '/auth/reset-password-sent',
+          query: { email },
+        });
+      } else {
+        setError(data.error || 'Failed to send reset email. Please try again.');
       }
-      
-      // Redirect to success page
-      router.push({
-        pathname: '/success',
-        query: {
-          redirectTo: '/auth/login',
-          message: 'Your password has been reset successfully. You can now log in with your new password.'
-        }
-      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setError('An unexpected error occurred. Please try again.');
+      console.error('Forgot password error:', err);
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  // Show error if no token is provided
-  if (router.isReady && !token) {
-    return (
-      <div className="auth-container">
-        <h1 className="auth-title">Invalid Reset Link</h1>
-        <div className="auth-message error-message" role="alert">
-          The password reset link is invalid or has expired.
-        </div>
-        <div className="auth-links">
-          <p>
-            {/* FIXED: Text and link destination now match */}
-            <AuthLink href="forgot-password">
-              Forgot Password
-            </AuthLink>
-            {' '} - Request a new reset link.
-          </p>
-        </div>
-      </div>
-    );
-  }
-  
   return (
-    <div className="auth-container">
-      <h1 className="auth-title">Set New Password</h1>
-      <p className="auth-subtitle">Please enter your new password</p>
+    <div className={`auth-container ${formVisible ? 'visible' : ''}`}>
+      <div className="auth-back-container">
+        <AuthLink href="/auth/login" className="back-link">
+          <ArrowLeftIcon size={16} />
+          Back to Login
+        </AuthLink>
+      </div>
+      
+      <h1 className="auth-title">Reset Password</h1>
+      <p className="auth-subtitle">Enter your email to receive a password reset link</p>
       
       {error && (
         <div className="auth-message error-message" role="alert">
@@ -119,71 +98,55 @@ export default function ResetPasswordForm() {
       
       <form onSubmit={handleSubmit} className="auth-form">
         <div className="form-group">
-          <label htmlFor="password" className="form-label">New Password</label>
-          <input
-            id="password"
-            type="password"
-            className={`form-input ${password && !isPasswordValid ? 'error' : ''}`}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            disabled={isSubmitting}
-          />
-          <div className="form-hint">
-            Password must:
-            <ul style={{ margin: '0.5rem 0 0 1.5rem', padding: 0 }}>
-              <li style={{ color: hasMinLength ? 'var(--success-color)' : 'var(--text-light)' }}>
-                Be at least 8 characters
-              </li>
-              <li style={{ color: hasLetter ? 'var(--success-color)' : 'var(--text-light)' }}>
-                Include at least one letter
-              </li>
-              <li style={{ color: hasNumber ? 'var(--success-color)' : 'var(--text-light)' }}>
-                Include at least one number
-              </li>
-            </ul>
+          <label htmlFor="email" className="form-label">Email Address</label>
+          <div className="input-wrapper">
+            <MailIcon className="form-icon" />
+            <input
+              id="email"
+              type="email"
+              className="form-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              required
+              disabled={isSubmitting}
+              autoComplete="email"
+            />
           </div>
         </div>
-        
-        <div className="form-group">
-          <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
-          <input
-            id="confirmPassword"
-            type="password"
-            className={`form-input ${confirmPassword && !passwordsMatch ? 'error' : ''}`}
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            disabled={isSubmitting}
-          />
-        </div>
-        
-        {/* Hidden input for token */}
-        <input type="hidden" name="token" value={token as string} />
         
         <div className="form-group">
           <button 
             type="submit" 
             className="btn btn-primary btn-block" 
-            disabled={isSubmitting || !isPasswordValid || !passwordsMatch}
+            disabled={isSubmitting || !email}
           >
             {isSubmitting ? (
               <>
-                <span className="form-loader"></span>
-                Resetting Password...
+                <span className="spinner"></span>
+                Sending Reset Link...
               </>
-            ) : 'Reset Password'}
+            ) : 'Send Reset Link'}
           </button>
         </div>
       </form>
       
+      <div className="auth-info">
+        <p>We'll send you an email with a link to reset your password.</p>
+        <p>If you don't receive an email within a few minutes, please check your spam folder.</p>
+      </div>
+      
       <div className="auth-links">
         <p>
           Remember your password?{' '}
-          <AuthLink href="login">
+          <AuthLink href="/auth/login">
             Log in
+          </AuthLink>
+        </p>
+        <p>
+          Don't have an account?{' '}
+          <AuthLink href="/auth/signup">
+            Sign up
           </AuthLink>
         </p>
       </div>

@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import SignupForm from '@/components/auth/SignupForm';
+import AuthLayout from '@/components/auth/AuthLayout';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -8,7 +9,10 @@ export default function SignupPage() {
   const redirectTo = router.query.redirectTo as string | undefined;
   
   return (
-    <>
+    <AuthLayout
+      title="Sign Up"
+      description="Create a new MTGBAN account"
+    >
       <Head>
         <title>Sign Up | MTGBAN</title>
         <meta name="description" content="Create a new MTGBAN account" />
@@ -17,6 +21,6 @@ export default function SignupPage() {
       <div className="auth-page">
         <SignupForm redirectTo={redirectTo} />
       </div>
-    </>
+    </AuthLayout>
   );
 }

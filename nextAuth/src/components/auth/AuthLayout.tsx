@@ -1,5 +1,5 @@
 // src/components/auth/AuthLayout.tsx
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import Head from 'next/head';
 import Image from 'next/image';
 import AuthLink from './AuthLink';
@@ -10,16 +10,42 @@ interface AuthLayoutProps {
   description?: string;
 }
 
-const AuthLayout: React.FC<AuthLayoutProps> = ({ 
+export default function AuthLayout({ 
   children, 
   title, 
   description = 'Authentication page for MTGBAN'
-}) => {
+}: AuthLayoutProps ) {
+  // Apply dark mode based on system preference
+  useEffect(() => {
+    const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Add data attribute to document
+    if (prefersDarkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+    
+    // Listen for changes color scheme
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
+
   return (
     <>
       <Head>
         <title>{title} | MTGBAN</title>
         <meta name="description" content={description} />
+        <meta name="color-scheme" content="light dark" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#121212" />
       </Head>
       
       <div className="auth-layout">
@@ -29,17 +55,6 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({
         </div>
         
         <div className="auth-page">
-          <div className="auth-logo-container">
-            <AuthLink href="/" className="auth-logo-link">
-              <Image 
-                src="/logo.png" 
-                alt="MTGBAN Logo" 
-                width={150} 
-                height={40} 
-                priority
-                className="auth-logo"
-              />
-            </AuthLink>
           </div>
           
           {children}
@@ -50,9 +65,6 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({
             </p>
           </div>
         </div>
-      </div>
     </>
   );
 };
-
-export default AuthLayout;
