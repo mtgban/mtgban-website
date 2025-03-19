@@ -488,7 +488,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tiers []string
-	for tierName := range Config.ACL {
+	for tierName := range Config.ACL.Tiers {
 		tiers = append(tiers, tierName)
 	}
 	sort.Slice(tiers, func(i, j int) bool {

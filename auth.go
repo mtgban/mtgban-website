@@ -144,6 +144,7 @@ type AuthService struct {
 	DebugMode      bool
 	BaseAuthURL    string
 	CSRFSecret     []byte
+	BanACL         *BanACL
 	AuthConfig     AuthConfig
 
 	// Rate limiters
@@ -167,9 +168,18 @@ type AuthConfig struct {
 
 // UserData holds user data for MTGBAN users
 type UserData struct {
-	UserId string
-	Email  string
-	Tier   string
+	UserId string `json:"user_id"`
+	Email  string `json:"email"`
+	Tier   string `json:"tier"`
+}
+
+type BanUser struct {
+	User        *UserData              `json:"user"`
+	Permissions map[string]interface{} `json:"permissions"`
+}
+
+type BanACL struct {
+	Users map[string]*BanUser
 }
 
 // LoginRequest represents a login request payload
@@ -229,7 +239,7 @@ func (c MiddlewareChain) Append(m ...func(http.HandlerFunc) http.HandlerFunc) Mi
 // DefaultAuthConfig returns the default authentication configuration
 func DefaultAuthConfig() AuthConfig {
 	return AuthConfig{
-		LogPrefix: "[AUTH] ",
+		LogPrefix: " ",
 		ExemptRoutes: []string{
 			"/",
 			"/home",
@@ -301,12 +311,8 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
+	logger := log.New(os.Stdout, config.LogPrefix, log.LstdFlags)
 
-	// Create logger
-	logger := log.New(os.Stdout, config.LogPrefix, log.Ldate|log.Ltime|log.Lshortfile)
-
-	// Create Supabase client
-	logger.Printf("Creating Supabase client with URL: %s", config.SupabaseURL)
 	supabaseClient := supabase.CreateClient(config.SupabaseURL, config.SupabaseAnonKey)
 	if supabaseClient == nil {
 		return nil, errors.New("failed to create Supabase client")
@@ -329,6 +335,8 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 		BaseAuthURL:     config.SupabaseURL + "/auth/v1",
 		CSRFSecret:      csrfSecret,
 		AuthConfig:      config,
+		BanACL:          nil,        // load ACL after initialization
+		IPLimiters:      sync.Map{}, // Initialize the map
 		LoginLimiter:    rate.NewLimiter(rate.Every(1*time.Second), 5),
 		SignupLimiter:   rate.NewLimiter(rate.Every(5*time.Second), 3),
 		ResetPwdLimiter: rate.NewLimiter(rate.Every(30*time.Second), 3),
@@ -343,8 +351,219 @@ func (a *AuthService) Initialize() error {
 	a.Logger.Printf("Supabase URL: %s", a.SupabaseURL)
 
 	a.registerRoutes()
+
 	a.Logger.Printf("Authentication service initialized successfully")
 	return nil
+}
+
+func (a *AuthService) GetBanACL(result *BanACL) error {
+	var banUsers []struct {
+		UserId      string                 `json:"user_id"`
+		Email       string                 `json:"email"`
+		Tier        string                 `json:"tier"`
+		Permissions map[string]interface{} `json:"permissions"`
+	}
+
+	err := a.Supabase.DB.From("acl").
+		Select("user_id", "email", "tier", "permissions").
+		Execute(&banUsers)
+	if err != nil {
+		return fmt.Errorf("failed to get ban users: %w", err)
+	}
+
+	result.Users = make(map[string]*BanUser)
+	for _, user := range banUsers {
+		result.Users[user.Email] = &BanUser{
+			User: &UserData{
+				UserId: user.UserId,
+				Email:  user.Email,
+				Tier:   user.Tier,
+			},
+			Permissions: user.Permissions,
+		}
+	}
+	return nil
+}
+
+func (a *AuthService) getAccessByEmail(email string) (map[string]interface{}, error) {
+	if a.BanACL == nil {
+		return nil, errors.New("BanACL is not initialized")
+	}
+
+	user, exists := a.BanACL.Users[email]
+	if !exists {
+		return nil, errors.New("user not found")
+	}
+
+	return user.Permissions, nil
+}
+
+// registerRoutes registers authentication routes
+func (a *AuthService) registerRoutes() {
+	a.Logger.Printf("Registering authentication routes")
+
+	// Next.js static assets handler - this must be registered first
+	http.HandleFunc("/_next/", a.handleNextJsAssets)
+
+	// Create middleware chains
+	chains := a.createMiddlewareChains()
+
+	// Define routes with their middlewares
+	routes := []AuthRoute{
+		// Base routes
+		{
+			Path:        "/auth/login",
+			Method:      "GET",
+			Handler:     a.handleAuthLogin,
+			Middlewares: chains["base"],
+			Description: "Login page",
+		},
+		{
+			Path:        "/auth/signup",
+			Method:      "GET",
+			Handler:     a.handleAuthSignup,
+			Middlewares: chains["base"],
+			Description: "Signup page",
+		},
+		// API Routes
+		{
+			Path:        "/next-api/auth/login",
+			Method:      "POST",
+			Handler:     a.handleAuthLogin,
+			Middlewares: chains["apiAuth"],
+			Description: "API login endpoint",
+		},
+		{
+			Path:        "/next-api/auth/signup",
+			Method:      "POST",
+			Handler:     a.handleAuthSignup,
+			Middlewares: chains["apiAuth"],
+			Description: "API signup endpoint",
+		},
+		{
+			Path:        "/next-api/auth/logout",
+			Method:      "POST",
+			Handler:     a.handleAuthLogout,
+			Middlewares: chains["api"],
+			Description: "API logout endpoint",
+		},
+		{
+			Path:        "/next-api/auth/me",
+			Method:      "GET",
+			Handler:     a.handleAuthGetUser,
+			Middlewares: chains["api"],
+			Description: "API get current user endpoint",
+		},
+		{
+			Path:        "/next-api/auth/refresh-token",
+			Method:      "POST",
+			Handler:     a.handleAuthRefreshToken,
+			Middlewares: chains["api"],
+			Description: "API refresh token endpoint",
+		},
+		{
+			Path:        "/next-api/auth/forgot-password",
+			Method:      "POST",
+			Handler:     a.handleAuthForgotPassword,
+			Middlewares: chains["apiAuth"],
+			Description: "API forgot password endpoint",
+		},
+		{
+			Path:        "/next-api/auth/reset-password",
+			Method:      "POST",
+			Handler:     a.handleAuthResetPassword,
+			Middlewares: chains["apiAuth"],
+			Description: "API reset password endpoint",
+		},
+
+		// Form submission routes
+		{
+			Path:        "/auth/login-submit",
+			Method:      "POST",
+			Handler:     a.handleLoginFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Login form submission",
+		},
+		{
+			Path:        "/auth/signup-submit",
+			Method:      "POST",
+			Handler:     a.handleSignupFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Signup form submission",
+		},
+		{
+			Path:        "/auth/forgot-password-submit",
+			Method:      "POST",
+			Handler:     a.handleForgotPasswordFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Forgot password form submission",
+		},
+		{
+			Path:        "/auth/reset-password-submit",
+			Method:      "POST",
+			Handler:     a.handleResetPasswordFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Reset password form submission",
+		},
+		{
+			Path:        "/auth/logout",
+			Method:      "GET",
+			Handler:     a.handleLogoutForm,
+			Middlewares: chains["base"],
+			Description: "Logout form submission",
+		},
+	}
+
+	// Register routes
+	for _, route := range routes {
+		handler := route.Handler
+
+		// Apply middlewares
+		handler = route.Middlewares.Then(handler)
+
+		// Register with method checking
+		http.HandleFunc(route.Path, func(w http.ResponseWriter, r *http.Request) {
+			if route.Method != "" && r.Method != route.Method {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			handler(w, r)
+		})
+
+		a.Logger.Printf("Registered route: %s %s", route.Method, route.Path)
+	}
+
+	// Set up path normalizer for /auth/auth/ redirects
+	pathNormalizerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/auth/auth/") {
+			newPath := "/auth/" + strings.TrimPrefix(path, "/auth/auth/")
+			query := r.URL.RawQuery
+			if query != "" {
+				newPath += "?" + query
+			}
+			a.Logger.Printf("Redirecting from duplicate auth path: %s → %s", path, newPath)
+			http.Redirect(w, r, newPath, http.StatusMovedPermanently)
+			return
+		}
+
+		// Continue to next handler
+		http.NotFound(w, r)
+	})
+
+	// Handle path normalization before serving static files
+	http.Handle("/auth/auth/", pathNormalizerHandler)
+
+	// Serve static files and React components from embedded Next.js app
+	authFS, err := fs.Sub(authAssets, "nextAuth/out")
+	if err != nil {
+		a.Logger.Printf("Failed to load embedded auth assets: %v", err)
+		return
+	}
+
+	http.Handle("/auth/", http.StripPrefix("/auth", a.createStaticFileServer(authFS)))
+
+	a.Logger.Printf("Authentication routes registered successfully")
 }
 
 // ============================================================================================
@@ -515,7 +734,7 @@ func (a *AuthService) AuthRequired(next http.HandlerFunc) http.HandlerFunc {
 			a.logWithContext(r, "Invalid auth token: %v", err)
 
 			// Clear cookies and redirect to login
-			a.clearAuthCookies(w)
+			a.clearAuthCookies(w, r)
 			http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
 			return
 		}
@@ -569,10 +788,57 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 // AuthWrapper is a middleware that handles authentication based on existing middleware
 func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		a.logWithContext(r, "[Go-Auth] %s %s", r.Method, r.URL.Path)
 		path := r.URL.Path
 
+		// First check if path is exempt
 		if a.isExemptPath(path) {
-			// Check if path is exempt from authentication
+			a.logWithContext(r, "Exempt path: %s", path)
+			handler.ServeHTTP(w, r)
+			return
+		}
+
+		// Non-exempt paths must be authenticated
+		sig := getSignatureFromCookies(r)
+		if sig == "" {
+			a.logWithContext(r, "No signature found for protected path: %s", path)
+			http.Redirect(w, r, "/auth/login?return_to="+path, http.StatusFound)
+			return
+		}
+
+		decodedSig, err := base64.StdEncoding.DecodeString(sig)
+		if err != nil {
+			a.logWithContext(r, "Failed to decode signature: %v", err)
+			http.Error(w, "Invalid signature", http.StatusUnauthorized)
+			return
+		}
+
+		values, err := url.ParseQuery(string(decodedSig))
+		if err != nil {
+			a.logWithContext(r, "Failed to parse signature: %v", err)
+			http.Error(w, "Invalid signature", http.StatusUnauthorized)
+			return
+		}
+
+		userEmail := values.Get("UserEmail")
+
+		userAccess, err := a.getAccessByEmail(userEmail)
+		if DevMode {
+			a.logWithContext(r, "User access: %v", userAccess)
+		}
+		if err != nil {
+			a.logWithContext(r, "Failed to get user access: %v", err)
+			http.Error(w, "Internal System Error", http.StatusSeeOther)
+			return
+		}
+
+		if _, ok := userAccess[path]; ok {
+			handler(w, r)
+			return
+		}
+
+		if a.isExemptPath(path) {
+
 			noSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
 			return
 		}
@@ -753,6 +1019,7 @@ func (a *AuthService) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		Tier:   tier,
 	}
 
+	// put signature in cookies
 	baseURL := getBaseURL(r)
 	sig := a.sign(baseURL, tier, userData)
 	a.putSignatureInCookies(w, r, sig)
@@ -1519,31 +1786,121 @@ func (a *AuthService) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Clear auth cookies
-	a.clearAuthCookies(w)
+	a.clearAuthCookies(w, r)
 
 	// Return success response
-	a.sendAPISuccess(w, "Logout successful", nil)
+	a.sendAPISuccess(w, "Logout successful", map[string]interface{}{
+		"redirectTo": "/",
+	})
 }
 
 // handleLogoutForm handles form-based logout requests
 func (a *AuthService) handleLogoutForm(w http.ResponseWriter, r *http.Request) {
 	a.logWithContext(r, "Form logout request")
 
-	// Get token from cookie
+	// Get token from cookie and sign out from Supabase
 	authCookie, err := r.Cookie("auth_token")
 	if err == nil && authCookie.Value != "" {
-		// Sign out from Supabase
-		err := a.Supabase.Auth.SignOut(context.Background(), authCookie.Value)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := a.Supabase.Auth.SignOut(ctx, authCookie.Value)
 		if err != nil {
 			a.logWithContext(r, "Supabase logout error: %v", err)
 		}
 	}
 
-	// Clear all auth cookies
-	a.clearAuthCookies(w)
+	// 2. Clear ALL cookies (using multiple techniques)
+	a.clearAllCookies(w, r)
 
-	// Redirect to home page
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	// 3. Serve a cleanup page with JavaScript to clear client-side state
+	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+
+	// Construct home URL
+	baseURL := getBaseURL(r)
+	homeURL := baseURL
+	if !strings.HasSuffix(homeURL, "/") {
+		homeURL += "/"
+	}
+
+	logoutHTML := `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logging Out</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <script>
+        // Clear all client-side state
+        function cleanupAndRedirect() {
+            // Clear localStorage and sessionStorage
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (e) {
+                console.error("Storage clear error:", e);
+            }
+
+            // Clear all cookies by setting expired date
+            document.cookie.split(";").forEach(function(c) {
+                document.cookie = c.trim().split("=")[0] + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                document.cookie = c.trim().split("=")[0] + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+            });
+
+            // Redirect to home with cache buster
+            window.location.href = "` + homeURL + `?nocache=" + new Date().getTime();
+        }
+
+        // Run immediately
+        cleanupAndRedirect();
+    </script>
+</head>
+<body>
+    <h1>Logging you out...</h1>
+    <p>Please wait while we complete the logout process.</p>
+    <p>If you're not redirected, <a href="` + homeURL + `">click here</a>.</p>
+</body>
+</html>
+`
+	w.Write([]byte(logoutHTML))
+}
+
+// Clear all cookies using multiple approaches to handle various scenarios
+func (a *AuthService) clearAllCookies(w http.ResponseWriter, r *http.Request) {
+	// Get domain variations
+	baseURL := getBaseURL(r)
+	domain := "mtgban.com"
+	if strings.Contains(baseURL, "localhost") {
+		domain = "localhost"
+	}
+
+	// List of cookies to clear
+	cookiesToClear := []string{"MTGBAN", "auth_token", "refresh_token", "csrf_token"}
+
+	// Clear each cookie in multiple ways
+	for _, name := range cookiesToClear {
+		// Clear with domain
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			Domain:   domain,
+			MaxAge:   -1,
+			Expires:  time.Unix(0, 0),
+			HttpOnly: true,
+		})
+
+		// Clear without domain (for browser compatibility)
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			Expires:  time.Unix(0, 0),
+			HttpOnly: true,
+		})
+	}
+
+	a.logWithContext(r, "Cleared all authentication cookies")
 }
 
 // handleAuthGetUser handles API requests to get user information
@@ -1572,7 +1929,7 @@ func (a *AuthService) handleAuthGetUser(w http.ResponseWriter, r *http.Request) 
 		newAuthToken, newRefreshToken, refreshedUser, refreshErr := a.refreshTokenInternal("", refreshCookie.Value)
 		if refreshErr != nil {
 			a.logWithContext(r, "Token refresh failed: %v", refreshErr)
-			a.clearAuthCookies(w)
+			a.clearAuthCookies(w, r)
 			a.handleAPIError(w, r, ErrSessionExpired)
 			return
 		}
@@ -1595,7 +1952,7 @@ func (a *AuthService) handleAuthGetUser(w http.ResponseWriter, r *http.Request) 
 				newAuthToken, newRefreshToken, refreshedUser, refreshErr := a.refreshTokenInternal(authCookie.Value, refreshCookie.Value)
 				if refreshErr != nil {
 					a.logWithContext(r, "Token refresh failed: %v", refreshErr)
-					a.clearAuthCookies(w)
+					a.clearAuthCookies(w, r)
 					a.handleAPIError(w, r, ErrSessionExpired)
 					return
 				}
@@ -1607,7 +1964,7 @@ func (a *AuthService) handleAuthGetUser(w http.ResponseWriter, r *http.Request) 
 				userInfo = refreshedUser
 			} else {
 				a.logWithContext(r, "Invalid auth token and no refresh token found")
-				a.clearAuthCookies(w)
+				a.clearAuthCookies(w, r)
 				a.handleAPIError(w, r, ErrInvalidToken)
 				return
 			}
@@ -1617,7 +1974,7 @@ func (a *AuthService) handleAuthGetUser(w http.ResponseWriter, r *http.Request) 
 	// If we still don't have valid user info after all attempts
 	if userInfo == nil {
 		a.logWithContext(r, "Failed to get user info after token refresh")
-		a.clearAuthCookies(w)
+		a.clearAuthCookies(w, r)
 		a.handleAPIError(w, r, ErrInvalidToken)
 		return
 	}
@@ -1730,7 +2087,7 @@ func (a *AuthService) handleAuthRefreshToken(w http.ResponseWriter, r *http.Requ
 	newAuthToken, newRefreshToken, userInfo, err := a.refreshTokenInternal(authToken, refreshToken)
 	if err != nil {
 		a.logWithContext(r, "Token refresh failed: %v", err)
-		a.clearAuthCookies(w)
+		a.clearAuthCookies(w, r)
 		a.handleAPIError(w, r, ErrSessionExpired)
 		return
 	}
@@ -1864,6 +2221,11 @@ func (a *AuthService) normalizeAuthPath(path string) string {
 
 // isExemptPath checks if a path is exempt from authentication
 func (a *AuthService) isExemptPath(path string) bool {
+	// Always exempt the root path
+	if path == "/" || path == "/home" {
+		return true
+	}
+
 	// Check exact routes
 	for _, route := range a.AuthConfig.ExemptRoutes {
 		if path == route {
@@ -2004,8 +2366,13 @@ func (a *AuthService) signHMACSHA256Base64(key []byte, data []byte) string {
 
 // sign signs data for permission granting
 func (a *AuthService) sign(link string, tierTitle string, userData *UserData) string {
+	// Get values for the tier
 	v := a.getValuesForTier(tierTitle)
-	if userData != nil {
+
+	// add BanACL data if available
+	if userData != nil && a.BanACL != nil {
+		a.addBanACLPermissions(v, userData.Email)
+
 		v.Set("UserEmail", userData.Email)
 		v.Set("UserTier", tierTitle)
 	}
@@ -2025,7 +2392,7 @@ func (a *AuthService) sign(link string, tierTitle string, userData *UserData) st
 // getValuesForTier gets values for a specific tier
 func (a *AuthService) getValuesForTier(tierTitle string) url.Values {
 	v := url.Values{}
-	tier, found := Config.ACL[tierTitle]
+	tier, found := Config.ACL.Tiers[tierTitle]
 	if !found {
 		return v
 	}
@@ -2045,6 +2412,60 @@ func (a *AuthService) getValuesForTier(tierTitle string) url.Values {
 		}
 	}
 	return v
+}
+
+// addBanACLPermissions adds permissions from BanACL to the values
+func (a *AuthService) addBanACLPermissions(v url.Values, email string) {
+	if a.BanACL == nil {
+		return
+	}
+
+	// Get user from BanACL
+	user, exists := a.BanACL.Users[email]
+	if !exists {
+		return
+	}
+
+	// Add permissions from BanACL to values
+	for section, permissions := range user.Permissions {
+		// Each section key corresponds to a value in OrderNav
+		if isNavSection(section) {
+			// Set the section to true to enable this navigation item
+			v.Set(section, "true")
+
+			// Add detailed permissions
+			if permMap, ok := permissions.(map[string]interface{}); ok {
+				for key, val := range permMap {
+					// Convert each permission value to string
+					var strVal string
+					switch v := val.(type) {
+					case string:
+						strVal = v
+					case bool:
+						strVal = strconv.FormatBool(v)
+					case float64:
+						strVal = strconv.FormatFloat(v, 'f', -1, 64)
+					case int:
+						strVal = strconv.Itoa(v)
+					default:
+						strVal = "true" // Default for complex objects
+					}
+
+					v.Set(key, strVal)
+				}
+			}
+		}
+	}
+}
+
+// isNavSection checks if a section name is in OrderNav
+func isNavSection(section string) bool {
+	for _, navSection := range OrderNav {
+		if navSection == section {
+			return true
+		}
+	}
+	return false
 }
 
 // GetParamFromSig gets a parameter from a signature
@@ -2083,11 +2504,12 @@ func (a *AuthService) putSignatureInCookies(w http.ResponseWriter, r *http.Reque
 }
 
 // setAuthCookies sets authentication cookies
-func (a *AuthService) setAuthCookies(w http.ResponseWriter, r *http.Request, token, refreshToken string, remember bool) {
-	// Set the token expiration time
-	maxAge := 24 * 60 * 60 // 24 hours
-	if remember {
-		maxAge = 30 * 24 * 60 * 60 // 30 days
+// Ensure the remember option is working correctly
+func (a *AuthService) setAuthCookies(w http.ResponseWriter, r *http.Request, token, refreshToken string, rememberMe bool) {
+	// Set the token expiration time based on remember option
+	maxAge := 24 * 60 * 60 // 24 hours by default
+	if rememberMe {
+		maxAge = 30 * 24 * 60 * 60 // 30 days if remember is checked
 	}
 
 	// Determine security settings
@@ -2109,20 +2531,40 @@ func (a *AuthService) setAuthCookies(w http.ResponseWriter, r *http.Request, tok
 	})
 
 	// Set refresh token cookie (longer expiry)
+	refreshMaxAge := 60 * 24 * 60 * 60 // 60 days by default
+	if rememberMe {
+		refreshMaxAge = 365 * 24 * 60 * 60 // 1 year if remember is checked
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		Path:     "/",
 		HttpOnly: true,
-		MaxAge:   60 * 24 * 60 * 60, // 60 days
+		MaxAge:   refreshMaxAge,
 		Secure:   isSecure,
 		SameSite: sameSiteMode,
 	})
 }
 
 // clearAuthCookies clears authentication cookies
-func (a *AuthService) clearAuthCookies(w http.ResponseWriter) {
+func (a *AuthService) clearAuthCookies(w http.ResponseWriter, r *http.Request) {
 	// Clear auth token cookie
+	baseURL := getBaseURL(r)
+	domain := "mtgban.com"
+	if strings.Contains(baseURL, "localhost") {
+		domain = "localhost"
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "MTGBAN",
+		Value:    "",
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
@@ -2153,15 +2595,6 @@ func (a *AuthService) clearAuthCookies(w http.ResponseWriter) {
 		MaxAge:   -1,
 		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
-	})
-
-	// Clear MTGBAN signature
-	http.SetCookie(w, &http.Cookie{
-		Name:     "MTGBAN",
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
 	})
 }
 
@@ -2211,174 +2644,6 @@ func (a *AuthService) handleFormError(w http.ResponseWriter, r *http.Request, er
 // ============================================================================================
 // Route Registration
 // ============================================================================================
-
-// registerRoutes registers authentication routes
-func (a *AuthService) registerRoutes() {
-	a.Logger.Printf("Registering authentication routes")
-
-	// Next.js static assets handler - this must be registered first
-	http.HandleFunc("/_next/", a.handleNextJsAssets)
-
-	// Create middleware chains
-	chains := a.createMiddlewareChains()
-
-	// Define routes with their middlewares
-	routes := []AuthRoute{
-		// Base routes
-		{
-			Path:        "/auth/login",
-			Method:      "GET",
-			Handler:     a.handleAuthLogin,
-			Middlewares: chains["base"],
-			Description: "Login page",
-		},
-		{
-			Path:        "/auth/signup",
-			Method:      "GET",
-			Handler:     a.handleAuthSignup,
-			Middlewares: chains["base"],
-			Description: "Signup page",
-		},
-		// API Routes
-		{
-			Path:        "/next-api/auth/login",
-			Method:      "POST",
-			Handler:     a.handleAuthLogin,
-			Middlewares: chains["apiAuth"],
-			Description: "API login endpoint",
-		},
-		{
-			Path:        "/next-api/auth/signup",
-			Method:      "POST",
-			Handler:     a.handleAuthSignup,
-			Middlewares: chains["apiAuth"],
-			Description: "API signup endpoint",
-		},
-		{
-			Path:        "/next-api/auth/logout",
-			Method:      "POST",
-			Handler:     a.handleAuthLogout,
-			Middlewares: chains["api"],
-			Description: "API logout endpoint",
-		},
-		{
-			Path:        "/next-api/auth/me",
-			Method:      "GET",
-			Handler:     a.handleAuthGetUser,
-			Middlewares: chains["api"],
-			Description: "API get current user endpoint",
-		},
-		{
-			Path:        "/next-api/auth/refresh-token",
-			Method:      "POST",
-			Handler:     a.handleAuthRefreshToken,
-			Middlewares: chains["api"],
-			Description: "API refresh token endpoint",
-		},
-		{
-			Path:        "/next-api/auth/forgot-password",
-			Method:      "POST",
-			Handler:     a.handleAuthForgotPassword,
-			Middlewares: chains["apiAuth"],
-			Description: "API forgot password endpoint",
-		},
-		{
-			Path:        "/next-api/auth/reset-password",
-			Method:      "POST",
-			Handler:     a.handleAuthResetPassword,
-			Middlewares: chains["apiAuth"],
-			Description: "API reset password endpoint",
-		},
-
-		// Form submission routes
-		{
-			Path:        "/auth/login-submit",
-			Method:      "POST",
-			Handler:     a.handleLoginFormSubmit,
-			Middlewares: chains["form"],
-			Description: "Login form submission",
-		},
-		{
-			Path:        "/auth/signup-submit",
-			Method:      "POST",
-			Handler:     a.handleSignupFormSubmit,
-			Middlewares: chains["form"],
-			Description: "Signup form submission",
-		},
-		{
-			Path:        "/auth/forgot-password-submit",
-			Method:      "POST",
-			Handler:     a.handleForgotPasswordFormSubmit,
-			Middlewares: chains["form"],
-			Description: "Forgot password form submission",
-		},
-		{
-			Path:        "/auth/reset-password-submit",
-			Method:      "POST",
-			Handler:     a.handleResetPasswordFormSubmit,
-			Middlewares: chains["form"],
-			Description: "Reset password form submission",
-		},
-		{
-			Path:        "/auth/logout",
-			Method:      "GET",
-			Handler:     a.handleLogoutForm,
-			Middlewares: chains["base"],
-			Description: "Logout form submission",
-		},
-	}
-
-	// Register routes
-	for _, route := range routes {
-		handler := route.Handler
-
-		// Apply middlewares
-		handler = route.Middlewares.Then(handler)
-
-		// Register with method checking
-		http.HandleFunc(route.Path, func(w http.ResponseWriter, r *http.Request) {
-			if route.Method != "" && r.Method != route.Method {
-				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-				return
-			}
-			handler(w, r)
-		})
-
-		a.Logger.Printf("Registered route: %s %s", route.Method, route.Path)
-	}
-
-	// Set up path normalizer for /auth/auth/ redirects
-	pathNormalizerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-		if strings.HasPrefix(path, "/auth/auth/") {
-			newPath := "/auth/" + strings.TrimPrefix(path, "/auth/auth/")
-			query := r.URL.RawQuery
-			if query != "" {
-				newPath += "?" + query
-			}
-			a.Logger.Printf("Redirecting from duplicate auth path: %s → %s", path, newPath)
-			http.Redirect(w, r, newPath, http.StatusMovedPermanently)
-			return
-		}
-
-		// Continue to next handler
-		http.NotFound(w, r)
-	})
-
-	// Handle path normalization before serving static files
-	http.Handle("/auth/auth/", pathNormalizerHandler)
-
-	// Serve static files and React components from embedded Next.js app
-	authFS, err := fs.Sub(authAssets, "nextAuth/out")
-	if err != nil {
-		a.Logger.Printf("Failed to load embedded auth assets: %v", err)
-		return
-	}
-
-	http.Handle("/auth/", http.StripPrefix("/auth", a.createStaticFileServer(authFS)))
-
-	a.Logger.Printf("Authentication routes registered successfully")
-}
 
 // createStaticFileServer creates a file server for static auth assets
 func (a *AuthService) createStaticFileServer(authFS fs.FS) http.Handler {
@@ -2801,7 +3066,7 @@ func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		querySig := r.FormValue("sig")
+		querySig := getSignatureFromCookies(r)
 		if querySig != "" {
 			authService.putSignatureInCookies(w, r, querySig)
 		}
@@ -2906,9 +3171,10 @@ func enforceAPISigning(next http.Handler) http.Handler {
 func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
-		var AuthHost = "localhost:8081"
-		if AuthHost == "" {
-			AuthHost = getBaseURL(r) + "/auth"
+
+		if authService.isExemptPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
 		}
 
 		sig := getSignatureFromCookies(r)
@@ -3098,6 +3364,11 @@ func InitAuth(params ...string) (*AuthService, error) {
 
 // getSignatureFromCookies returns the signature from the cookies
 func getSignatureFromCookies(r *http.Request) string {
+	_, authErr := r.Cookie("auth_token")
+	if authErr != nil {
+		return ""
+	}
+
 	var sig string
 	for _, cookie := range r.Cookies() {
 		if cookie.Name == "MTGBAN" {
@@ -3115,6 +3386,7 @@ func getSignatureFromCookies(r *http.Request) string {
 	if exp == "" {
 		return ""
 	}
+
 	expires, err := strconv.ParseInt(exp, 10, 64)
 	if err != nil || expires < time.Now().Unix() {
 		return ""

@@ -174,6 +174,9 @@ type PageVars struct {
 	MissingCounts   map[string]int
 	MissingPrices   map[string]float64
 	ResultPrices    map[string]map[string]float64
+	IsLoggedIn      bool
+	UserEmail       string
+	UserTier        string
 }
 
 type NavElem struct {
@@ -372,9 +375,12 @@ type ConfigType struct {
 		Secret  string `json:"supabase_jwt_secret"`
 		Url     string `json:"supabase_url"`
 	} `json:"db"`
-	ACL map[string]map[string]map[string]string `json:"acl"`
-
-	Uploader struct {
+	ACL struct {
+		Roles map[string]map[string]map[string]string `json:"roles"`
+		Tiers map[string]map[string]map[string]string `json:"tiers"`
+	} `json:"acl"`
+	SessionFile string `json:"session_file"`
+	Uploader    struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
@@ -414,6 +420,8 @@ var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
 
 var GoogleDocsClient *http.Client
+
+var banACL BanACL
 
 const (
 	DefaultConfigPort    = "8080"
@@ -466,6 +474,10 @@ func genPageNav(activeTab, sig string) PageVars {
 		showLogin = true
 	}
 
+	userEmail := GetParamFromSig(sig, "UserEmail")
+	userTier := GetParamFromSig(sig, "UserTier")
+	isLoggedIn := userEmail != "" && (expires > time.Now().Unix() || (DevMode && !SigCheck))
+
 	// These values need to be set for every rendered page
 	// In particular the Patreon variables are needed because the signature
 	// could expire in any page, and the button url needs these parameters
@@ -476,6 +488,11 @@ func genPageNav(activeTab, sig string) PageVars {
 
 		ShowLogin: showLogin,
 		Hash:      BuildCommit,
+
+		// Add user authentication info
+		IsLoggedIn: isLoggedIn,
+		UserEmail:  userEmail,
+		UserTier:   userTier,
 	}
 
 	if Config.Game != "" {
@@ -628,7 +645,6 @@ func main() {
 		SigCheck = *sigCheck
 		SkipInitialRefresh = *skipInitialRefresh
 	}
-
 	// Load necessary environmental variables
 	err := loadVars(Config.filePath, *port, *datastore)
 	if err != nil {
@@ -686,6 +702,14 @@ func main() {
 	if err := authService.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize auth service: %v", err)
 	}
+
+	// Load the ACL
+	err = authService.GetBanACL(&banACL)
+	if err != nil {
+		authService.Logger.Println("error loading ACL:", err)
+	}
+
+	authService.BanACL = &banACL
 
 	// Start background data loading
 	go func() {
@@ -778,7 +802,7 @@ func main() {
 			LogPages[key] = log.New(logFile, "", log.LstdFlags)
 		}
 
-		_, ExtraNavs[key].NoAuth = Config.ACL["Any"][key]
+		_, ExtraNavs[key].NoAuth = Config.ACL.Tiers["free"][key]
 
 		// Use the new auth service for handling routes
 		var handler http.Handler
@@ -927,15 +951,17 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		"base64enc": func(s string) string {
 			return base64.StdEncoding.EncodeToString([]byte(s))
 		},
+		"lower": strings.ToLower,
 	}
 
 	// Give each template a name
 	name := path.Base(tmpl)
 	// Prefix the name passed in with templates/
-	tmpl = fmt.Sprintf("templates/%s", tmpl)
+	tmplPath := fmt.Sprintf("templates/%s", tmpl)
+	navbarPath := "templates/navbar.html"
 
 	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmpl)
+	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
 	if err != nil {
 		log.Print("template parsing error: ", err)
 		return
