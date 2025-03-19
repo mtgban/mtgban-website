@@ -1,0 +1,32 @@
+{
+    "name": "embedded-auth",
+    "version": "0.0.1",
+    "description": "Embedded auth UI for MTGBAN",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint"
+    },
+    "dependencies": {
+        "lucide-react": "^0.482.0",
+        "next": "13.5.6",
+        "react": "18.2.0",
+        "react-dom": "18.2.0",
+        "undici": "^7.5.0"
+    },
+    "devDependencies": {
+        "@types/node": "20.8.6",
+        "@types/react": "18.2.28",
+        "@types/react-dom": "18.2.13",
+        "eslint": "8.51.0",
+        "eslint-config-next": "13.5.6",
+        "typescript": "5.2.2"
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    },
+    "license": "MIT",
+    "author": "mtgelmo"
+}

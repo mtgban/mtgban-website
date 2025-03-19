@@ -22,7 +22,7 @@ vendor/
 cache_*
 
 # Configuration files
-*.json
+config.json
 
 # Logs directory
 logs/
