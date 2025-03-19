@@ -459,7 +459,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		record := make([]string, 0, len(tcgcsvHeader))
 
 		record = append(record, tcgSkuId)
-		record = append(record, "")
+		record = append(record, "Magic")
 		record = append(record, co.Edition)
 		record = append(record, co.Name)
 		record = append(record, "")
@@ -472,7 +472,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		record = append(record, fmt.Sprintf("%0.2f", prices[2]))
 		record = append(record, "")
 		record = append(record, fmt.Sprint(qty[id+cond]))
-		record = append(record, "")
+		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
 		record = append(record, "")
 
 		err = w.Write(record)
