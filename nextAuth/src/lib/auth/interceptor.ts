@@ -1,5 +1,5 @@
 import { Request as UndiciRequest } from 'undici';
-import { authService } from './authService';
+import { authService } from '../../services/AuthService';
 
 /**
  * TypeScript declaration to ensure compatibility with undici

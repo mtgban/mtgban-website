@@ -1,38 +1,31 @@
-// src/pages/_app.tsx
-import React, { useEffect } from 'react';
-import type { AppProps } from 'next/app';
-import { useRouter } from 'next/router';
-import { AuthProvider } from '../context/AuthContext';
-import  '../../public/globals.css';
+import { useState } from 'react'
+import { AppProps } from 'next/app'
+import { QueryClient, QueryClientProvider } from 'react-query'
+import { ReactQueryDevtools } from 'react-query/devtools'
+import { GoDataProvider } from '@/context/GoDataContext'
+import { AuthProvider } from '@/context/AuthContext'
+import '../../public/globals.css'
 
-export default function App({ Component, pageProps }: AppProps) {
-  const router = useRouter();
-
-  // Add route change handling for page transitions
-  useEffect(() => {
-    const handleStart = () => {
-      // Show loading state on route change start
-      document.body.classList.add('loading');
-    };
-    
-    const handleComplete = () => {
-      document.body.classList.remove('loading');
-    };
-    
-    router.events.on('routeChangeStart', handleStart);
-    router.events.on('routeChangeComplete', handleComplete);
-    router.events.on('routeChangeError', handleComplete);
-    
-    return () => {
-      router.events.off('routeChangeStart', handleStart);
-      router.events.off('routeChangeComplete', handleComplete);
-      router.events.off('routeChangeError', handleComplete);
-    };
-  }, [router]);
+export default function MyApp({ Component, pageProps }: AppProps) {
+  // Create a QueryClient instance for React Query
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+        staleTime: 60000, // 1 minute
+        retry: 1,
+      },
+    },
+  }))
 
   return (
     <AuthProvider>
-      <Component {...pageProps} />
+      <QueryClientProvider client={queryClient}>
+        <GoDataProvider>
+          <Component {...pageProps} />
+          </GoDataProvider>
+        {process.env.NODE_ENV !== 'production' && <ReactQueryDevtools />}
+      </QueryClientProvider>
     </AuthProvider>
-  );
+  )
 }

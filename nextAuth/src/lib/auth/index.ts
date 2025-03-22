@@ -1,3 +1,3 @@
-export * from '../api/types';
-export { authService } from './authService';
+export * from '../../types/auth';
+export { authService } from '../../services/AuthService';
 export { createFetchInterceptor } from './interceptor';
