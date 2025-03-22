@@ -130,13 +130,13 @@ nearly black #292929
   --antialiasing: var(--darkeryellow);
   --slider: var(--navbackground);
   --backgroundImage: var(--darkImage);
-};
+}
 
 /* reset all margins and padding*/
 * {
   margin: 0;
   padding: 0;
-  font-family: 'Rosario', sans-serif !important;
+  font-family: 'Rosario', sans-serif; !important;
 }
 
 body {
@@ -175,6 +175,7 @@ tr:nth-child(odd).no-hover:hover{
 }
 
 th.wrap {
+  white-space;
   text-overflow: ellipsis;
   overflow: hidden;
   max-width: 354px;
@@ -801,73 +802,65 @@ img.hoverImage {
   max-height: 360px;
 }
 
-/* Authentication styling */
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.user-email {
-  font-size: 0.9em;
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-tier {
-  font-size: 0.8em;
-  font-weight: bold;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background-color: #3498db;
-  color: white;
-}
-
-.tier-pioneer { background-color: #27ae60; }
-.tier-modern { background-color: #9b59b6; }
-.tier-legacy { background-color: #e67e22; }
-.tier-vintage { background-color: #c0392b; }
-.tier-free { background-color: #3498db; }
-
 .auth-buttons {
-  margin-left: 5px;
-}
-
-.auth-btn {
-  display: inline-block;
-  padding: 5px 12px;
-  font-size: 0.9em;
-  border-radius: 4px;
-  text-decoration: none;
-  transition: background-color 0.2s;
+  display: inline-flex;
+  position: relative;
+  left: 10em;
+  top: 10em;
+  gap: 2em;
 }
 
 .login-btn {
-  background-color: #f1f1f1;
-  color: #333;
-}
-
-.signup-btn {
-  background-color: #4a6;
-  color: white;
-}
-
-.logout-btn {
-  font-size: 0.85em;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background-color: #f1f1f1;
-  color: #333;
+  background-color: #559eff;
+  color: var(--background);
+  padding: 10px 20px;
+  border-radius: 5px;
   text-decoration: none;
 }
 
-.login-btn:hover, .logout-btn:hover {
-  background-color: #ddd;
+.subscribe-btn {
+  width: 140px;
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(to right,#77530a,#ffd277,#77530a,#77530a,#ffd277,#77530a);
+  background-size: 250%;
+  background-position: left;
+  color: #ffd277;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition-duration: 1s;
+  overflow: hidden;
 }
 
-.signup-btn:hover {
-  background-color: #3a5;
+.subscribe-btn::before {
+  position: absolute;
+  content: "SUBSCRIBE";
+  color: #ffd277;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 97%;
+  height: 90%;
+  border-radius: 8px;
+  transition-duration: 1s;
+  background-color: rgba(0, 0, 0, 0.842);
+  background-size: 200%;
+}
+
+.subscribe-btn:hover {
+  background-position: right;
+  transition-duration: 1s;
+}
+
+.subscribe-btn:hover::before {
+  background-position: right;
+  transition-duration: 1s;
+}
+
+.subscribe-btn:active {
+  transform: scale(0.95);
 }
