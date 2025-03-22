@@ -370,10 +370,11 @@ type ConfigType struct {
 	GoogleCredentials string            `json:"google_credentials"`
 	DB                struct {
 		Prefix  string `json:"log_prefix"`
-		Key     string `json:"supabase_anon_key"`
-		RoleKey string `json:"role_key"`
-		Secret  string `json:"supabase_jwt_secret"`
 		Url     string `json:"supabase_url"`
+		Secret  string `json:"supabase_jwt_secret"`
+		Key     string `json:"supabase_anon_key"`
+		RoleKey string `json:"supabase_role_key"`
+		Backup  string `json:"backup"`
 	} `json:"db"`
 	ACL struct {
 		Roles map[string]map[string]map[string]string `json:"roles"`
@@ -551,6 +552,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		}
 		pageVars.Nav = append(pageVars.Nav, extra)
 	}
+
 	return pageVars
 }
 
@@ -686,12 +688,13 @@ func main() {
 		SupabaseURL:     Config.DB.Url,
 		SupabaseAnonKey: Config.DB.Key,
 		SupabaseSecret:  Config.DB.Secret,
+		SupabaseRoleKey: Config.DB.RoleKey,
 		DebugMode:       DevMode,
 		LogPrefix:       "[AUTH] ",
-		// Set exempt routes that don't require authentication
-		ExemptRoutes:   []string{"/", "/home"},
-		ExemptPrefixes: []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
-		ExemptSuffixes: []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
+		Backup:          Config.DB.Backup,
+		ExemptRoutes:    []string{"/", "/home", "/api/suggest", "/search", "/random"},
+		ExemptPrefixes:  []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
+		ExemptSuffixes:  []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
 	}
 
 	authService, err := NewAuthService(authConfig)
@@ -710,6 +713,8 @@ func main() {
 	}
 
 	authService.BanACL = &banACL
+
+	fmt.Println(banACL)
 
 	// Start background data loading
 	go func() {
@@ -958,10 +963,9 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	name := path.Base(tmpl)
 	// Prefix the name passed in with templates/
 	tmplPath := fmt.Sprintf("templates/%s", tmpl)
-	navbarPath := "templates/navbar.html"
 
 	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
+	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmplPath)
 	if err != nil {
 		log.Print("template parsing error: ", err)
 		return

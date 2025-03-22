@@ -159,6 +159,8 @@ type AuthConfig struct {
 	SupabaseURL     string   `json:"supabase_url"`
 	SupabaseAnonKey string   `json:"supabase_anon_key"`
 	SupabaseSecret  string   `json:"supabase_jwt_secret"`
+	SupabaseRoleKey string   `json:"supabase_role_key"`
+	Backup          string   `json:"backup"`
 	DebugMode       bool     `json:"debug_mode"`
 	LogPrefix       string   `json:"log_prefix"`
 	ExemptRoutes    []string `json:"exempt_routes"`
@@ -364,7 +366,7 @@ func (a *AuthService) GetBanACL(result *BanACL) error {
 		Permissions map[string]interface{} `json:"permissions"`
 	}
 
-	err := a.Supabase.DB.From("acl").
+	err := a.Supabase.DB.From("ban_acl").
 		Select("user_id", "email", "tier", "permissions").
 		Execute(&banUsers)
 	if err != nil {
