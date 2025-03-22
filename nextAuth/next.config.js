@@ -23,6 +23,7 @@ const nextConfig = {
       '/reset-password': { page: '/reset-password' },
       '/signup-success': { page: '/signup-success' },
       '/confirmation': { page: '/confirmation' },
+      '/v2/search': { page: '/v2/search' },
     };
   },
 };
