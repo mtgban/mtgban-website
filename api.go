@@ -326,7 +326,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		return err
 	}
 
-	header := []string{"name", "set_name", "language", "finish", "quantity"}
+	header := []string{"quantity", "productid", "name", "set_name", "language", "finish"}
 	err = w.Write(header)
 	if err != nil {
 		return err
@@ -336,10 +336,8 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		if !found {
 			continue
 		}
-		name, found := blEntries[0].CustomFields["SCGName"]
-		if !found {
-			continue
-		}
+		productId := blEntries[0].CustomFields["scgSKU"]
+		name := blEntries[0].CustomFields["SCGName"]
 		edition := blEntries[0].CustomFields["SCGEdition"]
 		language := blEntries[0].CustomFields["SCGLanguage"]
 		finish := blEntries[0].CustomFields["SCGFinish"]
@@ -348,7 +346,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 			quantity = qtys[i]
 		}
 
-		err = w.Write([]string{name, edition, language, finish, quantity})
+		err = w.Write([]string{quantity, productId, name, edition, language, finish})
 		if err != nil {
 			return err
 		}
