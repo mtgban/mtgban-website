@@ -210,7 +210,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "New config loaded!")
 		doReboot = true
 
-		err := loadVars(Config.filePath, "", "")
+		err := loadVars(Config.filePath, "", "", nil)
 		if err != nil {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}
