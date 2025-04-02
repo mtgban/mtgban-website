@@ -24,7 +24,6 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/NYTimes/gziphandler"
 	supabase "github.com/nedpals/supabase-go"
 	"golang.org/x/time/rate"
 )
@@ -138,6 +137,7 @@ type APIResponse struct {
 type AuthService struct {
 	Logger         *log.Logger
 	Supabase       *supabase.Client
+	SupabaseAdmin  *supabase.Client
 	SupabaseURL    string
 	SupabaseKey    string
 	SupabaseSecret string
@@ -158,6 +158,7 @@ type AuthService struct {
 type AuthConfig struct {
 	SupabaseURL     string   `json:"supabase_url"`
 	SupabaseAnonKey string   `json:"supabase_anon_key"`
+	SupabaseRoleKey string   `json:"supabase_role_key"`
 	SupabaseSecret  string   `json:"supabase_jwt_secret"`
 	DebugMode       bool     `json:"debug_mode"`
 	LogPrefix       string   `json:"log_prefix"`
@@ -318,6 +319,11 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 		return nil, errors.New("failed to create Supabase client")
 	}
 
+	supabaseAdminClient := supabase.CreateClient(config.SupabaseURL, config.SupabaseRoleKey)
+	if supabaseAdminClient == nil {
+		return nil, errors.New("failed to create Supabase admin client")
+	}
+
 	// Generate CSRF secret
 	csrfSecret := make([]byte, 32)
 	if _, err := rand.Read(csrfSecret); err != nil {
@@ -328,6 +334,7 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 	service := &AuthService{
 		Logger:          logger,
 		Supabase:        supabaseClient,
+		SupabaseAdmin:   supabaseAdminClient,
 		SupabaseURL:     config.SupabaseURL,
 		SupabaseKey:     config.SupabaseAnonKey,
 		SupabaseSecret:  config.SupabaseSecret,
@@ -364,9 +371,10 @@ func (a *AuthService) GetBanACL(result *BanACL) error {
 		Permissions map[string]interface{} `json:"permissions"`
 	}
 
-	err := a.Supabase.DB.From("acl").
+	err := a.Supabase.DB.From("ban_acl").
 		Select("user_id", "email", "tier", "permissions").
 		Execute(&banUsers)
+
 	if err != nil {
 		return fmt.Errorf("failed to get ban users: %w", err)
 	}
@@ -785,7 +793,7 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// AuthWrapper wraps handlers with authentication logic
+// AuthWrapper is a middleware that handles authentication based on existing middleware
 func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		a.logWithContext(r, "[Go-Auth] %s %s", r.Method, r.URL.Path)
@@ -806,16 +814,12 @@ func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		a.logWithContext(r, "Signature found: %s", sig)
-
 		decodedSig, err := base64.StdEncoding.DecodeString(sig)
 		if err != nil {
 			a.logWithContext(r, "Failed to decode signature: %v", err)
 			http.Error(w, "Invalid signature", http.StatusUnauthorized)
 			return
 		}
-
-		a.logWithContext(r, "Decoded signature: %s", string(decodedSig))
 
 		values, err := url.ParseQuery(string(decodedSig))
 		if err != nil {
@@ -825,7 +829,6 @@ func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 		}
 
 		userEmail := values.Get("UserEmail")
-		a.logWithContext(r, "User email extracted from signature: %s", userEmail)
 
 		userAccess, err := a.getAccessByEmail(userEmail)
 		if DevMode {
@@ -837,30 +840,26 @@ func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		a.logWithContext(r, "Checking access for path: %s", path)
 		if _, ok := userAccess[path]; ok {
-			a.logWithContext(r, "Access granted for path: %s", path)
 			handler(w, r)
 			return
 		}
 
-		a.logWithContext(r, "Access denied for path: %s", path)
-
 		if a.isExemptPath(path) {
-			a.logWithContext(r, "Path is exempt, no signing required: %s", path)
-			noSigningWithInstance(a, http.HandlerFunc(handler)).ServeHTTP(w, r)
+
+			noSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
 			return
 		}
 
 		if strings.HasPrefix(path, "/api/mtgban/") ||
 			strings.HasPrefix(path, "/api/mtgjson/") {
-			a.logWithContext(r, "Path is API, enforcing API signing: %s", path)
-			enforceAPISigningWithInstance(a, http.HandlerFunc(handler)).ServeHTTP(w, r)
+			// Use API-specific middleware for API paths
+			enforceAPISigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
 			return
 		}
 
-		a.logWithContext(r, "Enforcing standard signing for path: %s", path)
-		enforceSigningWithInstance(a, http.HandlerFunc(handler)).ServeHTTP(w, r)
+		// Otherwise use standard enforceSigning middleware
+		enforceSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
 	}
 }
 
@@ -3070,257 +3069,144 @@ func (rw *responseWriter) WriteHeader(code int) {
 // ============================================================================================
 // InitAuth - Legacy Compatibility Function
 // ============================================================================================
-func noSigningWithInstance(a *AuthService, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
 
-		querySig := getSignatureFromCookies(r)
-		if querySig != "" {
-			a.putSignatureInCookies(w, r, querySig)
-		}
-
-		next.ServeHTTP(w, r)
-	})
+type TierNavCache struct {
+	navConfigs map[string][]NavElem
+	mutex      sync.RWMutex
 }
 
-func enforceAPISigningWithInstance(a *AuthService, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
+// NewTierNavCache creates a navigation cache based on the current configuration
+func NewTierNavCache() *TierNavCache {
+	cache := &TierNavCache{
+		navConfigs: make(map[string][]NavElem),
+	}
 
-		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
+	cache.RefreshCache()
 
-		ip, err := IpAddress(r)
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-
-		if !APIRateLimiter.allow(string(ip)) {
-			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-			return
-		}
-
-		if !DatabaseLoaded {
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
-			return
-		}
-
-		w.Header().Add("Content-Type", "application/json")
-
-		sig := r.FormValue("sig")
-
-		// If signature is empty let it pass through
-		if sig == "" {
-			gziphandler.GzipHandler(next).ServeHTTP(w, r)
-			return
-		}
-
-		raw, err := base64.StdEncoding.DecodeString(sig)
-		if SigCheck && err != nil {
-			log.Println("API error, no sig", err)
-			w.Write([]byte(`{"error": "invalid signature"}`))
-			return
-		}
-
-		v, err := url.ParseQuery(string(raw))
-		if SigCheck && err != nil {
-			log.Println("API error, no b64", err)
-			w.Write([]byte(`{"error": "invalid b64 signature"}`))
-			return
-		}
-
-		q := url.Values{}
-		q.Set("API", v.Get("API"))
-
-		for _, optional := range OptionalFields {
-			val := v.Get(optional)
-			if val != "" {
-				q.Set(optional, val)
-			}
-		}
-
-		sig = v.Get("Signature")
-		exp := v.Get("Expires")
-
-		secret := os.Getenv("BAN_SECRET")
-		apiUsersMutex.RLock()
-		user_secret, found := Config.ApiUserSecrets[v.Get("UserEmail")]
-		apiUsersMutex.RUnlock()
-		if found {
-			secret = user_secret
-		}
-
-		var expires int64
-		if exp != "" {
-			expires, err = strconv.ParseInt(exp, 10, 64)
-			if err != nil {
-				log.Println("API error", err.Error())
-				w.Write([]byte(`{"error": "invalid or expired signature"}`))
-				return
-			}
-			q.Set("Expires", exp)
-		}
-
-		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
-		valid := a.signHMACSHA256Base64([]byte(secret), []byte(data))
-
-		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
-			log.Println("API error, invalid", data)
-			w.Write([]byte(`{"error": "invalid or expired signature"}`))
-			return
-		}
-
-		gziphandler.GzipHandler(next).ServeHTTP(w, r)
-	})
+	return cache
 }
 
-// enforceSigningWithInstance uses the provided AuthService instance
-func enforceSigningWithInstance(a *AuthService, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
+// RefreshCache rebuilds the navigation configurations for all tiers
+func (c *TierNavCache) RefreshCache() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
-		if a.isExemptPath(r.URL.Path) {
-			next.ServeHTTP(w, r)
-			return
+	// Clear existing configurations
+	c.navConfigs = make(map[string][]NavElem)
+
+	// Build navigation for each tier defined in Config
+	for tier := range Config.ACL.Tiers {
+		// Start with default navigation
+		nav := make([]NavElem, len(DefaultNav))
+		copy(nav, DefaultNav)
+
+		// Add navigation elements based on tier permissions
+		for _, feat := range OrderNav {
+			// Check if this tier has access to this feature
+			_, allowed := Config.ACL.Tiers[tier][feat]
+
+			// If allowed or feature doesn't require auth, add it
+			if allowed || ExtraNavs[feat].NoAuth {
+				nav = append(nav, *ExtraNavs[feat])
+			}
 		}
 
-		sig := getSignatureFromCookies(r)
-		querySig := r.FormValue("sig")
-		if querySig != "" {
-			sig = querySig
-			a.putSignatureInCookies(w, r, querySig)
-		}
+		c.navConfigs[tier] = nav
+	}
 
-		switch r.Method {
-		case "GET":
-		case "POST":
-			var ok bool
-			for _, nav := range ExtraNavs {
-				if nav.Link == r.URL.Path {
-					ok = nav.CanPOST
+	anonymousNav := make([]NavElem, len(DefaultNav))
+	copy(anonymousNav, DefaultNav)
+
+	for _, feat := range OrderNav {
+		if ExtraNavs[feat].NoAuth {
+			anonymousNav = append(anonymousNav, *ExtraNavs[feat])
+		}
+	}
+
+	c.navConfigs["anonymous"] = anonymousNav
+}
+
+// GetNavForTier returns a copy of the navigation for a specific tier
+func (c *TierNavCache) GetNavForTier(tier string) []NavElem {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	nav, exists := c.navConfigs[tier]
+	if !exists {
+		nav = c.navConfigs["free"]
+		if nav == nil {
+			nav = c.navConfigs["anonymous"]
+		}
+	}
+
+	// Return a copy to prevent modification of cached data
+	result := make([]NavElem, len(nav))
+	copy(result, nav)
+
+	return result
+}
+
+// BuildPageVars builds the PageVars with the right navigation
+func (c *TierNavCache) BuildPageVars(activeTab, sig string) PageVars {
+	// Extract basic user info from signature
+	exp := GetParamFromSig(sig, "Expires")
+	expires, _ := strconv.ParseInt(exp, 10, 64)
+	userEmail := GetParamFromSig(sig, "UserEmail")
+	userTier := GetParamFromSig(sig, "UserTier")
+
+	msg := ""
+	showLogin := false
+	if sig != "" {
+		if expires < time.Now().Unix() {
+			msg = ErrMsgExpired
+		}
+	} else {
+		showLogin = true
+	}
+
+	isLoggedIn := userEmail != "" && (expires > time.Now().Unix() || (DevMode && !SigCheck))
+
+	// Initialize base page variables
+	pageVars := PageVars{
+		Title:        "BAN " + activeTab,
+		ErrorMessage: msg,
+		LastUpdate:   LastUpdate,
+		ShowLogin:    showLogin,
+		Hash:         BuildCommit,
+		IsLoggedIn:   isLoggedIn,
+		UserEmail:    userEmail,
+		UserTier:     userTier,
+	}
+
+	applyGameSettings(&pageVars)
+
+	var nav []NavElem
+	if isLoggedIn {
+		nav = c.GetNavForTier(userTier)
+	} else {
+		nav = c.GetNavForTier("anonymous")
+	}
+
+	for i := range nav {
+		if nav[i].Name == activeTab {
+			nav[i].Active = true
+			nav[i].Class = "active"
+
+			if showLogin && nav[i].NoAuth {
+				betaNav := NavElem{
+					Active: true,
+					Class:  "beta",
+					Short:  "Beta Public Access",
+					Link:   "javascript:void(0)",
 				}
+				nav = append(nav, betaNav)
 			}
-			if !ok {
-				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-				return
-			}
-		default:
-			http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-			return
+			break
 		}
+	}
 
-		pageVars := genPageNav("Error", sig)
-
-		if !UserRateLimiter.allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
-			pageVars.Title = "Too Many Requests"
-			pageVars.ErrorMessage = ErrMsgUseAPI
-
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		raw, err := base64.StdEncoding.DecodeString(sig)
-		if SigCheck && err != nil {
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
-			if DevMode {
-				pageVars.ErrorMessage += " - " + err.Error()
-			}
-
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		v, err := url.ParseQuery(string(raw))
-		if SigCheck && err != nil {
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
-			if DevMode {
-				pageVars.ErrorMessage += " - " + err.Error()
-			}
-
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		q := url.Values{}
-		for _, optional := range append(OrderNav, OptionalFields...) {
-			val := v.Get(optional)
-			if val != "" {
-				q.Set(optional, val)
-			}
-		}
-
-		expectedSig := v.Get("Signature")
-		exp := v.Get("Expires")
-
-		data := fmt.Sprintf("GET%s%s%s", exp, getBaseURL(r), q.Encode())
-		valid := a.signHMACSHA256Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
-		expires, err := strconv.ParseInt(exp, 10, 64)
-		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
-			if r.Method != "GET" {
-				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-				return
-			}
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
-			if valid == expectedSig && expires < time.Now().Unix() {
-				pageVars.ErrorMessage = ErrMsgExpired
-				if DevMode {
-					pageVars.ErrorMessage += " - sig expired"
-				}
-			}
-
-			if DevMode {
-				if err != nil {
-					pageVars.ErrorMessage += " - " + err.Error()
-				} else {
-					pageVars.ErrorMessage += " - wrong host"
-				}
-			}
-			// If sig is invalid, redirect to home
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		if !DatabaseLoaded && r.URL.Path != "/admin" {
-			page := "home.html"
-			for _, navName := range OrderNav {
-				nav := ExtraNavs[navName]
-				if r.URL.Path == nav.Link {
-					pageVars = genPageNav(nav.Name, sig)
-					page = nav.Page
-				}
-			}
-			pageVars.Title = "Great things are coming"
-			pageVars.ErrorMessage = ErrMsgRestart
-
-			render(w, page, pageVars)
-			return
-		}
-
-		for _, navName := range OrderNav {
-			nav := ExtraNavs[navName]
-			if r.URL.Path == nav.Link {
-				param := GetParamFromSig(sig, navName)
-				canDo, _ := strconv.ParseBool(param)
-				if DevMode && nav.AlwaysOnForDev {
-					canDo = true
-				}
-				if SigCheck && !canDo {
-					pageVars = genPageNav(nav.Name, sig)
-					pageVars.Title = "This feature is BANned"
-					pageVars.ErrorMessage = ErrMsgPlus
-
-					render(w, nav.Page, pageVars)
-					return
-				}
-				break
-			}
-		}
-
-		gziphandler.GzipHandler(next).ServeHTTP(w, r)
-	})
+	pageVars.Nav = nav
+	return pageVars
 }
 
 // InitAuth initializes the auth service (legacy compatibility function)

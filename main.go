@@ -16,6 +16,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -266,6 +267,8 @@ var LogPages map[string]*log.Logger
 // All the page properties
 var ExtraNavs map[string]*NavElem
 
+var navCache *NavCache
+
 func init() {
 	ExtraNavs = map[string]*NavElem{
 		"Search": {
@@ -420,7 +423,6 @@ var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
 
 var GoogleDocsClient *http.Client
-
 var banACL BanACL
 
 const (
@@ -461,9 +463,96 @@ func (fs *FileSystem) Open(path string) (http.File, error) {
 	return f, nil
 }
 
-func genPageNav(activeTab, sig string) PageVars {
+// TierNavCache stores pre-generated navigation configurations for each tier
+type NavCache struct {
+	navConfigs map[string][]NavElem
+	mutex      sync.RWMutex
+}
+
+// NewTierNavCache creates a navigation cache based on the current configuration
+func NewNavCache() *NavCache {
+	cache := &NavCache{
+		navConfigs: make(map[string][]NavElem),
+	}
+
+	// Initialize the cache with all tier configurations
+	cache.RefreshCache()
+
+	return cache
+}
+
+// RefreshCache rebuilds the navigation configurations for all tiers
+func (c *NavCache) RefreshCache() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	// Clear existing configurations
+	c.navConfigs = make(map[string][]NavElem)
+
+	// Build navigation for each tier defined in Config
+	for tier := range Config.ACL.Tiers {
+		// Start with default navigation
+		nav := make([]NavElem, len(DefaultNav))
+		copy(nav, DefaultNav)
+
+		// Add navigation elements based on tier permissions
+		for _, feat := range OrderNav {
+			// Check if this tier has access to this feature
+			_, allowed := Config.ACL.Tiers[tier][feat]
+
+			// If allowed or feature doesn't require auth, add it
+			if allowed || ExtraNavs[feat].NoAuth {
+				nav = append(nav, *ExtraNavs[feat])
+			}
+		}
+
+		c.navConfigs[tier] = nav
+	}
+
+	// Add a special "anonymous" tier with just public navigation
+	anonymousNav := make([]NavElem, len(DefaultNav))
+	copy(anonymousNav, DefaultNav)
+
+	for _, feat := range OrderNav {
+		if ExtraNavs[feat].NoAuth {
+			anonymousNav = append(anonymousNav, *ExtraNavs[feat])
+		}
+	}
+
+	c.navConfigs["anonymous"] = anonymousNav
+}
+
+// GetNavForTier returns a copy of the navigation for a specific tier
+func (c *NavCache) GetNavForTier(tier string) []NavElem {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	nav, exists := c.navConfigs[tier]
+	if !exists {
+		// Default to free tier if tier not found
+		nav = c.navConfigs["free"]
+		if nav == nil {
+			// Fall back to anonymous if no free tier exists
+			nav = c.navConfigs["anonymous"]
+		}
+	}
+
+	// Return a copy to prevent modification of cached data
+	result := make([]NavElem, len(nav))
+	copy(result, nav)
+
+	return result
+}
+
+// BuildPageVars builds the PageVars with the right navigation
+func (c *NavCache) BuildPageVars(activeTab, sig string) PageVars {
+	// Extract basic user info from signature
 	exp := GetParamFromSig(sig, "Expires")
 	expires, _ := strconv.ParseInt(exp, 10, 64)
+	userEmail := GetParamFromSig(sig, "UserEmail")
+	userTier := GetParamFromSig(sig, "UserTier")
+
+	// Determine error message if any
 	msg := ""
 	showLogin := false
 	if sig != "" {
@@ -474,27 +563,58 @@ func genPageNav(activeTab, sig string) PageVars {
 		showLogin = true
 	}
 
-	userEmail := GetParamFromSig(sig, "UserEmail")
-	userTier := GetParamFromSig(sig, "UserTier")
+	// Check if user is logged in
 	isLoggedIn := userEmail != "" && (expires > time.Now().Unix() || (DevMode && !SigCheck))
 
-	// These values need to be set for every rendered page
-	// In particular the Patreon variables are needed because the signature
-	// could expire in any page, and the button url needs these parameters
+	// Initialize base page variables
 	pageVars := PageVars{
 		Title:        "BAN " + activeTab,
 		ErrorMessage: msg,
 		LastUpdate:   LastUpdate,
-
-		ShowLogin: showLogin,
-		Hash:      BuildCommit,
-
-		// Add user authentication info
-		IsLoggedIn: isLoggedIn,
-		UserEmail:  userEmail,
-		UserTier:   userTier,
+		ShowLogin:    showLogin,
+		Hash:         BuildCommit,
+		IsLoggedIn:   isLoggedIn,
+		UserEmail:    userEmail,
+		UserTier:     userTier,
 	}
 
+	// Apply game-specific settings
+	applyGameSettings(&pageVars)
+
+	// Get navigation based on user tier or anonymous if not logged in
+	var nav []NavElem
+	if isLoggedIn {
+		nav = c.GetNavForTier(userTier)
+	} else {
+		nav = c.GetNavForTier("anonymous")
+	}
+
+	// Mark active navigation element
+	for i := range nav {
+		if nav[i].Name == activeTab {
+			nav[i].Active = true
+			nav[i].Class = "active"
+
+			// Add beta notice for non-authenticated users on public pages
+			if showLogin && nav[i].NoAuth {
+				betaNav := NavElem{
+					Active: true,
+					Class:  "beta",
+					Short:  "Beta Public Access",
+					Link:   "javascript:void(0)",
+				}
+				nav = append(nav, betaNav)
+			}
+			break
+		}
+	}
+
+	pageVars.Nav = nav
+	return pageVars
+}
+
+// applyGameSettings sets game-specific page variables
+func applyGameSettings(pageVars *PageVars) {
 	if Config.Game != "" {
 		// Append which game this site is for
 		pageVars.Title += " - " + Config.Game
@@ -511,50 +631,13 @@ func genPageNav(activeTab, sig string) PageVars {
 	default:
 		panic("no pageVars.CardBackURL set")
 	}
-
-	// Allocate a new navigation bar
-	pageVars.Nav = make([]NavElem, len(DefaultNav))
-	copy(pageVars.Nav, DefaultNav)
-
-	// Enable buttons according to the enabled features
-	for _, feat := range OrderNav {
-		if expires > time.Now().Unix() || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
-			param := GetParamFromSig(sig, feat)
-			allowed, _ := strconv.ParseBool(param)
-			if DevMode && ExtraNavs[feat].AlwaysOnForDev {
-				allowed = true
-			}
-
-			if allowed || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
-				pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
-			}
-		}
-	}
-
-	mainNavIndex := 0
-	for i := range pageVars.Nav {
-		if pageVars.Nav[i].Name == activeTab {
-			mainNavIndex = i
-			break
-		}
-	}
-	pageVars.Nav[mainNavIndex].Active = true
-	pageVars.Nav[mainNavIndex].Class = "active"
-
-	// Add extra warning message if needed
-	if showLogin && pageVars.Nav[mainNavIndex].NoAuth {
-		extra := *&NavElem{
-			Active: true,
-			Class:  "beta",
-			Short:  "Beta Public Access",
-			Link:   "javascript:void(0)",
-		}
-		pageVars.Nav = append(pageVars.Nav, extra)
-	}
-	return pageVars
 }
 
-func loadVars(cfg, port, datastore string) error {
+func genPageNav(activeTab, sig string) PageVars {
+	return navCache.BuildPageVars(activeTab, sig)
+}
+
+func loadVars(cfg, port, datastore string, authConfig *AuthConfig) error {
 	// Load from config file
 	file, err := os.Open(cfg)
 	if !DevMode && err != nil {
@@ -596,6 +679,20 @@ func loadVars(cfg, port, datastore string) error {
 
 	InventoryDir = path.Join("cache_inv", Config.Game)
 	BuylistDir = path.Join("cache_bl", Config.Game)
+
+	if authConfig != nil {
+		*authConfig = AuthConfig{
+			SupabaseURL:     Config.DB.Url,
+			SupabaseAnonKey: Config.DB.Key,
+			SupabaseSecret:  Config.DB.Secret,
+			DebugMode:       DevMode,
+			LogPrefix:       "[AUTH] ",
+			// Set exempt routes that don't require authentication
+			ExemptRoutes:   []string{"/", "/home"},
+			ExemptPrefixes: []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
+			ExemptSuffixes: []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
+		}
+	}
 
 	return nil
 }
@@ -645,8 +742,13 @@ func main() {
 		SigCheck = *sigCheck
 		SkipInitialRefresh = *skipInitialRefresh
 	}
+
+	navCache = NewNavCache()
+	// Create an auth config instance
+	var authConfig AuthConfig
+
 	// Load necessary environmental variables
-	err := loadVars(Config.filePath, *port, *datastore)
+	err := loadVars(Config.filePath, *port, *datastore, &authConfig)
 	if err != nil {
 		log.Fatalln("unable to load config file:", err)
 	}
@@ -681,26 +783,9 @@ func main() {
 		}
 	}
 
-	// Initialize the auth service with proper configuration
-	authConfig := AuthConfig{
-		SupabaseURL:     Config.DB.Url,
-		SupabaseAnonKey: Config.DB.Key,
-		SupabaseSecret:  Config.DB.Secret,
-		DebugMode:       DevMode,
-		LogPrefix:       "[AUTH] ",
-		// Set exempt routes that don't require authentication
-		ExemptRoutes:   []string{"/", "/home"},
-		ExemptPrefixes: []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
-		ExemptSuffixes: []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
-	}
-
 	authService, err := NewAuthService(authConfig)
 	if err != nil {
 		log.Fatalf("Failed to create auth service: %v", err)
-	}
-
-	if err := authService.Initialize(); err != nil {
-		log.Fatalf("Failed to initialize auth service: %v", err)
 	}
 
 	// Load the ACL
@@ -784,7 +869,7 @@ func main() {
 	})
 
 	// Home page - no authentication required
-	http.Handle("/", authService.AuthWrapper(http.HandlerFunc(Home)))
+	http.Handle("/", http.HandlerFunc(Home))
 
 	// Register routes for each navigation item
 	for key, nav := range ExtraNavs {
@@ -804,18 +889,15 @@ func main() {
 
 		_, ExtraNavs[key].NoAuth = Config.ACL.Tiers["free"][key]
 
-		// Use the new auth service for handling routes
 		var handler http.Handler
 		if nav.NoAuth {
 			// No authentication required
 			handler = http.HandlerFunc(nav.Handle)
 		} else {
 			// Use AuthWrapper middleware
-			handler = http.HandlerFunc(authService.AuthWrapper(nav.Handle))
+			handler = http.HandlerFunc(authService.AuthRequired(nav.Handle))
 		}
-
 		http.Handle(nav.Link, handler)
-
 		// Add any additional endpoints to it
 		for _, subPage := range nav.SubPages {
 			http.Handle(subPage, handler)
@@ -823,18 +905,18 @@ func main() {
 	}
 
 	// API endpoints
-	http.Handle("/search/oembed", authService.AuthWrapper(http.HandlerFunc(Search)))
-	http.Handle("/api/mtgban/", authService.AuthWrapper(http.HandlerFunc(PriceAPI)))
-	http.Handle("/api/mtgjson/ck.json", authService.AuthWrapper(http.HandlerFunc(API)))
-	http.Handle("/api/tcgplayer/", authService.AuthWrapper(authService.AuthWrapper(TCGHandler)))
-	http.Handle("/api/search/", authService.AuthWrapper(authService.AuthWrapper(SearchAPI)))
-	http.Handle("/api/cardkingdom/pricelist.json", authService.AuthWrapper(http.HandlerFunc(CKMirrorAPI)))
-	http.Handle("/api/suggest", authService.AuthWrapper(http.HandlerFunc(SuggestAPI)))
-	http.Handle("/api/opensearch.xml", authService.AuthWrapper(http.HandlerFunc(OpenSearchDesc)))
+	http.Handle("/search/oembed", http.HandlerFunc(Search))
+	http.Handle("/api/mtgban/", http.HandlerFunc(PriceAPI))
+	http.Handle("/api/mtgjson/ck.json", http.HandlerFunc(API))
+	http.Handle("/api/tcgplayer/", http.HandlerFunc(TCGHandler))
+	http.Handle("/api/search/", http.HandlerFunc(SearchAPI))
+	http.Handle("/api/cardkingdom/pricelist.json", http.HandlerFunc(CKMirrorAPI))
+	http.Handle("/api/suggest", http.HandlerFunc(SuggestAPI))
+	http.Handle("/api/opensearch.xml", http.HandlerFunc(OpenSearchDesc))
 
 	// Favicon handler
 	http.HandleFunc("/favicon.ico", Favicon)
-	http.Handle("/img/opensearch.xml", authService.AuthWrapper(http.HandlerFunc(OpenSearchDesc)))
+	http.Handle("/img/opensearch.xml", http.HandlerFunc(OpenSearchDesc))
 
 	// Create and start the server
 	srv := &http.Server{
