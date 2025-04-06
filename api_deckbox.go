@@ -67,6 +67,9 @@ func deckboxIdConvert(w *csv.Writer, uploadedData []UploadEntry) error {
 			lang = ""
 		case "Portuguese (Brazilian)":
 			lang = "Portuguese"
+		case "Chinese Simplified",
+			"Chinese Traditional":
+			lang = "Chinese"
 		}
 
 		price := ""
