@@ -384,7 +384,7 @@ func (a *AuthService) GetBanACL(result *BanACL) error {
 		Permissions map[string]interface{} `json:"permissions"`
 	}
 
-	err := a.Supabase.DB.From("acl").
+	err := a.Supabase.DB.From("ban_acl").
 		Select("user_id", "email", "tier", "permissions").
 		Execute(&banUsers)
 	if err != nil {
@@ -420,9 +420,6 @@ func (a *AuthService) getAccessByEmail(email string) (map[string]interface{}, er
 
 // registerRoutes registers authentication routes
 func (a *AuthService) registerRoutes() {
-	if DevMode {
-		a.Logger.Printf("Registering authentication routes")
-	}
 	// Next.js static assets handler - this must be registered first
 	http.HandleFunc("/_next/", a.handleNextJsAssets)
 
@@ -551,9 +548,7 @@ func (a *AuthService) registerRoutes() {
 			handler(w, r)
 		})
 
-		if DevMode {
-			a.Logger.Printf("Registered route: %s %s", route.Method, route.Path)
-		}
+		a.Logger.Printf("Registered route: %s %s", route.Method, route.Path)
 	}
 
 	// Set up path normalizer for /auth/auth/ redirects
@@ -585,57 +580,73 @@ func (a *AuthService) registerRoutes() {
 
 func (a *AuthService) handleAuthAsset(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/auth/")
+
+	// Remove trailing slash if present
+	if len(path) > 0 && path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
 	a.logWithContext(r, "Direct auth asset request: %s (path: %s)", r.URL.Path, path)
 
 	if path == "" || path == "/" {
 		path = "index.html"
 	}
 
-	setContentTypeByExt(w, path)
-
-	isHTML := strings.HasSuffix(path, ".html")
-	if !isHTML && filepath.Ext(path) == "" {
+	// Determine if this is an HTML route (like login, signup, etc.)
+	isHtmlRoute := false
+	if filepath.Ext(path) == "" {
 		htmlRoutes := map[string]bool{
 			"login":           true,
 			"signup":          true,
 			"reset-password":  true,
 			"forgot-password": true,
+			"confirmation":    true,
+			"signup-success":  true,
+			"404":             true,
 		}
 
 		if htmlRoutes[path] {
-			isHTML = true
-			path += ".html" // for template lookup
+			path += ".html"
+			isHtmlRoute = true
 		}
 	}
 
-	if isHTML {
-		sig := getSignatureFromCookies(r)
-		pageVars := genPageNav("Authentication", sig)
-		templateName := filepath.Base(path)
+	// Set appropriate content type
+	setContentTypeByExt(w, path)
 
-		a.logWithContext(r, "rendering Auth template: %s", templateName)
-		render(w, templateName, pageVars)
+	// Try to find the file in the embedded filesystem
+	data, err := authAssets.ReadFile("nextAuth/out/" + path)
+	if err == nil {
+		// File was found, write it directly to response
+		w.Write(data)
 		return
 	}
 
-	// Try different paths to find the file
+	// If not found and it's an HTML route, try index.html (for client-side routing)
+	if isHtmlRoute {
+		data, err = authAssets.ReadFile("nextAuth/out/index.html")
+		if err == nil {
+			w.Write(data)
+			return
+		}
+	}
+
+	// Try alternative paths
 	possiblePaths := []string{
-		"nextAuth/out/" + path,
 		path,
+		"nextAuth/" + path,
 	}
 
 	for _, possiblePath := range possiblePaths {
 		data, err := authAssets.ReadFile(possiblePath)
 		if err == nil {
-			// found file, write it to resp.
+			// Found file, write it to response
 			w.Write(data)
 			return
 		}
-
-		a.logWithContext(r, "Tried path %s, error: %v", possiblePath, err)
 	}
 
-	// If we get here, the file was not found
+	// File not found
 	a.logWithContext(r, "File not found: %s", path)
 	http.NotFound(w, r)
 }
@@ -935,12 +946,18 @@ func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 
 // handleNextJsAssets serves static assets for Next.js
 func (a *AuthService) handleNextJsAssets(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/auth/")
-	a.logWithContext(r, "Next.js static asset request: %s (path: %s)", r.URL.Path, path)
+	requestPath := r.URL.Path
+	a.logWithContext(r, "Next.Js static asset request: %s", requestPath)
 
-	isHTML := strings.HasSuffix(r.URL.Path, ".html")
+	// Remove the leading slash for fs access
+	fsPath := strings.TrimPrefix(requestPath, "/")
 
-	if !isHTML && filepath.Ext(path) == "" {
+	// Set content type based on extension
+	setContentTypeByExt(w, requestPath)
+
+	// Check if this is an HTML route
+	isHTML := strings.HasSuffix(requestPath, ".html")
+	if !isHTML && filepath.Ext(fsPath) == "" {
 		htmlRoutes := map[string]bool{
 			"_next/data":      true,
 			"login":           true,
@@ -949,35 +966,40 @@ func (a *AuthService) handleNextJsAssets(w http.ResponseWriter, r *http.Request)
 			"forgot-password": true,
 		}
 
-		baseName := filepath.Base(path)
+		baseName := filepath.Base(fsPath)
 		if htmlRoutes[baseName] {
 			isHTML = true
-			path += ".html"
+			fsPath += ".html"
 		}
 	}
 
-	setContentTypeByExt(w, r.URL.Path)
+	possiblePaths := []string{
+		// Try direct path in nextAuth/out directory
+		"nextAuth/out/" + fsPath,
+		// Try without _next prefix (in case it's already in the embed path)
+		"nextAuth/out/" + strings.TrimPrefix(fsPath, "_next/"),
+		// Try just the filename part
+		"nextAuth/out/_next/" + filepath.Base(fsPath),
+		// Other possible variations
+		fsPath,
+		strings.TrimPrefix(fsPath, "_next/"),
+	}
 
-	if isHTML {
-		sig := getSignatureFromCookies(r)
-		pageVars := genPageNav("Authentication", sig)
-		templateName := filepath.Base(path)
+	// Log what we're looking for
+	a.logWithContext(r, "Looking for Next.js asset in possible paths: %v", possiblePaths)
 
-		if !strings.HasSuffix(templateName, ".html") {
-			templateName += ".html"
+	// Try each possible path
+	for _, tryPath := range possiblePaths {
+		data, err := authAssets.ReadFile(tryPath)
+		if err == nil {
+			// File found, serve it
+			w.Write(data)
+			a.logWithContext(r, "Successfully served Next.js asset from: %s", tryPath)
+			return
 		}
-
-		a.logWithContext(r, "rendering HTML template: %s", templateName)
-		render(w, templateName, pageVars)
-		return
 	}
 
-	data, err := authAssets.ReadFile("nextAuth/out/" + path)
-	if err == nil {
-		w.Write(data)
-		return
-	}
-
+	// Last resort: try using fs.Sub approach
 	a.logWithContext(r, "Direct access failed, trying fs.Sub approach")
 	authFS, err := fs.Sub(authAssets, "nextAuth/out")
 	if err != nil {
@@ -986,16 +1008,24 @@ func (a *AuthService) handleNextJsAssets(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	file, err := authFS.Open(path)
-	if err != nil {
-		a.logWithContext(r, "File not found: %s, error: %v", path, err)
-		http.NotFound(w, r)
-		return
+	// Try a few variations with fs.Sub too
+	for _, subPath := range []string{
+		fsPath,
+		strings.TrimPrefix(fsPath, "_next/"),
+		"_next/" + filepath.Base(fsPath),
+	} {
+		file, err := authFS.Open(subPath)
+		if err == nil {
+			defer file.Close()
+			io.Copy(w, file)
+			a.logWithContext(r, "Successfully served Next.js asset from fs.Sub: %s", subPath)
+			return
+		}
 	}
-	defer file.Close()
 
-	// Stream the file directly to the response
-	io.Copy(w, file)
+	// If we get here, we failed to find the file
+	a.logWithContext(r, "Failed to find Next.js asset for: %s", requestPath)
+	http.NotFound(w, r)
 }
 
 // handleAuthLogin handles API login requests
