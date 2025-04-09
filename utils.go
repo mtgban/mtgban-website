@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log"
 	"math/rand"
 	"net"
@@ -906,10 +905,4 @@ func maskID(id string) string {
 		return "***" + id[len(id)-2:]
 	}
 	return id[:4] + "***" + id[len(id)-4:]
-}
-
-// Helper function to check if a file exists in the filesystem
-func authFileExists(fsys fs.FS, path string) bool {
-	_, err := fs.Stat(fsys, path)
-	return err == nil
 }

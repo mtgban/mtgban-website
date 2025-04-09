@@ -51,6 +51,23 @@ const (
 //go:embed all:nextAuth/out
 var authAssets embed.FS
 
+// contentTypeMap maps file extensions to content types
+var contentTypeMap = map[string]string{
+	".html":  "text/html",
+	".js":    "application/javascript",
+	".css":   "text/css",
+	".json":  "application/json",
+	".map":   "application/json",
+	".png":   "image/png",
+	".jpg":   "image/jpeg",
+	".jpeg":  "image/jpeg",
+	".svg":   "image/svg+xml",
+	".ico":   "image/x-icon",
+	".woff":  "font/woff",
+	".woff2": "font/woff2",
+	".ttf":   "font/ttf",
+}
+
 // AuthError represents a standardized authentication error
 type AuthError struct {
 	Code       string
@@ -265,7 +282,7 @@ func DefaultAuthConfig() AuthConfig {
 	}
 }
 
-// LoadAuthConfig loads auth configuration from a file
+// LoadAuthConfig loads auth configuration from aa file
 func LoadAuthConfig(filePath string) (AuthConfig, error) {
 	// Start with default configuration
 	config := DefaultAuthConfig()
@@ -350,6 +367,9 @@ func (a *AuthService) Initialize() error {
 	a.Logger.Printf("Initializing authentication service")
 	a.Logger.Printf("Supabase URL: %s", a.SupabaseURL)
 
+	a.Logger.Printf("Listing embedded auth assets structure:")
+	printEmbeddedFS(authAssets, ".", "")
+
 	a.registerRoutes()
 
 	a.Logger.Printf("Authentication service initialized successfully")
@@ -400,8 +420,9 @@ func (a *AuthService) getAccessByEmail(email string) (map[string]interface{}, er
 
 // registerRoutes registers authentication routes
 func (a *AuthService) registerRoutes() {
-	a.Logger.Printf("Registering authentication routes")
-
+	if DevMode {
+		a.Logger.Printf("Registering authentication routes")
+	}
 	// Next.js static assets handler - this must be registered first
 	http.HandleFunc("/_next/", a.handleNextJsAssets)
 
@@ -530,7 +551,9 @@ func (a *AuthService) registerRoutes() {
 			handler(w, r)
 		})
 
-		a.Logger.Printf("Registered route: %s %s", route.Method, route.Path)
+		if DevMode {
+			a.Logger.Printf("Registered route: %s %s", route.Method, route.Path)
+		}
 	}
 
 	// Set up path normalizer for /auth/auth/ redirects
@@ -554,16 +577,67 @@ func (a *AuthService) registerRoutes() {
 	// Handle path normalization before serving static files
 	http.Handle("/auth/auth/", pathNormalizerHandler)
 
-	// Serve static files and React components from embedded Next.js app
-	authFS, err := fs.Sub(authAssets, "nextAuth/out")
-	if err != nil {
-		a.Logger.Printf("Failed to load embedded auth assets: %v", err)
+	http.HandleFunc("/auth/", a.handleAuthAsset)
+
+	a.Logger.Printf("Authentication routes registered successfully")
+
+}
+
+func (a *AuthService) handleAuthAsset(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/auth/")
+	a.logWithContext(r, "Direct auth asset request: %s (path: %s)", r.URL.Path, path)
+
+	if path == "" || path == "/" {
+		path = "index.html"
+	}
+
+	setContentTypeByExt(w, path)
+
+	isHTML := strings.HasSuffix(path, ".html")
+	if !isHTML && filepath.Ext(path) == "" {
+		htmlRoutes := map[string]bool{
+			"login":           true,
+			"signup":          true,
+			"reset-password":  true,
+			"forgot-password": true,
+		}
+
+		if htmlRoutes[path] {
+			isHTML = true
+			path += ".html" // for template lookup
+		}
+	}
+
+	if isHTML {
+		sig := getSignatureFromCookies(r)
+		pageVars := genPageNav("Authentication", sig)
+		templateName := filepath.Base(path)
+
+		a.logWithContext(r, "rendering Auth template: %s", templateName)
+		render(w, templateName, pageVars)
 		return
 	}
 
-	http.Handle("/auth/", http.StripPrefix("/auth", a.createStaticFileServer(authFS)))
+	// Try different paths to find the file
+	possiblePaths := []string{
+		"nextAuth/out/" + path,
+		path,
+	}
 
-	a.Logger.Printf("Authentication routes registered successfully")
+	for _, possiblePath := range possiblePaths {
+		data, err := authAssets.ReadFile(possiblePath)
+		if err == nil {
+			// found file, write it to resp.
+			w.Write(data)
+			return
+		}
+
+		a.logWithContext(r, "Tried path %s, error: %v", possiblePath, err)
+	}
+
+	// If we get here, the file was not found
+	a.logWithContext(r, "File not found: %s", path)
+	http.NotFound(w, r)
 }
 
 // ============================================================================================
@@ -861,20 +935,50 @@ func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
 
 // handleNextJsAssets serves static assets for Next.js
 func (a *AuthService) handleNextJsAssets(w http.ResponseWriter, r *http.Request) {
-	//a.logWithContext(r, "Next.js static asset request: %s", r.URL.Path)
+	path := strings.TrimPrefix(r.URL.Path, "/auth/")
+	a.logWithContext(r, "Next.js static asset request: %s (path: %s)", r.URL.Path, path)
 
-	// Set content type headers based on file extension
-	if strings.HasSuffix(r.URL.Path, ".js") {
-		w.Header().Set("Content-Type", "application/javascript")
-	} else if strings.HasSuffix(r.URL.Path, ".css") {
-		w.Header().Set("Content-Type", "text/css")
-	} else if strings.HasSuffix(r.URL.Path, ".json") {
-		w.Header().Set("Content-Type", "application/json")
-	} else if strings.HasSuffix(r.URL.Path, ".map") {
-		w.Header().Set("Content-Type", "application/json")
+	isHTML := strings.HasSuffix(r.URL.Path, ".html")
+
+	if !isHTML && filepath.Ext(path) == "" {
+		htmlRoutes := map[string]bool{
+			"_next/data":      true,
+			"login":           true,
+			"signup":          true,
+			"reset-password":  true,
+			"forgot-password": true,
+		}
+
+		baseName := filepath.Base(path)
+		if htmlRoutes[baseName] {
+			isHTML = true
+			path += ".html"
+		}
 	}
 
-	// Get embedded files
+	setContentTypeByExt(w, r.URL.Path)
+
+	if isHTML {
+		sig := getSignatureFromCookies(r)
+		pageVars := genPageNav("Authentication", sig)
+		templateName := filepath.Base(path)
+
+		if !strings.HasSuffix(templateName, ".html") {
+			templateName += ".html"
+		}
+
+		a.logWithContext(r, "rendering HTML template: %s", templateName)
+		render(w, templateName, pageVars)
+		return
+	}
+
+	data, err := authAssets.ReadFile("nextAuth/out/" + path)
+	if err == nil {
+		w.Write(data)
+		return
+	}
+
+	a.logWithContext(r, "Direct access failed, trying fs.Sub approach")
 	authFS, err := fs.Sub(authAssets, "nextAuth/out")
 	if err != nil {
 		a.logWithContext(r, "Failed to access embedded files: %v", err)
@@ -882,22 +986,10 @@ func (a *AuthService) handleNextJsAssets(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Remove leading slash for filesystem access
-	fsPath := strings.TrimPrefix(r.URL.Path, "/")
-
-	// Check if file exists
-	_, err = fs.Stat(authFS, fsPath)
+	file, err := authFS.Open(path)
 	if err != nil {
-		a.logWithContext(r, "File not found: %s, error: %v", fsPath, err)
+		a.logWithContext(r, "File not found: %s, error: %v", path, err)
 		http.NotFound(w, r)
-		return
-	}
-
-	// Open the file
-	file, err := authFS.Open(fsPath)
-	if err != nil {
-		a.logWithContext(r, "Error opening file: %s", fsPath)
-		http.Error(w, "Server Error", http.StatusInternalServerError)
 		return
 	}
 	defer file.Close()
@@ -915,16 +1007,20 @@ func (a *AuthService) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		// Set content type to HTML
 		w.Header().Set("Content-Type", "text/html")
 
-		// Get embedded files
-		authFS, err := fs.Sub(authAssets, "nextAuth/out")
+		// Try to load the login page directly
+		data, err := authAssets.ReadFile("nextAuth/out/login.html")
 		if err != nil {
-			a.logWithContext(r, "Failed to access embedded files: %v", err)
-			http.Error(w, "Server Error", http.StatusInternalServerError)
-			return
+			// If direct access failed, try alternative paths
+			data, err = authAssets.ReadFile("login.html")
+			if err != nil {
+				a.logWithContext(r, "Failed to load login page: %v", err)
+				http.Error(w, "Server Error - Login page not found", http.StatusInternalServerError)
+				return
+			}
 		}
 
-		// Serve the login HTML file
-		serveFile(http.FileServer(http.FS(authFS)), w, r, "login.html")
+		// Write the file data to response
+		w.Write(data)
 		return
 	}
 
@@ -2181,6 +2277,51 @@ func (a *AuthService) logWithContext(r *http.Request, format string, v ...interf
 	a.Logger.Printf(contextMsg, v...)
 }
 
+// authFileExists checks if a file exists in the embedded filesystem
+func authFileExists(fsys fs.FS, path string) bool {
+	// Clean the path to avoid directory traversal
+	path = filepath.Clean(path)
+
+	// Check if the file exists
+	info, err := fs.Stat(fsys, path)
+	if err != nil {
+		return false
+	}
+
+	return !info.IsDir()
+}
+
+// Debug function to print all files in an embedded filesystem
+func printEmbeddedFS(fsys embed.FS, dir string, indent string) {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		log.Printf("Error reading dir %s: %v", dir, err)
+		return
+	}
+
+	for _, entry := range entries {
+		path := dir + "/" + entry.Name()
+		if dir == "." {
+			path = entry.Name()
+		}
+
+		if entry.IsDir() {
+			log.Printf("%s[DIR] %s", indent, path)
+			printEmbeddedFS(fsys, path, indent+"  ")
+		} else {
+			log.Printf("%s[FILE] %s", indent, path)
+		}
+	}
+}
+
+// setContentTypeByExt sets the content type using contentTypeMap
+func setContentTypeByExt(w http.ResponseWriter, path string) {
+	ext := filepath.Ext(path)
+	if contentType, ok := contentTypeMap[ext]; ok {
+		w.Header().Set("Content-Type", contentType)
+	}
+}
+
 // normalizeAuthPath normalizes authentication paths
 func (a *AuthService) normalizeAuthPath(path string) string {
 	// Define base auth paths
@@ -2281,47 +2422,15 @@ func (a *AuthService) validatePassword(password string) (bool, string) {
 // serveFile serves a file with a modified request path
 func serveFile(fileServer http.Handler, w http.ResponseWriter, r *http.Request, path string) {
 	// Create a new request with the modified path
-	newReq := &http.Request{
-		Method:     r.Method,
-		URL:        &url.URL{Path: "/" + path},
-		Proto:      r.Proto,
-		ProtoMajor: r.ProtoMajor,
-		ProtoMinor: r.ProtoMinor,
-		Header:     r.Header,
-		Body:       r.Body,
-		Host:       r.Host,
-	}
-
 	if DevMode {
-		log.Printf("Serving auth asset: %s", path)
+		log.Printf("Serving file: %s", path)
 	}
 
-	// Set the content type based on the file extension
-	if strings.HasSuffix(path, ".html") {
-		w.Header().Set("Content-Type", "text/html")
-	} else if strings.HasSuffix(path, ".js") {
-		w.Header().Set("Content-Type", "application/javascript")
-	} else if strings.HasSuffix(path, ".json") {
-		w.Header().Set("Content-Type", "application/json")
-	} else if strings.HasSuffix(path, ".svg") {
-		w.Header().Set("Content-Type", "image/svg+xml")
-	} else if strings.HasSuffix(path, ".png") {
-		w.Header().Set("Content-Type", "image/png")
-	} else if strings.HasSuffix(path, ".jpg") || strings.HasSuffix(path, ".jpeg") {
-		w.Header().Set("Content-Type", "image/jpeg")
-	} else if strings.HasSuffix(path, ".ico") {
-		w.Header().Set("Content-Type", "image/x-icon")
-	} else if strings.HasSuffix(path, ".css") {
-		w.Header().Set("Content-Type", "text/css")
-	} else if strings.HasSuffix(path, ".woff") {
-		w.Header().Set("Content-Type", "font/woff")
-	} else if strings.HasSuffix(path, ".woff2") {
-		w.Header().Set("Content-Type", "font/woff2")
-	} else if strings.HasSuffix(path, ".ttf") {
-		w.Header().Set("Content-Type", "font/ttf")
-	}
+	newReq := r.Clone(r.Context())
+	newReq.URL.Path = "/" + path
 
-	// Serve the file
+	setContentTypeByExt(w, path)
+
 	fileServer.ServeHTTP(w, newReq)
 }
 
