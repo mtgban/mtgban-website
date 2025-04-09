@@ -24,6 +24,7 @@ cache_*
 # Configuration files
 config.json
 allprintings5.json
+client_secret.json
 
 # Logs directory
 logs/
