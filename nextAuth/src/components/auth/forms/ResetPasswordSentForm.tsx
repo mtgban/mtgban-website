@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import AuthLink from './AuthLink';
+import AuthLink from '@/components/auth/AuthLink';
 import { MailIcon } from 'lucide-react';
 
 interface ResetPasswordSentFormProps {

@@ -1,8 +1,8 @@
 // src/pages/reset-password-sent.tsx
 import React from 'react';
 import { useRouter } from 'next/router';
-import AuthLayout from '../components/auth/AuthLayout';
-import ResetPasswordSentForm from '../components/auth/ResetPasswordSentForm';
+import AuthLayout from '@/components/auth/AuthLayout';
+import ResetPasswordSentForm from '@/components/auth/forms/ResetPasswordSentForm';
 
 export default function ResetPasswordSentPage() {
   const router = useRouter();

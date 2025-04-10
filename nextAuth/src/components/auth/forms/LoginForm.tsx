@@ -2,8 +2,8 @@
 import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { MailIcon, LockIcon, ArrowLeftIcon, CheckCircleIcon, AlertCircleIcon } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
-import AuthLink from './AuthLink';
+import { useAuth } from '@/context/AuthContext';
+import AuthLink from '@/components/auth/AuthLink';
 
 export interface LoginFormProps {
   redirectTo?: string;

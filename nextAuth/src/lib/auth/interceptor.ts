@@ -30,11 +30,12 @@ export function createFetchInterceptor() {
   // helper function
   const isOnAuthPage = () => {
     const path = window.location.pathname;
-    return path.includes('/auth/login') || 
-           path.includes('/auth/signup') || 
-           path.includes('/auth/reset-password') ||
-           path.includes('/auth/forgot-password') ||
-           path.includes('/auth/confirmation');
+    return path.includes('/auth/login')
+        || path.includes('/auth/signup')
+        || path.includes('/auth/reset-password')
+        || path.includes('/auth/forgot-password')
+        || path.includes('/auth/confirmation')
+        || path.includes('/auth/account')
   };
 
   // Replace global fetch with intercepted version

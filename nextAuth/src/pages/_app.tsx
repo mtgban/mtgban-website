@@ -1,9 +1,24 @@
 // src/pages/_app.tsx
 import React, { useEffect } from 'react';
+import { Metadata } from 'next';
+import { getURL } from '@/lib/helpers';
 import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
-import { AuthProvider } from '../context/AuthContext';
+import { AuthProvider } from '../context/AuthProvider';
 import  '../../public/globals.css';
+
+const title = 'MTGBAN User Portal';
+const description = 'Manage your MTGBAN subscription.';
+
+export const metadata: Metadata = {
+  metadataBase: new URL(getURL()),
+  title,
+  description,
+  openGraph: {
+    title,
+    description
+  }
+};
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -36,3 +51,4 @@ export default function App({ Component, pageProps }: AppProps) {
     </AuthProvider>
   );
 }
+

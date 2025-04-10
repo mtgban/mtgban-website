@@ -1,7 +1,7 @@
 import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { UserIcon, MailIcon, LockIcon, ArrowLeftIcon, CheckCircleIcon, AlertCircleIcon } from 'lucide-react';
-import AuthLink from './AuthLink';
+import AuthLink from '@/components/auth/AuthLink';
 import { authService } from '@/lib/auth/authService';
 
 export interface SignupFormProps {
