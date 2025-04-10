@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html class="dark">
 <head>
-    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="/css/nav.css?hash={{.Hash}}">
+    <link href='https://fonts.googleapis.com/css?family=Inter:400,500,600' rel='stylesheet' type='text/css'>
     <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
     <title>{{.Title}}</title>
 
@@ -10,45 +10,78 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
     <link rel="manifest" href="/img/favicon/site.webmanifest">
-    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
     <link rel="shortcut icon" href="/img/favicon/favicon.ico">
-    <meta name="msapplication-TileColor" content="#da532c">
-    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
-    <meta name="theme-color" content="#ff0000">
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
 </head>
 
-<body class="light-theme">
-<script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
+<body class="dark">
+    <!-- Authentication background -->
+    <div class="auth-background">
+        <div class="auth-background-pattern"></div>
+        <div class="auth-background-gradient"></div>
+    </div>
+    
     {{template "navbar" .}}
-    <div class="bg">
-        <div class="mainbody">
-                <div class="indent">
-                    <form class="search autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
-                        <input id="searchbox" class="w3-input w3-border w3-round-small search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
-                    </form>
-                </div>
-
-                <script type="text/javascript">
-                    autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
-                </script>
+    
+    <div class="main-layout">
+        <div class="main-content">
+            <!-- Logo section -->
+            <div class="auth-logo-container">
+                <img src="/img/logo/ban-round.png" alt="BAN Arbitrage Network" class="auth-logo">
+            </div>
+            
+            <!-- Search form -->
+            <div class="auth-form">
+                <form class="search autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+                    <div class="form-group">
+                        <div class="input-wrapper">
+                            <input id="searchbox" class="form-input" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Message section -->
+            <div class="auth-header">
+                <h1 class="auth-title">
+                    Shaking up the <span class="gradient-text">TCG collectable</span> market with actual working data.
+                </h1>
+                <p class="auth-subtitle">
+                    Helping you make money.
+                </p>
+            </div>
+            
+            <!-- Error message if needed -->
+            {{if ne .ErrorMessage ""}}
+            <div class="auth-message error-message">
+                {{.ErrorMessage}}
+            </div>
+            {{end}}
+            
+            <!-- Links -->
+            <div class="auth-links">
+                Jump to: <a href="https://mtgban.com">Magic: the Gathering</a> | <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
+            </div>
+            
+            <!-- Footer -->
+            <div class="auth-divider"></div>
+            <div class="auth-info">
+                &copy; 2019-2025 MTGBAN Inc<br>
+                <br>
+                Cookies may be in use to ensure correct functionality of the platform.<br>
+                Content is provided for informational purpose only.
+            </div>
         </div>
     </div>
 
-    {{if ne .ErrorMessage ""}}
-        <h1>{{.ErrorMessage}}</h1>
-    {{end}}
-    <br>
-    <div class="indent">
-    Jump to &nbsp;<a href="https://mtgban.com">Magic: the Gathering</a> &nbsp;|&nbsp; <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
-    </div>
-
-    <br>
-    <div class="footer">&copy; 2019-2025 MTGBAN Inc<br>
-        <br><hr width=30% style="border: 1px dotted;">
-        Cookies may be in use to ensure correct functionality of the platform.<br>
-        Content is provided for informational purpose only.<br>
-    </div>
+    <script>
+        // Initialize autocomplete
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
+        
+        // Ensure dark mode is enabled
+        document.documentElement.classList.add('dark');
+        document.body.classList.add('dark');
+    </script>
 </body>
 </html>

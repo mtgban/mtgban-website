@@ -1,4 +1,6 @@
 {{define "navbar"}}
+<link rel="stylesheet" type="text/css" href="/css/globals.css?hash={{.Hash}}">
+
 <nav>
     <ul>
         <li {{if .ShowLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
@@ -13,15 +15,17 @@
         <!-- Authentication buttons -->
         {{if .IsLoggedIn}}
             <li class="user-info">
-                <span class="user-email" title="{{.UserEmail}}">
-                    {{if gt (len .UserEmail) 20}}
-                        {{slice .UserEmail 0 17}}...
-                    {{else}}
-                        {{.UserEmail}}
-                    {{end}}
-                </span>
-                <span class="user-tier tier-{{.UserTier | lower}}">{{.UserTier}}</span>
-                <a href="/logout" class="logout-btn">Logout</a>
+                <div class="user-info-container">
+                    <span class="user-email" title="{{.UserEmail}}">
+                        {{if gt (len .UserEmail) 20}}
+                            {{slice .UserEmail 0 17}}...
+                        {{else}}
+                            {{.UserEmail}}
+                        {{end}}
+                    </span>
+                    <span class="user-tier tier-{{.UserTier | lower}}">{{.UserTier}}</span>
+                </div>
+                <a href="/auth/logout" class="logout-btn">Logout</a>
             </li>
         {{else}}
             <li class="auth-buttons">
