@@ -39,9 +39,9 @@ var SleeperColors = []string{
 }
 
 func Sleepers(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.GetSignature(r)
 
-	pageVars := genPageNav("Sleepers", sig)
+	pageVars := genPageNav("Sleepers", r, sig)
 
 	// Load the defaul blocklist (same as Search)
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)

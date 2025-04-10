@@ -23,8 +23,6 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
 )
 
-var authService *AuthService
-
 var Country2flag = map[string]string{
 	"EU": "🇪🇺",
 	"JP": "🇯🇵",

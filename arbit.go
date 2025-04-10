@@ -324,13 +324,13 @@ func Reverse(w http.ResponseWriter, r *http.Request) {
 }
 
 func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.SessionManager.authService.GetSignature(r)
 
 	pageName := "Arbitrage"
 	if reverse {
 		pageName = "Reverse"
 	}
-	pageVars := genPageNav(pageName, sig)
+	pageVars := genPageNav(pageName, r, sig)
 
 	var anyOptionEnabled bool
 
@@ -411,9 +411,9 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 }
 
 func Global(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.SessionManager.authService.GetSignature(r)
 
-	pageVars := genPageNav("Global", sig)
+	pageVars := genPageNav("Global", r, sig)
 
 	anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")
 	anyEnabled, _ := strconv.ParseBool(anyEnabledOpt)

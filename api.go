@@ -572,13 +572,13 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchAPI(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.SessionManager.authService.GetSignature(r)
 
 	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
 	if !canDownloadCSV {
-		pageVars := genPageNav("Error", sig)
+		pageVars := genPageNav("Error", r, sig)
 		pageVars.Title = "Unauthorized"
 		pageVars.ErrorMessage = "Unable to download CSV"
 		render(w, "home.html", pageVars)
@@ -650,7 +650,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Del("Content-Type")
 		w.Header().Del("Content-Disposition")
 		UserNotify("search", err.Error())
-		pageVars := genPageNav("Error", sig)
+		pageVars := genPageNav("Error", r, sig)
 		pageVars.Title = "Error"
 		pageVars.InfoMessage = "Unable to download CSV right now"
 		render(w, "home.html", pageVars)

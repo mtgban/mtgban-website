@@ -521,12 +521,21 @@ func getLastDBUpdate(db *sql.DB) (string, error) {
 }
 
 func Newspaper(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.GetSignature(r)
+	session, _ := authService.SessionManager.GetSession(r)
+	pageVars := genPageNav("Newspaper", r, sig)
 
-	pageVars := genPageNav("Newspaper", sig)
+	// Check if user has permission to access this feature
+	if !authService.PermissionManager.HasPermission(session, "Newspaper") {
+		pageVars.Title = "This feature is BANned"
+		pageVars.ErrorMessage = ErrMsgPlus
+
+		render(w, "news.html", pageVars)
+		return
+	}
 
 	var db *sql.DB
-	enabled := GetParamFromSig(sig, "NewsEnabled")
+	enabled := GetParamFromSig(sig, "NewspaperEnabled")
 	if enabled == "1day" {
 		db = Newspaper1dayDB
 		pageVars.IsOneDay = true

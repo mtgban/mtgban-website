@@ -73,9 +73,9 @@ func isSame(a, b SearchEntry) bool {
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 
 func Search(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.GetSignature(r)
 
-	pageVars := genPageNav("Search", sig)
+	pageVars := genPageNav("Search", r, sig)
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 

@@ -119,9 +119,9 @@ type OptimizedUploadEntry struct {
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.GetSignature(r)
 
-	pageVars := genPageNav("Upload", sig)
+	pageVars := genPageNav("Upload", r, sig)
 
 	// Maximum form size
 	r.ParseMultipartForm(MaxUploadFileSize)

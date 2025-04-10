@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -368,16 +369,34 @@ type ConfigType struct {
 	} `json:"patreon"`
 	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
 	GoogleCredentials string            `json:"google_credentials"`
-	DB                struct {
-		Prefix  string `json:"log_prefix"`
-		Key     string `json:"supabase_anon_key"`
-		RoleKey string `json:"role_key"`
-		Secret  string `json:"supabase_jwt_secret"`
-		Url     string `json:"supabase_url"`
-	} `json:"db"`
+	Auth              struct {
+		Domain          string   `json:"domain"`
+		Port            string   `json:"port"`
+		SecureCookies   bool     `json:"secure_cookies"`
+		CookieDomain    string   `json:"cookie_domain"`
+		CSRFSecret      string   `json:"csrf_secret"`
+		SignatureTTL    int      `json:"signature_ttl"`
+		LoginRateLimit  int      `json:"login_rate_limit"`
+		SignupRateLimit int      `json:"signup_rate_limit"`
+		APIRateLimit    int      `json:"api_rate_limit"`
+		PublicRateLimit int      `json:"public_rate_limit"`
+		Prefix          string   `json:"log_prefix"`
+		Key             string   `json:"supabase_anon_key"`
+		RoleKey         string   `json:"supabase_role_key"`
+		Secret          string   `json:"supabase_jwt_secret"`
+		Url             string   `json:"supabase_url"`
+		ExemptRoutes    []string `json:"exempt_routes"`
+		ExemptPrefixes  []string `json:"exempt_prefixes"`
+		ExemptSuffixes  []string `json:"exempt_suffixes"`
+		AssetsPath      string   `json:"assets_path"`
+		ACL             struct {
+			Tiers map[string]map[string]map[string]string `json:"tier"`
+			Roles map[string]map[string]map[string]string `json:"role"`
+		} `json:"acl"`
+	} `json:"auth"`
 	ACL struct {
-		Roles map[string]map[string]map[string]string `json:"roles"`
-		Tiers map[string]map[string]map[string]string `json:"tiers"`
+		Tiers map[string]map[string]map[string]string `json:"tier"`
+		Roles map[string]map[string]map[string]string `json:"role"`
 	} `json:"acl"`
 	SessionFile string `json:"session_file"`
 	Uploader    struct {
@@ -423,6 +442,9 @@ var GoogleDocsClient *http.Client
 
 var banACL BanACL
 
+var authConfig AuthConfig
+var authService *AuthService
+
 const (
 	DefaultConfigPort    = "8080"
 	DefaultDatastorePath = "allprintings5.json"
@@ -436,121 +458,265 @@ func Favicon(w http.ResponseWriter, r *http.Request) {
 
 // FileSystem custom file system handler
 type FileSystem struct {
-	httpfs http.FileSystem
+	fs http.FileSystem
 }
 
-// Open opens file
-func (fs *FileSystem) Open(path string) (http.File, error) {
-	f, err := fs.httpfs.Open(path)
+// ServeHTTP implements the http.Handler interface and ensures proper MIME types
+func (fs FileSystem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Get the file path from the request URL, stripping any query parameters
+	path := r.URL.Path
+	if strings.Contains(path, "?") {
+		path = strings.Split(path, "?")[0]
+	}
+
+	// Set content type based on file extension before the file is served
+	ext := filepath.Ext(path)
+	if ext == ".css" {
+		// Always set CSS files to text/css
+		w.Header().Set("Content-Type", "text/css")
+		log.Printf("Serving CSS file: %s with Content-Type: text/css", path)
+	} else {
+		switch ext {
+		case ".js":
+			w.Header().Set("Content-Type", "application/javascript")
+		case ".png":
+			w.Header().Set("Content-Type", "image/png")
+		case ".jpg", ".jpeg":
+			w.Header().Set("Content-Type", "image/jpeg")
+		case ".svg":
+			w.Header().Set("Content-Type", "image/svg+xml")
+		case ".ico":
+			w.Header().Set("Content-Type", "image/x-icon")
+		case ".woff":
+			w.Header().Set("Content-Type", "font/woff")
+		case ".woff2":
+			w.Header().Set("Content-Type", "font/woff2")
+		}
+	}
+
+	// Let the default file server handle the rest
+	http.FileServer(fs.fs).ServeHTTP(w, r)
+}
+
+// Open opens the file at name from the underlying http.FileSystem
+func (fs FileSystem) Open(name string) (http.File, error) {
+	// Clean the path to prevent directory traversal
+	name = path.Clean(name)
+
+	// Try to open the file
+	f, err := fs.fs.Open(name)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := f.Stat()
+	// Check if it's a directory
+	stat, err := f.Stat()
 	if err != nil {
+		f.Close()
 		return nil, err
 	}
-	if s.IsDir() {
-		index := strings.TrimSuffix(path, "/") + "/index.html"
-		_, err := fs.httpfs.Open(index)
+
+	// If it's a directory, try to serve the index.html file
+	if stat.IsDir() {
+		// Close the directory file
+		f.Close()
+
+		// Try to open the index.html file
+		indexPath := path.Join(name, "index.html")
+		index, err := fs.fs.Open(indexPath)
 		if err != nil {
 			return nil, err
 		}
+
+		// Return the index file wrapped with correct MIME type
+		return &FileWithCorrectMimeType{index, indexPath}, nil
 	}
 
-	return f, nil
+	// Return the file wrapped with correct MIME type
+	return &FileWithCorrectMimeType{f, name}, nil
 }
 
-func genPageNav(activeTab, sig string) PageVars {
-	exp := GetParamFromSig(sig, "Expires")
-	expires, _ := strconv.ParseInt(exp, 10, 64)
-	msg := ""
-	showLogin := false
-	if sig != "" {
-		if expires < time.Now().Unix() {
-			msg = ErrMsgExpired
-		}
-	} else {
-		showLogin = true
+// FileWithCorrectMimeType wraps http.File to ensure correct MIME type detection
+type FileWithCorrectMimeType struct {
+	http.File
+	path string
+}
+
+// Stat returns file info with correct content type
+func (f *FileWithCorrectMimeType) Stat() (os.FileInfo, error) {
+	stat, err := f.File.Stat()
+	if err != nil {
+		return nil, err
 	}
+	return &FileInfoWithCorrectMimeType{stat, f.path}, nil
+}
 
-	userEmail := GetParamFromSig(sig, "UserEmail")
-	userTier := GetParamFromSig(sig, "UserTier")
-	isLoggedIn := userEmail != "" && (expires > time.Now().Unix() || (DevMode && !SigCheck))
+// FileInfoWithCorrectMimeType wraps os.FileInfo to provide content type info
+type FileInfoWithCorrectMimeType struct {
+	os.FileInfo
+	path string
+}
 
-	// These values need to be set for every rendered page
-	// In particular the Patreon variables are needed because the signature
-	// could expire in any page, and the button url needs these parameters
+// ContentType returns the MIME type based on file extension
+func (fi *FileInfoWithCorrectMimeType) ContentType() string {
+	ext := filepath.Ext(fi.path)
+	switch ext {
+	case ".css":
+		return "text/css"
+	case ".js":
+		return "application/javascript"
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".svg":
+		return "image/svg+xml"
+	case ".ico":
+		return "image/x-icon"
+	case ".woff":
+		return "font/woff"
+	case ".woff2":
+		return "font/woff2"
+	case ".ttf":
+		return "font/ttf"
+	case ".html", ".htm":
+		return "text/html"
+	case ".json":
+		return "application/json"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func genPageNav(activeTab string, r *http.Request, sig string) PageVars {
 	pageVars := PageVars{
 		Title:        "BAN " + activeTab,
-		ErrorMessage: msg,
 		LastUpdate:   LastUpdate,
-
-		ShowLogin: showLogin,
-		Hash:      BuildCommit,
-
-		// Add user authentication info
-		IsLoggedIn: isLoggedIn,
-		UserEmail:  userEmail,
-		UserTier:   userTier,
+		Hash:         BuildCommit,
+		ShowLogin:    false,
+		ErrorMessage: "",
 	}
 
 	if Config.Game != "" {
 		// Append which game this site is for
 		pageVars.Title += " - " + Config.Game
-
 		// Charts are available only for one game
 		pageVars.DisableChart = true
 	}
 
+	// Set card back URL based on game
 	switch Config.Game {
 	case mtgban.GameMagic:
 		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
 	case mtgban.GameLorcana:
 		pageVars.CardBackURL = "img/backs/lorcana.webp"
 	default:
-		panic("no pageVars.CardBackURL set")
+		pageVars.CardBackURL = "img/backs/default.png"
 	}
 
-	// Allocate a new navigation bar
-	pageVars.Nav = make([]NavElem, len(DefaultNav))
-	copy(pageVars.Nav, DefaultNav)
+	// Initialize user authentication state
+	var session *UserSession
+	var isLoggedIn bool
+	var userEmail, userTier string
 
-	// Enable buttons according to the enabled features
-	for _, feat := range OrderNav {
-		if expires > time.Now().Unix() || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
-			param := GetParamFromSig(sig, feat)
-			allowed, _ := strconv.ParseBool(param)
-			if DevMode && ExtraNavs[feat].AlwaysOnForDev {
-				allowed = true
-			}
+	// Try to get session if auth service is available
+	if authService != nil && authService.SessionManager != nil {
+		session, _ = authService.SessionManager.GetSession(r)
+	}
 
-			if allowed || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
-				pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
+	// Check authentication status
+	if session != nil && !time.Now().After(session.ExpiresAt) {
+		// Valid session
+		isLoggedIn = true
+		userEmail = session.Email
+		userTier = session.Tier
+	} else if sig != "" {
+		// Fallback to signature-based auth if session not available
+		exp := GetParamFromSig(sig, "Expires")
+		if exp != "" {
+			expires, _ := strconv.ParseInt(exp, 10, 64)
+			if expires > time.Now().Unix() || (DevMode && !SigCheck) {
+				userEmail = GetParamFromSig(sig, "UserEmail")
+				userTier = GetParamFromSig(sig, "UserTier")
+				isLoggedIn = userEmail != ""
+			} else {
+				pageVars.ErrorMessage = ErrMsgExpired
 			}
 		}
 	}
 
-	mainNavIndex := 0
+	// Update page variables
+	pageVars.IsLoggedIn = isLoggedIn
+	pageVars.UserEmail = userEmail
+	pageVars.UserTier = userTier
+
+	if !isLoggedIn {
+		pageVars.ShowLogin = true
+	}
+
+	// Initialize navigation
+	if DefaultNav != nil {
+		pageVars.Nav = make([]NavElem, len(DefaultNav))
+		copy(pageVars.Nav, DefaultNav)
+	} else {
+		pageVars.Nav = []NavElem{}
+	}
+
+	// Add navigation items
+	if OrderNav != nil && ExtraNavs != nil {
+		for _, feat := range OrderNav {
+			navItem, exists := ExtraNavs[feat]
+			if !exists || navItem == nil {
+				continue
+			}
+
+			// Show if public or user has permission
+			showNavItem := navItem.NoAuth
+
+			if isLoggedIn && !showNavItem {
+				if authService != nil && authService.PermissionManager != nil {
+					showNavItem = authService.PermissionManager.HasPermission(session, feat)
+				} else {
+					// Fallback to signature permissions
+					param := GetParamFromSig(sig, feat)
+					allowed, _ := strconv.ParseBool(param)
+					showNavItem = allowed || (DevMode && (navItem.AlwaysOnForDev || !SigCheck))
+				}
+			}
+
+			if showNavItem {
+				pageVars.Nav = append(pageVars.Nav, *navItem)
+			}
+		}
+	}
+
+	// Set active tab
+	mainNavIndex := -1
 	for i := range pageVars.Nav {
 		if pageVars.Nav[i].Name == activeTab {
 			mainNavIndex = i
 			break
 		}
 	}
-	pageVars.Nav[mainNavIndex].Active = true
-	pageVars.Nav[mainNavIndex].Class = "active"
 
-	// Add extra warning message if needed
-	if showLogin && pageVars.Nav[mainNavIndex].NoAuth {
-		extra := *&NavElem{
-			Active: true,
-			Class:  "beta",
-			Short:  "Beta Public Access",
-			Link:   "javascript:void(0)",
+	if mainNavIndex >= 0 && mainNavIndex < len(pageVars.Nav) {
+		pageVars.Nav[mainNavIndex].Active = true
+		pageVars.Nav[mainNavIndex].Class = "active"
+
+		// Add beta warning if applicable
+		if pageVars.ShowLogin && pageVars.Nav[mainNavIndex].NoAuth {
+			extra := NavElem{
+				Active: true,
+				Class:  "beta",
+				Short:  "Beta Public Access",
+				Link:   "javascript:void(0)",
+			}
+			pageVars.Nav = append(pageVars.Nav, extra)
 		}
-		pageVars.Nav = append(pageVars.Nav, extra)
 	}
+
 	return pageVars
 }
 
@@ -626,6 +792,21 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
+// A specialized middleware to ensure CSS files are served with the correct MIME type
+func cssMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if this is a request for a CSS file (regardless of query parameters)
+		if strings.HasSuffix(strings.Split(r.URL.Path, "?")[0], ".css") {
+			// Force the Content-Type header for CSS files
+			w.Header().Set("Content-Type", "text/css")
+			log.Printf("CSS middleware: serving %s with Content-Type: text/css", r.URL.Path)
+		}
+
+		// Call the next handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	flag.StringVar(&Config.filePath, "cfg", DefaultConfigPath, "Load configuration file")
 	port := flag.String("port", "", "Override server port")
@@ -681,20 +862,35 @@ func main() {
 		}
 	}
 
-	// Initialize the auth service with proper configuration
 	authConfig := AuthConfig{
-		SupabaseURL:     Config.DB.Url,
-		SupabaseAnonKey: Config.DB.Key,
-		SupabaseSecret:  Config.DB.Secret,
+		Domain:          Config.Auth.Domain,
+		Port:            Config.Auth.Port,
+		SecureCookies:   Config.Auth.SecureCookies,
+		CookieDomain:    Config.Auth.CookieDomain,
+		CSRFSecret:      Config.Auth.CSRFSecret,
+		SignatureTTL:    time.Duration(Config.Auth.SignatureTTL) * time.Second,
+		LoginRateLimit:  Config.Auth.LoginRateLimit,
+		SignupRateLimit: Config.Auth.SignupRateLimit,
+		APIRateLimit:    Config.Auth.APIRateLimit,
+		PublicRateLimit: Config.Auth.PublicRateLimit,
+		SupabaseRoleKey: Config.Auth.RoleKey,
+		SupabaseURL:     Config.Auth.Url,
+		SupabaseAnonKey: Config.Auth.Key,
+		SupabaseSecret:  Config.Auth.Secret,
+		LogPrefix:       Config.Auth.Prefix,
+		ExemptRoutes:    Config.Auth.ExemptRoutes,
+		ExemptPrefixes:  Config.Auth.ExemptPrefixes,
+		ExemptSuffixes:  Config.Auth.ExemptSuffixes,
 		DebugMode:       DevMode,
-		LogPrefix:       "[AUTH] ",
-		// Set exempt routes that don't require authentication
-		ExemptRoutes:   []string{"/", "/home"},
-		ExemptPrefixes: []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
-		ExemptSuffixes: []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
+		AssetsPath:      Config.Auth.AssetsPath,
+		ACL: ACLConfig{
+			Tiers: Config.Auth.ACL.Tiers,
+			Roles: Config.Auth.ACL.Roles,
+		},
 	}
 
 	authService, err := NewAuthService(authConfig)
+
 	if err != nil {
 		log.Fatalf("Failed to create auth service: %v", err)
 	}
@@ -770,10 +966,11 @@ func main() {
 	// Set seed in case we need to do random operations
 	rand.Seed(time.Now().UnixNano())
 
-	// Serve static files
-	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(&FileSystem{http.Dir("css")})))
-	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(&FileSystem{http.Dir("img")})))
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(&FileSystem{http.Dir("js")})))
+	// Serve static files with specialized CSS handling
+	cssHandler := cssMiddleware(&FileSystem{http.Dir("css")})
+	http.Handle("/css/", http.StripPrefix("/css/", cssHandler))
+	http.Handle("/img/", http.StripPrefix("/img/", &FileSystem{http.Dir("img")}))
+	http.Handle("/js/", http.StripPrefix("/js/", &FileSystem{http.Dir("js")}))
 
 	// Custom redirects
 	http.HandleFunc("/go/", Redirect)
@@ -784,7 +981,7 @@ func main() {
 	})
 
 	// Home page - no authentication required
-	http.Handle("/", authService.AuthWrapper(http.HandlerFunc(Home)))
+	http.Handle("/", (http.HandlerFunc(Home)))
 
 	// Register routes for each navigation item
 	for key, nav := range ExtraNavs {
@@ -802,7 +999,7 @@ func main() {
 			LogPages[key] = log.New(logFile, "", log.LstdFlags)
 		}
 
-		_, ExtraNavs[key].NoAuth = Config.ACL.Tiers["free"][key]
+		_, ExtraNavs[key].NoAuth = Config.Auth.ACL.Tiers["free"][key]
 
 		// Use the new auth service for handling routes
 		var handler http.Handler
@@ -811,7 +1008,7 @@ func main() {
 			handler = http.HandlerFunc(nav.Handle)
 		} else {
 			// Use AuthWrapper middleware
-			handler = http.HandlerFunc(authService.AuthWrapper(nav.Handle))
+			handler = http.HandlerFunc((nav.Handle))
 		}
 
 		http.Handle(nav.Link, handler)
@@ -823,18 +1020,18 @@ func main() {
 	}
 
 	// API endpoints
-	http.Handle("/search/oembed", authService.AuthWrapper(http.HandlerFunc(Search)))
-	http.Handle("/api/mtgban/", authService.AuthWrapper(http.HandlerFunc(PriceAPI)))
-	http.Handle("/api/mtgjson/ck.json", authService.AuthWrapper(http.HandlerFunc(API)))
-	http.Handle("/api/tcgplayer/", authService.AuthWrapper(authService.AuthWrapper(TCGHandler)))
-	http.Handle("/api/search/", authService.AuthWrapper(authService.AuthWrapper(SearchAPI)))
-	http.Handle("/api/cardkingdom/pricelist.json", authService.AuthWrapper(http.HandlerFunc(CKMirrorAPI)))
-	http.Handle("/api/suggest", authService.AuthWrapper(http.HandlerFunc(SuggestAPI)))
-	http.Handle("/api/opensearch.xml", authService.AuthWrapper(http.HandlerFunc(OpenSearchDesc)))
+	http.Handle("/search/oembed", (http.HandlerFunc(Search)))
+	http.Handle("/api/mtgban/", (http.HandlerFunc(PriceAPI)))
+	http.Handle("/api/mtgjson/ck.json", (http.HandlerFunc(API)))
+	http.Handle("/api/tcgplayer/", (http.HandlerFunc(TCGHandler)))
+	http.Handle("/api/search/", (http.HandlerFunc(SearchAPI)))
+	http.Handle("/api/cardkingdom/pricelist.json", (http.HandlerFunc(CKMirrorAPI)))
+	http.Handle("/api/suggest", (http.HandlerFunc(SuggestAPI)))
+	http.Handle("/api/opensearch.xml", (http.HandlerFunc(OpenSearchDesc)))
 
 	// Favicon handler
 	http.HandleFunc("/favicon.ico", Favicon)
-	http.Handle("/img/opensearch.xml", authService.AuthWrapper(http.HandlerFunc(OpenSearchDesc)))
+	http.Handle("/img/opensearch.xml", (http.HandlerFunc(OpenSearchDesc)))
 
 	// Create and start the server
 	srv := &http.Server{

@@ -8,7 +8,7 @@ import (
 
 // Handler for / renders the home.html page
 func Home(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.GetSignature(r)
 	errmsg := r.FormValue("errmsg")
 	message := ""
 
@@ -36,7 +36,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		sig = ""
 	}
 
-	pageVars := genPageNav("Home", sig)
+	pageVars := genPageNav("Home", r, sig)
 	pageVars.ErrorMessage = message
 
 	render(w, "home.html", pageVars)

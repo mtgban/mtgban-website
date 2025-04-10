@@ -46,10 +46,10 @@ var BuildCommit = func() string {
 }()
 
 func Admin(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	sig := authService.SessionManager.authService.GetSignature(r)
 
 	page := r.FormValue("page")
-	pageVars := genPageNav("Admin", sig)
+	pageVars := genPageNav("Admin", r, sig)
 	pageVars.Nav = insertNavBar("Admin", pageVars.Nav, []NavElem{
 		NavElem{
 			Name:   "People",
@@ -119,10 +119,13 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	spoof := r.FormValue("spoof")
 	if spoof != "" {
 		baseURL := getBaseURL(r)
-		sig := authService.sign(baseURL, spoof, nil)
-
+		sig := authService.SessionManager.authService.GetSignature(r)
+		if sig == "" {
+			http.Redirect(w, r, baseURL, http.StatusFound)
+			return
+		}
 		// Overwrite the current signature
-		authService.putSignatureInCookies(w, r, sig)
+		authService.sign(baseURL, spoof, nil)
 
 		http.Redirect(w, r, baseURL, http.StatusFound)
 		return
@@ -488,7 +491,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tiers []string
-	for tierName := range Config.ACL.Tiers {
+	for tierName := range Config.Auth.ACL.Tiers {
 		tiers = append(tiers, tierName)
 	}
 	sort.Slice(tiers, func(i, j int) bool {
@@ -699,7 +702,7 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 	}
 
 	data := fmt.Sprintf("GET%s%s%s", exp, link, v.Encode())
-	sig := authService.signHMACSHA256Base64([]byte(key), []byte(data))
+	sig := SignHMACSHA256Base64([]byte(key), []byte(data))
 
 	v.Set("Signature", sig)
 	return base64.StdEncoding.EncodeToString([]byte(v.Encode())), nil
