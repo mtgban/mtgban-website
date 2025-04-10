@@ -67,7 +67,7 @@
   --primary-color:hsl(var(--primary-hue),75%,45%);
   --primary-dark:hsl(calc(var(--primary-hue) - 5),80%,35%);
   --primary-gradient:linear-gradient(135deg,var(--primary-light),var(--primary-color),var(--primary-dark));
-  --primary-hue:0;
+  --primary-hue:290;
   --primary-light:hsl(calc(var(--primary-hue) + 5),70%,55%);
   --secondary-color:#d4a01b;
   --success-color:#10b981;
@@ -159,6 +159,21 @@
     overflow-x: hidden;
     transition: var(--transition-base);
     position: relative;
+  }
+  
+  body::after {
+    content: '';
+    background-image: var(--mainImage);
+    background-size: cover;
+    background-position: center;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.3; 
+    z-index: -1;
+    pointer-events: none;
   }
   
   .auth-layout {
