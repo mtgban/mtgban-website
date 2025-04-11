@@ -25,6 +25,7 @@ const (
 
 	MaxResultsGlobal      = 300
 	MaxResultsGlobalLimit = 50
+	MinSpreadGlobalPro    = 50
 
 	MinSpreadNegative = -30
 	MinDiffNegative   = -100
@@ -421,8 +422,12 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	anyExperimentOpt := GetParamFromSig(sig, "AnyExperimentsEnabled")
 	anyExperiment, _ := strconv.ParseBool(anyExperimentOpt)
 
+	anySpreadOpt := GetParamFromSig(sig, "AnySpread")
+	anySpread, _ := strconv.ParseBool(anySpreadOpt)
+
 	anyEnabled = anyEnabled || (DevMode && !SigCheck)
 	anyExperiment = anyExperiment || (DevMode && !SigCheck)
+	anySpread = anySpread || (DevMode && !SigCheck)
 
 	// The "menu" section, the reference
 	var allowlistSellers []string
@@ -490,7 +495,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, anyEnabled)
+	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, anyEnabled, false, anySpread)
 
 	user := GetParamFromSig(sig, "UserEmail")
 	msg := fmt.Sprintf("Request by %s took %v", user, time.Since(start))
@@ -508,6 +513,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 	limitedResults := len(flags) > 0 && !flags[0]
 	anyOptionEnabled := len(flags) > 1 && flags[1]
+	anySpread := len(flags) > 2 && flags[2]
 
 	pageVars.CanShowAll = anyOptionEnabled
 
@@ -700,6 +706,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	// Customize opts for Globals
 	if pageVars.GlobalMode && !source.Info().SealedMode {
 		opts.MinSpread = MinSpreadGlobal
+		if anySpread {
+			opts.MinSpread = MinSpreadGlobalPro
+		}
 		opts.MaxSpread = MaxSpreadGlobal
 		opts.MaxPriceRatio = MaxPriceRatio
 

@@ -239,6 +239,7 @@ var OptionalFields = []string{
 	"UploadNoLimit",
 	"AnyEnabled",
 	"AnyExperimentsEnabled",
+	"AnySpread",
 	"APImode",
 }
 
