@@ -1033,6 +1033,7 @@ func parseHeader(first []string) (map[string]int, error) {
 			strings.Contains(field, "qty") ||
 			strings.Contains(field, "stock") ||
 			strings.Contains(field, "count") ||
+			strings.Contains(field, "trade") ||
 			strings.Contains(field, "have")) &&
 			!strings.HasPrefix(field, "set") && !strings.Contains(field, "pending"):
 			// Keep headers like "Add To Quantity" as backup if nothing is found later
