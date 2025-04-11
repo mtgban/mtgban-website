@@ -28,7 +28,6 @@ import (
 	"github.com/mtgban/go-mtgban/miniaturemarket"
 	"github.com/mtgban/go-mtgban/mintcard"
 	"github.com/mtgban/go-mtgban/mtgseattle"
-	"github.com/mtgban/go-mtgban/purplemana"
 	"github.com/mtgban/go-mtgban/sealedev"
 	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/strikezone"
@@ -412,6 +411,7 @@ var mtgScraperOptions = map[string]*scraperOption{
 		},
 	},
 	"mtgseattle": &scraperOption{
+		OnlySeller: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := mtgseattle.NewScraper()
 			scraper.LogCallback = logger.Printf
@@ -568,13 +568,6 @@ var mtgScraperOptions = map[string]*scraperOption{
 			scraper := manapool.NewScraper()
 			scraper.LogCallback = logger.Printf
 			scraper.Partner = Config.Affiliate["MP"]
-			return scraper, nil
-		},
-	},
-	"purplemana": &scraperOption{
-		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := purplemana.NewScraper(purplemana.GameMagic)
-			scraper.LogCallback = logger.Printf
 			return scraper, nil
 		},
 	},
