@@ -39,8 +39,8 @@
   --primary-hover: #e53935;
   --accent-color: #ffc107;
   --accent-hover: #ffca28;
-  --link-color: #7e57c2;
-  --link-hover: #9575cd;
+  --link-color: #3fbed2;
+  --link-hover: #31cfe4;
   --text-color: #f5f5f5;
   --text-secondary: #aaaaaa;
   --bg-color: #121212;
@@ -51,7 +51,7 @@
   --footer-bg: rgba(18, 18, 18, 0.95);
   --shadow-color: rgba(0, 0, 0, 0.2);
   --highlight-text: #ffc107;
-  --highlight-secondary: #40e0d0;
+  --highlight-secondary: #1ef048;
   --button-text: #ffffff;
 }
 

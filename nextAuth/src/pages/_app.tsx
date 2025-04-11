@@ -1,4 +1,5 @@
-// src/pages/_app.tsx
+'use client';
+
 import React, { useEffect } from 'react';
 import { Metadata } from 'next';
 import { getURL } from '@/lib/helpers';
@@ -6,6 +7,7 @@ import type { AppProps } from 'next/app';
 import { useRouter } from 'next/router';
 import { AuthProvider } from '../context/AuthProvider';
 import  '../../public/globals.css';
+import  '../../public/search.css';
 
 const title = 'MTGBAN User Portal';
 const description = 'Manage your MTGBAN subscription.';

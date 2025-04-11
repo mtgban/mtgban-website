@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 	"unicode"
 
@@ -72,11 +74,12 @@ var authPagesMap = map[string]string{
 	"/auth/login":           "login.html",
 	"/auth/signup":          "signup.html",
 	"/auth/account":         "account.html",
-	"/auth/pricing":         "pricing.html",
 	"/auth/reset-password":  "reset-password.html",
 	"/auth/forgot-password": "forgot-password.html",
 	"/auth/confirmation":    "confirmation.html",
 	"/auth/success":         "success.html",
+	"/next/search":          "next/search.html",
+	"/next/pricing":         "next/pricing.html",
 }
 
 type SessionKey string
@@ -170,7 +173,12 @@ type ACLConfig struct {
 
 // StandardErrors defines all error types
 type StandardErrors struct {
+	Unauthorized       AuthError
 	Forbidden          AuthError
+	InvalidPassword    AuthError
+	InvalidEmail       AuthError
+	MissingEmail       AuthError
+	MissingPassword    AuthError
 	InvalidForm        AuthError
 	InvalidCredentials AuthError
 	SessionExpired     AuthError
@@ -263,6 +271,31 @@ type Middleware func(http.Handler) http.Handler
 // NewStandardErrors creates all standard errors
 func NewStandardErrors() StandardErrors {
 	return StandardErrors{
+		Unauthorized: AuthError{
+			Code:       "UNAUTHORIZED",
+			Message:    "Unauthorized",
+			StatusCode: http.StatusUnauthorized,
+		},
+		InvalidPassword: AuthError{
+			Code:       "INVALID_PASSWORD",
+			Message:    "Invalid password",
+			StatusCode: http.StatusUnauthorized,
+		},
+		InvalidEmail: AuthError{
+			Code:       "INVALID_EMAIL",
+			Message:    "Invalid email",
+			StatusCode: http.StatusUnauthorized,
+		},
+		MissingEmail: AuthError{
+			Code:       "MISSING_EMAIL",
+			Message:    "Email is required",
+			StatusCode: http.StatusUnauthorized,
+		},
+		MissingPassword: AuthError{
+			Code:       "MISSING_PASSWORD",
+			Message:    "Password is required",
+			StatusCode: http.StatusUnauthorized,
+		},
 		Forbidden: AuthError{
 			Code:       "FORBIDDEN",
 			Message:    "Access denied",
@@ -1165,29 +1198,30 @@ func (pm *PermissionManager) ClearCache() {
 type AssetLoader struct {
 	fs           embed.FS
 	rootDir      string
+	subFS        fs.FS
 	contentTypes map[string]string
 	logger       *log.Logger
 	pathHandlers map[string]func(http.ResponseWriter, *http.Request)
 }
 
 // NewAssetLoader creates a new asset loader
-func NewAssetLoader(embedFS embed.FS, rootDir string, logger *log.Logger) (*AssetLoader, error) {
+func NewAssetLoader(embedFS embed.FS, rootDir string, logger *log.Logger) *AssetLoader {
 	// If rootDir is empty or ".", use the default path based on the go:embed directive
 	if rootDir == "" || rootDir == "." {
 		rootDir = "nextAuth/out"
 	}
 
-	// Use fs.Sub correctly to get a sub-filesystem just to verify the path is valid
+	// Create sub-filesystem once
 	logger.Printf("Creating sub-filesystem with path: %s", rootDir)
-	_, err := fs.Sub(embedFS, rootDir)
+	subFS, err := fs.Sub(embedFS, rootDir)
 	if err != nil {
 		logger.Printf("Failed to create sub-filesystem: %v", err)
-		return nil, fmt.Errorf("failed to create sub FS: %w", err)
 	}
 
 	loader := &AssetLoader{
-		fs:           embedFS, // Keep the original FS for access to the whole hierarchy
+		fs:           embedFS,
 		rootDir:      rootDir,
+		subFS:        subFS,
 		contentTypes: contentTypeMap,
 		logger:       logger,
 		pathHandlers: make(map[string]func(http.ResponseWriter, *http.Request)),
@@ -1198,7 +1232,7 @@ func NewAssetLoader(embedFS embed.FS, rootDir string, logger *log.Logger) (*Asse
 	loader.RegisterPathHandler("reset-password-sent", loader.serveResetPasswordSentPage)
 	loader.RegisterPathHandler("success", loader.serveSuccessPage)
 
-	return loader, nil
+	return loader
 }
 
 // RegisterPathHandler registers a custom handler for a specific path
@@ -1208,12 +1242,30 @@ func (al *AssetLoader) RegisterPathHandler(path string, handler func(http.Respon
 
 // ServeAsset serves an embedded asset
 func (al *AssetLoader) ServeAsset(w http.ResponseWriter, r *http.Request) {
+	// Handle trailing slashes by redirecting to the non-slash version
+	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/auth/" {
+		// Remove trailing slash and redirect
+		redirectPath := strings.TrimSuffix(r.URL.Path, "/")
+		if r.URL.RawQuery != "" {
+			redirectPath += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
+		al.logger.Printf("Redirecting %s to %s (trailing slash removal)", r.URL.Path, redirectPath)
+		return
+	}
+
 	// Extract path from request URL
 	var path string
 	if strings.HasPrefix(r.URL.Path, "/_next/") {
 		// Handle Next.js static assets
 		path = strings.TrimPrefix(r.URL.Path, "/")
-		al.logger.Printf("Serving Next.js asset: %s", path)
+		//al.logger.Printf("Serving Next.js asset: %s", path)
+	} else if strings.HasPrefix(r.URL.Path, "/next/") {
+		path = strings.TrimPrefix(r.URL.Path, "/")
+		if filepath.Ext(path) == "" {
+			path += ".html"
+		}
+		//al.logger.Printf("Serving Next.js asset: %s", path)
 	} else {
 		// Handle auth/* routes
 		path = strings.TrimPrefix(r.URL.Path, "/auth/")
@@ -1232,6 +1284,7 @@ func (al *AssetLoader) ServeAsset(w http.ResponseWriter, r *http.Request) {
 				"login": true, "signup": true, "account": true,
 				"pricing": true, "reset-password": true,
 				"forgot-password": true, "confirmation": true,
+				"search": true,
 			}
 
 			if htmlPaths[path] {
@@ -1252,18 +1305,12 @@ func (al *AssetLoader) ServeAsset(w http.ResponseWriter, r *http.Request) {
 	// Set content type based on file extension
 	al.setContentType(w, path)
 
-	// Get sub-filesystem
-	al.logger.Printf("Creating sub-filesystem for path: %s", al.rootDir)
-	authFS, err := fs.Sub(al.fs, al.rootDir)
-	if err != nil {
-		al.logger.Printf("Failed to access embedded files: %v", err)
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		return
-	}
+	// Use the cached sub-filesystem instead of creating a new one
+	authFS := al.subFS
 
 	// Check if file exists
-	al.logger.Printf("Checking if file exists: %s", path)
-	_, err = fs.Stat(authFS, path)
+	//al.logger.Printf("Checking if file exists: %s", path)
+	_, err := fs.Stat(authFS, path)
 	if err != nil {
 		// Fallback to index.html for HTML routes
 		if filepath.Ext(path) == ".html" {
@@ -1284,7 +1331,6 @@ func (al *AssetLoader) ServeAsset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Open the file
-	al.logger.Printf("Opening file: %s", path)
 	file, err := authFS.Open(path)
 	if err != nil {
 		al.logger.Printf("Error opening file: %s, error: %v", path, err)
@@ -1343,25 +1389,37 @@ func (al *AssetLoader) ServeIndexWithData(w http.ResponseWriter, data map[string
 
 // RenderTemplate renders a template with data
 func (al *AssetLoader) RenderTemplate(w http.ResponseWriter, templateName string, data interface{}) error {
-	templatePath := filepath.Join(al.rootDir, "templates", templateName)
-	templateData, err := al.fs.ReadFile(templatePath)
+	// Path to template
+	path := filepath.Join("templates", templateName)
+	al.logger.Printf("Rendering template: %s", path)
+
+	// Set content type
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	// Read template file
+	content, err := fs.ReadFile(al.fs, filepath.Join(al.rootDir, path))
 	if err != nil {
-		al.logger.Printf("Template not found: %s", templatePath)
+		al.logger.Printf("Error reading template file: %v", err)
+		http.Error(w, "Server Error", http.StatusInternalServerError)
 		return err
 	}
 
-	htmlContent := string(templateData)
-	if dataMap, ok := data.(map[string]interface{}); ok {
-		for key, value := range dataMap {
-			placeholder := "{{." + key + "}}"
-			strValue := fmt.Sprintf("%v", value)
-			htmlContent = strings.Replace(htmlContent, placeholder, strValue, -1)
-		}
+	// Parse template
+	tmpl, err := template.New(templateName).Parse(string(content))
+	if err != nil {
+		al.logger.Printf("Error parsing template: %v", err)
+		http.Error(w, "Server Error", http.StatusInternalServerError)
+		return err
 	}
 
-	// Set content type and serve
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(htmlContent))
+	// Execute template
+	err = tmpl.Execute(w, data)
+	if err != nil {
+		al.logger.Printf("Error executing template: %v", err)
+		http.Error(w, "Server Error", http.StatusInternalServerError)
+		return err
+	}
+
 	return nil
 }
 
@@ -1760,7 +1818,6 @@ type MiddlewareChain struct {
 	permissionManager *PermissionManager
 }
 
-// NewMiddlewareChain creates a new middleware chain manager
 func NewMiddlewareChain(service *AuthService, permManager *PermissionManager) *MiddlewareChain {
 	mc := &MiddlewareChain{
 		service:           service,
@@ -1768,44 +1825,62 @@ func NewMiddlewareChain(service *AuthService, permManager *PermissionManager) *M
 		permissionManager: permManager,
 	}
 
-	// Register middleware chains
+	// Register middleware chains with ExemptPathCheck appropriately positioned
 	mc.RegisterChain("public",
 		mc.Recovery(),
+		mc.ExemptPathCheck(),
 		mc.RequestLogger(),
-		mc.RateLimiter(service.Config.PublicRateLimit))
+		mc.RateLimiter(service.authConfig.PublicRateLimit))
 
 	mc.RegisterChain("base",
 		mc.Recovery(),
-		mc.RequestLogger())
+		mc.ExemptPathCheck(),
+		mc.RequestLogger(),
+		mc.RateLimiter(service.authConfig.PublicRateLimit))
 
 	mc.RegisterChain("api",
 		mc.Recovery(),
+		mc.ExemptPathCheck(),
 		mc.RequestLogger(),
-		mc.RateLimiter(service.Config.APIRateLimit))
+		mc.RateLimiter(service.authConfig.APIRateLimit))
 
 	mc.RegisterChain("auth",
 		mc.Recovery(),
+		mc.ExemptPathCheck(),
 		mc.RequestLogger(),
 		mc.Authentication())
 
 	mc.RegisterChain("form",
 		mc.Recovery(),
+		mc.ExemptPathCheck(),
 		mc.RequestLogger(),
 		mc.MethodValidator("POST"),
-		mc.RateLimiter(service.Config.LoginRateLimit))
+		mc.CSRFProtection(),
+		mc.RateLimiter(service.authConfig.LoginRateLimit))
 
 	mc.RegisterChain("protected",
 		mc.Recovery(),
+		mc.ExemptPathCheck(),
 		mc.RequestLogger(),
 		mc.Authentication(),
 		mc.CSRFProtection())
+
+	mc.RegisterChain("entry",
+		mc.Recovery(),
+		mc.ExemptPathCheck(),
+		mc.RequestLogger(),
+		mc.MethodValidator("POST"),
+		mc.RateLimiter(service.authConfig.LoginRateLimit))
 
 	return mc
 }
 
 // RegisterChain registers a named middleware chain
 func (mc *MiddlewareChain) RegisterChain(name string, middlewares ...Middleware) {
-	mc.chains[name] = middlewares
+	chain := mc.GetChain("base")
+	chain = append(chain, mc.ExemptPathCheck())
+	chain = append(chain, middlewares...)
+	mc.chains[name] = chain
 }
 
 // GetChain returns a named middleware chain
@@ -1874,59 +1949,6 @@ func (mc *MiddlewareChain) RequestLogger() Middleware {
 	}
 }
 
-// Authentication middleware ensures the request is authenticated
-func (mc *MiddlewareChain) Authentication() Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip authentication for exempt paths
-			if mc.permissionManager.IsExemptPath(r.URL.Path) {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			// Get session from request
-			session, err := mc.service.SessionManager.GetSession(r)
-			if err != nil {
-				// Try session refresh first
-				refreshedSession, refreshErr := mc.tryRefreshSession(w, r)
-				if refreshErr == nil {
-					// Store user info in context and continue
-					ctx := context.WithValue(r.Context(), SessionKey("session"), refreshedSession)
-					next.ServeHTTP(w, r.WithContext(ctx))
-					return
-				}
-
-				// Handle authentication failure
-				mc.handleAuthFailure(w, r, err)
-				return
-			}
-
-			// Store session in context
-			ctx := context.WithValue(r.Context(), SessionKey("session"), session)
-
-			// Check permissions if applicable
-			if !mc.permissionManager.IsExemptPath(r.URL.Path) &&
-				!mc.permissionManager.HasPermission(session, r.URL.Path) {
-				mc.service.ErrorHandler.RespondWithError(w, r, mc.service.ErrorHandler.errors.Forbidden, nil)
-				return
-			}
-
-			// Continue with the authenticated request
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
-// tryRefreshSession attempts to refresh an expired session
-func (mc *MiddlewareChain) tryRefreshSession(w http.ResponseWriter, r *http.Request) (*UserSession, error) {
-	refreshCookie, refreshErr := r.Cookie("refresh_token")
-	if refreshErr != nil || refreshCookie.Value == "" {
-		return nil, errors.New("no refresh token")
-	}
-
-	return mc.service.SessionManager.RefreshSession(w, r)
-}
-
 // handleAuthFailure handles authentication failures
 func (mc *MiddlewareChain) handleAuthFailure(w http.ResponseWriter, r *http.Request, err error) {
 	// Handle API requests
@@ -1940,6 +1962,58 @@ func (mc *MiddlewareChain) handleAuthFailure(w http.ResponseWriter, r *http.Requ
 				url.QueryEscape(r.URL.Path))
 		}
 		http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	}
+}
+
+// Authentication middleware ensures the request is authenticated
+func (mc *MiddlewareChain) Authentication() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Get session from request
+			session, err := mc.service.SessionManager.GetSession(r)
+			if err != nil {
+				// Check if there's an auth_token cookie before trying refresh
+				authCookie, cookieErr := r.Cookie("auth_token")
+				if cookieErr == nil && authCookie.Value != "" {
+					// Only try to refresh if we have both auth_token and refresh_token
+					refreshCookie, refreshErr := r.Cookie("refresh_token")
+					if refreshErr == nil && refreshCookie.Value != "" {
+						// Log the refresh attempt with timestamps for debugging
+						mc.service.Logger.Printf("Attempting to refresh token for request to %s", r.URL.Path)
+
+						// Try session refresh
+						refreshedSession, refreshErr := mc.service.SessionManager.RefreshSession(w, r)
+						if refreshErr == nil {
+							// Store user info in context and continue
+							ctx := context.WithValue(r.Context(), SessionKey("session"), refreshedSession)
+							next.ServeHTTP(w, r.WithContext(ctx))
+							return
+						}
+
+						// Log refresh failure for debugging
+						mc.service.Logger.Printf("Token refresh failed: %v", refreshErr)
+					} else {
+						mc.service.Logger.Printf("Auth token exists but no refresh token found")
+					}
+				}
+
+				// Handle authentication failure
+				mc.handleAuthFailure(w, r, err)
+				return
+			}
+
+			// Store session in context
+			ctx := context.WithValue(r.Context(), SessionKey("session"), session)
+
+			// Check permissions
+			if !mc.permissionManager.HasPermission(session, r.URL.Path) {
+				mc.service.ErrorHandler.RespondWithError(w, r, mc.service.ErrorHandler.errors.Forbidden, nil)
+				return
+			}
+
+			// Continue with the authenticated request
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
 	}
 }
 
@@ -2025,13 +2099,35 @@ func (mc *MiddlewareChain) MethodValidator(method string) Middleware {
 	}
 }
 
+// ExemptPathCheck middleware checks if a path is exempt from authentication requirements
+func (mc *MiddlewareChain) ExemptPathCheck() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Check if the path is exempt from authentication
+			if mc.permissionManager.IsExemptPath(r.URL.Path) {
+				// Log exemption if in debug mode
+				if mc.service.authConfig.DebugMode {
+					mc.service.Logger.Printf("Exempt path accessed: %s", r.URL.Path)
+				}
+
+				// For exempt paths, skip authorization checks
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// For non-exempt paths, continue with normal middleware chain
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // ==============================================================================================
 // AuthService
 // ==============================================================================================
 
 // AuthService handles all authentication related functionality
 type AuthService struct {
-	Config         *AuthConfig
+	authConfig     *AuthConfig
 	Logger         *log.Logger
 	Supabase       *supabase.Client
 	CSRFSecret     []byte
@@ -2050,11 +2146,12 @@ type AuthService struct {
 	userCacheMutex sync.RWMutex
 	tierCache      map[string]map[string]bool
 	tierCacheMutex sync.RWMutex
+
+	refreshMutex sync.Mutex
 }
 
 // NewAuthService creates a new authentication service
 func NewAuthService(config AuthConfig) (*AuthService, error) {
-	var err error
 	// Validate config
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
@@ -2067,6 +2164,7 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 		return nil, errors.New("failed to create Supabase client")
 	}
 
+	// initialize CSRF secret
 	var csrfSecret []byte
 	if config.CSRFSecret != "" {
 		var err error
@@ -2091,55 +2189,42 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 
 	// Create the service
 	service := &AuthService{
-		Config:         &config,
+		authConfig:     &config,
 		Logger:         logger,
 		Supabase:       supabaseClient,
 		CSRFSecret:     csrfSecret,
 		StandardErrors: NewStandardErrors(),
+		userCache:      make(map[string]*UserData),
+		tierCache:      make(map[string]map[string]bool),
+		refreshMutex:   sync.Mutex{},
 		BanACL: &BanACL{
 			Users: make(map[string]*BanUser),
 		},
-		userCache: make(map[string]*UserData),
-		tierCache: make(map[string]map[string]bool),
 	}
 
 	// Initialize error handler
 	service.ErrorHandler = NewErrorHandler(logger, config.DebugMode)
 
 	// Initialize asset loader
-	var assetLoader *AssetLoader
-	assetLoader, err = NewAssetLoader(authAssets, config.AssetsPath, logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create asset loader: %w", err)
-	}
-	service.AssetLoader = assetLoader
+	service.AssetLoader = NewAssetLoader(authAssets, config.AssetsPath, logger)
+
+	// Set the renderer in error handler
+	service.ErrorHandler.SetRenderer(service.AssetLoader)
 
 	// Initialize permission manager
-	service.PermissionManager = NewPermissionManager(service.Config, logger, service.BanACL)
+	service.PermissionManager = NewPermissionManager(service.authConfig, logger, service.BanACL)
+
+	// Initialize session manager
+	service.SessionManager = NewSessionManager(config.Domain, config.SecureCookies, csrfSecret, logger)
 
 	// Initialize middleware chain manager
 	service.MiddlewareChain = NewMiddlewareChain(service, service.PermissionManager)
-
-	// Initialize session manager
-	sameSite := http.SameSiteStrictMode
-	service.SessionManager = &SessionManager{
-		domain:        config.CookieDomain,
-		secureCookies: config.SecureCookies,
-		sameSite:      sameSite,
-		csrfSecret:    csrfSecret,
-		logger:        logger,
-		banACL:        service.BanACL,
-		authService:   service,
-	}
 
 	// Initialize response helper
 	service.ResponseHelper = NewResponseHelper()
 
 	// Initialize response writer
 	service.Writer = NewResponseWriter(http.ResponseWriter(nil))
-
-	// Set the renderer in error handler
-	service.ErrorHandler.SetRenderer(service.AssetLoader)
 
 	return service, nil
 }
@@ -2151,11 +2236,49 @@ func (a *AuthService) Initialize() error {
 	if err := a.GetBanACL(a.BanACL); err != nil {
 		a.Logger.Printf("Warning: Failed to load BanACL: %v", err)
 	}
-
+	// Register auth routes
 	a.RegisterAuthRoutes(http.DefaultServeMux)
+
+	// set up Next.js routes
+	a.MiddlewareChain.RegisterNextJSRoutes(http.DefaultServeMux, "localhost:"+a.authConfig.Port)
 
 	a.Logger.Printf("Authentication service initialized successfully")
 	return nil
+}
+
+// GetSessionManager returns the session manager instance
+func (a *AuthService) GetSessionManager() *SessionManager {
+	return a.SessionManager
+}
+
+// GetErrorHandler returns the error handler instance
+func (a *AuthService) GetErrorHandler() *ErrorHandler {
+	return a.ErrorHandler
+}
+
+// GetPermissionManager returns the permission manager instance
+func (a *AuthService) GetPermissionManager() *PermissionManager {
+	return a.PermissionManager
+}
+
+// GetAssetLoader returns the asset loader instance
+func (a *AuthService) GetAssetLoader() *AssetLoader {
+	return a.AssetLoader
+}
+
+// GetMiddlewareChain returns the middleware chain instance
+func (a *AuthService) GetMiddlewareChain() *MiddlewareChain {
+	return a.MiddlewareChain
+}
+
+// GetResponseHelper returns the response helper instance
+func (a *AuthService) GetResponseHelper() *ResponseHelper {
+	return a.ResponseHelper
+}
+
+// GetWriter returns the response writer instance
+func (a *AuthService) GetWriter() *responseWriter {
+	return a.Writer
 }
 
 // RegisterAuthRoutes registers all authentication routes
@@ -2166,37 +2289,37 @@ func (a *AuthService) RegisterAuthRoutes(mux *http.ServeMux) {
 	mux.Handle("/_next/", http.HandlerFunc(a.AssetLoader.ServeAsset))
 	a.Logger.Printf("Registered Next.js assets route: /_next/")
 
-	// Register auth pages
-	for route, page := range authPagesMap {
-		var handler http.Handler
+	mux.Handle("/auth/", a.MiddlewareChain.Apply("public",
+		http.HandlerFunc(a.AssetLoader.ServeAsset)))
 
-		if route == "/auth/account" {
-			handler = a.MiddlewareChain.Apply("protected",
-				http.HandlerFunc(a.handleAuthPageWithSession(page)))
-		} else {
-			handler = a.MiddlewareChain.Apply("base",
-				http.HandlerFunc(a.handleAuthPage(page)))
-		}
+	a.Logger.Printf("Registered authentication routes successfully")
 
-		mux.Handle(route, handler)
-		a.Logger.Printf("Registered route: %s", route)
-	}
-
-	// Register API routes
+	// Register Next.js API routes
 	apiRoutes := []AuthRoute{
-		{Path: "/next-api/auth/login", Method: "POST", Handler: a.handleLoginAPI, Middleware: "form"},
-		{Path: "/next-api/auth/signup", Method: "POST", Handler: a.handleSignupAPI, Middleware: "form"},
-		{Path: "/next-api/auth/logout", Method: "POST", Handler: a.handleLogoutAPI, Middleware: "api"},
+		{Path: "/next-api/auth/login", Method: "POST", Handler: a.handleLoginAPI, Middleware: "entry"},
+		{Path: "/next-api/auth/signup", Method: "POST", Handler: a.handleSignupAPI, Middleware: "entry"},
+		{Path: "/next-api/auth/logout", Method: "POST", Handler: a.handleLogoutAPI, Middleware: "entry"},
 		{Path: "/next-api/auth/me", Method: "GET", Handler: a.handleGetUserAPI, Middleware: "api"},
 		{Path: "/next-api/auth/refresh-token", Method: "POST", Handler: a.handleRefreshTokenAPI, Middleware: "api"},
 		{Path: "/next-api/auth/forgot-password", Method: "POST", Handler: a.handleForgotPasswordAPI, Middleware: "form"},
 		{Path: "/next-api/auth/reset-password", Method: "POST", Handler: a.handleResetPasswordAPI, Middleware: "form"},
+		{Path: "/next-api/auth/account", Method: "GET", Handler: a.handleAccountAPI, Middleware: "api"},
 	}
 
 	for _, route := range apiRoutes {
 		mux.Handle(route.Path, a.MiddlewareChain.Apply(route.Middleware,
 			http.HandlerFunc(route.Handler)))
 		a.Logger.Printf("Registered API route: %s %s", route.Method, route.Path)
+	}
+
+	goRoutes := []AuthRoute{
+		{Path: "/api/nav-data", Method: "GET", Handler: a.handleNavDataAPI, Middleware: "api"},
+	}
+
+	for _, route := range goRoutes {
+		mux.Handle(route.Path, a.MiddlewareChain.Apply(route.Middleware,
+			http.HandlerFunc(route.Handler)))
+		a.Logger.Printf("Registered Go route: %s %s", route.Method, route.Path)
 	}
 
 	// Form submission routes
@@ -2213,12 +2336,65 @@ func (a *AuthService) RegisterAuthRoutes(mux *http.ServeMux) {
 			http.HandlerFunc(route.Handler)))
 		a.Logger.Printf("Registered form route: %s %s", route.Method, route.Path)
 	}
+}
 
-	// Catch-all handler for auth assets
-	mux.Handle("/auth/", a.MiddlewareChain.Apply("base",
-		http.HandlerFunc(a.AssetLoader.ServeAsset)))
+// RegisterNextJSRoutes registers routes that should be served by Next.js
+func (mc *MiddlewareChain) RegisterNextJSRoutes(router *http.ServeMux, nextJSServerURL string) {
+	nextJSHandler := httputil.NewSingleHostReverseProxy(&url.URL{
+		Scheme: "http",
+		Host:   nextJSServerURL,
+	})
 
-	a.Logger.Printf("Registered authentication routes successfully")
+	publicChain := mc.GetChain("public")
+
+	// Define routes to be handled by Next.js
+	nextJSRoutes := []string{
+		"/_next/*",
+		"/public/*",
+		"/api/client/*",
+		"/next/*",
+	}
+
+	mc.service.Logger.Printf("Registering Next.js routes with server URL: %s", nextJSServerURL)
+
+	for _, route := range nextJSRoutes {
+		handler := mc.ApplyMiddlewares(nextJSHandler, publicChain...)
+		router.Handle(route, handler)
+		mc.service.Logger.Printf("Registered Next.js route: %s", route)
+	}
+}
+
+// RegisterAdditionalNextJSRoute registers a single additional Next.js route with specific middleware
+func (mc *MiddlewareChain) RegisterAdditionalNextJSRoute(router *http.ServeMux, path string, nextJSServerURL string, middlewareChain string) {
+	// Check if the path is already registered in the auth routes
+	if path == "/next/search" || path == "/next/pricing" || path == "/next/account" {
+		mc.service.Logger.Printf("Skipping registration of %s as it's already registered", path)
+		return
+	}
+
+	// Create handler for this specific route
+	nextJSHandler := httputil.NewSingleHostReverseProxy(&url.URL{
+		Scheme: "http",
+		Host:   nextJSServerURL,
+	})
+
+	// Apply specified middleware chain
+	handler := mc.Apply(middlewareChain, nextJSHandler)
+
+	// Register the route
+	router.Handle(path, handler)
+	mc.service.Logger.Printf("Registered additional Next.js route: %s with middleware: %s", path, middlewareChain)
+}
+
+func (a *AuthService) NextJSHandler(nextFileURL string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxy := httputil.NewSingleHostReverseProxy(&url.URL{
+			Scheme: "http",
+			Host:   nextFileURL,
+		})
+
+		proxy.ServeHTTP(w, r)
+	})
 }
 
 // handleAuthPage creates a handler for auth pages
@@ -2486,7 +2662,6 @@ func (a *AuthService) ClearAllCaches() {
 
 // sign signs data for permission granting
 func (a *AuthService) sign(baseURL, tierTitle string, userData *UserData) string {
-	// Create values for the signature
 	v := url.Values{}
 
 	// Add user data
@@ -2504,7 +2679,7 @@ func (a *AuthService) sign(baseURL, tierTitle string, userData *UserData) string
 	}
 
 	// Set expiration
-	expires := time.Now().Add(a.Config.SignatureTTL)
+	expires := time.Now().Add(a.authConfig.SignatureTTL)
 	expiresUnix := fmt.Sprintf("%d", expires.Unix())
 
 	// Create signature data
@@ -2513,7 +2688,7 @@ func (a *AuthService) sign(baseURL, tierTitle string, userData *UserData) string
 	// Get secret key
 	key := os.Getenv("BAN_SECRET")
 	if key == "" {
-		key = a.Config.SupabaseSecret
+		key = a.authConfig.SupabaseSecret
 	}
 
 	// Generate signature
@@ -2531,7 +2706,7 @@ func (a *AuthService) sign(baseURL, tierTitle string, userData *UserData) string
 
 // addTierPermissions adds permissions for a specific tier
 func (a *AuthService) addTierPermissions(v url.Values, tierTitle string) {
-	tierConfig, found := a.Config.ACL.Tiers[tierTitle]
+	tierConfig, found := a.authConfig.ACL.Tiers[tierTitle]
 	if !found {
 		return
 	}
@@ -2605,6 +2780,27 @@ func (a *AuthService) validateCSRFToken(token, userID string) bool {
 // ==============================================================================================
 // API Handlers
 // ==============================================================================================
+
+// handleNavDataAPI returns navigation structure and auth data for frontend
+func (a *AuthService) handleNavDataAPI(w http.ResponseWriter, r *http.Request) {
+	sig := a.GetSignature(r)
+	pageVars := genPageNav("home", r, sig)
+
+	// Extract just the navigation and auth data needed by frontend
+	navData := map[string]interface{}{
+		"nav":      pageVars.Nav,
+		"extraNav": pageVars.ExtraNav,
+		"auth": map[string]interface{}{
+			"isLoggedIn": pageVars.IsLoggedIn,
+			"userEmail":  pageVars.UserEmail,
+			"userTier":   pageVars.UserTier,
+		},
+		"showLogin": pageVars.ShowLogin,
+	}
+
+	// Send nav data to frontend
+	a.ResponseHelper.SendSuccess(w, "Navigation data retrieved", navData)
+}
 
 // handleLoginAPI handles API login requests
 func (a *AuthService) handleLoginAPI(w http.ResponseWriter, r *http.Request) {
@@ -3350,6 +3546,46 @@ func (a *AuthService) handleResetPasswordFormSubmit(w http.ResponseWriter, r *ht
 		url.QueryEscape("Your password has been reset successfully. You can now log in with your new password."))
 
 	http.Redirect(w, r, successURL, http.StatusSeeOther)
+}
+
+// handleAccountAPI handles account API requests
+func (a *AuthService) handleAccountAPI(w http.ResponseWriter, r *http.Request) {
+	// Only accept POST requests
+	if r.Method != http.MethodPost {
+		a.ErrorHandler.RespondWithError(w, r, AuthError{
+			Code:       "METHOD_NOT_ALLOWED",
+			Message:    "Method not allowed",
+			StatusCode: http.StatusMethodNotAllowed,
+		}, NewStandardErrors().Forbidden)
+		return
+	}
+
+	// Get user session
+	session, err := a.SessionManager.GetSession(r)
+	if err != nil {
+		a.ErrorHandler.RespondWithError(w, r, AuthError{
+			Code:       "UNAUTHORIZED",
+			Message:    "Unauthorized",
+			StatusCode: http.StatusUnauthorized,
+		}, NewStandardErrors().Unauthorized)
+		return
+	}
+
+	userEmail := session.Email
+	userTier := session.Tier
+	userRole := session.Role
+	userFullName := session.Metadata["full_name"]
+
+	// Create response
+	response := map[string]interface{}{
+		"tier":  userTier,
+		"role":  userRole,
+		"email": userEmail,
+		"name":  userFullName,
+	}
+
+	// Send response
+	a.ResponseHelper.SendSuccess(w, "Account data retrieved", response)
 }
 
 // ==============================================================================================

@@ -130,3 +130,8 @@ export const getErrorRedirect = (
     disableButton,
     arbitraryParams
   );
+
+export const cn = (...classes: string[]) => {
+  return classes.filter(Boolean).join(' ')
+}
+

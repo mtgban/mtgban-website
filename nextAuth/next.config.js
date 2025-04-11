@@ -13,20 +13,7 @@ const nextConfig = {
 
   eslint: {
     ignoreDuringBuilds: true,
-  },
-  exportPathMap: async function () {
-    return {
-      '/': { page: '/' },
-      '/account': { page: '/account' },
-      '/pricing': { page: '/pricing' },
-      '/login': { page: '/login' },
-      '/signup': { page: '/signup' },
-      '/forgot-password': { page: '/forgot-password' },
-      '/reset-password': { page: '/reset-password' },
-      '/signup-success': { page: '/signup-success' },
-      '/confirmation': { page: '/confirmation' },
-    };
-  },
+  }
 };
 
 module.exports = nextConfig;

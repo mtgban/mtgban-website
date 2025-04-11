@@ -1,4 +1,5 @@
-// src/pages/reset-password-sent.tsx
+'use client';
+
 import React from 'react';
 import { useRouter } from 'next/router';
 import AuthLayout from '@/components/auth/AuthLayout';

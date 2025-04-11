@@ -442,7 +442,6 @@ var GoogleDocsClient *http.Client
 
 var banACL BanACL
 
-var authConfig AuthConfig
 var authService *AuthService
 
 const (
@@ -1028,6 +1027,7 @@ func main() {
 	http.Handle("/api/cardkingdom/pricelist.json", (http.HandlerFunc(CKMirrorAPI)))
 	http.Handle("/api/suggest", (http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/opensearch.xml", (http.HandlerFunc(OpenSearchDesc)))
+	http.Handle("/api/search-json/", http.HandlerFunc(SearchAPIJSON))
 
 	// Favicon handler
 	http.HandleFunc("/favicon.ico", Favicon)

@@ -1291,3 +1291,251 @@ func sortSetsByBuylist(uuidI, uuidJ string, blVendors []string) bool {
 
 	return priceI > priceJ
 }
+
+func SearchAPIJSON(w http.ResponseWriter, r *http.Request) {
+	// Set content type early in case we need to return an error
+	w.Header().Set("Content-Type", "application/json")
+
+	// Safely get the signature
+	var sig string
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic in SearchAPIJSON: %v", r)
+			errorResponse(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+	}()
+
+	if authService != nil && authService.SessionManager != nil && authService.SessionManager.authService != nil {
+		sig = authService.SessionManager.authService.GetSignature(r)
+	}
+
+	// Safely get blocklists
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+
+	// Extract search mode from path
+	path := r.URL.Path
+	isRetail := strings.Contains(path, "/retail/")
+	isBuylist := strings.Contains(path, "/buylist/")
+	isSealed := strings.Contains(path, "/sealed/")
+
+	// Extract query from path
+	query := path
+	query = strings.TrimPrefix(query, "/api/search-json/retail/")
+	query = strings.TrimPrefix(query, "/api/search-json/buylist/")
+	query = strings.TrimPrefix(query, "/api/search-json/sealed/")
+
+	// Set up search configuration
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+
+	// Handle potential panics from parseSearchOptionsNG
+	var config SearchConfig
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Recovered from panic in parseSearchOptionsNG: %v", r)
+			}
+		}()
+		config = parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
+	}()
+
+	if isSealed {
+		config.SearchMode = "sealed"
+	}
+
+	// Apply sorting if specified
+	if sort := r.URL.Query().Get("sort"); sort != "" {
+		config.SortMode = sort
+	}
+
+	// Perform search with error handling
+	allKeys, err := func() ([]string, error) {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Recovered from panic in searchAndFilter: %v", r)
+			}
+		}()
+		return searchAndFilter(config)
+	}()
+
+	if err != nil {
+		errorResponse(w, "Search failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Limit results to be processed
+	maxResults := 100
+	if len(allKeys) > maxResults {
+		allKeys = allKeys[:maxResults]
+	}
+
+	// Prepare empty results in case of further errors
+	var foundSellers map[string]map[string][]SearchEntry = make(map[string]map[string][]SearchEntry)
+	var foundVendors map[string]map[string][]SearchEntry = make(map[string]map[string][]SearchEntry)
+
+	// Only perform the search if we have keys
+	if len(allKeys) > 0 {
+		// Perform search to find pricing data with error handling
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("Recovered from panic in searchParallelNG: %v", r)
+				}
+			}()
+			foundSellers, foundVendors = searchParallelNG(allKeys, config)
+		}()
+	}
+
+	// Filter away any empty result with error handling
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Recovered from panic in PostSearchFilter: %v", r)
+			}
+		}()
+		if len(config.PostFilters) > 0 {
+			allKeys = PostSearchFilter(config, allKeys, foundSellers, foundVendors)
+		}
+	}()
+
+	// Format results for JSON response
+	var formattedResults []map[string]interface{}
+
+	if len(allKeys) > 0 {
+		formattedResults = formatResultsForJSON(allKeys, foundSellers, foundVendors)
+	} else {
+		formattedResults = []map[string]interface{}{}
+	}
+
+	// Set appropriate headers for JSON response
+	response := map[string]interface{}{
+		"success": true,
+		"results": formattedResults,
+		"query":   query,
+		"mode":    getSearchMode(isRetail, isBuylist),
+		"count":   len(formattedResults),
+	}
+
+	// Send the JSON response
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
+		log.Printf("Error encoding JSON response: %v", err)
+	}
+}
+
+// errorResponse sends a JSON error response
+func errorResponse(w http.ResponseWriter, message string, statusCode int) {
+	w.WriteHeader(statusCode)
+	response := map[string]interface{}{
+		"success": false,
+		"error":   message,
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+// Helper function to get search mode
+func getSearchMode(isBuylist, isSealed bool) string {
+	if isSealed {
+		return "sealed"
+	} else if isBuylist {
+		return "buylist"
+	}
+	return "retail"
+}
+
+// formatResultsForJSON converts search results into a format suitable for the UI
+func formatResultsForJSON(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry) []map[string]interface{} {
+	formattedResults := make([]map[string]interface{}, 0, len(allKeys))
+
+	for _, cardId := range allKeys {
+		// Skip if either map is nil
+		if foundSellers == nil || foundVendors == nil {
+			continue
+		}
+
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			continue
+		}
+
+		// Format sellers
+		var sellers []map[string]interface{}
+		if sellerConditions, ok := foundSellers[cardId]; ok {
+			for condition, entries := range sellerConditions {
+				// Skip INDEX entries for the UI display
+				if condition == "INDEX" {
+					continue
+				}
+
+				for _, entry := range entries {
+					seller := map[string]interface{}{
+						"name":      entry.ScraperName,
+						"price":     entry.Price,
+						"condition": condition,
+						"quantity":  entry.Quantity,
+					}
+
+					// Only add optional fields if they exist
+					if entry.Country != "" {
+						seller["country"] = entry.Country
+					}
+
+					sellers = append(sellers, seller)
+				}
+			}
+		}
+
+		// Format buyers
+		var buyers []map[string]interface{}
+		if vendorConditions, ok := foundVendors[cardId]; ok {
+			for condition, entries := range vendorConditions {
+				// Skip INDEX entries for the UI display
+				if condition == "INDEX" {
+					continue
+				}
+
+				for _, entry := range entries {
+					buyer := map[string]interface{}{
+						"name":      entry.ScraperName,
+						"price":     entry.Price,
+						"condition": condition,
+					}
+
+					// Only add optional fields if they exist
+					if entry.Country != "" {
+						buyer["country"] = entry.Country
+					}
+
+					buyers = append(buyers, buyer)
+				}
+			}
+		}
+
+		// Create result entry
+		result := map[string]interface{}{
+			"id":              cardId,
+			"name":            co.Name,
+			"setCode":         co.SetCode,
+			"setName":         co.Edition,
+			"collectorNumber": co.Number,
+			"rarity":          co.Rarity,
+			"foil":            co.Foil,
+			"etched":          co.Etched,
+			"sellers":         sellers,
+			"buyers":          buyers,
+		}
+
+		if len(sellers) > 0 {
+			result["sellers"] = sellers
+		}
+
+		if len(buyers) > 0 {
+			result["buyers"] = buyers
+		}
+
+		formattedResults = append(formattedResults, result)
+	}
+
+	return formattedResults
+}
