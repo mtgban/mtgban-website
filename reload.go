@@ -157,11 +157,9 @@ func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
 
 	// Do not update in case the new inventory wasn't completely loaded
 	// for example due to API problems
-	if i >= 0 {
-		old, _ := Sellers[i].Inventory()
-		if len(inv) < len(old)/2 {
-			return errors.New("new inventory is missing too many entries")
-		}
+	old, _ := Sellers[i].Inventory()
+	if len(inv) > 0 && len(inv) < len(old)/2 {
+		return errors.New("new inventory is missing too many entries")
 	}
 
 	// Make sure the input seller is _only_ a Seller and not anything
@@ -229,13 +227,11 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
 		return err
 	}
 
-	// Do not update in case the new inventory wasn't completely loaded
+	// Do not update in case the new buylist wasn't completely loaded
 	// for example due to API problems
-	if i >= 0 {
-		old, _ := Vendors[i].Buylist()
-		if len(bl) < len(old)/2 {
-			return errors.New("new buylist is missing too many entries")
-		}
+	old, _ := Vendors[i].Buylist()
+	if len(bl) > 0 && len(bl) < len(old)/2 {
+		return errors.New("new buylist is missing too many entries")
 	}
 
 	// Save vendor in global array, making sure it's _only_ a Vendor
