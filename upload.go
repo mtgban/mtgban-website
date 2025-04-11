@@ -1185,7 +1185,7 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 		if err != nil || num == 0 {
 			// Retry in the second quantity data if present
 			idx, found = indexMap["quantity_backup"]
-			if found {
+			if found && idx < len(record) {
 				num, err = getQuantity(record[idx])
 			}
 		}
