@@ -39,7 +39,7 @@ var SleeperColors = []string{
 }
 
 func Sleepers(w http.ResponseWriter, r *http.Request) {
-	sig := authService.GetSignature(r)
+	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav("Sleepers", r, sig)
 

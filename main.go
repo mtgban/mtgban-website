@@ -618,19 +618,13 @@ func genPageNav(activeTab string, r *http.Request, sig string) PageVars {
 	// Initialize user authentication state
 	var session *UserSession
 	var isLoggedIn bool
-	var userEmail, userTier string
-
-	// Try to get session if auth service is available
-	if authService != nil && authService.SessionManager != nil {
-		session, _ = authService.SessionManager.GetSession(r)
-	}
+	var userEmail string
 
 	// Check authentication status
 	if session != nil && !time.Now().After(session.ExpiresAt) {
 		// Valid session
 		isLoggedIn = true
 		userEmail = session.Email
-		userTier = session.Tier
 	} else if sig != "" {
 		// Fallback to signature-based auth if session not available
 		exp := GetParamFromSig(sig, "Expires")
@@ -638,7 +632,6 @@ func genPageNav(activeTab string, r *http.Request, sig string) PageVars {
 			expires, _ := strconv.ParseInt(exp, 10, 64)
 			if expires > time.Now().Unix() || (DevMode && !SigCheck) {
 				userEmail = GetParamFromSig(sig, "UserEmail")
-				userTier = GetParamFromSig(sig, "UserTier")
 				isLoggedIn = userEmail != ""
 			} else {
 				pageVars.ErrorMessage = ErrMsgExpired
@@ -649,7 +642,6 @@ func genPageNav(activeTab string, r *http.Request, sig string) PageVars {
 	// Update page variables
 	pageVars.IsLoggedIn = isLoggedIn
 	pageVars.UserEmail = userEmail
-	pageVars.UserTier = userTier
 
 	if !isLoggedIn {
 		pageVars.ShowLogin = true
@@ -675,14 +667,10 @@ func genPageNav(activeTab string, r *http.Request, sig string) PageVars {
 			showNavItem := navItem.NoAuth
 
 			if isLoggedIn && !showNavItem {
-				if authService != nil && authService.PermissionManager != nil {
-					showNavItem = authService.PermissionManager.HasPermission(session, feat)
-				} else {
-					// Fallback to signature permissions
-					param := GetParamFromSig(sig, feat)
-					allowed, _ := strconv.ParseBool(param)
-					showNavItem = allowed || (DevMode && (navItem.AlwaysOnForDev || !SigCheck))
-				}
+				// Fallback to signature permissions
+				param := GetParamFromSig(sig, feat)
+				allowed, _ := strconv.ParseBool(param)
+				showNavItem = allowed || (DevMode && (navItem.AlwaysOnForDev || !SigCheck))
 			}
 
 			if showNavItem {
@@ -862,17 +850,6 @@ func main() {
 	}
 
 	authConfig := AuthConfig{
-		Domain:          Config.Auth.Domain,
-		Port:            Config.Auth.Port,
-		SecureCookies:   Config.Auth.SecureCookies,
-		CookieDomain:    Config.Auth.CookieDomain,
-		CSRFSecret:      Config.Auth.CSRFSecret,
-		SignatureTTL:    time.Duration(Config.Auth.SignatureTTL) * time.Second,
-		LoginRateLimit:  Config.Auth.LoginRateLimit,
-		SignupRateLimit: Config.Auth.SignupRateLimit,
-		APIRateLimit:    Config.Auth.APIRateLimit,
-		PublicRateLimit: Config.Auth.PublicRateLimit,
-		SupabaseRoleKey: Config.Auth.RoleKey,
 		SupabaseURL:     Config.Auth.Url,
 		SupabaseAnonKey: Config.Auth.Key,
 		SupabaseSecret:  Config.Auth.Secret,
@@ -881,11 +858,6 @@ func main() {
 		ExemptPrefixes:  Config.Auth.ExemptPrefixes,
 		ExemptSuffixes:  Config.Auth.ExemptSuffixes,
 		DebugMode:       DevMode,
-		AssetsPath:      Config.Auth.AssetsPath,
-		ACL: ACLConfig{
-			Tiers: Config.Auth.ACL.Tiers,
-			Roles: Config.Auth.ACL.Roles,
-		},
 	}
 
 	authService, err := NewAuthService(authConfig)
@@ -991,6 +963,7 @@ func main() {
 			Flags:       logfile.FileOnly,
 			OldVersions: 2,
 		})
+
 		if err != nil {
 			log.Printf("Failed to create logFile for %s: %s", key, err)
 			LogPages[key] = log.New(os.Stderr, "", log.LstdFlags)
@@ -1000,22 +973,7 @@ func main() {
 
 		_, ExtraNavs[key].NoAuth = Config.Auth.ACL.Tiers["free"][key]
 
-		// Use the new auth service for handling routes
-		var handler http.Handler
-		if nav.NoAuth {
-			// No authentication required
-			handler = http.HandlerFunc(nav.Handle)
-		} else {
-			// Use AuthWrapper middleware
-			handler = http.HandlerFunc((nav.Handle))
-		}
-
-		http.Handle(nav.Link, handler)
-
-		// Add any additional endpoints to it
-		for _, subPage := range nav.SubPages {
-			http.Handle(subPage, handler)
-		}
+		http.Handle(ExtraNavs[key].Link, authService.handler)
 	}
 
 	// API endpoints
@@ -1160,8 +1118,12 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Parse the template file held in the templates folder, add any Funcs to parsing
 	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
 	if err != nil {
-		log.Print("template parsing error: ", err)
-		return
+		tmplPath = fmt.Sprintf("nextAuth/out/%s", tmpl)
+		t, err = template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
+		if err != nil {
+			log.Print("template parsing error: ", err)
+			return
+		}
 	}
 
 	// Execute the template and pass in the variables to fill the gaps

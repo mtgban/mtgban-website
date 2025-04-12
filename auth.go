@@ -14,7 +14,6 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -22,10 +21,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 	"unicode"
 
+	"github.com/NYTimes/gziphandler"
 	supabase "github.com/nedpals/supabase-go"
 	"golang.org/x/time/rate"
 )
@@ -39,7 +38,7 @@ const (
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
 
-// Error message constants
+// Error messages used throughout the application
 const (
 	ErrMsg        = "Join the BAN Community and gain access to exclusive tools!"
 	ErrMsgPlus    = "Increase your pledge to gain access to this feature!"
@@ -52,7 +51,7 @@ const (
 //go:embed all:nextAuth/out
 var authAssets embed.FS
 
-// Map content types
+// contentTypeMap maps file extensions to content types
 var contentTypeMap = map[string]string{
 	".html":  "text/html",
 	".js":    "application/javascript",
@@ -69,31 +68,23 @@ var contentTypeMap = map[string]string{
 	".ttf":   "font/ttf",
 }
 
-// Map of auth page routes to their corresponding HTML files
-var authPagesMap = map[string]string{
-	"/auth/login":           "login.html",
-	"/auth/signup":          "signup.html",
-	"/auth/account":         "account.html",
-	"/auth/reset-password":  "reset-password.html",
-	"/auth/forgot-password": "forgot-password.html",
-	"/auth/confirmation":    "confirmation.html",
-	"/auth/success":         "success.html",
-	"/next/search":          "next/search.html",
-	"/next/pricing":         "next/pricing.html",
+type UserSession struct {
+	UserID       string
+	Email        string
+	Token        string
+	RefreshToken string
+	ExpiresAt    time.Time
 }
 
-type SessionKey string
-
-// AuthError represents an auth-related error
+// AuthError represents a standardized authentication error
 type AuthError struct {
 	Code       string
 	Message    string
 	StatusCode int
 	Internal   error
-	Field      string
 }
 
-// Error returns the error string
+// Error returns the string representation of the error
 func (e AuthError) Error() string {
 	if e.Internal != nil {
 		return fmt.Sprintf("%s: %v", e.Message, e.Internal)
@@ -101,108 +92,103 @@ func (e AuthError) Error() string {
 	return e.Message
 }
 
-// APIResponse represents a API response
+// Common authentication errors
+var (
+	ErrInvalidCredentials = AuthError{
+		Code:       "INVALID_CREDENTIALS",
+		Message:    "Invalid email or password",
+		StatusCode: http.StatusUnauthorized,
+	}
+
+	ErrSessionExpired = AuthError{
+		Code:       "SESSION_EXPIRED",
+		Message:    "Your session has expired. Please log in again.",
+		StatusCode: http.StatusUnauthorized,
+	}
+
+	ErrEmailTaken = AuthError{
+		Code:       "EMAIL_TAKEN",
+		Message:    "Email address is already in use",
+		StatusCode: http.StatusBadRequest,
+	}
+
+	ErrWeakPassword = AuthError{
+		Code:       "WEAK_PASSWORD",
+		Message:    "Password does not meet strength requirements",
+		StatusCode: http.StatusBadRequest,
+	}
+
+	ErrCSRFValidation = AuthError{
+		Code:       "INVALID_CSRF_TOKEN",
+		Message:    "Invalid security token",
+		StatusCode: http.StatusForbidden,
+	}
+
+	ErrRateLimitExceeded = AuthError{
+		Code:       "RATE_LIMIT_EXCEEDED",
+		Message:    "Too many requests. Please try again later.",
+		StatusCode: http.StatusTooManyRequests,
+	}
+
+	ErrMissingToken = AuthError{
+		Code:       "MISSING_TOKEN",
+		Message:    "Authentication required",
+		StatusCode: http.StatusUnauthorized,
+	}
+
+	ErrInvalidToken = AuthError{
+		Code:       "INVALID_TOKEN",
+		Message:    "Invalid authentication token",
+		StatusCode: http.StatusUnauthorized,
+	}
+
+	ErrServerError = AuthError{
+		Code:       "SERVER_ERROR",
+		Message:    "An unexpected error occurred",
+		StatusCode: http.StatusInternalServerError,
+	}
+)
+
+// APIResponse represents a standardized API response
 type APIResponse struct {
 	Success    bool        `json:"success"`
 	Message    string      `json:"message,omitempty"`
 	Error      string      `json:"error,omitempty"`
 	Code       string      `json:"code,omitempty"`
-	Field      string      `json:"field,omitempty"`
 	Data       interface{} `json:"data,omitempty"`
 	RedirectTo string      `json:"redirectTo,omitempty"`
 }
 
+// AuthService handles all authentication related functionality
+type AuthService struct {
+	Logger         *log.Logger
+	Supabase       *supabase.Client
+	SupabaseURL    string
+	SupabaseKey    string
+	SupabaseSecret string
+	DebugMode      bool
+	BaseAuthURL    string
+	CSRFSecret     []byte
+	BanACL         *BanACL
+	AuthConfig     AuthConfig
+
+	// Rate limiters
+	LoginLimiter    *rate.Limiter
+	SignupLimiter   *rate.Limiter
+	ResetPwdLimiter *rate.Limiter
+	IPLimiters      sync.Map // map[string]*rate.Limiter
+}
+
 // AuthConfig holds the configuration for the authentication service
 type AuthConfig struct {
-	// Server settings
-	Domain        string `json:"domain"`
-	Port          string `json:"port"`
-	SecureCookies bool   `json:"secure_cookies"`
-	CookieDomain  string `json:"cookie_domain"`
-
-	// Auth provider settings
-	SupabaseURL     string `json:"supabase_url"`
-	SupabaseAnonKey string `json:"supabase_anon_key"`
-	SupabaseRoleKey string `json:"supabase_role_key"`
-	SupabaseSecret  string `json:"supabase_jwt_secret"`
-
-	// Security settings
-	CSRFSecret   string        `json:"csrf_secret"`
-	SignatureTTL time.Duration `json:"signature_ttl"`
-
-	// Access Control
-	ExemptRoutes   []string `json:"exempt_routes"`
-	ExemptPrefixes []string `json:"exempt_prefixes"`
-	ExemptSuffixes []string `json:"exempt_suffixes"`
-
-	// Rate Limiting
-	LoginRateLimit  int `json:"login_rate_limit"`
-	SignupRateLimit int `json:"signup_rate_limit"`
-	APIRateLimit    int `json:"api_rate_limit"`
-	PublicRateLimit int `json:"public_rate_limit"`
-
-	// Assets
-	AssetsPath string `json:"assets_path"`
-
-	// Dev mode
-	DebugMode bool   `json:"debug_mode"`
-	LogPrefix string `json:"log_prefix"`
-
-	ACL ACLConfig `json:"acl"`
-}
-
-// Validate validates the auth configuration
-func (c AuthConfig) Validate() error {
-	if c.SupabaseURL == "" {
-		return errors.New("SupabaseURL is required")
-	}
-
-	if c.SupabaseAnonKey == "" {
-		return errors.New("SupabaseAnonKey is required")
-	}
-
-	return nil
-}
-
-// ACLConfig represents the access control list configuration
-type ACLConfig struct {
-	Tiers       map[string]map[string]map[string]string `json:"tier"`
-	Roles       map[string]map[string]map[string]string `json:"role"`
-	NavSections []string                                `json:"nav_sections"`
-}
-
-// StandardErrors defines all error types
-type StandardErrors struct {
-	Unauthorized       AuthError
-	Forbidden          AuthError
-	InvalidPassword    AuthError
-	InvalidEmail       AuthError
-	MissingEmail       AuthError
-	MissingPassword    AuthError
-	InvalidForm        AuthError
-	InvalidCredentials AuthError
-	SessionExpired     AuthError
-	EmailTaken         AuthError
-	WeakPassword       AuthError
-	CSRFValidation     AuthError
-	RateLimitExceeded  AuthError
-	MissingToken       AuthError
-	InvalidToken       AuthError
-	ServerError        AuthError
-}
-
-// UserSession represents a user session
-type UserSession struct {
-	AccessToken  string
-	RefreshToken string
-	CSRFToken    string
-	BanSignature string
-	UserID       string
-	Email        string
-	Tier         string
-	Role         string
-	Metadata     map[string]interface{}
-	ExpiresAt    time.Time
+	SupabaseURL     string   `json:"supabase_url"`
+	SupabaseAnonKey string   `json:"supabase_anon_key"`
+	SupabaseSecret  string   `json:"supabase_jwt_secret"`
+	DebugMode       bool     `json:"debug_mode"`
+	LogPrefix       string   `json:"log_prefix"`
+	ExemptRoutes    []string `json:"exempt_routes"`
+	ExemptPrefixes  []string `json:"exempt_prefixes"`
+	ExemptSuffixes  []string `json:"exempt_suffixes"`
 }
 
 // UserData holds user data for MTGBAN users
@@ -212,23 +198,13 @@ type UserData struct {
 	Tier   string `json:"tier"`
 }
 
-// BanUser represents a user in the ban ACL
 type BanUser struct {
 	User        *UserData              `json:"user"`
 	Permissions map[string]interface{} `json:"permissions"`
 }
 
-// BanACL represents the ban access control list
 type BanACL struct {
 	Users map[string]*BanUser
-}
-
-// CookieOptions stores configuration for a cookie
-type CookieOptions struct {
-	HttpOnly bool
-	Path     string
-	SameSite http.SameSite
-	MaxAge   int // In seconds, -1 for session, 0 for delete
 }
 
 // LoginRequest represents a login request payload
@@ -261,114 +237,42 @@ type AuthRoute struct {
 	Path        string
 	Method      string
 	Handler     http.HandlerFunc
-	Middleware  string
+	Middlewares MiddlewareChain
 	Description string
 }
 
-// Middleware wraps an HTTP handler
-type Middleware func(http.Handler) http.Handler
+// MiddlewareChain is a chain of middleware functions
+type MiddlewareChain []func(http.HandlerFunc) http.HandlerFunc
 
-// NewStandardErrors creates all standard errors
-func NewStandardErrors() StandardErrors {
-	return StandardErrors{
-		Unauthorized: AuthError{
-			Code:       "UNAUTHORIZED",
-			Message:    "Unauthorized",
-			StatusCode: http.StatusUnauthorized,
-		},
-		InvalidPassword: AuthError{
-			Code:       "INVALID_PASSWORD",
-			Message:    "Invalid password",
-			StatusCode: http.StatusUnauthorized,
-		},
-		InvalidEmail: AuthError{
-			Code:       "INVALID_EMAIL",
-			Message:    "Invalid email",
-			StatusCode: http.StatusUnauthorized,
-		},
-		MissingEmail: AuthError{
-			Code:       "MISSING_EMAIL",
-			Message:    "Email is required",
-			StatusCode: http.StatusUnauthorized,
-		},
-		MissingPassword: AuthError{
-			Code:       "MISSING_PASSWORD",
-			Message:    "Password is required",
-			StatusCode: http.StatusUnauthorized,
-		},
-		Forbidden: AuthError{
-			Code:       "FORBIDDEN",
-			Message:    "Access denied",
-			StatusCode: http.StatusForbidden,
-		},
-		InvalidForm: AuthError{
-			Code:       "INVALID_FORM",
-			Message:    "Invalid form submission",
-			StatusCode: http.StatusBadRequest,
-		},
-		InvalidCredentials: AuthError{
-			Code:       "INVALID_CREDENTIALS",
-			Message:    "Invalid email or password",
-			StatusCode: http.StatusUnauthorized,
-		},
-		SessionExpired: AuthError{
-			Code:       "SESSION_EXPIRED",
-			Message:    "Your session has expired. Please log in again.",
-			StatusCode: http.StatusUnauthorized,
-		},
-		EmailTaken: AuthError{
-			Code:       "EMAIL_TAKEN",
-			Message:    "Email address is already in use",
-			StatusCode: http.StatusBadRequest,
-		},
-		WeakPassword: AuthError{
-			Code:       "WEAK_PASSWORD",
-			Message:    "Password does not meet strength requirements",
-			StatusCode: http.StatusBadRequest,
-		},
-		CSRFValidation: AuthError{
-			Code:       "INVALID_CSRF_TOKEN",
-			Message:    "Invalid security token",
-			StatusCode: http.StatusForbidden,
-		},
-		RateLimitExceeded: AuthError{
-			Code:       "RATE_LIMIT_EXCEEDED",
-			Message:    "Too many requests. Please try again later.",
-			StatusCode: http.StatusTooManyRequests,
-		},
-		MissingToken: AuthError{
-			Code:       "MISSING_TOKEN",
-			Message:    "Authentication required",
-			StatusCode: http.StatusUnauthorized,
-		},
-		InvalidToken: AuthError{
-			Code:       "INVALID_TOKEN",
-			Message:    "Invalid authentication token",
-			StatusCode: http.StatusUnauthorized,
-		},
-		ServerError: AuthError{
-			Code:       "SERVER_ERROR",
-			Message:    "An unexpected error occurred",
-			StatusCode: http.StatusInternalServerError,
-		},
+// Then applies the middleware chain to a handler
+func (c MiddlewareChain) Then(h http.HandlerFunc) http.HandlerFunc {
+	for i := len(c) - 1; i >= 0; i-- {
+		h = c[i](h)
 	}
+	return h
 }
 
-// ==============================================================================================
-// DefaultAuthConfig
-// ==============================================================================================
+// Append adds more middleware to the chain
+func (c MiddlewareChain) Append(m ...func(http.HandlerFunc) http.HandlerFunc) MiddlewareChain {
+	return append(c, m...)
+}
+
+// ============================================================================================
+// AuthService Initialization
+// ============================================================================================
 
 // DefaultAuthConfig returns the default authentication configuration
 func DefaultAuthConfig() AuthConfig {
 	return AuthConfig{
-		LogPrefix: "[Auth] ",
+		LogPrefix: " ",
 		ExemptRoutes: []string{
 			"/",
 			"/home",
 			"/auth",
 		},
 		ExemptPrefixes: []string{
-			"/public/",
+			"/auth/",
+			"/next-api/auth/",
 			"/css/",
 			"/js/",
 			"/img/",
@@ -383,18 +287,10 @@ func DefaultAuthConfig() AuthConfig {
 			".gif",
 			".svg",
 		},
-		SignatureTTL: DefaultSignatureDuration,
-		ACL: ACLConfig{
-			NavSections: []string{
-				"Search", "Newspaper", "Sleepers", "Upload",
-				"Global", "Arbit", "Reverse", "Admin", "API",
-			},
-			Tiers: make(map[string]map[string]map[string]string),
-		},
 	}
 }
 
-// LoadAuthConfig loads auth configuration from a file
+// LoadAuthConfig loads auth configuration from aa file
 func LoadAuthConfig(filePath string) (AuthConfig, error) {
 	// Start with default configuration
 	config := DefaultAuthConfig()
@@ -421,1733 +317,17 @@ func LoadAuthConfig(filePath string) (AuthConfig, error) {
 	return config, nil
 }
 
-// ==============================================================================================
-// ErrorHandler Implementation
-// ==============================================================================================
-
-// ErrorHandler provides error handling
-type ErrorHandler struct {
-	logger   *log.Logger
-	debug    bool
-	renderer *AssetLoader
-	errors   StandardErrors
-}
-
-// NewErrorHandler creates a new error handler
-func NewErrorHandler(logger *log.Logger, debug bool) *ErrorHandler {
-	return &ErrorHandler{
-		logger: logger,
-		debug:  debug,
-		errors: NewStandardErrors(),
-	}
-}
-
-// SetRenderer sets the renderer for HTML error pages
-func (eh *ErrorHandler) SetRenderer(renderer *AssetLoader) {
-	eh.renderer = renderer
-}
-
-// RespondWithError handles all error responses
-func (eh *ErrorHandler) RespondWithError(w http.ResponseWriter, r *http.Request, err AuthError, internal error) {
-	// Update internal error if provided
-	if internal != nil {
-		err.Internal = internal
-	}
-
-	// Log the error
-	if err.Internal != nil {
-		eh.logger.Printf("Error (%s): %v", err.Code, err.Internal)
-	} else {
-		eh.logger.Printf("Error (%s): %s", err.Code, err.Message)
-	}
-
-	// Determine response based on request type
-	if isAPIRequest(r) {
-		eh.sendAPIError(w, err)
-	} else if isFormSubmission(r) {
-		eh.redirectWithError(w, r, err)
-	} else {
-		eh.renderErrorPage(w, err)
-	}
-}
-
-// sendAPIError sends a JSON error response
-func (eh *ErrorHandler) sendAPIError(w http.ResponseWriter, err AuthError) {
-	response := APIResponse{
-		Success: false,
-		Error:   err.Message,
-		Code:    err.Code,
-		Field:   err.Field,
-	}
-
-	// Include debug info if enabled
-	if eh.debug && err.Internal != nil {
-		response.Error = fmt.Sprintf("%s: %v", err.Message, err.Internal)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(err.StatusCode)
-	json.NewEncoder(w).Encode(response)
-}
-
-// redirectWithError redirects with error parameters
-func (eh *ErrorHandler) redirectWithError(w http.ResponseWriter, r *http.Request, err AuthError) {
-	// Determine return path based on the error and request
-	returnPath := determineReturnPath(r, err)
-
-	// Build redirect URL with error parameters
-	redirectURL := fmt.Sprintf("%s?error=%s&message=%s",
-		returnPath,
-		url.QueryEscape(err.Code),
-		url.QueryEscape(err.Message))
-
-	// Add field for form errors if specified
-	if err.Field != "" {
-		redirectURL += "&field=" + url.QueryEscape(err.Field)
-	}
-
-	// Preserve return_to parameter if present
-	if returnTo := r.FormValue("return_to"); returnTo != "" {
-		redirectURL += "&return_to=" + url.QueryEscape(returnTo)
-	}
-
-	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-}
-
-// renderErrorPage renders an HTML error page
-func (eh *ErrorHandler) renderErrorPage(w http.ResponseWriter, err AuthError) {
-	w.WriteHeader(err.StatusCode)
-
-	// Prepare template data
-	data := map[string]interface{}{
-		"Title":   fmt.Sprintf("Error: %s", err.Code),
-		"Message": err.Message,
-		"Code":    err.Code,
-		"Status":  err.StatusCode,
-	}
-
-	// Include debug info if enabled
-	if eh.debug && err.Internal != nil {
-		data["Debug"] = err.Internal.Error()
-	}
-
-	// Render template if available, otherwise use fallback
-	if eh.renderer != nil {
-		if err := eh.renderer.RenderTemplate(w, "error.html", data); err != nil {
-			eh.renderFallbackErrorPage(w, data)
-		}
-	} else {
-		eh.renderFallbackErrorPage(w, data)
-	}
-}
-
-// renderFallbackErrorPage renders a basic HTML error page
-func (eh *ErrorHandler) renderFallbackErrorPage(w http.ResponseWriter, data map[string]interface{}) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-
-	// HTML template with error information
-	html := `
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>{{.Title}}</title>
-		<style>
-			body { font-family: sans-serif; margin: 40px; line-height: 1.6; }
-			.error-container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
-			.error-title { color: #d32f2f; margin-top: 0; }
-			.error-message { background-color: #ffebee; padding: 15px; border-radius: 4px; }
-			.error-code { color: #555; font-size: 0.9em; margin-top: 15px; }
-			.error-debug { background-color: #f5f5f5; padding: 10px; font-family: monospace; margin-top: 15px; overflow-x: auto; }
-		</style>
-	</head>
-	<body>
-		<div class="error-container">
-			<h1 class="error-title">{{.Title}}</h1>
-			<div class="error-message">{{.Message}}</div>
-			<div class="error-code">Error code: {{.Code}} (Status: {{.Status}})</div>
-			{{if .Debug}}<div class="error-debug">Debug: {{.Debug}}</div>{{end}}
-			<p><a href="/">Return to home page</a></p>
-		</div>
-	</body>
-	</html>
-	`
-
-	// Replace template variables
-	for key, value := range data {
-		placeholder := "{{." + key + "}}"
-		strValue := fmt.Sprintf("%v", value)
-		html = strings.Replace(html, placeholder, strValue, -1)
-	}
-
-	// Handle conditional debug info
-	if debug, ok := data["Debug"]; ok {
-		debugHTML := fmt.Sprintf(`<div class="error-debug">Debug: %v</div>`, debug)
-		html = strings.Replace(html, `{{if .Debug}}<div class="error-debug">Debug: {{.Debug}}</div>{{end}}`, debugHTML, 1)
-	} else {
-		html = strings.Replace(html, `{{if .Debug}}<div class="error-debug">Debug: {{.Debug}}</div>{{end}}`, "", 1)
-	}
-
-	w.Write([]byte(html))
-}
-
-// ==============================================================================================
-// SessionManager
-// ==============================================================================================
-
-// SessionManager handles all session operations
-type SessionManager struct {
-	domain        string
-	secureCookies bool
-	sameSite      http.SameSite
-	csrfSecret    []byte
-	logger        *log.Logger
-	banACL        *BanACL
-	authService   *AuthService
-	cookieOptions map[string]CookieOptions
-}
-
-// NewSessionManager creates a new session manager
-func NewSessionManager(domain string, secureCookies bool, csrfSecret []byte, logger *log.Logger) *SessionManager {
-	// Determine SameSite mode based on security settings
-	sameSite := http.SameSiteStrictMode
-	if !secureCookies {
-		sameSite = http.SameSiteLaxMode
-	}
-
-	// Define standard cookie configurations
-	cookieOptions := map[string]CookieOptions{
-		"auth_token": {
-			HttpOnly: true,
-			Path:     "/",
-			SameSite: sameSite,
-			MaxAge:   24 * 60 * 60, // 24 hours default
-		},
-		"refresh_token": {
-			HttpOnly: true,
-			Path:     "/",
-			SameSite: sameSite,
-			MaxAge:   60 * 24 * 60 * 60, // 60 days
-		},
-		"csrf_token": {
-			HttpOnly: false, // Accessible to JS
-			Path:     "/",
-			SameSite: sameSite,
-			MaxAge:   24 * 60 * 60,
-		},
-		"MTGBAN": {
-			HttpOnly: true,
-			Path:     "/",
-			SameSite: sameSite,
-			MaxAge:   30 * 24 * 60 * 60, // 30 days
-		},
-	}
-
-	return &SessionManager{
-		domain:        domain,
-		secureCookies: secureCookies,
-		sameSite:      sameSite,
-		csrfSecret:    csrfSecret,
-		logger:        logger,
-		cookieOptions: cookieOptions,
-	}
-}
-
-// setCookie sets a cookie with the standard options
-func (sm *SessionManager) setCookie(w http.ResponseWriter, name, value string, maxAgeOverride int) {
-	options, exists := sm.cookieOptions[name]
-	if !exists {
-		// Use default options
-		options = CookieOptions{
-			HttpOnly: true,
-			Path:     "/",
-			SameSite: sm.sameSite,
-			MaxAge:   24 * 60 * 60, // 24 hours default
-		}
-	}
-
-	// Override MaxAge if specified
-	maxAge := options.MaxAge
-	if maxAgeOverride != 0 {
-		maxAge = maxAgeOverride
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     name,
-		Value:    value,
-		Path:     options.Path,
-		Domain:   sm.domain,
-		HttpOnly: options.HttpOnly,
-		Secure:   sm.secureCookies,
-		SameSite: options.SameSite,
-		MaxAge:   maxAge,
-	})
-}
-
-// SetSession establishes a user session with all required cookies
-func (sm *SessionManager) SetSession(w http.ResponseWriter, r *http.Request, session *UserSession) {
-	// Set auth_token cookie
-	sm.setCookie(w, "auth_token", session.AccessToken, int(time.Until(session.ExpiresAt).Seconds()))
-
-	// Set refresh_token cookie
-	sm.setCookie(w, "refresh_token", session.RefreshToken, 0) // Use default
-
-	// Set CSRF token cookie
-	sm.setCookie(w, "csrf_token", session.CSRFToken, int(time.Until(session.ExpiresAt).Seconds()))
-
-	// Set MTGBAN signature cookie
-	sm.setCookie(w, "MTGBAN", session.BanSignature, 0) // Use default
-
-	sm.logger.Printf("Session established for user: %s (tier: %s)", session.Email, session.Tier)
-}
-
-// ClearSession clears all session cookies
-func (sm *SessionManager) ClearSession(w http.ResponseWriter, r *http.Request) {
-	// List of cookies to clear
-	cookieNames := []string{"auth_token", "refresh_token", "csrf_token", "MTGBAN"}
-
-	for _, name := range cookieNames {
-		// Clear with domain
-		sm.setCookie(w, name, "", -1)
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     name,
-			Value:    "",
-			Path:     "/",
-			HttpOnly: true,
-			MaxAge:   -1,
-			Expires:  time.Unix(0, 0),
-		})
-	}
-
-	sm.logger.Printf("Session cleared for request from: %s", getClientIP(r))
-}
-
-// GetSession retrieves and validates the current session
-func (sm *SessionManager) GetSession(r *http.Request) (*UserSession, error) {
-	// Get auth token from cookie
-	authCookie, err := r.Cookie("auth_token")
-	if err != nil || authCookie.Value == "" {
-		return nil, errors.New("no auth token found")
-	}
-
-	// Get refresh token
-	refreshCookie, _ := r.Cookie("refresh_token")
-	refreshToken := ""
-	if refreshCookie != nil {
-		refreshToken = refreshCookie.Value
-	}
-
-	// Get CSRF token
-	csrfCookie, _ := r.Cookie("csrf_token")
-	csrfToken := ""
-	if csrfCookie != nil {
-		csrfToken = csrfCookie.Value
-	}
-
-	// Get MTGBAN signature
-	mtgbanCookie, _ := r.Cookie("MTGBAN")
-	banSignature := ""
-	if mtgbanCookie != nil {
-		banSignature = mtgbanCookie.Value
-	}
-
-	// Validate token with Supabase
-	ctx := r.Context()
-	userInfo, err := sm.validateSupabaseToken(ctx, authCookie.Value)
-	if err != nil {
-		return nil, fmt.Errorf("invalid token: %w", err)
-	}
-
-	// Extract tier from metadata
-	tier := extractTier(userInfo)
-
-	// Return session
-	return &UserSession{
-		AccessToken:  authCookie.Value,
-		RefreshToken: refreshToken,
-		CSRFToken:    csrfToken,
-		BanSignature: banSignature,
-		UserID:       userInfo.ID,
-		Email:        userInfo.Email,
-		Tier:         tier,
-		Role:         getUserRole(userInfo),
-		Metadata:     userInfo.UserMetadata,
-		ExpiresAt:    time.Now().Add(24 * time.Hour), // Approximate JWT expiration
-	}, nil
-}
-
-// RefreshSession attempts to refresh an expired session
-func (sm *SessionManager) RefreshSession(w http.ResponseWriter, r *http.Request) (*UserSession, error) {
-	// Get refresh token from cookie
-	refreshCookie, err := r.Cookie("refresh_token")
-	if err != nil || refreshCookie.Value == "" {
-		return nil, errors.New("no refresh token found")
-	}
-
-	// Get current auth token if available
-	var currentToken string
-	authCookie, authErr := r.Cookie("auth_token")
-	if authErr == nil && authCookie.Value != "" {
-		currentToken = authCookie.Value
-	}
-
-	// Call Supabase to refresh token
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	authResponse, err := sm.authService.Supabase.Auth.RefreshUser(ctx, currentToken, refreshCookie.Value)
-	if err != nil {
-		sm.logger.Printf("Token refresh failed: %v", err)
-		return nil, fmt.Errorf("failed to refresh token: %w", err)
-	}
-
-	// Extract new tokens
-	newAccessToken := authResponse.AccessToken
-	newRefreshToken := authResponse.RefreshToken
-
-	// Get user data with new token
-	userInfo, err := sm.authService.Supabase.Auth.User(ctx, newAccessToken)
-	if err != nil {
-		sm.logger.Printf("Error retrieving user data after refresh: %v", err)
-		return nil, fmt.Errorf("failed to get user data: %w", err)
-	}
-
-	// Extract tier from metadata
-	tier := extractTier(userInfo)
-
-	// Extract role
-	role := getUserRole(userInfo)
-
-	// Generate new CSRF token
-	csrfToken := sm.generateCSRFToken(userInfo.ID)
-
-	// Generate new BAN signature
-	userData := &UserData{
-		UserId: userInfo.ID,
-		Email:  userInfo.Email,
-		Tier:   tier,
-	}
-
-	baseURL := getBaseURL(r)
-	banSignature := sm.authService.sign(baseURL, tier, userData)
-
-	// Create new session
-	session := &UserSession{
-		AccessToken:  newAccessToken,
-		RefreshToken: newRefreshToken,
-		CSRFToken:    csrfToken,
-		BanSignature: banSignature,
-		UserID:       userInfo.ID,
-		Email:        userInfo.Email,
-		Tier:         tier,
-		Role:         role,
-		Metadata:     userInfo.UserMetadata,
-		ExpiresAt:    time.Now().Add(24 * time.Hour),
-	}
-
-	// Set new session cookies
-	sm.SetSession(w, r, session)
-
-	sm.logger.Printf("Session refreshed for user: %s (tier: %s)", session.Email, session.Tier)
-	return session, nil
-}
-
-// validateSupabaseToken validates a token with Supabase
-func (sm *SessionManager) validateSupabaseToken(ctx context.Context, token string) (*supabase.User, error) {
-	return sm.authService.Supabase.Auth.User(ctx, token)
-}
-
-// generateCSRFToken generates a CSRF token for a user
-func (sm *SessionManager) generateCSRFToken(userID string) string {
-	h := hmac.New(sha256.New, sm.csrfSecret)
-	h.Write([]byte(userID))
-	h.Write([]byte(time.Now().Format("2006-01-02")))
-	return base64.StdEncoding.EncodeToString(h.Sum(nil))
-}
-
-// ==============================================================================================
-// PermissionManager
-// ==============================================================================================
-
-// PermissionManager handles all permission checks
-type PermissionManager struct {
-	config      *AuthConfig
-	logger      *log.Logger
-	banACL      *BanACL
-	pathCache   map[string]bool // Cache for exempt path checks
-	accessCache map[string]bool // Cache for access check results
-	cacheMutex  sync.RWMutex    // Mutex for thread-safe cache access
-}
-
-// NewPermissionManager creates a new permission manager
-func NewPermissionManager(config *AuthConfig, logger *log.Logger, banACL *BanACL) *PermissionManager {
-	// Pre-compute common exempt paths
-	pathCache := make(map[string]bool)
-	for _, route := range config.ExemptRoutes {
-		pathCache[route] = true
-	}
-
-	return &PermissionManager{
-		config:      config,
-		logger:      logger,
-		banACL:      banACL,
-		pathCache:   pathCache,
-		accessCache: make(map[string]bool),
-	}
-}
-
-// IsExemptPath checks if a path is exempt from auth
-func (pm *PermissionManager) IsExemptPath(path string) bool {
-	// Check cache first
-	if exempt, found := pm.pathCache[path]; found {
-		return exempt
-	}
-
-	// Always exempt the root and common paths
-	if path == "/" || path == "/home" {
-		pm.pathCache[path] = true
-		return true
-	}
-
-	// Check exact routes
-	if pm.pathCache[path] {
-		return true
-	}
-
-	// Check prefixes
-	for _, prefix := range pm.config.ExemptPrefixes {
-		if strings.HasPrefix(path, prefix) {
-			pm.pathCache[path] = true
-			return true
-		}
-	}
-
-	// Check suffixes
-	for _, suffix := range pm.config.ExemptSuffixes {
-		if strings.HasSuffix(path, suffix) {
-			pm.pathCache[path] = true
-			return true
-		}
-	}
-
-	pm.pathCache[path] = false
-	return false
-}
-
-// HasPermission is the main entry point for permission checks
-func (pm *PermissionManager) HasPermission(session *UserSession, path string) bool {
-	// Check if path is exempt from authentication
-	if pm.IsExemptPath(path) {
-		return true
-	}
-
-	// Generate cache key
-	cacheKey := fmt.Sprintf("%s:%s:%s:%s", session.UserID, session.Role, session.Tier, path)
-
-	// Check cache first
-	pm.cacheMutex.RLock()
-	if hasAccess, found := pm.accessCache[cacheKey]; found {
-		pm.cacheMutex.RUnlock()
-		return hasAccess
-	}
-	pm.cacheMutex.RUnlock()
-
-	// Determine access
-	hasAccess := pm.hasAccess(session, path)
-
-	// Cache the result
-	pm.cacheMutex.Lock()
-	pm.accessCache[cacheKey] = hasAccess
-	pm.cacheMutex.Unlock()
-
-	return hasAccess
-}
-
-// hasAccess is the core permission check
-func (pm *PermissionManager) hasAccess(session *UserSession, path string) bool {
-	// Default paths accessible to all authenticated users
-	defaultPaths := map[string]bool{
-		"/account": true,
-		"/pricing": true,
-	}
-
-	if defaultPaths[path] {
-		return true
-	}
-
-	// Admin/root roles have access to everything
-	if session.Role == "admin" || session.Role == "root" {
-		return true
-	}
-
-	// Check role-based permissions
-	if session.Role != "" && pm.hasRoleAccess(session.Role, path) {
-		return true
-	}
-
-	// Check tier-based permissions
-	if session.Tier != "" && pm.hasTierAccess(session.Tier, path) {
-		return true
-	}
-
-	// Check BanACL for specific permissions
-	if pm.banACL != nil {
-		user, exists := pm.banACL.Users[session.Email]
-		if exists {
-			for section, permissions := range user.Permissions {
-				// Check if this is a nav section
-				if pm.isNavSection(section) {
-					// Check specific path permission
-					if permMap, ok := permissions.(map[string]interface{}); ok {
-						if _, ok := permMap[path]; ok {
-							return true
-						}
-					}
-
-					// If section matches path section, grant access
-					pathSection := determinePathSection(path, pm.getNavSections())
-					if pathSection == section {
-						return true
-					}
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-// hasRoleAccess checks role-based access to a path
-func (pm *PermissionManager) hasRoleAccess(role, path string) bool {
-	section := determinePathSection(path, pm.getNavSections())
-	if section == "" {
-		pm.logger.Printf("No section found for path: %s", path)
-		return false
-	}
-
-	roleConfig, exists := pm.config.ACL.Roles[role]
-	if !exists {
-		pm.logger.Printf("Role '%s' not found in ACL", role)
-		return false
-	}
-
-	// Check if role has access to this section
-	sectionConfig, exists := roleConfig[section]
-	if !exists {
-		pm.logger.Printf("Section '%s' not found for role '%s'", section, role)
-		return false
-	}
-
-	// Check for any feature-specific permissions
-	subPath := getSubPathPermission(path)
-	if subPath != "" {
-		// Check for explicit denials first
-		for key, value := range sectionConfig {
-			if strings.HasSuffix(key, "Disabled") &&
-				strings.Contains(key, subPath) &&
-				value != "NONE" {
-				return false
-			}
-		}
-
-		// Check for explicit permissions
-		permKey := section + subPath + "Enabled"
-		if value, exists := sectionConfig[permKey]; exists && value == "true" {
-			return true
-		}
-
-		// Check for specific permissions
-		if subPath == "buylist" {
-			if value, exists := sectionConfig["UploadBuylistEnabled"]; exists && value == "true" {
-				return true
-			}
-		} else if subPath == "changestore" {
-			if value, exists := sectionConfig["UploadChangeStoresEnabled"]; exists && value == "true" {
-				return true
-			}
-		} else if subPath == "optimizer" {
-			if value, exists := sectionConfig["UploadOptimizer"]; exists && value == "true" {
-				return true
-			}
-		} else if subPath == "download" || subPath == "csv" {
-			if value, exists := sectionConfig["SearchDownloadCSV"]; exists && value == "true" {
-				return true
-			}
-		}
-	}
-
-	// If there's section access and no specific denials, grant access
-	return true
-}
-
-// hasTierAccess checks tier-based access to a path
-func (pm *PermissionManager) hasTierAccess(tier, path string) bool {
-	section := determinePathSection(path, pm.getNavSections())
-	if section == "" {
-		pm.logger.Printf("No section found for path: %s", path)
-		return false
-	}
-
-	tierConfig, exists := pm.config.ACL.Tiers[tier]
-	if !exists {
-		pm.logger.Printf("Tier '%s' not found in ACL", tier)
-		return false
-	}
-
-	sectionConfig, exists := tierConfig[section]
-	if !exists {
-		pm.logger.Printf("Section '%s' not found for tier '%s'", section, tier)
-		return false
-	}
-
-	// Check for any feature-specific permissions
-	subPath := getSubPathPermission(path)
-	if subPath != "" {
-		// Check for explicit denials first
-		for key, value := range sectionConfig {
-			if strings.HasSuffix(key, "Disabled") &&
-				strings.Contains(key, subPath) &&
-				value != "NONE" {
-				return false
-			}
-		}
-
-		// Check for explicit permissions based on the ACL format
-		if subPath == "buylist" {
-			if value, exists := sectionConfig["UploadBuylistEnabled"]; exists && value == "true" {
-				return true
-			}
-		} else if subPath == "changestore" {
-			if value, exists := sectionConfig["UploadChangeStoresEnabled"]; exists && value == "true" {
-				return true
-			}
-		} else if subPath == "optimizer" {
-			if value, exists := sectionConfig["UploadOptimizer"]; exists && value == "true" {
-				return true
-			}
-		} else if subPath == "download" || subPath == "csv" {
-			if value, exists := sectionConfig["SearchDownloadCSV"]; exists && value == "true" {
-				return true
-			}
-		}
-	}
-
-	// If there's section access and no specific denials, grant access
-	return true
-}
-
-// isNavSection checks if a section name is in the navigation sections
-func (pm *PermissionManager) isNavSection(section string) bool {
-	navSections := pm.getNavSections()
-
-	for _, s := range navSections {
-		if s == section {
-			return true
-		}
-	}
-
-	return false
-}
-
-// getNavSections gets the list of navigation sections
-func (pm *PermissionManager) getNavSections() []string {
-	// Use configured nav sections if available
-	if len(pm.config.ACL.NavSections) > 0 {
-		return pm.config.ACL.NavSections
-	}
-
-	// Otherwise, infer from the ACL structure
-	sectionSet := make(map[string]bool)
-
-	// Extract from roles
-	for _, roleConfig := range pm.config.ACL.Roles {
-		for section := range roleConfig {
-			sectionSet[section] = true
-		}
-	}
-
-	// Extract from tiers
-	for _, tierConfig := range pm.config.ACL.Tiers {
-		for section := range tierConfig {
-			sectionSet[section] = true
-		}
-	}
-
-	// Convert map to slice
-	var sections []string
-	for section := range sectionSet {
-		sections = append(sections, section)
-	}
-
-	return sections
-}
-
-// ClearCache clears the permission caches
-func (pm *PermissionManager) ClearCache() {
-	pm.cacheMutex.Lock()
-	pm.pathCache = make(map[string]bool)
-	pm.accessCache = make(map[string]bool)
-	pm.cacheMutex.Unlock()
-}
-
-// ==============================================================================================
-// AssetLoader
-// ==============================================================================================
-
-// AssetLoader handles embedded asset loading
-type AssetLoader struct {
-	fs           embed.FS
-	rootDir      string
-	subFS        fs.FS
-	contentTypes map[string]string
-	logger       *log.Logger
-	pathHandlers map[string]func(http.ResponseWriter, *http.Request)
-}
-
-// NewAssetLoader creates a new asset loader
-func NewAssetLoader(embedFS embed.FS, rootDir string, logger *log.Logger) *AssetLoader {
-	// If rootDir is empty or ".", use the default path based on the go:embed directive
-	if rootDir == "" || rootDir == "." {
-		rootDir = "nextAuth/out"
-	}
-
-	// Create sub-filesystem once
-	logger.Printf("Creating sub-filesystem with path: %s", rootDir)
-	subFS, err := fs.Sub(embedFS, rootDir)
-	if err != nil {
-		logger.Printf("Failed to create sub-filesystem: %v", err)
-	}
-
-	loader := &AssetLoader{
-		fs:           embedFS,
-		rootDir:      rootDir,
-		subFS:        subFS,
-		contentTypes: contentTypeMap,
-		logger:       logger,
-		pathHandlers: make(map[string]func(http.ResponseWriter, *http.Request)),
-	}
-
-	// Register special page handlers
-	loader.RegisterPathHandler("confirmation", loader.serveConfirmationPage)
-	loader.RegisterPathHandler("reset-password-sent", loader.serveResetPasswordSentPage)
-	loader.RegisterPathHandler("success", loader.serveSuccessPage)
-
-	return loader
-}
-
-// RegisterPathHandler registers a custom handler for a specific path
-func (al *AssetLoader) RegisterPathHandler(path string, handler func(http.ResponseWriter, *http.Request)) {
-	al.pathHandlers[path] = handler
-}
-
-// ServeAsset serves an embedded asset
-func (al *AssetLoader) ServeAsset(w http.ResponseWriter, r *http.Request) {
-	// Handle trailing slashes by redirecting to the non-slash version
-	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/auth/" {
-		// Remove trailing slash and redirect
-		redirectPath := strings.TrimSuffix(r.URL.Path, "/")
-		if r.URL.RawQuery != "" {
-			redirectPath += "?" + r.URL.RawQuery
-		}
-		http.Redirect(w, r, redirectPath, http.StatusSeeOther)
-		al.logger.Printf("Redirecting %s to %s (trailing slash removal)", r.URL.Path, redirectPath)
-		return
-	}
-
-	// Extract path from request URL
-	var path string
-	if strings.HasPrefix(r.URL.Path, "/_next/") {
-		// Handle Next.js static assets
-		path = strings.TrimPrefix(r.URL.Path, "/")
-		//al.logger.Printf("Serving Next.js asset: %s", path)
-	} else if strings.HasPrefix(r.URL.Path, "/next/") {
-		path = strings.TrimPrefix(r.URL.Path, "/")
-		if filepath.Ext(path) == "" {
-			path += ".html"
-		}
-		//al.logger.Printf("Serving Next.js asset: %s", path)
-	} else {
-		// Handle auth/* routes
-		path = strings.TrimPrefix(r.URL.Path, "/auth/")
-
-		// Default to index.html for empty path
-		if path == "" || path == "/" {
-			path = "index.html"
-		}
-
-		// Trim trailing slashes before normalization to handle paths like "login/"
-		path = strings.TrimSuffix(path, "/")
-
-		// Normalize HTML page paths
-		if filepath.Ext(path) == "" {
-			htmlPaths := map[string]bool{
-				"login": true, "signup": true, "account": true,
-				"pricing": true, "reset-password": true,
-				"forgot-password": true, "confirmation": true,
-				"search": true,
-			}
-
-			if htmlPaths[path] {
-				path += ".html"
-			}
-		}
-	}
-
-	// Check for special page handlers
-	pathBase := strings.TrimSuffix(path, filepath.Ext(path))
-	if !strings.HasPrefix(r.URL.Path, "/_next/") && pathBase != "" {
-		if handler, ok := al.pathHandlers[pathBase]; ok {
-			handler(w, r)
-			return
-		}
-	}
-
-	// Set content type based on file extension
-	al.setContentType(w, path)
-
-	// Use the cached sub-filesystem instead of creating a new one
-	authFS := al.subFS
-
-	// Check if file exists
-	//al.logger.Printf("Checking if file exists: %s", path)
-	_, err := fs.Stat(authFS, path)
-	if err != nil {
-		// Fallback to index.html for HTML routes
-		if filepath.Ext(path) == ".html" {
-			al.logger.Printf("Trying index.html fallback")
-			_, err = fs.Stat(authFS, "index.html")
-			if err == nil {
-				path = "index.html"
-			} else {
-				al.logger.Printf("File not found: %s, error: %v", path, err)
-				http.NotFound(w, r)
-				return
-			}
-		} else {
-			al.logger.Printf("File not found: %s, error: %v", path, err)
-			http.NotFound(w, r)
-			return
-		}
-	}
-
-	// Open the file
-	file, err := authFS.Open(path)
-	if err != nil {
-		al.logger.Printf("Error opening file: %s, error: %v", path, err)
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		return
-	}
-	defer file.Close()
-
-	// Read file content
-	content, err := io.ReadAll(file)
-	if err != nil {
-		al.logger.Printf("Error reading file: %s, error: %v", path, err)
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Write content to response
-	w.Write(content)
-}
-
-// ServeIndexWithData serves index.html with injected data
-func (al *AssetLoader) ServeIndexWithData(w http.ResponseWriter, data map[string]interface{}) {
-	// Read the index file
-	indexPath := filepath.Join(al.rootDir, "index.html")
-	indexContent, err := al.fs.ReadFile(indexPath)
-	if err != nil {
-		al.logger.Printf("Failed to read index.html: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Convert data to JSON for injection
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		al.logger.Printf("Failed to marshal data: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Inject data script before closing head tag
-	htmlContent := string(indexContent)
-	if strings.Contains(htmlContent, "</head>") {
-		injectScript := fmt.Sprintf(`<script id="__INITIAL_DATA__" type="application/json">%s</script>
-	<script>
-	window.__INITIAL_DATA__ = JSON.parse(document.getElementById('__INITIAL_DATA__').textContent);
-	</script>
-	</head>`, jsonData)
-
-		htmlContent = strings.Replace(htmlContent, "</head>", injectScript, 1)
-	}
-
-	// Set content type and serve
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(htmlContent))
-}
-
-// RenderTemplate renders a template with data
-func (al *AssetLoader) RenderTemplate(w http.ResponseWriter, templateName string, data interface{}) error {
-	// Path to template
-	path := filepath.Join("templates", templateName)
-	al.logger.Printf("Rendering template: %s", path)
-
-	// Set content type
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-
-	// Read template file
-	content, err := fs.ReadFile(al.fs, filepath.Join(al.rootDir, path))
-	if err != nil {
-		al.logger.Printf("Error reading template file: %v", err)
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		return err
-	}
-
-	// Parse template
-	tmpl, err := template.New(templateName).Parse(string(content))
-	if err != nil {
-		al.logger.Printf("Error parsing template: %v", err)
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		return err
+// ValidateConfig validates the auth configuration
+func (c AuthConfig) Validate() error {
+	if c.SupabaseURL == "" {
+		return errors.New("SupabaseURL is required")
 	}
 
-	// Execute template
-	err = tmpl.Execute(w, data)
-	if err != nil {
-		al.logger.Printf("Error executing template: %v", err)
-		http.Error(w, "Server Error", http.StatusInternalServerError)
-		return err
+	if c.SupabaseAnonKey == "" {
+		return errors.New("SupabaseAnonKey is required")
 	}
 
 	return nil
-}
-
-// setContentType sets the content type based on file extension
-func (al *AssetLoader) setContentType(w http.ResponseWriter, path string) {
-	ext := filepath.Ext(path)
-
-	// Ensure that Next.js JS files are served with the correct MIME type
-	if strings.HasPrefix(path, "_next/") && ext == ".js" {
-		w.Header().Set("Content-Type", "application/javascript")
-		return
-	}
-
-	// Special case for certain Next.js files
-	if strings.Contains(path, "_buildManifest.js") ||
-		strings.Contains(path, "_ssgManifest.js") ||
-		strings.HasSuffix(path, ".js.map") {
-		w.Header().Set("Content-Type", "application/javascript")
-		return
-	}
-
-	// Use the content type map for other extensions
-	if contentType, ok := al.contentTypes[ext]; ok {
-		w.Header().Set("Content-Type", contentType)
-		return
-	}
-
-	// Fallback for common types not in the map
-	switch ext {
-	case ".js":
-		w.Header().Set("Content-Type", "application/javascript")
-	case ".css":
-		w.Header().Set("Content-Type", "text/css")
-	case ".json":
-		w.Header().Set("Content-Type", "application/json")
-	case ".png":
-		w.Header().Set("Content-Type", "image/png")
-	case ".jpg", ".jpeg":
-		w.Header().Set("Content-Type", "image/jpeg")
-	case ".svg":
-		w.Header().Set("Content-Type", "image/svg+xml")
-	case ".woff":
-		w.Header().Set("Content-Type", "font/woff")
-	case ".woff2":
-		w.Header().Set("Content-Type", "font/woff2")
-	case ".ttf":
-		w.Header().Set("Content-Type", "font/ttf")
-	case ".html", ".htm":
-		w.Header().Set("Content-Type", "text/html")
-	default:
-		// Default to octet-stream for unknown types
-		w.Header().Set("Content-Type", "application/octet-stream")
-	}
-}
-
-// serveConfirmationPage serves the email confirmation page
-func (al *AssetLoader) serveConfirmationPage(w http.ResponseWriter, r *http.Request) {
-	// Extract query parameters
-	email := r.URL.Query().Get("email")
-	message := r.URL.Query().Get("message")
-
-	if message == "" {
-		message = "Please check your email to verify your account."
-	}
-
-	// Create email message paragraph if email is present
-	var emailHTML string
-	if email != "" {
-		emailHTML = "<p>We've sent a verification email to <strong>" + email + "</strong></p>"
-	}
-
-	// Serve a simple static HTML confirmation page
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(`
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Confirm Your Email | MTGBAN</title>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<style>
-			.auth-container {
-				max-width: 450px;
-				margin: 2rem auto;
-				padding: 2rem;
-				background-color: #fff;
-				border-radius: 8px;
-				box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-			}
-			.auth-title {
-				font-size: 1.75rem;
-				margin-bottom: 1rem;
-				text-align: center;
-			}
-			.auth-message {
-				padding: 1rem;
-				margin-bottom: 1.5rem;
-				border-radius: 4px;
-			}
-			.success-message {
-				background-color: rgba(52, 211, 153, 0.2);
-				color: #065f46;
-				border-left: 4px solid #10b981;
-			}
-			.auth-links {
-				margin-top: 1.5rem;
-				text-align: center;
-			}
-			.auth-links a {
-				color: #2563eb;
-				text-decoration: none;
-			}
-			.auth-links a:hover {
-				text-decoration: underline;
-			}
-		</style>
-	</head>
-	<body>
-		<div class="auth-container">
-			<h1 class="auth-title">Check Your Email</h1>
-			<div class="auth-message success-message">
-				` + message + `
-			</div>
-			` + emailHTML + `
-			<div class="auth-links">
-				<p>Return to <a href="/auth/login">Login</a></p>
-			</div>
-		</div>
-	</body>
-	</html>
-	`))
-}
-
-// serveResetPasswordSentPage serves the reset password sent page
-func (al *AssetLoader) serveResetPasswordSentPage(w http.ResponseWriter, r *http.Request) {
-	email := r.URL.Query().Get("email")
-
-	var emailHTML string
-	if email != "" {
-		emailHTML = "<p>We've sent password reset instructions to <strong>" + email + "</strong></p>"
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(`
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Reset Password | MTGBAN</title>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<style>
-			.auth-container {
-				max-width: 450px;
-				margin: 2rem auto;
-				padding: 2rem;
-				background-color: #fff;
-				border-radius: 8px;
-				box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-			}
-			.auth-title {
-				font-size: 1.75rem;
-				margin-bottom: 1rem;
-				text-align: center;
-			}
-			.auth-message {
-				padding: 1rem;
-				margin-bottom: 1.5rem;
-				border-radius: 4px;
-			}
-			.info-message {
-				background-color: rgba(59, 130, 246, 0.2);
-				color: #1e40af;
-				border-left: 4px solid #3b82f6;
-			}
-			.auth-info {
-				margin: 1.5rem 0;
-			}
-			.auth-links {
-				margin-top: 1.5rem;
-				text-align: center;
-			}
-			.auth-links a {
-				color: #2563eb;
-				text-decoration: none;
-			}
-			.auth-links a:hover {
-				text-decoration: underline;
-			}
-		</style>
-	</head>
-	<body>
-		<div class="auth-container">
-			<h1 class="auth-title">Check Your Email</h1>
-			<div class="auth-message info-message">
-				If an account exists with that email, we've sent password reset instructions.
-			</div>
-			` + emailHTML + `
-			<div class="auth-info">
-				<p>Please check your inbox and follow the instructions in the email to reset your password.</p>
-				<p>If you don't see the email, check your spam folder.</p>
-			</div>
-			<div class="auth-links">
-				<p>Return to <a href="/auth/login">Login</a></p>
-			</div>
-		</div>
-	</body>
-	</html>
-	`))
-}
-
-// serveSuccessPage serves a success page with optional redirect
-func (al *AssetLoader) serveSuccessPage(w http.ResponseWriter, r *http.Request) {
-	redirectTo := r.URL.Query().Get("redirectTo")
-	message := r.URL.Query().Get("message")
-
-	if message == "" {
-		message = "Your action was completed successfully."
-	}
-
-	if redirectTo == "" {
-		redirectTo = "/auth/login"
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(`
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Success | MTGBAN</title>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<style>
-			.auth-container {
-				max-width: 450px;
-				margin: 2rem auto;
-				padding: 2rem;
-				background-color: #fff;
-				border-radius: 8px;
-				box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-			}
-			.auth-title {
-				font-size: 1.75rem;
-				margin-bottom: 1rem;
-				text-align: center;
-			}
-			.auth-message {
-				padding: 1rem;
-				margin-bottom: 1.5rem;
-				border-radius: 4px;
-			}
-			.success-message {
-				background-color: rgba(52, 211, 153, 0.2);
-				color: #065f46;
-				border-left: 4px solid #10b981;
-			}
-			.auth-subtitle {
-				text-align: center;
-				margin-bottom: 1rem;
-			}
-			.btn {
-				display: inline-block;
-				padding: 0.75rem 1.5rem;
-				border-radius: 0.375rem;
-				font-weight: 500;
-				text-align: center;
-				text-decoration: none;
-				cursor: pointer;
-				background-color: #2563eb;
-				color: white;
-				border: none;
-				width: 100%;
-				text-align: center;
-				margin-top: 1rem;
-			}
-			.auth-links {
-				margin-top: 1.5rem;
-				text-align: center;
-			}
-		</style>
-		<!-- Auto redirect after 3 seconds -->
-		<meta http-equiv="refresh" content="3;url=` + redirectTo + `">
-	</head>
-	<body>
-		<div class="auth-container">
-			<h1 class="auth-title">Success</h1>
-			<div class="auth-message success-message">
-				` + message + `
-			</div>
-			<p class="auth-subtitle">
-				Redirecting you automatically in 3 seconds...
-			</p>
-			<a href="` + redirectTo + `" class="btn">
-				Continue Now
-			</a>
-		</div>
-	</body>
-	</html>
-	`))
-}
-
-// ==============================================================================================
-// ResponseWriter
-// ==============================================================================================
-
-// ResponseWriter wraps http.ResponseWriter to capture the status code
-type responseWriter struct {
-	http.ResponseWriter
-	Status int
-}
-
-// NewResponseWriter creates a new response writer
-func NewResponseWriter(w http.ResponseWriter) *responseWriter {
-	return &responseWriter{w, http.StatusOK}
-}
-
-// WriteHeader overrides the original WriteHeader to capture the status code
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.Status = code
-	if rw.ResponseWriter != nil {
-		rw.ResponseWriter.WriteHeader(code)
-	}
-}
-
-// Write overrides the original Write to handle non-200 responses
-func (rw *responseWriter) Write(b []byte) (int, error) {
-	if rw.ResponseWriter == nil {
-		return len(b), nil
-	}
-	if rw.Status == http.StatusOK {
-		return rw.ResponseWriter.Write(b)
-	}
-	return len(b), nil
-}
-
-// responseWriter returns the underlying http.ResponseWriter
-func (rw *responseWriter) responseWriter(w http.ResponseWriter) http.ResponseWriter {
-	if rw.ResponseWriter == nil {
-		rw.ResponseWriter = w
-	}
-	return rw.ResponseWriter
-}
-
-// ==============================================================================================
-// ResponseHelper
-// ==============================================================================================
-
-// ResponseHelper provides API responses
-type ResponseHelper struct {
-	writer *responseWriter
-}
-
-// NewResponseHelper creates a new response helper
-func NewResponseHelper() *ResponseHelper {
-	return &ResponseHelper{
-		writer: NewResponseWriter(nil),
-	}
-}
-
-// SendSuccess sends a success response
-func (rh *ResponseHelper) SendSuccess(w http.ResponseWriter, msg string, data interface{}) {
-	rh.writer.responseWriter(w).WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(APIResponse{
-		Success: true,
-		Message: msg,
-		Data:    data,
-	})
-}
-
-// SendRedirect sends a success response with redirect
-func (rh *ResponseHelper) SendRedirect(w http.ResponseWriter, msg string, redirectTo string, data interface{}) {
-	rh.writer.responseWriter(w).WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(APIResponse{
-		Success:    true,
-		Message:    msg,
-		RedirectTo: redirectTo,
-		Data:       data,
-	})
-}
-
-// SendValidationError sends a validation error response
-func (rh *ResponseHelper) SendValidationError(w http.ResponseWriter, field, message string) {
-	w.WriteHeader(http.StatusBadRequest)
-	json.NewEncoder(w).Encode(APIResponse{
-		Success: false,
-		Error:   message,
-		Code:    "VALIDATION_ERROR",
-		Field:   field,
-	})
-}
-
-// ==============================================================================================
-// Middlewares
-// ==============================================================================================
-
-// MiddlewareChain manages middleware chains
-type MiddlewareChain struct {
-	service           *AuthService
-	chains            map[string][]Middleware
-	permissionManager *PermissionManager
-}
-
-func NewMiddlewareChain(service *AuthService, permManager *PermissionManager) *MiddlewareChain {
-	mc := &MiddlewareChain{
-		service:           service,
-		chains:            make(map[string][]Middleware),
-		permissionManager: permManager,
-	}
-
-	// Register middleware chains with ExemptPathCheck appropriately positioned
-	mc.RegisterChain("public",
-		mc.Recovery(),
-		mc.ExemptPathCheck(),
-		mc.RequestLogger(),
-		mc.RateLimiter(service.authConfig.PublicRateLimit))
-
-	mc.RegisterChain("base",
-		mc.Recovery(),
-		mc.ExemptPathCheck(),
-		mc.RequestLogger(),
-		mc.RateLimiter(service.authConfig.PublicRateLimit))
-
-	mc.RegisterChain("api",
-		mc.Recovery(),
-		mc.ExemptPathCheck(),
-		mc.RequestLogger(),
-		mc.RateLimiter(service.authConfig.APIRateLimit))
-
-	mc.RegisterChain("auth",
-		mc.Recovery(),
-		mc.ExemptPathCheck(),
-		mc.RequestLogger(),
-		mc.Authentication())
-
-	mc.RegisterChain("form",
-		mc.Recovery(),
-		mc.ExemptPathCheck(),
-		mc.RequestLogger(),
-		mc.MethodValidator("POST"),
-		mc.CSRFProtection(),
-		mc.RateLimiter(service.authConfig.LoginRateLimit))
-
-	mc.RegisterChain("protected",
-		mc.Recovery(),
-		mc.ExemptPathCheck(),
-		mc.RequestLogger(),
-		mc.Authentication(),
-		mc.CSRFProtection())
-
-	mc.RegisterChain("entry",
-		mc.Recovery(),
-		mc.ExemptPathCheck(),
-		mc.RequestLogger(),
-		mc.MethodValidator("POST"),
-		mc.RateLimiter(service.authConfig.LoginRateLimit))
-
-	return mc
-}
-
-// RegisterChain registers a named middleware chain
-func (mc *MiddlewareChain) RegisterChain(name string, middlewares ...Middleware) {
-	chain := mc.GetChain("base")
-	chain = append(chain, mc.ExemptPathCheck())
-	chain = append(chain, middlewares...)
-	mc.chains[name] = chain
-}
-
-// GetChain returns a named middleware chain
-func (mc *MiddlewareChain) GetChain(name string) []Middleware {
-	return mc.chains[name]
-}
-
-// Apply applies a middleware chain to a handler
-func (mc *MiddlewareChain) Apply(chainName string, handler http.Handler) http.Handler {
-	chain, ok := mc.chains[chainName]
-	if !ok {
-		mc.service.Logger.Printf("Warning: Middleware chain '%s' not found", chainName)
-		return handler
-	}
-
-	return mc.ApplyMiddlewares(handler, chain...)
-}
-
-// ApplyMiddlewares applies multiple middlewares to a handler
-func (mc *MiddlewareChain) ApplyMiddlewares(handler http.Handler, middlewares ...Middleware) http.Handler {
-	for i := len(middlewares) - 1; i >= 0; i-- {
-		handler = middlewares[i](handler)
-	}
-	return handler
-}
-
-// Recovery middleware recovers from panics
-func (mc *MiddlewareChain) Recovery() Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			defer func() {
-				if err := recover(); err != nil {
-					// Log stack trace
-					buf := make([]byte, 1<<16)
-					n := runtime.Stack(buf, false)
-					mc.service.Logger.Printf("PANIC: %v\n%s", err, buf[:n])
-
-					// Handle the error
-					mc.service.ErrorHandler.RespondWithError(w, r, mc.service.ErrorHandler.errors.ServerError, fmt.Errorf("%v", err))
-				}
-			}()
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// RequestLogger logs request information
-func (mc *MiddlewareChain) RequestLogger() Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
-
-			// Create response writer that captures status code
-			rw := &responseWriter{ResponseWriter: w, Status: http.StatusOK}
-
-			// Process request
-			next.ServeHTTP(rw, r)
-
-			// Log request completion
-			duration := time.Since(start)
-			clientIP := getClientIP(r)
-			mc.service.Logger.Printf("[%s] %s %s - %d %s - %v",
-				clientIP, r.Method, r.URL.Path, rw.Status,
-				http.StatusText(rw.Status), duration)
-		})
-	}
-}
-
-// handleAuthFailure handles authentication failures
-func (mc *MiddlewareChain) handleAuthFailure(w http.ResponseWriter, r *http.Request, err error) {
-	// Handle API requests
-	if isAPIRequest(r) {
-		mc.service.ErrorHandler.RespondWithError(w, r, mc.service.ErrorHandler.errors.MissingToken, err)
-	} else {
-		// Redirect to login for browser requests
-		redirectURL := "/auth/login"
-		if r.URL.Path != "/" {
-			redirectURL = fmt.Sprintf("/auth/login?return_to=%s",
-				url.QueryEscape(r.URL.Path))
-		}
-		http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-	}
-}
-
-// Authentication middleware ensures the request is authenticated
-func (mc *MiddlewareChain) Authentication() Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Get session from request
-			session, err := mc.service.SessionManager.GetSession(r)
-			if err != nil {
-				// Check if there's an auth_token cookie before trying refresh
-				authCookie, cookieErr := r.Cookie("auth_token")
-				if cookieErr == nil && authCookie.Value != "" {
-					// Only try to refresh if we have both auth_token and refresh_token
-					refreshCookie, refreshErr := r.Cookie("refresh_token")
-					if refreshErr == nil && refreshCookie.Value != "" {
-						// Log the refresh attempt with timestamps for debugging
-						mc.service.Logger.Printf("Attempting to refresh token for request to %s", r.URL.Path)
-
-						// Try session refresh
-						refreshedSession, refreshErr := mc.service.SessionManager.RefreshSession(w, r)
-						if refreshErr == nil {
-							// Store user info in context and continue
-							ctx := context.WithValue(r.Context(), SessionKey("session"), refreshedSession)
-							next.ServeHTTP(w, r.WithContext(ctx))
-							return
-						}
-
-						// Log refresh failure for debugging
-						mc.service.Logger.Printf("Token refresh failed: %v", refreshErr)
-					} else {
-						mc.service.Logger.Printf("Auth token exists but no refresh token found")
-					}
-				}
-
-				// Handle authentication failure
-				mc.handleAuthFailure(w, r, err)
-				return
-			}
-
-			// Store session in context
-			ctx := context.WithValue(r.Context(), SessionKey("session"), session)
-
-			// Check permissions
-			if !mc.permissionManager.HasPermission(session, r.URL.Path) {
-				mc.service.ErrorHandler.RespondWithError(w, r, mc.service.ErrorHandler.errors.Forbidden, nil)
-				return
-			}
-
-			// Continue with the authenticated request
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
-// CSRFProtection middleware provides CSRF protection
-func (mc *MiddlewareChain) CSRFProtection() Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip for GET, HEAD, OPTIONS, TRACE requests
-			if r.Method == "GET" || r.Method == "HEAD" ||
-				r.Method == "OPTIONS" || r.Method == "TRACE" {
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			// Get session from context (added by Authentication middleware)
-			session, ok := r.Context().Value("session").(*UserSession)
-			if !ok {
-				mc.service.ErrorHandler.RespondWithError(w, r, mc.service.ErrorHandler.errors.MissingToken, nil)
-				return
-			}
-
-			// Extract CSRF token
-			csrfToken := r.Header.Get("X-CSRF-Token")
-			if csrfToken == "" {
-				csrfToken = r.FormValue("csrf_token")
-				if csrfToken == "" {
-					csrfCookie, err := r.Cookie("csrf_token")
-					if err == nil {
-						csrfToken = csrfCookie.Value
-					}
-				}
-			}
-
-			// Validate CSRF token
-			if !mc.service.validateCSRFToken(csrfToken, session.UserID) {
-				mc.service.Logger.Printf("CSRF validation failed for user %s", session.UserID)
-				mc.service.ErrorHandler.RespondWithError(w, r, mc.service.ErrorHandler.errors.CSRFValidation, nil)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// RateLimiter provides rate limiting for requests
-func (mc *MiddlewareChain) RateLimiter(requestsPerMinute int) Middleware {
-	// Create limiter store with concurrent access
-	limiters := &sync.Map{}
-
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Get client IP
-			ip := getClientIP(r)
-
-			// Get or create limiter for this IP
-			limiterI, _ := limiters.LoadOrStore(ip,
-				rate.NewLimiter(rate.Limit(float64(requestsPerMinute)/60.0), requestsPerMinute))
-			limiter := limiterI.(*rate.Limiter)
-
-			// Check rate limit
-			if !limiter.Allow() {
-				mc.service.Logger.Printf("Rate limit exceeded for IP: %s", ip)
-				mc.service.ErrorHandler.RespondWithError(w, r, mc.service.ErrorHandler.errors.RateLimitExceeded, nil)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// MethodValidator validates HTTP methods
-func (mc *MiddlewareChain) MethodValidator(method string) Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != method {
-				http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// ExemptPathCheck middleware checks if a path is exempt from authentication requirements
-func (mc *MiddlewareChain) ExemptPathCheck() Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Check if the path is exempt from authentication
-			if mc.permissionManager.IsExemptPath(r.URL.Path) {
-				// Log exemption if in debug mode
-				if mc.service.authConfig.DebugMode {
-					mc.service.Logger.Printf("Exempt path accessed: %s", r.URL.Path)
-				}
-
-				// For exempt paths, skip authorization checks
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			// For non-exempt paths, continue with normal middleware chain
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
-// ==============================================================================================
-// AuthService
-// ==============================================================================================
-
-// AuthService handles all authentication related functionality
-type AuthService struct {
-	authConfig     *AuthConfig
-	Logger         *log.Logger
-	Supabase       *supabase.Client
-	CSRFSecret     []byte
-	BanACL         *BanACL
-	StandardErrors StandardErrors
-
-	SessionManager    *SessionManager
-	ErrorHandler      *ErrorHandler
-	AssetLoader       *AssetLoader
-	MiddlewareChain   *MiddlewareChain
-	PermissionManager *PermissionManager
-	ResponseHelper    *ResponseHelper
-	Writer            *responseWriter
-
-	userCache      map[string]*UserData
-	userCacheMutex sync.RWMutex
-	tierCache      map[string]map[string]bool
-	tierCacheMutex sync.RWMutex
-
-	refreshMutex sync.Mutex
 }
 
 // NewAuthService creates a new authentication service
@@ -2156,7 +336,6 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
-
 	logger := log.New(os.Stdout, config.LogPrefix, log.LstdFlags)
 
 	supabaseClient := supabase.CreateClient(config.SupabaseURL, config.SupabaseAnonKey)
@@ -2164,67 +343,29 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 		return nil, errors.New("failed to create Supabase client")
 	}
 
-	// initialize CSRF secret
-	var csrfSecret []byte
-	if config.CSRFSecret != "" {
-		var err error
-		csrfSecret, err = base64.StdEncoding.DecodeString(config.CSRFSecret)
-		if err != nil {
-			// If CSRF secret is not valid base64, generate a new one
-			logger.Printf("Warning: Invalid CSRF secret - generating a new random one")
-			csrfSecret = make([]byte, 32)
-			if _, err := rand.Read(csrfSecret); err != nil {
-				return nil, fmt.Errorf("failed to generate CSRF secret: %w", err)
-			}
-			// Encode and log the new secret so it can be saved to the config if desired
-			newEncodedSecret := base64.StdEncoding.EncodeToString(csrfSecret)
-			logger.Printf("New CSRF secret generated. Add this to your config file: %s", newEncodedSecret)
-		}
-	} else {
-		csrfSecret = make([]byte, 32)
-		if _, err := rand.Read(csrfSecret); err != nil {
-			return nil, fmt.Errorf("failed to generate CSRF secret: %w", err)
-		}
+	// Generate CSRF secret
+	csrfSecret := make([]byte, 32)
+	if _, err := rand.Read(csrfSecret); err != nil {
+		return nil, fmt.Errorf("failed to generate CSRF secret: %w", err)
 	}
 
 	// Create the service
 	service := &AuthService{
-		authConfig:     &config,
-		Logger:         logger,
-		Supabase:       supabaseClient,
-		CSRFSecret:     csrfSecret,
-		StandardErrors: NewStandardErrors(),
-		userCache:      make(map[string]*UserData),
-		tierCache:      make(map[string]map[string]bool),
-		refreshMutex:   sync.Mutex{},
-		BanACL: &BanACL{
-			Users: make(map[string]*BanUser),
-		},
+		Logger:          logger,
+		Supabase:        supabaseClient,
+		SupabaseURL:     config.SupabaseURL,
+		SupabaseKey:     config.SupabaseAnonKey,
+		SupabaseSecret:  config.SupabaseSecret,
+		DebugMode:       config.DebugMode,
+		BaseAuthURL:     config.SupabaseURL + "/auth/v1",
+		CSRFSecret:      csrfSecret,
+		AuthConfig:      config,
+		BanACL:          nil,        // load ACL after initialization
+		IPLimiters:      sync.Map{}, // Initialize the map
+		LoginLimiter:    rate.NewLimiter(rate.Every(1*time.Second), 5),
+		SignupLimiter:   rate.NewLimiter(rate.Every(5*time.Second), 3),
+		ResetPwdLimiter: rate.NewLimiter(rate.Every(30*time.Second), 3),
 	}
-
-	// Initialize error handler
-	service.ErrorHandler = NewErrorHandler(logger, config.DebugMode)
-
-	// Initialize asset loader
-	service.AssetLoader = NewAssetLoader(authAssets, config.AssetsPath, logger)
-
-	// Set the renderer in error handler
-	service.ErrorHandler.SetRenderer(service.AssetLoader)
-
-	// Initialize permission manager
-	service.PermissionManager = NewPermissionManager(service.authConfig, logger, service.BanACL)
-
-	// Initialize session manager
-	service.SessionManager = NewSessionManager(config.Domain, config.SecureCookies, csrfSecret, logger)
-
-	// Initialize middleware chain manager
-	service.MiddlewareChain = NewMiddlewareChain(service, service.PermissionManager)
-
-	// Initialize response helper
-	service.ResponseHelper = NewResponseHelper()
-
-	// Initialize response writer
-	service.Writer = NewResponseWriter(http.ResponseWriter(nil))
 
 	return service, nil
 }
@@ -2232,294 +373,17 @@ func NewAuthService(config AuthConfig) (*AuthService, error) {
 // Initialize sets up the auth service and registers routes
 func (a *AuthService) Initialize() error {
 	a.Logger.Printf("Initializing authentication service")
+	a.Logger.Printf("Supabase URL: %s", a.SupabaseURL)
 
-	if err := a.GetBanACL(a.BanACL); err != nil {
-		a.Logger.Printf("Warning: Failed to load BanACL: %v", err)
-	}
-	// Register auth routes
-	a.RegisterAuthRoutes(http.DefaultServeMux)
+	a.Logger.Printf("Listing embedded auth assets structure:")
+	printEmbeddedFS(authAssets, ".", "")
 
-	// set up Next.js routes
-	a.MiddlewareChain.RegisterNextJSRoutes(http.DefaultServeMux, "localhost:"+a.authConfig.Port)
+	a.registerRoutes()
 
 	a.Logger.Printf("Authentication service initialized successfully")
 	return nil
 }
 
-// GetSessionManager returns the session manager instance
-func (a *AuthService) GetSessionManager() *SessionManager {
-	return a.SessionManager
-}
-
-// GetErrorHandler returns the error handler instance
-func (a *AuthService) GetErrorHandler() *ErrorHandler {
-	return a.ErrorHandler
-}
-
-// GetPermissionManager returns the permission manager instance
-func (a *AuthService) GetPermissionManager() *PermissionManager {
-	return a.PermissionManager
-}
-
-// GetAssetLoader returns the asset loader instance
-func (a *AuthService) GetAssetLoader() *AssetLoader {
-	return a.AssetLoader
-}
-
-// GetMiddlewareChain returns the middleware chain instance
-func (a *AuthService) GetMiddlewareChain() *MiddlewareChain {
-	return a.MiddlewareChain
-}
-
-// GetResponseHelper returns the response helper instance
-func (a *AuthService) GetResponseHelper() *ResponseHelper {
-	return a.ResponseHelper
-}
-
-// GetWriter returns the response writer instance
-func (a *AuthService) GetWriter() *responseWriter {
-	return a.Writer
-}
-
-// RegisterAuthRoutes registers all authentication routes
-func (a *AuthService) RegisterAuthRoutes(mux *http.ServeMux) {
-	a.Logger.Printf("Registering authentication routes")
-
-	// Next.js static assets handler - this must be registered first
-	mux.Handle("/_next/", http.HandlerFunc(a.AssetLoader.ServeAsset))
-	a.Logger.Printf("Registered Next.js assets route: /_next/")
-
-	mux.Handle("/auth/", a.MiddlewareChain.Apply("public",
-		http.HandlerFunc(a.AssetLoader.ServeAsset)))
-
-	a.Logger.Printf("Registered authentication routes successfully")
-
-	// Register Next.js API routes
-	apiRoutes := []AuthRoute{
-		{Path: "/next-api/auth/login", Method: "POST", Handler: a.handleLoginAPI, Middleware: "entry"},
-		{Path: "/next-api/auth/signup", Method: "POST", Handler: a.handleSignupAPI, Middleware: "entry"},
-		{Path: "/next-api/auth/logout", Method: "POST", Handler: a.handleLogoutAPI, Middleware: "entry"},
-		{Path: "/next-api/auth/me", Method: "GET", Handler: a.handleGetUserAPI, Middleware: "api"},
-		{Path: "/next-api/auth/refresh-token", Method: "POST", Handler: a.handleRefreshTokenAPI, Middleware: "api"},
-		{Path: "/next-api/auth/forgot-password", Method: "POST", Handler: a.handleForgotPasswordAPI, Middleware: "form"},
-		{Path: "/next-api/auth/reset-password", Method: "POST", Handler: a.handleResetPasswordAPI, Middleware: "form"},
-		{Path: "/next-api/auth/account", Method: "GET", Handler: a.handleAccountAPI, Middleware: "api"},
-	}
-
-	for _, route := range apiRoutes {
-		mux.Handle(route.Path, a.MiddlewareChain.Apply(route.Middleware,
-			http.HandlerFunc(route.Handler)))
-		a.Logger.Printf("Registered API route: %s %s", route.Method, route.Path)
-	}
-
-	goRoutes := []AuthRoute{
-		{Path: "/api/nav-data", Method: "GET", Handler: a.handleNavDataAPI, Middleware: "api"},
-	}
-
-	for _, route := range goRoutes {
-		mux.Handle(route.Path, a.MiddlewareChain.Apply(route.Middleware,
-			http.HandlerFunc(route.Handler)))
-		a.Logger.Printf("Registered Go route: %s %s", route.Method, route.Path)
-	}
-
-	// Form submission routes
-	formRoutes := []AuthRoute{
-		{Path: "/auth/login-submit", Method: "POST", Handler: a.handleLoginFormSubmit, Middleware: "form"},
-		{Path: "/auth/signup-submit", Method: "POST", Handler: a.handleSignupFormSubmit, Middleware: "form"},
-		{Path: "/auth/forgot-password-submit", Method: "POST", Handler: a.handleForgotPasswordFormSubmit, Middleware: "form"},
-		{Path: "/auth/reset-password-submit", Method: "POST", Handler: a.handleResetPasswordFormSubmit, Middleware: "form"},
-		{Path: "/auth/logout", Method: "GET", Handler: a.handleLogoutForm, Middleware: "base"},
-	}
-
-	for _, route := range formRoutes {
-		mux.Handle(route.Path, a.MiddlewareChain.Apply(route.Middleware,
-			http.HandlerFunc(route.Handler)))
-		a.Logger.Printf("Registered form route: %s %s", route.Method, route.Path)
-	}
-}
-
-// RegisterNextJSRoutes registers routes that should be served by Next.js
-func (mc *MiddlewareChain) RegisterNextJSRoutes(router *http.ServeMux, nextJSServerURL string) {
-	nextJSHandler := httputil.NewSingleHostReverseProxy(&url.URL{
-		Scheme: "http",
-		Host:   nextJSServerURL,
-	})
-
-	publicChain := mc.GetChain("public")
-
-	// Define routes to be handled by Next.js
-	nextJSRoutes := []string{
-		"/_next/*",
-		"/public/*",
-		"/api/client/*",
-		"/next/*",
-	}
-
-	mc.service.Logger.Printf("Registering Next.js routes with server URL: %s", nextJSServerURL)
-
-	for _, route := range nextJSRoutes {
-		handler := mc.ApplyMiddlewares(nextJSHandler, publicChain...)
-		router.Handle(route, handler)
-		mc.service.Logger.Printf("Registered Next.js route: %s", route)
-	}
-}
-
-// RegisterAdditionalNextJSRoute registers a single additional Next.js route with specific middleware
-func (mc *MiddlewareChain) RegisterAdditionalNextJSRoute(router *http.ServeMux, path string, nextJSServerURL string, middlewareChain string) {
-	// Check if the path is already registered in the auth routes
-	if path == "/next/search" || path == "/next/pricing" || path == "/next/account" {
-		mc.service.Logger.Printf("Skipping registration of %s as it's already registered", path)
-		return
-	}
-
-	// Create handler for this specific route
-	nextJSHandler := httputil.NewSingleHostReverseProxy(&url.URL{
-		Scheme: "http",
-		Host:   nextJSServerURL,
-	})
-
-	// Apply specified middleware chain
-	handler := mc.Apply(middlewareChain, nextJSHandler)
-
-	// Register the route
-	router.Handle(path, handler)
-	mc.service.Logger.Printf("Registered additional Next.js route: %s with middleware: %s", path, middlewareChain)
-}
-
-func (a *AuthService) NextJSHandler(nextFileURL string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proxy := httputil.NewSingleHostReverseProxy(&url.URL{
-			Scheme: "http",
-			Host:   nextFileURL,
-		})
-
-		proxy.ServeHTTP(w, r)
-	})
-}
-
-// handleAuthPage creates a handler for auth pages
-func (a *AuthService) handleAuthPage(pageName string) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		a.Logger.Printf("Auth page request: %s", pageName)
-		a.AssetLoader.setContentType(w, pageName)
-		a.AssetLoader.ServeAsset(w, r)
-	}
-}
-
-// handleAuthPageWithSession creates a handler for auth pages with session
-func (a *AuthService) handleAuthPageWithSession(pageName string) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// get session from context (should be set by middleware)
-		session, ok := r.Context().Value("session").(*UserSession)
-		if !ok {
-			// this shouldn't happen since Authentication MW would redirect
-			http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
-			return
-		}
-
-		// get additional page data
-		pageData := map[string]interface{}{
-			"user": map[string]interface{}{
-				"id":       session.UserID,
-				"email":    session.Email,
-				"tier":     session.Tier,
-				"metadata": session.Metadata,
-			},
-			"csrf_token": session.CSRFToken,
-		}
-
-		// Add specific page data based on page name
-		switch pageName {
-		case "account.html":
-			userDetails, _ := a.getUserDetails(session.UserID)
-			subscription, _ := a.getUserSubscription(session.UserID)
-			pageData["userDetails"] = userDetails
-			pageData["subscription"] = subscription
-
-		case "pricing.html":
-			userDetails, _ := a.getUserDetails(session.UserID)
-			subscription, _ := a.getUserSubscription(session.UserID)
-			productsWithPrices, _ := a.getProductsWithPrices()
-			pageData["userDetails"] = userDetails
-			pageData["subscription"] = subscription
-			pageData["products"] = productsWithPrices
-		}
-
-		// serve page with injected data
-		a.AssetLoader.ServeIndexWithData(w, pageData)
-	}
-}
-
-// authenticateUser handles the core authentication logic
-func (a *AuthService) authenticateUser(email, password string, rememberMe bool) (*UserSession, error) {
-	// Authenticate with Supabase
-	ctx := context.Background()
-	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
-		Email:    email,
-		Password: password,
-	})
-
-	if err != nil {
-		a.Logger.Printf("Authentication failed for email %s: %v", maskEmail(email), err)
-		return nil, err
-	}
-
-	// Get user info
-	userInfo, err := a.Supabase.Auth.User(ctx, authResponse.AccessToken)
-	if err != nil {
-		a.Logger.Printf("Error retrieving user data after authentication: %v", err)
-		return nil, fmt.Errorf("error retrieving user data: %w", err)
-	}
-
-	// Extract tier from metadata
-	tier := extractTier(userInfo)
-
-	// Extract role
-	role := getUserRole(userInfo)
-
-	// Generate CSRF token
-	csrfToken := a.SessionManager.generateCSRFToken(userInfo.ID)
-
-	// Generate BAN signature
-	userData := &UserData{
-		UserId: userInfo.ID,
-		Email:  userInfo.Email,
-		Tier:   tier,
-	}
-
-	// Calculate expiry duration
-	expiryDuration := 24 * time.Hour // Default expiry
-	if rememberMe {
-		expiryDuration = 30 * 24 * time.Hour // 30 days if remember me is checked
-	}
-
-	// Create and return session
-	session := &UserSession{
-		AccessToken:  authResponse.AccessToken,
-		RefreshToken: authResponse.RefreshToken,
-		CSRFToken:    csrfToken,
-		BanSignature: a.sign("", tier, userData), // Base URL will be added when cookies are set
-		UserID:       userInfo.ID,
-		Email:        userInfo.Email,
-		Tier:         tier,
-		Role:         role,
-		Metadata:     userInfo.UserMetadata,
-		ExpiresAt:    time.Now().Add(expiryDuration),
-	}
-
-	a.Logger.Printf("Authentication successful for user: %s (tier: %s)", maskEmail(email), tier)
-	return session, nil
-}
-
-func (a *AuthService) GetSignature(r *http.Request) string {
-	session, ok := r.Context().Value("session").(*UserSession)
-	if !ok || session == nil {
-		return ""
-	}
-	return session.BanSignature
-}
-
-// GetBanACL retrieves the ban access control list from Supabase
 func (a *AuthService) GetBanACL(result *BanACL) error {
 	var banUsers []struct {
 		UserId      string                 `json:"user_id"`
@@ -2549,177 +413,2141 @@ func (a *AuthService) GetBanACL(result *BanACL) error {
 	return nil
 }
 
-// getUserDetails retrieves user details from the database
-func (a *AuthService) getUserDetails(userID string) (map[string]interface{}, error) {
-	var userDetails map[string]interface{}
-
-	err := a.Supabase.DB.From("users").
-		Select("*").
-		Eq("id", userID).
-		Execute(&userDetails)
-
-	if err != nil {
-		a.Logger.Printf("Failed to get user details for %s: %v", userID, err)
-		return nil, fmt.Errorf("failed to retrieve user details: %w", err)
+func (a *AuthService) getAccessByEmail(email string) (map[string]interface{}, error) {
+	if a.BanACL == nil {
+		return nil, errors.New("BanACL is not initialized")
 	}
 
-	return userDetails, nil
+	user, exists := a.BanACL.Users[email]
+	if !exists {
+		return nil, errors.New("user not found")
+	}
+
+	return user.Permissions, nil
 }
 
-// getUserSubscription retrieves subscription information for a user
-func (a *AuthService) getUserSubscription(userID string) (map[string]interface{}, error) {
-	var subscriptions []map[string]interface{}
+// registerRoutes registers authentication routes
+func (a *AuthService) registerRoutes() {
+	if DevMode {
+		a.Logger.Printf("Registering authentication routes")
+	}
+	// Next.js static assets handler - this must be registered first
+	http.HandleFunc("/_next/", a.serveNextJsFile)
 
-	err := a.Supabase.DB.From("subscriptions").
-		Select("*, prices(*, products(*))").
-		Eq("user_id", userID).
-		In("status", []string{"trialing", "active"}).
-		Execute(&subscriptions)
+	// Create middleware chains
+	chains := a.createMiddlewareChains()
 
-	if err != nil {
-		a.Logger.Printf("Failed to get subscription info for %s: %v", userID, err)
-		return nil, fmt.Errorf("failed to retrieve subscription: %w", err)
+	// Define routes with their middlewares
+	routes := []AuthRoute{
+		// Base routes
+		{
+			Path:        "/auth/login",
+			Method:      "GET",
+			Handler:     a.handleAuthLogin,
+			Middlewares: chains["base"],
+			Description: "Login page",
+		},
+		{
+			Path:        "/auth/signup",
+			Method:      "GET",
+			Handler:     a.handleAuthSignup,
+			Middlewares: chains["base"],
+			Description: "Signup page",
+		},
+		// API Routes
+		{
+			Path:        "/next-api/auth/login",
+			Method:      "POST",
+			Handler:     a.handleAuthLogin,
+			Middlewares: chains["apiAuth"],
+			Description: "API login endpoint",
+		},
+		{
+			Path:        "/next-api/auth/signup",
+			Method:      "POST",
+			Handler:     a.handleAuthSignup,
+			Middlewares: chains["apiAuth"],
+			Description: "API signup endpoint",
+		},
+		{
+			Path:        "/next-api/auth/logout",
+			Method:      "POST",
+			Handler:     a.handleAuthLogout,
+			Middlewares: chains["api"],
+			Description: "API logout endpoint",
+		},
+		{
+			Path:        "/next-api/auth/me",
+			Method:      "GET",
+			Handler:     a.handleAuthGetUser,
+			Middlewares: chains["api"],
+			Description: "API get current user endpoint",
+		},
+		{
+			Path:        "/next-api/auth/refresh-token",
+			Method:      "POST",
+			Handler:     a.handleAuthRefreshToken,
+			Middlewares: chains["api"],
+			Description: "API refresh token endpoint",
+		},
+		{
+			Path:        "/next-api/auth/forgot-password",
+			Method:      "POST",
+			Handler:     a.handleAuthForgotPassword,
+			Middlewares: chains["apiAuth"],
+			Description: "API forgot password endpoint",
+		},
+		{
+			Path:        "/next-api/auth/reset-password",
+			Method:      "POST",
+			Handler:     a.handleAuthResetPassword,
+			Middlewares: chains["apiAuth"],
+			Description: "API reset password endpoint",
+		},
+
+		// Form submission routes
+		{
+			Path:        "/auth/login-submit",
+			Method:      "POST",
+			Handler:     a.handleLoginFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Login form submission",
+		},
+		{
+			Path:        "/auth/signup-submit",
+			Method:      "POST",
+			Handler:     a.handleSignupFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Signup form submission",
+		},
+		{
+			Path:        "/auth/forgot-password-submit",
+			Method:      "POST",
+			Handler:     a.handleForgotPasswordFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Forgot password form submission",
+		},
+		{
+			Path:        "/auth/reset-password-submit",
+			Method:      "POST",
+			Handler:     a.handleResetPasswordFormSubmit,
+			Middlewares: chains["form"],
+			Description: "Reset password form submission",
+		},
+		{
+			Path:        "/auth/logout",
+			Method:      "GET",
+			Handler:     a.handleLogoutForm,
+			Middlewares: chains["base"],
+			Description: "Logout form submission",
+		},
+
+		// page routes
+		{
+			Path:        "/auth/v2/search",
+			Method:      "GET",
+			Handler:     Search,
+			Middlewares: chains["base"],
+			Description: "Search page",
+		},
+		{
+			Path:        "/auth/v2/pricing",
+			Method:      "GET",
+			Handler:     a.serveNextJsFile,
+			Middlewares: chains["base"],
+			Description: "Pricing page",
+		},
+		{
+			Path:        "/auth/v2/account",
+			Method:      "GET",
+			Handler:     a.serveNextJsFile,
+			Middlewares: chains["base"],
+			Description: "Account page",
+		},
 	}
 
-	// Return the first active subscription if any exists
-	if len(subscriptions) > 0 {
-		return subscriptions[0], nil
-	}
+	// Register routes
+	for _, route := range routes {
+		handler := route.Handler
 
-	return nil, nil
-}
+		// Apply middlewares
+		handler = route.Middlewares.Then(handler)
 
-// getProductsWithPrices retrieves products with pricing information
-func (a *AuthService) getProductsWithPrices() ([]map[string]interface{}, error) {
-	var products []map[string]interface{}
+		// Register with method checking
+		http.HandleFunc(route.Path, func(w http.ResponseWriter, r *http.Request) {
+			if route.Method != "" && r.Method != route.Method {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			handler(w, r)
+		})
 
-	err := a.Supabase.DB.From("products").
-		Select("*, prices(*)").
-		Eq("active", "true").
-		Execute(&products)
-
-	if err != nil {
-		a.Logger.Printf("Failed to get products: %v", err)
-		return nil, fmt.Errorf("failed to retrieve products: %w", err)
-	}
-
-	return products, nil
-}
-
-// GetUserData gets user data
-func (a *AuthService) GetUserData(userID string) (*UserData, error) {
-	// Check cache first
-	a.userCacheMutex.RLock()
-	cachedData, found := a.userCache[userID]
-	a.userCacheMutex.RUnlock()
-
-	if found {
-		return cachedData, nil
-	}
-
-	// Get from database
-	var userData UserData
-
-	userInfo, err := a.getUserDetails(userID)
-	if err != nil {
-		return nil, err
-	}
-
-	userData.UserId = userID
-	userData.Email = userInfo["email"].(string)
-
-	if tierVal, ok := userInfo["tier"].(string); ok {
-		userData.Tier = tierVal
-	} else {
-		userData.Tier = "free"
-	}
-
-	// Cache the result
-	a.userCacheMutex.Lock()
-	a.userCache[userID] = &userData
-	a.userCacheMutex.Unlock()
-
-	return &userData, nil
-}
-
-// ClearUserCache clears the user data cache for a specific user
-func (a *AuthService) ClearUserCache(userID string) {
-	a.userCacheMutex.Lock()
-	delete(a.userCache, userID)
-	a.userCacheMutex.Unlock()
-}
-
-// ClearAllCaches clears all caches
-func (a *AuthService) ClearAllCaches() {
-	a.userCacheMutex.Lock()
-	a.userCache = make(map[string]*UserData)
-	a.userCacheMutex.Unlock()
-
-	a.tierCacheMutex.Lock()
-	a.tierCache = make(map[string]map[string]bool)
-	a.tierCacheMutex.Unlock()
-}
-
-// sign signs data for permission granting
-func (a *AuthService) sign(baseURL, tierTitle string, userData *UserData) string {
-	v := url.Values{}
-
-	// Add user data
-	if userData != nil {
-		v.Set("UserEmail", userData.Email)
-		v.Set("UserTier", tierTitle)
-
-		// Add permissions based on tier
-		a.addTierPermissions(v, tierTitle)
-
-		// Add BanACL permissions if available
-		if a.BanACL != nil {
-			a.addBanACLPermissions(v, userData.Email)
+		if DevMode {
+			a.Logger.Printf("Registered route: %s %s", route.Method, route.Path)
 		}
 	}
 
-	// Set expiration
-	expires := time.Now().Add(a.authConfig.SignatureTTL)
-	expiresUnix := fmt.Sprintf("%d", expires.Unix())
+	// Set up path normalizer for /auth/auth/ redirects
+	pathNormalizerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/auth/auth/") {
+			newPath := "/auth/" + strings.TrimPrefix(path, "/auth/auth/")
+			query := r.URL.RawQuery
+			if query != "" {
+				newPath += "?" + query
+			}
+			a.Logger.Printf("Redirecting from duplicate auth path: %s → %s", path, newPath)
+			http.Redirect(w, r, newPath, http.StatusMovedPermanently)
+			return
+		}
 
-	// Create signature data
-	data := fmt.Sprintf("GET%s%s%s", expiresUnix, baseURL, v.Encode())
+		// Continue to next handler
+		http.NotFound(w, r)
+	})
 
-	// Get secret key
-	key := os.Getenv("BAN_SECRET")
-	if key == "" {
-		key = a.authConfig.SupabaseSecret
-	}
+	// Handle path normalization before serving static files
+	http.Handle("/auth/auth/", pathNormalizerHandler)
 
-	// Generate signature
-	h := hmac.New(sha256.New, []byte(key))
-	h.Write([]byte(data))
-	sig := base64.StdEncoding.EncodeToString(h.Sum(nil))
+	http.HandleFunc("/auth/", a.handleAuthAsset)
 
-	// Add signature and expiration to values
-	v.Set("Expires", expiresUnix)
-	v.Set("Signature", sig)
+	a.Logger.Printf("Authentication routes registered successfully")
 
-	// Encode final result
-	return base64.StdEncoding.EncodeToString([]byte(v.Encode()))
 }
 
-// addTierPermissions adds permissions for a specific tier
-func (a *AuthService) addTierPermissions(v url.Values, tierTitle string) {
-	tierConfig, found := a.authConfig.ACL.Tiers[tierTitle]
-	if !found {
+func (a *AuthService) handleAuthAsset(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/auth/")
+	path = strings.TrimSuffix(path, "/")
+	a.logWithContext(r, "Direct auth asset request: %s (path: %s)", r.URL.Path, path)
+
+	if path == "" || path == "/" {
+		path = "index.html"
+	}
+
+	setContentTypeByExt(w, path)
+
+	isHTML := strings.HasSuffix(path, ".html")
+	if !isHTML && filepath.Ext(path) == "" {
+		htmlRoutes := map[string]bool{
+			"login":           true,
+			"signup":          true,
+			"reset-password":  true,
+			"forgot-password": true,
+			"pricing":         true,
+			"search":          true,
+			"account":         true,
+		}
+
+		if htmlRoutes[path] {
+			isHTML = true
+			path += ".html"
+		}
+	}
+
+	if isHTML {
+		sig := getSignatureFromCookies(r)
+		pageVars := genPageNav("Authentication", r, sig)
+		templateName := filepath.Base(path)
+
+		a.logWithContext(r, "rendering Auth template: %s", templateName)
+		render(w, templateName, pageVars)
 		return
 	}
 
-	// Add permissions for each section
-	for section, permissions := range tierConfig {
-		v.Set(section, "true")
+	// Try different paths to find the file
+	possiblePaths := []string{
+		"nextAuth/out/" + path,
+		"nextAuth/out/v2/" + path,
+		path,
+	}
 
-		// Add detailed permissions
-		for key, val := range permissions {
+	for _, possiblePath := range possiblePaths {
+		data, err := authAssets.ReadFile(possiblePath)
+		if err == nil {
+			// found file, write it to resp.
+			w.Write(data)
+			return
+		}
+
+		a.logWithContext(r, "Tried path %s, error: %v", possiblePath, err)
+	}
+
+	// If we get here, the file was not found
+	a.logWithContext(r, "File not found: %s", path)
+	http.NotFound(w, r)
+}
+
+// ============================================================================================
+// Middleware Functions
+// ============================================================================================
+
+// createMiddlewareChains creates standard middleware chains
+func (a *AuthService) createMiddlewareChains() map[string]MiddlewareChain {
+	return map[string]MiddlewareChain{
+		"base": {
+			a.Recover,        // Always first to catch panics
+			a.RequestLogger,  // Log all requests
+			a.PathNormalizer, // Normalize paths
+		},
+		"api": {
+			a.Recover,       // Always first to catch panics
+			a.RequestLogger, // Log all requests
+		},
+		"apiAuth": {
+			a.Recover,
+			a.RequestLogger,
+			a.RateLimitAuth,
+		},
+		"form": {
+			a.Recover,
+			a.RequestLogger,
+			a.PathNormalizer,
+			a.MethodValidator("POST"),
+		},
+		"authRequired": {
+			a.Recover,
+			a.RequestLogger,
+			a.PathNormalizer,
+			a.AuthRequired,   // Check for authentication
+			a.CSRFProtection, // CSRF protection for authenticated requests
+		},
+	}
+}
+
+// Recover middleware to recover from panics
+func (a *AuthService) Recover(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Log stack trace
+				buf := make([]byte, 1<<16)
+				n := runtime.Stack(buf, false)
+				a.logWithContext(r, "PANIC: %v\n%s", err, buf[:n])
+
+				// Create server error
+				serverErr := ErrServerError
+				serverErr.Internal = fmt.Errorf("%v", err)
+
+				// Handle the error
+				a.handleAPIError(w, r, serverErr)
+			}
+		}()
+		next(w, r)
+	}
+}
+
+// RequestLogger logs request information
+func (a *AuthService) RequestLogger(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		a.logWithContext(r, "Request started")
+
+		// Create a response wrapper to capture status code
+		rw := newResponseWriter(w)
+		next(rw, r)
+
+		duration := time.Since(start)
+		a.logWithContext(r, "Request completed: status=%d duration=%v",
+			rw.status, duration)
+	}
+}
+
+// PathNormalizer normalizes request paths
+func (a *AuthService) PathNormalizer(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		originalPath := r.URL.Path
+		normalizedPath := a.normalizeAuthPath(originalPath)
+
+		if normalizedPath != originalPath {
+			query := r.URL.RawQuery
+			if query != "" {
+				normalizedPath += "?" + query
+			}
+			a.logWithContext(r, "Redirecting to normalized path: %s → %s", originalPath, normalizedPath)
+			http.Redirect(w, r, normalizedPath, http.StatusMovedPermanently)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+// MethodValidator validates the request method
+func (a *AuthService) MethodValidator(method string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != method {
+				a.logWithContext(r, "Method not allowed: %s", r.Method)
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			next(w, r)
+		}
+	}
+}
+
+// RateLimitAuth provides rate limiting for authentication endpoints
+func (a *AuthService) RateLimitAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ip := getClientIP(r)
+
+		// Get or create limiter for this IP
+		limiterI, _ := a.IPLimiters.LoadOrStore(ip, rate.NewLimiter(rate.Every(1*time.Second), 5))
+		limiter := limiterI.(*rate.Limiter)
+
+		if !limiter.Allow() {
+			a.logWithContext(r, "Rate limit exceeded for IP: %s", ip)
+			a.handleAPIError(w, r, ErrRateLimitExceeded)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+// AuthRequired ensures the request is authenticated
+func (a *AuthService) AuthRequired(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if the path is exempt from authentication
+		if a.isExemptPath(r.URL.Path) {
+			next(w, r)
+			return
+		}
+
+		// Check if user is authenticated
+		authCookie, err := r.Cookie("auth_token")
+		if err != nil {
+			a.logWithContext(r, "No auth_token cookie found")
+
+			// Try to refresh token if refresh token exists
+			_, refreshErr := r.Cookie("refresh_token")
+			if refreshErr == nil {
+				a.logWithContext(r, "Found refresh_token, attempting refresh")
+				a.handleAuthRefreshToken(w, r)
+				return
+			}
+
+			// Redirect to login
+			redirectURL := "/auth/login"
+			if r.URL.Path != "/" {
+				redirectURL = fmt.Sprintf("/auth/login?return_to=%s", url.QueryEscape(r.URL.Path))
+			}
+
+			a.logWithContext(r, "Redirecting to login: %s", redirectURL)
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+			return
+		}
+
+		// Validate the token
+		ctx := context.Background()
+		userInfo, err := a.Supabase.Auth.User(ctx, authCookie.Value)
+		if err != nil {
+			a.logWithContext(r, "Invalid auth token: %v", err)
+
+			// Clear cookies and redirect to login
+			a.clearAuthCookies(w, r)
+			http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+			return
+		}
+
+		// Store user info in request context
+		ctx = context.WithValue(r.Context(), "user", userInfo)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+// CSRFProtection provides CSRF protection for authenticated requests
+func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Skip for GET, HEAD, OPTIONS, TRACE
+		if r.Method == "GET" || r.Method == "HEAD" || r.Method == "OPTIONS" || r.Method == "TRACE" {
+			next(w, r)
+			return
+		}
+
+		// Get user from context
+		userInfo, ok := r.Context().Value("user").(*supabase.User)
+		if !ok {
+			a.logWithContext(r, "No user in context for CSRF check")
+			a.handleAPIError(w, r, ErrMissingToken)
+			return
+		}
+
+		// Check CSRF token
+		csrfToken := r.Header.Get("X-CSRF-Token")
+		if csrfToken == "" {
+			// Try to get from form or cookie
+			csrfToken = r.FormValue("csrf_token")
+			if csrfToken == "" {
+				csrfCookie, err := r.Cookie("csrf_token")
+				if err == nil {
+					csrfToken = csrfCookie.Value
+				}
+			}
+		}
+
+		if !a.validateCSRFToken(csrfToken, userInfo.ID) {
+			a.logWithContext(r, "CSRF validation failed for user %s", userInfo.ID)
+			a.handleAPIError(w, r, ErrCSRFValidation)
+			return
+		}
+
+		next(w, r)
+	}
+}
+
+// AuthWrapper is a middleware that handles authentication based on existing middleware
+func (a *AuthService) AuthWrapper(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		a.logWithContext(r, "[Go-Auth] %s %s", r.Method, r.URL.Path)
+		path := r.URL.Path
+
+		// First check if path is exempt
+		if a.isExemptPath(path) {
+			a.logWithContext(r, "Exempt path: %s", path)
+			handler.ServeHTTP(w, r)
+			return
+		}
+
+		// Non-exempt paths must be authenticated
+		sig := getSignatureFromCookies(r)
+		if sig == "" {
+			a.logWithContext(r, "No signature found for protected path: %s", path)
+			http.Redirect(w, r, "/auth/login?return_to="+path, http.StatusFound)
+			return
+		}
+
+		decodedSig, err := base64.StdEncoding.DecodeString(sig)
+		if err != nil {
+			a.logWithContext(r, "Failed to decode signature: %v", err)
+			http.Error(w, "Invalid signature", http.StatusUnauthorized)
+			return
+		}
+
+		values, err := url.ParseQuery(string(decodedSig))
+		if err != nil {
+			a.logWithContext(r, "Failed to parse signature: %v", err)
+			http.Error(w, "Invalid signature", http.StatusUnauthorized)
+			return
+		}
+
+		userEmail := values.Get("UserEmail")
+
+		userAccess, err := a.getAccessByEmail(userEmail)
+		if DevMode {
+			a.logWithContext(r, "User access: %v", userAccess)
+		}
+		if err != nil {
+			a.logWithContext(r, "Failed to get user access: %v", err)
+			http.Error(w, "Internal System Error", http.StatusSeeOther)
+			return
+		}
+
+		if _, ok := userAccess[path]; ok {
+			handler(w, r)
+			return
+		}
+
+		if a.isExemptPath(path) {
+
+			noSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+			return
+		}
+
+		if strings.HasPrefix(path, "/api/mtgban/") ||
+			strings.HasPrefix(path, "/api/mtgjson/") {
+			// Use API-specific middleware for API paths
+			enforceAPISigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+			return
+		}
+
+		// Otherwise use standard enforceSigning middleware
+		enforceSigning(http.HandlerFunc(handler)).ServeHTTP(w, r)
+	}
+}
+
+// ============================================================================================
+// Authentication Handler Functions
+// ============================================================================================
+
+// handleAuthLogin handles API login requests
+func (a *AuthService) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
+	// Handle GET requests (serve the page)
+	if r.Method == http.MethodGet {
+		a.logWithContext(r, "Login page request")
+
+		// Set content type to HTML
+		w.Header().Set("Content-Type", "text/html")
+
+		// Try to load the login page directly
+		data, err := authAssets.ReadFile("nextAuth/out/login.html")
+		if err != nil {
+			// If direct access failed, try alternative paths
+			data, err = authAssets.ReadFile("login.html")
+			if err != nil {
+				a.logWithContext(r, "Failed to load login page: %v", err)
+				http.Error(w, "Server Error - Login page not found", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Write the file data to response
+		w.Write(data)
+		return
+	}
+
+	// Continue with POST handling for API login
+	if r.Method != http.MethodPost {
+		a.logWithContext(r, "Method not allowed: %s", r.Method)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	a.logWithContext(r, "API login attempt")
+
+	// Parse request
+	var req LoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		a.logWithContext(r, "Failed to parse login request: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Invalid request format",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Basic validation
+	if req.Email == "" || req.Password == "" {
+		a.logWithContext(r, "Login attempt with empty credentials")
+		a.handleAPIError(w, r, AuthError{
+			Code:       "MISSING_CREDENTIALS",
+			Message:    "Email and password are required",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Authenticate with Supabase
+	ctx := context.Background()
+	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+
+	if err != nil {
+		a.logWithContext(r, "Login failed: %v", err)
+		a.handleAPIError(w, r, ErrInvalidCredentials)
+		return
+	}
+
+	// Set cookies
+	a.setAuthCookies(w, r, authResponse.AccessToken, authResponse.RefreshToken, req.Remember)
+
+	// Get user data
+	userInfo, err := a.Supabase.Auth.User(ctx, authResponse.AccessToken)
+	if err != nil {
+		a.logWithContext(r, "Error retrieving user data: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "USER_DATA_ERROR",
+			Message:    "Error retrieving user data",
+			StatusCode: http.StatusInternalServerError,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Get user tier from metadata
+	tier := "free"
+	if userInfo.UserMetadata != nil {
+		if tierVal, ok := userInfo.UserMetadata["tier"].(string); ok && tierVal != "" {
+			tier = tierVal
+		}
+	}
+
+	// Generate CSRF token
+	csrfToken := a.generateCSRFToken(userInfo.ID)
+
+	// Set CSRF cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Path:     "/",
+		HttpOnly: false,        // Accessible to JS
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Generate internal signature for app permissions
+	userData := &UserData{
+		UserId: userInfo.ID,
+		Email:  userInfo.Email,
+		Tier:   tier,
+	}
+
+	// put signature in cookies
+	baseURL := getBaseURL(r)
+	sig := a.sign(baseURL, tier, userData)
+	a.putSignatureInCookies(w, r, sig)
+
+	// Send success response
+	a.sendAPISuccess(w, "Login successful", map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":             userInfo.ID,
+			"email":          userInfo.Email,
+			"tier":           tier,
+			"emailConfirmed": !userInfo.ConfirmedAt.IsZero(),
+			"user_metadata":  userInfo.UserMetadata,
+		},
+		"session": map[string]interface{}{
+			"expires_at": time.Now().Add(24 * time.Hour).Unix(),
+			"csrf_token": csrfToken,
+		},
+	})
+}
+
+// handleLoginFormSubmit handles form-based login submissions
+func (a *AuthService) handleLoginFormSubmit(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form login attempt")
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		a.logWithContext(r, "Error parsing form data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_FORM",
+			Message:    "Error parsing form data",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		}, "/auth/login")
+		return
+	}
+
+	// Get form values
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	remember := r.FormValue("remember") == "on"
+
+	// Validate required fields
+	if email == "" || password == "" {
+		a.logWithContext(r, "Login attempt with empty credentials")
+		a.handleFormError(w, r, AuthError{
+			Code:       "MISSING_CREDENTIALS",
+			Message:    "Email and password are required",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/login")
+		return
+	}
+
+	// Authenticate with Supabase
+	ctx := context.Background()
+	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
+		Email:    email,
+		Password: password,
+	})
+
+	if err != nil {
+		a.logWithContext(r, "Login failed: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_CREDENTIALS",
+			Message:    "Invalid email or password",
+			StatusCode: http.StatusUnauthorized,
+			Internal:   err,
+		}, "/auth/login")
+		return
+	}
+
+	// Extract tokens
+	jwtToken := authResponse.AccessToken
+	refreshToken := authResponse.RefreshToken
+
+	// Set cookies
+	a.setAuthCookies(w, r, jwtToken, refreshToken, remember)
+
+	// Get user data
+	userInfo, err := a.Supabase.Auth.User(ctx, jwtToken)
+	if err != nil {
+		a.logWithContext(r, "Error getting user data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "USER_DATA_ERROR",
+			Message:    "Error retrieving user data",
+			StatusCode: http.StatusInternalServerError,
+			Internal:   err,
+		}, "/auth/login")
+		return
+	}
+
+	// Set user tier
+	tierTitle := "free"
+	if userInfo.UserMetadata != nil {
+		if tier, ok := userInfo.UserMetadata["tier"].(string); ok && tier != "" {
+			tierTitle = tier
+		}
+	}
+
+	// Generate signature
+	userData := &UserData{
+		UserId: userInfo.ID,
+		Email:  userInfo.Email,
+		Tier:   tierTitle,
+	}
+
+	baseURL := getBaseURL(r)
+	sig := a.sign(baseURL, tierTitle, userData)
+	a.putSignatureInCookies(w, r, sig)
+
+	// Generate CSRF token
+	csrfToken := a.generateCSRFToken(userInfo.ID)
+
+	// Set CSRF cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Path:     "/",
+		HttpOnly: false,        // Accessible to JS
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Redirect after successful login
+	returnTo := r.FormValue("return_to")
+	if returnTo == "" {
+		returnTo = "/home"
+	}
+
+	// Redirect to success page with proper parameters
+	successURL := fmt.Sprintf("/auth/success?redirectTo=%s&message=%s",
+		url.QueryEscape(returnTo),
+		url.QueryEscape("You have successfully logged in"))
+
+	a.logWithContext(r, "Login successful, redirecting to: %s", successURL)
+	http.Redirect(w, r, successURL, http.StatusSeeOther)
+}
+
+// handleAuthSignup handles API signup requests
+func (a *AuthService) handleAuthSignup(w http.ResponseWriter, r *http.Request) {
+	// Handle GET requests (serve the page)
+	if r.Method == http.MethodGet {
+		a.logWithContext(r, "Signup page request")
+
+		// Set content type to HTML
+		w.Header().Set("Content-Type", "text/html")
+
+		// Get embedded files
+		authFS, err := fs.Sub(authAssets, "nextAuth/out")
+		if err != nil {
+			a.logWithContext(r, "Failed to access embedded files: %v", err)
+			http.Error(w, "Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		// Serve the signup HTML file
+		a.serveFile(http.FileServer(http.FS(authFS)), w, r, "signup.html")
+		return
+	}
+
+	// Continue with POST handling for API signup
+	if r.Method != http.MethodPost {
+		a.logWithContext(r, "Method not allowed: %s", r.Method)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	a.logWithContext(r, "API signup attempt")
+
+	// Read request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		a.logWithContext(r, "Error reading request body: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Error reading request body",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Parse request
+	var req SignupRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		a.logWithContext(r, "Error parsing signup request: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Invalid request format",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Validate required fields
+	if req.Email == "" || req.Password == "" {
+		a.logWithContext(r, "Signup attempt with empty credentials")
+		a.handleAPIError(w, r, AuthError{
+			Code:       "MISSING_CREDENTIALS",
+			Message:    "Email and password are required",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Validate password strength
+	isValid, errorMsg := a.validatePassword(req.Password)
+	if !isValid {
+		a.logWithContext(r, "Password validation failed: %s", errorMsg)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "WEAK_PASSWORD",
+			Message:    errorMsg,
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Ensure user data has tier set
+	if req.UserData == nil {
+		req.UserData = make(map[string]interface{})
+	}
+	if _, ok := req.UserData["tier"]; !ok {
+		req.UserData["tier"] = "free"
+	}
+
+	// Sign up with Supabase
+	ctx := context.Background()
+	user, err := a.Supabase.Auth.SignUp(ctx, supabase.UserCredentials{
+		Email:    req.Email,
+		Password: req.Password,
+		Data:     req.UserData,
+	})
+
+	if err != nil {
+		a.logWithContext(r, "Signup failed: %v", err)
+
+		// Check for common errors
+		errMsg := err.Error()
+		if strings.Contains(strings.ToLower(errMsg), "already") ||
+			strings.Contains(strings.ToLower(errMsg), "taken") {
+			a.handleAPIError(w, r, ErrEmailTaken)
+		} else {
+			a.handleAPIError(w, r, AuthError{
+				Code:       "SIGNUP_FAILED",
+				Message:    "Failed to create account",
+				StatusCode: http.StatusBadRequest,
+				Internal:   err,
+			})
+		}
+		return
+	}
+
+	// Check if email confirmation is required
+	if user.ConfirmedAt.IsZero() {
+		// Email confirmation required
+		a.logWithContext(r, "Signup successful, email confirmation required: %s", req.Email)
+		a.sendAPISuccess(w, "Account created successfully. Please check your email to verify your account.", map[string]interface{}{
+			"user": map[string]interface{}{
+				"id":             user.ID,
+				"email":          user.Email,
+				"emailConfirmed": false,
+			},
+			"emailConfirmationRequired": true,
+		})
+		return
+	}
+
+	// If email already confirmed, log in the user automatically
+	a.logWithContext(r, "Signup successful with pre-confirmed email: %s", req.Email)
+	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+
+	if err != nil {
+		// Return partial success without session
+		a.sendAPISuccess(w, "Account created successfully. Please log in.", map[string]interface{}{
+			"user": map[string]interface{}{
+				"id":             user.ID,
+				"email":          user.Email,
+				"emailConfirmed": true,
+			},
+		})
+		return
+	}
+
+	// Set cookies for the frontend
+	a.setAuthCookies(w, r, authResponse.AccessToken, authResponse.RefreshToken, false)
+
+	// Generate MTGBAN signature for internal auth
+	userData := &UserData{
+		UserId: user.ID,
+		Email:  user.Email,
+		Tier:   "free", // Default tier, can be updated later
+	}
+
+	baseURL := getBaseURL(r)
+	sig := a.sign(baseURL, userData.Tier, userData)
+	a.putSignatureInCookies(w, r, sig)
+
+	// Generate CSRF token
+	csrfToken := a.generateCSRFToken(user.ID)
+
+	// Set CSRF cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Path:     "/",
+		HttpOnly: false,        // Accessible to JS
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Return full success response with session
+	a.sendAPISuccess(w, "Account created successfully", map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":             user.ID,
+			"email":          user.Email,
+			"emailConfirmed": true,
+			"tier":           "free",
+			"user_metadata":  user.UserMetadata,
+		},
+		"session": map[string]interface{}{
+			"expires_at": time.Now().Add(24 * time.Hour).Unix(),
+			"csrf_token": csrfToken,
+		},
+	})
+}
+
+// handleSignupFormSubmit handles form-based signup submissions
+func (a *AuthService) handleSignupFormSubmit(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form signup attempt")
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		a.logWithContext(r, "Error parsing form data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_FORM",
+			Message:    "Error parsing form data",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		}, "/auth/signup")
+		return
+	}
+
+	// Get form values
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	confirmPassword := r.FormValue("confirm-password")
+	fullName := r.FormValue("fullname")
+	termsAccepted := r.FormValue("terms") == "on"
+
+	// Mask email for logging
+	maskedEmail := maskEmail(email)
+
+	// Validate inputs
+	if email == "" || password == "" || fullName == "" {
+		a.logWithContext(r, "Signup validation failed for %s: empty fields", maskedEmail)
+		a.handleFormError(w, r, AuthError{
+			Code:       "MISSING_FIELDS",
+			Message:    "All fields are required",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/signup")
+		return
+	}
+
+	if password != confirmPassword {
+		a.logWithContext(r, "Signup validation failed for %s: passwords don't match", maskedEmail)
+		a.handleFormError(w, r, AuthError{
+			Code:       "PASSWORD_MISMATCH",
+			Message:    "Passwords do not match",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/signup")
+		return
+	}
+
+	if !termsAccepted {
+		a.logWithContext(r, "Signup validation failed for %s: terms not accepted", maskedEmail)
+		a.handleFormError(w, r, AuthError{
+			Code:       "TERMS_REQUIRED",
+			Message:    "You must accept the Terms of Service",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/signup")
+		return
+	}
+
+	// Validate password strength
+	isValid, errorMsg := a.validatePassword(password)
+	if !isValid {
+		a.logWithContext(r, "Password validation failed for %s: %s", maskedEmail, errorMsg)
+		a.handleFormError(w, r, AuthError{
+			Code:       "WEAK_PASSWORD",
+			Message:    errorMsg,
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/signup")
+		return
+	}
+
+	// Create user metadata
+	userMetadata := map[string]interface{}{
+		"full_name": fullName,
+		"tier":      "free",
+	}
+
+	// Create user in Supabase
+	ctx := context.Background()
+	user, err := a.Supabase.Auth.SignUp(ctx, supabase.UserCredentials{
+		Email:    email,
+		Password: password,
+		Data:     userMetadata,
+	})
+
+	if err != nil {
+		// Error handling
+		errMsg := err.Error()
+		a.logWithContext(r, "Signup failed for %s: %v", maskedEmail, err)
+
+		if strings.Contains(strings.ToLower(errMsg), "already") ||
+			strings.Contains(strings.ToLower(errMsg), "taken") {
+			a.handleFormError(w, r, ErrEmailTaken, "/auth/signup")
+		} else if strings.Contains(strings.ToLower(errMsg), "database") {
+			a.handleFormError(w, r, AuthError{
+				Code:       "DATABASE_ERROR",
+				Message:    "Database error occurred",
+				StatusCode: http.StatusInternalServerError,
+				Internal:   err,
+			}, "/auth/signup")
+		} else {
+			a.handleFormError(w, r, AuthError{
+				Code:       "SIGNUP_FAILED",
+				Message:    "Failed to create account",
+				StatusCode: http.StatusBadRequest,
+				Internal:   err,
+			}, "/auth/signup")
+		}
+		return
+	}
+
+	a.logWithContext(r, "Signup successful for %s", maskedEmail)
+
+	// If email confirmation is NOT required (user is already confirmed)
+	if !user.ConfirmedAt.IsZero() {
+		a.logWithContext(r, "Auto-login for new user %s", maskedEmail)
+
+		// Auto-login the user after signup
+		authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
+			Email:    email,
+			Password: password,
+		})
+
+		if err == nil {
+			a.logWithContext(r, "Auto-login successful for %s", maskedEmail)
+
+			// Extract tokens
+			jwtToken := authResponse.AccessToken
+			refreshToken := authResponse.RefreshToken
+
+			// Set cookies
+			a.setAuthCookies(w, r, jwtToken, refreshToken, false)
+
+			// Get user data
+			userData := &UserData{
+				UserId: user.ID,
+				Email:  user.Email,
+				Tier:   "free", // Default tier for new users
+			}
+
+			// Generate internal signature
+			baseURL := getBaseURL(r)
+			sig := a.sign(baseURL, userData.Tier, userData)
+			a.putSignatureInCookies(w, r, sig)
+
+			// Generate CSRF token
+			csrfToken := a.generateCSRFToken(user.ID)
+
+			// Set CSRF cookie
+			http.SetCookie(w, &http.Cookie{
+				Name:     "csrf_token",
+				Value:    csrfToken,
+				Path:     "/",
+				HttpOnly: false,        // Accessible to JS
+				MaxAge:   24 * 60 * 60, // 24 hours
+				Secure:   r.TLS != nil,
+				SameSite: http.SameSiteStrictMode,
+			})
+
+			// Redirect to success page instead of directly to home
+			successURL := fmt.Sprintf("/auth/success?redirectTo=%s&message=%s",
+				url.QueryEscape("/home"),
+				url.QueryEscape("Your account has been created successfully!"))
+
+			a.logWithContext(r, "Redirecting new user %s to success page", maskedEmail)
+			http.Redirect(w, r, successURL, http.StatusSeeOther)
+			return
+		} else {
+			a.logWithContext(r, "Auto-login failed for new user %s: %v", maskedEmail, err)
+		}
+	}
+
+	// Redirect to confirmation page if email verification is required
+	a.logWithContext(r, "Redirecting %s to confirmation page (email verification pending)", maskedEmail)
+	confirmationURL := fmt.Sprintf("/auth/confirmation?email=%s&message=%s",
+		url.QueryEscape(email),
+		url.QueryEscape("Your account has been created. Please check your email to verify your account."))
+
+	http.Redirect(w, r, confirmationURL, http.StatusSeeOther)
+}
+
+// handleAuthForgotPassword handles API password reset requests
+func (a *AuthService) handleAuthForgotPassword(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API password reset request")
+
+	// Parse request
+	var req PasswordResetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		a.logWithContext(r, "Error parsing password reset request: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Invalid request format",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
+		return
+	}
+
+	if req.Email == "" {
+		a.logWithContext(r, "Password reset request with empty email")
+		a.handleAPIError(w, r, AuthError{
+			Code:       "MISSING_EMAIL",
+			Message:    "Email is required",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Request password reset from Supabase
+	ctx := context.Background()
+	err := a.Supabase.Auth.ResetPasswordForEmail(ctx, req.Email, "/auth/reset-password")
+
+	// For security reasons, don't reveal if the email exists
+	if err != nil {
+		a.logWithContext(r, "Password reset request failed: %v", err)
+	} else {
+		a.logWithContext(r, "Password reset request sent to: %s", maskEmail(req.Email))
+	}
+
+	// Return success response regardless to prevent email enumeration
+	a.sendAPISuccess(w, "If an account exists with that email, we've sent password reset instructions.", nil)
+}
+
+// handleForgotPasswordFormSubmit handles form-based password reset requests
+func (a *AuthService) handleForgotPasswordFormSubmit(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form password reset request")
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		a.logWithContext(r, "Error parsing form data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_FORM",
+			Message:    "Error parsing form data",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		}, "/auth/forgot-password")
+		return
+	}
+
+	// Get form values
+	email := r.FormValue("email")
+	maskedEmail := maskEmail(email)
+
+	if email == "" {
+		a.logWithContext(r, "Password reset request with empty email")
+		a.handleFormError(w, r, AuthError{
+			Code:       "MISSING_EMAIL",
+			Message:    "Email is required",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/forgot-password")
+		return
+	}
+
+	// Request password reset from Supabase
+	ctx := context.Background()
+	err := a.Supabase.Auth.ResetPasswordForEmail(ctx, email, "/auth/reset-password")
+
+	// For security reasons, don't reveal if the email exists
+	if err != nil {
+		a.logWithContext(r, "Password reset request failed: %v", err)
+	} else {
+		a.logWithContext(r, "Password reset request sent to: %s", maskedEmail)
+	}
+
+	// Redirect to confirmation page
+	confirmationURL := fmt.Sprintf("/auth/reset-password-sent?email=%s&message=%s",
+		url.QueryEscape(email),
+		url.QueryEscape("If an account exists with that email, we've sent password reset instructions."))
+
+	http.Redirect(w, r, confirmationURL, http.StatusSeeOther)
+}
+
+// handleAuthResetPassword handles API password reset completions
+func (a *AuthService) handleAuthResetPassword(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API password reset completion")
+
+	// Parse request
+	var req PasswordUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		a.logWithContext(r, "Error parsing password update request: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "INVALID_REQUEST",
+			Message:    "Invalid request format",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Validate required fields
+	if req.Password == "" || req.Token == "" {
+		a.logWithContext(r, "Password update request with missing fields")
+		a.handleAPIError(w, r, AuthError{
+			Code:       "MISSING_FIELDS",
+			Message:    "Password and token are required",
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Validate password strength
+	isValid, errorMsg := a.validatePassword(req.Password)
+	if !isValid {
+		a.logWithContext(r, "Password validation failed: %s", errorMsg)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "WEAK_PASSWORD",
+			Message:    errorMsg,
+			StatusCode: http.StatusBadRequest,
+		})
+		return
+	}
+
+	// Update user's password with token
+	ctx := context.Background()
+	updateData := map[string]interface{}{
+		"password": req.Password,
+	}
+
+	user, err := a.Supabase.Auth.UpdateUser(ctx, req.Token, updateData)
+	if err != nil {
+		a.logWithContext(r, "Password reset failed: %v", err)
+		a.handleAPIError(w, r, AuthError{
+			Code:       "RESET_FAILED",
+			Message:    "Failed to reset password",
+			StatusCode: http.StatusInternalServerError,
+			Internal:   err,
+		})
+		return
+	}
+
+	// Log the successful password reset
+	a.logWithContext(r, "Password reset successful for user ID: %s", user.ID)
+
+	// Return success response with redirect to login page
+	a.sendAPISuccess(w, "Your password has been reset successfully. You can now log in with your new password.", map[string]interface{}{
+		"redirectTo": "/auth/login",
+	})
+}
+
+// handleResetPasswordFormSubmit handles form-based password reset completions
+func (a *AuthService) handleResetPasswordFormSubmit(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form password reset completion")
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		a.logWithContext(r, "Error parsing form data: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "INVALID_FORM",
+			Message:    "Error parsing form data",
+			StatusCode: http.StatusBadRequest,
+			Internal:   err,
+		}, "/auth/reset-password")
+		return
+	}
+
+	// Get form values
+	password := r.FormValue("password")
+	confirmPassword := r.FormValue("confirm-password")
+	token := r.FormValue("token") // This is the reset token from the URL
+
+	// Validate inputs
+	if password == "" || token == "" {
+		a.logWithContext(r, "Password reset with empty fields")
+		a.handleFormError(w, r, AuthError{
+			Code:       "MISSING_FIELDS",
+			Message:    "Password and token are required",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/reset-password")
+		return
+	}
+
+	if password != confirmPassword {
+		a.logWithContext(r, "Password reset passwords don't match")
+		a.handleFormError(w, r, AuthError{
+			Code:       "PASSWORD_MISMATCH",
+			Message:    "Passwords do not match",
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/reset-password")
+		return
+	}
+
+	// Validate password strength
+	isValid, errorMsg := a.validatePassword(password)
+	if !isValid {
+		a.logWithContext(r, "Password validation failed: %s", errorMsg)
+		a.handleFormError(w, r, AuthError{
+			Code:       "WEAK_PASSWORD",
+			Message:    errorMsg,
+			StatusCode: http.StatusBadRequest,
+		}, "/auth/reset-password")
+		return
+	}
+
+	// Update user's password with token
+	ctx := context.Background()
+	updateData := map[string]interface{}{
+		"password": password,
+	}
+
+	user, err := a.Supabase.Auth.UpdateUser(ctx, token, updateData)
+	if err != nil {
+		a.logWithContext(r, "Password reset failed: %v", err)
+		a.handleFormError(w, r, AuthError{
+			Code:       "RESET_FAILED",
+			Message:    "Failed to reset password",
+			StatusCode: http.StatusInternalServerError,
+			Internal:   err,
+		}, "/auth/reset-password")
+		return
+	}
+
+	// Log the successful password reset
+	a.logWithContext(r, "Password reset successful for user ID: %s", user.ID)
+
+	// Redirect to success page
+	successURL := fmt.Sprintf("/auth/success?redirectTo=%s&message=%s",
+		url.QueryEscape("/auth/login"),
+		url.QueryEscape("Your password has been reset successfully. You can now log in with your new password."))
+
+	http.Redirect(w, r, successURL, http.StatusSeeOther)
+}
+
+// handleAuthLogout handles API logout requests
+func (a *AuthService) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API logout request")
+
+	// Get token from cookie
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil && authCookie.Value != "" {
+		// Sign out from Supabase
+		err := a.Supabase.Auth.SignOut(context.Background(), authCookie.Value)
+		if err != nil {
+			a.logWithContext(r, "Supabase logout error: %v", err)
+		}
+	}
+
+	// Clear auth cookies
+	a.clearAuthCookies(w, r)
+
+	// Return success response
+	a.sendAPISuccess(w, "Logout successful", map[string]interface{}{
+		"redirectTo": "/",
+	})
+}
+
+// handleLogoutForm handles form-based logout requests
+func (a *AuthService) handleLogoutForm(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "Form logout request")
+
+	// Get token from cookie and sign out from Supabase
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil && authCookie.Value != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := a.Supabase.Auth.SignOut(ctx, authCookie.Value)
+		if err != nil {
+			a.logWithContext(r, "Supabase logout error: %v", err)
+		}
+	}
+
+	// 2. Clear ALL cookies (using multiple techniques)
+	a.clearAllCookies(w, r)
+
+	// 3. Serve a cleanup page with JavaScript to clear client-side state
+	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+
+	// Construct home URL
+	baseURL := getBaseURL(r)
+	homeURL := baseURL
+	if !strings.HasSuffix(homeURL, "/") {
+		homeURL += "/"
+	}
+
+	logoutHTML := `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logging Out</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <script>
+        // Clear all client-side state
+        function cleanupAndRedirect() {
+            // Clear localStorage and sessionStorage
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+            } catch (e) {
+                console.error("Storage clear error:", e);
+            }
+
+            // Clear all cookies by setting expired date
+            document.cookie.split(";").forEach(function(c) {
+                document.cookie = c.trim().split("=")[0] + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                document.cookie = c.trim().split("=")[0] + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+            });
+
+            // Redirect to home with cache buster
+            window.location.href = "` + homeURL + `?nocache=" + new Date().getTime();
+        }
+
+        // Run immediately
+        cleanupAndRedirect();
+    </script>
+</head>
+<body>
+    <h1>Logging you out...</h1>
+    <p>Please wait while we complete the logout process.</p>
+    <p>If you're not redirected, <a href="` + homeURL + `">click here</a>.</p>
+</body>
+</html>
+`
+	w.Write([]byte(logoutHTML))
+}
+
+// Clear all cookies using multiple approaches to handle various scenarios
+func (a *AuthService) clearAllCookies(w http.ResponseWriter, r *http.Request) {
+	// Get domain variations
+	baseURL := getBaseURL(r)
+	domain := "mtgban.com"
+	if strings.Contains(baseURL, "localhost") {
+		domain = "localhost"
+	}
+
+	// List of cookies to clear
+	cookiesToClear := []string{"MTGBAN", "auth_token", "refresh_token", "csrf_token"}
+
+	// Clear each cookie in multiple ways
+	for _, name := range cookiesToClear {
+		// Clear with domain
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			Domain:   domain,
+			MaxAge:   -1,
+			Expires:  time.Unix(0, 0),
+			HttpOnly: true,
+		})
+
+		// Clear without domain (for browser compatibility)
+		http.SetCookie(w, &http.Cookie{
+			Name:     name,
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			Expires:  time.Unix(0, 0),
+			HttpOnly: true,
+		})
+	}
+
+	a.logWithContext(r, "Cleared all authentication cookies")
+}
+
+// handleAuthGetUser handles API requests to get user information
+func (a *AuthService) handleAuthGetUser(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API get user request")
+
+	// Get auth token and refresh token from cookies
+	authCookie, authErr := r.Cookie("auth_token")
+	refreshCookie, refreshErr := r.Cookie("refresh_token")
+
+	var userInfo *supabase.User
+	var err error
+
+	// Check if we have a valid auth token
+	if authErr != nil || authCookie.Value == "" {
+		// No auth token, check if we have refresh token
+		if refreshErr != nil || refreshCookie.Value == "" {
+			a.logWithContext(r, "No auth token and no refresh token found")
+			a.handleAPIError(w, r, ErrMissingToken)
+			return
+		}
+
+		// Try to refresh using refresh token
+		a.logWithContext(r, "No auth token but refresh token found, attempting token refresh")
+
+		newAuthToken, newRefreshToken, refreshedUser, refreshErr := a.refreshTokenInternal("", refreshCookie.Value)
+		if refreshErr != nil {
+			a.logWithContext(r, "Token refresh failed: %v", refreshErr)
+			a.clearAuthCookies(w, r)
+			a.handleAPIError(w, r, ErrSessionExpired)
+			return
+		}
+
+		// Set new cookies
+		a.setAuthCookies(w, r, newAuthToken, newRefreshToken, true)
+
+		// Use the refreshed user info
+		userInfo = refreshedUser
+	} else {
+		// We have an auth token, try to get user info
+		ctx := context.Background()
+		userInfo, err = a.Supabase.Auth.User(ctx, authCookie.Value)
+
+		if err != nil {
+			// Auth token is invalid, try to refresh if we have a refresh token
+			if refreshErr == nil && refreshCookie.Value != "" {
+				a.logWithContext(r, "Invalid auth token, attempting refresh")
+
+				newAuthToken, newRefreshToken, refreshedUser, refreshErr := a.refreshTokenInternal(authCookie.Value, refreshCookie.Value)
+				if refreshErr != nil {
+					a.logWithContext(r, "Token refresh failed: %v", refreshErr)
+					a.clearAuthCookies(w, r)
+					a.handleAPIError(w, r, ErrSessionExpired)
+					return
+				}
+
+				// Set new cookies
+				a.setAuthCookies(w, r, newAuthToken, newRefreshToken, true)
+
+				// Use the refreshed user info
+				userInfo = refreshedUser
+			} else {
+				a.logWithContext(r, "Invalid auth token and no refresh token found")
+				a.clearAuthCookies(w, r)
+				a.handleAPIError(w, r, ErrInvalidToken)
+				return
+			}
+		}
+	}
+
+	// If we still don't have valid user info after all attempts
+	if userInfo == nil {
+		a.logWithContext(r, "Failed to get user info after token refresh")
+		a.clearAuthCookies(w, r)
+		a.handleAPIError(w, r, ErrInvalidToken)
+		return
+	}
+
+	// Extract user metadata and tier information
+	var userMetadata map[string]interface{}
+	tier := "free" // Default tier
+
+	if userInfo.UserMetadata != nil {
+		userMetadata = userInfo.UserMetadata
+
+		// Extract tier from metadata if available
+		if tierVal, ok := userInfo.UserMetadata["tier"].(string); ok && tierVal != "" {
+			tier = tierVal
+		}
+	}
+
+	// Get current user tier from internal cookie if available
+	signature, err := r.Cookie("MTGBAN")
+	if err == nil && signature.Value != "" {
+		sigTier := GetParamFromSig(signature.Value, "UserTier")
+		if sigTier != "" {
+			tier = sigTier
+		}
+	}
+
+	// Update internal signature with latest user data
+	userData := &UserData{
+		UserId: userInfo.ID,
+		Email:  userInfo.Email,
+		Tier:   tier,
+	}
+
+	baseURL := getBaseURL(r)
+	sig := a.sign(baseURL, tier, userData)
+	a.putSignatureInCookies(w, r, sig)
+
+	// Generate new CSRF token
+	csrfToken := a.generateCSRFToken(userInfo.ID)
+
+	// Set CSRF cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Path:     "/",
+		HttpOnly: false,        // Accessible to JS
+		MaxAge:   24 * 60 * 60, // 24 hours
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Return comprehensive user data
+	a.sendAPISuccess(w, "User data retrieved successfully", map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":             userInfo.ID,
+			"email":          userInfo.Email,
+			"tier":           tier,
+			"emailConfirmed": !userInfo.ConfirmedAt.IsZero(),
+			"user_metadata":  userMetadata,
+		},
+		"csrf_token": csrfToken,
+	})
+}
+
+// refreshTokenInternal handles the internal logic for refreshing tokens
+func (a *AuthService) refreshTokenInternal(authToken, refreshToken string) (string, string, *supabase.User, error) {
+	ctx := context.Background()
+
+	// Refresh token with Supabase
+	authResponse, err := a.Supabase.Auth.RefreshUser(ctx, authToken, refreshToken)
+	if err != nil {
+		return "", "", nil, err
+	}
+
+	// Extract new tokens
+	newJwtToken := authResponse.AccessToken
+	newRefreshToken := authResponse.RefreshToken
+
+	// Get user data if token was refreshed successfully
+	var userInfo *supabase.User
+	if newJwtToken != "" {
+		userInfo, _ = a.Supabase.Auth.User(ctx, newJwtToken)
+	}
+
+	return newJwtToken, newRefreshToken, userInfo, nil
+}
+
+// handleAuthRefreshToken handles API requests to refresh tokens
+func (a *AuthService) handleAuthRefreshToken(w http.ResponseWriter, r *http.Request) {
+	a.logWithContext(r, "API token refresh request")
+
+	// Get refresh token from cookie
+	refreshCookie, refreshErr := r.Cookie("refresh_token")
+	authCookie, authErr := r.Cookie("auth_token")
+
+	if refreshErr != nil || refreshCookie.Value == "" {
+		a.logWithContext(r, "No refresh token found")
+		a.handleAPIError(w, r, ErrMissingToken)
+		return
+	}
+
+	// Get tokens from cookies
+	var authToken string
+	if authErr == nil && authCookie.Value != "" {
+		authToken = authCookie.Value
+	}
+	refreshToken := refreshCookie.Value
+
+	// Refresh the token using our internal function
+	newAuthToken, newRefreshToken, userInfo, err := a.refreshTokenInternal(authToken, refreshToken)
+	if err != nil {
+		a.logWithContext(r, "Token refresh failed: %v", err)
+		a.clearAuthCookies(w, r)
+		a.handleAPIError(w, r, ErrSessionExpired)
+		return
+	}
+
+	// Set new cookies
+	a.setAuthCookies(w, r, newAuthToken, newRefreshToken, true)
+
+	// Prepare the response
+	response := map[string]interface{}{
+		"expires_at":      time.Now().Add(24 * time.Hour).Unix(),
+		"token_refreshed": true,
+	}
+
+	// Only proceed with user data if we have a valid user
+	if userInfo != nil {
+		// Update signature cookie with latest user data
+		tier := "free"
+		if userInfo.UserMetadata != nil {
+			if tierVal, ok := userInfo.UserMetadata["tier"].(string); ok && tierVal != "" {
+				tier = tierVal
+			}
+		}
+
+		userData := &UserData{
+			UserId: userInfo.ID,
+			Email:  userInfo.Email,
+			Tier:   tier,
+		}
+
+		baseURL := getBaseURL(r)
+		sig := a.sign(baseURL, tier, userData)
+		a.putSignatureInCookies(w, r, sig)
+
+		// Generate new CSRF token
+		csrfToken := a.generateCSRFToken(userInfo.ID)
+
+		// Set CSRF cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:     "csrf_token",
+			Value:    csrfToken,
+			Path:     "/",
+			HttpOnly: false,        // Accessible to JS
+			MaxAge:   24 * 60 * 60, // 24 hours
+			Secure:   r.TLS != nil,
+			SameSite: http.SameSiteStrictMode,
+		})
+
+		// Add user info and CSRF token to response
+		response["csrf_token"] = csrfToken
+		response["user"] = map[string]interface{}{
+			"id":    userInfo.ID,
+			"email": userInfo.Email,
+			"tier":  tier,
+		}
+	}
+
+	// Send the response
+	a.sendAPISuccess(w, "Token refreshed successfully", response)
+}
+
+// ============================================================================================
+// Helper Functions
+// ============================================================================================
+
+// logWithContext logs messages with request context
+func (a *AuthService) logWithContext(r *http.Request, format string, v ...interface{}) {
+	clientIP := getClientIP(r)
+	method := r.Method
+	path := r.URL.Path
+
+	// Get user ID if authenticated
+	userID := "anonymous"
+	authCookie, err := r.Cookie("auth_token")
+	if err == nil && authCookie.Value != "" {
+		// Extract user ID from JWT without full verification
+		parts := strings.Split(authCookie.Value, ".")
+		if len(parts) == 3 {
+			payload, _ := base64.RawURLEncoding.DecodeString(parts[1])
+			var claims map[string]interface{}
+			if json.Unmarshal(payload, &claims) == nil {
+				if sub, ok := claims["sub"].(string); ok {
+					userID = maskID(sub) // Mask for security
+				}
+			}
+		}
+	}
+
+	contextMsg := fmt.Sprintf("[%s][%s %s][User:%s] %s",
+		clientIP, method, path, userID, format)
+
+	a.Logger.Printf(contextMsg, v...)
+}
+
+// Debug function to print all files in an embedded filesystem
+func printEmbeddedFS(fsys embed.FS, dir string, indent string) {
+	entries, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		log.Printf("Error reading dir %s: %v", dir, err)
+		return
+	}
+
+	for _, entry := range entries {
+		path := dir + "/" + entry.Name()
+		if dir == "." {
+			path = entry.Name()
+		}
+
+		if entry.IsDir() {
+			log.Printf("%s[DIR] %s", indent, path)
+			printEmbeddedFS(fsys, path, indent+"  ")
+		} else {
+			log.Printf("%s[FILE] %s", indent, path)
+		}
+	}
+}
+
+// setContentTypeByExt sets the content type using contentTypeMap
+func setContentTypeByExt(w http.ResponseWriter, path string) {
+	ext := filepath.Ext(path)
+	if contentType, ok := contentTypeMap[ext]; ok {
+		w.Header().Set("Content-Type", contentType)
+	}
+}
+
+// normalizeAuthPath normalizes authentication paths
+func (a *AuthService) normalizeAuthPath(path string) string {
+	// Define base auth paths
+	authPaths := map[string]bool{
+		"/login":                  true,
+		"/signup":                 true,
+		"/forgot-password":        true,
+		"/reset-password":         true,
+		"/confirmation":           true,
+		"/success":                true,
+		"/signup-success":         true,
+		"/reset-password-sent":    true,
+		"/login-submit":           true,
+		"/signup-submit":          true,
+		"/forgot-password-submit": true,
+		"/reset-password-submit":  true,
+		"/logout":                 true,
+		"/search":                 true,
+	}
+
+	// Remove trailing slash if present
+	if len(path) > 1 && path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
+	// Handle duplicate /auth/auth/ prefix
+	if strings.HasPrefix(path, "/auth/auth/") {
+		path = "/auth/" + strings.TrimPrefix(path, "/auth/auth/")
+		return path
+	}
+
+	// Add /auth/ prefix for known auth paths if missing
+	if authPaths[path] && !strings.HasPrefix(path, "/auth") {
+		return "/auth" + path
+	}
+
+	return path
+}
+
+// isExemptPath checks if a path is exempt from authentication
+func (a *AuthService) isExemptPath(path string) bool {
+	// Always exempt the root path
+	if path == "/" || path == "/home" {
+		return true
+	}
+
+	// Check exact routes
+	for _, route := range a.AuthConfig.ExemptRoutes {
+		if path == route {
+			return true
+		}
+	}
+
+	// Check prefixes
+	for _, prefix := range a.AuthConfig.ExemptPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			return true
+		}
+	}
+
+	// Check suffixes
+	for _, suffix := range a.AuthConfig.ExemptSuffixes {
+		if strings.HasSuffix(path, suffix) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// validatePassword checks password strength
+func (a *AuthService) validatePassword(password string) (bool, string) {
+	if len(password) < 8 {
+		return false, "Password must be at least 8 characters long"
+	}
+
+	hasLetter := false
+	hasDigit := false
+
+	for _, c := range password {
+		if unicode.IsLetter(c) {
+			hasLetter = true
+		} else if unicode.IsDigit(c) {
+			hasDigit = true
+		}
+	}
+
+	if !hasLetter {
+		return false, "Password must contain at least one letter"
+	}
+
+	if !hasDigit {
+		return false, "Password must contain at least one number"
+	}
+
+	return true, ""
+}
+
+// serveFile serves a file with a modified request path
+func (a *AuthService) serveFile(fileServer http.Handler, w http.ResponseWriter, r *http.Request, path string) {
+	// Create a new request with the modified path
+	if DevMode {
+		log.Printf("Serving file: %s", path)
+	}
+
+	newReq := r.Clone(r.Context())
+	newReq.URL.Path = "/" + path
+
+	setContentTypeByExt(w, path)
+
+	fileServer.ServeHTTP(w, newReq)
+}
+
+// serveNextJsFile serves static assets for Next.js
+func (a *AuthService) serveNextJsFile(w http.ResponseWriter, r *http.Request) {
+	// Get the original request path
+	path := r.URL.Path
+
+	setContentTypeByExt(w, path)
+
+	fsPath := "nextAuth/out" + path
+
+	// Try to read the file from the embedded filesystem
+	data, err := authAssets.ReadFile(fsPath)
+	if err == nil {
+		// Found the file, serve it
+		w.Write(data)
+		return
+	}
+
+	if strings.Contains(path, "/_next/static/") && strings.Count(path, "/") >= 4 {
+		parts := strings.Split(path, "/")
+		if len(parts) >= 5 {
+			buildHashIndex := 3
+			suffix := strings.Join(parts[4:], "/")
+
+			correctPath := ""
+			entries, dirErr := authAssets.ReadDir("nextAuth/out/_next/static")
+			if dirErr == nil {
+				for _, entry := range entries {
+					if entry.IsDir() {
+						potentialHash := entry.Name()
+						testPath := fmt.Sprintf("nextAuth/out/_next/static/%s/%s", potentialHash, suffix)
+
+						if _, testErr := authAssets.ReadFile(testPath); testErr == nil {
+							correctPath = testPath
+							if a.DebugMode {
+								a.logWithContext(r, "Found build hash mismatch. Requested: %s, Found: %s",
+									parts[buildHashIndex], potentialHash)
+							}
+							break
+						}
+					}
+				}
+			}
+
+			if correctPath != "" {
+				data, err := authAssets.ReadFile(correctPath)
+				if err == nil {
+					w.Write(data)
+					return
+				}
+			}
+		}
+	}
+
+	if DevMode {
+		a.logWithContext(r, "Static asset not found: %s", fsPath)
+	}
+
+	http.NotFound(w, r)
+}
+
+// handleAuthPage creates a handler for auth pages
+func (a *AuthService) handleAuthPage(pageName string) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		a.Logger.Printf("Auth page request: %s", pageName)
+		setContentTypeByExt(w, pageName)
+		a.serveNextJsFile(w, r)
+	}
+}
+
+// generateCSRFToken generates a CSRF token for a user
+func (a *AuthService) generateCSRFToken(userID string) string {
+	h := hmac.New(sha256.New, a.CSRFSecret)
+	h.Write([]byte(userID))
+	h.Write([]byte(time.Now().Format("2006-01-02"))) // Daily rotation
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+// validateCSRFToken validates a CSRF token
+func (a *AuthService) validateCSRFToken(token, userID string) bool {
+	// If no token provided, validation fails
+	if token == "" {
+		return false
+	}
+
+	expected := a.generateCSRFToken(userID)
+	return token == expected
+}
+
+// getBaseURL gets the base URL for the request
+func getBaseURL(r *http.Request) string {
+	host := r.Host
+	if host == "localhost:8080" && !DevMode {
+		host = DefaultHost
+	}
+	baseURL := "http://" + host
+	if r.TLS != nil {
+		baseURL = strings.Replace(baseURL, "http", "https", 1)
+	}
+	return baseURL
+}
+
+// signHMACSHA256Base64 signs data with HMAC-SHA256
+func (a *AuthService) signHMACSHA256Base64(key []byte, data []byte) string {
+	h := hmac.New(sha256.New, key)
+	h.Write(data)
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+// sign signs data for permission granting
+func (a *AuthService) sign(link string, tierTitle string, userData *UserData) string {
+	// Get values for the tier
+	v := a.getValuesForTier(tierTitle)
+
+	// add BanACL data if available
+	if userData != nil && a.BanACL != nil {
+		a.addBanACLPermissions(v, userData.Email)
+
+		v.Set("UserEmail", userData.Email)
+		v.Set("UserTier", tierTitle)
+	}
+
+	expires := time.Now().Add(DefaultSignatureDuration)
+	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
+	key := os.Getenv("BAN_SECRET")
+	sig := a.signHMACSHA256Base64([]byte(key), []byte(data))
+
+	v.Set("Expires", fmt.Sprintf("%d", expires.Unix()))
+	v.Set("Signature", sig)
+	str := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
+
+	return str
+}
+
+// getValuesForTier gets values for a specific tier
+func (a *AuthService) getValuesForTier(tierTitle string) url.Values {
+	v := url.Values{}
+	tier, found := Config.ACL.Tiers[tierTitle]
+	if !found {
+		return v
+	}
+	for _, page := range OrderNav {
+		options, found := tier[page]
+		if !found {
+			continue
+		}
+		v.Set(page, "true")
+
+		for _, key := range OptionalFields {
+			val, found := options[key]
+			if !found {
+				continue
+			}
 			v.Set(key, val)
 		}
 	}
+	return v
 }
 
 // addBanACLPermissions adds permissions from BanACL to the values
@@ -2736,8 +2564,8 @@ func (a *AuthService) addBanACLPermissions(v url.Values, email string) {
 
 	// Add permissions from BanACL to values
 	for section, permissions := range user.Permissions {
-		// Each section key corresponds to a navigation section
-		if a.PermissionManager.isNavSection(section) {
+		// Each section key corresponds to a value in OrderNav
+		if isNavSection(section) {
 			// Set the section to true to enable this navigation item
 			v.Set(section, "true")
 
@@ -2766,1040 +2594,526 @@ func (a *AuthService) addBanACLPermissions(v url.Values, email string) {
 	}
 }
 
-// validateCSRFToken validates a CSRF token
-func (a *AuthService) validateCSRFToken(token, userID string) bool {
-	// If no token provided, validation fails
-	if token == "" {
-		return false
-	}
-
-	expected := a.SessionManager.generateCSRFToken(userID)
-	return token == expected
-}
-
-// ==============================================================================================
-// API Handlers
-// ==============================================================================================
-
-// handleNavDataAPI returns navigation structure and auth data for frontend
-func (a *AuthService) handleNavDataAPI(w http.ResponseWriter, r *http.Request) {
-	sig := a.GetSignature(r)
-	pageVars := genPageNav("home", r, sig)
-
-	// Extract just the navigation and auth data needed by frontend
-	navData := map[string]interface{}{
-		"nav":      pageVars.Nav,
-		"extraNav": pageVars.ExtraNav,
-		"auth": map[string]interface{}{
-			"isLoggedIn": pageVars.IsLoggedIn,
-			"userEmail":  pageVars.UserEmail,
-			"userTier":   pageVars.UserTier,
-		},
-		"showLogin": pageVars.ShowLogin,
-	}
-
-	// Send nav data to frontend
-	a.ResponseHelper.SendSuccess(w, "Navigation data retrieved", navData)
-}
-
-// handleLoginAPI handles API login requests
-func (a *AuthService) handleLoginAPI(w http.ResponseWriter, r *http.Request) {
-	// Only accept POST requests
-	if r.Method != http.MethodPost {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "METHOD_NOT_ALLOWED",
-			Message:    "Method not allowed",
-			StatusCode: http.StatusMethodNotAllowed,
-		}, nil)
-		return
-	}
-
-	// Parse request
-	var req LoginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_REQUEST",
-			Message:    "Invalid request format",
-			StatusCode: http.StatusBadRequest,
-		}, err)
-		return
-	}
-
-	// Validate required fields
-	if req.Email == "" || req.Password == "" {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "MISSING_CREDENTIALS",
-			Message:    "Email and password are required",
-			StatusCode: http.StatusBadRequest,
-		}, nil)
-		return
-	}
-
-	// Authenticate with Supabase
-	session, err := a.authenticateUser(req.Email, req.Password, req.Remember)
-	if err != nil {
-		a.ErrorHandler.RespondWithError(w, r, a.ErrorHandler.errors.InvalidCredentials, nil)
-		return
-	}
-
-	a.SessionManager.SetSession(w, r, session)
-
-	a.ResponseHelper.SendSuccess(w, "Login successful", map[string]interface{}{
-		"user": map[string]interface{}{
-			"id":             session.UserID,
-			"email":          session.Email,
-			"tier":           session.Tier,
-			"role":           session.Role,
-			"emailConfirmed": true,
-			"user_metadata":  session.Metadata,
-		},
-		"session": map[string]interface{}{
-			"expires_at": session.ExpiresAt.Unix(),
-			"csrf_token": session.CSRFToken,
-		},
-	})
-}
-
-// handleSignupAPI handles API signup requests
-func (a *AuthService) handleSignupAPI(w http.ResponseWriter, r *http.Request) {
-	// Only accept POST requests
-	if r.Method != http.MethodPost {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "METHOD_NOT_ALLOWED",
-			Message:    "Method not allowed",
-			StatusCode: http.StatusMethodNotAllowed,
-		}, nil)
-		return
-	}
-
-	// Parse request
-	var req SignupRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_REQUEST",
-			Message:    "Invalid request format",
-			StatusCode: http.StatusBadRequest,
-		}, err)
-		return
-	}
-
-	// Validate required fields
-	if req.Email == "" || req.Password == "" {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "MISSING_CREDENTIALS",
-			Message:    "Email and password are required",
-			StatusCode: http.StatusBadRequest,
-		}, nil)
-		return
-	}
-
-	// Validate password strength
-	isValid, errorMsg := validatePassword(req.Password)
-	if !isValid {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "WEAK_PASSWORD",
-			Message:    errorMsg,
-			StatusCode: http.StatusBadRequest,
-		}, nil)
-		return
-	}
-
-	// Ensure user data has tier set
-	if req.UserData == nil {
-		req.UserData = make(map[string]interface{})
-	}
-	if _, ok := req.UserData["tier"]; !ok {
-		req.UserData["tier"] = "free"
-	}
-
-	// Sign up with Supabase
-	ctx := context.Background()
-	user, err := a.Supabase.Auth.SignUp(ctx, supabase.UserCredentials{
-		Email:    req.Email,
-		Password: req.Password,
-		Data:     req.UserData,
-	})
-
-	if err != nil {
-		// Check for common errors
-		errMsg := err.Error()
-		if strings.Contains(strings.ToLower(errMsg), "already") ||
-			strings.Contains(strings.ToLower(errMsg), "taken") {
-			a.ErrorHandler.RespondWithError(w, r, a.ErrorHandler.errors.EmailTaken, err)
-		} else {
-			a.ErrorHandler.RespondWithError(w, r, AuthError{
-				Code:       "SIGNUP_FAILED",
-				Message:    "Failed to create account",
-				StatusCode: http.StatusBadRequest,
-				Internal:   err,
-			}, err)
+// isNavSection checks if a section name is in OrderNav
+func isNavSection(section string) bool {
+	for _, navSection := range OrderNav {
+		if navSection == section {
+			return true
 		}
-		return
 	}
+	return false
+}
 
-	// Check if email confirmation is required
-	if user.ConfirmedAt.IsZero() {
-		// Email confirmation required
-		a.Logger.Printf("Signup successful, email confirmation required: %s", maskEmail(req.Email))
-		a.ResponseHelper.SendSuccess(w, "Account created successfully. Please check your email to verify your account.", map[string]interface{}{
-			"user": map[string]interface{}{
-				"id":             user.ID,
-				"email":          user.Email,
-				"emailConfirmed": false,
-			},
-			"emailConfirmationRequired": true,
-		})
-		return
-	}
-
-	// If email already confirmed, log in the user automatically
-	a.Logger.Printf("Signup successful with pre-confirmed email: %s", maskEmail(req.Email))
-	authResponse, err := a.Supabase.Auth.SignIn(ctx, supabase.UserCredentials{
-		Email:    req.Email,
-		Password: req.Password,
-	})
-
+// GetParamFromSig gets a parameter from a signature
+func GetParamFromSig(sig, param string) string {
+	raw, err := base64.StdEncoding.DecodeString(sig)
 	if err != nil {
-		// Return partial success without session
-		a.ResponseHelper.SendSuccess(w, "Account created successfully. Please check your email to verify your account.", map[string]interface{}{
-			"user": map[string]interface{}{
-				"id":             user.ID,
-				"email":          user.Email,
-				"emailConfirmed": true,
-			},
-		})
-
-		return
+		return ""
 	}
-
-	// Extract tier from metadata
-	tier := extractTier(user)
-
-	// Get role
-	role := getUserRole(user)
-
-	// Generate CSRF token
-	csrfToken := a.SessionManager.generateCSRFToken(user.ID)
-
-	// Generate BAN signature
-	userData := &UserData{
-		UserId: user.ID,
-		Email:  user.Email,
-		Tier:   tier,
+	v, err := url.ParseQuery(string(raw))
+	if err != nil {
+		return ""
 	}
+	return v.Get(param)
+}
 
+// putSignatureInCookies puts a signature in cookies
+func (a *AuthService) putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
 	baseURL := getBaseURL(r)
-	banSignature := a.sign(baseURL, tier, userData)
 
-	// Create session
-	session := &UserSession{
-		AccessToken:  authResponse.AccessToken,
-		RefreshToken: authResponse.RefreshToken,
-		CSRFToken:    csrfToken,
-		BanSignature: banSignature,
-		UserID:       user.ID,
-		Email:        user.Email,
-		Tier:         tier,
-		Role:         role,
-		Metadata:     user.UserMetadata,
-		ExpiresAt:    time.Now().Add(24 * time.Hour),
+	year, month, _ := time.Now().Date()
+	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
+	domain := "mtgban.com"
+	if strings.Contains(baseURL, "localhost") {
+		domain = "localhost"
 	}
 
-	// Set session cookies
-	a.SessionManager.SetSession(w, r, session)
+	cookie := http.Cookie{
+		Name:    "MTGBAN",
+		Domain:  domain,
+		Path:    "/",
+		Expires: endOfThisMonth,
+		Value:   sig,
+	}
 
-	// Return full success response with session
-	a.ResponseHelper.SendSuccess(w, "Signup successful", map[string]interface{}{
-		"user": map[string]interface{}{
-			"id":             user.ID,
-			"email":          user.Email,
-			"emailConfirmed": true,
-			"tier":           tier,
-			"role":           role,
-			"user_metadata":  user.UserMetadata,
-		},
-		"session": map[string]interface{}{
-			"expires_at": session.ExpiresAt.Unix(),
-			"csrf_token": csrfToken,
-		},
+	http.SetCookie(w, &cookie)
+}
+
+// setAuthCookies sets authentication cookies
+// Ensure the remember option is working correctly
+func (a *AuthService) setAuthCookies(w http.ResponseWriter, r *http.Request, token, refreshToken string, rememberMe bool) {
+	// Set the token expiration time based on remember option
+	maxAge := 24 * 60 * 60 // 24 hours by default
+	if rememberMe {
+		maxAge = 30 * 24 * 60 * 60 // 30 days if remember is checked
+	}
+
+	// Determine security settings
+	isSecure := r.TLS != nil || !a.DebugMode
+	sameSiteMode := http.SameSiteStrictMode
+	if a.DebugMode {
+		sameSiteMode = http.SameSiteLaxMode
+	}
+
+	// Set auth token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   maxAge,
+		Secure:   isSecure,
+		SameSite: sameSiteMode,
+	})
+
+	// Set refresh token cookie (longer expiry)
+	refreshMaxAge := 60 * 24 * 60 * 60 // 60 days by default
+	if rememberMe {
+		refreshMaxAge = 365 * 24 * 60 * 60 // 1 year if remember is checked
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   refreshMaxAge,
+		Secure:   isSecure,
+		SameSite: sameSiteMode,
 	})
 }
 
-// handleLogoutAPI handles API logout requests
-func (a *AuthService) handleLogoutAPI(w http.ResponseWriter, r *http.Request) {
-	// Get token from cookie
-	authCookie, err := r.Cookie("auth_token")
-	if err == nil && authCookie.Value != "" {
-		// Sign out from Supabase
-		ctx := context.Background()
-		err := a.Supabase.Auth.SignOut(ctx, authCookie.Value)
-		if err != nil {
-			a.Logger.Printf("Supabase logout error: %v", err)
-		}
-	}
-
-	// Clear all session cookies
-	a.SessionManager.ClearSession(w, r)
-
-	// Return success response
-	a.ResponseHelper.SendSuccess(w, "Logout successful", nil)
-}
-
-// handleGetUserAPI handles API requests to get current user information
-func (a *AuthService) handleGetUserAPI(w http.ResponseWriter, r *http.Request) {
-	// Get session from context (added by Authentication middleware)
-	session, ok := r.Context().Value("session").(*UserSession)
-	if !ok {
-		a.ErrorHandler.RespondWithError(w, r, a.ErrorHandler.errors.MissingToken, nil)
-		return
-	}
-
-	// Try to get user details
-	userDetails, _ := a.getUserDetails(session.UserID)
-
-	// Try to get subscription info
-	subscription, _ := a.getUserSubscription(session.UserID)
-
-	// Return user data
-	a.ResponseHelper.SendSuccess(w, "User data retrieved", map[string]interface{}{
-		"user": map[string]interface{}{
-			"id":            session.UserID,
-			"email":         session.Email,
-			"tier":          session.Tier,
-			"role":          session.Role,
-			"user_metadata": session.Metadata,
-		},
-		"userDetails":  userDetails,
-		"subscription": subscription,
-		"csrf_token":   session.CSRFToken,
-	})
-}
-
-// handleRefreshTokenAPI handles API requests to refresh authentication tokens
-func (a *AuthService) handleRefreshTokenAPI(w http.ResponseWriter, r *http.Request) {
-	// Attempt to refresh the session
-	session, err := a.SessionManager.RefreshSession(w, r)
-	if err != nil {
-		a.ErrorHandler.RespondWithError(w, r, a.ErrorHandler.errors.SessionExpired, err)
-		return
-	}
-
-	// Return success with updated session info
-	a.ResponseHelper.SendSuccess(w, "Token refreshed successfully", map[string]interface{}{
-		"user": map[string]interface{}{
-			"id":    session.UserID,
-			"email": session.Email,
-			"tier":  session.Tier,
-			"role":  session.Role,
-		},
-		"session": map[string]interface{}{
-			"expires_at": session.ExpiresAt.Unix(),
-			"csrf_token": session.CSRFToken,
-		},
-	})
-}
-
-// handleForgotPasswordAPI handles API password reset requests
-func (a *AuthService) handleForgotPasswordAPI(w http.ResponseWriter, r *http.Request) {
-	// Only accept POST requests
-	if r.Method != http.MethodPost {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "METHOD_NOT_ALLOWED",
-			Message:    "Method not allowed",
-			StatusCode: http.StatusMethodNotAllowed,
-		}, nil)
-		return
-	}
-
-	// Parse request
-	var req PasswordResetRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_REQUEST",
-			Message:    "Invalid request format",
-			StatusCode: http.StatusBadRequest,
-		}, err)
-		return
-	}
-
-	// Validate email
-	if req.Email == "" {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "MISSING_EMAIL",
-			Message:    "Email is required",
-			StatusCode: http.StatusBadRequest,
-		}, nil)
-		return
-	}
-
-	// Request password reset from Supabase
-	ctx := context.Background()
-	err := a.Supabase.Auth.ResetPasswordForEmail(ctx, req.Email, "/auth/reset-password")
-
-	// For security reasons, don't reveal if the email exists
-	if err != nil {
-		a.Logger.Printf("Password reset request failed: %v", err)
-	} else {
-		a.Logger.Printf("Password reset request sent to: %s", maskEmail(req.Email))
-	}
-
-	// Return success response regardless to prevent email enumeration
-	a.ResponseHelper.SendSuccess(w, "If an account exists with that email, we've sent password reset instructions.", nil)
-}
-
-// handleResetPasswordAPI handles API password reset completions
-func (a *AuthService) handleResetPasswordAPI(w http.ResponseWriter, r *http.Request) {
-	// Only accept POST requests
-	if r.Method != http.MethodPost {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "METHOD_NOT_ALLOWED",
-			Message:    "Method not allowed",
-			StatusCode: http.StatusMethodNotAllowed,
-		}, nil)
-		return
-	}
-
-	// Parse request
-	var req PasswordUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_REQUEST",
-			Message:    "Invalid request format",
-			StatusCode: http.StatusBadRequest,
-		}, err)
-		return
-	}
-
-	// Validate required fields
-	if req.Password == "" || req.Token == "" {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "MISSING_FIELDS",
-			Message:    "Password and token are required",
-			StatusCode: http.StatusBadRequest,
-		}, nil)
-		return
-	}
-
-	// Validate password strength
-	isValid, errorMsg := validatePassword(req.Password)
-	if !isValid {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "WEAK_PASSWORD",
-			Message:    errorMsg,
-			StatusCode: http.StatusBadRequest,
-		}, nil)
-		return
-	}
-
-	// Update user's password with token
-	ctx := context.Background()
-	updateData := map[string]interface{}{
-		"password": req.Password,
-	}
-
-	user, err := a.Supabase.Auth.UpdateUser(ctx, req.Token, updateData)
-	if err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "RESET_FAILED",
-			Message:    "Failed to reset password",
-			StatusCode: http.StatusInternalServerError,
-		}, err)
-		return
-	}
-
-	// Log the successful password reset
-	a.Logger.Printf("Password reset successful for user ID: %s", maskID(user.ID))
-
-	// Return success response with redirect to login page
-	a.ResponseHelper.SendRedirect(w, "Your password has been reset successfully. You can now log in with your new password.", "/auth/login", nil)
-}
-
-// ==============================================================================================
-// Form Handlers
-// ==============================================================================================
-
-// handleLoginFormSubmit handles form-based login requests
-func (a *AuthService) handleLoginFormSubmit(w http.ResponseWriter, r *http.Request) {
-	// Parse form
-	if err := r.ParseForm(); err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_FORM",
-			Message:    "Error parsing form data",
-			StatusCode: http.StatusBadRequest,
-			Internal:   err,
-		}, NewStandardErrors().InvalidForm)
-		return
-	}
-
-	// Extract email and password
-	email := r.FormValue("email")
-	password := r.FormValue("password")
-	rememberMe := r.FormValue("remember") == "on"
-	returnTo := r.FormValue("return_to")
-
-	if email == "" || password == "" {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "MISSING_CREDENTIALS",
-			Message:    "Email and password are required",
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidCredentials)
-		return
-	}
-
-	// Authenticate with Supabase
-	session, err := a.authenticateUser(email, password, rememberMe)
-	if err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_CREDENTIALS",
-			Message:    "Invalid email or password",
-			StatusCode: http.StatusUnauthorized,
-		}, NewStandardErrors().InvalidCredentials)
-		return
-	}
-
-	// Set session cookies
-	a.SessionManager.SetSession(w, r, session)
-
-	// Redirect to return path or default
-	if returnTo == "" {
-		returnTo = "/"
-	}
-
-	http.Redirect(w, r, returnTo, http.StatusSeeOther)
-}
-
-// handleSignupFormSubmit handles form-based signup requests
-func (a *AuthService) handleSignupFormSubmit(w http.ResponseWriter, r *http.Request) {
-	// Parse form
-	if err := r.ParseForm(); err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_FORM",
-			Message:    "Error parsing form data",
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidForm)
-		return
-	}
-
-	// Extract form values
-	email := r.FormValue("email")
-	password := r.FormValue("password")
-	confirmPassword := r.FormValue("confirm-password")
-
-	// Basic validation
-	if email == "" || password == "" {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "MISSING_CREDENTIALS",
-			Message:    "Email and password are required",
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidCredentials)
-		return
-	}
-
-	if password != confirmPassword {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "PASSWORD_MISMATCH",
-			Message:    "Passwords do not match",
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidCredentials)
-		return
-	}
-
-	// Validate password strength
-	isValid, errorMsg := validatePassword(password)
-	if !isValid {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "WEAK_PASSWORD",
-			Message:    errorMsg,
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().WeakPassword)
-		return
-	}
-
-	// Setup user metadata
-	userData := map[string]interface{}{
-		"tier": "free", // Default tier
-	}
-
-	// Create user in Supabase
-	ctx := context.Background()
-	user, err := a.Supabase.Auth.SignUp(ctx, supabase.UserCredentials{
-		Email:    email,
-		Password: password,
-		Data:     userData,
-	})
-
-	if err != nil {
-		// Check for email already taken
-		if strings.Contains(strings.ToLower(err.Error()), "already") {
-			a.ErrorHandler.RespondWithError(w, r, AuthError{
-				Code:       "EMAIL_TAKEN",
-				Message:    "Email is already taken",
-				StatusCode: http.StatusBadRequest,
-			}, NewStandardErrors().EmailTaken)
-		} else {
-			a.ErrorHandler.RespondWithError(w, r, AuthError{
-				Code:       "SIGNUP_FAILED",
-				Message:    "Failed to create account",
-				StatusCode: http.StatusInternalServerError,
-				Internal:   err,
-			}, NewStandardErrors().ServerError)
-		}
-		return
-	}
-
-	// Check if email confirmation is required
-	if user.ConfirmedAt.IsZero() {
-		// Redirect to confirmation page
-		confirmURL := fmt.Sprintf("/auth/confirmation?email=%s", url.QueryEscape(email))
-		http.Redirect(w, r, confirmURL, http.StatusSeeOther)
-		return
-	}
-
-	// If email already confirmed, redirect to success page
-	successURL := "/auth/success?redirectTo=/auth/login&message=Account created successfully. You can now log in."
-	http.Redirect(w, r, successURL, http.StatusSeeOther)
-}
-
-// handleLogoutForm handles form-based logout requests
-func (a *AuthService) handleLogoutForm(w http.ResponseWriter, r *http.Request) {
-	// Get token from cookie and sign out from Supabase
-	authCookie, err := r.Cookie("auth_token")
-	if err == nil && authCookie.Value != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		err := a.Supabase.Auth.SignOut(ctx, authCookie.Value)
-		if err != nil {
-			a.Logger.Printf("Supabase logout error: %v", err)
-		}
-	}
-
-	// Clear all session cookies
-	a.SessionManager.ClearSession(w, r)
-
-	// Serve a cleanup page with JavaScript to clear client-side state
-	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
-
-	// Construct home URL
+// clearAuthCookies clears authentication cookies
+func (a *AuthService) clearAuthCookies(w http.ResponseWriter, r *http.Request) {
+	// Clear auth token cookie
 	baseURL := getBaseURL(r)
-	homeURL := baseURL
-	if !strings.HasSuffix(homeURL, "/") {
-		homeURL += "/"
+	domain := "mtgban.com"
+	if strings.Contains(baseURL, "localhost") {
+		domain = "localhost"
 	}
 
-	logoutHTML := `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Logging Out</title>
-        <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-        <script>
-            // Clear all client-side state
-            function cleanupAndRedirect() {
-                // Clear localStorage and sessionStorage
-                try {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                } catch (e) {
-                    console.error("Storage clear error:", e);
-                }
+	http.SetCookie(w, &http.Cookie{
+		Name:     "MTGBAN",
+		Value:    "",
+		Path:     "/",
+		Domain:   domain,
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
 
-                // Clear all cookies by setting expired date
-                document.cookie.split(";").forEach(function(c) {
-                    document.cookie = c.trim().split("=")[0] + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
-                    document.cookie = c.trim().split("=")[0] + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
-                });
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
 
-                // Redirect to home with cache buster
-                window.location.href = "` + homeURL + `?nocache=" + new Date().getTime();
-            }
+	// Clear refresh token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		MaxAge:   -1,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
 
-            // Run immediately
-            cleanupAndRedirect();
-        </script>
-    </head>
-    <body>
-        <h1>Logging you out...</h1>
-        <p>Please wait while we complete the logout process.</p>
-        <p>If you're not redirected, <a href="` + homeURL + `">click here</a>.</p>
-    </body>
-    </html>
-    `
-	w.Write([]byte(logoutHTML))
+	// Clear CSRF token
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: false,
+		MaxAge:   -1,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
-// handleForgotPasswordFormSubmit handles form-based password reset requests
-func (a *AuthService) handleForgotPasswordFormSubmit(w http.ResponseWriter, r *http.Request) {
-	// Parse form
-	if err := r.ParseForm(); err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_FORM",
-			Message:    "Error parsing form data",
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidForm)
-		return
-	}
-
-	// Extract email
-	email := r.FormValue("email")
-	if email == "" {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "MISSING_EMAIL",
-			Message:    "Email is required",
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidCredentials)
-		return
-	}
-
-	// Request password reset from Supabase
-	ctx := context.Background()
-	err := a.Supabase.Auth.ResetPasswordForEmail(ctx, email, "/auth/reset-password")
-
-	// For security reasons, don't reveal if the email exists
-	if err != nil {
-		a.Logger.Printf("Password reset request failed: %v", err)
-	} else {
-		a.Logger.Printf("Password reset request sent to: %s", maskEmail(email))
-	}
-
-	// Redirect to reset password sent page
-	resetSentURL := fmt.Sprintf("/auth/reset-password-sent?email=%s", url.QueryEscape(email))
-	http.Redirect(w, r, resetSentURL, http.StatusSeeOther)
+// sendAPISuccess sends a successful API response
+func (a *AuthService) sendAPISuccess(w http.ResponseWriter, message string, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: true,
+		Message: message,
+		Data:    data,
+	})
 }
 
-// handleResetPasswordFormSubmit handles form-based password reset completions
-func (a *AuthService) handleResetPasswordFormSubmit(w http.ResponseWriter, r *http.Request) {
-	// Parse form data
-	if err := r.ParseForm(); err != nil {
-		a.Logger.Printf("Error parsing form data: %v", err)
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "INVALID_FORM",
-			Message:    "Error parsing form data",
-			StatusCode: http.StatusBadRequest,
-			Internal:   err,
-		}, NewStandardErrors().InvalidForm)
-		return
+// handleAPIError handles API errors
+func (a *AuthService) handleAPIError(w http.ResponseWriter, r *http.Request, err AuthError) {
+	// Log internal error if present
+	if err.Internal != nil {
+		a.logWithContext(r, "API error (%s): %v", err.Code, err.Internal)
 	}
 
-	// Get form values
-	password := r.FormValue("password")
-	confirmPassword := r.FormValue("confirm-password")
-	token := r.FormValue("token") // This is the reset token from the URL
-
-	// Validate inputs
-	if password == "" || token == "" {
-		a.Logger.Printf("Password reset with empty fields")
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "MISSING_FIELDS",
-			Message:    "Password and token are required",
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidForm)
-		return
-	}
-
-	if password != confirmPassword {
-		a.Logger.Printf("Password reset passwords don't match")
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "PASSWORD_MISMATCH",
-			Message:    "Passwords do not match",
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidForm)
-		return
-	}
-
-	// Validate password strength
-	isValid, errorMsg := validatePassword(password)
-	if !isValid {
-		a.Logger.Printf("Password validation failed: %s", errorMsg)
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "WEAK_PASSWORD",
-			Message:    errorMsg,
-			StatusCode: http.StatusBadRequest,
-		}, NewStandardErrors().InvalidForm)
-		return
-	}
-
-	// Update user's password with token
-	ctx := context.Background()
-	updateData := map[string]interface{}{
-		"password": password,
-	}
-
-	user, err := a.Supabase.Auth.UpdateUser(ctx, token, updateData)
-	if err != nil {
-		a.Logger.Printf("Password reset failed: %v", err)
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "RESET_FAILED",
-			Message:    "Failed to reset password",
-			StatusCode: http.StatusInternalServerError,
-			Internal:   err,
-		}, NewStandardErrors().InvalidForm)
-		return
-	}
-
-	// Log the successful password reset
-	a.Logger.Printf("Password reset successful for user ID: %s", maskID(user.ID))
-
-	// Redirect to success page
-	successURL := fmt.Sprintf("/auth/success?redirectTo=%s&message=%s",
-		url.QueryEscape("/auth/login"),
-		url.QueryEscape("Your password has been reset successfully. You can now log in with your new password."))
-
-	http.Redirect(w, r, successURL, http.StatusSeeOther)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(err.StatusCode)
+	json.NewEncoder(w).Encode(APIResponse{
+		Success: false,
+		Error:   err.Message,
+		Code:    err.Code,
+	})
 }
 
-// handleAccountAPI handles account API requests
-func (a *AuthService) handleAccountAPI(w http.ResponseWriter, r *http.Request) {
-	// Only accept POST requests
-	if r.Method != http.MethodPost {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "METHOD_NOT_ALLOWED",
-			Message:    "Method not allowed",
-			StatusCode: http.StatusMethodNotAllowed,
-		}, NewStandardErrors().Forbidden)
-		return
+// handleFormError handles form errors with redirects
+func (a *AuthService) handleFormError(w http.ResponseWriter, r *http.Request, err AuthError, returnPath string) {
+	// Log internal error if present
+	if err.Internal != nil {
+		a.logWithContext(r, "Form error (%s): %v", err.Code, err.Internal)
 	}
 
-	// Get user session
-	session, err := a.SessionManager.GetSession(r)
-	if err != nil {
-		a.ErrorHandler.RespondWithError(w, r, AuthError{
-			Code:       "UNAUTHORIZED",
-			Message:    "Unauthorized",
-			StatusCode: http.StatusUnauthorized,
-		}, NewStandardErrors().Unauthorized)
-		return
-	}
+	// Redirect with error message
+	redirectURL := fmt.Sprintf("%s?error=%s&message=%s",
+		returnPath,
+		url.QueryEscape(err.Code),
+		url.QueryEscape(err.Message))
 
-	userEmail := session.Email
-	userTier := session.Tier
-	userRole := session.Role
-	userFullName := session.Metadata["full_name"]
-
-	// Create response
-	response := map[string]interface{}{
-		"tier":  userTier,
-		"role":  userRole,
-		"email": userEmail,
-		"name":  userFullName,
-	}
-
-	// Send response
-	a.ResponseHelper.SendSuccess(w, "Account data retrieved", response)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
-// ==============================================================================================
-// Utility Functions
-// ==============================================================================================
+// ============================================================================================
+// Route Registration
+// ============================================================================================
 
-// extractTier extracts the tier from user metadata
-func extractTier(userInfo *supabase.User) string {
-	if userInfo == nil || userInfo.UserMetadata == nil {
-		return "free"
-	}
-
-	tierVal, ok := userInfo.UserMetadata["tier"].(string)
-	if !ok || tierVal == "" {
-		return "free"
-	}
-
-	return tierVal
+// responseWriter wraps http.ResponseWriter to capture the status code
+type responseWriter struct {
+	http.ResponseWriter
+	status int
 }
 
-// getUserRole extracts the role from user metadata or defaults to "user"
-func getUserRole(userInfo *supabase.User) string {
-	if userInfo == nil || userInfo.UserMetadata == nil {
-		return "user"
-	}
-
-	roleVal, ok := userInfo.UserMetadata["role"].(string)
-	if !ok || roleVal == "" {
-		return "user"
-	}
-
-	return roleVal
+// newResponseWriter creates a new response writer
+func newResponseWriter(w http.ResponseWriter) *responseWriter {
+	return &responseWriter{w, http.StatusOK}
 }
 
-// determineReturnPath determines the appropriate return path for a redirect
-func determineReturnPath(r *http.Request, err AuthError) string {
-	// Check for return_to parameter
-	returnTo := r.FormValue("return_to")
-	if returnTo != "" {
-		return returnTo
-	}
-
-	// Default paths based on error context
-	if strings.Contains(r.URL.Path, "login") || err.Code == "INVALID_CREDENTIALS" {
-		return "/auth/login"
-	} else if strings.Contains(r.URL.Path, "signup") || err.Code == "EMAIL_TAKEN" {
-		return "/auth/signup"
-	} else if strings.Contains(r.URL.Path, "reset-password") || err.Code == "RESET_FAILED" {
-		return "/auth/reset-password"
-	} else if strings.Contains(r.URL.Path, "forgot-password") {
-		return "/auth/forgot-password"
-	}
-
-	// Default fallback
-	return "/auth/login"
+// WriteHeader overrides the original WriteHeader to capture the status code
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
 }
 
-// isFormSubmission determines if a request is a form submission
-func isFormSubmission(r *http.Request) bool {
-	// Check method
-	if r.Method != "POST" {
-		return false
-	}
+// ============================================================================================
+// InitAuth - Legacy Compatibility Function
+// ============================================================================================
 
-	// Check content type
-	contentType := r.Header.Get("Content-Type")
-	return strings.Contains(contentType, "application/x-www-form-urlencoded") ||
-		strings.Contains(contentType, "multipart/form-data")
-}
+func noSigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
 
-// isAPIRequest determines if a request is an API request
-func isAPIRequest(r *http.Request) bool {
-	// Check path first (faster check)
-	if strings.Contains(r.URL.Path, "/api/") || strings.Contains(r.URL.Path, "/next-api/") {
-		return true
-	}
-
-	// Check Accept header
-	accept := r.Header.Get("Accept")
-	return strings.Contains(accept, "application/json")
-}
-
-// getBaseURL gets the base URL for the request
-func getBaseURL(r *http.Request) string {
-	scheme := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-		scheme = "https"
-	}
-
-	host := r.Host
-	if host == "" {
-		host = DefaultHost
-	}
-
-	return fmt.Sprintf("%s://%s", scheme, host)
-}
-
-// determinePathSection maps a path to a section
-func determinePathSection(path string, navSections []string) string {
-	// Map common path prefixes to sections
-	pathSectionMap := map[string]string{
-		"/search":           "Search",
-		"/sets":             "Search",
-		"/sealed":           "Search",
-		"/newspaper":        "Newspaper",
-		"/sleepers":         "Sleepers",
-		"/upload":           "Upload",
-		"/global":           "Global",
-		"/arbit":            "Arbit",
-		"/reverse":          "Reverse",
-		"/admin":            "Admin",
-		"/api/mtgban/":      "API",
-		"/api/mtgjson/":     "API",
-		"/api/tcgplayer/":   "API",
-		"/api/search/":      "Search",
-		"/api/cardkingdom/": "API",
-		"/api/suggest":      "API",
-	}
-
-	// Check exact matches
-	if section, exists := pathSectionMap[path]; exists {
-		return section
-	}
-
-	// Check prefixes
-	for prefix, section := range pathSectionMap {
-		if strings.HasPrefix(path, prefix) {
-			return section
+		querySig := getSignatureFromCookies(r)
+		if querySig != "" {
+			authService.putSignatureInCookies(w, r, querySig)
 		}
-	}
 
-	// If no mapping found, try to match with nav sections
-	for _, section := range navSections {
-		if strings.Contains(path, strings.ToLower(section)) {
-			return section
+		next.ServeHTTP(w, r)
+	})
+}
+
+// enforceAPISigning is a middleware that enforces API signing (legacy compatibility)
+func enforceAPISigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+
+		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
+
+		ip, err := IpAddress(r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
 		}
-	}
 
-	return ""
+		if !APIRateLimiter.allow(string(ip)) {
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			return
+		}
+
+		if !DatabaseLoaded {
+			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+
+		sig := r.FormValue("sig")
+
+		// If signature is empty let it pass through
+		if sig == "" {
+			gziphandler.GzipHandler(next).ServeHTTP(w, r)
+			return
+		}
+
+		raw, err := base64.StdEncoding.DecodeString(sig)
+		if SigCheck && err != nil {
+			log.Println("API error, no sig", err)
+			w.Write([]byte(`{"error": "invalid signature"}`))
+			return
+		}
+
+		v, err := url.ParseQuery(string(raw))
+		if SigCheck && err != nil {
+			log.Println("API error, no b64", err)
+			w.Write([]byte(`{"error": "invalid b64 signature"}`))
+			return
+		}
+
+		q := url.Values{}
+		q.Set("API", v.Get("API"))
+
+		for _, optional := range OptionalFields {
+			val := v.Get(optional)
+			if val != "" {
+				q.Set(optional, val)
+			}
+		}
+
+		sig = v.Get("Signature")
+		exp := v.Get("Expires")
+
+		secret := os.Getenv("BAN_SECRET")
+		apiUsersMutex.RLock()
+		user_secret, found := Config.ApiUserSecrets[v.Get("UserEmail")]
+		apiUsersMutex.RUnlock()
+		if found {
+			secret = user_secret
+		}
+
+		var expires int64
+		if exp != "" {
+			expires, err = strconv.ParseInt(exp, 10, 64)
+			if err != nil {
+				log.Println("API error", err.Error())
+				w.Write([]byte(`{"error": "invalid or expired signature"}`))
+				return
+			}
+			q.Set("Expires", exp)
+		}
+
+		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
+		valid := authService.signHMACSHA256Base64([]byte(secret), []byte(data))
+
+		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
+			log.Println("API error, invalid", data)
+			w.Write([]byte(`{"error": "invalid or expired signature"}`))
+			return
+		}
+
+		gziphandler.GzipHandler(next).ServeHTTP(w, r)
+	})
 }
 
-// getSubPathPermission extracts the specific permission needed for a path
-func getSubPathPermission(path string) string {
-	// Extract sub-features from path
-	if strings.Contains(path, "buylist") {
-		return "buylist"
-	} else if strings.Contains(path, "optimizer") {
-		return "optimizer"
-	} else if strings.Contains(path, "download") || strings.Contains(path, "csv") {
-		return "download"
-	} else if strings.Contains(path, "changestore") {
-		return "changestore"
-	} else if strings.Contains(path, "sealed") {
-		return "sealed"
-	}
-	return ""
+// enforceSigning is a middleware that enforces signing (legacy compatibility)
+func enforceSigning(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+
+		if authService.isExemptPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		sig := getSignatureFromCookies(r)
+		querySig := r.FormValue("sig")
+		if querySig != "" {
+			sig = querySig
+			authService.putSignatureInCookies(w, r, querySig)
+		}
+
+		switch r.Method {
+		case "GET":
+		case "POST":
+			var ok bool
+			for _, nav := range ExtraNavs {
+				if nav.Link == r.URL.Path {
+					ok = nav.CanPOST
+				}
+			}
+			if !ok {
+				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+				return
+			}
+		default:
+			http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		pageVars := genPageNav("Error", r, sig)
+
+		if !UserRateLimiter.allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
+			pageVars.Title = "Too Many Requests"
+			pageVars.ErrorMessage = ErrMsgUseAPI
+
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		raw, err := base64.StdEncoding.DecodeString(sig)
+		if SigCheck && err != nil {
+			pageVars.Title = "Unauthorized"
+			pageVars.ErrorMessage = ErrMsg
+			if DevMode {
+				pageVars.ErrorMessage += " - " + err.Error()
+			}
+
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		v, err := url.ParseQuery(string(raw))
+		if SigCheck && err != nil {
+			pageVars.Title = "Unauthorized"
+			pageVars.ErrorMessage = ErrMsg
+			if DevMode {
+				pageVars.ErrorMessage += " - " + err.Error()
+			}
+
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		q := url.Values{}
+		for _, optional := range append(OrderNav, OptionalFields...) {
+			val := v.Get(optional)
+			if val != "" {
+				q.Set(optional, val)
+			}
+		}
+
+		expectedSig := v.Get("Signature")
+		exp := v.Get("Expires")
+
+		data := fmt.Sprintf("GET%s%s%s", exp, getBaseURL(r), q.Encode())
+		valid := authService.signHMACSHA256Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+		expires, err := strconv.ParseInt(exp, 10, 64)
+		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
+			if r.Method != "GET" {
+				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			pageVars.Title = "Unauthorized"
+			pageVars.ErrorMessage = ErrMsg
+			if valid == expectedSig && expires < time.Now().Unix() {
+				pageVars.ErrorMessage = ErrMsgExpired
+				if DevMode {
+					pageVars.ErrorMessage += " - sig expired"
+				}
+			}
+
+			if DevMode {
+				if err != nil {
+					pageVars.ErrorMessage += " - " + err.Error()
+				} else {
+					pageVars.ErrorMessage += " - wrong host"
+				}
+			}
+			// If sig is invalid, redirect to home
+			render(w, "home.html", pageVars)
+			return
+		}
+
+		if !DatabaseLoaded && r.URL.Path != "/admin" {
+			page := "home.html"
+			for _, navName := range OrderNav {
+				nav := ExtraNavs[navName]
+				if r.URL.Path == nav.Link {
+					pageVars = genPageNav(nav.Name, r, sig)
+					page = nav.Page
+				}
+			}
+			pageVars.Title = "Great things are coming"
+			pageVars.ErrorMessage = ErrMsgRestart
+
+			render(w, page, pageVars)
+			return
+		}
+
+		for _, navName := range OrderNav {
+			nav := ExtraNavs[navName]
+			if r.URL.Path == nav.Link {
+				param := GetParamFromSig(sig, navName)
+				canDo, _ := strconv.ParseBool(param)
+				if DevMode && nav.AlwaysOnForDev {
+					canDo = true
+				}
+				if SigCheck && !canDo {
+					pageVars = genPageNav(nav.Name, r, sig)
+					pageVars.Title = "This feature is BANned"
+					pageVars.ErrorMessage = ErrMsgPlus
+
+					render(w, nav.Page, pageVars)
+					return
+				}
+				break
+			}
+		}
+
+		gziphandler.GzipHandler(next).ServeHTTP(w, r)
+	})
 }
 
-// GetParamFromSig extracts a parameter from the BAN signature
-func GetParamFromSig(sig, paramName string) string {
-	if sig == "" {
+// getSignatureFromCookies returns the signature from the cookies
+func getSignatureFromCookies(r *http.Request) string {
+	_, authErr := r.Cookie("auth_token")
+	if authErr != nil {
 		return ""
 	}
 
-	// Decode base64 signature
-	decodedBytes, err := base64.StdEncoding.DecodeString(sig)
-	if err != nil {
-		return ""
-	}
-
-	// Parse as URL query parameters
-	values, err := url.ParseQuery(string(decodedBytes))
-	if err != nil {
-		return ""
-	}
-
-	// Return the requested parameter
-	return values.Get(paramName)
-}
-
-// validatePassword checks password strength
-func validatePassword(password string) (bool, string) {
-	if len(password) < 8 {
-		return false, "Password must be at least 8 characters long"
-	}
-
-	var (
-		hasLetter bool
-		hasDigit  bool
-	)
-
-	for _, c := range password {
-		switch {
-		case unicode.IsLetter(c):
-			hasLetter = true
-		case unicode.IsDigit(c):
-			hasDigit = true
+	var sig string
+	for _, cookie := range r.Cookies() {
+		if cookie.Name == "MTGBAN" {
+			sig = cookie.Value
+			break
 		}
 	}
 
-	if !hasLetter {
-		return false, "Password must contain at least one letter"
+	querySig := r.FormValue("sig")
+	if sig == "" && querySig != "" {
+		sig = querySig
 	}
 
-	if !hasDigit {
-		return false, "Password must contain at least one number"
+	exp := GetParamFromSig(sig, "Expires")
+	if exp == "" {
+		return ""
 	}
 
-	return true, ""
+	expires, err := strconv.ParseInt(exp, 10, 64)
+	if err != nil || expires < time.Now().Unix() {
+		return ""
+	}
+
+	return sig
 }
 
-func SignHMACSHA256Base64(key, data []byte) string {
-	mac := hmac.New(sha256.New, key)
-	mac.Write(data)
-	signature := mac.Sum(nil)
-	return base64.StdEncoding.EncodeToString(signature)
+func recoverPanic(r *http.Request, w http.ResponseWriter) {
+	errPanic := recover()
+	if errPanic != nil {
+		log.Println("panic occurred:", errPanic)
+
+		// Restrict stack size to fit into discord message
+		buf := make([]byte, 1<<16)
+		n := runtime.Stack(buf, true)
+		if n > 1024 {
+			buf = buf[:1024]
+		}
+
+		var msg string
+		err, ok := errPanic.(error)
+		if ok {
+			msg = err.Error()
+		} else {
+			msg = fmt.Sprintf("%v", errPanic)
+		}
+
+		// Notify server administrators
+		ServerNotify("panic", msg, true)
+		ServerNotify("panic", string(buf[:n]))
+		ServerNotify("panic", "source request: "+r.URL.String())
+
+		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+	}
 }

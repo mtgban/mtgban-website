@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import LoginForm from '../components/auth/forms/LoginForm';
-import { useAuth } from '../context/AuthProvider';
+import LoginForm from '@/components/auth/forms/LoginForm';
+import { useAuth } from '@/context/AuthProvider';
 import AuthLayout from '@/components/auth/AuthLayout';
 import { AuthProvider } from '@/context/AuthContext';
 

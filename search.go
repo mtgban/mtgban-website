@@ -73,7 +73,7 @@ func isSame(a, b SearchEntry) bool {
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 
 func Search(w http.ResponseWriter, r *http.Request) {
-	sig := authService.GetSignature(r)
+	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav("Search", r, sig)
 
@@ -1306,9 +1306,7 @@ func SearchAPIJSON(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	if authService != nil && authService.SessionManager != nil && authService.SessionManager.authService != nil {
-		sig = authService.SessionManager.authService.GetSignature(r)
-	}
+	sig = getSignatureFromCookies(r)
 
 	// Safely get blocklists
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)

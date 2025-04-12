@@ -46,7 +46,7 @@ var BuildCommit = func() string {
 }()
 
 func Admin(w http.ResponseWriter, r *http.Request) {
-	sig := authService.SessionManager.authService.GetSignature(r)
+	sig := getSignatureFromCookies(r)
 
 	page := r.FormValue("page")
 	pageVars := genPageNav("Admin", r, sig)
@@ -119,7 +119,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	spoof := r.FormValue("spoof")
 	if spoof != "" {
 		baseURL := getBaseURL(r)
-		sig := authService.SessionManager.authService.GetSignature(r)
+		sig := getSignatureFromCookies(r)
 		if sig == "" {
 			http.Redirect(w, r, baseURL, http.StatusFound)
 			return
@@ -702,7 +702,7 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 	}
 
 	data := fmt.Sprintf("GET%s%s%s", exp, link, v.Encode())
-	sig := SignHMACSHA256Base64([]byte(key), []byte(data))
+	sig := authService.signHMACSHA256Base64([]byte(key), []byte(data))
 
 	v.Set("Signature", sig)
 	return base64.StdEncoding.EncodeToString([]byte(v.Encode())), nil

@@ -119,7 +119,7 @@ type OptimizedUploadEntry struct {
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
-	sig := authService.GetSignature(r)
+	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav("Upload", r, sig)
 
