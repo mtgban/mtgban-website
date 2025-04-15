@@ -24,6 +24,8 @@ import (
 type ckMeta struct {
 	Id  int    `json:"id,omitempty"`
 	URL string `json:"url,omitempty"`
+
+	path string
 }
 
 type ck2id struct {
@@ -122,6 +124,54 @@ func prepareCKAPI() error {
 			output[id].Foil = data
 		} else {
 			output[id].Normal = data
+		}
+	}
+
+	// Append Sealed data as well
+	sealedList, err := cardkingdom.NewCKClient().GetSealedList()
+	if err == nil {
+		list = append(list, sealedList...)
+	}
+
+	uuids := mtgmatcher.GetSealedUUIDs()
+	for _, cardId := range uuids {
+		co, _ := mtgmatcher.GetUUID(cardId)
+
+		ckId, found := co.Identifiers["cardKingdomId"]
+		if !found {
+			continue
+		}
+		id, err := strconv.Atoi(ckId)
+		if err != nil {
+			continue
+		}
+
+		for _, product := range sealedList {
+			if id != product.Id {
+				continue
+			}
+
+			_, found = output[co.UUID]
+			if !found {
+				output[co.UUID] = &ck2id{}
+			}
+
+			// Clean up one of the path components
+			edition := strings.ToLower(product.Edition)
+			edition = strings.Replace(edition, "'", "", -1)
+			edition = strings.Replace(edition, ":", "", -1)
+			edition = strings.Replace(edition, ".", "", -1)
+			edition = strings.Replace(edition, ",", "", -1)
+			edition = strings.Replace(edition, " -", "", -1)
+			edition = strings.Replace(edition, "&", "and", -1)
+			edition = strings.Replace(edition, " ", "-", -1)
+
+			data := &ckMeta{
+				Id:   product.Id,
+				URL:  "https://www.cardkingdom.com/" + product.URL,
+				path: edition,
+			}
+			output[co.UUID].Normal = data
 		}
 	}
 

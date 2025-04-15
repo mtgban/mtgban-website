@@ -507,6 +507,9 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 			restockURL = restock.Foil.URL
 		} else if !co.Etched && !co.Foil && restock.Normal != nil {
 			restockURL = restock.Normal.URL
+			if co.Sealed {
+				restockURL = strings.Replace(restockURL, "-sealed", "/"+restock.Normal.path, 1)
+			}
 		}
 		if restockURL != "" {
 			restockURL = strings.Replace(restockURL, "mtg", "catalog/restock_notice", 1)
