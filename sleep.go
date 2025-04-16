@@ -13,6 +13,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
+	supabase "github.com/nedpals/supabase-go"
 	"golang.org/x/exp/slices"
 )
 
@@ -39,14 +40,20 @@ var SleeperColors = []string{
 }
 
 func Sleepers(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	pageVars := genPageNav("Sleepers", r)
 
-	pageVars := genPageNav("Sleepers", sig)
+	var userInfo *supabase.User
+	var userEmail string = "anonymous"
 
-	// Load the defaul blocklist (same as Search)
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	if userCtx := r.Context().Value(userContextKey); userCtx != nil {
+		if user, ok := userCtx.(*supabase.User); ok && user != nil {
+			userInfo = user
+			userEmail = userInfo.Email
+		}
+	}
 
-	// Expand with any custom list if necessary
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists(r)
+
 	if Config.SleepersBlockList != nil {
 		blocklistRetail = append(blocklistRetail, Config.SleepersBlockList...)
 		blocklistBuylist = append(blocklistBuylist, Config.SleepersBlockList...)
@@ -151,8 +158,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	pageVars.SleepersColors = SleeperColors
 
 	// Log performance
-	user := GetParamFromSig(sig, "UserEmail")
-	msg := fmt.Sprintf("Sleepers call by %s with took %v", user, time.Since(start))
+	msg := fmt.Sprintf("Sleepers call by %s with took %v", userEmail, time.Since(start))
 	UserNotify("sleepers", msg)
 	LogPages["Sleepers"].Println(msg)
 

@@ -2,42 +2,37 @@ package main
 
 import (
 	"net/http"
-	"strings"
-	"time"
 )
 
 // Handler for / renders the home.html page
 func Home(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
-	errmsg := r.FormValue("errmsg")
-	message := ""
+	pageVars := genPageNav("Home", r)
+	pageVars.ErrorMessage = ""
 
-	switch errmsg {
-	case "TokenNotFound":
-		message = "There was a problem authenticating you with Patreon."
-	case "UserNotFound", "TierNotFound":
-		message = ErrMsg
-	case "logout":
-		domain := "mtgban.com"
-		if strings.Contains(getBaseURL(r), "localhost") {
-			domain = "localhost"
+	// Try auto-login only if not already logged in
+	if !pageVars.IsLoggedIn {
+		authCookie, authErr := r.Cookie("auth_token")
+		refreshCookie, refreshErr := r.Cookie("refresh_token")
+
+		if authErr == nil && authCookie.Value != "" &&
+			refreshErr == nil && refreshCookie.Value != "" {
+			newSession, authErr := authService.refreshAuthTokens(r, w, refreshCookie.Value, authCookie.Value)
+			if authErr == nil && newSession != nil {
+				authService.logWithContext(r, "user %s logged in automatically", maskEmail(newSession.User.Email))
+				pageVars.InfoMessage = "You've been logged in successfully."
+				pageVars.IsLoggedIn = true
+				pageVars.UserEmail = newSession.User.Email
+				pageVars.UserTier = getTierFromUser(&newSession.User)
+				pageVars.ShowLogin = false
+			} else {
+				authService.logWithContext(r, "auto-login failed, clearing cookies: %v", authErr)
+				authService.clearAuthCookies(w, r)
+				pageVars.IsLoggedIn = false
+				pageVars.ShowLogin = true
+			}
 		}
-
-		// Invalidate the current cookie
-		cookie := http.Cookie{
-			Name:    "MTGBAN",
-			Domain:  domain,
-			Path:    "/",
-			Expires: time.Now(),
-		}
-		http.SetCookie(w, &cookie)
-
-		// Delete signature
-		sig = ""
 	}
 
-	pageVars := genPageNav("Home", sig)
-	pageVars.ErrorMessage = message
-
+	//render template
 	render(w, "home.html", pageVars)
 }

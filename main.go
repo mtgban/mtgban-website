@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,7 +24,6 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
 	"gopkg.in/Iwark/spreadsheet.v2"
@@ -177,7 +177,11 @@ type PageVars struct {
 	ResultPrices    map[string]map[string]float64
 	IsLoggedIn      bool
 	UserEmail       string
+	UserRole        string
 	UserTier        string
+
+	IsImpersonating     bool
+	ImpersonationTarget string
 }
 
 type NavElem struct {
@@ -215,6 +219,10 @@ type NavElem struct {
 	NoAuth bool
 }
 
+// Cache for generated navigation slices based on user context
+var navCache = make(map[string][]NavElem)
+var navCacheMutex sync.RWMutex
+
 var startTime = time.Now()
 
 var DefaultNav = []NavElem{
@@ -227,8 +235,7 @@ var DefaultNav = []NavElem{
 	},
 }
 
-// List of keys that may be present or not, and when present they are
-// guaranteed not to be user-editable)
+// optional list of keys that are guaranteed not to be user-editable if present
 var OptionalFields = []string{
 	"UserName",
 	"UserEmail",
@@ -266,8 +273,6 @@ var LogPages map[string]*log.Logger
 
 // All the page properties
 var ExtraNavs map[string]*NavElem
-
-var navCache *NavCache
 
 func init() {
 	ExtraNavs = map[string]*NavElem{
@@ -339,6 +344,7 @@ var Config ConfigType
 
 type ConfigType struct {
 	Port                   string            `json:"port"`
+	DefaultHost            string            `json:"default_host"`
 	DatastorePath          string            `json:"datastore_path"`
 	Game                   string            `json:"game"`
 	DBAddress              string            `json:"db_address"`
@@ -371,16 +377,25 @@ type ConfigType struct {
 	} `json:"patreon"`
 	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
 	GoogleCredentials string            `json:"google_credentials"`
-	DB                struct {
-		Prefix  string `json:"log_prefix"`
-		Key     string `json:"supabase_anon_key"`
-		RoleKey string `json:"role_key"`
-		Secret  string `json:"supabase_jwt_secret"`
-		Url     string `json:"supabase_url"`
-	} `json:"db"`
+	Auth              struct {
+		Domain         string   `json:"domain"`
+		DebugMode      bool     `json:"debug_mode"`
+		SecureCookies  bool     `json:"secure_cookies"`
+		CSRFSecret     string   `json:"csrf_secret"`
+		SignatureTTL   int      `json:"signature_ttl"`
+		Prefix         string   `json:"log_prefix"`
+		Key            string   `json:"supabase_anon_key"`
+		RoleKey        string   `json:"supabase_role_key"`
+		Secret         string   `json:"supabase_jwt_secret"`
+		Url            string   `json:"supabase_url"`
+		ExemptRoutes   []string `json:"exempt_routes"`
+		ExemptPrefixes []string `json:"exempt_prefixes"`
+		ExemptSuffixes []string `json:"exempt_suffixes"`
+		AssetsPath     string   `json:"assets_path"`
+	} `json:"auth"`
 	ACL struct {
-		Roles map[string]map[string]map[string]string `json:"roles"`
-		Tiers map[string]map[string]map[string]string `json:"tiers"`
+		Tiers map[string]map[string]map[string]string `json:"tier"`
+		Roles map[string]map[string]map[string]string `json:"role"`
 	} `json:"acl"`
 	SessionFile string `json:"session_file"`
 	Uploader    struct {
@@ -423,7 +438,9 @@ var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
 
 var GoogleDocsClient *http.Client
+
 var banACL BanACL
+var authService *AuthService
 
 const (
 	DefaultConfigPort    = "8080"
@@ -438,188 +455,129 @@ func Favicon(w http.ResponseWriter, r *http.Request) {
 
 // FileSystem custom file system handler
 type FileSystem struct {
-	httpfs http.FileSystem
+	fs http.FileSystem
 }
 
-// Open opens file
-func (fs *FileSystem) Open(path string) (http.File, error) {
-	f, err := fs.httpfs.Open(path)
+// ServeHTTP implements the http.Handler interface and ensures proper MIME types
+func (fs FileSystem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Get the file path from the request URL, stripping any query parameters
+	path := r.URL.Path
+	if strings.Contains(path, "?") {
+		path = strings.Split(path, "?")[0]
+	}
+
+	// Set content type based on file extension
+	ext := filepath.Ext(path)
+	if mimeType := getMimeType(ext); mimeType != "" {
+		w.Header().Set("Content-Type", mimeType)
+	}
+
+	// Let the default file server handle the rest
+	http.FileServer(fs.fs).ServeHTTP(w, r)
+}
+
+// Open opens the file at name from the underlying http.FileSystem
+func (fs FileSystem) Open(name string) (http.File, error) {
+	// Clean the path to prevent directory traversal
+	name = path.Clean(name)
+
+	// Try to open the file
+	f, err := fs.fs.Open(name)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := f.Stat()
+	// Check if it's a directory
+	stat, err := f.Stat()
 	if err != nil {
+		f.Close()
 		return nil, err
 	}
-	if s.IsDir() {
-		index := strings.TrimSuffix(path, "/") + "/index.html"
-		_, err := fs.httpfs.Open(index)
-		if err != nil {
-			return nil, err
+
+	// If it's a directory, try to serve the index.html file
+	if stat.IsDir() {
+		f.Close()
+		indexPath := path.Join(name, "index.html")
+		if index, err := fs.fs.Open(indexPath); err == nil {
+			return index, nil
 		}
+		return nil, err
 	}
 
 	return f, nil
 }
 
-// TierNavCache stores pre-generated navigation configurations for each tier
-type NavCache struct {
-	navConfigs map[string][]NavElem
-	mutex      sync.RWMutex
-}
-
-// NewTierNavCache creates a navigation cache based on the current configuration
-func NewNavCache() *NavCache {
-	cache := &NavCache{
-		navConfigs: make(map[string][]NavElem),
+// buildNav constructs the base navigation list based on user session permissions
+func buildNav(userSession *UserSession, isDevMode bool) []NavElem {
+	var baseNav []NavElem
+	// Initialize navigation with defaults
+	if DefaultNav != nil {
+		baseNav = make([]NavElem, len(DefaultNav))
+		copy(baseNav, DefaultNav)
+	} else {
+		baseNav = []NavElem{}
 	}
 
-	// Initialize the cache with all tier configurations
-	cache.RefreshCache()
-
-	return cache
-}
-
-// RefreshCache rebuilds the navigation configurations for all tiers
-func (c *NavCache) RefreshCache() {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	// Clear existing configurations
-	c.navConfigs = make(map[string][]NavElem)
-
-	// Build navigation for each tier defined in Config
-	for tier := range Config.ACL.Tiers {
-		// Start with default navigation
-		nav := make([]NavElem, len(DefaultNav))
-		copy(nav, DefaultNav)
-
-		// Add navigation elements based on tier permissions
+	// Add navigation items based on ACL
+	if OrderNav != nil && ExtraNavs != nil {
 		for _, feat := range OrderNav {
-			// Check if this tier has access to this feature
-			_, allowed := Config.ACL.Tiers[tier][feat]
+			navItem, exists := ExtraNavs[feat]
+			if !exists || navItem == nil {
+				continue
+			}
 
-			// If allowed or feature doesn't require auth, add it
-			if allowed || ExtraNavs[feat].NoAuth {
-				nav = append(nav, *ExtraNavs[feat])
+			// Determine if the nav item should be shown
+			showNavItem := false
+			if navItem.NoAuth {
+				showNavItem = true
+				if isDevMode {
+					log.Printf("[DEBUG] Nav item '%s' shown: NoAuth=true", feat)
+				}
+			} else if userSession != nil { // Check if we have a valid session
+				if userSession.Permissions != nil {
+					// Check if the feature exists in permissions
+					_, hasPerm := userSession.Permissions[feat]
+					if hasPerm {
+						showNavItem = true
+						if isDevMode {
+							log.Printf("[DEBUG] Nav item '%s' shown: permission found in ACL", feat)
+						}
+					} else if isDevMode && (navItem.AlwaysOnForDev || !SigCheck) {
+						showNavItem = true
+						log.Printf("[DEBUG] Nav item '%s' shown: DevMode override (AlwaysOn=%t, !SigCheck=%t)", feat, navItem.AlwaysOnForDev, !SigCheck)
+					} else if isDevMode {
+						log.Printf("[DEBUG] Nav item '%s' NOT shown: No permission found", feat)
+					}
+				} else if isDevMode {
+					userEmail := "<nil session>"
+					if userSession.User != nil {
+						userEmail = maskEmail(userSession.User.Email)
+					}
+					log.Printf("[DEBUG] User session permissions map is nil for user %s", userEmail)
+				}
+			}
+
+			if showNavItem {
+				displayNavItem := *navItem // Copy the NavElem
+				baseNav = append(baseNav, displayNavItem)
 			}
 		}
-
-		c.navConfigs[tier] = nav
 	}
-
-	// Add a special "anonymous" tier with just public navigation
-	anonymousNav := make([]NavElem, len(DefaultNav))
-	copy(anonymousNav, DefaultNav)
-
-	for _, feat := range OrderNav {
-		if ExtraNavs[feat].NoAuth {
-			anonymousNav = append(anonymousNav, *ExtraNavs[feat])
-		}
-	}
-
-	c.navConfigs["anonymous"] = anonymousNav
+	return baseNav
 }
 
-// GetNavForTier returns a copy of the navigation for a specific tier
-func (c *NavCache) GetNavForTier(tier string) []NavElem {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-
-	nav, exists := c.navConfigs[tier]
-	if !exists {
-		// Default to free tier if tier not found
-		nav = c.navConfigs["free"]
-		if nav == nil {
-			// Fall back to anonymous if no free tier exists
-			nav = c.navConfigs["anonymous"]
-		}
-	}
-
-	// Return a copy to prevent modification of cached data
-	result := make([]NavElem, len(nav))
-	copy(result, nav)
-
-	return result
-}
-
-// BuildPageVars builds the PageVars with the right navigation
-func (c *NavCache) BuildPageVars(activeTab, sig string) PageVars {
-	// Extract basic user info from signature
-	exp := GetParamFromSig(sig, "Expires")
-	expires, _ := strconv.ParseInt(exp, 10, 64)
-	userEmail := GetParamFromSig(sig, "UserEmail")
-	userTier := GetParamFromSig(sig, "UserTier")
-
-	// Determine error message if any
-	msg := ""
-	showLogin := false
-	if sig != "" {
-		if expires < time.Now().Unix() {
-			msg = ErrMsgExpired
-		}
-	} else {
-		showLogin = true
-	}
-
-	// Check if user is logged in
-	isLoggedIn := userEmail != "" && (expires > time.Now().Unix() || (DevMode && !SigCheck))
-
-	// Initialize base page variables
+func genPageNav(activeTab string, r *http.Request) PageVars {
 	pageVars := PageVars{
 		Title:        "BAN " + activeTab,
-		ErrorMessage: msg,
 		LastUpdate:   LastUpdate,
-		ShowLogin:    showLogin,
 		Hash:         BuildCommit,
-		IsLoggedIn:   isLoggedIn,
-		UserEmail:    userEmail,
-		UserTier:     userTier,
+		ShowLogin:    true,
+		IsLoggedIn:   false,
+		ErrorMessage: "",
 	}
 
-	// Apply game-specific settings
-	applyGameSettings(&pageVars)
-
-	// Get navigation based on user tier or anonymous if not logged in
-	var nav []NavElem
-	if isLoggedIn {
-		nav = c.GetNavForTier(userTier)
-	} else {
-		nav = c.GetNavForTier("anonymous")
-	}
-
-	// Mark active navigation element
-	for i := range nav {
-		if nav[i].Name == activeTab {
-			nav[i].Active = true
-			nav[i].Class = "active"
-
-			// Add beta notice for non-authenticated users on public pages
-			if showLogin && nav[i].NoAuth {
-				betaNav := NavElem{
-					Active: true,
-					Class:  "beta",
-					Short:  "Beta Public Access",
-					Link:   "javascript:void(0)",
-				}
-				nav = append(nav, betaNav)
-			}
-			break
-		}
-	}
-
-	pageVars.Nav = nav
-	return pageVars
-}
-
-// applyGameSettings sets game-specific page variables
-func applyGameSettings(pageVars *PageVars) {
 	if Config.Game != "" {
-		// Append which game this site is for
 		pageVars.Title += " - " + Config.Game
-
-		// Charts are available only for one game
 		pageVars.DisableChart = true
 	}
 
@@ -629,15 +587,138 @@ func applyGameSettings(pageVars *PageVars) {
 	case mtgban.GameLorcana:
 		pageVars.CardBackURL = "img/backs/lorcana.webp"
 	default:
-		panic("no pageVars.CardBackURL set")
+		pageVars.CardBackURL = "img/backs/default.png"
 	}
+
+	// Declare variables with default values outside the if block
+	userTier := "free"
+	userRole := ""
+	isImpersonating := false
+	userEmail := ""
+
+	// Get UserSession from context
+	var userSession *UserSession
+	sessionData := r.Context().Value(userSessionContextKey)
+	if sessionData != nil {
+		var ok bool
+		userSession, ok = sessionData.(*UserSession)
+		if ok && userSession != nil {
+			// Populate pageVars based on UserSession
+			pageVars.IsLoggedIn = true
+			if userSession.User != nil {
+				userEmail = userSession.User.Email
+			} else {
+
+				log.Printf("[WARNING] User session found but User is nil")
+			}
+			pageVars.ShowLogin = false
+			userTier = userSession.Tier
+			userRole = userSession.Role
+			isImpersonating = userSession.IsImpersonating
+
+			if DevMode {
+				log.Printf("[DEBUG] User session loaded: Email: %s, Role: %s, Tier: %s, Impersonating: %t", maskEmail(userEmail), userRole, userTier, isImpersonating)
+			}
+		} else {
+			if DevMode {
+				log.Printf("[WARNING] Invalid type found in userSessionContextKey: %T", sessionData)
+			}
+		}
+	} else if DevMode {
+		log.Printf("[DEBUG] No user session found in context.")
+	}
+
+	// Update PageVars with final determined values
+	pageVars.UserEmail = userEmail
+	pageVars.UserTier = userTier
+	pageVars.UserRole = userRole
+
+	pageVars.IsImpersonating = isImpersonating
+	pageVars.ImpersonationTarget = ""
+
+	cacheKey := fmt.Sprintf("role:%s|tier:%s|imp:%t|dev:%t", userRole, userTier, isImpersonating, DevMode)
+
+	var finalNav []NavElem
+
+	// Attempt to read from cache
+	navCacheMutex.RLock()
+	cachedNav, found := navCache[cacheKey]
+	navCacheMutex.RUnlock()
+
+	if found {
+		if DevMode {
+			log.Printf("[DEBUG] Navigation cache HIT for key: %s", cacheKey)
+		}
+		// Cache hit: Create a copy and use it
+		finalNav = make([]NavElem, len(cachedNav))
+		copy(finalNav, cachedNav)
+	} else {
+		if DevMode {
+			log.Printf("[DEBUG] Navigation cache MISS for key: %s", cacheKey)
+		}
+		// Cache miss: Build the navigation from scratch
+		baseNav := buildNav(userSession, DevMode)
+
+		// Store a copy in the cache (using write lock)
+		navToCache := make([]NavElem, len(baseNav))
+		copy(navToCache, baseNav)
+
+		navCacheMutex.Lock()
+		// Double check in case another routine populated it between RUnlock and Lock
+		_, stillNotFound := navCache[cacheKey]
+		if !stillNotFound {
+			navCache[cacheKey] = navToCache
+			if DevMode {
+				log.Printf("[DEBUG] Stored navigation in cache for key: %s", cacheKey)
+			}
+		} else {
+			if DevMode {
+				log.Printf("[DEBUG] Cache key %s populated concurrently, skipping store.", cacheKey)
+			}
+		}
+		navCacheMutex.Unlock()
+
+		// Use the originally built slice for this request
+		finalNav = baseNav
+	}
+
+	pageVars.Nav = finalNav // Assign the determined nav slice
+	mainNavIndex := -1
+	for i := range pageVars.Nav {
+		// Reset any potential stale state from cache/copying
+		pageVars.Nav[i].Active = false
+		pageVars.Nav[i].Class = ""
+
+		if pageVars.Nav[i].Name == activeTab {
+			mainNavIndex = i
+			break
+		} else {
+			// Check subpages for active tab based on the current request URL
+			for _, subPage := range pageVars.Nav[i].SubPages {
+				// Use r.URL.Path for checking subpages, as activeTab might just be the main Name
+				if r.URL.Path == subPage {
+					mainNavIndex = i
+					break
+				}
+			}
+			if mainNavIndex != -1 {
+				break
+			}
+		}
+	}
+
+	if mainNavIndex >= 0 && mainNavIndex < len(pageVars.Nav) {
+		pageVars.Nav[mainNavIndex].Active = true
+		pageVars.Nav[mainNavIndex].Class = "active"
+		if DevMode {
+			log.Printf("[DEBUG] Set active nav tab: %s", pageVars.Nav[mainNavIndex].Name)
+		}
+	}
+
+	return pageVars
 }
 
-func genPageNav(activeTab, sig string) PageVars {
-	return navCache.BuildPageVars(activeTab, sig)
-}
-
-func loadVars(cfg, port, datastore string, authConfig *AuthConfig) error {
+func loadVars(cfg, port, datastore string) error {
 	// Load from config file
 	file, err := os.Open(cfg)
 	if !DevMode && err != nil {
@@ -680,20 +761,6 @@ func loadVars(cfg, port, datastore string, authConfig *AuthConfig) error {
 	InventoryDir = path.Join("cache_inv", Config.Game)
 	BuylistDir = path.Join("cache_bl", Config.Game)
 
-	if authConfig != nil {
-		*authConfig = AuthConfig{
-			SupabaseURL:     Config.DB.Url,
-			SupabaseAnonKey: Config.DB.Key,
-			SupabaseSecret:  Config.DB.Secret,
-			DebugMode:       DevMode,
-			LogPrefix:       "[AUTH] ",
-			// Set exempt routes that don't require authentication
-			ExemptRoutes:   []string{"/", "/home"},
-			ExemptPrefixes: []string{"/auth/", "/next-api/auth/", "/css/", "/js/", "/img/"},
-			ExemptSuffixes: []string{".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg"},
-		}
-	}
-
 	return nil
 }
 
@@ -728,29 +795,34 @@ func main() {
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
+	flag.BoolVar(&Config.Auth.DebugMode, "debug", false, "Enable debug mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	skipInitialRefresh := flag.Bool("skip", true, "Skip initial refresh")
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
+	// Load necessary environmental variables
+	err := loadVars(Config.filePath, *port, *datastore)
+	if err != nil {
+		log.Fatalln("unable to load config file:", err)
+	}
+
 	flag.Parse()
 
-	// Initial state
+	// Apply command-line overrides for port and datastore
+	if *port != "" {
+		Config.Port = *port
+	}
+	if *datastore != "" {
+		Config.DatastorePath = *datastore
+	}
+
+	// Initial state settings
 	SkipInitialRefresh = false
 	SigCheck = true
 	if DevMode {
 		SigCheck = *sigCheck
 		SkipInitialRefresh = *skipInitialRefresh
-	}
-
-	navCache = NewNavCache()
-	// Create an auth config instance
-	var authConfig AuthConfig
-
-	// Load necessary environmental variables
-	err := loadVars(Config.filePath, *port, *datastore, &authConfig)
-	if err != nil {
-		log.Fatalln("unable to load config file:", err)
 	}
 
 	// Create necessary directories
@@ -783,18 +855,40 @@ func main() {
 		}
 	}
 
-	authService, err := NewAuthService(authConfig)
+	// Initialize auth service
+	authConfig := AuthConfig{
+		SupabaseURL:     Config.Auth.Url,
+		SupabaseAnonKey: Config.Auth.Key,
+		SupabaseSecret:  Config.Auth.Secret,
+		LogPrefix:       Config.Auth.Prefix,
+		ExemptRoutes:    Config.Auth.ExemptRoutes,
+		ExemptPrefixes:  Config.Auth.ExemptPrefixes,
+		ExemptSuffixes:  Config.Auth.ExemptSuffixes,
+		DebugMode:       Config.Auth.DebugMode,
+	}
+
+	// Create the AuthService instance, passing ExtraNavs
+	authService, err = NewAuthService(authConfig, ExtraNavs)
 	if err != nil {
 		log.Fatalf("Failed to create auth service: %v", err)
 	}
 
-	// Load the ACL
-	err = authService.GetBanACL(&banACL)
+	// Load the BanACL data into the authService
+	err = authService.LoadBanACL()
 	if err != nil {
-		authService.Logger.Println("error loading ACL:", err)
+		authService.Logger.Printf("CRITICAL: Failed to load BAN ACL: %v. Authorization checks may fail.", err)
+		if !DevMode {
+			log.Fatalf("CRITICAL: Failed to load BAN ACL, cannot start server: %v", err)
+		}
 	}
 
-	authService.BanACL = &banACL
+	banACL = BanACL{Users: make(map[string]*BanUser)}
+	if authService.BanACL != nil {
+		for _, user := range authService.BanACL.Users {
+			banACL.Users[user.UserData.Email] = user
+		}
+	}
+	authService.Logger.Println("AuthService initialized and ACL loaded.")
 
 	// Start background data loading
 	go func() {
@@ -855,77 +949,16 @@ func main() {
 	// Set seed in case we need to do random operations
 	rand.Seed(time.Now().UnixNano())
 
-	// Serve static files
-	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(&FileSystem{http.Dir("css")})))
-	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(&FileSystem{http.Dir("img")})))
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(&FileSystem{http.Dir("js")})))
+	// Initialize router and configure all routes
+	mux := setupRouter()
 
-	// Custom redirects
-	http.HandleFunc("/go/", Redirect)
-	http.HandleFunc("/random", RandomSearch)
-	http.HandleFunc("/randomsealed", RandomSealedSearch)
-	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
-	})
+	// Configure and start the server
+	srv := configureServer(mux)
 
-	// Home page - no authentication required
-	http.Handle("/", http.HandlerFunc(Home))
-
-	// Register routes for each navigation item
-	for key, nav := range ExtraNavs {
-		// Set up logging
-		logFile, err := logfile.New(&logfile.LogFile{
-			FileName:    path.Join(LogDir, key+".log"),
-			MaxSize:     500 * 1024,
-			Flags:       logfile.FileOnly,
-			OldVersions: 2,
-		})
-		if err != nil {
-			log.Printf("Failed to create logFile for %s: %s", key, err)
-			LogPages[key] = log.New(os.Stderr, "", log.LstdFlags)
-		} else {
-			LogPages[key] = log.New(logFile, "", log.LstdFlags)
-		}
-
-		_, ExtraNavs[key].NoAuth = Config.ACL.Tiers["free"][key]
-
-		var handler http.Handler
-		if nav.NoAuth {
-			// No authentication required
-			handler = http.HandlerFunc(nav.Handle)
-		} else {
-			// Use AuthWrapper middleware
-			handler = http.HandlerFunc(authService.AuthRequired(nav.Handle))
-		}
-		http.Handle(nav.Link, handler)
-		// Add any additional endpoints to it
-		for _, subPage := range nav.SubPages {
-			http.Handle(subPage, handler)
-		}
-	}
-
-	// API endpoints
-	http.Handle("/search/oembed", http.HandlerFunc(Search))
-	http.Handle("/api/mtgban/", http.HandlerFunc(PriceAPI))
-	http.Handle("/api/mtgjson/ck.json", http.HandlerFunc(API))
-	http.Handle("/api/tcgplayer/", http.HandlerFunc(TCGHandler))
-	http.Handle("/api/search/", http.HandlerFunc(SearchAPI))
-	http.Handle("/api/cardkingdom/pricelist.json", http.HandlerFunc(CKMirrorAPI))
-	http.Handle("/api/suggest", http.HandlerFunc(SuggestAPI))
-	http.Handle("/api/opensearch.xml", http.HandlerFunc(OpenSearchDesc))
-
-	// Favicon handler
-	http.HandleFunc("/favicon.ico", Favicon)
-	http.Handle("/img/opensearch.xml", http.HandlerFunc(OpenSearchDesc))
-
-	// Create and start the server
-	srv := &http.Server{
-		Addr: ":" + Config.Port,
-	}
-
-	// Handle graceful shutdown
+	// Wait for shutdown signal
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
 		err := srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
@@ -935,15 +968,20 @@ func main() {
 
 	<-done
 
-	// Close any zombie connection and perform any extra cleanup
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// Perform graceful shutdown
+	gracefulShutdown(srv)
+}
+
+// gracefulShutdown performs a graceful server shutdown
+func gracefulShutdown(srv *http.Server) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer func() {
 		ServerNotify("shutdown", "Server cleaning up...")
 		cleanupDiscord()
 		cancel()
 	}()
 
-	err = srv.Shutdown(ctx)
+	err := srv.Shutdown(ctx)
 	if err != nil {
 		ServerNotify("shutdown", "Server shutdown failed: "+err.Error())
 		return
@@ -1045,8 +1083,11 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Parse the template file held in the templates folder, add any Funcs to parsing
 	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
 	if err != nil {
-		log.Print("template parsing error: ", err)
-		return
+		t, err = template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
+		if err != nil {
+			log.Print("template parsing error: ", err)
+			return
+		}
 	}
 
 	// Execute the template and pass in the variables to fill the gaps

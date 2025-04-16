@@ -1,42 +1,5 @@
 
-/* Ubuntu-ish Colour theme
-   Dark brown - #332532
-   Light brown - #644D52
-   Peach - #F77A52
-   sunshine - #FF974F
-   grey blue - #A49A87
- */
-
- /* alternative theme including white
-  offwhite - #f8f8f8
-  cream - #f2e5bd
-  apple - #b9bf83
-  pear - #a69f7c
-  chocolate - #8c6865
-  black - #000000
- */
-
- /* lavender theme including white
-  purple - #6765AD
-  blue - #8FB0FF
-  offwhite - #F8F8F8
-  lightgreen - #89B28A
-  darkgreen - #577043
-  nearly black -#292929
- */
-
- /* scheme picked from image
- light blue 199 217 236 #C7D9EC
- navy blue  75 87 134  #4b5786
- desaturated blue 86 129 178 #96b1cf
- mid blue 144 189 230 #90bde6
- really dark blue 23, 55, 94 #17375e
- orange 249 166 74 #f9a64a
- dark brown 162 83 55 #a25337
-nearly black #292929
- */
-
- :root {
+:root {
   --white: #f8f8f8;
   --violet: #f2f2ff;
   --blueish: #e0f0ff;
@@ -75,7 +38,13 @@ nearly black #292929
   --darkeryellow: #c7a44c;
 
   --mainImage: url("/img/misc/background.png");
-  --darkImage: url("/img/misc/background-dark.png")
+  --darkImage: url("/img/misc/background-dark.png");
+
+  --nav-bg: #79818f; 
+  --nav-text-color: #f8f8f8; 
+  --nav-active-bg: #96b1cf; 
+  --nav-active-text-color: #17375e; 
+  --nav-hover-bg: #96b1cf; 
 }
 
 .light-theme {
@@ -137,6 +106,7 @@ nearly black #292929
   margin: 0;
   padding: 0;
   font-family: 'Rosario', sans-serif !important;
+  box-sizing: border-box; 
 }
 
 body {
@@ -262,57 +232,79 @@ a.pagination {
   display: inline;
 }
 
+nav {
+  background-color: var(--navbackground);
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: -webkit-fill-available;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); 
+}
+
 nav ul {
   list-style-type: none;
   margin: 0;
   padding: 0;
-  background-color: var(--navbackground);
-  position: fixed;
-  top: 0;
-  width: 100%;
-  height: 48px;
-  z-index: 100;
+  display: flex; 
+  align-items: center; 
+  justify-content: flex-start; 
+  height: auto; 
 }
 
 nav li {
-  float: left;
-  border-right: 1px solid var(--greytext);
-  height: 48px;
-}
-
-nav li.optional {
-  border-right: none;
+  height: auto; 
+  border-right: none; 
+  margin-right: 1.5rem; 
+  display: flex; 
+  align-items: center;
 }
 
 nav li:last-child {
-  float: right;
-  color:  var(--activetext);
-  text-align: center;
-  padding: 14px;
-  font-style: italic;
+  margin-right: 0; 
+  margin-left: auto; 
+  border-right: none; 
+  text-align: center; 
+  padding: 0; 
+  font-style: normal; 
+}
+
+nav li:first-child, nav li:nth-child(2) {
+  margin-right: 1.5rem; 
+}
+nav li:first-child {
+  margin-right: auto; 
+  margin-left: 0;
+}
+nav li:nth-child(2) {
+  margin-right: 1.5rem; 
+  margin-left: 0;
 }
 
 nav li a {
-  display: inline-block;
-  color:  var(--activetext);
+  display: block; 
+  color: var(--activetext);
   text-align: center;
-  padding: 14px 16px;
+  padding: 0.75rem 1rem; 
   text-decoration: none;
-}
-
-nav li:first-child a {
-  display: inline-block;
-  padding: 0;
-}
-
-nav li:nth-child(2) a {
-  display: inline-block;
-  padding: 0;
+  border-radius: 0.375rem; 
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; 
 }
 
 nav li a:hover {
-  color: var(--background);
+  background-color: var(--hover); 
+  color: var(--normaltext); 
 }
+
+nav li:first-child a,
+nav li:nth-child(2) a {
+  padding: 0; 
+}
+
+nav li a img {
+  vertical-align: middle; 
+}
+
 
 .index ol {
   padding: 14px 16px;
@@ -324,69 +316,55 @@ nav li a:hover {
   margin: 4px 20px;
 }
 
-/* Dropdown container - needed to position the dropdown content */
 .dropdown {
-float: left;
-overflow: hidden;
+  float: left;
+  overflow: hidden;
 }
 
-/* Style the dropdown button to fit inside the topnav */
 .dropdown .dropbtn {
-font-size: 17px;
-border: none;
-outline: none;
-color: var(--activetext);
-padding: 14px 16px;
-background-color: inherit;
-font-family: inherit;
-margin: 0;
-height: 48px;
+  font-size: 17px;
+  border: none;
+  outline: none;
+  color: var(--activetext);
+  padding: 14px 16px;
+  background-color: inherit;
+  font-family: inherit;
+  margin: 0;
+  height: 48px;
 }
 
-/* Style the dropdown content (hidden by default) */
 .dropdown-content {
-display: none;
-position: absolute;
-background-color: var(--headerbackground);
-min-width: 160px;
-box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-z-index: 1;
+  display: none;
+  position: absolute;
+  background-color: var(--headerbackground);
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
 }
 
-/* Style the links inside the dropdown */
 .dropdown-content a {
-float: none;
-color: var(--activetext);
-padding: 12px 16px;
-text-decoration: none;
-display: block;
-text-align: left;
+  float: none;
+  color: var(--activetext);
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  text-align: left;
 }
 
-/* Add a dark background on topnav links and the dropdown button on hover */
 .nav a:hover, .dropdown:hover .dropbtn {
-background-color: var(--tralternatebase);
-color: var(--activetext);
+  background-color: var(--tralternatebase);
+  color: var(--activetext);
 }
 
-/* Add a grey background to dropdown links on hover */
 .dropdown-content a:hover {
-background-color: #ddd;
-color: black;
+  background-color: #ddd;
+  color: black;
 }
 
-/* Show the dropdown menu when the user moves the mouse over the dropdown button */
 .dropdown:hover .dropdown-content {
-display: block;
+  display: block;
 }
 
-.active {
-  background-color: var(--background);
-  color: var(--activetext);
-}
-a.active:hover{
-  color: var(--activetext);
-}
 a.beta {
   color: var(--background);
   font-weight: bold;
@@ -568,9 +546,9 @@ th a {
 }
 
 pre {
-display: inline-block;
-font-family: monospace;
-white-space: pre;
+  display: inline-block;
+  font-family: monospace;
+  white-space: pre;
 }
 
 h3.storename {
@@ -712,74 +690,74 @@ input:checked + .slider {
 }
 
 .arrow {
-border: solid var(--normal);
-border-width: 0 3px 3px 0;
-display: inline-block;
-padding: 3px;
+  border: solid var(--normal);
+  border-width: 0 3px 3px 0;
+  display: inline-block;
+  padding: 3px;
 }
 
 .right {
-transform: rotate(-45deg);
--webkit-transform: rotate(-45deg);
+  transform: rotate(-45deg);
+  -webkit-transform: rotate(-45deg);
 }
 
 .left {
-transform: rotate(135deg);
--webkit-transform: rotate(135deg);
+  transform: rotate(135deg);
+  -webkit-transform: rotate(135deg);
 }
 
 .up {
-transform: rotate(-135deg);
--webkit-transform: rotate(-135deg);
+  transform: rotate(-135deg);
+  -webkit-transform: rotate(-135deg);
 }
 
 .down {
-transform: rotate(45deg);
--webkit-transform: rotate(45deg);
+  transform: rotate(45deg);
+  -webkit-transform: rotate(45deg);
 }
 
 /* Create three equal columns that floats next to each other */
 .column {
-float: left;
-width: 30%;
-padding: 10px;
+  float: left;
+  width: 30%;
+  padding: 10px;
 }
 
 /* Clear floats after the columns */
 .row:after {
-content: "";
-display: table;
-clear: both;
+  content: "";
+  display: table;
+  clear: both;
 }
 
 /* Responsive layout - when the screen is toosmall, make the columns stack on
 * top of each other instead of next to each other */
 @media screen and (max-width: 1300px) {
-.column {
-  width: 90%;
-}
+  .column {
+      width: 90%;
+  }
 }
 
 .h6inline {
-display: inline;
-font-size: .67em;
-margin-top: 2.33em;
-margin-bottom: 2.33em;
-margin-left: 0;
-margin-right: 0;
-font-weight: bold;
+  display: inline;
+  font-size: .67em;
+  margin-top: 2.33em;
+  margin-bottom: 2.33em;
+  margin-left: 0;
+  margin-right: 0;
+  font-weight: bold;
 }
 
 .small-hidden-text {
-z-index: 1000;
-color: transparent;
-font-size: 14px;
-position: absolute;
-padding: .65% 0 0 1%;
-letter-spacing: 0px;
-pointer-events: none;
-width: 146px; /* Size of the small img */
-white-space: normal;
+  z-index: 1000;
+  color: transparent;
+  font-size: 14px;
+  position: absolute;
+  padding: .65% 0 0 1%;
+  letter-spacing: 0px;
+  pointer-events: none;
+  width: 146px; /* Size of the small img */
+  white-space: normal;
 }
 
 div.stores-select {
@@ -801,73 +779,154 @@ img.hoverImage {
   max-height: 360px;
 }
 
-/* Authentication styling */
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.user-email {
-  font-size: 0.9em;
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.user-tier {
-  font-size: 0.8em;
-  font-weight: bold;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background-color: #3498db;
-  color: white;
-}
-
-.tier-pioneer { background-color: #27ae60; }
-.tier-modern { background-color: #9b59b6; }
-.tier-legacy { background-color: #e67e22; }
-.tier-vintage { background-color: #c0392b; }
-.tier-free { background-color: #3498db; }
-
 .auth-buttons {
-  margin-left: 5px;
+  margin-left: 0.5rem; 
 }
 
 .auth-btn {
   display: inline-block;
-  padding: 5px 12px;
+  padding: 0.5rem 1rem; 
+  font-size: 0.9rem; 
+  border-radius: 0.375rem; 
+  text-decoration: none;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out; 
+}
+
+.login-btn, .logout-btn {
+  background-color: transparent; 
+  color: var(--activetext); 
+  border: 1px solid var(--activetext); 
+}
+
+.signup-btn {
+  background-color: var(--blue); 
+  color: var(--white); 
+  border: 1px solid var(--blue); 
+}
+
+.login-btn:hover, .logout-btn:hover {
+  background-color: var(--hover); 
+  color: var(--normaltext); 
+  border-color: var(--hover); 
+}
+
+.signup-btn:hover {
+  background-color: var(--almostblue); 
+  border-color: var(--almostblue); 
+}
+
+
+.switch {
+  margin-left: 1.5rem; 
+}
+
+.switch div {
+  width: 30px; 
+}
+
+.slider {
+  height: 16px; 
+  width: 16px; 
+}
+
+input:checked + .slider {
+  transform: translateX(14px); 
+}
+
+.navbar nav ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  background-color: var(--navbackground);
+  position: fixed;
+  top: 0;
+  width: 100%;
+  height: auto; 
+  z-index: 100;
+  display: flex; 
+  align-items: center; 
+  padding: 0 20px; 
+  justify-content: flex-start; 
+}
+
+.navbar nav li {
+  float: none; 
+  height: auto; 
+  border-right: none; 
+  display: flex; 
+  align-items: center; 
+}
+
+.navbar nav li.nav-item-icon {
+  margin-right: 15px; 
+}
+
+.navbar nav li.nav-item-auth {
+  margin-left: auto; 
+  display: flex; 
+}
+
+.navbar nav li.nav-item-switch {
+  margin-left: 20px; 
+}
+
+
+.navbar nav li a.nav-link {
+  display: block; 
+  color: var(--activetext);
+  text-align: center;
+  padding: 10px 15px; 
+  text-decoration: none;
+  border-radius: 4px; 
+  transition: background-color 0.3s ease; 
+}
+
+.navbar nav li a.nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.1); 
+  color: var(--background); 
+}
+
+
+.navbar nav li a.nav-auth-link {
+  padding: 8px 12px;
   font-size: 0.9em;
   border-radius: 4px;
   text-decoration: none;
   transition: background-color 0.2s;
+  margin-left: 5px; 
 }
 
-.login-btn {
-  background-color: #f1f1f1;
-  color: #333;
+.navbar nav li a.nav-auth-link:hover {
+  background-color: rgba(255, 255, 255, 0.2); 
 }
 
-.signup-btn {
-  background-color: #4a6;
-  color: white;
-}
+@media (max-width: 768px) { 
+  .navbar nav ul {
+      flex-direction: column; 
+      align-items: flex-start; 
+      padding: 10px 20px; 
+  }
 
-.logout-btn {
-  font-size: 0.85em;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background-color: #f1f1f1;
-  color: #333;
-  text-decoration: none;
-}
+  .navbar nav li {
+      width: 100%; 
+      margin-bottom: 5px; 
+  }
 
-.login-btn:hover, .logout-btn:hover {
-  background-color: #ddd;
-}
+  .navbar nav li.nav-item-auth {
+      margin-left: 0; 
+      flex-direction: column; 
+      align-items: flex-start; 
+  }
 
-.signup-btn:hover {
-  background-color: #3a5;
+  .navbar nav li.nav-item-auth a.nav-auth-link {
+      margin-left: 0; 
+      margin-bottom: 5px; 
+      width: 100%; 
+      text-align: left; 
+  }
+
+  .navbar nav li.nav-item-switch {
+      margin-left: 0; 
+      margin-top: 10px; 
+  }
 }

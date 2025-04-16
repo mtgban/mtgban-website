@@ -1,7 +1,7 @@
 import React, { useState, FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { LockIcon, ArrowLeftIcon } from 'lucide-react';
-import AuthLink from './AuthLink';
+import AuthLink from '@/components/auth/AuthLink';
 
 interface ResetPasswordFormProps {
   token: string;

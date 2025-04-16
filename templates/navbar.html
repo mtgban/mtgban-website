@@ -1,44 +1,40 @@
 {{define "navbar"}}
-<nav>
+<nav class="navbar">
     <ul>
-        <li {{if .ShowLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
+        <li class="nav-item nav-item-icon">
+            <a {{if not .ShowLogin}}href="/discord"{{else}}style="cursor: default;"{{end}}>
+                <img src="/img/misc/discord.png" width=48 alt="Discord" {{if .ShowLogin}}style="opacity: 0.5;"{{end}}>
+            </a>
+        </li>
         {{range .Nav}}
-            <li>
-                <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+            <li class="nav-item auth-buttons">
+                <a {{if .Active}}class="nav-link nav-link-active {{.Class}}"{{else}}class="nav-link"{{end}} href="{{.Link}}" >
                     <span>{{.Short}} {{.Name}}</span>
                 </a>
             </li>
         {{end}}
-        
+
         <!-- Authentication buttons -->
-        {{if .IsLoggedIn}}
-            <li class="user-info">
-                <span class="user-email" title="{{.UserEmail}}">
-                    {{if gt (len .UserEmail) 20}}
-                        {{slice .UserEmail 0 17}}...
-                    {{else}}
-                        {{.UserEmail}}
-                    {{end}}
-                </span>
-                <span class="user-tier tier-{{.UserTier | lower}}">{{.UserTier}}</span>
-                <a href="/logout" class="logout-btn">Logout</a>
-            </li>
-        {{else}}
-            <li class="auth-buttons">
-                <a href="/auth/login/" class="auth-btn login-btn">Login</a>
-            </li>
-            <li class="auth-buttons">
-                <a href="/auth/signup/" class="auth-btn signup-btn">Sign Up</a>
-            </li>
-        {{end}}
+        <li class="nav-item nav-item-auth auth-buttons">
+            <a href="#" onclick="subscribe()" class="nav-link nav-auth-link"><span>🔔 Subscribe</span></a>
+            {{if .IsLoggedIn}}
+                <a href="#" onclick="account()" class="nav-link nav-auth-link">👤 Account</a>
+                <a href="#" onclick="logout()" class="nav-link nav-auth-link">🚪 Logout</a>
+            {{else}}
+                <a href="/auth/login/" class="nav-link nav-auth-link">🔑 Login</a>
+                <a href="/auth/signup/" class="nav-link nav-auth-link">✏️ Sign Up</a>
+            {{end}}
+        </li>
+
         
-        <li>
+        <li class="nav-item nav-item-switch">
             <label class="switch">
                 <div>
                     <input type="checkbox"/>
-                    <span class="slider"></span>
+                    <span class="slider" title="Nightbound"></span>
                 </div>
                 <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+                <script type="text/javascript" src="/js/buttonz.js"></script>
             </label>
         </li>
     </ul>

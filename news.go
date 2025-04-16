@@ -521,15 +521,14 @@ func getLastDBUpdate(db *sql.DB) (string, error) {
 }
 
 func Newspaper(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
-
-	pageVars := genPageNav("Newspaper", sig)
+	pageVars := genPageNav("Newspaper", r)
 
 	var db *sql.DB
-	enabled := GetParamFromSig(sig, "NewsEnabled")
+	enabled := ""
 	if enabled == "1day" {
 		db = Newspaper1dayDB
 		pageVars.IsOneDay = true
+		pageVars.CanSwitchDay = true
 	} else if enabled == "3day" {
 		db = Newspaper3dayDB
 	} else if enabled == "0day" || (DevMode && !SigCheck) {
@@ -539,11 +538,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		} else {
 			db = Newspaper1dayDB
 			pageVars.IsOneDay = true
+			pageVars.CanSwitchDay = true
 		}
-		pageVars.CanSwitchDay = true
 	} else {
 		pageVars.Title = "This feature is BANned"
-		pageVars.ErrorMessage = ErrMsgDenied
+		pageVars.ErrorMessage = "Permission denied"
 
 		render(w, "news.html", pageVars)
 		return
@@ -729,7 +728,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			qs := strings.Split(newspage.Query, "FROM")
 			if len(qs) != 2 {
 				pageVars.Title = "Errors have been made"
-				pageVars.ErrorMessage = ErrMsgDenied
+				pageVars.ErrorMessage = "Permission denied"
 
 				render(w, "news.html", pageVars)
 				return

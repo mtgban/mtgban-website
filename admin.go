@@ -46,10 +46,9 @@ var BuildCommit = func() string {
 }()
 
 func Admin(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
 
 	page := r.FormValue("page")
-	pageVars := genPageNav("Admin", sig)
+	pageVars := genPageNav("Admin", r)
 	pageVars.Nav = insertNavBar("Admin", pageVars.Nav, []NavElem{
 		NavElem{
 			Name:   "People",
@@ -66,6 +65,19 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			Class:  "selected",
 		},
 	})
+
+	var isAdmin bool
+	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
+		if aclData, ok := aclCtx.(map[string]interface{}); ok {
+			if roleVal, okRole := aclData["role"].(string); okRole {
+				isAdmin = (roleVal == "admin" || roleVal == "root")
+			}
+		}
+	}
+	if !isAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 
 	msg := r.FormValue("msg")
 	if msg != "" {
@@ -116,16 +128,48 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spoof := r.FormValue("spoof")
-	if spoof != "" {
-		baseURL := getBaseURL(r)
-		sig := authService.sign(baseURL, spoof, nil)
+	// --- Spoofing Logic ---
+	clearSpoof := r.FormValue("clear_spoof")
+	spoofTarget := r.FormValue("spoof_target")
 
-		// Overwrite the current signature
-		authService.putSignatureInCookies(w, r, sig)
-
-		http.Redirect(w, r, baseURL, http.StatusFound)
+	if clearSpoof == "true" || clearSpoof == "1" {
+		// Clear the cookie
+		http.SetCookie(w, &http.Cookie{
+			Name:   spoofCookieName,
+			Value:  "",
+			Path:   "/",
+			MaxAge: -1, // Expire immediately
+		})
+		// Redirect to remove the query param
+		q := r.URL.Query()
+		q.Del("clear_spoof")
+		r.URL.RawQuery = q.Encode()
+		http.Redirect(w, r, r.URL.String(), http.StatusFound)
 		return
+	} else if spoofTarget != "" {
+		// Validate format
+		if !(strings.HasPrefix(spoofTarget, "user:") || strings.HasPrefix(spoofTarget, "tier:") || strings.HasPrefix(spoofTarget, "role:")) {
+			pageVars.ErrorMessage = "Invalid spoof target format. Use user:<email>, tier:<name>, or role:<name>."
+			// Don't redirect, show error on admin page
+		} else {
+			// Set the cookie
+			isSecure := r.TLS != nil || !DevMode
+			http.SetCookie(w, &http.Cookie{
+				Name:     spoofCookieName,
+				Value:    spoofTarget,
+				Path:     "/",
+				MaxAge:   3600, // 1 hour
+				HttpOnly: true,
+				Secure:   isSecure,
+				SameSite: http.SameSiteStrictMode,
+			})
+			// Redirect to remove the query param
+			q := r.URL.Query()
+			q.Del("spoof_target")
+			r.URL.RawQuery = q.Encode()
+			http.Redirect(w, r, r.URL.String(), http.StatusFound)
+			return
+		}
 	}
 
 	reboot := r.FormValue("reboot")
@@ -210,7 +254,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "New config loaded!")
 		doReboot = true
 
-		err := loadVars(Config.filePath, "", "", nil)
+		err := loadVars(Config.filePath, "", "")
 		if err != nil {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}

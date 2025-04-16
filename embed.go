@@ -135,7 +135,7 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 			// Build url for our redirect
 			kind := strings.ToLower(string(EmbedFieldsNames[i][0]))
 			store := entry.Shorthand
-			value.Link = "https://" + DefaultHost + "/" + path.Join("go", kind, store, searchRes.CardId)
+			value.Link = "https://" + Config.DefaultHost + "/" + path.Join("go", kind, store, searchRes.CardId)
 
 			if entry.Ratio > 60 {
 				value.HasFire = true

@@ -1,7 +1,7 @@
 // src/pages/signup-success.tsx
 import React from 'react';
-import AuthLink from '../components/auth/AuthLink';
-import AuthLayout from '../components/auth/AuthLayout';
+import AuthLink from '@/components/auth/AuthLink';
+import AuthLayout from '@/components/auth/AuthLayout';
 
 export default function SignupSuccessPage() {
   return (

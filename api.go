@@ -135,9 +135,22 @@ func prepareCKAPI() error {
 }
 
 func API(w http.ResponseWriter, r *http.Request) {
-	sig := r.FormValue("sig")
+	// --- Get User and ACL data from Context ---
+	var userPermissions map[string]interface{}
+	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
+		if aclData, ok := aclCtx.(map[string]interface{}); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+				userPermissions = perms
+			}
+		}
+	}
+	// --- End Context Retrieval ---
 
-	param := GetParamFromSig(sig, "API")
+	//param := GetParamFromSig(sig, "API")
+	param := "" // Default
+	if permValue, ok := userPermissions["API"].(string); ok {
+		param = permValue
+	}
 	canAPI := strings.Contains(param, "CK")
 	if SigCheck && !canAPI {
 		w.Write([]byte(`{"error": "invalid signature"}`))
@@ -572,20 +585,30 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchAPI(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	var userPermissions map[string]interface{}
+	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
+		if aclData, ok := aclCtx.(map[string]interface{}); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+				userPermissions = perms
+			}
+		}
+	}
 
 	// Load whether a user can download CSV and validate the query parameter
-	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
+	canDownloadCSV := false // Default
+	if permValue, ok := userPermissions["SearchDownloadCSV"].(bool); ok {
+		canDownloadCSV = permValue
+	}
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
 	if !canDownloadCSV {
-		pageVars := genPageNav("Error", sig)
+		pageVars := genPageNav("Error", r)
 		pageVars.Title = "Unauthorized"
 		pageVars.ErrorMessage = "Unable to download CSV"
 		render(w, "home.html", pageVars)
 		return
 	}
 
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists(r)
 
 	isRetail := strings.Contains(r.URL.Path, "/retail/")
 	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
@@ -650,7 +673,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		w.Header().Del("Content-Type")
 		w.Header().Del("Content-Disposition")
 		UserNotify("search", err.Error())
-		pageVars := genPageNav("Error", sig)
+		pageVars := genPageNav("Error", r)
 		pageVars.Title = "Error"
 		pageVars.InfoMessage = "Unable to download CSV right now"
 		render(w, "home.html", pageVars)

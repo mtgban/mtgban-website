@@ -24,6 +24,7 @@ import (
 	"gopkg.in/Iwark/spreadsheet.v2"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	supabase "github.com/nedpals/supabase-go"
 )
 
 const (
@@ -119,9 +120,26 @@ type OptimizedUploadEntry struct {
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	pageVars := genPageNav("Upload", r)
 
-	pageVars := genPageNav("Upload", sig)
+	var userInfo *supabase.User
+	var userPermissions map[string]interface{}
+	var userEmail string = "anonymous"
+
+	if userCtx := r.Context().Value(userContextKey); userCtx != nil {
+		if user, ok := userCtx.(*supabase.User); ok && user != nil {
+			userInfo = user
+			userEmail = userInfo.Email
+		}
+	}
+	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
+		if aclData, ok := aclCtx.(map[string]interface{}); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+				userPermissions = perms
+			}
+		}
+	}
+	// --- End Context Retrieval ---
 
 	// Maximum form size
 	r.ParseMultipartForm(MaxUploadFileSize)
@@ -164,7 +182,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	blMode := readSetFlag(w, r, "mode", "uploadMode")
 
 	// Disable buylist if not permitted
-	canBuylist, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadBuylistEnabled"))
+	canBuylist := false // Default
+	if permValue, ok := userPermissions["UploadBuylistEnabled"].(bool); ok {
+		canBuylist = permValue
+	}
 	if DevMode && !SigCheck {
 		canBuylist = true
 	}
@@ -173,7 +194,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Disable changing stores if not permitted
-	canChangeStores, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadChangeStoresEnabled"))
+	canChangeStores := false // Default
+	if permValue, ok := userPermissions["UploadChangeStoresEnabled"].(bool); ok {
+		canChangeStores = permValue
+	}
 	if DevMode && !SigCheck {
 		canChangeStores = true
 	}
@@ -245,7 +269,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanBuylist = canBuylist
 	pageVars.CanChangeStores = canChangeStores
 
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists(r)
 	var enabledStores []string
 	var allSellers []string
 	var allVendors []string
@@ -372,13 +396,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	maxRows := MaxUploadEntries
 
 	// Increase upload limit if allowed
-	optimizerOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadOptimizer"))
+	optimizerOpt := false // Default
+	if permValue, ok := userPermissions["UploadOptimizer"].(bool); ok {
+		optimizerOpt = permValue
+	}
 	increaseMaxRows := optimizerOpt || (DevMode && !SigCheck)
 	if increaseMaxRows {
 		maxRows = MaxUploadProEntries
 	}
 	// Allow a larger upload limit if set, if dev, or if it's an external call
-	limitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
+	limitOpt := false // Default
+	if permValue, ok := userPermissions["UploadNoLimit"].(bool); ok {
+		limitOpt = permValue
+	}
 	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate || deckbox
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
@@ -875,13 +905,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.MissingPrices = missingPrices
 	pageVars.ResultPrices = resultPrices
 
-	// Logs
-	user := GetParamFromSig(sig, "UserEmail")
+	// Log performance
 	msgMode := "retail"
 	if blMode {
 		msgMode = "buylist"
 	}
-	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(cardIds), msgMode, pageVars.SearchQuery, time.Since(start))
+	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", userEmail, len(cardIds), msgMode, pageVars.SearchQuery, time.Since(start))
 	UserNotify("upload", msg)
 	LogPages["Upload"].Println(msg)
 

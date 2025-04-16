@@ -1,13 +1,15 @@
 import { 
   UserCredentials,
   SignupData,
-  User
-} from '../api/types';
+  User,
+  AuthResponse,
+  createCredentials,
+  createSignupData,
+  createDefaultUser
+} from '@/types/auth';
 
 import { createFetchInterceptor } from './interceptor';
 
-// Get the API base URL from environment variable or default
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/next-api';
 const AUTH_API_PATH = process.env.NEXT_PUBLIC_AUTH_API_PATH || '/next-api/auth';
 
 /**
@@ -17,9 +19,18 @@ export class AuthService {
   private user: User | null = null;
   private refreshTimer: ReturnType<typeof setTimeout> | null = null;
   private refreshing = false;
+  private loggingOut = false;
   private listeners: ((user: User | null) => void)[] = [];
   private tokenExpiryKey = 'token_expires_at';
   
+   /**
+   * Get API URL based on current environment
+   */
+   private getApiUrl(endpoint: string): string {
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    return `${AUTH_API_PATH}/${cleanEndpoint}`;
+  }
+
   /**
    * Initialize auth state
    * @param initialUser - User data if available
@@ -35,18 +46,9 @@ export class AuthService {
   }
   
   /**
-   * Get API URL based on current environment
-   */
-  private getApiUrl(endpoint: string): string {
-    // Remove leading slash if present for consistent joining
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-    return `${AUTH_API_PATH}/${cleanEndpoint}`;
-  }
-  
-  /**
    * Login with email and password
    */
-  public async login(credentials: UserCredentials): Promise<{ success: boolean; user?: User; error?: string }> {
+  public async login(credentials: UserCredentials): Promise<AuthResponse> {
     try {
       const response = await fetch(this.getApiUrl('login'), {
         method: 'POST',
@@ -81,12 +83,15 @@ export class AuthService {
       
       return {
         success: true,
-        user: data.user
+        user: data.user,
+        session: data.session
       };
     } catch (error) {
       console.error('Login error:', error);
       return {
         success: false,
+        user: null,
+        session: null,
         error: error instanceof Error ? error.message : 'Login failed'
       };
     }
@@ -95,23 +100,24 @@ export class AuthService {
   /**
    * Sign up a new user
    */
-  public async signup(data: SignupData): Promise<{ 
-    success: boolean; 
-    user?: User; 
-    error?: string;
-    emailConfirmationRequired?: boolean;
-  }> {
+  public async signup(data: SignupData): Promise<AuthResponse> {
     try {
       if (data.password !== data.confirmPassword) {
         return {
           success: false,
+          user: null,
+          session: null,
           error: 'Passwords do not match'
         };
       }
 
       const userData = {
-        full_name: data.fullName,
-        tier: 'free'
+        email: data.email,
+        password: data.password,
+        userData: {
+          full_name: data.fullName,
+          tier: 'free'
+        }
       };
 
       const response = await fetch(this.getApiUrl('signup'), {
@@ -119,11 +125,7 @@ export class AuthService {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          userData
-        }),
+        body: JSON.stringify(userData),
         credentials: 'same-origin'
       });
       
@@ -134,12 +136,12 @@ export class AuthService {
       
       const responseData = await response.json();
       
-      // If email confirmation is required
       if (responseData.emailConfirmationRequired) {
         return {
           success: true,
-          emailConfirmationRequired: true,
-          user: responseData.user
+          user: responseData.user || null,
+          session: null,
+          emailConfirmationRequired: true
         };
       }
       
@@ -155,17 +157,19 @@ export class AuthService {
       this.user = responseData.user;
       this.notifyListeners();
       
-      // Setup token refresh
       this.setupTokenRefresh();
       
       return {
         success: true,
-        user: responseData.user
+        user: responseData.user,
+        session: responseData.session
       };
     } catch (error) {
       console.error('Signup error:', error);
       return {
         success: false,
+        user: null,
+        session: null,
         error: error instanceof Error ? error.message : 'Signup failed'
       };
     }
@@ -175,6 +179,13 @@ export class AuthService {
    * Logout the current user
    */
   public async logout(): Promise<void> {
+    if (this.loggingOut) {
+      console.log('Logout already in progress');
+      return;
+    }
+
+    this.loggingOut = true;
+    console.log('Logging out user');
     try {
       await fetch(this.getApiUrl('logout'), {
         method: 'POST',
@@ -182,37 +193,43 @@ export class AuthService {
       });
     } catch (error) {
       console.error('Logout error:', error);
+    } finally {
+      this.user = null;
+
+      if (this.refreshTimer) {
+        clearTimeout(this.refreshTimer);
+        this.refreshTimer = null;
+      }
+
+      try {
+        localStorage.removeItem(this.tokenExpiryKey);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+      } catch (e) {
+        console.warn('Local storage not available for logout');
+      }
+
+      this.notifyListeners();
+      this.loggingOut = false;
+      console.log('User logged out');
     }
-    
-    // Clear local state regardless of server response
-    this.user = null;
-    
-    // Clear refresh timer
-    if (this.refreshTimer) {
-      clearTimeout(this.refreshTimer);
-      this.refreshTimer = null;
-    }
-    
-    // Clear stored expiry time
-    try {
-      localStorage.removeItem(this.tokenExpiryKey);
-    } catch (e) {
-      // Local storage might not be available
-    }
-    
-    this.notifyListeners();
   }
   
-  /**
+   /**
    * Get current user information
    */
-  public async fetchUser(): Promise<User | null> {
+   public async fetchUser(): Promise<User | null> {
     try {
       const response = await fetch(this.getApiUrl('me'), {
         credentials: 'same-origin'
       });
       
       if (!response.ok) {
+        if (response.status === 401) {
+          // Not authenticated
+          return null;
+        }
         throw new Error('Failed to fetch user');
       }
       
@@ -229,10 +246,10 @@ export class AuthService {
     }
   }
   
-  /**
+   /**
    * Refresh the authentication tokens
    */
-  public async refreshSession(): Promise<boolean> {
+   public async refreshSession(): Promise<boolean> {
     if (this.refreshing) return false;
     
     this.refreshing = true;
@@ -278,6 +295,7 @@ export class AuthService {
     }
   }
   
+  
   /**
    * Request a password reset
    */
@@ -302,6 +320,34 @@ export class AuthService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to request password reset'
+      };
+    }
+  }
+
+  /**
+   * Reset password
+   */
+  public async resetPassword(password: string, token: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await fetch(this.getApiUrl('reset-password'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ password, token })
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to reset password');
+      }
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Reset password error:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to reset password'
       };
     }
   }

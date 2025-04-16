@@ -1,6 +1,8 @@
 import React, { useState, FormEvent, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { UserIcon, MailIcon, LockIcon, ArrowLeftIcon, CheckCircleIcon, AlertCircleIcon } from 'lucide-react';
+import Link from 'next/link';
+import { useLegalNavigation } from '@/lib/legal';
+import { UserIcon, MailIcon, LockIcon, ArrowLeftIcon, CheckCircleIcon, AlertCircleIcon} from 'lucide-react';
 import AuthLink from './AuthLink';
 import { authService } from '@/lib/auth/authService';
 
@@ -10,6 +12,7 @@ export interface SignupFormProps {
 
 export default function SignupForm({ redirectTo }: SignupFormProps) {
   const router = useRouter();
+  const { goToCasualTerms, goToCasualPrivacy } = useLegalNavigation();
   const urlError = router.query.error as string | undefined;
   const urlMessage = router.query.message as string | undefined;
   const urlEmail = router.query.email as string | undefined;
@@ -307,13 +310,13 @@ export default function SignupForm({ redirectTo }: SignupFormProps) {
           />
           <label htmlFor="terms" className="form-check-label">
             I accept the{' '}
-            <AuthLink href="/terms">
+            <Link href="/legal/casual-terms">
               Terms of Service
-            </AuthLink>{' '}
-            and{' '}
-            <AuthLink href="/privacy">
+            </Link>{' '}
+              and{' '}
+            <Link href="/legal/casual-privacy">
               Privacy Policy
-            </AuthLink>
+            </Link>
           </label>
         </div>
         

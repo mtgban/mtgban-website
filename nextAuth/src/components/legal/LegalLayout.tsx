@@ -2,17 +2,17 @@
 import React, { ReactNode, useEffect } from 'react';
 import Head from 'next/head';
 
-interface AuthLayoutProps {
+interface LegalLayoutProps {
   children: ReactNode;
   title: string;
   description?: string;
 }
 
-export default function AuthLayout({ 
+export default function LegalLayout({ 
   children, 
   title, 
-  description = 'Authentication page for MTGBAN'
-}: AuthLayoutProps ) {
+  description = 'Legal page for MTGBAN'
+}: LegalLayoutProps ) {
   // Apply dark mode based on system preference
   useEffect(() => {
     const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -52,7 +52,7 @@ export default function AuthLayout({
           <div className="auth-background-gradient"></div>
         </div>
         
-        <div className="auth-page">
+        <div className="legal-page">
           </div>
           
           {children}

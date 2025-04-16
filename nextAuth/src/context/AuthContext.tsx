@@ -40,11 +40,12 @@
     if (typeof window === 'undefined') return false;
     
     const path = window.location.pathname;
-    return path.includes('/auth/login') || 
-          path.includes('/auth/signup') || 
-          path.includes('/auth/reset-password') ||
-          path.includes('/auth/forgot-password') ||
-          path.includes('/auth/confirmation');
+    return path.includes('/auth/login')
+        || path.includes('/auth/signup')
+        || path.includes('/auth/reset-password')
+        || path.includes('/auth/forgot-password')
+        || path.includes('/auth/confirmation')
+        || path.includes('/auth/account')
   }
 
   export const AuthProvider = ({ children }: AuthProviderProps) => {
@@ -129,13 +130,13 @@
     };
 
     // Login function
-    const login = async (email: string, password: string, remember: boolean = false): Promise<boolean> => {
+    const login = async (email: string, password: string, rememberMe: boolean = false): Promise<boolean> => {
       try {
         setLoading(true);
         clearError();
         
         console.log('Logging in user:', email);
-        const response = await authApi.login({ email, password, remember });
+        const response = await authApi.login({ email, password, rememberMe: rememberMe });
         
         const user = response.user || (response.data && response.data.user);
 

@@ -107,7 +107,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	storesOpt := GetParamFromSig(sig, "API")
+	storesOpt := r.FormValue("stores")
 	if DevMode && !SigCheck && storesOpt == "" {
 		storesOpt = "DEV_ACCESS"
 	}
@@ -209,7 +209,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	enabledModes := strings.Split(GetParamFromSig(sig, "APImode"), ",")
+	enabledModes := strings.Split(r.FormValue("mode"), ",")
 	idOpt := r.FormValue("id")
 	qty, _ := strconv.ParseBool(r.FormValue("qty"))
 	conds, _ := strconv.ParseBool(r.FormValue("conds"))
@@ -316,7 +316,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		out.Buylist = getVendorPrices(idOpt, enabledStores, filterByEdition, filterByHash, filterByFinish, qty, conds, isSealed, tagName)
 	}
 
-	user := GetParamFromSig(sig, "UserEmail")
+	user := r.FormValue("user")
 	if sig == "" && user == "" {
 		user = "DEMO"
 	}

@@ -73,11 +73,9 @@ func isSame(a, b SearchEntry) bool {
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 
 func Search(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	pageVars := genPageNav("Search", r)
 
-	pageVars := genPageNav("Search", sig)
-
-	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
+	blocklistRetail, blocklistBuylist := getDefaultBlocklists(r)
 
 	query := strings.TrimSpace(r.FormValue("q"))
 
@@ -164,7 +162,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
 	}
 	// For buylists, if open mode, filter any store except the ones in the AffiliatesBuylistList
-	if sig == "" && SigCheck {
+	if SigCheck {
 		for _, vendor := range Vendors {
 			if vendor != nil && !slices.Contains(Config.AffiliatesBuylistList, vendor.Info().Shorthand) {
 				blocklistBuylist = append(blocklistBuylist, vendor.Info().Shorthand)
@@ -189,7 +187,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") == "prices")
 
 	// Load whether a user can download CSV and validate the query parameter
-	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
+	canDownloadCSV := false // Default
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
 	pageVars.CanDownloadCSV = canDownloadCSV
 
@@ -531,7 +529,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 						sealedEVindexes = map[string]int{}
 					}
 
-					// Determine an identifiers from the name (the second word)
+					// Determine an identifiers from the name
 					fields := strings.Fields(indexArray[i].ScraperName)
 					if len(fields) < 2 {
 						continue
@@ -641,11 +639,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	user := GetParamFromSig(sig, "UserEmail")
-	if user == "" {
-		user = "anonymous"
-	}
-	msg := fmt.Sprintf("[%s] from %s by %s (took %v)", query, source, user, time.Since(start))
+
+	msg := fmt.Sprintf("[%s] from %s by %s (took %v)", query, source, pageVars.UserEmail, time.Since(start))
 	UserNotify(notifyTitle, msg)
 	LogPages["Search"].Println(msg)
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	supabase "github.com/nedpals/supabase-go"
 	"golang.org/x/exp/slices"
 )
 
@@ -42,10 +43,10 @@ const (
 )
 
 var FilteredEditions = []string{
-	"Collectors’ Edition",
+	"Collectors' Edition",
 	"Foreign Black Border",
 	"Foreign White Border",
-	"Intl. Collectors’ Edition",
+	"Intl. Collectors' Edition",
 	"Limited Edition Alpha",
 	"Limited Edition Beta",
 	"Unlimited Edition",
@@ -324,18 +325,41 @@ func Reverse(w http.ResponseWriter, r *http.Request) {
 }
 
 func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
-	sig := getSignatureFromCookies(r)
+	start := time.Now()
 
 	pageName := "Arbitrage"
 	if reverse {
 		pageName = "Reverse"
 	}
-	pageVars := genPageNav(pageName, sig)
+	pageVars := genPageNav(pageName, r)
+
+	// --- Get User and ACL data from Context ---
+	var userInfo *supabase.User
+	var userPermissions map[string]interface{}
+	var userEmail string = "anonymous" // Default email
+
+	if userCtx := r.Context().Value(userContextKey); userCtx != nil {
+		if user, ok := userCtx.(*supabase.User); ok && user != nil {
+			userInfo = user
+			userEmail = userInfo.Email // Use authenticated user's email
+		}
+	}
+	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
+		if aclData, ok := aclCtx.(map[string]interface{}); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+				userPermissions = perms
+			}
+		}
+	}
+	// --- End Context Retrieval ---
 
 	var anyOptionEnabled bool
 
 	var allowlistSellers []string
-	allowlistSellersOpt := GetParamFromSig(sig, "ArbitEnabled")
+	allowlistSellersOpt := "" // Default value
+	if permValue, ok := userPermissions["ArbitEnabled"].(string); ok {
+		allowlistSellersOpt = permValue
+	}
 
 	if allowlistSellersOpt == "ALL" || (DevMode && !SigCheck) {
 		for _, seller := range Sellers {
@@ -353,7 +377,10 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	}
 
 	var blocklistVendors []string
-	blocklistVendorsOpt := GetParamFromSig(sig, "ArbitDisabledVendors")
+	blocklistVendorsOpt := "" // Default value
+	if permValue, ok := userPermissions["ArbitDisabledVendors"].(string); ok {
+		blocklistVendorsOpt = permValue
+	}
 	if blocklistVendorsOpt == "" {
 		blocklistVendors = Config.ArbitBlockVendors
 	} else if blocklistVendorsOpt != "NONE" {
@@ -400,26 +427,50 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	pageVars.ReverseMode = reverse
 
-	start := time.Now()
-
 	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, true, anyOptionEnabled)
 
-	user := GetParamFromSig(sig, "UserEmail")
-	msg := fmt.Sprintf("Request by %s took %v", user, time.Since(start))
+	msg := fmt.Sprintf("Request by %s took %v", userEmail, time.Since(start))
 	UserNotify("arbit", msg)
 	LogPages["Arbit"].Println(msg)
 }
 
 func Global(w http.ResponseWriter, r *http.Request) {
-	sig := getSignatureFromCookies(r)
+	start := time.Now()
+	pageVars := genPageNav("Global", r)
 
-	pageVars := genPageNav("Global", sig)
+	// --- Get User and ACL data from Context ---
+	var userInfo *supabase.User
+	var userPermissions map[string]interface{}
+	var userEmail string = "anonymous" // Default email
 
-	anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")
-	anyEnabled, _ := strconv.ParseBool(anyEnabledOpt)
+	if userCtx := r.Context().Value(userContextKey); userCtx != nil {
+		if user, ok := userCtx.(*supabase.User); ok && user != nil {
+			userInfo = user
+			userEmail = userInfo.Email // Use authenticated user's email
+		}
+	}
+	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
+		if aclData, ok := aclCtx.(map[string]interface{}); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+				userPermissions = perms
+			}
+		}
+	}
+	// --- End Context Retrieval ---
 
-	anyExperimentOpt := GetParamFromSig(sig, "AnyExperimentsEnabled")
-	anyExperiment, _ := strconv.ParseBool(anyExperimentOpt)
+	//anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")
+	//anyEnabled, _ := strconv.ParseBool(anyEnabledOpt)
+	anyEnabled := false // Default value
+	if permValue, ok := userPermissions["AnyEnabled"].(bool); ok {
+		anyEnabled = permValue
+	}
+
+	//anyExperimentOpt := GetParamFromSig(pageVars.Sig, "AnyExperimentsEnabled")
+	//anyExperiment, _ := strconv.ParseBool(anyExperimentOpt)
+	anyExperiment := false // Default value
+	if permValue, ok := userPermissions["AnyExperimentsEnabled"].(bool); ok {
+		anyExperiment = permValue
+	}
 
 	anyEnabled = anyEnabled || (DevMode && !SigCheck)
 	anyExperiment = anyExperiment || (DevMode && !SigCheck)
@@ -488,12 +539,9 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	// Inform the render this is Global
 	pageVars.GlobalMode = true
 
-	start := time.Now()
-
 	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, anyEnabled)
 
-	user := GetParamFromSig(sig, "UserEmail")
-	msg := fmt.Sprintf("Request by %s took %v", user, time.Since(start))
+	msg := fmt.Sprintf("Request by %s took %v", userEmail, time.Since(start))
 	UserNotify("global", msg)
 	LogPages["Global"].Println(msg)
 }
