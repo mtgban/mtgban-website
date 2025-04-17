@@ -1122,13 +1122,20 @@ func getSortingData(uuid string) (*SortingData, error) {
 	}, nil
 }
 
-func sortByNumberAndFinish(cI, cJ *mtgmatcher.CardObject, strip bool) bool {
+func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
+	sortingI, err := getSortingData(uuidI)
+	if err != nil {
+		return false
+	}
+	sortingJ, err := getSortingData(uuidJ)
+	if err != nil {
+		return false
+	}
+	cI := sortingI.co
+	cJ := sortingJ.co
+
 	numI := cI.Card.Number
 	numJ := cJ.Card.Number
-	if strip {
-		numI = mtgmatcher.ExtractNumericalValue(cI.Card.Number)
-		numJ = mtgmatcher.ExtractNumericalValue(cJ.Card.Number)
-	}
 
 	// If their number is the same, check for foiling status
 	if numI == numJ {
@@ -1153,8 +1160,19 @@ func sortByNumberAndFinish(cI, cJ *mtgmatcher.CardObject, strip bool) bool {
 	// If both are foil or both are non-foil, check their number
 	cInum, errI := strconv.Atoi(numI)
 	cJnum, errJ := strconv.Atoi(numJ)
-	if errI == nil && errJ == nil && cInum != cJnum {
+	if errI == nil && errJ == nil {
 		return cInum < cJnum
+	}
+
+	// If conversion fails for any reson, try again using the numerical value of the card only
+	if strip {
+		numI = mtgmatcher.ExtractNumericalValue(cI.Card.Number)
+		numJ = mtgmatcher.ExtractNumericalValue(cJ.Card.Number)
+		cInum, errI = strconv.Atoi(numI)
+		cJnum, errJ = strconv.Atoi(numJ)
+		if errI == nil && errJ == nil && cInum != cJnum {
+			return cInum < cJnum
+		}
 	}
 
 	// If either one is not a number (due to extra letters) just
@@ -1184,7 +1202,7 @@ func sortSets(uuidI, uuidJ string) bool {
 				return cI.Name < cJ.Name
 			}
 
-			return sortByNumberAndFinish(cI, cJ, true)
+			return sortByNumberAndFinish(uuidI, uuidJ, true)
 			// For the special case of set promos, always keeps them after
 		} else if sortingI.parentCode == "" && sortingJ.parentCode != "" {
 			return true
@@ -1215,7 +1233,7 @@ func sortSetsAlphabetical(uuidI, uuidJ string) bool {
 	if cI.Name == cJ.Name {
 		if setDateI.Equal(setDateJ) {
 			// We need not to strip to keep set ordered wrt Promos etc
-			return sortByNumberAndFinish(cI, cJ, false)
+			return sortByNumberAndFinish(uuidI, uuidJ, false)
 		}
 
 		return setDateI.After(setDateJ)
