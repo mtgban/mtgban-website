@@ -210,7 +210,9 @@ func setupDynamicNavRoutes(mux *http.ServeMux, mr *MiddlewareRegistry) {
 		// Apply appropriate middleware chain based on route requirements
 		middlewareChain := "protected"
 		if nav.CanPOST {
-			middlewareChain = "csrf-protected"
+			if !strings.Contains(nav.Name, "Search") {
+				middlewareChain = "csrf-protected"
+			}
 		}
 
 		mux.Handle(nav.Link, mr.ApplyMiddleware(middlewareChain, http.HandlerFunc(nav.Handle)))
