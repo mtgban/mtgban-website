@@ -1,3 +1,10 @@
+interface Window {
+    __INITIAL_DATA__?: {
+      user?: User | null;
+      csrf_token?: string | null;
+    };
+  }
+
 declare module '*.module.css' {
     const classes: { [key: string]: string };
     export default classes;
