@@ -17,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -125,7 +126,7 @@ type AuthService struct {
 	Logger     *log.Logger
 	Supabase   *supabase.Client
 	Config     AuthConfig
-	CSRFSecret []byte
+	CSRFSecret string
 	BanACL     *BanACL
 	Navs       map[string]*NavElem
 	IPLimiters sync.Map
@@ -347,11 +348,7 @@ func NewAuthService(config AuthConfig, extraNavs map[string]*NavElem) (*AuthServ
 	}
 	logger.Printf("Supabase client initialized for URL: %s", config.SupabaseURL)
 
-	// Generate CSRF secret
-	csrfSecret := make([]byte, 32)
-	if _, err := rand.Read(csrfSecret); err != nil {
-		return nil, fmt.Errorf("failed to generate secure CSRF secret: %w", err)
-	}
+	csrfSecret, _ := generateCSRFSecret(32, "csrf_secret.txt")
 
 	// Create the service instance
 	service := &AuthService{
@@ -565,14 +562,14 @@ func (a *AuthService) logWithContext(r *http.Request, format string, v ...interf
 // getUserIDFromRequest extracts user ID from request context or cookie
 func (a *AuthService) getUserIDFromRequest(r *http.Request) string {
 	// First try to get UserID from context
-	if user, ok := r.Context().Value("user").(*supabase.User); ok && user != nil {
-		return maskID(user.ID)
+	if user, ok := r.Context().Value(userSessionContextKey).(*supabase.User); ok && user != nil {
+		return user.ID
 	}
 
 	// Then try to get from UserSession if available
 	if sessionData := r.Context().Value(userSessionContextKey); sessionData != nil {
 		if userSession, ok := sessionData.(*UserSession); ok && userSession != nil && userSession.User != nil {
-			return maskID(userSession.User.ID)
+			return userSession.User.ID
 		}
 	}
 
@@ -584,7 +581,7 @@ func (a *AuthService) getUserIDFromRequest(r *http.Request) string {
 				var claims map[string]interface{}
 				if json.Unmarshal(payload, &claims) == nil {
 					if sub, ok := claims["sub"].(string); ok {
-						return maskID(sub)
+						return sub
 					}
 				}
 			}
@@ -626,7 +623,7 @@ func (a *AuthService) handleAPIError(w http.ResponseWriter, r *http.Request, err
 // setAuthCookies sets the necessary authentication cookies
 func (a *AuthService) setAuthCookies(w http.ResponseWriter, r *http.Request, token, refreshToken string, rememberMe bool) {
 	// Determine cookie security settings
-	isSecure := r.TLS != nil
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 	sameSiteMode := a.getCookieSameSiteMode()
 
 	// Set auth token cookie
@@ -636,7 +633,7 @@ func (a *AuthService) setAuthCookies(w http.ResponseWriter, r *http.Request, tok
 	} else {
 		maxAge = 24 * 60 * 60 // 24 hours
 	}
-	a.setCookie(w, "auth_token", token, maxAge, true, isSecure, sameSiteMode)
+	a.setCookie(w, "auth_token", token, maxAge, true, isSecure, http.SameSiteLaxMode)
 
 	// Set refresh token with longer expiry
 	refreshMaxAge := 60 * 24 * 60 * 60 // 60 days
@@ -666,6 +663,7 @@ func (a *AuthService) setCookie(w http.ResponseWriter, name, value string, maxAg
 		Name:     name,
 		Value:    value,
 		Path:     "/",
+		Domain:   Config.Auth.Domain,
 		HttpOnly: httpOnly,
 		MaxAge:   maxAge,
 		Secure:   secure,
@@ -690,7 +688,7 @@ func (a *AuthService) getCookieSameSiteMode() http.SameSite {
 
 // generateCSRFToken generates a CSRF token for a user session
 func (a *AuthService) generateCSRFToken(sessionID string) string {
-	h := hmac.New(sha256.New, a.CSRFSecret)
+	h := hmac.New(sha256.New, a.getCSRFSecretKey())
 	h.Write([]byte(sessionID))
 	h.Write([]byte(time.Now().Format("2006-01-02")))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
@@ -701,7 +699,20 @@ func (a *AuthService) validateCSRFToken(submittedToken, sessionID string) bool {
 	if submittedToken == "" || sessionID == "" {
 		return false
 	}
-	expectedToken := a.generateCSRFToken(sessionID)
+
+	// Extract the secret
+	secretParts := strings.Split(a.CSRFSecret, "|")
+	if len(secretParts) != 2 {
+		a.Logger.Printf("[ERROR] Invalid CSRF secret format")
+		return false
+	}
+
+	// Generate expected token
+	h := hmac.New(sha256.New, a.getCSRFSecretKey())
+	h.Write([]byte(sessionID))
+	h.Write([]byte(time.Now().Format("2006-01-02")))
+	expectedToken := base64.StdEncoding.EncodeToString(h.Sum(nil))
+
 	return hmac.Equal([]byte(submittedToken), []byte(expectedToken))
 }
 
@@ -779,7 +790,7 @@ func (a *AuthService) performSupabaseAuth(ctx context.Context, email, password s
 	})
 
 	if err != nil {
-		a.logWithContext(nil, "Supabase SignIn failed for %s: %v", maskEmail(email), err)
+		a.Logger.Printf("Supabase SignIn failed for %s: %v", maskEmail(email), err)
 		return nil, nil, &ErrInvalidCredentials
 	}
 
@@ -794,7 +805,7 @@ func (a *AuthService) performSupabaseAuth(ctx context.Context, email, password s
 	})
 
 	if err != nil {
-		a.logWithContext(nil, "Failed to get user info after sign-in for %s: %v", maskEmail(email), err)
+		a.Logger.Printf("Failed to get user info after sign-in for %s: %v", maskEmail(email), err)
 		return nil, nil, &AuthError{
 			Code:       "USER_FETCH_FAILED",
 			Message:    "Could not retrieve user data after login",
@@ -817,10 +828,10 @@ func (a *AuthService) createUserResponse(userInfo *supabase.User, expiresAt int6
 
 	return map[string]interface{}{
 		"user": map[string]interface{}{
-			"id":            userInfo.ID,
-			"email":         userInfo.Email,
-			"tier":          tier,
-			"user_metadata": userInfo.UserMetadata,
+			"id":    userInfo.ID,
+			"tier":  tier,
+			"email": userInfo.Email,
+			"sub":   userInfo.UserMetadata["sub"],
 		},
 		"session": map[string]interface{}{
 			"expires_at": expiresAt,
@@ -926,6 +937,8 @@ func (a *AuthService) SignupAPI(w http.ResponseWriter, r *http.Request) {
 		"user": map[string]interface{}{
 			"id":    user.ID,
 			"email": user.Email,
+			"tier":  user.UserMetadata["tier"],
+			"sub":   user.UserMetadata["sub"],
 		},
 	}
 
@@ -1261,6 +1274,7 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 		// Validate Token with Supabase
 		user, valid := validateAuthToken(a, ctx, token)
 		if !valid || user == nil {
+			a.Logger.Printf("[DEBUG] validateAuthToken failed for token: %s...", token[:10])
 			next(w, r.WithContext(ctx))
 			return
 		}
@@ -1358,7 +1372,7 @@ func (a *AuthService) userHasPermission(session *UserSession, permissionKey stri
 		if session.User != nil {
 			email = session.User.Email
 		}
-		a.logWithContext(nil, "[DEBUG] Permission check: user %s, key %s = %t",
+		a.Logger.Printf("[DEBUG] Permission check: user %s, key %s = %t",
 			maskEmail(email), permissionKey, hasPermission)
 	}
 
@@ -1566,7 +1580,7 @@ func createSpoofedSession(ctx context.Context, originalSession *UserSession, tar
 
 	if a.Config.DebugMode {
 		email := getEmailSafe(originalSession)
-		a.logWithContext(nil, "[DEBUG] SpoofMiddleware: Created spoofed session for %s as %s (Role: %s, Tier: %s)",
+		a.Logger.Printf("[DEBUG] SpoofMiddleware: Created spoofed session for %s as %s (Role: %s, Tier: %s)",
 			email, targetEmail, spoofedSession.Role, spoofedSession.Tier)
 	}
 
@@ -1601,7 +1615,7 @@ func (a *AuthService) handleAuthAsset(w http.ResponseWriter, r *http.Request) {
 	fsPath = filepath.ToSlash(fsPath)
 
 	// Log the requested path, *unless* it's a Next.js internal asset
-	if !strings.HasPrefix(path, "/_next/") {
+	if !strings.Contains("/_next/", path) {
 		a.logWithContext(r, "Serving auth asset: %s", path)
 	}
 
@@ -1665,6 +1679,129 @@ func (a *AuthService) signHMACSHA256Base64(key, data []byte) string {
 	h := hmac.New(sha256.New, key)
 	h.Write(data)
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+// generateCSRFSecret generates a new CSRF secret and writes it to a file
+func generateCSRFSecret(length int, filePath string) (string, error) {
+	if length <= 0 {
+		return "", fmt.Errorf("length must be greater than 0")
+	}
+	// Generate random bytes for the secret part
+	secretBytes := make([]byte, length)
+	_, err := rand.Read(secretBytes)
+	if err != nil {
+		return "", err
+	}
+	encodedSecret := base64.StdEncoding.EncodeToString(secretBytes)
+
+	timestamp := time.Now().Unix()
+	combinedSecret := fmt.Sprintf("%s:%d", encodedSecret, timestamp)
+
+	err = os.WriteFile(filePath, []byte(combinedSecret), 0600)
+	if err != nil {
+		return "", err
+	}
+
+	return combinedSecret, nil
+}
+
+// Extract the actual secret for use in HMAC
+func (a *AuthService) getCSRFSecretKey() []byte {
+	parts := strings.SplitN(a.CSRFSecret, ":", 2)
+	if len(parts) == 2 {
+		return []byte(parts[1]) // Just use the random part as the HMAC key
+	}
+	return []byte(a.CSRFSecret) // Fallback to using the whole string
+}
+
+// CSRFRotate rotates the CSRF secret periodically
+func (a *AuthService) CSRFRotate(interval time.Duration, filePath string) {
+	go func() {
+		for {
+			// First check if current secret needs rotation
+			parts := strings.SplitN(a.CSRFSecret, ":", 2)
+			if len(parts) == 2 {
+				ts, err := strconv.ParseInt(parts[0], 10, 64)
+				if err == nil {
+					secretTime := time.Unix(ts, 0)
+					elapsed := time.Since(secretTime)
+
+					if elapsed < interval {
+						// Secret doesn't need rotation yet
+						waitTime := interval - elapsed
+						a.Logger.Printf("[INFO] CSRF secret age: %v, rotating in %v", elapsed, waitTime)
+						time.Sleep(waitTime)
+						continue
+					}
+				}
+			} else {
+				// No timestamp found, generate new secret
+				secret, err := generateCSRFSecret(32, filePath)
+				if err != nil {
+					a.Logger.Printf("[ERROR] Failed to generate CSRF secret: %v", err)
+					time.Sleep(24 * time.Hour)
+					continue
+				}
+
+				a.CSRFSecret = secret
+				a.Logger.Printf("[INFO] CSRF secret rotated")
+			}
+			time.Sleep(interval)
+		}
+	}()
+}
+
+// LoadCSRFSecret loads the CSRF secret
+func (a *AuthService) LoadCSRFSecret(filePath string) error {
+	_, err := os.Stat(filePath)
+	if os.IsNotExist(err) {
+		secret, err := generateCSRFSecret(32, filePath)
+		if err != nil {
+			return fmt.Errorf("failed to generate CSRF secret: %w", err)
+		}
+		a.CSRFSecret = secret
+		a.Logger.Printf("[DEBUG] CSRF secret file created and secret generated.")
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to check CSRF secret file: %w", err)
+	}
+
+	secretBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read CSRF secret file: %w", err)
+	}
+
+	fullSecret := strings.TrimSpace(string(secretBytes))
+
+	// Parse and validate the timestamp
+	parts := strings.Split(fullSecret, ":")
+	if len(parts) != 2 {
+		// Legacy format or invalid - generate new one
+		secret, err := generateCSRFSecret(32, filePath)
+		if err != nil {
+			return fmt.Errorf("failed to generate CSRF secret: %w", err)
+		}
+		a.CSRFSecret = secret
+		return nil
+	}
+
+	timestamp, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		// Invalid timestamp - generate new one
+		secret, err := generateCSRFSecret(32, filePath)
+		if err != nil {
+			return fmt.Errorf("failed to generate CSRF secret: %w", err)
+		}
+		a.CSRFSecret = secret
+		return nil
+	}
+
+	createTime := time.Unix(timestamp, 0)
+	age := time.Since(createTime)
+
+	a.CSRFSecret = fullSecret
+	a.Logger.Printf("[DEBUG] CSRF Secret loaded successfully from file (age: %v)", age)
+	return nil
 }
 
 // setupUserSession sets cookies and CSRF token after successful authentication
@@ -1754,20 +1891,20 @@ func validateAuthToken(a *AuthService, ctx context.Context, token string) (*supa
 	user, err := a.Supabase.Auth.User(validateCtx, token)
 	if err != nil {
 		if a.Config.DebugMode {
-			a.logWithContext(nil, "[DEBUG] AuthContext: Token validation failed: %v", err)
+			a.Logger.Printf("[DEBUG] AuthContext: Token validation failed: %v", err)
 		}
 		return nil, false
 	}
 
 	if user == nil {
 		if a.Config.DebugMode {
-			a.logWithContext(nil, "[DEBUG] AuthContext: Token validated but user object is nil")
+			a.Logger.Printf("[DEBUG] AuthContext: Token validated but user object is nil")
 		}
 		return nil, false
 	}
 
 	if a.Config.DebugMode {
-		a.logWithContext(nil, "[DEBUG] AuthContext: Valid user found via token: %s (ID: %s)",
+		a.Logger.Printf("[DEBUG] AuthContext: Valid user found via token: %s (ID: %s)",
 			maskEmail(user.Email), maskID(user.ID))
 	}
 
@@ -1784,16 +1921,16 @@ func getUserSessionFromCache(a *AuthService, userID string) (*UserSession, bool)
 
 	if found && time.Since(cachedSession.CreatedAt) < cacheTTL {
 		if a.Config.DebugMode {
-			a.logWithContext(nil, "[DEBUG] AuthContext: User session cache HIT for user %s", userID)
+			a.Logger.Printf("[DEBUG] AuthContext: User session cache HIT for user %s", userID)
 		}
 		return cachedSession, true
 	}
 
 	if a.Config.DebugMode {
 		if found {
-			a.logWithContext(nil, "[DEBUG] AuthContext: User session cache EXPIRED for user %s", userID)
+			a.Logger.Printf("[DEBUG] AuthContext: User session cache EXPIRED for user %s", userID)
 		} else {
-			a.logWithContext(nil, "[DEBUG] AuthContext: User session cache MISS for user %s", userID)
+			a.Logger.Printf("[DEBUG] AuthContext: User session cache MISS for user %s", userID)
 		}
 	}
 
@@ -1814,7 +1951,7 @@ func buildUserSession(a *AuthService, user *supabase.User) *UserSession {
 		permissions = banUser.Permissions
 
 		if a.Config.DebugMode {
-			a.logWithContext(nil, "[DEBUG] AuthContext: Found user %s in BAN ACL (Role: %s, Tier: %s)",
+			a.Logger.Printf("[DEBUG] AuthContext: Found user %s in BAN ACL (Role: %s, Tier: %s)",
 				user.Email, userRole, userTier)
 		}
 	} else {
@@ -1832,7 +1969,7 @@ func buildUserSession(a *AuthService, user *supabase.User) *UserSession {
 		setPermissionsFromACL(a, &userRole, &userTier, &permissions)
 
 		if a.Config.DebugMode {
-			a.logWithContext(nil, "[DEBUG] AuthContext: User %s not in BAN ACL, determined Role: %s, Tier: %s from metadata/defaults",
+			a.Logger.Printf("[DEBUG] AuthContext: User %s not in BAN ACL, determined Role: %s, Tier: %s from metadata/defaults",
 				user.Email, userRole, userTier)
 		}
 	}
@@ -1852,7 +1989,7 @@ func buildUserSession(a *AuthService, user *supabase.User) *UserSession {
 	userSessionCacheMutex.Unlock()
 
 	if a.Config.DebugMode {
-		a.logWithContext(nil, "[DEBUG] AuthContext: Added UserSession to context (Role: %s, Tier: %s, Permissions: %d keys)",
+		a.Logger.Printf("[DEBUG] AuthContext: Added UserSession to context (Role: %s, Tier: %s, Permissions: %d keys)",
 			newSession.Role, newSession.Tier, len(newSession.Permissions))
 	}
 

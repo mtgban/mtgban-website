@@ -381,7 +381,6 @@ type ConfigType struct {
 		Domain         string   `json:"domain"`
 		DebugMode      bool     `json:"debug_mode"`
 		SecureCookies  bool     `json:"secure_cookies"`
-		CSRFSecret     string   `json:"csrf_secret"`
 		SignatureTTL   int      `json:"signature_ttl"`
 		Prefix         string   `json:"log_prefix"`
 		Key            string   `json:"supabase_anon_key"`
@@ -809,7 +808,7 @@ func main() {
 
 	flag.Parse()
 
-	// Apply command-line overrides for port and datastore
+	// Apply overrides
 	if *port != "" {
 		Config.Port = *port
 	}
@@ -872,6 +871,18 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create auth service: %v", err)
 	}
+
+	secretFilePath := "csrf_secret.txt"
+	interval := 24 * time.Hour
+
+	err = authService.LoadCSRFSecret(secretFilePath)
+	if err != nil {
+		log.Fatalf("Failed to load CSRF secret: %v", err)
+	} else {
+		fmt.Println("CSRF secret loaded successfully")
+	}
+
+	authService.CSRFRotate(interval, secretFilePath)
 
 	// Load the BanACL data into the authService
 	err = authService.LoadBanACL()
@@ -970,6 +981,7 @@ func main() {
 
 	// Perform graceful shutdown
 	gracefulShutdown(srv)
+
 }
 
 // gracefulShutdown performs a graceful server shutdown
