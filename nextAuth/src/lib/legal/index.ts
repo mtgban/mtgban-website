@@ -5,10 +5,8 @@ import { useRouter } from 'next/router';
  * Enum of available legal page routes
  */
 export enum LegalPage {
-  TERMS = 'terms-and-conditions',
-  CASUAL_TERMS = 'casual-terms',
-  PRIVACY = 'privacy-policy',
-  CASUAL_PRIVACY = 'casual-privacy',
+  TERMS = 'terms', // Simplified to 'terms'
+  PRIVACY = 'privacy', // Simplified to 'privacy'
 }
 
 /**
@@ -26,14 +24,14 @@ export const navigateToLegalPage = (
   }
 ) => {
   const { newTab = false, query = {} } = options || {};
-  
-  const path = `/legal/${page}`;
-  const queryString = Object.keys(query).length 
-    ? `?${new URLSearchParams(query).toString()}` 
+
+  const path = `/legal/${page}`; // Path is now just /legal/terms or /legal/privacy
+  const queryString = Object.keys(query).length
+    ? `?${new URLSearchParams(query).toString()}`
     : '';
-  
+
   const fullPath = `${path}${queryString}`;
-  
+
   if (newTab) {
     // Open in a new tab
     window.open(fullPath, '_blank');
@@ -54,19 +52,13 @@ export const navigateToLegalPage = (
  */
 export const useLegalNavigation = () => {
   const router = useRouter();
-  
+
   return {
-    goToTerms: (options?: { newTab?: boolean; query?: Record<string, string> }) => 
+    goToTerms: (options?: { newTab?: boolean; query?: Record<string, string> }) =>
       navigateToLegalPage(LegalPage.TERMS, router, options),
 
-    goToPrivacy: (options?: { newTab?: boolean; query?: Record<string, string> }) => 
+    goToPrivacy: (options?: { newTab?: boolean; query?: Record<string, string> }) =>
       navigateToLegalPage(LegalPage.PRIVACY, router, options),
-    
-    goToCasualTerms: (options?: { newTab?: boolean; query?: Record<string, string> }) => 
-      navigateToLegalPage(LegalPage.CASUAL_TERMS, router, options),
-    
-    goToCasualPrivacy: (options?: { newTab?: boolean; query?: Record<string, string> }) => 
-      navigateToLegalPage(LegalPage.CASUAL_PRIVACY, router, options),
   };
 };
 
@@ -74,7 +66,6 @@ export const useLegalNavigation = () => {
  * Props for the LegalLinks component
  */
 export interface LegalLinksProps {
-  casual?: boolean;
   className?: string;
   linkClassName?: string;
   separator?: React.ReactNode;

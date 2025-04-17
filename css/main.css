@@ -255,7 +255,6 @@ nav ul {
 nav li {
   height: auto; 
   border-right: none; 
-  margin-right: 1.5rem; 
   display: flex; 
   align-items: center;
 }

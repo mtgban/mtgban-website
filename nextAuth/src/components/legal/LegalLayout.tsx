@@ -1,6 +1,7 @@
 // src/components/auth/AuthLayout.tsx
 import React, { ReactNode, useEffect } from 'react';
 import Head from 'next/head';
+import LegalLinks from './LegalLinks';
 
 interface LegalLayoutProps {
   children: ReactNode;
@@ -53,14 +54,11 @@ export default function LegalLayout({
         </div>
         
         <div className="legal-page">
+          <div className="legal-page-content"></div>
+            {children}
           </div>
-          
-          {children}
-          
-          <div className="auth-footer">
-            <p className="auth-footer-text">
-              &copy; {new Date().getFullYear()} MTGBAN. All rights reserved.
-            </p>
+          <div className="legal-page-footer">
+            <LegalLinks />
           </div>
         </div>
     </>

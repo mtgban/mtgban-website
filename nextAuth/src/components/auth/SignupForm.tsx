@@ -12,7 +12,7 @@ export interface SignupFormProps {
 
 export default function SignupForm({ redirectTo }: SignupFormProps) {
   const router = useRouter();
-  const { goToCasualTerms, goToCasualPrivacy } = useLegalNavigation();
+  const { goToTerms, goToPrivacy } = useLegalNavigation();
   const urlError = router.query.error as string | undefined;
   const urlMessage = router.query.message as string | undefined;
   const urlEmail = router.query.email as string | undefined;
@@ -310,11 +310,11 @@ export default function SignupForm({ redirectTo }: SignupFormProps) {
           />
           <label htmlFor="terms" className="form-check-label">
             I accept the{' '}
-            <Link href="/legal/casual-terms">
+            <Link href="/legal/terms">
               Terms of Service
             </Link>{' '}
               and{' '}
-            <Link href="/legal/casual-privacy">
+            <Link href="/legal/privacy">
               Privacy Policy
             </Link>
           </label>

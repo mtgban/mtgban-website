@@ -2,7 +2,7 @@
 import React from 'react';
 import css from 'styled-jsx';
 import Link from 'next/link';
-import LegalLinks from '@/components/legal/links';
+import LegalLinks from '@/components/legal/LegalLinks';
 
 interface FooterProps {
     companyName: string;

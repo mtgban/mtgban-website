@@ -23,6 +23,8 @@ const nextConfig = {
       '/reset-password': { page: '/reset-password' },
       '/signup-success': { page: '/signup-success' },
       '/confirmation': { page: '/confirmation' },
+      '/legal/terms': { page: '/legal/terms' },
+      '/legal/privacy': { page: '/legal/privacy' },
     };
   },
 };
