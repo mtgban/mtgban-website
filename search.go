@@ -348,6 +348,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		sort.Slice(allKeys, func(i, j int) bool {
 			return sortSetsAlphabeticalSet(allKeys[i], allKeys[j])
 		})
+	case "number":
+		sort.Slice(allKeys, func(i, j int) bool {
+			return sortByNumberAndFinish(allKeys[i], allKeys[j], false)
+		})
 	case "retail":
 		retSellers := defaultSellerPriorityOpt
 		retSeller := readCookie(r, "SearchSellersPriority")

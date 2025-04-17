@@ -625,7 +625,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		case "sort":
 			code = strings.ToLower(code)
 			switch code {
-			case "chrono", "hybrid", "alpha", "retail", "buylist":
+			case "chrono", "hybrid", "alpha", "number", "retail", "buylist":
 				config.SortMode = code
 			}
 
