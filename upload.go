@@ -139,7 +139,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// --- End Context Retrieval ---
 
 	// Maximum form size
 	r.ParseMultipartForm(MaxUploadFileSize)

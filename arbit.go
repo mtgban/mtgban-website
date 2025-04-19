@@ -333,7 +333,6 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	}
 	pageVars := genPageNav(pageName, r)
 
-	// --- Get User and ACL data from Context ---
 	var userInfo *supabase.User
 	var userPermissions map[string]interface{}
 	var userEmail string = "anonymous" // Default email

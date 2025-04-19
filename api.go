@@ -135,7 +135,6 @@ func prepareCKAPI() error {
 }
 
 func API(w http.ResponseWriter, r *http.Request) {
-	// --- Get User and ACL data from Context ---
 	var userPermissions map[string]interface{}
 	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
 		if aclData, ok := aclCtx.(map[string]interface{}); ok {
@@ -144,7 +143,6 @@ func API(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	// --- End Context Retrieval ---
 
 	//param := GetParamFromSig(sig, "API")
 	param := "" // Default

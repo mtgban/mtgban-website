@@ -390,7 +390,8 @@ type ConfigType struct {
 		ExemptRoutes   []string `json:"exempt_routes"`
 		ExemptPrefixes []string `json:"exempt_prefixes"`
 		ExemptSuffixes []string `json:"exempt_suffixes"`
-		AssetsPath     string   `json:"assets_path"`
+		CSRFPath       string   `json:"csrf_path"`
+		CSRFInterval   int      `json:"csrf_interval"`
 	} `json:"auth"`
 	ACL struct {
 		Tiers map[string]map[string]map[string]string `json:"tier"`
@@ -439,7 +440,6 @@ var Newspaper1dayDB *sql.DB
 var GoogleDocsClient *http.Client
 
 var banACL BanACL
-var authService *AuthService
 
 const (
 	DefaultConfigPort    = "8080"
@@ -597,7 +597,7 @@ func genPageNav(activeTab string, r *http.Request) PageVars {
 
 	// Get UserSession from context
 	var userSession *UserSession
-	sessionData := r.Context().Value(userSessionContextKey)
+	sessionData := r.Context().Value(userContextKey)
 	if sessionData != nil {
 		var ok bool
 		userSession, ok = sessionData.(*UserSession)
@@ -611,9 +611,8 @@ func genPageNav(activeTab string, r *http.Request) PageVars {
 				log.Printf("[WARNING] User session found but User is nil")
 			}
 			pageVars.ShowLogin = false
-			userTier = userSession.Tier
-			userRole = userSession.Role
-			isImpersonating = userSession.IsImpersonating
+			userTier = userSession.User.Tier
+			userRole = userSession.User.Role
 
 			if DevMode {
 				log.Printf("[DEBUG] User session loaded: Email: %s, Role: %s, Tier: %s, Impersonating: %t", maskEmail(userEmail), userRole, userTier, isImpersonating)
@@ -800,13 +799,14 @@ func main() {
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
+	// parse flags
+	flag.Parse()
+
 	// Load necessary environmental variables
 	err := loadVars(Config.filePath, *port, *datastore)
 	if err != nil {
 		log.Fatalln("unable to load config file:", err)
 	}
-
-	flag.Parse()
 
 	// Apply overrides
 	if *port != "" {
@@ -859,47 +859,36 @@ func main() {
 		SupabaseURL:     Config.Auth.Url,
 		SupabaseAnonKey: Config.Auth.Key,
 		SupabaseSecret:  Config.Auth.Secret,
+		SupabaseRoleKey: Config.Auth.RoleKey,
+		DebugMode:       Config.Auth.DebugMode,
 		LogPrefix:       Config.Auth.Prefix,
 		ExemptRoutes:    Config.Auth.ExemptRoutes,
 		ExemptPrefixes:  Config.Auth.ExemptPrefixes,
 		ExemptSuffixes:  Config.Auth.ExemptSuffixes,
-		DebugMode:       Config.Auth.DebugMode,
+		CSRFPath:        Config.Auth.CSRFPath,
+		CSRFInterval:    Config.Auth.CSRFInterval,
 	}
 
-	// Create the AuthService instance, passing ExtraNavs
-	authService, err = NewAuthService(authConfig, ExtraNavs)
+	authService, err := NewAuthService(authConfig, ExtraNavs)
 	if err != nil {
 		log.Fatalf("Failed to create auth service: %v", err)
 	}
 
-	secretFilePath := "csrf_secret.txt"
-	interval := 24 * time.Hour
-
-	err = authService.LoadCSRFSecret(secretFilePath)
-	if err != nil {
-		log.Fatalf("Failed to load CSRF secret: %v", err)
-	} else {
-		fmt.Println("CSRF secret loaded successfully")
-	}
-
-	authService.CSRFRotate(interval, secretFilePath)
-
 	// Load the BanACL data into the authService
 	err = authService.LoadBanACL()
 	if err != nil {
-		authService.Logger.Printf("CRITICAL: Failed to load BAN ACL: %v. Authorization checks may fail.", err)
-		if !DevMode {
-			log.Fatalf("CRITICAL: Failed to load BAN ACL, cannot start server: %v", err)
-		}
+		authService.Logger.Fatalf("CRITICAL: Failed to load BAN ACL: %v. Authorization checks may fail.", err)
 	}
 
 	banACL = BanACL{Users: make(map[string]*BanUser)}
-	if authService.BanACL != nil {
-		for _, user := range authService.BanACL.Users {
+	if authService.ACL != nil {
+		for _, user := range authService.ACL.Users {
 			banACL.Users[user.UserData.Email] = user
 		}
 	}
-	authService.Logger.Println("AuthService initialized and ACL loaded.")
+
+	// setup secret rotation
+	authService.CSRF.RotateSecret(time.Duration(Config.Auth.CSRFInterval) * time.Hour)
 
 	// Start background data loading
 	go func() {
@@ -960,11 +949,12 @@ func main() {
 	// Set seed in case we need to do random operations
 	rand.Seed(time.Now().UnixNano())
 
-	// Initialize router and configure all routes
-	mux := setupRouter()
-
-	// Configure and start the server
-	srv := configureServer(mux)
+	// setup router and inject authService
+	mux := setupRouter(authService)
+	injectorMiddleware := InjectAuthServiceMiddleware(authService)
+	var finalHandler http.Handler = mux
+	finalHandler = injectorMiddleware(finalHandler)
+	srv := configureServer(finalHandler)
 
 	// Wait for shutdown signal
 	done := make(chan os.Signal, 1)

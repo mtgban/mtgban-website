@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
@@ -79,61 +80,80 @@ func cssMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// InjectAuthServiceMiddleware adds the AuthService instance to the request context.
+func InjectAuthServiceMiddleware(authSvc *AuthService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := context.WithValue(r.Context(), authServiceKey, authSvc)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func GetAuthServiceFromContext(ctx context.Context) (*AuthService, bool) {
+	authService, ok := ctx.Value(authServiceKey).(*AuthService)
+	if !ok {
+		log.Println("ERROR: AuthService not found in request context!")
+		return nil, false
+	}
+	return authService, true
+}
+
 // ==========================================================================
 // Middleware Configuration
 // ==========================================================================
 
 // initMiddlewareRegistry creates and configures the middleware registry
-func initMiddlewareRegistry() *MiddlewareRegistry {
+func initMiddlewareRegistry(auth *AuthService) *MiddlewareRegistry {
 	registry := NewMiddlewareRegistry()
 
 	// Core middleware for most routes
 	registry.RegisterChain("core",
-		authService.Recover,
-		authService.RequestLogger,
-		authService.AuthContext,
+		auth.Recover,
+		auth.RequestLogger,
+		auth.AuthContext,
 	)
 
 	// Minimal core middleware without AuthContext
 	registry.RegisterChain("core-no-auth",
-		authService.Recover,
-		authService.RequestLogger,
+		auth.Recover,
+		auth.RequestLogger,
 	)
 
 	// Authentication-related middleware chains
 	registry.RegisterChain("auth",
-		authService.Recover,
-		authService.RequestLogger,
+		auth.Recover,
+		auth.RequestLogger,
 	)
 
 	registry.RegisterChain("auth-assets",
-		authService.Recover,
-		authService.RequestLogger,
+		auth.Recover,
+		auth.RequestLogger,
 	)
 
 	// Protected route middleware chains
 	registry.RegisterChain("protected",
-		authService.Recover,
-		authService.RequestLogger,
-		authService.AuthContext,
-		authService.AuthRequired,
-		authService.SpoofMiddleware,
+		auth.Recover,
+		auth.RequestLogger,
+		auth.AuthContext,
+		auth.AuthRequired,
+		auth.SpoofMiddleware,
 	)
 
 	registry.RegisterChain("csrf-protected",
-		authService.Recover,
-		authService.RequestLogger,
-		authService.AuthContext,
-		authService.AuthRequired,
-		authService.SpoofMiddleware,
-		authService.CSRFProtection,
+		auth.Recover,
+		auth.RequestLogger,
+		auth.AuthContext,
+		auth.AuthRequired,
+		auth.SpoofMiddleware,
+		auth.CSRFProtection,
 	)
 
 	registry.RegisterChain("api-protected",
-		authService.Recover,
-		authService.RequestLogger,
-		authService.AuthContext,
-		authService.AuthRequired,
+		auth.Recover,
+		auth.RequestLogger,
+		auth.AuthContext,
+		auth.AuthRequired,
 	)
 
 	return registry
@@ -168,18 +188,18 @@ func setupPublicRoutes(mux *http.ServeMux, mr *MiddlewareRegistry) {
 }
 
 // setupAuthRoutes configures authentication-related routes
-func setupAuthRoutes(mux *http.ServeMux, mr *MiddlewareRegistry) {
-	logoutHandler := http.HandlerFunc(authService.LogoutAPI)
-	authAssetHandler := http.HandlerFunc(authService.handleAuthAsset)
+func setupAuthRoutes(mux *http.ServeMux, mr *MiddlewareRegistry, auth *AuthService) {
+	logoutHandler := http.HandlerFunc(auth.LogoutAPI)
+	authAssetHandler := http.HandlerFunc(auth.handleAuthAsset)
 
 	// Login endpoints
-	mux.Handle("/next-api/auth/login", mr.WrapFunc("auth", authService.LoginAPI))
-	mux.Handle("/next-api/auth/signup", mr.WrapFunc("auth", authService.SignupAPI))
-	mux.Handle("/next-api/auth/forgot-password", mr.WrapFunc("auth", authService.ForgotPasswordAPI))
-	mux.Handle("/next-api/auth/me", mr.WrapFunc("protected", authService.GetUserAPI))
+	mux.Handle("/next-api/auth/login", mr.WrapFunc("auth", auth.LoginAPI))
+	mux.Handle("/next-api/auth/signup", mr.WrapFunc("auth", auth.SignupAPI))
+	mux.Handle("/next-api/auth/forgot-password", mr.WrapFunc("auth", auth.ForgotPasswordAPI))
+	mux.Handle("/next-api/auth/me", mr.WrapFunc("protected", auth.GetUserAPI))
 
 	// Token refresh
-	mux.Handle("/next-api/auth/refresh-token", mr.WrapFunc("auth", authService.RefreshTokenAPI))
+	mux.Handle("/next-api/auth/refresh-token", mr.WrapFunc("auth", auth.RefreshTokenAPI))
 
 	// Logout
 	mux.Handle("/next-api/auth/logout", mr.WrapFunc("auth", logoutHandler))
@@ -244,12 +264,12 @@ func setupAPIRoutes(mux *http.ServeMux, mr *MiddlewareRegistry) {
 // ==========================================================================
 
 // setupRouter initializes the HTTP router and configures all routes
-func setupRouter() *http.ServeMux {
+func setupRouter(auth *AuthService) *http.ServeMux {
 	mux := http.NewServeMux()
-	middlewares := initMiddlewareRegistry()
+	middlewares := initMiddlewareRegistry(auth)
 	setupStaticRoutes(mux)
 	setupPublicRoutes(mux, middlewares)
-	setupAuthRoutes(mux, middlewares)
+	setupAuthRoutes(mux, middlewares, auth)
 	setupDynamicNavRoutes(mux, middlewares)
 	setupAPIRoutes(mux, middlewares)
 	return mux
@@ -260,9 +280,9 @@ func setupRouter() *http.ServeMux {
 // ==========================================================================
 
 // configureServer creates and configures the HTTP server
-func configureServer(mux *http.ServeMux) *http.Server {
+func configureServer(handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:    ":" + Config.Port,
-		Handler: mux,
+		Handler: handler,
 	}
 }

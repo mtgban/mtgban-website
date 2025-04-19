@@ -2,6 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -46,7 +49,6 @@ var BuildCommit = func() string {
 }()
 
 func Admin(w http.ResponseWriter, r *http.Request) {
-
 	page := r.FormValue("page")
 	pageVars := genPageNav("Admin", r)
 	pageVars.Nav = insertNavBar("Admin", pageVars.Nav, []NavElem{
@@ -67,11 +69,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	var isAdmin bool
-	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
-		if aclData, ok := aclCtx.(map[string]interface{}); ok {
-			if roleVal, okRole := aclData["role"].(string); okRole {
-				isAdmin = (roleVal == "admin" || roleVal == "root")
-			}
+	if userSession := r.Context().Value(userContextKey); userSession != nil {
+		if session, ok := userSession.(*UserSession); ok && session.User != nil {
+			isAdmin = (session.User.Role == "admin" || session.User.Role == "root")
 		}
 	}
 	if !isAdmin {
@@ -128,14 +128,13 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --- Spoofing Logic ---
 	clearSpoof := r.FormValue("clear_spoof")
 	spoofTarget := r.FormValue("spoof_target")
 
 	if clearSpoof == "true" || clearSpoof == "1" {
 		// Clear the cookie
 		http.SetCookie(w, &http.Cookie{
-			Name:   spoofCookieName,
+			Name:   "spoof",
 			Value:  "",
 			Path:   "/",
 			MaxAge: -1, // Expire immediately
@@ -155,7 +154,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			// Set the cookie
 			isSecure := r.TLS != nil || !DevMode
 			http.SetCookie(w, &http.Cookie{
-				Name:     spoofCookieName,
+				Name:     "spoof",
 				Value:    spoofTarget,
 				Path:     "/",
 				MaxAge:   3600, // 1 hour
@@ -743,7 +742,10 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 	}
 
 	data := fmt.Sprintf("GET%s%s%s", exp, link, v.Encode())
-	sig := authService.signHMACSHA256Base64([]byte(key), []byte(data))
+	sig, err := signHMACSHA256Base64([]byte(key), []byte(data))
+	if err != nil {
+		return "", err
+	}
 
 	v.Set("Signature", sig)
 	return base64.StdEncoding.EncodeToString([]byte(v.Encode())), nil
@@ -756,4 +758,74 @@ func randomString(l int) string {
 		bytes[i] = byte(33 + rand.Intn(126-33))
 	}
 	return string(bytes)
+}
+
+func signHMACSHA256Base64(key []byte, message []byte) (string, error) {
+	h := hmac.New(sha256.New, key)
+	_, err := h.Write(message)
+	if err != nil {
+		return "", err
+	}
+	signature := h.Sum(nil)
+	return base64.StdEncoding.EncodeToString(signature), nil
+}
+
+// clearImpersonation handles clearing the impersonation flag
+func clearImpersonation(w http.ResponseWriter, r *http.Request, ctx context.Context, session *UserSession, next http.HandlerFunc, a *AuthService) {
+
+	// Create a clean copy without impersonation
+	modifiedSession := *session
+	modifiedSession.Metadata["is_impersonating"] = false
+	ctx = context.WithValue(ctx, userContextKey, &modifiedSession)
+
+	if a.Config.DebugMode {
+		email := getEmailSafe(session)
+		a.logWithContext(r, "[DEBUG] SpoofMiddleware: Clearing IsImpersonating flag for admin %s", email)
+	}
+
+	next(w, r.WithContext(ctx))
+}
+
+// handleTargetNotFound handles the case when a target user for spoofing is not found
+func handleTargetNotFound(w http.ResponseWriter, r *http.Request, ctx context.Context, session *UserSession, targetEmail string, next http.HandlerFunc, a *AuthService) {
+
+	a.logWithContext(r, "SpoofMiddleware: Target user %s not found in BanACL. Clearing spoof cookie.", targetEmail)
+
+	// Clear the invalid cookie
+	http.SetCookie(w, &http.Cookie{Name: "spoof", Value: "", Path: "/", MaxAge: -1})
+
+	// Clear impersonation flag if needed
+	if session.Metadata["is_impersonating"] == true {
+		clearImpersonation(w, r, ctx, session, next, a)
+		return
+	}
+
+	next(w, r.WithContext(ctx))
+}
+
+// createSpoofedSession creates and adds a spoofed session to the context
+func createSpoofedSession(ctx context.Context, originalSession *UserSession, targetUser *BanUser, targetEmail string, a *AuthService) context.Context {
+
+	// Create the spoofed session object
+	spoofedSession := &UserSession{
+		User: &UserData{
+			UserId: targetUser.UserData.UserId,
+			Email:  targetUser.UserData.Email,
+			Role:   targetUser.UserData.Role,
+			Tier:   targetUser.UserData.Tier,
+		},
+		Permissions: make(map[string]interface{}),
+		Metadata: map[string]interface{}{
+			"is_impersonating": true,
+		},
+	}
+
+	if a.Config.DebugMode {
+		email := getEmailSafe(originalSession)
+		a.Logger.Printf("[DEBUG] SpoofMiddleware: Created spoofed session for %s as %s (Role: %s, Tier: %s)",
+			email, targetEmail, spoofedSession.User.Role, spoofedSession.User.Tier)
+	}
+
+	// Add the spoofed session to context
+	return context.WithValue(ctx, userContextKey, spoofedSession)
 }

@@ -9,13 +9,14 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	pageVars := genPageNav("Home", r)
 	pageVars.ErrorMessage = ""
 
+	// get the authService from the context
+	authService := r.Context().Value(authServiceKey).(*AuthService)
+
 	// Try auto-login only if not already logged in
 	if !pageVars.IsLoggedIn {
 		authCookie, authErr := r.Cookie("auth_token")
 		refreshCookie, refreshErr := r.Cookie("refresh_token")
-
-		if authErr == nil && authCookie.Value != "" &&
-			refreshErr == nil && refreshCookie.Value != "" {
+		if authErr == nil && authCookie.Value != "" && refreshErr == nil && refreshCookie.Value != "" {
 			newSession, authErr := authService.refreshAuthTokens(r, w, refreshCookie.Value, authCookie.Value)
 			if authErr == nil && newSession != nil {
 				authService.logWithContext(r, "user %s logged in automatically", maskEmail(newSession.User.Email))
