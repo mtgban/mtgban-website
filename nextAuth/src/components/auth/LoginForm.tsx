@@ -11,7 +11,7 @@ export interface LoginFormProps {
 
 export default function LoginForm({ redirectTo }: LoginFormProps) {
   // Get auth context and router
-  const { login, loading, error, clearError } = useAuth();
+  const { login, isLoading, error, clearError } = useAuth();
   const router = useRouter();
   
   // Extract email from query parameters if available (for pre-filling)
@@ -24,9 +24,9 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
   const [localError, setLocalError] = useState<string | null>(null);
 
   // Message transitions
-  const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+  const [status, setStatus] = useState('idle'); 
   const [message, setMessage] = useState('');
-  const [messageTransition, setMessageTransition] = useState(''); // '' | 'entering' | 'exiting'
+  const [messageTransition, setMessageTransition] = useState(''); 
   const messageRef = useRef(null);
   
   // Animation state
@@ -105,7 +105,8 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
 
     try {
       // Call login function from auth context
-      const success = await login(email, password, rememberMe);
+      const credentials = { email, password, rememberMe };
+      const success = await login(credentials);
 
       if (success) {
         // Show success message with animation
@@ -171,7 +172,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
               required
-              disabled={loading || status === 'success'}
+              disabled={isLoading || status === 'success'}
               autoComplete="username email"
               name="email"
               autoFocus={!email} // Auto-focus if email isn't pre-filled
@@ -193,10 +194,10 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               required
-              disabled={loading || status === 'success'}
+              disabled={isLoading || status === 'success'}
               autoComplete="current-password"
               name="password"
-              autoFocus={!!email} // Auto-focus if email is pre-filled
+              autoFocus={!!email} 
             />
           </div>
         </div>
@@ -208,7 +209,7 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
             className="form-check-input"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
-            disabled={loading || status === 'success'}
+            disabled={isLoading || status === 'success'}
             name="remember-me"
           />
           <label htmlFor="rememberMe" className="form-check-label">
@@ -219,9 +220,9 @@ export default function LoginForm({ redirectTo }: LoginFormProps) {
         <button
           type="submit"
           className="btn btn-primary btn-block"
-          disabled={loading || status === 'success'}
+          disabled={isLoading || status === 'success'}
         >
-          {loading || status === 'loading' ? (
+          {isLoading || status === 'loading' ? (
             <>
               <span className="spinner"></span>
               <span>Logging in...</span>

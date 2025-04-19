@@ -1,367 +1,248 @@
-// providers/AuthProvider.tsx
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { authApi } from '@/lib/api/auth';
-import { User } from '@/lib/api/types';
+// context/AuthContext/AuthProvider.tsx
+import React, {
+    useState,
+    useEffect,
+    useMemo,
+    useCallback,
+    PropsWithChildren,
+} from 'react';
+import { AuthContext } from './AuthContext';
 
-// Auth context type definition
-interface AuthContextType {
-  user: User | null;
-  setUser: (user: User | null) => void;
-  loading: boolean;
-  error: string | null;
-  csrfToken: string | null;
-  login: (email: string, password: string, remember?: boolean) => Promise<boolean>;
-  signup: (email: string, password: string, fullName: string) => Promise<boolean>;
-  logout: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<boolean>;
-  resetPassword: (password: string, token: string) => Promise<boolean>;
-  refreshUser: () => Promise<void>;
-  clearError: () => void;
-}
+// Import the refined types
+import type {
+    AuthContextType,
+    AuthContextUser, // This is AppUser | null
+    AuthContextError,
+    AppUser, // Specific type for the user object
+    UserCredentials,
+    SignupFormData, // Use the corrected name
+} from '@/types/auth'; // Adjust path as needed
 
-// Create context with undefined default
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Import the singleton authService
+import { authService } from '@/lib/auth/authService'; // Adjust path as needed
 
-// Helper to consistently check if on an auth page
-const isAuthPage = () => {
-  if (typeof window === 'undefined') return false;
-  
-  const path = window.location.pathname;
-  return path.includes('/auth/login')
-      || path.includes('/auth/signup')
-      || path.includes('/auth/reset-password')
-      || path.includes('/auth/forgot-password')
-      || path.includes('/auth/confirmation')
-      || path.includes('/auth/account');
-};
+export const AuthProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
+    // State using the refined types
+    const [user, setUser] = useState<AuthContextUser>(null); // AppUser | null
+    const [csrfToken, setCsrfToken] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState<boolean>(true); // Start loading initially
+    const [error, setError] = useState<AuthContextError | null>(null);
 
-// Check for pre-loaded data from the server
-const getInitialData = () => {
-  if (typeof window !== 'undefined' && window.__INITIAL_DATA__) {
-    return {
-      user: window.__INITIAL_DATA__.user || null,
-      csrfToken: window.__INITIAL_DATA__.csrf_token || null
-    };
-  }
-  return { user: null, csrfToken: null };
-};
+    // Derived state
+    const isAuthenticated = useMemo(() => !!user, [user]);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Get initial data if available
-  const initialData = getInitialData();
-  
-  const [user, setUser] = useState<User | null>(initialData.user);
-  const [csrfToken, setCsrfToken] = useState<string | null>(initialData.csrfToken);
-  const [loading, setLoading] = useState<boolean>(!initialData.user);
-  const [error, setError] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState<boolean>(!!initialData.user);
+    // Helper to clear error state
+    const clearError = useCallback(() => {
+        setError(null);
+    }, []);
 
-  // Check for existing session on mount
-  useEffect(() => {
-    if (initialized) return; // Only run once
-    
-    // Skip auth check on auth pages to prevent redirect loops
-    if (isAuthPage()) {
-      setLoading(false);
-      setInitialized(true);
-      return;
-    }
+    // --- Authentication Actions ---
+    // These now primarily call authService and then sync the provider's state
+    // with the service's state.
 
-    const checkSession = async () => {
-      try {
-        // First try to get the user directly - if there's a valid token this will work
-        try {
-          const apiUser = await authApi.getUser();
-          if (apiUser) {
-            setUser(apiUser);
-            return;
-          }
-        } catch (userError) {
-          console.log('Initial user check failed, trying refresh:', userError);
-        }
-        
-        // If we get here, try to refresh the token
-        try {
-          const refreshResult = await authApi.refreshToken();
-          if (refreshResult.success) {
-            // If the refresh returned a user, use it
-            if (refreshResult.user) {
-              setUser(refreshResult.user);
-              return;
+    const login = useCallback(
+        async (credentials: UserCredentials): Promise<boolean> => {
+            setIsLoading(true);
+            clearError();
+            try {
+                // authService.login handles API call, state update within service, returns success/user/error
+                const result = await authService.login(credentials);
+
+                if (result.success) {
+                    // Sync provider state with service state
+                    setUser(authService.getUser()); // Get the AppUser | null from service
+                    setCsrfToken(authService.getCsrfToken());
+                    setError(null);
+                    setIsLoading(false);
+                    return true;
+                } else {
+                    throw new Error(result.error || 'Login failed');
+                }
+            } catch (err: any) {
+                console.error('AuthProvider Login Error:', err);
+                setError({ message: err.message || 'Login failed' });
+                // Ensure provider state is cleared if service failed internally
+                setUser(null);
+                setCsrfToken(null);
+                setIsLoading(false);
+                return false;
             }
-            
-            // Otherwise, try to fetch the user
-            const apiUser = await authApi.getUser();
-            if (apiUser) {
-              setUser(apiUser);
-              return;
+        },
+        [clearError] // Dependency injection for clearError
+    );
+
+    const signup = useCallback(
+        async (signupData: SignupFormData): Promise<{ success: boolean; emailConfirmationRequired?: boolean }> => {
+            setIsLoading(true);
+            clearError();
+            try {
+                // Use the corrected input type: SignupFormData
+                const result = await authService.signup(signupData);
+
+                if (result.success) {
+                    if (result.emailConfirmationRequired) {
+                        setError({ message: 'Please check your email to confirm your account.' });
+                        // Keep user null as they haven't auto-logged in
+                        setUser(null);
+                        setCsrfToken(null); // No CSRF token yet
+                    } else if (result.user) {
+                        // Auto-login successful, sync state
+                        setUser(authService.getUser());
+                        setCsrfToken(authService.getCsrfToken());
+                        setError(null);
+                    }
+                    // If success but no user/confirmation, state remains logged out
+                    setIsLoading(false);
+                    return { success: true, emailConfirmationRequired: result.emailConfirmationRequired };
+                } else {
+                    throw new Error(result.error || 'Signup failed');
+                }
+            } catch (err: any) {
+                console.error('AuthProvider Signup Error:', err);
+                setError({ message: err.message || 'Signup failed' });
+                setUser(null);
+                setCsrfToken(null);
+                setIsLoading(false);
+                return { success: false };
             }
-          }
-        } catch (refreshError) {
-          console.log('Token refresh failed:', refreshError);
+        },
+        [clearError]
+    );
+
+    const logout = useCallback(async (): Promise<void> => {
+        // Don't necessarily need isLoading here, logout should feel instant locally
+        // setIsLoading(true);
+        clearError();
+        try {
+            await authService.logout(); // Service clears its state immediately & calls backend
+        } catch (err: any) {
+            // Log service error, but local state clearing should proceed
+            console.error('AuthProvider Logout Error (from service):', err);
+            // setError({ message: 'Logout failed, clearing local state.' }); // Optional: Inform user
+        } finally {
+            // Sync provider state AFTER service has cleared its state
+            setUser(authService.getUser()); // Should be null
+            setCsrfToken(authService.getCsrfToken()); // Should be null
+            // setIsLoading(false);
         }
-        
-        // Check for user data in localStorage as a last resort
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          try {
-            const parsedUser = JSON.parse(storedUser);
-            // Try to validate this user with a token refresh
-            const refreshResult = await authApi.refreshToken();
-            if (refreshResult.success) {
-              setUser(refreshResult.user || parsedUser);
+    }, [clearError]);
+
+    const fetchUser = useCallback(async (): Promise<AuthContextUser> => {
+        // Only set loading if not already loading (prevents flicker on rapid calls)
+        // Although usually called only on init or manually
+        if (!isLoading) setIsLoading(true);
+        clearError();
+        try {
+            // Service fetchUser handles API call and updates its internal state
+            const fetchedUser = await authService.fetchUser();
+            // Sync provider state with the result from the service
+            setUser(fetchedUser);
+            setCsrfToken(authService.getCsrfToken());
+            setError(null); // Clear error on successful fetch
+            setIsLoading(false);
+            return fetchedUser; // Return AppUser | null
+        } catch (err: any) {
+            // This catch might not be strictly needed if authService handles its errors,
+            // but good for safety / logging provider-level fetch issues.
+            console.error('AuthProvider Fetch User Error:', err);
+            // Sync state even on error (authService might have cleared user on 401)
+            setUser(authService.getUser());
+            setCsrfToken(authService.getCsrfToken());
+            setError({ message: err.message || 'Failed to check session' });
+            setIsLoading(false);
+            return null;
+        }
+    }, [clearError, isLoading]); // Add isLoading to dependencies
+
+    const refreshSession = useCallback(async (): Promise<boolean> => {
+        setIsLoading(true);
+        clearError();
+        try {
+            const success = await authService.refreshSession(); // Service handles API, state update, logout on fail
+            // Sync provider state with service state after the attempt
+            setUser(authService.getUser());
+            setCsrfToken(authService.getCsrfToken());
+            if (!success) {
+                setError({ message: 'Session expired or refresh failed.' });
             } else {
-              // If refresh fails, clear storage
-              localStorage.removeItem('user');
+                setError(null); // Clear error on successful refresh
             }
-          } catch (localStorageError) {
-            console.log('Stored user invalid, clearing:', localStorageError);
-            localStorage.removeItem('user');
-          }
+            setIsLoading(false);
+            return success;
+        } catch (err: any) {
+            // Should be caught by authService which triggers logout, but sync state just in case
+            console.error('AuthProvider Refresh Session Error:', err);
+            setUser(null);
+            setCsrfToken(null);
+            setError({ message: 'Session refresh failed unexpectedly.' });
+            setIsLoading(false);
+            return false;
         }
-      } catch (err) {
-        console.error('Session check error:', err);
-      } finally {
-        setLoading(false);
-        setInitialized(true);
-      }
-    };
-    
-    checkSession();
-  }, [initialized]);
+    }, [clearError]);
 
-  // Set up scheduled token refresh
-  useEffect(() => {
-    if (!user) return;
+    // --- Initial Load Effect ---
+    useEffect(() => {
+        let isMounted = true; // Prevent state updates if component unmounts during fetch
+        console.log('AuthProvider mounted. Initializing auth state...');
+        setIsLoading(true);
 
-    const refreshInterval = setInterval(async () => {
-      try {
-        const refreshResult = await authApi.refreshToken();
-        if (refreshResult.success) {
-          if (refreshResult.user) {
-            setUser(refreshResult.user);
-          } else {
-            await refreshUser(); // Update user data after refresh if no user returned
-          }
-        }
-      } catch (err) {
-        console.error('Token refresh error:', err);
-      }
-    }, 20 * 60 * 1000); // 20 minutes
-    
-    return () => clearInterval(refreshInterval);
-  }, [user]);
+        authService.fetchUser().then(initialUser => {
+            if (isMounted) {
+                setUser(initialUser);
+                setCsrfToken(authService.getCsrfToken());
+                console.log('AuthProvider initialization complete. User:', initialUser ? initialUser.email : 'None');
+            }
+        }).catch(err => {
+            if (isMounted) {
+                console.log('Initial fetchUser failed (likely no session):', err.message);
+                setUser(null);
+                setCsrfToken(null);
+            }
+        }).finally(() => {
+            if (isMounted) {
+                setIsLoading(false);
+            }
+        });
 
-  // Clear any error messages
-  const clearError = () => {
-    setError(null);
-  };
+        // Cleanup function to prevent setting state on unmounted component
+        return () => {
+            isMounted = false;
+        };
+    }, []); // Run only on mount
 
-  // Refresh user data
-  const refreshUser = async () => {
-    try {
-      setLoading(true);
-      const updatedUser = await authApi.getUser();
-      if (updatedUser) {
-        setUser(updatedUser);
-      }
-    } catch (err) {
-      console.error('User refresh error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Memoize the context value
+    const contextValue = useMemo<AuthContextType>(
+        () => ({
+            user,
+            isAuthenticated,
+            isLoading,
+            error,
+            csrfToken,
+            login,
+            logout,
+            signup,
+            fetchUser,
+            refreshSession,
+            clearError,
+            forgotPassword: () => Promise.resolve(false),
+            resetPassword: () => Promise.resolve(false),
+        }),
+        [
+            user,
+            isAuthenticated,
+            isLoading,
+            error,
+            csrfToken,
+            login,
+            logout,
+            signup,
+            fetchUser,
+            refreshSession,
+            clearError,
+        ]
+    );
 
-  // Login function
-  const login = async (email: string, password: string, remember = false): Promise<boolean> => {
-    try {
-      setLoading(true);
-      clearError();
-      
-      const response = await authApi.login({ email, password, remember });
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Login failed');
-      }
-      
-      if (response.user) {
-        setUser(response.user);
-        
-        // Store CSRF token if available
-        if (response.session?.csrf_token) {
-          setCsrfToken(response.session.csrf_token);
-        }
-        
-        // Save to localStorage for persistence
-        localStorage.setItem('user', JSON.stringify(response.user));
-        
-        // Redirect if needed
-        if (response.redirectTo) {
-          window.location.href = response.redirectTo;
-        }
-      }
-      
-      return true;
-    } catch (err) {
-      console.error('Login error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Signup function
-  const signup = async (email: string, password: string, fullName: string): Promise<boolean> => {
-    try {
-      setLoading(true);
-      clearError();
-      
-      const response = await authApi.signup({
-        email,
-        password,
-        confirmPassword: password,
-        fullName
-      });
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Signup failed');
-      }
-      
-      if (response.emailConfirmationRequired) {
-        // If email confirmation is required, return success but don't set user
-        return true;
-      }
-
-      if (response.user) {
-        setUser(response.user);
-        
-        // Store CSRF token if available
-        if (response.session?.csrf_token) {
-          setCsrfToken(response.session.csrf_token);
-        }
-        
-        localStorage.setItem('user', JSON.stringify(response.user));
-        
-        // Redirect if needed
-        if (response.redirectTo) {
-          window.location.href = response.redirectTo;
-        }
-      }
-      
-      return true;
-    } catch (err) {
-      console.error('Signup error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Logout function
-  const logout = async (): Promise<void> => {
-    try {
-      setLoading(true);
-      
-      const response = await authApi.logout();
-      
-      // Clear user from state and local storage
-      setUser(null);
-      setCsrfToken(null);
-      localStorage.removeItem('user');
-      
-      // Redirect if needed
-      if (response.redirectTo) {
-        window.location.href = response.redirectTo;
-      }
-    } catch (err) {
-      console.error('Logout error:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Forgot password function
-  const forgotPassword = async (email: string): Promise<boolean> => {
-    try {
-      setLoading(true);
-      clearError();
-      
-      const response = await authApi.forgotPassword(email);
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to request password reset');
-      }
-      
-      return true;
-    } catch (err) {
-      console.error('Forgot password error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Reset password function
-  const resetPassword = async (password: string, token: string): Promise<boolean> => {
-    try {
-      setLoading(true);
-      clearError();
-      
-      const response = await authApi.resetPassword(password, token);
-      
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to reset password');
-      }
-      
-      // Redirect if needed
-      if (response.redirectTo) {
-        window.location.href = response.redirectTo;
-      }
-      
-      return true;
-    } catch (err) {
-      console.error('Reset password error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
-      setError(errorMessage);
-      return false;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const contextValue: AuthContextType = {
-    user,
-    setUser,
-    loading,
-    error,
-    csrfToken,
-    login,
-    signup,
-    logout,
-    forgotPassword,
-    resetPassword,
-    refreshUser,
-    clearError
-  };
-
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
-
-// Custom hook to use the auth context
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+    return (
+        <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+    );
 };

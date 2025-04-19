@@ -1,13 +1,11 @@
-// lib/api/auth.ts
-import { UserCredentials, SignupData, User } from './types';
-
+import type { AppUser } from '@/types/auth';
 // Define response types
 interface AuthResponse {
   success: boolean;
   message?: string;
   error?: string;
   data?: any;
-  user?: User;
+  user?: AppUser;
   session?: {
     expires_at: number;
     csrf_token: string;
@@ -16,281 +14,86 @@ interface AuthResponse {
   emailConfirmationRequired?: boolean;
 }
 
-/**
- * Authentication API service
- */
-export const authApi = {
-  /**
-   * Login with email and password
-   */
-  async login(credentials: UserCredentials): Promise<AuthResponse> {
-    try {
-      const response = await fetch('/next-api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(credentials),
-        credentials: 'same-origin'
-      });
-      
-      const data = await response.json();
-      
-      return {
-        success: data.success,
-        message: data.message,
-        error: data.error,
-        user: data.data?.user,
-        session: {
-          expires_at: data.data?.expires_at || 0,
-          csrf_token: data.data?.csrf_token || ''
-        },
-        redirectTo: data.data?.redirectTo
-      };
-    } catch (error) {
-      console.error('Login API error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
-      };
-    }
-  },
+// Define refresh token response type
+interface RefreshResponse {
+  success: boolean;
+  user?: AppUser;
+  error?: string;
+  session?: {
+    csrf_token: string;
+  };
+}
 
-  /**
-   * Sign up a new user
-   */
-  async signup(data: SignupData): Promise<AuthResponse> {
-    try {
-      const response = await fetch('/next-api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-          userData: {
-            full_name: data.fullName,
-            tier: 'free'
+// API base URL
+const API_BASE_URL = '/next-api';
+
+// Helper function to make API requests with CSRF handling
+async function apiRequest<T>(
+  endpoint: string,
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
+  body?: any,
+  csrfToken?: string | null // Pass CSRF token as argument
+): Promise<T> {
+  const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+  };
+
+  // Add CSRF token header if available and not a GET request
+  if (csrfToken && method !== 'GET') {
+      headers['X-CSRF-Token'] = csrfToken; 
+  }
+
+  const config: RequestInit = {
+      method,
+      headers,
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      credentials: 'omit' 
+  };
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+
+  if (!response.ok) {
+      if (response.status === 403 || response.status === 400) { 
+          if (endpoint !== '/auth/refresh-token') { 
+              throw new Error('CSRF token invalid or expired'); 
           }
-        }),
-        credentials: 'same-origin'
-      });
-      
-      const responseData = await response.json();
-      
-      return {
-        success: responseData.success,
-        message: responseData.message,
-        error: responseData.error,
-        user: responseData.data?.user,
-        emailConfirmationRequired: responseData.data?.emailConfirmationRequired,
-        session: responseData.data?.session,
-        redirectTo: responseData.data?.redirectTo
-      };
-    } catch (error) {
-      console.error('Signup API error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
-      };
-    }
-  },
-
-  /**
-   * Logout user
-   */
-  async logout(): Promise<AuthResponse> {
-    try {
-      const response = await fetch('/next-api/auth/logout', {
-        method: 'POST',
-        credentials: 'same-origin'
-      });
-      
-      const data = await response.json();
-      
-      return {
-        success: data.success,
-        message: data.message,
-        error: data.error,
-        redirectTo: data.data?.redirectTo
-      };
-    } catch (error) {
-      console.error('Logout API error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
-      };
-    }
-  },
-
-  /**
-   * Get current user
-   */
-  async getUser(): Promise<User | null> {
-    try {
-      const response = await fetch('/next-api/auth/me', {
-        credentials: 'same-origin'
-      });
-      
-      const data = await response.json();
-      
-      if (!data.success || !data.data?.user) {
-        return null;
       }
-      
-      return data.data.user;
-    } catch (error) {
-      console.error('Get user API error:', error);
-      return null;
-    }
+
+      const errorData = await response.json(); 
+      const errorMessage = errorData?.error || `API request failed with status ${response.status}`;
+      throw new Error(errorMessage);
+  }
+
+  return response.json() as Promise<T>; // Or response.text() if needed
+}
+
+
+export const authApi = {
+  getUser: async (): Promise<AppUser | null> => {
+      return apiRequest<AppUser | null>('/auth/user');
   },
 
-  /**
-   * Refresh authentication token
-   */
-  async refreshToken(): Promise<{success: boolean, user?: User}> {
-    try {
-      const response = await fetch('/next-api/auth/refresh-token', {
-        method: 'POST',
-        credentials: 'same-origin'
-      });
-      
-      if (!response.ok) {
-        console.error('Refresh token response not OK:', response.status, response.statusText);
-        return { success: false };
-      }
-      
-      const data = await response.json();
-      
-      return { 
-        success: data.success === true,
-        user: data.data?.user || null
-      };
-    } catch (error) {
-      console.error('Refresh token API error:', error);
-      return { success: false };
-    }
+  login: async (credentials: any): Promise<AuthResponse> => {
+      return apiRequest<AuthResponse>('/auth/login', 'POST', credentials);
   },
 
-  /**
-   * Request password reset
-   */
-  async forgotPassword(email: string): Promise<AuthResponse> {
-    try {
-      const response = await fetch('/next-api/auth/forgot-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email }),
-        credentials: 'same-origin'
-      });
-      
-      const data = await response.json();
-      
-      return {
-        success: data.success,
-        message: data.message,
-        error: data.error
-      };
-    } catch (error) {
-      console.error('Forgot password API error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
-      };
-    }
+  signup: async (credentials: any): Promise<AuthResponse> => {
+      return apiRequest<AuthResponse>('/auth/signup', 'POST', credentials);
   },
 
-  /**
-   * Reset password with token
-   */
-  async resetPassword(password: string, token: string): Promise<AuthResponse> {
-    try {
-      const response = await fetch('/next-api/auth/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ password, token }),
-        credentials: 'same-origin'
-      });
-      
-      const data = await response.json();
-      
-      return {
-        success: data.success,
-        message: data.message,
-        error: data.error,
-        redirectTo: data.data?.redirectTo
-      };
-    } catch (error) {
-      console.error('Reset password API error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
-      };
-    }
+  logout: async (): Promise<AuthResponse> => {
+      return apiRequest<AuthResponse>('/auth/logout', 'POST');
   },
 
-  /**
-   * Update user's email
-   */
-  async updateEmail(newEmail: string): Promise<AuthResponse> {
-    try {
-      const response = await fetch('/next-api/auth/update-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ newEmail }),
-        credentials: 'same-origin'
-      });
-      
-      const data = await response.json();
-      
-      return {
-        success: data.success,
-        message: data.message,
-        error: data.error
-      };
-    } catch (error) {
-      console.error('Update email API error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
-      };
-    }
+  forgotPassword: async (email: string): Promise<AuthResponse> => {
+      return apiRequest<AuthResponse>('/auth/forgot-password', 'POST', { email });
   },
 
-  /**
-   * Update user's name
-   */
-  async updateName(fullName: string): Promise<AuthResponse> {
-    try {
-      const response = await fetch('/next-api/auth/update-name', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ fullName }),
-        credentials: 'same-origin'
-      });
-      
-      const data = await response.json();
-      
-      return {
-        success: data.success,
-        message: data.message,
-        error: data.error
-      };
-    } catch (error) {
-      console.error('Update name API error:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An unexpected error occurred'
-      };
-    }
+  resetPassword: async (password: string, token: string): Promise<AuthResponse> => {
+      return apiRequest<AuthResponse>('/auth/reset-password', 'POST', { password, token });
+  },
+
+  refreshToken: async (): Promise<RefreshResponse> => {
+      return apiRequest<RefreshResponse>('/auth/refresh-token', 'POST');
   }
 };

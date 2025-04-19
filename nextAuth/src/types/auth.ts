@@ -1,37 +1,104 @@
+// ========================================================================
+// Backend API Response Structures
+// ========================================================================
+
 /**
- * Authentication related type definitions and factory functions
+ * Mirrors the Go backend's `UserResponse` struct.
+ * Expected structure within the 'data' field of successful
+ * user-related API responses (login, refresh, get user).
  */
-interface LoginRequest {
+export interface BackendUserResponse {
+    user_id: string;
+    email: string;
+    tier: string;
+    role: string;
+    expires_at: number;
+    csrf_token: string;
+}
+
+/**
+ * Mirrors the Go backend's top-level `APIResponse` struct.
+ * Generic wrapper for most backend responses.
+ * @template T The type of the data expected in the 'data' field.
+ */
+export interface BackendApiResponse<T = any> {
+    success: boolean;
+    message?: string;
+    error?: string;
+    code?: string;
+    data?: T | null;
+    redirectTo?: string;
+}
+
+// --- Specific Backend Response Type Aliases ---
+
+export type BackendUserApiResponse = BackendApiResponse<BackendUserResponse>;
+export type BackendSimpleApiResponse = BackendApiResponse<null | Record<string, unknown>>;
+
+// ========================================================================
+// Frontend Application State & Context Types
+// ========================================================================
+
+/**
+ * Represents the user object as stored and used within the frontend application state.
+ * Derived from BackendUserResponse.
+ */
+export interface AppUser {
+    id: string; 
+    email: string;
+    tier: string;
+    role: string;
+}
+
+export type AuthContextUser = AppUser | null;
+export interface AuthContextError {
+    message: string;
+    code?: string;
+}
+
+export interface AuthContextType {
+    user: AuthContextUser;
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    error: AuthContextError | null;
+    csrfToken: string | null;
+
+    
+    login: (credentials: UserCredentials) => Promise<boolean>;
+    logout: () => Promise<void>;
+    signup: (data: SignupFormData) => Promise<{ success: boolean, emailConfirmationRequired?: boolean }>;
+    fetchUser: () => Promise<AuthContextUser>;
+    refreshSession: () => Promise<boolean>;
+    clearError: () => void;
+    forgotPassword: (email: string) => Promise<boolean>;
+    resetPassword: (password: string, token: string) => Promise<boolean>;
+}
+
+// ========================================================================
+// Frontend Action Input Data Structures
+// ========================================================================
+
+/** Data needed for the login action/form */
+export interface UserCredentials {
     email: string;
     password: string;
     remember?: boolean;
 }
 
-interface SignupRequest {
+/** Data needed for the signup action/form */
+export interface SignupFormData {
     email: string;
     password: string;
-    confirmPassword: string;
+    confirmPassword?: string;
     fullName: string;
 }
 
-/**
- * Basic user credentials for login
- */
-interface UserCredentials {
-    /** User's email address */
-    email: string;
+// ========================================================================
+// Factory Functions
+// ========================================================================
 
-    /** User's password */
-    password: string;
-
-    /** Whether to remember the user for a longer period */
-    remember?: boolean;
-}
-
-/**
- * Create default UserCredentials with optional overrides
- */
-const createCredentials = (
+/** Creates default UserCredentials */
+export const createCredentials = (
     partial?: Partial<UserCredentials>
 ): UserCredentials => ({
     email: "",
@@ -40,27 +107,8 @@ const createCredentials = (
     ...partial,
 });
 
-/**
- * Data required for creating a new user account
- */
-interface SignupData {
-    /** User's email address */
-    email: string;
-
-    /** User's chosen password */
-    password: string;
-
-    /** Confirmation of the password (for validation) */
-    confirmPassword?: string;
-
-    /** User's full name */
-    fullName: string;
-}
-
-/**
- * Create default SignupData with optional overrides
- */
-const createSignupData = (partial?: Partial<SignupData>): SignupData => ({
+/** Creates default SignupFormData */
+export const createSignupFormData = (partial?: Partial<SignupFormData>): SignupFormData => ({
     email: "",
     password: "",
     confirmPassword: "",
@@ -68,201 +116,10 @@ const createSignupData = (partial?: Partial<SignupData>): SignupData => ({
     ...partial,
 });
 
-/**
- * Additional metadata stored with a user account
- */
-interface UserMetadata {
-    /** User's full name */
-    full_name?: string;
-
-    /** User's subscription tier */
-    tier?: string;
-
-    /** User's role */
-    role?: string;
-
-    /** Any additional custom fields */
-    [key: string]: any;
-}
-
-/**
- * Create default UserMetadata
- */
-const createDefaultMetadata = (): UserMetadata => ({
-    tier: "free",
-    full_name: "",
-});
-
-/**
- * User object representing an authenticated user
- */
-interface User {
-    /** Unique identifier for the user */
-    id: string;
-    /** User's email address */
-    email: string;
-    /** Whether the user's email has been confirmed */
-    emailConfirmed: boolean;
-    /** Additional user metadata from Supabase */
-    user_metadata?: UserMetadata;
-    /** Any other user properties */
-    [key: string]: any;
-}
-
-/**
- * Create a default User object
- */
-const createDefaultUser = (): User => ({
+/** Creates a default/empty AppUser */
+export const createDefaultAppUser = (): AppUser => ({
     id: "",
     email: "",
-    emailConfirmed: false,
-    user_metadata: {
-        tier: "free",
-        full_name: "",
-    },
+    tier: "free",
+    role: "user",
 });
-
-/**
- * Authentication token data
- */
-interface TokenData {
-    /** JWT access token */
-    accessToken: string;
-
-    /** Refresh token for obtaining new access tokens */
-    refreshToken: string;
-
-    /** Timestamp when the token expires */
-    expiresAt: number;
-}
-
-/**
- * Authentication session information
- */
-interface Session {
-    /** JWT access token */
-    access_token: string;
-
-    /** Refresh token */
-    refresh_token: string;
-
-    /** CSRF token */
-    csrf_token: string;
-
-    /** Timestamp when the session expires */
-    expires_at: number;
-
-    /** Any other session properties */
-    [key: string]: any;
-}
-
-/**
- * AuthResponse type
- */
-interface AuthResponse {
-    /** Whether the operation was successful */
-    success: boolean;
-
-    /** User data if applicable */
-    user: User | null;
-
-    /** Session data if applicable */
-    session: {
-        auth_token?: string;
-        refresh_token?: string;
-        csrf_token?: string;
-        expires_at?: number;
-        [key: string]: any;
-    } | null;
-
-    /** Whether email confirmation is required */
-    emailConfirmationRequired?: boolean;
-
-    /** Error message if applicable */
-    error?: string;
-}
-
-/**
- * Error information for authentication operations
- */
-interface AuthError {
-    /** Error message */
-    message: string;
-
-    /** HTTP status code if applicable */
-    status?: number;
-}
-
-/**
- * Current application authentication state
- */
-interface AuthState {
-    /** Current authenticated user or null */
-    user: User | null;
-
-    /** Whether authentication state is being loaded */
-    isLoading: boolean;
-
-    /** Whether the user is authenticated */
-    isAuthenticated: boolean;
-
-    /** Current authentication error if any */
-    error: AuthError | null;
-}
-
-/**
- * Create default AuthState
- */
-const createDefaultAuthState = (): AuthState => ({
-    user: null,
-    isLoading: false,
-    isAuthenticated: false,
-    error: null,
-});
-
-/**
- * Backend response format
- */
-interface BackendResponse {
-    /** Whether the operation was successful */
-    success: boolean;
-
-    /** Error message if operation failed */
-    error?: string;
-
-    /** User data if applicable */
-    user?: User;
-
-    /** Session information if applicable */
-    session?: {
-        expires_at: number;
-    };
-
-    /** Backend token for internal authentication */
-    backendToken?: string;
-
-    /** Whether email confirmation is required */
-    emailConfirmationRequired?: boolean;
-}
-
-export {
-    createDefaultUser,
-    createDefaultMetadata,
-    createDefaultAuthState,
-    createCredentials,
-    createSignupData,
-};
-export type {
-    UserCredentials,
-    SignupData,
-    UserMetadata,
-    User,
-    TokenData,
-    Session,
-    AuthResponse,
-    AuthError,
-    AuthState,
-    BackendResponse,
-    LoginRequest,
-    SignupRequest,
-};

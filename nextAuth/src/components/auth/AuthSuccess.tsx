@@ -1,9 +1,9 @@
 import React from 'react';
 import { useRouter } from 'next/router';
-import { User } from '@/context/AuthContext';
+import { AppUser } from '@/types/auth';
 
 interface AuthSuccessProps {
-  user: User | null;
+  user: AppUser | null;
   message: string;
   redirectTo?: string;
   redirectTimeout?: number; 

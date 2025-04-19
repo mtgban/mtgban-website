@@ -268,17 +268,7 @@ nav li:last-child {
   font-style: normal; 
 }
 
-nav li:first-child, nav li:nth-child(2) {
-  margin-right: 1.5rem; 
-}
-nav li:first-child {
-  margin-right: auto; 
-  margin-left: 0;
-}
-nav li:nth-child(2) {
-  margin-right: 1.5rem; 
-  margin-left: 0;
-}
+
 
 nav li a {
   display: block; 
