@@ -522,9 +522,18 @@ func getLastDBUpdate(db *sql.DB) (string, error) {
 
 func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars := genPageNav("Newspaper", r)
-
 	var db *sql.DB
+
+	userSession := getUserSessionFromContext(r)
 	enabled := ""
+
+	if userSession != nil && userSession.Permissions != nil {
+		if newspaperPerms, ok := userSession.Permissions["Newspaper"].(map[string]interface{}); ok {
+			if newsEnabled, ok := newspaperPerms["NewsEnabled"].(string); ok {
+				enabled = newsEnabled
+			}
+		}
+	}
 	if enabled == "1day" {
 		db = Newspaper1dayDB
 		pageVars.IsOneDay = true

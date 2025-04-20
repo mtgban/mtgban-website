@@ -144,7 +144,7 @@ export function createFetchInterceptor() {
             }
         }
 
-        // --- 5. Return Original Response (Success or Unhandled Error) ---
+        // Return Original Response (Success or Unhandled Error)
         return response;
     };
 

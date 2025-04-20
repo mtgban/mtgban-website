@@ -413,9 +413,7 @@ export class AuthService {
     }
 
     if (expiresAtMs <= 0) {
-      console.warn('No valid token expiry found, cannot schedule refresh precisely. Refresh may rely on periodic checks or user actions.');
-      // Optionally, schedule a less frequent check (e.g., every 30 mins) as a fallback
-      // this.refreshTimer = setTimeout(() => this.refreshSession(), 30 * 60 * 1000);
+      this.refreshTimer = setTimeout(() => this.refreshSession(), 30 * 60 * 1000);
       return;
     }
 

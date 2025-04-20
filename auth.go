@@ -365,19 +365,7 @@ func NewAuthService(config AuthConfig, extraNavs map[string]*NavElem) (*AuthServ
 		return nil, fmt.Errorf("invalid auth config: %w", err)
 	}
 	// Setup logging
-	var logger *log.Logger
-	logFilePath := path.Join(LogDir, "auth.log")
-	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0660)
-	if err != nil {
-		// Fallback to stdout if file cannot be opened
-		log.Printf("Warning: Failed to open log file '%s', falling back to stdout: %v", logFilePath, err)
-		logger = log.New(os.Stdout, config.LogPrefix, log.LstdFlags|log.Lshortfile)
-		logger.Println("Logger initialized to stdout.")
-	} else {
-		logger = log.New(logFile, config.LogPrefix, log.LstdFlags|log.Lshortfile)
-		logger.Printf("Logging to file: %s", logFilePath)
-		logger.Println("Logger initialized to file.")
-	}
+	logger := log.New(os.Stdout, config.LogPrefix, log.LstdFlags|log.Lshortfile)
 
 	// Initialize Supabase clients
 	supabaseClient := supabase.CreateClient(config.SupabaseURL, config.SupabaseAnonKey)
