@@ -658,6 +658,9 @@ func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string)
 	if strings.Contains(getBaseURL(r), "localhost") {
 		domain = "localhost"
 	}
+	if strings.Contains(getBaseURL(r), "beta.mtgban.com") {
+		domain = "beta.mtgban.com"
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:   cookieName,
 		Domain: domain,

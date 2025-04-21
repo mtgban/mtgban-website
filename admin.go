@@ -771,32 +771,32 @@ func signHMACSHA256Base64(key []byte, message []byte) (string, error) {
 }
 
 // clearImpersonation handles clearing the impersonation flag
-func clearImpersonation(w http.ResponseWriter, r *http.Request, ctx context.Context, session *UserSession, next http.HandlerFunc, a *AuthService) {
+func clearImpersonation(w http.ResponseWriter, r *http.Request, ctx context.Context, session *UserSession, next http.HandlerFunc) {
 
 	// Create a clean copy without impersonation
 	modifiedSession := *session
 	modifiedSession.Metadata["is_impersonating"] = false
 	ctx = context.WithValue(ctx, userContextKey, &modifiedSession)
 
-	if a.Config.DebugMode {
+	if DebugMode {
 		email := getEmailSafe(session)
-		a.logWithContext(r, "[DEBUG] SpoofMiddleware: Clearing IsImpersonating flag for admin %s", email)
+		log.Printf("[DEBUG] SpoofMiddleware: Clearing IsImpersonating flag for admin %s", email)
 	}
 
 	next(w, r.WithContext(ctx))
 }
 
 // handleTargetNotFound handles the case when a target user for spoofing is not found
-func handleTargetNotFound(w http.ResponseWriter, r *http.Request, ctx context.Context, session *UserSession, targetEmail string, next http.HandlerFunc, a *AuthService) {
+func handleTargetNotFound(w http.ResponseWriter, r *http.Request, ctx context.Context, session *UserSession, targetEmail string, next http.HandlerFunc) {
 
-	a.logWithContext(r, "SpoofMiddleware: Target user %s not found in BanACL. Clearing spoof cookie.", targetEmail)
+	log.Printf("SpoofMiddleware: Target user %s not found in BanACL. Clearing spoof cookie.", targetEmail)
 
 	// Clear the invalid cookie
 	http.SetCookie(w, &http.Cookie{Name: "spoof", Value: "", Path: "/", MaxAge: -1})
 
 	// Clear impersonation flag if needed
 	if session.Metadata["is_impersonating"] == true {
-		clearImpersonation(w, r, ctx, session, next, a)
+		clearImpersonation(w, r, ctx, session, next)
 		return
 	}
 
@@ -804,7 +804,7 @@ func handleTargetNotFound(w http.ResponseWriter, r *http.Request, ctx context.Co
 }
 
 // createSpoofedSession creates and adds a spoofed session to the context
-func createSpoofedSession(ctx context.Context, originalSession *UserSession, targetUser *BanUser, targetEmail string, a *AuthService) context.Context {
+func createSpoofedSession(ctx context.Context, originalSession *UserSession, targetUser *BanUser, targetEmail string) context.Context {
 
 	// Create the spoofed session object
 	spoofedSession := &UserSession{
@@ -820,12 +820,11 @@ func createSpoofedSession(ctx context.Context, originalSession *UserSession, tar
 		},
 	}
 
-	if a.Config.DebugMode {
+	if DebugMode {
 		email := getEmailSafe(originalSession)
-		a.Logger.Printf("[DEBUG] SpoofMiddleware: Created spoofed session for %s as %s (Role: %s, Tier: %s)",
+		log.Printf("[DEBUG] SpoofMiddleware: Created spoofed session for %s as %s (Role: %s, Tier: %s)",
 			email, targetEmail, spoofedSession.User.Role, spoofedSession.User.Tier)
 	}
-
 	// Add the spoofed session to context
 	return context.WithValue(ctx, userContextKey, spoofedSession)
 }
