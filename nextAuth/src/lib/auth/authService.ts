@@ -300,7 +300,7 @@ export class AuthService {
 
       // Refresh successful
       console.debug("Session refresh successful.");
-      this.handleAuthSuccess(responseData.data); // Update user, csrf, expiry, reschedule
+      this.handleAuthSuccess(responseData.data);
       this.refreshing = false;
       return true;
 
