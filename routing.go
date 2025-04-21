@@ -160,8 +160,79 @@ func initMiddlewareRegistry(auth *AuthService) *MiddlewareRegistry {
 }
 
 // ==========================================================================
-// Route Setup Functions
+// Handlers
 // ==========================================================================
+
+type Handlers struct {
+	// Group handlers by domain
+	Auth struct {
+		Login           http.HandlerFunc
+		Signup          http.HandlerFunc
+		Logout          http.HandlerFunc
+		ForgotPassword  http.HandlerFunc
+		GetUser         http.HandlerFunc
+		RefreshToken    http.HandlerFunc
+		HandleAuthAsset http.HandlerFunc
+	}
+
+	Public struct {
+		Home           http.HandlerFunc
+		RandomSearch   http.HandlerFunc
+		RandomSealed   http.HandlerFunc
+		Redirect       http.HandlerFunc
+		Favicon        http.HandlerFunc
+		OpenSearchDesc http.HandlerFunc
+	}
+
+	API struct {
+		Search     http.HandlerFunc
+		Suggest    http.HandlerFunc
+		Price      http.HandlerFunc
+		CKMirror   http.HandlerFunc
+		TCGHandler http.HandlerFunc
+	}
+
+	// DynamicNavHandlers are populated from ExtraNavs
+	DynamicNavHandlers map[string]http.HandlerFunc
+}
+
+// NewHandlers initializes all handlers
+func NewHandlers(auth *AuthService) *Handlers {
+	h := &Handlers{
+		DynamicNavHandlers: make(map[string]http.HandlerFunc),
+	}
+
+	// Initialize Auth handlers
+	h.Auth.Login = auth.LoginAPI
+	h.Auth.Signup = auth.SignupAPI
+	h.Auth.Logout = auth.LogoutAPI
+	h.Auth.ForgotPassword = auth.ForgotPasswordAPI
+	h.Auth.GetUser = auth.GetUserAPI
+	h.Auth.RefreshToken = auth.RefreshTokenAPI
+	h.Auth.HandleAuthAsset = auth.handleAuthAsset
+
+	// Initialize Public handlers
+	h.Public.Home = Home
+	h.Public.RandomSearch = RandomSearch
+	h.Public.RandomSealed = RandomSealedSearch
+	h.Public.Redirect = Redirect
+	h.Public.Favicon = Favicon
+	h.Public.OpenSearchDesc = OpenSearchDesc
+
+	// Initialize API handlers
+	h.API.Search = SearchAPI
+	h.API.Suggest = SuggestAPI
+	h.API.Price = PriceAPI
+	h.API.CKMirror = CKMirrorAPI
+	h.API.TCGHandler = TCGHandler
+
+	// Populate dynamic nav handlers
+	for key, nav := range ExtraNavs {
+		h.DynamicNavHandlers[key] = nav.Handle
+	}
+
+	return h
+}
 
 // setupStaticRoutes configures routes for static assets
 func setupStaticRoutes(mux *http.ServeMux) {
@@ -285,4 +356,13 @@ func configureServer(handler http.Handler) *http.Server {
 		Addr:    ":" + Config.Port,
 		Handler: handler,
 	}
+}
+
+func setupServer(authService *AuthService) *http.Server {
+	mux := setupRouter(authService)
+	injectorMiddleware := InjectAuthServiceMiddleware(authService)
+	var finalHandler http.Handler = mux
+	finalHandler = injectorMiddleware(finalHandler)
+	srv := configureServer(finalHandler)
+	return srv
 }

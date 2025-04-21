@@ -17,7 +17,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -219,10 +218,6 @@ type NavElem struct {
 	NoAuth bool
 }
 
-// Cache for generated navigation slices based on user context
-var navCache = make(map[string][]NavElem)
-var navCacheMutex sync.RWMutex
-
 var startTime = time.Now()
 
 var DefaultNav = []NavElem{
@@ -328,12 +323,11 @@ func init() {
 			Page:   "arbit.html",
 		},
 		"Admin": {
-			Name:   "Admin",
-			Short:  "❌",
-			Link:   "/admin",
-			Handle: Admin,
-			Page:   "admin.html",
-
+			Name:           "Admin",
+			Short:          "❌",
+			Link:           "/admin",
+			Handle:         Admin,
+			Page:           "admin.html",
 			CanPOST:        true,
 			AlwaysOnForDev: true,
 		},
@@ -377,28 +371,9 @@ type ConfigType struct {
 	} `json:"patreon"`
 	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
 	GoogleCredentials string            `json:"google_credentials"`
-	Auth              struct {
-		Domain         string   `json:"domain"`
-		DebugMode      bool     `json:"debug_mode"`
-		SecureCookies  bool     `json:"secure_cookies"`
-		SignatureTTL   int      `json:"signature_ttl"`
-		Prefix         string   `json:"log_prefix"`
-		Key            string   `json:"supabase_anon_key"`
-		RoleKey        string   `json:"supabase_role_key"`
-		Secret         string   `json:"supabase_jwt_secret"`
-		Url            string   `json:"supabase_url"`
-		ExemptRoutes   []string `json:"exempt_routes"`
-		ExemptPrefixes []string `json:"exempt_prefixes"`
-		ExemptSuffixes []string `json:"exempt_suffixes"`
-		CSRFPath       string   `json:"csrf_path"`
-		CSRFInterval   int      `json:"csrf_interval"`
-	} `json:"auth"`
-	ACL struct {
-		Tiers map[string]map[string]map[string]string `json:"tier"`
-		Roles map[string]map[string]map[string]string `json:"role"`
-	} `json:"acl"`
-	SessionFile string `json:"session_file"`
-	Uploader    struct {
+	Auth              AuthConfig        `json:"auth"`
+	ACL               ACLConfig         `json:"acl"`
+	Uploader          struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
@@ -409,7 +384,13 @@ type ConfigType struct {
 	filePath string
 }
 
+type ACLConfig struct {
+	Tiers map[string]map[string]map[string]string `json:"tier"`
+	Roles map[string]map[string]map[string]string `json:"role"`
+}
+
 var DevMode bool
+var DebugMode bool
 var SigCheck bool
 var SkipInitialRefresh bool
 var SkipPrices bool
@@ -438,7 +419,6 @@ var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
 
 var GoogleDocsClient *http.Client
-
 var banACL BanACL
 
 const (
@@ -464,13 +444,11 @@ func (fs FileSystem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.Contains(path, "?") {
 		path = strings.Split(path, "?")[0]
 	}
-
 	// Set content type based on file extension
 	ext := filepath.Ext(path)
 	if mimeType := getMimeType(ext); mimeType != "" {
 		w.Header().Set("Content-Type", mimeType)
 	}
-
 	// Let the default file server handle the rest
 	http.FileServer(fs.fs).ServeHTTP(w, r)
 }
@@ -506,216 +484,6 @@ func (fs FileSystem) Open(name string) (http.File, error) {
 	return f, nil
 }
 
-// buildNav constructs the base navigation list based on user session permissions
-func buildNav(userSession *UserSession, isDevMode bool) []NavElem {
-	var baseNav []NavElem
-	// Initialize navigation with defaults
-	if DefaultNav != nil {
-		baseNav = make([]NavElem, len(DefaultNav))
-		copy(baseNav, DefaultNav)
-	} else {
-		baseNav = []NavElem{}
-	}
-
-	// Add navigation items based on ACL
-	if OrderNav != nil && ExtraNavs != nil {
-		for _, feat := range OrderNav {
-			navItem, exists := ExtraNavs[feat]
-			if !exists || navItem == nil {
-				continue
-			}
-
-			// Determine if the nav item should be shown
-			showNavItem := false
-			if navItem.NoAuth {
-				showNavItem = true
-				if isDevMode {
-					log.Printf("[DEBUG] Nav item '%s' shown: NoAuth=true", feat)
-				}
-			} else if userSession != nil { // Check if we have a valid session
-				if userSession.Permissions != nil {
-					// Check if the feature exists in permissions
-					_, hasPerm := userSession.Permissions[feat]
-					if hasPerm {
-						showNavItem = true
-						if isDevMode {
-							log.Printf("[DEBUG] Nav item '%s' shown: permission found in ACL", feat)
-						}
-					} else if isDevMode && (navItem.AlwaysOnForDev || !SigCheck) {
-						showNavItem = true
-						log.Printf("[DEBUG] Nav item '%s' shown: DevMode override (AlwaysOn=%t, !SigCheck=%t)", feat, navItem.AlwaysOnForDev, !SigCheck)
-					} else if isDevMode {
-						log.Printf("[DEBUG] Nav item '%s' NOT shown: No permission found", feat)
-					}
-				} else if isDevMode {
-					userEmail := "<nil session>"
-					if userSession.User != nil {
-						userEmail = maskEmail(userSession.User.Email)
-					}
-					log.Printf("[DEBUG] User session permissions map is nil for user %s", userEmail)
-				}
-			}
-
-			if showNavItem {
-				displayNavItem := *navItem // Copy the NavElem
-				baseNav = append(baseNav, displayNavItem)
-			}
-		}
-	}
-	return baseNav
-}
-
-func genPageNav(activeTab string, r *http.Request) PageVars {
-	pageVars := PageVars{
-		Title:        "BAN " + activeTab,
-		LastUpdate:   LastUpdate,
-		Hash:         BuildCommit,
-		ShowLogin:    true,
-		IsLoggedIn:   false,
-		ErrorMessage: "",
-	}
-
-	if Config.Game != "" {
-		pageVars.Title += " - " + Config.Game
-		pageVars.DisableChart = true
-	}
-
-	switch Config.Game {
-	case mtgban.GameMagic:
-		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
-	case mtgban.GameLorcana:
-		pageVars.CardBackURL = "img/backs/lorcana.webp"
-	default:
-		pageVars.CardBackURL = "img/backs/default.png"
-	}
-
-	// Declare variables with default values outside the if block
-	userTier := "free"
-	userRole := ""
-	isImpersonating := false
-	userEmail := ""
-
-	// Get UserSession from context
-	var userSession *UserSession
-	sessionData := r.Context().Value(userContextKey)
-	if sessionData != nil {
-		var ok bool
-		userSession, ok = sessionData.(*UserSession)
-		if ok && userSession != nil {
-			// Populate pageVars based on UserSession
-			pageVars.IsLoggedIn = true
-			if userSession.User != nil {
-				userEmail = userSession.User.Email
-			} else {
-
-				log.Printf("[WARNING] User session found but User is nil")
-			}
-			pageVars.ShowLogin = false
-			userTier = userSession.User.Tier
-			userRole = userSession.User.Role
-
-			if DevMode {
-				log.Printf("[DEBUG] User session loaded: Email: %s, Role: %s, Tier: %s, Impersonating: %t", maskEmail(userEmail), userRole, userTier, isImpersonating)
-			}
-		} else {
-			if DevMode {
-				log.Printf("[WARNING] Invalid type found in userSessionContextKey: %T", sessionData)
-			}
-		}
-	} else if DevMode {
-		log.Printf("[DEBUG] No user session found in context.")
-	}
-
-	// Update PageVars with final determined values
-	pageVars.UserEmail = userEmail
-	pageVars.UserTier = userTier
-	pageVars.UserRole = userRole
-
-	pageVars.IsImpersonating = isImpersonating
-	pageVars.ImpersonationTarget = ""
-
-	cacheKey := fmt.Sprintf("role:%s|tier:%s|imp:%t|dev:%t", userRole, userTier, isImpersonating, DevMode)
-
-	var finalNav []NavElem
-
-	// Attempt to read from cache
-	navCacheMutex.RLock()
-	cachedNav, found := navCache[cacheKey]
-	navCacheMutex.RUnlock()
-
-	if found {
-		if DevMode {
-			log.Printf("[DEBUG] Navigation cache HIT for key: %s", cacheKey)
-		}
-		// Cache hit: Create a copy and use it
-		finalNav = make([]NavElem, len(cachedNav))
-		copy(finalNav, cachedNav)
-	} else {
-		if DevMode {
-			log.Printf("[DEBUG] Navigation cache MISS for key: %s", cacheKey)
-		}
-		// Cache miss: Build the navigation from scratch
-		baseNav := buildNav(userSession, DevMode)
-
-		// Store a copy in the cache (using write lock)
-		navToCache := make([]NavElem, len(baseNav))
-		copy(navToCache, baseNav)
-
-		navCacheMutex.Lock()
-		// Double check in case another routine populated it between RUnlock and Lock
-		_, stillNotFound := navCache[cacheKey]
-		if !stillNotFound {
-			navCache[cacheKey] = navToCache
-			if DevMode {
-				log.Printf("[DEBUG] Stored navigation in cache for key: %s", cacheKey)
-			}
-		} else {
-			if DevMode {
-				log.Printf("[DEBUG] Cache key %s populated concurrently, skipping store.", cacheKey)
-			}
-		}
-		navCacheMutex.Unlock()
-
-		// Use the originally built slice for this request
-		finalNav = baseNav
-	}
-
-	pageVars.Nav = finalNav // Assign the determined nav slice
-	mainNavIndex := -1
-	for i := range pageVars.Nav {
-		// Reset any potential stale state from cache/copying
-		pageVars.Nav[i].Active = false
-		pageVars.Nav[i].Class = ""
-
-		if pageVars.Nav[i].Name == activeTab {
-			mainNavIndex = i
-			break
-		} else {
-			// Check subpages for active tab based on the current request URL
-			for _, subPage := range pageVars.Nav[i].SubPages {
-				// Use r.URL.Path for checking subpages, as activeTab might just be the main Name
-				if r.URL.Path == subPage {
-					mainNavIndex = i
-					break
-				}
-			}
-			if mainNavIndex != -1 {
-				break
-			}
-		}
-	}
-
-	if mainNavIndex >= 0 && mainNavIndex < len(pageVars.Nav) {
-		pageVars.Nav[mainNavIndex].Active = true
-		pageVars.Nav[mainNavIndex].Class = "active"
-		if DevMode {
-			log.Printf("[DEBUG] Set active nav tab: %s", pageVars.Nav[mainNavIndex].Name)
-		}
-	}
-
-	return pageVars
-}
-
 func loadVars(cfg, port, datastore string) error {
 	// Load from config file
 	file, err := os.Open(cfg)
@@ -737,6 +505,9 @@ func loadVars(cfg, port, datastore string) error {
 	}
 	if Config.Port == "" {
 		Config.Port = DefaultConfigPort
+	}
+	if Config.Auth.DebugMode == "true" {
+		DebugMode = true
 	}
 
 	if datastore != "" {
@@ -793,7 +564,7 @@ func main() {
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
-	flag.BoolVar(&Config.Auth.DebugMode, "debug", false, "Enable debug mode")
+	flag.BoolVar(&DebugMode, "debug", false, "Enable debug mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	skipInitialRefresh := flag.Bool("skip", true, "Skip initial refresh")
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
@@ -834,6 +605,9 @@ func main() {
 	}
 	LogPages = map[string]*log.Logger{}
 
+	// Precompute all nav states
+	precomputeNavigation()
+
 	// Initialize Google client
 	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
 	if err != nil {
@@ -855,19 +629,7 @@ func main() {
 	}
 
 	// Initialize auth service
-	authConfig := AuthConfig{
-		SupabaseURL:     Config.Auth.Url,
-		SupabaseAnonKey: Config.Auth.Key,
-		SupabaseSecret:  Config.Auth.Secret,
-		SupabaseRoleKey: Config.Auth.RoleKey,
-		DebugMode:       Config.Auth.DebugMode,
-		LogPrefix:       Config.Auth.Prefix,
-		ExemptRoutes:    Config.Auth.ExemptRoutes,
-		ExemptPrefixes:  Config.Auth.ExemptPrefixes,
-		ExemptSuffixes:  Config.Auth.ExemptSuffixes,
-		CSRFPath:        Config.Auth.CSRFPath,
-		CSRFInterval:    Config.Auth.CSRFInterval,
-	}
+	authConfig := initAuthConfig()
 
 	authService, err := NewAuthService(authConfig, ExtraNavs)
 	if err != nil {
@@ -947,14 +709,10 @@ func main() {
 	}
 
 	// Set seed in case we need to do random operations
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	// setup router and inject authService
-	mux := setupRouter(authService)
-	injectorMiddleware := InjectAuthServiceMiddleware(authService)
-	var finalHandler http.Handler = mux
-	finalHandler = injectorMiddleware(finalHandler)
-	srv := configureServer(finalHandler)
+	// setup http server with authService
+	srv := setupServer(authService)
 
 	// Wait for shutdown signal
 	done := make(chan os.Signal, 1)
@@ -1085,11 +843,8 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Parse the template file held in the templates folder, add any Funcs to parsing
 	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
 	if err != nil {
-		t, err = template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
-		if err != nil {
-			log.Print("template parsing error: ", err)
-			return
-		}
+		log.Print("template parsing error: ", err)
+		return
 	}
 
 	// Execute the template and pass in the variables to fill the gaps
