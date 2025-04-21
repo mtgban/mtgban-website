@@ -7,21 +7,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	supabase "github.com/nedpals/supabase-go"
 	"golang.org/x/exp/slices"
-	"golang.org/x/time/rate"
 )
 
 // ============================================================================================
@@ -59,18 +56,10 @@ const (
 	MTGBAN_ROLE     ctxKey = "mtgban_website"
 )
 
-// session cache settings
 const (
-	sessionCacheTTL     = 3 * time.Hour
-	sessionCacheMaxSize = 2000
-	cacheCleanInterval  = 1 * time.Hour
-)
-
-// Session cache to reduce backend lookups
-var (
-	userSessionCache      = make(map[string]*UserSession)
-	userSessionCacheMutex sync.RWMutex
-	cacheCleanerStarted   sync.Once
+	authTokenCookie    = "auth_token"
+	refreshTokenCookie = "refresh_token"
+	csrfTokenCookie    = "csrf_token"
 )
 
 // Common authentication errors
@@ -148,33 +137,34 @@ var (
 
 // AuthConfig holds the configuration settings for the authentication service
 type AuthConfig struct {
-	SupabaseURL     string   `json:"supabase_url"`
-	SupabaseAnonKey string   `json:"supabase_anon_key"`
-	SupabaseRoleKey string   `json:"supabase_role_key"`
-	SupabaseSecret  string   `json:"supabase_jwt_secret"`
-	DebugMode       bool     `json:"debug_mode"`
-	LogPrefix       string   `json:"log_prefix"`
-	ExemptRoutes    []string `json:"exempt_routes"`
-	ExemptPrefixes  []string `json:"exempt_prefixes"`
-	ExemptSuffixes  []string `json:"exempt_suffixes"`
-	CSRFPath        string   `json:"csrf_path"`
-	CSRFInterval    int      `json:"csrf_interval"`
+	Domain         string      `json:"domain"`
+	DebugMode      string      `json:"debug_mode"`
+	SecureCookies  string      `json:"secure_cookies"`
+	SignatureTTL   int         `json:"signature_ttl"`
+	LogPrefix      string      `json:"log_prefix"`
+	DB             DBConfig    `json:"db"`
+	ExemptRoutes   []string    `json:"exempt_routes"`
+	ExemptPrefixes []string    `json:"exempt_prefixes"`
+	ExemptSuffixes []string    `json:"exempt_suffixes"`
+	CSRFPath       string      `json:"csrf_path"`
+	CSRFInterval   int         `json:"csrf_interval"`
+	Cache          CacheConfig `json:"cache"`
 }
 
 // AuthService handles all authentication-related functionality
 type AuthService struct {
-	Logger     *log.Logger
-	Supabase   *supabase.Client
-	MTGBAN     *supabase.Client
-	Config     AuthConfig
-	CSRF       *CSRF
-	ACL        *BanACL
-	Navs       map[string]*NavElem
-	IPLimiters sync.Map
+	Logger       *log.Logger
+	Supabase     *supabase.Client
+	MTGBAN       *supabase.Client
+	Config       AuthConfig
+	CSRF         *CSRF
+	ACL          *BanACL
+	Navs         map[string]*NavElem
+	SessionCache *SessionCache
 }
 
 // AuthToken represents the authentication token for a user
-type AuthToken struct {
+type AccessToken struct {
 	Token     string `json:"token"`
 	ExpiresAt int64  `json:"expires_at"`
 }
@@ -187,7 +177,7 @@ type RefreshToken struct {
 
 // AuthTokens represents the authentication tokens for a user
 type AuthTokens struct {
-	AccessToken  *AuthToken    `json:"access_token"`
+	AccessToken  *AccessToken  `json:"access_token"`
 	RefreshToken *RefreshToken `json:"refresh_token"`
 	CSRFToken    string        `json:"csrf_token"`
 }
@@ -200,6 +190,7 @@ type UserSession struct {
 	Permissions map[string]interface{} `json:"permissions"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	CreatedAt   time.Time              `json:"created_at"`
+	LastActive  time.Time              `json:"last_active"`
 }
 
 // UserResponse represents the response for a user
@@ -254,8 +245,7 @@ type BanUser struct {
 
 // BanACL holds the Access Control List, mapping emails to user permissions
 type BanACL struct {
-	Users map[string]*BanUser
-
+	Users   map[string]*BanUser
 	mux     sync.RWMutex
 	Updated time.Time
 }
@@ -293,119 +283,100 @@ type Middleware func(http.HandlerFunc) http.HandlerFunc
 // AuthService Initialization
 // ============================================================================================
 
-// DefaultAuthConfig returns the default configuration
-func DefaultAuthConfig() AuthConfig {
-	return AuthConfig{
-		LogPrefix: "AUTH ",
-		ExemptRoutes: []string{
-			"/",
-			"/home",
-			"/search",
-			"/favicon.ico",
+func initAuthConfig() AuthConfig {
+	authConfig := AuthConfig{
+		DB: DBConfig{
+			URL:     Config.Auth.DB.URL,
+			AnonKey: Config.Auth.DB.AnonKey,
+			RoleKey: Config.Auth.DB.RoleKey,
+			Secret:  Config.Auth.DB.Secret,
 		},
-		ExemptPrefixes: []string{
-			"/auth/",
-			"/next-api/auth/",
-			"/api/search/",
-			"/api/suggest/",
-			"/css/",
-			"/js/",
-			"/img/",
+		Cache: CacheConfig{
+			TTL:             Config.Auth.Cache.TTL,
+			CleanupInterval: Config.Auth.Cache.CleanupInterval,
+			MaxSize:         Config.Auth.Cache.MaxSize,
+			Metrics:         Config.Auth.Cache.Metrics,
 		},
-		ExemptSuffixes: []string{
-			".css", ".js", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".woff", ".woff2", ".ttf", ".map",
-		},
+		DebugMode:      Config.Auth.DebugMode,
+		SecureCookies:  Config.Auth.SecureCookies,
+		LogPrefix:      Config.Auth.LogPrefix,
+		ExemptRoutes:   Config.Auth.ExemptRoutes,
+		ExemptPrefixes: Config.Auth.ExemptPrefixes,
+		ExemptSuffixes: Config.Auth.ExemptSuffixes,
+		CSRFPath:       Config.Auth.CSRFPath,
+		CSRFInterval:   Config.Auth.CSRFInterval,
 	}
-}
-
-// LoadAuthConfig loads auth configuration from a file, falling back to defaults
-func LoadAuthConfig(filePath string) (AuthConfig, error) {
-	config := DefaultAuthConfig()
-
-	if filePath == "" {
-		return config, nil
-	}
-
-	file, err := os.Open(filePath)
+	authConfig, err := validateAuthConfig(authConfig)
 	if err != nil {
-		if os.IsNotExist(err) {
-			log.Printf("Auth config file '%s' not found, using defaults.", filePath)
-			return config, nil
-		}
-		return config, fmt.Errorf("failed to open auth config file '%s': %w", filePath, err)
+		log.Fatalf("Failed to validate auth config: %v", err)
 	}
-	defer file.Close()
-
-	if err := json.NewDecoder(file).Decode(&config); err != nil {
-		log.Printf("Warning: Failed to parse auth config file '%s', continuing with potential defaults: %v", filePath, err)
-		return DefaultAuthConfig(), fmt.Errorf("failed to parse auth config file '%s': %w", filePath, err)
-	}
-
-	return config, nil
+	return authConfig
 }
 
 // Validation checks
-func (c AuthConfig) Validate() error {
-	if c.SupabaseURL == "" {
-		return errors.New("AuthConfig: SupabaseURL is required")
+func validateAuthConfig(config AuthConfig) (AuthConfig, error) {
+	if config.DB.URL == "" {
+		return config, fmt.Errorf("AuthConfig: DB.URL is required")
 	}
-	if c.SupabaseAnonKey == "" {
-		return errors.New("AuthConfig: SupabaseAnonKey is required (for client-side interaction)")
+	if config.DB.AnonKey == "" {
+		return config, fmt.Errorf("AuthConfig: DB.AnonKey is required (for client-side interaction)")
 	}
-	if c.SupabaseSecret == "" {
-		log.Println("Warning: AuthConfig: SupabaseSecret is not set. Backend operations requiring admin privileges might fail.")
+	if config.DB.Secret == "" {
+		log.Println("Warning: AuthConfig: DB.Secret is not set. Backend operations requiring admin privileges might fail.")
 	}
-	return nil
+	return config, nil
 }
 
-// NewAuthService creates and initializes a new AuthService instance
 func NewAuthService(config AuthConfig, extraNavs map[string]*NavElem) (*AuthService, error) {
-	// Validate config first
-	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid auth config: %w", err)
-	}
-	// Setup logging
-	logger := log.New(os.Stdout, config.LogPrefix, log.LstdFlags|log.Lshortfile)
-
-	// Initialize Supabase clients
-	supabaseClient := supabase.CreateClient(config.SupabaseURL, config.SupabaseAnonKey)
-	if supabaseClient == nil {
-		return nil, errors.New("failed to create Supabase client")
-	}
-
-	// Initialize MTGBAN client
-	mtgbanClient, err := CustomRoleClient(config.SupabaseURL, config.SupabaseRoleKey, string(MTGBAN_ROLE))
+	logger := log.New(os.Stdout, config.LogPrefix, log.LstdFlags)
+	// init Supabase client
+	dbClient, err := supabaseClient(config.DB.URL, config.DB.AnonKey)
 	if err != nil {
+		logger.Printf("NewAuthService: Supabase client error: %v", err)
+		return nil, fmt.Errorf("failed to create Supabase client: %w", err)
+	}
+	logger.Printf("Supabase client initialized successfully.")
+
+	// init MTGBAN client
+	mtgbanClient, err := roleClient(config.DB.URL, config.DB.RoleKey, string(MTGBAN_ROLE))
+	if err != nil {
+		logger.Printf("NewAuthService: MTGBAN client error: %v", err)
 		return nil, fmt.Errorf("failed to create MTGBAN client: %w", err)
 	}
-
-	logger.Printf("Supabase client initialized for URL: %s", config.SupabaseURL)
+	logger.Printf("MTGBAN client initialized successfully.")
 
 	// Create the service instance
+	logger.Printf("NewAuthService: Creating AuthService struct instance...") // Log step
 	service := &AuthService{
-		Logger:     logger,
-		Supabase:   supabaseClient,
-		MTGBAN:     mtgbanClient,
-		Config:     config,
-		CSRF:       nil,
-		ACL:        &BanACL{Users: make(map[string]*BanUser)},
-		Navs:       extraNavs,
-		IPLimiters: sync.Map{},
+		Logger:       logger,
+		Supabase:     dbClient,
+		MTGBAN:       mtgbanClient,
+		Config:       config,
+		CSRF:         nil,
+		ACL:          &BanACL{Users: make(map[string]*BanUser)},
+		Navs:         extraNavs,
+		SessionCache: nil,
 	}
+	logger.Printf("NewAuthService: AuthService instance created.")
 
 	csrf, err := NewCSRF(config.CSRFPath, service.Logger)
 	if err != nil {
+		logger.Printf("NewAuthService: CSRF error: %v", err)
 		return nil, fmt.Errorf("failed to create CSRF: %w", err)
 	}
-
 	service.CSRF = csrf
+	logger.Printf("NewAuthService: CSRF initialized.")
 
-	service.Logger.Printf("AuthService created successfully.")
-	if config.DebugMode {
-		service.Logger.Println("Debug mode enabled. Printing embedded auth assets:")
-		service.printEmbeddedFS(authAssets, "nextAuth/out", "")
+	// init session cache
+	sessionCache := NewSessionCache(InitCacheConfig(config))
+	if sessionCache == nil {
+		logger.Printf("NewAuthService: SessionCache initialization failed")
+		return nil, fmt.Errorf("failed to create SessionCache")
 	}
+	service.SessionCache = sessionCache
+	logger.Printf("NewAuthService: SessionCache initialized")
 
+	logger.Printf("NewAuthService: Initialized successfully.")
 	return service, nil
 }
 
@@ -423,7 +394,7 @@ func (a *AuthService) LoadBanACL() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	err := a.MTGBAN.DB.From("acl").Select("user_id,email,tier,role,permissions").ExecuteWithContext(ctx, &banUsersData)
+	err := a.MTGBAN.DB.From("acl").Select("user_id,email,tier,role,permissions").Filter("role", "neq", "user").ExecuteWithContext(ctx, &banUsersData)
 	if err != nil {
 		a.Logger.Printf("Error fetching BAN ACL data: %v", err)
 		return fmt.Errorf("failed to fetch ban_acl data from Supabase: %w", err)
@@ -451,7 +422,6 @@ func (a *AuthService) LoadBanACL() error {
 			Permissions: permsCopy,
 		}
 	}
-
 	// replace the old map with the new one
 	a.ACL.Users = newUsers
 	a.ACL.Updated = time.Now()
@@ -484,7 +454,7 @@ func (a *AuthService) getUserByID(userID string) (*BanUser, bool) {
 			userDataCopy := *user.UserData
 			userCopy.UserData = &userDataCopy
 
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.Logger.Printf("[DEBUG] getUserByID: Found user with ID %s", maskID(userID))
 			}
 
@@ -492,7 +462,7 @@ func (a *AuthService) getUserByID(userID string) (*BanUser, bool) {
 		}
 	}
 
-	if a.Config.DebugMode {
+	if DebugMode {
 		a.Logger.Printf("[DEBUG] getUserByID: User %s not found in ACL.", userID)
 	}
 
@@ -548,14 +518,14 @@ func (a *AuthService) getUserPermissions(userId string) (map[string]interface{},
 		}
 		permissions = permsCopy
 
-		if a.Config.DebugMode {
+		if DebugMode {
 			a.Logger.Printf("[DEBUG] getUserPermissions: Found user %s in BAN ACL (Role: %s, Tier: %s)",
 				maskEmail(banUser.UserData.Email), userRole, userTier)
 		}
 		return permissions, nil
 	}
 
-	// get user details from Supabase if not in ACL
+	// get user details from Supabase if not in BAN ACL
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -575,13 +545,13 @@ func (a *AuthService) getUserPermissions(userId string) (map[string]interface{},
 		}
 	}
 
-	// get permissions based on role/tier
-	err = a.setPermissions(userRole, userTier, &permissions)
+	// set permissions based on role/tier
+	err = setPermissions(userRole, userTier, &permissions)
 	if err != nil {
 		a.Logger.Printf("Error setting permissions from role/tier for user %s: %v", maskID(userId), err)
 	}
 
-	if a.Config.DebugMode {
+	if DebugMode {
 		a.Logger.Printf("[DEBUG] getUserPermissions: Retrieved permissions for user %s (Role: %s, Tier: %s) from Supabase",
 			maskID(userId), userRole, userTier)
 	}
@@ -590,77 +560,139 @@ func (a *AuthService) getUserPermissions(userId string) (map[string]interface{},
 }
 
 // setPermissions is a helper function to set permissions based on role and tier
-func (a *AuthService) setPermissions(userRole string, userTier string, permissions *map[string]interface{}) error {
-	// try tier permissions first
-	tierPerms, tierName, tierFound := a.getACLDataByTierRole(userTier)
-	if tierFound {
-		// Copy permissions
-		for k, v := range tierPerms {
-			(*permissions)[k] = v
+func setPermissions(userRole string, userTier string, permissions *map[string]interface{}) error {
+	// Helper to extract permissions for a single name (tier or role)
+	getSingleACLPermission := func(name string, aclSection map[string]map[string]map[string]string) map[string]map[string]string {
+		if permission, exists := aclSection[name]; exists {
+			return permission // returns map[Feature]map[Flag]Value
 		}
-
-		if a.Config.DebugMode {
-			a.Logger.Printf("[DEBUG] setPermissions: Applied tier permissions for %s", tierName)
-		}
+		return nil
 	}
-
-	// Add role permissions (these can override tier permissions)
-	rolePerms, roleName, roleFound := a.getACLDataByTierRole(userRole)
-	if roleFound {
-		// Copy permissions
-		for k, v := range rolePerms {
-			(*permissions)[k] = v
+	// Helper to merge two boolean permissions
+	mergePermissionFlags := func(permission1, permission2 map[string]string) map[string]string {
+		if permission1 == nil && permission2 == nil {
+			return make(map[string]string) // Return empty if both are nil
+		}
+		if permission1 == nil {
+			permission1 = make(map[string]string)
+		}
+		if permission2 == nil {
+			permission2 = make(map[string]string)
 		}
 
-		if a.Config.DebugMode {
-			a.Logger.Printf("[DEBUG] setPermissionsFromRoleTier: Applied role permissions for %s", roleName)
+		combined := make(map[string]string)
+		allSubKeys := make(map[string]struct{})
+		for key := range permission1 {
+			allSubKeys[key] = struct{}{}
 		}
-	}
+		for key := range permission2 {
+			allSubKeys[key] = struct{}{}
+		}
 
-	// If neither found, use default user permissions
-	if !tierFound && !roleFound {
-		defaultPerms, _, defaultFound := a.getACLDataByTierRole("user")
-		if defaultFound {
-			for k, v := range defaultPerms {
-				(*permissions)[k] = v
+		for subKey := range allSubKeys {
+			val1, ok1 := permission1[subKey]
+			val2, ok2 := permission2[subKey]
+			isVal1True := ok1 && strings.EqualFold(val1, "true")
+			isVal2True := ok2 && strings.EqualFold(val2, "true")
+
+			if isVal1True || isVal2True {
+				combined[subKey] = "true"
+			} else if ok1 || ok2 {
+				isVal1False := ok1 && strings.EqualFold(val1, "false")
+				isVal2False := ok2 && strings.EqualFold(val2, "false")
+				if isVal1False || isVal2False {
+					combined[subKey] = "false"
+				} else {
+					if DevMode {
+						log.Printf("[WARNING] mergePermissionFlags: Unrecognized boolean value for subkey '%s': val1='%s', val2='%s'. Defaulting to false.", subKey, val1, val2)
+					}
+					combined[subKey] = "false"
+				}
 			}
+		}
+		return combined
+	}
 
-			if a.Config.DebugMode {
-				a.Logger.Printf("[DEBUG] setPermissionsFromRoleTier: Applied default user permissions")
-			}
-		} else {
-			return fmt.Errorf("no permissions found for role %s, tier %s, or default user", userRole, userTier)
+	combinedPermissions := make(map[string]interface{})
+	allRootKeys := make(map[string]struct{})
+
+	// Ensure ACL sections are not nil
+	tierACL := Config.ACL.Tiers
+	if tierACL == nil {
+		tierACL = make(map[string]map[string]map[string]string)
+	}
+	roleACL := Config.ACL.Roles
+	if roleACL == nil {
+		roleACL = make(map[string]map[string]map[string]string)
+	}
+
+	// Get permissions for the specific tier and role
+	// These are map[FeatureName]map[FlagName]FlagValue
+	tierPermissions := getSingleACLPermission(userTier, tierACL)
+	rolePermissions := getSingleACLPermission(userRole, roleACL)
+
+	// Populate allRootKeys from both tier and role permissions
+	if tierPermissions != nil {
+		for key := range tierPermissions {
+			allRootKeys[key] = struct{}{}
+		}
+	}
+	if rolePermissions != nil {
+		for key := range rolePermissions {
+			allRootKeys[key] = struct{}{}
 		}
 	}
 
+	for rootKey := range allRootKeys {
+		// Get the specific flag maps for this rootKey from both sources
+		var tierFlags map[string]string
+		var roleFlags map[string]string
+		if tierPermissions != nil {
+			tierFlags = tierPermissions[rootKey] // Can be nil map
+		}
+		if rolePermissions != nil {
+			roleFlags = rolePermissions[rootKey] // Can be nil map
+		}
+
+		// Determine if this rootKey *actually exists* in either source ACL.
+		// This is crucial because allRootKeys aggregates keys.
+		_, tierKeyExists := tierPermissions[rootKey]
+		_, roleKeyExists := rolePermissions[rootKey]
+		keyExistsInACL := tierKeyExists || roleKeyExists
+
+		// Merge the sub-flags (if any exist)
+		combinedFlagsMap := mergePermissionFlags(tierFlags, roleFlags)
+
+		// Add the key to the final permissions IF:
+		// 2. We either have merged flags OR the original definition was just {}
+		if keyExistsInACL {
+			if len(combinedFlagsMap) > 0 {
+				// Key exists AND has sub-flags after merging
+				nestedPermissionsMap := make(map[string]interface{}, len(combinedFlagsMap))
+				for k, v := range combinedFlagsMap {
+					boolVal := false
+					if strings.EqualFold(v, "true") {
+						boolVal = true
+					}
+					nestedPermissionsMap[k] = boolVal // Store boolean
+				}
+				combinedPermissions[rootKey] = nestedPermissionsMap
+			} else {
+				// Add empty map to signify permission grant
+				combinedPermissions[rootKey] = make(map[string]interface{})
+			}
+		}
+	}
+	// Assign the calculated permissions to the caller's map pointer
+	*permissions = combinedPermissions
+
+	// Log the result for debugging
+	if DebugMode {
+		log.Printf("[DEBUG] setPermissions: effective permissions for Role '%s', Tier '%s' are: '%v'", userRole, userTier, combinedPermissions)
+	}
+
+	// Return nil to indicate success
 	return nil
-}
-
-// getACLDataByTierRole retrieves the effective permissions for a given tier or role name.
-func (a *AuthService) getACLDataByTierRole(name string) (map[string]interface{}, string, bool) {
-	if tierData, exists := Config.ACL.Tiers[name]; exists {
-		perms := make(map[string]interface{})
-		for _, settings := range tierData {
-			for key, value := range settings {
-				perms[key] = value
-			}
-		}
-		return perms, name, true
-	}
-
-	// Check Roles if not found as a Tier
-	if roleData, exists := Config.ACL.Roles[name]; exists {
-		perms := make(map[string]interface{})
-		for _, settings := range roleData {
-			for key, value := range settings {
-				perms[key] = value
-			}
-		}
-		return perms, name, true
-	}
-
-	// name not found as a tier or role
-	return nil, "", false
 }
 
 // isExemptPath checks if a given request path is exempt from authentication checks
@@ -673,7 +705,7 @@ func (a *AuthService) isExemptPath(path string) bool {
 		if len(route) > 1 && route[len(route)-1] == '/' {
 			route = route[:len(route)-1]
 		}
-		if path == route && a.Config.DebugMode {
+		if path == route && DebugMode {
 			a.Logger.Printf("Path '%s' is exempt (exact match: '%s')", path, route)
 			return true
 		}
@@ -684,7 +716,7 @@ func (a *AuthService) isExemptPath(path string) bool {
 
 	// Check prefix matches
 	for _, prefix := range a.Config.ExemptPrefixes {
-		if strings.HasPrefix(path, prefix) && a.Config.DebugMode {
+		if strings.HasPrefix(path, prefix) && DebugMode {
 			a.Logger.Printf("Path '%s' is exempt (prefix match: '%s')", path, prefix)
 			return true
 		}
@@ -696,7 +728,7 @@ func (a *AuthService) isExemptPath(path string) bool {
 	// Check suffix matches
 	cleanedPath := strings.Split(path, "?")[0]
 	for _, suffix := range a.Config.ExemptSuffixes {
-		if strings.HasSuffix(cleanedPath, suffix) && a.Config.DebugMode {
+		if strings.HasSuffix(cleanedPath, suffix) && DebugMode {
 			a.Logger.Printf("Path '%s' is exempt (suffix match: '%s')", path, suffix)
 			return true
 		}
@@ -707,25 +739,6 @@ func (a *AuthService) isExemptPath(path string) bool {
 
 	// If no match found, the path is not exempt
 	return false
-}
-
-// Debug function to print embedded FS structure
-func (a *AuthService) printEmbeddedFS(fsys embed.FS, dir string, indent string) {
-	entries, err := fs.ReadDir(fsys, dir)
-	if err != nil {
-		a.Logger.Printf("%sError reading dir %s: %v", indent, dir, err)
-		return
-	}
-
-	for _, entry := range entries {
-		path := filepath.Join(dir, entry.Name())
-
-		if entry.IsDir() {
-			a.Logger.Printf("%s[DIR] %s", indent, path)
-		} else {
-			a.Logger.Printf("%s[FILE] %s", indent, path)
-		}
-	}
 }
 
 // ============================================================================================
@@ -798,7 +811,7 @@ func (a *AuthService) sendAPISuccess(w http.ResponseWriter, message string, data
 // handleAPIError sends a standardized error API response
 func (a *AuthService) handleAPIError(w http.ResponseWriter, r *http.Request, err AuthError) {
 	// Log internal error details if present and in debug mode
-	if err.Internal != nil && a.Config.DebugMode {
+	if err.Internal != nil && DebugMode {
 		a.logWithContext(r, "API Error Internal (%s - %d): %v", err.Code, err.StatusCode, err.Internal)
 	} else {
 		a.logWithContext(r, "API Error (%s - %d): %s", err.Code, err.StatusCode, err.Message)
@@ -813,70 +826,65 @@ func (a *AuthService) handleAPIError(w http.ResponseWriter, r *http.Request, err
 	})
 }
 
-// setAuthCookies sets the necessary authentication cookies
+// setAuthCookies sets both auth and refresh cookies
 func (a *AuthService) setAuthCookies(w http.ResponseWriter, r *http.Request, token, refreshToken string, rememberMe bool) {
-	// Determine cookie security settings
-	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
-	sameSiteMode := a.getCookieSameSiteMode()
+	// Set auth token
+	var maxAge int
+	var sameSite http.SameSite
 
-	// Set auth token cookie
-	maxAge := 0
 	if rememberMe {
 		maxAge = 30 * 24 * 60 * 60 // 30 days
 	} else {
 		maxAge = 24 * 60 * 60 // 24 hours
 	}
-	a.setCookie(w, "auth_token", token, maxAge, true, isSecure, http.SameSiteLaxMode)
 
-	// Set refresh token with longer expiry
-	refreshMaxAge := 60 * 24 * 60 * 60 // 60 days
-	a.setCookie(w, "refresh_token", refreshToken, refreshMaxAge, true, isSecure, sameSiteMode)
+	if DebugMode {
+		sameSite = http.SameSiteLaxMode
+	} else {
+		sameSite = http.SameSiteStrictMode
+	}
 
-	a.logWithContext(r, "Set auth cookies (MaxAge: %ds, RefreshMaxAge: %ds, Secure: %v, SameSite: %v)",
-		maxAge, refreshMaxAge, isSecure, sameSiteMode)
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+
+	// Set both cookies
+	http.SetCookie(w, &http.Cookie{
+		Name: authTokenCookie, Value: token, Path: "/", Domain: Config.Auth.Domain,
+		MaxAge: maxAge, HttpOnly: true, Secure: isSecure, SameSite: sameSite,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name: refreshTokenCookie, Value: refreshToken, Path: "/", Domain: Config.Auth.Domain,
+		MaxAge: 60 * 24 * 60 * 60, HttpOnly: true, Secure: isSecure, SameSite: sameSite,
+	})
+
+	a.logWithContext(r, "Set auth cookies (auth=%dh, refresh=%dh)", maxAge/3600, 60*24)
 }
 
-// clearAuthCookies removes authentication cookies
+// clearAuthCookies removes all auth cookies
 func (a *AuthService) clearAuthCookies(w http.ResponseWriter, r *http.Request) {
-	// Determine cookie security setting
-	isSecure := r.TLS != nil || !a.Config.DebugMode
-
-	// Remove multiple cookies in one go
-	cookieNames := []string{"auth_token", "refresh_token", "csrf_token"}
-	for _, name := range cookieNames {
-		a.setCookie(w, name, "", -1, name != "csrf_token", isSecure, http.SameSiteLaxMode)
+	var sameSite http.SameSite
+	if DebugMode {
+		sameSite = http.SameSiteLaxMode
+	} else {
+		sameSite = http.SameSiteStrictMode
 	}
 
-	a.logWithContext(r, "Cleared auth cookies (auth_token, refresh_token, csrf_token)")
-}
+	isSecure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 
-// setCookie is a helper function to create and set a cookie
-func (a *AuthService) setCookie(w http.ResponseWriter, name, value string, maxAge int, httpOnly, secure bool, sameSite http.SameSite) {
-	cookie := &http.Cookie{
-		Name:     name,
-		Value:    value,
-		Path:     "/",
-		Domain:   Config.Auth.Domain,
-		HttpOnly: httpOnly,
-		MaxAge:   maxAge,
-		Secure:   secure,
-		SameSite: sameSite,
+	// Cookie deletion properties
+	expiredCookie := func(name string, httpOnly bool) *http.Cookie {
+		return &http.Cookie{
+			Name: name, Value: "", Path: "/", Domain: Config.Auth.Domain,
+			MaxAge: -1, Expires: time.Unix(0, 0),
+			HttpOnly: httpOnly, Secure: isSecure, SameSite: sameSite,
+		}
 	}
+	// Clear all auth cookies
+	http.SetCookie(w, expiredCookie(authTokenCookie, true))
+	http.SetCookie(w, expiredCookie(refreshTokenCookie, true))
+	http.SetCookie(w, expiredCookie(csrfTokenCookie, true))
 
-	// Set expires time if removing cookie
-	if maxAge < 0 {
-		cookie.Expires = time.Unix(0, 0)
-	}
-
-	http.SetCookie(w, cookie)
-}
-
-// getCookieSameSiteMode returns the appropriate SameSite mode based on configuration
-func (a *AuthService) getCookieSameSiteMode() http.SameSite {
-	if a.Config.DebugMode {
-		return http.SameSiteLaxMode
-	}
-	return http.SameSiteStrictMode
+	a.logWithContext(r, "Cleared auth cookies")
 }
 
 // parseAndValidateRequest is a generic helper for parsing and validating JSON requests
@@ -921,7 +929,7 @@ func (a *AuthService) performSupabaseAuth(ctx context.Context, email, password s
 		})
 
 		if err != nil {
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.Logger.Printf("[DEBUG] Supabase authentication failed for %s: %v", maskEmail(email), err)
 			}
 
@@ -1059,17 +1067,20 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	a.logWithContext(r, "[DEBUG] LoginAPI: CSRF token generated.")
 	a.setAuthCookies(w, r, authResponse.AccessToken, authResponse.RefreshToken, req.Remember)
-	a.setCSRFCookie(w, r, csrfToken)
-
-	a.logWithContext(r, "[DEBUG] LoginAPI: Finished attempting to set cookies.")
 
 	expiresAt := time.Now().Add(time.Duration(authResponse.ExpiresIn) * time.Second).Unix()
+
 	userResponseData := UserResponse{
 		UserId:    userInfo.ID,
 		Email:     userInfo.Email,
 		Tier:      getTierFromUser(userInfo),
+		Role:      "",
 		ExpiresAt: expiresAt,
 		CSRFToken: csrfToken,
+	}
+	banUser, found := a.getUserByID(userInfo.ID)
+	if found {
+		userResponseData.Role = banUser.UserData.Role
 	}
 
 	a.logWithContext(r, "LoginAPI successful for %s (Tier: %s, Role: %s)", maskEmail(req.Email), userResponseData.Tier, userResponseData.Role)
@@ -1211,7 +1222,6 @@ func (a *AuthService) RefreshTokenAPI(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	a.setCSRFCookie(w, r, csrfToken)
 
 	// Calculate expiry time
 	expiresAt := time.Now().Add(time.Duration(newSession.ExpiresIn) * time.Second).Unix()
@@ -1289,8 +1299,6 @@ func (a *AuthService) GetUserAPI(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	a.setCSRFCookie(w, r, csrfToken)
-
 	// Estimate session expiry
 	expiresAt := time.Now().Add(24 * time.Hour).Unix()
 	if authCookie, err := r.Cookie("auth_token"); err == nil && authCookie.Value != "" {
@@ -1457,27 +1465,32 @@ func (a *AuthService) RequestLogger(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// RateLimitAuth middleware applies rate limiting based on IP address for auth-related actions
-func (a *AuthService) RateLimitAuth(limiter *rate.Limiter) Middleware {
+// RateLimitAuth middleware applies rate limiting based
+func (a *AuthService) RateLimitAuth(limiter *rateLimiter) Middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			// Extract client IP once
-			ip := getClientIP(r)
+			// Extract client IP
+			userIP, err := IpAddress(r)
+			if err != nil {
+				a.logWithContext(r, "[ERROR] Failed to extract IP address: %v", err)
+				a.handleAPIError(w, r, ErrServerError)
+				return
+			}
+			ipString := userIP.String()
 
-			// Check endpoint-specific limiter first (most restrictive)
-			if !limiter.Allow() {
-				if a.Config.DebugMode {
-					a.logWithContext(r, "[DEBUG] Rate limit exceeded for endpoint %s", r.URL.Path)
+			// Check endpoint-specific limiter first
+			if !limiter.Allow(ipString) {
+				if DebugMode {
+					a.logWithContext(r, "[DEBUG] Endpoint rate limit exceeded for %s on %s", ipString, r.URL.Path)
 				}
 				a.handleAPIError(w, r, ErrRateLimitExceeded)
 				return
 			}
 
-			// Then check IP-based general limiter
-			ipLimiter := a.getIPLimiter(ip)
-			if !ipLimiter.Allow() {
-				if a.Config.DebugMode {
-					a.logWithContext(r, "[DEBUG] IP-based rate limit exceeded for %s on %s", ip, r.URL.Path)
+			// Check user-specific limiter
+			if !limiter.Allow(ipString) {
+				if DebugMode {
+					a.logWithContext(r, "[DEBUG] User rate limit exceeded for %s on %s", ipString, r.URL.Path)
 				}
 				a.handleAPIError(w, r, ErrRateLimitExceeded)
 				return
@@ -1489,45 +1502,18 @@ func (a *AuthService) RateLimitAuth(limiter *rate.Limiter) Middleware {
 	}
 }
 
-// getIPLimiter retrieves or creates a rate limiter for a specific IP address
-func (a *AuthService) getIPLimiter(ip string) *rate.Limiter {
-	// Default rate: 20 requests per 2 seconds (100ms interval)
-	const defaultRate = 100 * time.Millisecond
-	const defaultBurst = 20
-
-	// Get existing limiter or create a new one
-	limiterI, _ := a.IPLimiters.LoadOrStore(ip, rate.NewLimiter(rate.Every(defaultRate), defaultBurst))
-	return limiterI.(*rate.Limiter)
-}
-
-// getStringFromMetadata safely gets a string from metadata
-func getStringFromMetadata(metadata map[string]interface{}, key, defaultValue string) string {
-	if metadata == nil {
-		return defaultValue
-	}
-
-	if value, ok := metadata[key].(string); ok && value != "" {
-		return value
-	}
-
-	return defaultValue
-}
-
-// calculateExpiresAt calculates the expiration time for a token
-func calculateExpiresAt(createdAt time.Time, duration time.Duration) int64 {
-	return createdAt.Add(duration).Unix()
-}
-
 // AuthContext middleware attempts to authenticate the user via cache, refresh, or token validation
 func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var finalSessionData *UserSession
 		ctx := r.Context()
 
+		justRefreshed := false
+
 		// Extract auth token from request
 		token := extractAuthToken(r)
 		if token == "" {
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.logWithContext(r, "[DEBUG] AuthContext: No auth token found in request.")
 			}
 			// Proceed without user context if no token is present
@@ -1538,7 +1524,7 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 		// Extract user ID from token
 		userID := extractUserIDFromToken(token)
 		if userID == "" {
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.logWithContext(r, "[DEBUG] AuthContext: Could not extract UserID from token.")
 			}
 			a.clearAuthCookies(w, r)
@@ -1547,12 +1533,12 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		// Try to get user session from cache
-		cachedSession, found := getUserSessionFromCache(userID)
+		cachedSession, found := a.SessionCache.Get(userID)
 		if found && cachedSession.Tokens != nil &&
 			cachedSession.Tokens.RefreshToken != nil &&
 			cachedSession.Tokens.RefreshToken.Token != "" {
 
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.logWithContext(r, "[DEBUG] AuthContext: Found session in cache for user %s", maskID(userID))
 			}
 
@@ -1563,7 +1549,7 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 			}
 
 			// Attempt to refresh tokens
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.logWithContext(r, "[DEBUG] AuthContext: Attempting token refresh for cached user %s", maskID(userID))
 			}
 
@@ -1575,50 +1561,52 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 				finalSessionData = createSession(&newSession.User, newSession.AccessToken, newSession.RefreshToken, newSession.ExpiresIn, a, r)
 
 				if finalSessionData != nil {
-					cacheUserSession(finalSessionData)
-					if a.Config.DebugMode {
+					a.SessionCache.Set(finalSessionData)
+					if DebugMode {
 						a.logWithContext(r, "[DEBUG] AuthContext: Successfully refreshed and cached session for user %s (Role: %s)",
 							maskID(userID), finalSessionData.User.Role)
 					}
-
-					// Add session to context and proceed
-					ctx = context.WithValue(ctx, userContextKey, finalSessionData)
-					next(w, r.WithContext(ctx))
+					justRefreshed = true
+					// redirect after refresh to render correct navbar
+					http.Redirect(w, r, r.URL.String(), http.StatusFound)
 					return
 				}
 			} else {
 				// Refresh failed
-				if a.Config.DebugMode {
+				if DebugMode {
 					logMsg := "[DEBUG] AuthContext: Refresh failed for cached session %s."
 					if err != nil {
 						logMsg += " Error: " + err.Error()
 					}
 					a.logWithContext(r, logMsg, maskID(userID))
 				}
-				removeSessionFromCache(userID)
+				a.SessionCache.Delete(userID)
 			}
 		} else if found {
 			// Cache hit, but no refresh token
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.logWithContext(r, "[DEBUG] AuthContext: Session found in cache for %s but no refresh token. Forcing validation.", maskID(userID))
 			}
-			removeSessionFromCache(userID) // Remove incomplete cache entry
+			a.SessionCache.Delete(userID) // Remove incomplete cache entry
 		}
 
 		// If we reached here, we need to validate the token
 		validatedUser, valid := validateAuthToken(a, ctx, token)
 		if !valid || validatedUser == nil {
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.logWithContext(r, "[DEBUG] AuthContext: Token validation failed or returned nil user.")
 			}
-			a.clearAuthCookies(w, r)
-			removeSessionFromCache(userID)
+			if !justRefreshed {
+				a.clearAuthCookies(w, r)
+				a.SessionCache.Delete(userID)
+			}
 			next(w, r.WithContext(ctx))
 			return
 		}
 
 		// Validation successful
 		finalSessionData = createSession(validatedUser, token, "", 0, a, r)
+
 		if finalSessionData == nil {
 			a.logWithContext(r, "[ERROR] AuthContext: Failed to create session data after validation for user %s.", maskID(userID))
 			a.clearAuthCookies(w, r)
@@ -1626,8 +1614,69 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		// Add session to context and proceed
+		a.SessionCache.Set(finalSessionData)
 		ctx = context.WithValue(ctx, userContextKey, finalSessionData)
 		next(w, r.WithContext(ctx))
+	}
+}
+
+// AuthRequired middleware enforces authentication for protected routes
+func (a *AuthService) AuthRequired(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		// Fast path: check for exempt paths
+		if a.isExemptPath(path) {
+			if DebugMode {
+				a.logWithContext(r, "[DEBUG] AuthRequired: Path exempt from enforcement: %s", path)
+			}
+			next(w, r)
+			return
+		}
+
+		if DebugMode {
+			a.logWithContext(r, "[DEBUG] AuthRequired: Enforcing auth for path: %s", path)
+		}
+
+		// Get user session from context
+		userSession := getUserSessionFromContext(r)
+		if userSession == nil {
+			if DebugMode {
+				a.logWithContext(r, "[DEBUG] AuthRequired: No valid session for path %s", path)
+			}
+			a.handleAPIError(w, r, ErrMissingToken)
+			return
+		}
+
+		// Check user permissions for this route
+		requiredPermission := a.findRequiredPermission(path)
+		if requiredPermission == "" {
+			// No specific permission needed for this path, just auth is enough
+			if DebugMode {
+				a.logWithContext(r, "[DEBUG] AuthRequired: No specific permission needed for %s", path)
+			}
+			next(w, r.WithContext(r.Context()))
+			return
+		}
+
+		// Check if user has required permission
+		if !a.hasPermission(userSession, requiredPermission) {
+			// User doesn't have required permission
+			if DebugMode {
+				userID := getUserID(userSession)
+				a.logWithContext(r, "[DEBUG] AuthRequired: Permission DENIED for user %s on path %s (requires %s)",
+					userID, path, requiredPermission)
+			}
+			a.handleAPIError(w, r, ErrPermissionDenied)
+			return
+		}
+
+		// User has permission, proceed
+		if DebugMode {
+			userID := getUserID(userSession)
+			a.logWithContext(r, "[DEBUG] AuthRequired: Permission GRANTED for user %s on path %s", userID, path)
+		}
+		next(w, r.WithContext(r.Context()))
 	}
 }
 
@@ -1645,7 +1694,7 @@ func createSession(user *supabase.User, accessToken, refreshToken string, expire
 	if found {
 		authRole = banUser.UserData.Role
 		authTier = banUser.UserData.Tier
-		if a.Config.DebugMode {
+		if DebugMode {
 			a.logWithContext(r, "[DEBUG] AuthContext: User %s found in BAN ACL, using Role: %s, Tier: %s",
 				maskID(user.ID), authRole, authTier)
 		}
@@ -1669,7 +1718,7 @@ func createSession(user *supabase.User, accessToken, refreshToken string, expire
 	session := &UserSession{
 		UserId: user.ID,
 		Tokens: &AuthTokens{
-			AccessToken: &AuthToken{
+			AccessToken: &AccessToken{
 				Token:     accessToken,
 				ExpiresAt: calculateExpiresAt(time.Now(), time.Duration(expiresIn)*time.Second),
 			},
@@ -1698,7 +1747,7 @@ func createSession(user *supabase.User, accessToken, refreshToken string, expire
 	if accessToken != "" {
 		expires := time.Now().Add(time.Duration(expiresIn) * time.Second).Unix()
 		session.Tokens = &AuthTokens{
-			AccessToken: &AuthToken{Token: accessToken, ExpiresAt: expires},
+			AccessToken: &AccessToken{Token: accessToken, ExpiresAt: expires},
 		}
 
 		if refreshToken != "" {
@@ -1713,66 +1762,6 @@ func createSession(user *supabase.User, accessToken, refreshToken string, expire
 		}
 	}
 	return session
-}
-
-// AuthRequired middleware enforces authentication for protected routes
-func (a *AuthService) AuthRequired(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		// Fast path: check for exempt paths
-		if a.isExemptPath(path) {
-			if a.Config.DebugMode {
-				a.logWithContext(r, "[DEBUG] AuthRequired: Path exempt from enforcement: %s", path)
-			}
-			next(w, r)
-			return
-		}
-
-		if a.Config.DebugMode {
-			a.logWithContext(r, "[DEBUG] AuthRequired: Enforcing auth for path: %s", path)
-		}
-
-		// Get user session from context
-		userSession := getUserSessionFromContext(r)
-		if userSession == nil {
-			if a.Config.DebugMode {
-				a.logWithContext(r, "[DEBUG] AuthRequired: No valid session for path %s", path)
-			}
-			a.handleAPIError(w, r, ErrMissingToken)
-			return
-		}
-
-		// Check user permissions for this route
-		requiredPermission := a.findRequiredPermission(path)
-		if requiredPermission == "" {
-			// No specific permission needed for this path, just auth is enough
-			if a.Config.DebugMode {
-				a.logWithContext(r, "[DEBUG] AuthRequired: No specific permission needed for %s", path)
-			}
-			next(w, r.WithContext(r.Context()))
-			return
-		}
-
-		// Check if user has required permission
-		if !a.hasPermission(userSession, requiredPermission) {
-			// User doesn't have required permission
-			if a.Config.DebugMode {
-				userID := getUserID(userSession)
-				a.logWithContext(r, "[DEBUG] AuthRequired: Permission DENIED for user %s on path %s (requires %s)",
-					userID, path, requiredPermission)
-			}
-			a.handleAPIError(w, r, ErrPermissionDenied)
-			return
-		}
-
-		// User has permission, proceed
-		if a.Config.DebugMode {
-			userID := getUserID(userSession)
-			a.logWithContext(r, "[DEBUG] AuthRequired: Permission GRANTED for user %s on path %s", userID, path)
-		}
-		next(w, r.WithContext(r.Context()))
-	}
 }
 
 // findRequiredPermission finds the permission key required for a path
@@ -1801,7 +1790,7 @@ func (a *AuthService) hasPermission(userSession *UserSession, permission string)
 		return true
 	}
 
-	if a.Config.DebugMode {
+	if DebugMode {
 		if userSession.User != nil {
 			a.Logger.Printf("[DEBUG] hasPermission: User %s (Role: %s) lacks permission '%s'",
 				maskEmail(userSession.User.Email), userSession.User.Role, permission)
@@ -1859,7 +1848,7 @@ func (a *AuthService) SpoofMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if err != nil || spoofCookie.Value == "" {
 			// No spoofing active, ensure flag is cleared if needed
 			if originalUserSession.Metadata["is_impersonating"] == true {
-				clearImpersonation(w, r, ctx, originalUserSession, next, a)
+				clearImpersonation(w, r, ctx, originalUserSession, next)
 				return
 			}
 			// Normal admin session
@@ -1869,7 +1858,7 @@ func (a *AuthService) SpoofMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		// Admin is attempting to spoof another user
 		targetEmail := spoofCookie.Value
-		if a.Config.DebugMode {
+		if DebugMode {
 			adminEmail := getEmailSafe(originalUserSession)
 			a.logWithContext(r, "[DEBUG] SpoofMiddleware: Admin %s attempting to spoof %s", adminEmail, targetEmail)
 		}
@@ -1877,22 +1866,14 @@ func (a *AuthService) SpoofMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Find target user in BanACL
 		targetBanUser, targetFound := a.getUserByEmail(targetEmail)
 		if !targetFound {
-			handleTargetNotFound(w, r, ctx, originalUserSession, targetEmail, next, a)
+			handleTargetNotFound(w, r, ctx, originalUserSession, targetEmail, next)
 			return
 		}
 
 		// Create spoofed session
-		ctx = createSpoofedSession(ctx, originalUserSession, targetBanUser, targetEmail, a)
+		ctx = createSpoofedSession(ctx, originalUserSession, targetBanUser, targetEmail)
 		next(w, r.WithContext(ctx))
 	}
-}
-
-// isAdmin checks if user has admin privileges
-func isAdmin(session *UserSession) bool {
-	if session == nil {
-		return false
-	}
-	return session.User.Role == "admin" || session.User.Role == "root"
 }
 
 // getEmailSafe safely gets user email for logging
@@ -1950,7 +1931,7 @@ func (a *AuthService) handleAuthAsset(w http.ResponseWriter, r *http.Request) {
 		default:
 			contentType = "application/octet-stream" // Fallback for truly unknown types
 			// Log if defaulting for a non-_next asset
-			if !isNextAsset && a.Config.DebugMode {
+			if !isNextAsset && DebugMode {
 				a.logWithContext(r, "[DEBUG] handleAuthAsset: Unknown content type for '%s', defaulting to octet-stream", ext)
 			}
 		}
@@ -1979,7 +1960,7 @@ func (a *AuthService) handleAuthAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if a.Config.DebugMode && !isNextAsset {
+	if DebugMode && !isNextAsset {
 		a.logWithContext(r, "[DEBUG] handleAuthAsset: Successfully served: %s -> %s", requestPath, fsPath)
 	}
 	w.WriteHeader(http.StatusOK)
@@ -2036,7 +2017,7 @@ func extractAuthToken(r *http.Request) string {
 // Helper function to validate token
 func validateAuthToken(a *AuthService, ctx context.Context, token string) (*supabase.User, bool) {
 	if token == "" {
-		if a.Config.DebugMode {
+		if DebugMode {
 			a.Logger.Printf("[DEBUG] validateAuthToken: Empty token provided")
 		}
 		return nil, false
@@ -2045,7 +2026,7 @@ func validateAuthToken(a *AuthService, ctx context.Context, token string) (*supa
 	// Check token format
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		if a.Config.DebugMode {
+		if DebugMode {
 			a.Logger.Printf("[DEBUG] validateAuthToken: Invalid token format")
 		}
 		return nil, false
@@ -2059,25 +2040,25 @@ func validateAuthToken(a *AuthService, ctx context.Context, token string) (*supa
 	user, err := a.Supabase.Auth.User(validateCtx, token)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "expired") {
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.Logger.Printf("[DEBUG] validateAuthToken: Token expired")
 			}
 			return nil, false
 		}
-		if a.Config.DebugMode {
+		if DebugMode {
 			a.Logger.Printf("[DEBUG] validateAuthToken: Token validation failed: %v", err)
 		}
 		return nil, false
 	}
 
 	if user == nil {
-		if a.Config.DebugMode {
+		if DebugMode {
 			a.Logger.Printf("[DEBUG] validateAuthToken: Token validated but user object is nil")
 		}
 		return nil, false
 	}
 
-	if a.Config.DebugMode {
+	if DebugMode {
 		a.Logger.Printf("[DEBUG] validateAuthToken: Valid user found via token: %s (ID: %s)",
 			maskEmail(user.Email), maskID(user.ID))
 	}
@@ -2085,179 +2066,28 @@ func validateAuthToken(a *AuthService, ctx context.Context, token string) (*supa
 	return user, true
 }
 
-// ==============================================================================
-// session cache
-// ==============================================================================
-
-// getUserSessionFromCache retrieves a valid session from cache or returns nil if not found/expired
-func getUserSessionFromCache(userID string) (*UserSession, bool) {
-	userSessionCacheMutex.RLock()
-	session, found := userSessionCache[userID]
-	userSessionCacheMutex.RUnlock()
-
-	if !found {
-		return nil, false
+// getStringFromMetadata safely gets a string from metadata
+func getStringFromMetadata(metadata map[string]interface{}, key, defaultValue string) string {
+	if metadata == nil {
+		return defaultValue
 	}
 
-	// Check if session is expired
-	if time.Since(session.CreatedAt) > sessionCacheTTL {
-		// Remove expired session
-		userSessionCacheMutex.Lock()
-		delete(userSessionCache, userID)
-		userSessionCacheMutex.Unlock()
-		return nil, false
+	if value, ok := metadata[key].(string); ok && value != "" {
+		return value
 	}
 
-	// Return a deep copy to prevent race conditions
-	return deepCopySession(session), true
+	return defaultValue
 }
 
-// deepCopySession creates a deep copy of a UserSessio
-func deepCopySession(src *UserSession) *UserSession {
-	if src == nil {
-		return nil
-	}
-
-	// Copy tokens
-	var tokensCopy *AuthTokens
-	if src.Tokens != nil {
-		tokensCopy = &AuthTokens{
-			CSRFToken: src.Tokens.CSRFToken,
-		}
-		if src.Tokens.AccessToken != nil {
-			tokensCopy.AccessToken = &AuthToken{
-				Token:     src.Tokens.AccessToken.Token,
-				ExpiresAt: src.Tokens.AccessToken.ExpiresAt,
-			}
-		}
-		if src.Tokens.RefreshToken != nil {
-			tokensCopy.RefreshToken = &RefreshToken{
-				Token:     src.Tokens.RefreshToken.Token,
-				ExpiresAt: src.Tokens.RefreshToken.ExpiresAt,
-			}
-		}
-	}
-
-	// Copy user data
-	var userCopy *UserData
-	if src.User != nil {
-		userCopy = &UserData{
-			UserId: src.User.UserId,
-			Email:  src.User.Email,
-			Role:   src.User.Role,
-			Tier:   src.User.Tier,
-		}
-	}
-
-	// Copy permissions
-	permsCopy := make(map[string]interface{}, len(src.Permissions))
-	for k, v := range src.Permissions {
-		permsCopy[k] = v
-	}
-
-	// Copy metadata
-	metaCopy := make(map[string]interface{}, len(src.Metadata))
-	for k, v := range src.Metadata {
-		metaCopy[k] = v
-	}
-
-	return &UserSession{
-		UserId:      src.UserId,
-		Tokens:      tokensCopy,
-		User:        userCopy,
-		Permissions: permsCopy,
-		Metadata:    metaCopy,
-		CreatedAt:   src.CreatedAt,
-	}
+// calculateExpiresAt calculates the expiration time for a token
+func calculateExpiresAt(createdAt time.Time, duration time.Duration) int64 {
+	return createdAt.Add(duration).Unix()
 }
 
-// cacheUserSession adds or updates a session in the cache
-func cacheUserSession(session *UserSession) {
-	if session == nil || session.UserId == "" {
-		return
+// getSessionUserEmail safely retrieves the masked email from a UserSession for logging
+func getSessionUserEmail(userSession *UserSession) string {
+	if userSession != nil && userSession.User != nil {
+		return maskEmail(userSession.User.Email)
 	}
-
-	userSessionCacheMutex.Lock()
-	defer userSessionCacheMutex.Unlock()
-
-	// Store a deep copy to prevent race conditions
-	userSessionCache[session.UserId] = deepCopySession(session)
-
-	// Start the background cache cleaner if not already running
-	cacheCleanerStarted.Do(startCacheCleaner)
-}
-
-// startCacheCleaner starts a background goroutine to periodically clean the session cache
-func startCacheCleaner() {
-	go func() {
-		ticker := time.NewTicker(cacheCleanInterval)
-		defer ticker.Stop()
-
-		for range ticker.C {
-			cleanSessionCache()
-		}
-	}()
-}
-
-// cleanSessionCache removes expired sessions and enforces cache size limits
-func cleanSessionCache() {
-	userSessionCacheMutex.Lock()
-	defer userSessionCacheMutex.Unlock()
-
-	// Track expired sessions and creation times for age-based cleanup
-	var expiredKeys []string
-	sessionAges := make(map[string]time.Time, len(userSessionCache))
-
-	// Find expired sessions
-	now := time.Now()
-	for key, session := range userSessionCache {
-		sessionAges[key] = session.CreatedAt
-		if now.Sub(session.CreatedAt) > sessionCacheTTL {
-			expiredKeys = append(expiredKeys, key)
-		}
-	}
-
-	// Remove expired sessions
-	for _, key := range expiredKeys {
-		delete(userSessionCache, key)
-		delete(sessionAges, key)
-	}
-
-	// If still over size limit, remove oldest sessions
-	if len(userSessionCache) > sessionCacheMaxSize {
-		// Convert to slice for sorting
-		type sessionAge struct {
-			key string
-			age time.Time
-		}
-		ages := make([]sessionAge, 0, len(sessionAges))
-		for k, v := range sessionAges {
-			ages = append(ages, sessionAge{k, v})
-		}
-
-		// Sort by age (oldest first)
-		sort.Slice(ages, func(i, j int) bool {
-			return ages[i].age.Before(ages[j].age)
-		})
-
-		// Remove oldest entries until we're under the limit
-		for i := 0; i < len(ages) && len(userSessionCache) > sessionCacheMaxSize; i++ {
-			delete(userSessionCache, ages[i].key)
-		}
-	}
-}
-
-// Helper to remove a session from cache
-func removeSessionFromCache(userID string) {
-	userSessionCacheMutex.Lock()
-	defer userSessionCacheMutex.Unlock()
-
-	delete(userSessionCache, userID)
-}
-
-// CustomRoleClient creates a new supabase client with a custom role
-func CustomRoleClient(url, key, roleName string) (*supabase.Client, error) {
-	client := supabase.CreateClient(url, key)
-	client.DB.AddHeader("x-postgres-role", roleName)
-	return client, nil
+	return "<nil user in session>"
 }

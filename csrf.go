@@ -2,12 +2,12 @@ package main
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -69,7 +69,8 @@ func NewCSRF(filePath string, logger *log.Logger) (*CSRF, error) {
 	if errGen != nil {
 		return nil, fmt.Errorf("failed to generate new CSRF secret for file '%s': %w", csrf.filePath, errGen)
 	}
-	csrf.secret = newSecret // Assign the generated secret to the instance
+	// Assign the generated secret to the instance
+	csrf.secret = newSecret
 
 	if errSave := csrf.saveSecret(csrf.filePath, csrf.secret); errSave != nil {
 		return nil, fmt.Errorf("failed to save newly generated CSRF secret to file '%s': %w", csrf.filePath, errSave)
@@ -127,7 +128,7 @@ func (f *CSRF) saveSecret(filepath string, secret string) error {
 	return nil
 }
 
-// RotateSecret rotates the CSRF secret periodically.
+// RotateSecret rotates the CSRF secret periodically
 func (f *CSRF) RotateSecret(interval time.Duration) {
 	if f.filePath == "" {
 		f.logger.Println("[ERROR] RotateSecret called but filePath is unexpectedly empty. Rotation disabled.")
@@ -135,24 +136,20 @@ func (f *CSRF) RotateSecret(interval time.Duration) {
 	}
 
 	go func() {
-		// Add a small initial random delay to prevent thundering herd if multiple instances start simultaneously
-		randDelay := time.Duration(rand.Intn(5000)) * time.Millisecond
-		time.Sleep(5*time.Second + randDelay) // Initial delay + jitter
+		time.Sleep(5 * time.Second) // Initial delay
 
 		f.logger.Printf("[INFO] CSRF rotation check loop started. Interval: %v", interval)
 
 		for { // Main rotation check loop
 			f.logger.Printf("[DEBUG] Rotation loop iteration starting.") // Log loop start
 
-			// Read the secret currently held by the CSRF instance
 			fullSecret := f.secret
 			if fullSecret == "" {
 				f.logger.Printf("[ERROR] Instance secret (f.secret) is empty in rotation loop. Skipping check.")
-				time.Sleep(interval) // Wait before retrying
+				time.Sleep(interval)
 				continue
 			}
 
-			// --- Check format and timestamp ---
 			parts := strings.SplitN(fullSecret, ":", 2)
 			var ts int64
 			var parseErr error // Renamed from err for clarity
@@ -163,9 +160,8 @@ func (f *CSRF) RotateSecret(interval time.Duration) {
 				timestampStr = parts[1] // Get the string part
 				ts, parseErr = strconv.ParseInt(timestampStr, 10, 64)
 				if parseErr != nil {
-					// +++ CRITICAL LOGGING +++
 					f.logger.Printf("[ERROR] Failed to parse timestamp '%s' from secret string '%s' in rotation check: %v", timestampStr, fullSecret, parseErr)
-					validFormat = false // Treat as invalid format if timestamp parsing fails
+					validFormat = false
 				}
 			} else {
 				f.logger.Printf("[ERROR] Invalid secret format (expected 'base64:timestamp') found in rotation check: '%s'", fullSecret)
@@ -183,13 +179,11 @@ func (f *CSRF) RotateSecret(interval time.Duration) {
 				elapsed := time.Since(secretTime)
 				f.logger.Printf("[DEBUG] Checking secret age: %v (Timestamp: %s, Parsed Unix: %d)", elapsed, timestampStr, ts)
 
-				if elapsed >= interval { // Use >= for safety
+				if elapsed >= interval {
 					f.logger.Printf("[INFO] CSRF secret age: %v (>= interval %v), rotating now.", elapsed, interval)
 					rotateNow = true
 				} else {
-					// Secret is still fresh, wait until it's time to rotate
 					waitTime = interval - elapsed
-					// Only log wait time if it's significant to avoid spam
 					if waitTime > 1*time.Minute {
 						f.logger.Printf("[INFO] CSRF secret age: %v, still fresh. Next check in approx %v.", elapsed, waitTime)
 					} else {
@@ -201,10 +195,9 @@ func (f *CSRF) RotateSecret(interval time.Duration) {
 			if !rotateNow {
 				f.logger.Printf("[DEBUG] Not rotating now, sleeping for %v.", waitTime)
 				time.Sleep(waitTime)
-				continue // Continue to the next loop iteration after waiting
+				continue
 			}
 
-			// --- Rotation Logic ---
 			f.logger.Printf("[INFO] Performing CSRF secret rotation...")
 			newSecretString, errGen := generateNewSecretString(32)
 			if errGen != nil {
@@ -216,18 +209,15 @@ func (f *CSRF) RotateSecret(interval time.Duration) {
 
 			// Update the instance's secret *before* saving
 			f.secret = newSecretString
-			f.logger.Printf("[DEBUG] Generated new secret string: %s...", newSecretString[:10]) // Log partial new secret
+			f.logger.Printf("[DEBUG] Generated new secret string: %s...", newSecretString[:10])
 
 			// Save the new secret using the instance's method
 			if errSave := f.saveSecret(f.filePath, f.secret); errSave != nil {
 				f.logger.Printf("[ERROR] Failed to save new CSRF secret during rotation to '%s': %v", f.filePath, errSave)
-				// Consider what to do here. Revert f.secret? For now, just log and retry later.
-				f.logger.Printf("[INFO] Retrying rotation after 1 hour due to save error.")
-				time.Sleep(1 * time.Hour) // Retry after a delay on save error
+				time.Sleep(1 * time.Hour)
 				continue
 			}
-			f.logger.Printf("[DEBUG] Successfully saved new secret to '%s'.", f.filePath) // Confirmation of save success
-			// --- End Rotation Logic ---
+			f.logger.Printf("[DEBUG] Successfully saved new secret to '%s'.", f.filePath)
 
 			f.logger.Printf("[INFO] CSRF secret rotated successfully.")
 
@@ -268,9 +258,8 @@ func (a *AuthService) generateCSRFToken(sessionID string) (string, error) {
 	}
 
 	h := hmac.New(sha256.New, key)
-	// Include session ID and a time component
 	h.Write([]byte(sessionID))
-	h.Write([]byte(time.Now().Format("2006-01-02"))) // Daily rotation of token validity
+	h.Write([]byte(time.Now().Format("2006-01-02")))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil)), nil
 }
 
@@ -282,12 +271,10 @@ func (a *AuthService) validateCSRFToken(submittedToken, sessionID string) (bool,
 	}
 
 	h := hmac.New(sha256.New, key)
-	// Recreate the expected token using the same data
 	h.Write([]byte(sessionID))
-	h.Write([]byte(time.Now().Format("2006-01-02"))) // Use the same time component
+	h.Write([]byte(time.Now().Format("2006-01-02")))
 	expectedToken := base64.StdEncoding.EncodeToString(h.Sum(nil))
 
-	// Use hmac.Equal for constant-time comparison to prevent timing attacks
 	return hmac.Equal([]byte(submittedToken), []byte(expectedToken)), nil
 }
 
@@ -302,11 +289,9 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 
 		// Get user session from context
 		userSession := getUserSessionFromContext(r)
-		// If no user session, we cannot validate CSRF token bound to a user.
-		// This assumes CSRF protection is only for authenticated users.
 		if userSession == nil || userSession.User == nil {
 			a.logWithContext(r, "CSRFProtection: No valid user session found for non-exempt path %s %s, cannot validate CSRF.", r.Method, r.URL.Path)
-			a.handleAPIError(w, r, ErrInvalidToken) // Or perhaps a more generic bad request/forbidden
+			a.handleAPIError(w, r, ErrInvalidToken)
 			return
 		}
 
@@ -322,12 +307,11 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 		valid, err := a.validateCSRFToken(submittedToken, userSession.UserId)
 		if err != nil {
 			a.logWithContext(r, "CSRFProtection: Error validating CSRF token for user %s on %s %s: %v", maskID(userSession.UserId), r.Method, r.URL.Path, err)
-			a.handleAPIError(w, r, ErrCSRFValidation) // Use ErrCSRFValidation for validation errors
+			a.handleAPIError(w, r, ErrCSRFValidation)
 			return
 		}
 		if !valid {
-			// IMPORTANT: Avoid logging the submitted token directly in production logs
-			if a.Config.DebugMode {
+			if DebugMode {
 				a.logWithContext(r, "[DEBUG] CSRF Token Validation Failed for user %s on %s %s. Token mismatch.", maskID(userSession.UserId), r.Method, r.URL.Path)
 			} else {
 				a.logWithContext(r, "CSRF Token Validation Failed for user %s on %s %s.", maskID(userSession.UserId), r.Method, r.URL.Path)
@@ -335,26 +319,15 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 			a.handleAPIError(w, r, ErrCSRFValidation)
 			return
 		}
-
 		// Token is valid, continue
 		a.logWithContext(r, "[DEBUG] CSRF token validated successfully for user %s on %s %s.", maskID(userSession.UserId), r.Method, r.URL.Path)
 		next(w, r)
 	}
 }
 
-// setCSRFCookie sets the CSRF token cookie for the frontend to use
-func (a *AuthService) setCSRFCookie(w http.ResponseWriter, r *http.Request, csrfToken string) {
-	isSecure := r.TLS != nil || !a.Config.DebugMode // Use TLS status or debug mode to determine Secure flag
-	// CSRF cookie should be HttpOnly: false so frontend JS can read it
-	a.setCookie(w, "csrf_token", csrfToken, 24*60*60, false, isSecure, http.SameSiteStrictMode) // Set expiry to 24 hours
-	if a.Config.DebugMode {
-		a.logWithContext(r, "[DEBUG] Set CSRF cookie.")
-	}
-}
-
 // getCSRFToken extracts the CSRF token from a request
 func getCSRFToken(r *http.Request) string {
-	// Try header first (common for API requests)
+	// Try header first
 	token := r.Header.Get("X-CSRF-Token")
 	if token != "" {
 		return token
