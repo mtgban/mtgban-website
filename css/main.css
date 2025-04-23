@@ -822,6 +822,7 @@ input:checked + .slider {
   transform: translateX(14px); 
 }
 
+/* Base navbar styles */
 .navbar nav ul {
   list-style-type: none;
   margin: 0;
@@ -829,7 +830,8 @@ input:checked + .slider {
   background-color: var(--navbackground);
   position: fixed;
   top: 0;
-  width: 100%;
+  width: -webkit-fill-available;
+  width: -moz-available;
   height: auto; 
   z-index: 100;
   display: flex; 
@@ -850,16 +852,101 @@ input:checked + .slider {
   margin-right: 15px; 
 }
 
-.navbar nav li.nav-item-auth {
-  margin-left: auto; 
-  display: flex; 
+/* Spacer to push items to the right */
+.nav-item-spacer {
+  flex-grow: 1;
 }
 
+/* Authentication status indicator */
+.auth-status {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.auth-indicator {
+  display: inline-block;
+  font-size: 1.2em;
+  margin-right: 5px;
+}
+
+.auth-logged-in {
+  color: var(--asuccess);
+}
+
+.auth-logged-out {
+  color: var(--navbackground);
+}
+
+.debug-info {
+  font-size: 0.9em;
+  margin-left: 5px;
+  cursor: help;
+}
+
+/* Dropdown styles */
+.nav-item-dropdown {
+  position: relative;
+  margin-right: 10px;
+}
+
+.dropbtn {
+  background-color: transparent;
+  color: var(--activetext);
+  padding: 8px 12px;
+  font-size: 1em;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.dropbtn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown-arrow {
+  font-size: 0.7em;
+  margin-left: 5px;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  right: 0;
+  background-color: var(--background);
+  min-width: 160px;
+  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+  z-index: 1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dropdown-content a {
+  color: var(--activetext);
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.dropdown-content a:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+/* Theme toggle styles */
 .navbar nav li.nav-item-switch {
-  margin-left: 20px; 
+  margin-left: 5px; 
 }
 
-
+/* Regular nav links */
 .navbar nav li a.nav-link {
   display: block; 
   color: var(--activetext);
@@ -872,50 +959,49 @@ input:checked + .slider {
 
 .navbar nav li a.nav-link:hover {
   background-color: rgba(255, 255, 255, 0.1); 
-  color: var(--background); 
 }
 
-
-.navbar nav li a.nav-auth-link {
-  padding: 8px 12px;
-  font-size: 0.9em;
-  border-radius: 4px;
-  text-decoration: none;
-  transition: background-color 0.2s;
-  margin-left: 5px; 
+.nav-link-active {
+  background-color: rgba(255, 255, 255, 0.15);
+  font-weight: bold;
 }
 
-.navbar nav li a.nav-auth-link:hover {
-  background-color: rgba(255, 255, 255, 0.2); 
-}
-
+/* Responsive styles */
 @media (max-width: 768px) { 
   .navbar nav ul {
-      flex-direction: column; 
-      align-items: flex-start; 
-      padding: 10px 20px; 
+    flex-direction: column; 
+    align-items: flex-start; 
+    padding: 10px 20px; 
   }
 
   .navbar nav li {
-      width: 100%; 
-      margin-bottom: 5px; 
+    width: 100%; 
+    margin-bottom: 5px; 
   }
-
-  .navbar nav li.nav-item-auth {
-      margin-left: 0; 
-      flex-direction: column; 
-      align-items: flex-start; 
+  
+  .nav-item-spacer {
+    display: none;
   }
-
-  .navbar nav li.nav-item-auth a.nav-auth-link {
-      margin-left: 0; 
-      margin-bottom: 5px; 
-      width: 100%; 
-      text-align: left; 
+  
+  .auth-status, .nav-item-dropdown, .nav-item-switch {
+    align-self: flex-end;
   }
-
-  .navbar nav li.nav-item-switch {
-      margin-left: 0; 
-      margin-top: 10px; 
+  
+  /* Group authentication elements in mobile view */
+  .auth-status, .nav-item-dropdown {
+    order: 1;
+    margin: 5px 0;
+  }
+  
+  .nav-item-switch {
+    order: 2;
+    margin-top: 10px;
+  }
+  
+  /* Adjust dropdown position in mobile view */
+  .dropdown-content {
+    right: 0;
+    width: 100%;
+    max-width: 200px;
   }
 }

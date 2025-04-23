@@ -2,35 +2,51 @@
 <nav class="navbar">
     <ul>
         <li class="nav-item nav-item-icon">
-            <a {{if not .ShowLogin}}href="/discord"{{else}}style="cursor: default;"{{end}}>
-                <img src="/img/misc/discord.png" width=48 alt="Discord" {{if .ShowLogin}}style="opacity: 0.5;"{{end}}>
+            <a {{if not .ShowLogin}}href="/discord" {{else}}style="cursor: default;" {{end}}>
+                <img src="/img/misc/discord.png" width=48 alt="Discord" {{if .ShowLogin}}style="opacity: 0.5;" {{end}}>
             </a>
         </li>
         {{range .Nav}}
-            <li class="nav-item auth-buttons">
-                <a {{if .Active}}class="nav-link nav-link-active {{.Class}}"{{else}}class="nav-link"{{end}} href="{{.Link}}" >
-                    <span>{{.Short}} {{.Name}}</span>
-                </a>
-            </li>
+        <li class="nav-item auth-buttons">
+            <a {{if .Active}}class="nav-link nav-link-active {{.Class}}" {{else}}class="nav-link" {{end}}
+                href="{{.Link}}">
+                <span>{{.Short}} {{.Name}}</span>
+            </a>
+        </li>
         {{end}}
 
-        <!-- Authentication buttons -->
-        <li class="nav-item nav-item-auth auth-buttons">
-            <a href="#" onclick="subscribe()" class="nav-link nav-auth-link"><span>🔔 Subscribe</span></a>
-            {{if .IsLoggedIn}}
-                <a href="#" onclick="account()" class="nav-link nav-auth-link">👤 Account</a>
-                <a href="#" onclick="logout()" class="nav-link nav-auth-link">🚪 Logout</a>
-            {{else}}
-                <a href="/auth/login/" class="nav-link nav-auth-link">🔑 Login</a>
-                <a href="/auth/signup/" class="nav-link nav-auth-link">✏️ Sign Up</a>
-            {{end}}
+        <li class="nav-item-spacer"></li>
+
+        <li class="nav-item auth-status">
+            <span class="auth-indicator {{if .IsLoggedIn}}auth-logged-in{{else}}auth-logged-out{{end}}"
+                title="{{if .IsLoggedIn}}Logged In{{else}}Not Logged In{{end}}">
+                {{if .IsLoggedIn}}●{{else}}○{{end}}
+            </span>
         </li>
 
-        
+        <li class="nav-item nav-item-dropdown">
+            <div class="dropdown">
+                <button class="dropbtn">
+                    <span class="user-icon">{{if .IsLoggedIn}}👤{{else}}🔑{{end}}</span>
+                    <span class="dropdown-arrow">▼</span>
+                </button>
+                <div class="dropdown-content">
+                    <a href="#" onclick="subscribe()" class="dropdown-item"><span>🔔 Subscribe</span></a>
+                    {{if .IsLoggedIn}}
+                    <a href="#" onclick="account()" class="dropdown-item">👤 Account</a>
+                    <a href="#" onclick="logout()" class="dropdown-item">🚪 Logout</a>
+                    {{else}}
+                    <a href="/auth/login/" class="dropdown-item">🔑 Login</a>
+                    <a href="/auth/signup/" class="dropdown-item">✏️ Sign Up</a>
+                    {{end}}
+                </div>
+            </div>
+        </li>
+
         <li class="nav-item nav-item-switch">
             <label class="switch">
                 <div>
-                    <input type="checkbox"/>
+                    <input type="checkbox" />
                     <span class="slider" title="Nightbound"></span>
                 </div>
                 <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
