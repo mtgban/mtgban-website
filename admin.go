@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -68,16 +67,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	var isAdmin bool
-	if userSession := r.Context().Value(userContextKey); userSession != nil {
-		if session, ok := userSession.(*UserSession); ok && session.User != nil {
-			isAdmin = (session.User.Role == "admin" || session.User.Role == "root")
-		}
-	}
-	if !isAdmin {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
+	authService := r.Context().Value(authServiceKey).(*AuthService)
+	userSession := r.Context().Value(userContextKey).(*UserSession)
 
 	msg := r.FormValue("msg")
 	if msg != "" {
@@ -129,45 +120,48 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clearSpoof := r.FormValue("clear_spoof")
-	spoofTarget := r.FormValue("spoof_target")
+	spoofTier := r.FormValue("spoof_tier")
 
-	if clearSpoof == "true" || clearSpoof == "1" {
-		// Clear the cookie
-		http.SetCookie(w, &http.Cookie{
-			Name:   "spoof",
-			Value:  "",
-			Path:   "/",
-			MaxAge: -1, // Expire immediately
-		})
-		// Redirect to remove the query param
-		q := r.URL.Query()
-		q.Del("clear_spoof")
-		r.URL.RawQuery = q.Encode()
-		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+	if clearSpoof == "true" {
+		if userSession != nil {
+			userSession.Metadata["spoofed_tier"] = ""
+
+			// Restore original tier if available
+			if originalTier, ok := userSession.Metadata["original_tier"].(string); ok && originalTier != "" {
+				userSession.User.Tier = originalTier
+				userSession.Metadata["original_tier"] = ""
+			}
+
+			if authService.SessionCache != nil {
+				authService.SessionCache.Set(userSession)
+			}
+			if DebugMode {
+				log.Printf("[DEBUG] SpoofHandler: Cleared spoofed tier for user %s", maskID(userSession.User.UserId))
+			}
+		}
+		http.Redirect(w, r, r.URL.Path, http.StatusFound)
 		return
-	} else if spoofTarget != "" {
-		// Validate format
-		if !(strings.HasPrefix(spoofTarget, "user:") || strings.HasPrefix(spoofTarget, "tier:") || strings.HasPrefix(spoofTarget, "role:")) {
-			pageVars.ErrorMessage = "Invalid spoof target format. Use user:<email>, tier:<name>, or role:<name>."
-			// Don't redirect, show error on admin page
-		} else {
-			// Set the cookie
-			isSecure := r.TLS != nil || !DevMode
-			http.SetCookie(w, &http.Cookie{
-				Name:     "spoof",
-				Value:    spoofTarget,
-				Path:     "/",
-				MaxAge:   3600, // 1 hour
-				HttpOnly: true,
-				Secure:   isSecure,
-				SameSite: http.SameSiteStrictMode,
-			})
-			// Redirect to remove the query param
-			q := r.URL.Query()
-			q.Del("spoof_target")
-			r.URL.RawQuery = q.Encode()
-			http.Redirect(w, r, r.URL.String(), http.StatusFound)
+	} else if spoofTier != "" {
+		if userSession != nil && (userSession.User.Role == "admin" || userSession.User.Role == "root") {
+			// Store original tier if not already stored
+			if _, exists := userSession.Metadata["original_tier"]; !exists {
+				userSession.Metadata["original_tier"] = userSession.User.Tier
+			}
+
+			userSession.Metadata["spoofed_tier"] = spoofTier
+			userSession.User.Tier = spoofTier
+
+			if authService.SessionCache != nil {
+				authService.SessionCache.Set(userSession)
+			}
+			if DebugMode {
+				log.Printf("[DEBUG] SpoofHandler: Spoofed tier for user %s to %s", maskID(userSession.User.UserId), spoofTier)
+			}
+
+			http.Redirect(w, r, r.URL.Path, http.StatusFound)
 			return
+		} else {
+			pageVars.ErrorMessage = "Only admins can use tier spoofing."
 		}
 	}
 
@@ -768,63 +762,4 @@ func signHMACSHA256Base64(key []byte, message []byte) (string, error) {
 	}
 	signature := h.Sum(nil)
 	return base64.StdEncoding.EncodeToString(signature), nil
-}
-
-// clearImpersonation handles clearing the impersonation flag
-func clearImpersonation(w http.ResponseWriter, r *http.Request, ctx context.Context, session *UserSession, next http.HandlerFunc) {
-
-	// Create a clean copy without impersonation
-	modifiedSession := *session
-	modifiedSession.Metadata["is_impersonating"] = false
-	ctx = context.WithValue(ctx, userContextKey, &modifiedSession)
-
-	if DebugMode {
-		email := getEmailSafe(session)
-		log.Printf("[DEBUG] SpoofMiddleware: Clearing IsImpersonating flag for admin %s", email)
-	}
-
-	next(w, r.WithContext(ctx))
-}
-
-// handleTargetNotFound handles the case when a target user for spoofing is not found
-func handleTargetNotFound(w http.ResponseWriter, r *http.Request, ctx context.Context, session *UserSession, targetEmail string, next http.HandlerFunc) {
-
-	log.Printf("SpoofMiddleware: Target user %s not found in BanACL. Clearing spoof cookie.", targetEmail)
-
-	// Clear the invalid cookie
-	http.SetCookie(w, &http.Cookie{Name: "spoof", Value: "", Path: "/", MaxAge: -1})
-
-	// Clear impersonation flag if needed
-	if session.Metadata["is_impersonating"] == true {
-		clearImpersonation(w, r, ctx, session, next)
-		return
-	}
-
-	next(w, r.WithContext(ctx))
-}
-
-// createSpoofedSession creates and adds a spoofed session to the context
-func createSpoofedSession(ctx context.Context, originalSession *UserSession, targetUser *BanUser, targetEmail string) context.Context {
-
-	// Create the spoofed session object
-	spoofedSession := &UserSession{
-		User: &UserData{
-			UserId: targetUser.UserData.UserId,
-			Email:  targetUser.UserData.Email,
-			Role:   targetUser.UserData.Role,
-			Tier:   targetUser.UserData.Tier,
-		},
-		Permissions: make(map[string]interface{}),
-		Metadata: map[string]interface{}{
-			"is_impersonating": true,
-		},
-	}
-
-	if DebugMode {
-		email := getEmailSafe(originalSession)
-		log.Printf("[DEBUG] SpoofMiddleware: Created spoofed session for %s as %s (Role: %s, Tier: %s)",
-			email, targetEmail, spoofedSession.User.Role, spoofedSession.User.Tier)
-	}
-	// Add the spoofed session to context
-	return context.WithValue(ctx, userContextKey, spoofedSession)
 }
