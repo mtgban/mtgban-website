@@ -1,9 +1,12 @@
 package main
 
 import (
+	"container/list"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,15 +33,6 @@ type CacheMetrics struct {
 	LastCleanupTime time.Time
 }
 
-// SessionCache is a memory-based cache for user sessions
-type SessionCache struct {
-	config      CacheConfig
-	sessions    map[string]*UserSession
-	mutex       sync.RWMutex
-	metrics     CacheMetrics
-	stopCleanup chan struct{}
-}
-
 // Cache interface defines the methods for the cache
 type Cache interface {
 	Get(userID string) (*UserSession, bool)
@@ -47,6 +41,17 @@ type Cache interface {
 	Cleanup()
 	GetMetrics() CacheMetrics
 	Close() error
+}
+
+// SessionCache is a memory-based cache for user sessions
+type SessionCache struct {
+	config        CacheConfig
+	sessions      map[string]*list.Element
+	sessionsList  *list.List
+	mutex         sync.RWMutex
+	metrics       CacheMetrics
+	cleanerStop   chan struct{}
+	cleanerActive atomic.Bool
 }
 
 // InitCacheConfig initializes the cache config
@@ -67,47 +72,59 @@ func NewSessionCache(config CacheConfig) *SessionCache {
 	}
 	// init cache
 	cache := &SessionCache{
-		config:      config,
-		sessions:    make(map[string]*UserSession),
-		metrics:     CacheMetrics{},
-		stopCleanup: make(chan struct{}),
+		config:       config,
+		sessions:     make(map[string]*list.Element),
+		sessionsList: list.New(),
+		metrics:      CacheMetrics{},
+		cleanerStop:  make(chan struct{}),
 	}
+	// initialize cleaner paused
+	cache.cleanerActive.Store(false)
 
 	if DebugMode {
 		log.Printf("[DEBUG] Session cache map created. Initial size: %d", len(cache.sessions))
 	}
-	// Start background cleanup if interval > 0
-	if config.CleanupInterval > 0 {
-		if DebugMode {
-			log.Printf("[DEBUG] Starting session cache cleanup worker with interval %d seconds", config.CleanupInterval)
-		}
-		go cache.startCleanupWorker()
-	} else if DebugMode {
-		log.Printf("[DEBUG] Session cache cleanup worker disabled as CleanupInterval is %d", config.CleanupInterval)
-	}
-	// return cache
+
 	return cache
 }
 
 // startCleanupWorker starts a background goroutine to periodically clean the session cache
-func (c *SessionCache) startCleanupWorker() {
+func (c *SessionCache) startCleaner() {
+	// mark active
+	c.cleanerActive.Store(true)
+
+	// create ticker
 	ticker := time.NewTicker(time.Duration(c.config.CleanupInterval) * time.Second)
 	defer ticker.Stop()
+	// mark inactive on exit
+	defer c.cleanerActive.Store(false)
 
-	if DebugMode {
-		log.Printf("[DEBUG] Session cache cleanup worker started.")
-	}
-
+	// start cleaner loop
 	for {
 		select {
 		case <-ticker.C:
-			if DebugMode {
-				log.Printf("[DEBUG] Session cache cleanup worker received tick, initiating cleanup.")
+			// check if cache is empty
+			c.mutex.RLock()
+			cacheSize := len(c.sessions)
+			c.mutex.RUnlock()
+
+			if cacheSize >= 1 {
+				if DebugMode {
+					log.Printf("[DEBUG] Initiating Session cache cleaner")
+				}
+				// perform cleanup
+				c.Cleanup()
+				// reset pause
+			} else {
+				if DebugMode {
+					log.Printf("[DEBUG] Cache is empty, stopping cleaner")
+				}
+				// exit goroutine
+				return
 			}
-			c.Cleanup()
-		case <-c.stopCleanup:
+		case <-c.cleanerStop:
 			if DebugMode {
-				log.Printf("[DEBUG] Session cache cleanup worker received stop signal, exiting.")
+				log.Printf("[DEBUG] Cache cleaner received stop signal")
 			}
 			return
 		}
@@ -120,7 +137,7 @@ func (c *SessionCache) Get(userID string) (*UserSession, bool) {
 		log.Printf("[DEBUG] Session cache Get called for userID: %s", maskID(userID))
 	}
 	c.mutex.RLock()
-	session, found := c.sessions[userID]
+	element, found := c.sessions[userID]
 	if !found {
 		c.mutex.RUnlock()
 		atomic.AddInt64(&c.metrics.Misses, 1)
@@ -129,6 +146,8 @@ func (c *SessionCache) Get(userID string) (*UserSession, bool) {
 		}
 		return nil, false
 	}
+
+	session := element.Value.(*UserSession)
 
 	// check expiration
 	if time.Since(session.LastActive) > time.Duration(c.config.TTL)*time.Second {
@@ -144,6 +163,7 @@ func (c *SessionCache) Get(userID string) (*UserSession, bool) {
 
 	// found and not expired, uptick hits and copy under RLock
 	atomic.AddInt64(&c.metrics.Hits, 1)
+	// Deep copy under RLock
 	sessionCopy := deepCopySession(session)
 
 	c.mutex.RUnlock()
@@ -157,16 +177,23 @@ func (c *SessionCache) Get(userID string) (*UserSession, bool) {
 		log.Printf("[DEBUG] Session cache returning deep copy for userID: %s", maskID(userID))
 	}
 
-	// Update LastActive on the original session in the cache.
-	// goroutine to make this non-blocking for the request handler.
+	// Update recency (move to front of list) and LastActive
 	go func(userID string) {
 		c.mutex.Lock()
 		defer c.mutex.Unlock()
 		// Look up again under the write lock in case it was deleted concurrently
-		if sessionToUpdate, foundAgain := c.sessions[userID]; foundAgain {
-			sessionToUpdate.LastActive = time.Now()
-			if DebugMode {
-				log.Printf("[DEBUG] Session cache: Updated LastActive for userID: %s to %s", maskID(userID), sessionToUpdate.LastActive.Format(time.RFC3339))
+		if elementToUpdate, foundAgain := c.sessions[userID]; foundAgain {
+			sessionToUpdate := elementToUpdate.Value.(*UserSession)
+			if time.Since(sessionToUpdate.LastActive) <= time.Duration(c.config.TTL)*time.Second {
+				c.sessionsList.MoveToFront(elementToUpdate)
+				sessionToUpdate.LastActive = time.Now()
+				if DebugMode {
+					log.Printf("[DEBUG] Session cache: Updated LastActive for userID: %s to %s", maskID(userID), sessionToUpdate.LastActive.Format(time.RFC3339))
+				}
+			} else {
+				if DebugMode {
+					log.Printf("[DEBUG] Session cache: TTL expired for userID: %s - skipping update", maskID(userID))
+				}
 			}
 		} else {
 			if DebugMode {
@@ -192,49 +219,123 @@ func (c *SessionCache) Set(session *UserSession) error {
 	if DebugMode {
 		log.Printf("[DEBUG] Session cache Set called for userID: %s", maskID(userID))
 	}
+
 	// acquire lock
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
+	startCleaner := len(c.sessions) == 0 && !c.cleanerActive.Load() && c.config.CleanupInterval > 0
+
+	// Update session
 	session.LastActive = time.Now()
 	if session.CreatedAt.IsZero() {
 		session.CreatedAt = time.Now()
 	}
 	copiedSession := deepCopySession(session)
-	c.sessions[userID] = copiedSession
 
-	if DebugMode {
-		log.Printf("[DEBUG] Session cache stored deep copy for userID: %s. Current size: %d", userID, len(c.sessions))
+	if element, found := c.sessions[userID]; found {
+		// Update existing element's value and move to front
+		element.Value = copiedSession
+		c.sessionsList.MoveToFront(element)
+		if DebugMode {
+			log.Printf("[DEBUG] Session cache: Updated LastActive for userID: %s to %s", maskID(userID), session.LastActive.Format(time.RFC3339))
+		}
+	} else {
+		// Add new element to list and map
+		element = c.sessionsList.PushFront(copiedSession)
+		c.sessions[userID] = element
+		if DebugMode {
+			log.Printf("[DEBUG] Session cache added new session for userID: %s. Current size: %d", userID, len(c.sessions))
+		}
+
+		// Add item then check size limit
+		if c.config.MaxSize > 0 && c.sessionsList.Len() > c.config.MaxSize {
+			if DebugMode {
+				log.Printf("[DEBUG] Session cache size (%d) exceeds limit (%d). Evicting oldest.", c.sessionsList.Len(), c.config.MaxSize)
+			}
+			// Remove rear elements until size limit is met
+			for c.sessionsList.Len() > c.config.MaxSize {
+				// Get oldest element
+				oldestElement := c.sessionsList.Back()
+				if oldestElement == nil { // shouldn't happen if Len() > 0
+					break
+				}
+				// Remove from list and get value
+				sessionToRemove := c.sessionsList.Remove(oldestElement).(*UserSession)
+				delete(c.sessions, sessionToRemove.UserId) // Remove from map
+				atomic.AddInt64(&c.metrics.Evictions, 1)   // uptick evictions
+				if DebugMode {
+					log.Printf("[DEBUG] Session cache evicted oldest session for user: %s due to size limit.", maskID(sessionToRemove.UserId))
+				}
+			}
+			if DebugMode {
+				log.Printf("[DEBUG] Session cache size after size eviction: %d", c.sessionsList.Len())
+			}
+		}
 	}
-	// update size metric
-	c.metrics.Size = int64(len(c.sessions))
+
+	// Update size metric
+	c.metrics.Size = int64(c.sessionsList.Len())
+
+	if startCleaner {
+		if DebugMode {
+			log.Printf("[DEBUG] Session cache cleaner started")
+		}
+		go c.startCleaner()
+	}
 
 	return nil
 }
 
-// Delete removes a session from the cache by userID
+// Close closes the session cache
+func (c *SessionCache) Close() error {
+	if DebugMode {
+		log.Printf("[DEBUG] Session cache Close called")
+	}
+
+	// Signal cleaner to stop if active
+	if c.cleanerActive.Load() {
+		close(c.cleanerStop)
+		if DebugMode {
+			log.Printf("[DEBUG] Session cache cleanup worker stop signal sent")
+		}
+	}
+
+	c.mutex.Lock()
+	c.sessions = nil     // Dereference the map
+	c.sessionsList = nil // Dereference the list
+	c.mutex.Unlock()
+
+	if DebugMode {
+		log.Printf("[DEBUG] Session cache map set to nil. Cache closed")
+	}
+	return nil
+}
+
+// Delete method should now check if the cache becomes empty
 func (c *SessionCache) Delete(userID string) {
 	if DebugMode {
 		log.Printf("[DEBUG] Session cache Delete called for userID: %s", userID)
 	}
-	// acquire lock
+	// Acquire lock
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	// check if key exists before deleting
-	_, exists := c.sessions[userID]
-	if exists {
+	// Check if key exists in the map
+	if element, found := c.sessions[userID]; found {
+		// Remove from map and list
 		delete(c.sessions, userID)
+		c.sessionsList.Remove(element)
 		if DebugMode {
 			log.Printf("[DEBUG] Session cache removed session for userID: %s. New size: %d", userID, len(c.sessions))
 		}
-		// update size metric
-		c.metrics.Size = int64(len(c.sessions))
-		// uptick evictions
+		// Update size metric
+		c.metrics.Size = int64(c.sessionsList.Len())
+		// Uptick evictions
 		atomic.AddInt64(&c.metrics.Evictions, 1)
 	} else {
 		if DebugMode {
-			log.Printf("[DEBUG] Session cache Delete called for userID: %s, but session was not found.", userID)
+			log.Printf("[DEBUG] Session cache Delete called for userID: %s, but session was not found", userID)
 		}
 	}
 }
@@ -249,61 +350,59 @@ func (c *SessionCache) Cleanup() {
 	defer c.mutex.Unlock()
 
 	var evictionCount int64
-	initialSize := len(c.sessions)
+	initialSize := c.sessionsList.Len() // get list size
 	now := time.Now()
 
 	// Find and remove expired sessions
 	if DebugMode {
 		log.Printf("[DEBUG] Session cache Cleanup checking for expired sessions (TTL %ds)...", c.config.TTL)
 	}
-	for userID, session := range c.sessions {
-		// check if expired
+
+	// Iterate over list elements
+	elementsToRemove := []*list.Element{}
+	for e := c.sessionsList.Front(); e != nil; e = e.Next() {
+		session := e.Value.(*UserSession)
 		if now.Sub(session.LastActive) > time.Duration(c.config.TTL)*time.Second {
-			delete(c.sessions, userID)
-			evictionCount++
-			if DebugMode {
-				log.Printf("[DEBUG] Session cache Cleanup removing expired session for user: %s (LastActive: %s)", maskID(userID), session.LastActive.Format(time.RFC3339))
-			}
+			elementsToRemove = append(elementsToRemove, e)
 		}
 	}
+
+	// Remove expired sessions
+	for _, e := range elementsToRemove {
+		sessionsToRemove := c.sessionsList.Remove(e).(*UserSession)
+		delete(c.sessions, sessionsToRemove.UserId)
+		evictionCount++
+		if DebugMode {
+			log.Printf("[DEBUG] Session cache Cleanup removing expired session for user: %s (LastActive: %s)", maskID(sessionsToRemove.UserId), sessionsToRemove.LastActive.Format(time.RFC3339))
+		}
+	}
+
+	// Update size metric
 	if DebugMode {
 		log.Printf("[DEBUG] Session cache Cleanup removed %d expired sessions. Current size: %d", evictionCount, len(c.sessions))
 	}
 
 	// If still over size limit, remove oldest sessions
-	if c.config.MaxSize > 0 && len(c.sessions) > c.config.MaxSize {
+	if c.config.MaxSize > 0 && c.sessionsList.Len() > c.config.MaxSize {
 		if DebugMode {
 			log.Printf("[DEBUG] Session cache Cleanup checking size limit. Current size (%d) exceeds max size (%d).", len(c.sessions), c.config.MaxSize)
 		}
 
 		sizeEvictionCount := int64(0)
+		sessionsToRemove := c.sessionsList.Len() - c.config.MaxSize
 
-		// Convert to slice for sorting
-		type sessionRecency struct {
-			userID     string
-			lastActive time.Time
-		}
-
-		recencies := make([]sessionRecency, 0, len(c.sessions))
-		for id, s := range c.sessions {
-			recencies = append(recencies, sessionRecency{id, s.LastActive})
-		}
-
-		// Sort by recency (oldest LastActive first)
-		sort.Slice(recencies, func(i, j int) bool {
-			return recencies[i].lastActive.Before(recencies[j].lastActive)
-		})
-
-		// Remove oldest entries until we're under the limit
-		sessionsToRemove := len(c.sessions) - c.config.MaxSize
 		if sessionsToRemove > 0 {
 			for i := 0; i < sessionsToRemove; i++ {
-				userIDToRemove := recencies[i].userID
-				delete(c.sessions, userIDToRemove)
-				evictionCount++ // Total evictions
+				oldestElement := c.sessionsList.Back()
+				if oldestElement == nil {
+					break
+				}
+				sessionToRemove := c.sessionsList.Remove(oldestElement).(*UserSession)
+				delete(c.sessions, sessionToRemove.UserId)
+				evictionCount++
 				sizeEvictionCount++
 				if DebugMode {
-					log.Printf("[DEBUG] Session cache Cleanup removing oldest session for user: %s (LastActive: %s) due to size limit.", maskID(userIDToRemove), recencies[i].lastActive.Format(time.RFC3339))
+					log.Printf("[DEBUG] Session cache Cleanup removing oldest session for user: %s (LastActive: %s) due to size limit.", maskID(sessionToRemove.UserId), sessionToRemove.LastActive.Format(time.RFC3339))
 				}
 			}
 		}
@@ -319,7 +418,7 @@ func (c *SessionCache) Cleanup() {
 
 	// update metrics
 	atomic.AddInt64(&c.metrics.Evictions, evictionCount)
-	c.metrics.Size = int64(len(c.sessions))
+	c.metrics.Size = int64(c.sessionsList.Len())
 	c.metrics.LastCleanupTime = now
 
 	if DebugMode {
@@ -329,11 +428,14 @@ func (c *SessionCache) Cleanup() {
 
 // GetMetrics returns the current cache metrics
 func (c *SessionCache) GetMetrics() CacheMetrics {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
 	metrics := CacheMetrics{
 		Hits:            atomic.LoadInt64(&c.metrics.Hits),
 		Misses:          atomic.LoadInt64(&c.metrics.Misses),
 		Evictions:       atomic.LoadInt64(&c.metrics.Evictions),
-		Size:            atomic.LoadInt64(&c.metrics.Size),
+		Size:            c.metrics.Size,
 		LastCleanupTime: c.metrics.LastCleanupTime,
 	}
 	if DebugMode {
@@ -342,24 +444,19 @@ func (c *SessionCache) GetMetrics() CacheMetrics {
 	return metrics
 }
 
-// Close closes the session cache
-func (c *SessionCache) Close() error {
-	if DebugMode {
-		log.Printf("[DEBUG] Session cache Close called.")
-	}
-	if c.stopCleanup != nil {
-		close(c.stopCleanup) // Signal the worker to stop
-		if DebugMode {
-			log.Printf("[DEBUG] Session cache cleanup worker stop signal sent.")
-		}
-	}
+// ExportMetricsToJson writes the current cache metrics as JSON to the provided writer.
+func (c *SessionCache) ExportMetricsToJson(w io.Writer) error {
+	metrics := c.GetMetrics() // Get metrics
 
-	c.mutex.Lock()
-	c.sessions = nil // Dereference the map
-	c.mutex.Unlock()
-
+	encoder := json.NewEncoder(w)
+	encoder.SetIndent("", "  ")
+	err := encoder.Encode(metrics)
+	if err != nil {
+		log.Printf("[ERROR] Session cache ExportMetricsToJson failed to encode metrics: %v", err)
+		return fmt.Errorf("failed to encode metrics: %w", err)
+	}
 	if DebugMode {
-		log.Printf("[DEBUG] Session cache map set to nil. Cache closed.")
+		log.Printf("[DEBUG] Session cache ExportMetricsToJson successfully wrote metrics")
 	}
 	return nil
 }
