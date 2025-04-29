@@ -13,7 +13,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
-	supabase "github.com/nedpals/supabase-go"
+	supabase "github.com/the-muppet/supabase-go"
 	"golang.org/x/exp/slices"
 )
 

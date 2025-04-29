@@ -12,7 +12,6 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	supabase "github.com/nedpals/supabase-go"
 	"golang.org/x/exp/slices"
 )
 
@@ -326,38 +325,17 @@ func Reverse(w http.ResponseWriter, r *http.Request) {
 
 func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	start := time.Now()
-
 	pageName := "Arbitrage"
 	if reverse {
 		pageName = "Reverse"
 	}
 	pageVars := genPageNav(pageName, r)
 
-	var userInfo *supabase.User
-	var userPermissions map[string]interface{}
-	var userEmail string = "anonymous" // Default email
-
-	if userCtx := r.Context().Value(userContextKey); userCtx != nil {
-		if user, ok := userCtx.(*supabase.User); ok && user != nil {
-			userInfo = user
-			userEmail = userInfo.Email // Use authenticated user's email
-		}
-	}
-	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
-		if aclData, ok := aclCtx.(map[string]interface{}); ok {
-			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
-				userPermissions = perms
-			}
-		}
-	}
-	// --- End Context Retrieval ---
-
 	var anyOptionEnabled bool
-
 	var allowlistSellers []string
 	allowlistSellersOpt := "" // Default value
-	if permValue, ok := userPermissions["ArbitEnabled"].(string); ok {
-		allowlistSellersOpt = permValue
+	if permValue, ok := r.Context().Value(sessionKey).(map[string]any); ok {
+		allowlistSellersOpt = permValue["ArbitEnabled"].(string)
 	}
 
 	if allowlistSellersOpt == "ALL" || (DevMode && !SigCheck) {
@@ -377,8 +355,8 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	var blocklistVendors []string
 	blocklistVendorsOpt := "" // Default value
-	if permValue, ok := userPermissions["ArbitDisabledVendors"].(string); ok {
-		blocklistVendorsOpt = permValue
+	if permValue, ok := r.Context().Value(sessionKey).(map[string]any); ok {
+		blocklistVendorsOpt = permValue["ArbitDisabledVendors"].(string)
 	}
 	if blocklistVendorsOpt == "" {
 		blocklistVendors = Config.ArbitBlockVendors
@@ -428,7 +406,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, true, anyOptionEnabled)
 
-	msg := fmt.Sprintf("Request by %s took %v", userEmail, time.Since(start))
+	msg := fmt.Sprintf("Request by %s took %v", pageVars.UserEmail, time.Since(start))
 	UserNotify("arbit", msg)
 	LogPages["Arbit"].Println(msg)
 }
@@ -437,38 +415,14 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	pageVars := genPageNav("Global", r)
 
-	// --- Get User and ACL data from Context ---
-	var userInfo *supabase.User
-	var userPermissions map[string]interface{}
-	var userEmail string = "anonymous" // Default email
-
-	if userCtx := r.Context().Value(userContextKey); userCtx != nil {
-		if user, ok := userCtx.(*supabase.User); ok && user != nil {
-			userInfo = user
-			userEmail = userInfo.Email // Use authenticated user's email
-		}
-	}
-	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
-		if aclData, ok := aclCtx.(map[string]interface{}); ok {
-			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
-				userPermissions = perms
-			}
-		}
-	}
-	// --- End Context Retrieval ---
-
-	//anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")
-	//anyEnabled, _ := strconv.ParseBool(anyEnabledOpt)
 	anyEnabled := false // Default value
-	if permValue, ok := userPermissions["AnyEnabled"].(bool); ok {
-		anyEnabled = permValue
+	if permValue, ok := r.Context().Value(sessionKey).(map[string]any); ok {
+		anyEnabled = permValue["AnyEnabled"].(bool)
 	}
 
-	//anyExperimentOpt := GetParamFromSig(pageVars.Sig, "AnyExperimentsEnabled")
-	//anyExperiment, _ := strconv.ParseBool(anyExperimentOpt)
 	anyExperiment := false // Default value
-	if permValue, ok := userPermissions["AnyExperimentsEnabled"].(bool); ok {
-		anyExperiment = permValue
+	if permValue, ok := r.Context().Value(sessionKey).(map[string]any); ok {
+		anyExperiment = permValue["AnyExperimentsEnabled"].(bool)
 	}
 
 	anyEnabled = anyEnabled || (DevMode && !SigCheck)
@@ -540,7 +494,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, anyEnabled)
 
-	msg := fmt.Sprintf("Request by %s took %v", userEmail, time.Since(start))
+	msg := fmt.Sprintf("Request by %s took %v", pageVars.UserEmail, time.Since(start))
 	UserNotify("global", msg)
 	LogPages["Global"].Println(msg)
 }

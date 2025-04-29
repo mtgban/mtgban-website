@@ -24,7 +24,7 @@ import (
 	"gopkg.in/Iwark/spreadsheet.v2"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	supabase "github.com/nedpals/supabase-go"
+	supabase "github.com/the-muppet/supabase-go"
 )
 
 const (
@@ -123,7 +123,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars := genPageNav("Upload", r)
 
 	var userInfo *supabase.User
-	var userPermissions map[string]interface{}
+	var userPermissions map[string]any
 	var userEmail string = "anonymous"
 
 	if userCtx := r.Context().Value(userContextKey); userCtx != nil {
@@ -133,8 +133,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
-		if aclData, ok := aclCtx.(map[string]interface{}); ok {
-			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+		if aclData, ok := aclCtx.(map[string]any); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]any); permsOk {
 				userPermissions = perms
 			}
 		}

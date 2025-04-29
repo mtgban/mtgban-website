@@ -135,10 +135,10 @@ func prepareCKAPI() error {
 }
 
 func API(w http.ResponseWriter, r *http.Request) {
-	var userPermissions map[string]interface{}
+	var userPermissions map[string]any
 	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
-		if aclData, ok := aclCtx.(map[string]interface{}); ok {
-			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+		if aclData, ok := aclCtx.(map[string]any); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]any); permsOk {
 				userPermissions = perms
 			}
 		}
@@ -583,10 +583,10 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 }
 
 func SearchAPI(w http.ResponseWriter, r *http.Request) {
-	var userPermissions map[string]interface{}
+	var userPermissions map[string]any
 	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
-		if aclData, ok := aclCtx.(map[string]interface{}); ok {
-			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+		if aclData, ok := aclCtx.(map[string]any); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]any); permsOk {
 				userPermissions = perms
 			}
 		}

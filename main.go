@@ -178,9 +178,8 @@ type PageVars struct {
 	UserEmail       string
 	UserRole        string
 	UserTier        string
-
-	IsImpersonating     bool
-	ImpersonationTarget string
+	CacheMetrics    *CacheMetrics
+	ActiveSessions  []*UserSession
 }
 
 type NavElem struct {
@@ -372,8 +371,11 @@ type ConfigType struct {
 	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
 	GoogleCredentials string            `json:"google_credentials"`
 	Auth              AuthConfig        `json:"auth"`
-	ACL               ACLConfig         `json:"acl"`
-	Uploader          struct {
+	ACL               struct {
+		Roles map[string]map[string]map[string]any `json:"role"`
+		Tiers map[string]map[string]map[string]any `json:"tier"`
+	} `json:"acl"`
+	Uploader struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
@@ -382,11 +384,6 @@ type ConfigType struct {
 
 	/* The location of the configuation file */
 	filePath string
-}
-
-type ACLConfig struct {
-	Tiers map[string]map[string]map[string]string `json:"tier"`
-	Roles map[string]map[string]map[string]string `json:"role"`
 }
 
 var DevMode bool
@@ -606,7 +603,7 @@ func main() {
 	LogPages = map[string]*log.Logger{}
 
 	// Precompute all nav states
-	precomputeNavigation()
+	buildNavbars()
 
 	// Initialize Google client
 	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
@@ -839,17 +836,19 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Prefix the name passed in with templates/
 	tmplPath := fmt.Sprintf("templates/%s", tmpl)
 	navbarPath := "templates/navbar.html"
+	metricsPath := "templates/metrics.html"
 
 	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
+	t, err := template.New("").Funcs(funcMap).ParseFiles(tmplPath, navbarPath, metricsPath)
 	if err != nil {
 		log.Print("template parsing error: ", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	// Execute the template and pass in the variables to fill the gaps
-	err = t.Execute(w, pageVars)
+	err = t.ExecuteTemplate(w, name, pageVars)
 	if err != nil {
-		log.Print("template executing error: ", err)
+		log.Printf("template executing error (%s): %v", name, err)
 	}
 }

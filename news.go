@@ -528,7 +528,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	enabled := ""
 
 	if userSession != nil && userSession.Permissions != nil {
-		if newspaperPerms, ok := userSession.Permissions["Newspaper"].(map[string]interface{}); ok {
+		if newspaperPerms, ok := userSession.Permissions["Newspaper"].(map[string]any); ok {
 			if newsEnabled, ok := newspaperPerms["NewsEnabled"].(string); ok {
 				enabled = newsEnabled
 			}
@@ -929,8 +929,8 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	rawResult := make([][]byte, len(cols))
 	result := make([]string, len(cols))
 
-	// A temporary interface{} slice, containing a variable number of fields
-	dest := make([]interface{}, len(cols))
+	// A temporary any slice, containing a variable number of fields
+	dest := make([]any, len(cols))
 	for i := range rawResult {
 		// Put pointers to each string in the interface slice
 		dest[i] = &rawResult[i]

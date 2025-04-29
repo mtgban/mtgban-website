@@ -678,10 +678,10 @@ func getDefaultBlocklists(r *http.Request) ([]string, []string) {
 	var blocklistRetail, blocklistBuylist []string
 
 	// Get permissions from context
-	var userPermissions map[string]interface{}
+	var userPermissions map[string]any
 	if aclCtx := r.Context().Value(aclContextKey); aclCtx != nil {
-		if aclData, ok := aclCtx.(map[string]interface{}); ok {
-			if perms, permsOk := aclData["permissions"].(map[string]interface{}); permsOk {
+		if aclData, ok := aclCtx.(map[string]any); ok {
+			if perms, permsOk := aclData["permissions"].(map[string]any); permsOk {
 				userPermissions = perms
 			}
 		}

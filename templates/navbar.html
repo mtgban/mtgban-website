@@ -1,13 +1,38 @@
 {{define "navbar"}}
 <nav class="navbar">
-    <ul>
-        <li class="nav-item nav-item-icon">
-            <a {{if not .ShowLogin}}href="/discord" {{else}}style="cursor: default;" {{end}}>
-                <img src="/img/misc/discord.png" width=48 alt="Discord" {{if .ShowLogin}}style="opacity: 0.5;" {{end}}>
+    <input type="checkbox" id="mobile-menu-toggle" title="Toggle mobile menu">
+    <label for="mobile-menu-toggle" class="navbar-toggle">
+        <span></span>
+        <span></span>
+        <span></span>
+    </label>
+    <ul class="navbar-list">
+        <li class="nav-item">
+            <a class="discord-icon" {{if .ShowLogin}} onclick="account()" style="cursor: ignore;" {{else}} style="cursor: pointer;"{{end}}>
+                <svg width="52px" height="38px" viewBox="-10.48 -60.48 296.96 296.96" version="1.1"
+                    xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                    preserveAspectRatio="xMidYMid" fill="#000000" stroke="#000000" stroke-width="3.84">
+                    <g id="discord-bg" stroke-width="0" transform="translate(0,0), scale(1)"></g>
+                    <g id="discord-trace" stroke-linecap="round" stroke-linejoin="round" stroke="#00000000"
+                        stroke-width="24.064">
+                        <g>
+                            <path
+                                d="M216.856339,16.5966031 C200.285002,8.84328665 182.566144,3.2084988 164.041564,0 C161.766523,4.11318106 159.108624,9.64549908 157.276099,14.0464379 C137.583995,11.0849896 118.072967,11.0849896 98.7430163,14.0464379 C96.9108417,9.64549908 94.1925838,4.11318106 91.8971895,0 C73.3526068,3.2084988 55.6133949,8.86399117 39.0420583,16.6376612 C5.61752293,67.146514 -3.4433191,116.400813 1.08711069,164.955721 C23.2560196,181.510915 44.7403634,191.567697 65.8621325,198.148576 C71.0772151,190.971126 75.7283628,183.341335 79.7352139,175.300261 C72.104019,172.400575 64.7949724,168.822202 57.8887866,164.667963 C59.7209612,163.310589 61.5131304,161.891452 63.2445898,160.431257 C105.36741,180.133187 151.134928,180.133187 192.754523,160.431257 C194.506336,161.891452 196.298154,163.310589 198.110326,164.667963 C191.183787,168.842556 183.854737,172.420929 176.223542,175.320965 C180.230393,183.341335 184.861538,190.991831 190.096624,198.16893 C211.238746,191.588051 232.743023,181.531619 254.911949,164.955721 C260.227747,108.668201 245.831087,59.8662432 216.856339,16.5966031 Z M85.4738752,135.09489 C72.8290281,135.09489 62.4592217,123.290155 62.4592217,108.914901 C62.4592217,94.5396472 72.607595,82.7145587 85.4738752,82.7145587 C98.3405064,82.7145587 108.709962,94.5189427 108.488529,108.914901 C108.508531,123.290155 98.3405064,135.09489 85.4738752,135.09489 Z M170.525237,135.09489 C157.88039,135.09489 147.510584,123.290155 147.510584,108.914901 C147.510584,94.5396472 157.658606,82.7145587 170.525237,82.7145587 C183.391518,82.7145587 193.761324,94.5189427 193.539891,108.914901 C193.539891,123.290155 183.391518,135.09489 170.525237,135.09489 Z"
+                                fill="#5865F2" fill-rule="nonzero"> </path>
+                        </g>
+                    </g>
+                    <g id="discord-icon">
+                        <g>
+                            <path
+                                d="M216.856339,16.5966031 C200.285002,8.84328665 182.566144,3.2084988 164.041564,0 C161.766523,4.11318106 159.108624,9.64549908 157.276099,14.0464379 C137.583995,11.0849896 118.072967,11.0849896 98.7430163,14.0464379 C96.9108417,9.64549908 94.1925838,4.11318106 91.8971895,0 C73.3526068,3.2084988 55.6133949,8.86399117 39.0420583,16.6376612 C5.61752293,67.146514 -3.4433191,116.400813 1.08711069,164.955721 C23.2560196,181.510915 44.7403634,191.567697 65.8621325,198.148576 C71.0772151,190.971126 75.7283628,183.341335 79.7352139,175.300261 C72.104019,172.400575 64.7949724,168.822202 57.8887866,164.667963 C59.7209612,163.310589 61.5131304,161.891452 63.2445898,160.431257 C105.36741,180.133187 151.134928,180.133187 192.754523,160.431257 C194.506336,161.891452 196.298154,163.310589 198.110326,164.667963 C191.183787,168.842556 183.854737,172.420929 176.223542,175.320965 C180.230393,183.341335 184.861538,190.991831 190.096624,198.16893 C211.238746,191.588051 232.743023,181.531619 254.911949,164.955721 C260.227747,108.668201 245.831087,59.8662432 216.856339,16.5966031 Z M85.4738752,135.09489 C72.8290281,135.09489 62.4592217,123.290155 62.4592217,108.914901 C62.4592217,94.5396472 72.607595,82.7145587 85.4738752,82.7145587 C98.3405064,82.7145587 108.709962,94.5189427 108.488529,108.914901 C108.508531,123.290155 98.3405064,135.09489 85.4738752,135.09489 Z M170.525237,135.09489 C157.88039,135.09489 147.510584,123.290155 147.510584,108.914901 C147.510584,94.5396472 157.658606,82.7145587 170.525237,82.7145587 C183.391518,82.7145587 193.761324,94.5189427 193.539891,108.914901 C193.539891,123.290155 183.391518,135.09489 170.525237,135.09489 Z"
+                                fill="#5865F2" fill-rule="nonzero"> </path>
+                        </g>
+                    </g>
+                </svg>
             </a>
         </li>
         {{range .Nav}}
-        <li class="nav-item auth-buttons">
+        <li class="nav-item">
             <a {{if .Active}}class="nav-link nav-link-active {{.Class}}" {{else}}class="nav-link" {{end}}
                 href="{{.Link}}">
                 <span>{{.Short}} {{.Name}}</span>
@@ -17,36 +42,65 @@
 
         <li class="nav-item-spacer"></li>
 
-        <li class="nav-item auth-status">
-            <span class="auth-indicator {{if .IsLoggedIn}}auth-logged-in{{else}}auth-logged-out{{end}}"
-                title="{{if .IsLoggedIn}}Logged In{{else}}Not Logged In{{end}}">
-                {{if .IsLoggedIn}}●{{else}}○{{end}}
-            </span>
+        <li class="nav-item auth-status-container">
+            <div class="auth-status-stacked">
+                <div class="auth-status-line">
+                    <span
+                        class="auth-indicator {{if .IsLoggedIn}}auth-logged-in tier-{{.UserTier}}{{else}}auth-logged-out{{end}}"
+                        title="{{if .IsLoggedIn}}Logged In{{else}}Not Logged In{{end}}">
+                        {{if .IsLoggedIn}}⦿{{else}}○{{end}}
+                    </span>
+                    <span class="status-text {{if .IsLoggedIn}}status-tier-{{.UserTier}}{{end}}">
+                        {{if .IsLoggedIn}}{{if .UserTier}}{{.UserTier}}{{else}}Online{{end}}{{end}}
+                    </span>
+                </div>
+                {{if .IsLoggedIn}}
+                <div class="user-email">
+                    {{.UserEmail}}
+                </div>
+                {{end}}
+            </div>
         </li>
 
-        <li class="nav-item nav-item-dropdown">
-            <div class="dropdown">
-                <button class="dropbtn">
-                    <span class="user-icon">{{if .IsLoggedIn}}👤{{else}}🔑{{end}}</span>
-                    <span class="dropdown-arrow">▼</span>
-                </button>
-                <div class="dropdown-content">
-                    <a href="#" onclick="subscribe()" class="dropdown-item"><span>🔔 Subscribe</span></a>
-                    {{if .IsLoggedIn}}
-                    <a href="#" onclick="account()" class="dropdown-item">👤 Account</a>
-                    <a href="#" onclick="logout()" class="dropdown-item">🚪 Logout</a>
-                    {{else}}
-                    <a href="/auth/login/" class="dropdown-item">🔑 Login</a>
-                    <a href="/auth/signup/" class="dropdown-item">✏️ Sign Up</a>
-                    {{end}}
-                </div>
+        <!-- Completely isolated dropdown with new classes and IDs -->
+        <li class="nav-item tap-dropdown tier-{{.UserTier}}">
+            <input type="checkbox" id="tap-menu-toggle" class="tap-dropdown-checkbox" title="Toggle user menu">
+
+            <label for="tap-menu-toggle" class="tap-dropdown-toggle">
+                <svg class="tap-icon" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+                    <title>tap</title>
+                    <path
+                        d="M27.263 16.227h-12.874l4.714-3.355c-1.751-1.39-3.778-2.084-6.073-2.084-1.148 0-1.936 0.219-2.356 0.656-0.423 0.439-0.635 1.232-0.635 2.379 0 3.173 1.632 6.558 4.895 10.153l-3.715 3.762c-4.323-5.258-6.482-9.956-6.482-14.097 0-2.477 0.746-4.451 2.242-5.916 1.495-1.465 3.485-2.198 5.96-2.198 3.022 0 6.316 1.15 9.883 3.445l2.763-4.713 1.678 11.967z">
+                    </path>
+                </svg>
+
+                <svg class="untap-icon" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+                    <title>untap</title>
+                    <path
+                        d="M15.773 4.737v12.874l3.355-4.714c1.39 1.751 2.084 3.778 2.084 6.073 0 1.148-0.219 1.936-0.657 2.356-0.439 0.423-1.232 0.635-2.379 0.635-3.173 0-6.558-1.632-10.153-4.895l-3.762 3.715c5.258 4.323 9.956 6.482 14.097 6.482 2.477 0 4.451-0.746 5.916-2.242 1.465-1.495 2.198-3.485 2.198-5.96 0-3.022-1.15-6.316-3.445-9.883l4.713-2.763-11.967-1.678z">
+                    </path>
+                </svg>
+            </label>
+
+            <div class="tap-dropdown-content">
+                <a href="#" onclick="subscribe()" class="tap-dropdown-item"><span>🔔 Subscribe</span></a>
+                {{if .IsLoggedIn}}
+                <a href="#" onclick="account()" class="tap-dropdown-item">👤 Account</a>
+                <a href="#" onclick="logout()" class="tap-dropdown-item">🚪 Logout</a>
+                {{else}}
+                <a href="/auth/login/" class="tap-dropdown-item">🔑 Login</a>
+                <a href="/auth/signup/" class="tap-dropdown-item">✏️ Sign Up</a>
+                {{end}}
+
+                <a href="#" class="tap-dropdown-item">⚙️ Settings</a>
+                <a href="#" class="tap-dropdown-item">❓ Help</a>
             </div>
         </li>
 
         <li class="nav-item nav-item-switch">
             <label class="switch">
                 <div>
-                    <input type="checkbox" />
+                    <input type="checkbox" id="nightmode-toggle" />
                     <span class="slider" title="Nightbound"></span>
                 </div>
                 <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
