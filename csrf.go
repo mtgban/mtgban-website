@@ -291,7 +291,7 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 		userSession := getUserSessionFromContext(r)
 		if userSession == nil || userSession.User == nil {
 			a.logWithContext(r, "CSRFProtection: No valid user session found for non-exempt path %s %s, cannot validate CSRF.", r.Method, r.URL.Path)
-			a.handleAPIError(w, r, ErrInvalidToken)
+			a.handleError(w, r, ErrInvalidToken)
 			return
 		}
 
@@ -299,7 +299,7 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 		submittedToken := getCSRFToken(r)
 		if submittedToken == "" {
 			a.logWithContext(r, "CSRFProtection: Missing CSRF token in request for user %s on %s %s.", maskID(userSession.UserId), r.Method, r.URL.Path)
-			a.handleAPIError(w, r, ErrCSRFValidation)
+			a.handleError(w, r, ErrCSRFValidation)
 			return
 		}
 
@@ -307,7 +307,7 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 		valid, err := a.validateCSRFToken(submittedToken, userSession.UserId)
 		if err != nil {
 			a.logWithContext(r, "CSRFProtection: Error validating CSRF token for user %s on %s %s: %v", maskID(userSession.UserId), r.Method, r.URL.Path, err)
-			a.handleAPIError(w, r, ErrCSRFValidation)
+			a.handleError(w, r, ErrCSRFValidation)
 			return
 		}
 		if !valid {
@@ -316,7 +316,7 @@ func (a *AuthService) CSRFProtection(next http.HandlerFunc) http.HandlerFunc {
 			} else {
 				a.logWithContext(r, "CSRF Token Validation Failed for user %s on %s %s.", maskID(userSession.UserId), r.Method, r.URL.Path)
 			}
-			a.handleAPIError(w, r, ErrCSRFValidation)
+			a.handleError(w, r, ErrCSRFValidation)
 			return
 		}
 		// Token is valid, continue
