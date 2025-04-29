@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Head from 'next/head';
 import AuthLink from '@/components/auth/AuthLink';
-import styles from '@/styles/legal.module.css';
+import styles from './legal.module.css';
 import Link from 'next/link';
 
 interface CompanyInfo {

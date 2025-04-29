@@ -1,7 +1,7 @@
 import React, { FC } from 'react';
 import Head from 'next/head';
 import AuthLink from '@/components/auth/AuthLink';
-import styles from '../../../public/legal.module.css';
+import styles from './legal.module.css';
 
 interface CompanyInfo {
   name: string;

@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	supabase "github.com/nedpals/supabase-go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	supabase "github.com/the-muppet/supabase-go"
 )
 
 // Version information
@@ -141,8 +141,8 @@ type Config struct {
 
 // Query represents a Supabase query with named parameters
 type Query struct {
-	Query  string                 `json:"query"`
-	Params map[string]interface{} `json:"params"`
+	Query  string         `json:"query"`
+	Params map[string]any `json:"params"`
 }
 
 // ConvertToStructured converts the database-style ACL to a strongly typed structure
@@ -229,7 +229,7 @@ type Flags struct {
 
 // JSON buffer pool for optimized JSON operations
 var bufferPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return new(bytes.Buffer)
 	},
 }
@@ -281,24 +281,24 @@ func main() {
 	}
 
 	// Prepare the data to update
-	var aclData map[string]interface{}
+	var aclData map[string]any
 	if flags.JustRoles {
-		aclData = map[string]interface{}{
-			"acl": map[string]interface{}{
+		aclData = map[string]any{
+			"acl": map[string]any{
 				"roles": config.Auth.ACL.Roles,
 			},
 		}
 		log.Debug().Int("role_count", len(config.Auth.ACL.Roles)).Msg("Updating roles only")
 	} else if flags.JustTiers {
-		aclData = map[string]interface{}{
-			"acl": map[string]interface{}{
+		aclData = map[string]any{
+			"acl": map[string]any{
 				"tiers": config.Auth.ACL.Tiers,
 			},
 		}
 		log.Debug().Int("tier_count", len(config.Auth.ACL.Tiers)).Msg("Updating tiers only")
 	} else {
-		aclData = map[string]interface{}{
-			"acl": map[string]interface{}{
+		aclData = map[string]any{
+			"acl": map[string]any{
 				"roles": config.Auth.ACL.Roles,
 				"tiers": config.Auth.ACL.Tiers,
 			},
@@ -320,8 +320,8 @@ func main() {
 
 	// Call direct RPC endpoint
 	log.Info().Msg("Updating ACL in database")
-	var result interface{}
-	err = supabaseClient.DB.Rpc("load_acl", map[string]interface{}{
+	var result any
+	err = supabaseClient.DB.Rpc("load_acl", map[string]any{
 		"acl_data":   json.RawMessage(aclJSON),
 		"request_id": requestID,
 	}).Execute(&result)
@@ -330,9 +330,9 @@ func main() {
 	if err != nil {
 		log.Warn().Err(err).Msg("Direct RPC call failed, trying with exec_sql wrapper")
 
-		execSQLQuery := map[string]interface{}{
+		execSQLQuery := map[string]any{
 			"query": "SELECT load_acl($1::jsonb, $2::text)",
-			"params": map[string]interface{}{
+			"params": map[string]any{
 				"param1": string(aclJSON),
 				"param2": requestID,
 			},
@@ -536,21 +536,21 @@ func validateConfig(config *Config, authMode bool) error {
 
 // prepareACLJSON prepares the ACL JSON based on update type
 func prepareACLJSON(acl ACL, justRoles, justTiers, authMode bool) ([]byte, error) {
-	var data interface{}
+	var data any
 
 	if justRoles {
 		// Update only roles
 		if authMode {
-			data = map[string]interface{}{
-				"auth": map[string]interface{}{
-					"acl": map[string]interface{}{
+			data = map[string]any{
+				"auth": map[string]any{
+					"acl": map[string]any{
 						"role": acl.Roles,
 					},
 				},
 			}
 		} else {
-			data = map[string]interface{}{
-				"acl": map[string]interface{}{
+			data = map[string]any{
+				"acl": map[string]any{
 					"role": acl.Roles,
 				},
 			}
@@ -559,16 +559,16 @@ func prepareACLJSON(acl ACL, justRoles, justTiers, authMode bool) ([]byte, error
 	} else if justTiers {
 		// Update only tiers
 		if authMode {
-			data = map[string]interface{}{
-				"auth": map[string]interface{}{
-					"acl": map[string]interface{}{
+			data = map[string]any{
+				"auth": map[string]any{
+					"acl": map[string]any{
 						"tier": acl.Tiers,
 					},
 				},
 			}
 		} else {
-			data = map[string]interface{}{
-				"acl": map[string]interface{}{
+			data = map[string]any{
+				"acl": map[string]any{
 					"tier": acl.Tiers,
 				},
 			}
@@ -577,17 +577,17 @@ func prepareACLJSON(acl ACL, justRoles, justTiers, authMode bool) ([]byte, error
 	} else {
 		// Update both roles and tiers
 		if authMode {
-			data = map[string]interface{}{
-				"auth": map[string]interface{}{
-					"acl": map[string]interface{}{
+			data = map[string]any{
+				"auth": map[string]any{
+					"acl": map[string]any{
 						"tier": acl.Tiers,
 						"role": acl.Roles,
 					},
 				},
 			}
 		} else {
-			data = map[string]interface{}{
-				"acl": map[string]interface{}{
+			data = map[string]any{
+				"acl": map[string]any{
 					"tier": acl.Tiers,
 					"role": acl.Roles,
 				},
@@ -714,17 +714,17 @@ func backupCurrentACL(ctx context.Context, client *supabase.Client, authMode boo
 	if authMode {
 		fetchQuery = Query{
 			Query:  "SELECT get_current_auth_acl()",
-			Params: map[string]interface{}{},
+			Params: map[string]any{},
 		}
 	} else {
 		fetchQuery = Query{
 			Query:  "SELECT get_current_acl()",
-			Params: map[string]interface{}{},
+			Params: map[string]any{},
 		}
 	}
 
 	var result json.RawMessage
-	if err := client.DB.Rpc("exec_sql", map[string]interface{}{"query": fetchQuery.Query, "params": fetchQuery.Params}); err != nil {
+	if err := client.DB.Rpc("exec_sql", map[string]any{"query": fetchQuery.Query, "params": fetchQuery.Params}); err != nil {
 		return fmt.Errorf("failed to fetch current ACL: %w", err)
 	}
 
@@ -754,7 +754,7 @@ func updateACLWithRestAPI(ctx context.Context, client *supabase.Client, aclJSON 
 	if authMode {
 		updateQuery = Query{
 			Query: "SELECT load_auth_acl($1::jsonb, $2::text)",
-			Params: map[string]interface{}{
+			Params: map[string]any{
 				"param1": string(aclJSON),
 				"param2": requestID,
 			},
@@ -762,15 +762,15 @@ func updateACLWithRestAPI(ctx context.Context, client *supabase.Client, aclJSON 
 	} else {
 		updateQuery = Query{
 			Query: "SELECT load_acl($1::jsonb, $2::text)",
-			Params: map[string]interface{}{
+			Params: map[string]any{
 				"param1": string(aclJSON),
 				"param2": requestID,
 			},
 		}
 	}
 
-	var result interface{}
-	if err := client.DB.Rpc("exec_sql", map[string]interface{}{"query": updateQuery.Query, "params": updateQuery.Params}); err != nil {
+	var result any
+	if err := client.DB.Rpc("exec_sql", map[string]any{"query": updateQuery.Query, "params": updateQuery.Params}); err != nil {
 		return fmt.Errorf("database update failed: %w", err)
 	}
 
@@ -788,17 +788,17 @@ func fetchCurrentACL(ctx context.Context, client *supabase.Client, authMode bool
 	if authMode {
 		fetchQuery = Query{
 			Query:  "SELECT get_current_auth_acl()",
-			Params: map[string]interface{}{},
+			Params: map[string]any{},
 		}
 	} else {
 		fetchQuery = Query{
 			Query:  "SELECT get_current_acl()",
-			Params: map[string]interface{}{},
+			Params: map[string]any{},
 		}
 	}
 
 	var result json.RawMessage
-	if err := client.DB.Rpc("exec_sql", map[string]interface{}{"query": fetchQuery.Query, "params": fetchQuery.Params}); err != nil {
+	if err := client.DB.Rpc("exec_sql", map[string]any{"query": fetchQuery.Query, "params": fetchQuery.Params}); err != nil {
 		return acl, fmt.Errorf("failed to fetch current ACL: %w", err)
 	}
 
