@@ -374,8 +374,7 @@ func validateAuthConfig(config AuthConfig) (AuthConfig, error) {
 func NewAuthService(config AuthConfig, extraNavs map[string]*NavElem) (*AuthService, error) {
 	logger := log.New(os.Stdout, config.LogPrefix, log.LstdFlags)
 	// init Supabase client
-	GetServices().Initialize(&config.DB)
-	client := GetServices().GetSupabaseClient()
+	client, err := supabaseClient(config.DB.URL, config.DB.RoleKey)
 	if client == nil {
 		clientErr := fmt.Errorf("failed to create Supabase client")
 		logger.Printf("NewAuthService: Supabase client error: %v", clientErr)
@@ -957,11 +956,9 @@ func (a *AuthService) performSupabaseAuth(ctx context.Context, email, password s
 	var authResponse *supabase.AuthenticatedDetails
 	var userInfo *supabase.User
 
-	// Create timeout context
 	authCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	// supabase auth
 	err := func() error {
 		resp, err := a.Supabase.Auth.SignIn(authCtx, supabase.UserCredentials{
 			Email:    email,
@@ -973,7 +970,7 @@ func (a *AuthService) performSupabaseAuth(ctx context.Context, email, password s
 				a.Logger.Printf("[DEBUG] Supabase authentication failed for %s: %v", maskEmail(email), err)
 			}
 
-			// Categorize error types for better client feedback
+			// Categorize error types for better feedback
 			errMsg := strings.ToLower(err.Error())
 			if strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "credentials") {
 				return &AuthError{
@@ -1000,9 +997,7 @@ func (a *AuthService) performSupabaseAuth(ctx context.Context, email, password s
 		return nil, nil, err
 	}
 
-	// Then get user information using the token
 	err = func() error {
-		// Create separate context for user info request
 		userCtx, userCancel := context.WithTimeout(ctx, 5*time.Second)
 		defer userCancel()
 
@@ -1060,7 +1055,6 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 
 	var req LoginRequest
 
-	// Parse and validate request
 	if authErr := a.parseAndValidateRequest(r, &req, func() *AuthError {
 		if req.Email == "" || req.Password == "" {
 			return &AuthError{
@@ -1075,15 +1069,12 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Authenticate with auth provider
 	authResponse, userInfo, authErrInternal := a.authenticateUser(r, req.Email, req.Password)
 	if authErrInternal != nil {
-		// Try to cast to AuthError for specific codes
 		var authErr AuthError
 		if errors.As(authErrInternal, &authErr) {
 			a.handleError(w, r, authErr)
 		} else {
-			// Generic auth failed
 			a.handleError(w, r, AuthError{
 				Code:       "AUTH_FAILED",
 				Message:    "Authentication failed",
@@ -1098,7 +1089,6 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 		a.logWithContext(r, "[DEBUG] LoginAPI: Authentication successful for %s", maskEmail(req.Email))
 	}
 
-	// Generate CSRF token
 	csrfToken, csrfErr := a.generateCSRFToken(userInfo.ID)
 	if csrfErr != nil {
 		a.logWithContext(r, "[ERROR] LoginAPI: Failed to generate CSRF token: %v", csrfErr)
@@ -1115,10 +1105,8 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 		a.logWithContext(r, "[DEBUG] LoginAPI: CSRF token generated.")
 	}
 
-	// Set auth cookies
 	a.setAuthCookies(w, r, authResponse.AccessToken, authResponse.RefreshToken, req.Remember)
 
-	// Get user data from banUser
 	banUser, found := a.getUserByID(userInfo.ID)
 	if !found {
 		a.logWithContext(r, "[ERROR] LoginAPI: User authenticated (%s) but banUser data not found for ID %s", maskEmail(req.Email), maskID(userInfo.ID))
@@ -1140,7 +1128,6 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 		a.logWithContext(r, "[ERROR] LoginAPI: Failed to get user permissions for %s: %v", maskID(userInfo.ID), err)
 	}
 
-	// Create a complete session object
 	finalSessionData := &UserSession{
 		UserId:     userInfo.ID,
 		CreatedAt:  time.Now(),
@@ -1164,7 +1151,7 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 					refreshExpiresIn := authResponse.ExpiresIn
 					if refreshExpiresIn == 0 {
 						a.logWithContext(r, "[WARN] LoginAPI: Refresh token provided for %s, but expiration is missing or zero in authResponse. Setting very long default expiry.", maskID(userInfo.ID))
-						refreshExpiresIn = 365 * 24 * 3600 // 1 year default if not provided
+						refreshExpiresIn = 30 * 24 * 3600
 					}
 					return &RefreshToken{
 						Token:     authResponse.RefreshToken,
@@ -1183,7 +1170,6 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 		cacheSetDuration := time.Since(cacheSetStart)
 		if err != nil {
 			a.logWithContext(r, "[ERROR] LoginAPI: Failed to set session in cache for user %s: %v", maskID(userInfo.ID), err)
-			// Log error, but continue as user has cookies
 		} else if DebugMode {
 			a.logWithContext(r, "[DEBUG] LoginAPI: Successfully set session in cache for user %s in %v", maskID(userInfo.ID), cacheSetDuration)
 		}
@@ -1191,7 +1177,6 @@ func (a *AuthService) LoginAPI(w http.ResponseWriter, r *http.Request) {
 		a.logWithContext(r, "[WARN] LoginAPI: SessionCache is nil, unable to cache session for user %s", maskID(userInfo.ID))
 	}
 
-	// Prepare and send API response
 	userResponseData := UserResponse{
 		UserId:    finalSessionData.UserId,
 		Email:     finalSessionData.User.Email,
@@ -1226,7 +1211,6 @@ func (a *AuthService) SignupAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create the user in Supabase
 	if req.UserData == nil {
 		req.UserData = make(map[string]any)
 	}
@@ -1234,7 +1218,6 @@ func (a *AuthService) SignupAPI(w http.ResponseWriter, r *http.Request) {
 		req.UserData["tier"] = "free"
 	}
 
-	// Sign Up
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	user, err := a.Supabase.Auth.SignUp(ctx, supabase.UserCredentials{
@@ -1253,7 +1236,6 @@ func (a *AuthService) SignupAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	// attempt Auto-Login after successful signup
 	ctx = r.Context()
 	authResponse, userInfo, _ := a.performSupabaseAuth(ctx, req.Email, req.Password)
 	if authResponse != nil && userInfo != nil {
@@ -1513,7 +1495,6 @@ func (a *AuthService) ForgotPasswordAPI(w http.ResponseWriter, r *http.Request) 
 // Middleware Methods
 // ============================================================================================
 
-// responseWriter wraps http.ResponseWriter to capture the status code for logging
 type responseWriter struct {
 	http.ResponseWriter
 	status int
@@ -1535,7 +1516,6 @@ func (a *AuthService) Recover(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
-				// Log stack trace
 				buf := make([]byte, 1<<16)
 				n := runtime.Stack(buf, true)
 				a.Logger.Printf("PANIC recovered: %v\nRequest: %s %s\nStack trace:\n%s", err, r.Method, r.URL.Path, buf[:n])
@@ -1629,7 +1609,6 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 		ctx := r.Context()
 		justRefreshed := false
 
-		// Extract auth token from request
 		token := extractAuthToken(r)
 		if token == "" {
 			if DebugMode {
@@ -1638,7 +1617,6 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 			next(w, r.WithContext(ctx))
 			return
 		}
-		// Extract user ID from token
 		cookieObj, err := r.Cookie("auth_token")
 		if err != nil || cookieObj.Value == "" {
 			if DebugMode {
@@ -1702,10 +1680,12 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 						redirectURL := r.URL
 						q := redirectURL.Query()
 						q.Set("refreshed", "true")
+						// Update the query parameters
 						redirectURL.RawQuery = q.Encode()
 						if DebugMode {
 							a.logWithContext(r, "[DEBUG] Redirecting to %s", redirectURL.String())
 						}
+						// Add session to context and proceed
 						ctx = context.WithValue(ctx, userContextKey, finalSessionData)
 						next(w, r.WithContext(ctx))
 						return
@@ -1751,12 +1731,13 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 		log.Printf("[%s] AuthContext: Beginning token validation for user %s",
 			time.Now().Format(time.RFC3339), maskID(userID))
 		validationStart := time.Now()
-
+		// Validate the token
 		validatedUser, valid := validateAuthToken(a, ctx, token)
 		validationDuration := time.Since(validationStart)
 		log.Printf("[%s] AuthContext: Token validation completed in %v, valid: %v",
 			time.Now().Format(time.RFC3339), validationDuration, valid)
 
+		// If token validation failed or returned nil user, clear cookies and cache
 		if !valid || validatedUser == nil {
 			if DebugMode {
 				a.logWithContext(r, "[%s][DEBUG] AuthContext: Token validation failed or returned nil user.",
@@ -1765,12 +1746,14 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 			log.Printf("[%s] AuthContext: Token validation failed for user %s",
 				time.Now().Format(time.RFC3339), maskID(userID))
 
+			// If the token was not just refreshed, clear cookies and cache
 			if !justRefreshed {
 				log.Printf("[%s] AuthContext: Clearing cookies and cache for user %s",
 					time.Now().Format(time.RFC3339), maskID(userID))
 				a.clearAuthCookies(w, r)
 				a.SessionCache.Delete(userID)
 			}
+			// Proceed to next middleware
 			next(w, r.WithContext(ctx))
 			return
 		}
@@ -1782,20 +1765,25 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 		if finalSessionData == nil {
 			a.logWithContext(r, "[%s][ERROR] AuthContext: Failed to create session data after validation for user %s.",
 				time.Now().Format(time.RFC3339), maskID(userID))
+			// Clear cookies and handle error
 			log.Printf("[%s] AuthContext: Session creation failed after validation", time.Now().Format(time.RFC3339))
 			a.clearAuthCookies(w, r)
 			a.handleError(w, r, ErrServerError)
 			return
 		}
 
+		// If the user is an admin or root, check for spoofed tier
 		if finalSessionData.User != nil && (finalSessionData.User.Role == "admin" || finalSessionData.User.Role == "root") {
 			if spoofedTier, tierOK := finalSessionData.Metadata["spoofed_tier"].(string); tierOK && spoofedTier != "" {
+				// Store the original tier
 				finalSessionData.Metadata["original_tier"] = finalSessionData.User.Tier
+				// Apply the spoofed tier
 				finalSessionData.User.Tier = spoofedTier
 				if DebugMode {
 					log.Printf("[DEBUG] AuthContext: Applying spoofed tier '%s' for user %s", spoofedTier, maskID(finalSessionData.User.UserId))
 				}
 			}
+			// Set the spoof flag
 			finalSessionData.Metadata["spoof_enabled"] = true
 		}
 
@@ -1809,6 +1797,7 @@ func (a *AuthService) AuthContext(next http.HandlerFunc) http.HandlerFunc {
 		log.Printf("[%s] AuthContext: Middleware completed in %v for path %s (using validation)",
 			time.Now().Format(time.RFC3339), duration, r.URL.Path)
 
+		// Proceed to next middleware
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -1818,7 +1807,7 @@ func (a *AuthService) AuthRequired(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
-		// Fast path: check for exempt paths
+		// check for exempt paths
 		if a.isExemptPath(path) {
 			if DebugMode {
 				a.logWithContext(r, "[DEBUG] AuthRequired: Path exempt from enforcement: %s", path)

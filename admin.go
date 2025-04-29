@@ -48,6 +48,9 @@ var BuildCommit = func() string {
 }()
 
 func Admin(w http.ResponseWriter, r *http.Request) {
+	authService := r.Context().Value(authServiceKey).(*AuthService)
+	userSession := r.Context().Value(userContextKey).(*UserSession)
+
 	page := r.FormValue("page")
 	pageVars := genPageNav("Admin", r)
 	pageVars.Nav = insertNavBar("Admin", pageVars.Nav, []NavElem{
@@ -65,10 +68,14 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			Active: page == "config",
 			Class:  "selected",
 		},
+		NavElem{
+			Name:   "Metrics",
+			Short:  "📊",
+			Link:   "/admin?page=metrics",
+			Active: page == "metrics",
+			Class:  "selected",
+		},
 	})
-
-	authService := r.Context().Value(authServiceKey).(*AuthService)
-	userSession := r.Context().Value(userContextKey).(*UserSession)
 
 	msg := r.FormValue("msg")
 	if msg != "" {
@@ -141,6 +148,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Redirect(w, r, r.URL.Path, http.StatusFound)
 		return
+
 	} else if spoofTier != "" {
 		if userSession != nil && (userSession.User.Role == "admin" || userSession.User.Role == "root") {
 			// Store original tier if not already stored
@@ -413,6 +421,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			pageVars.InfoMessage = err.Error()
 		}
 		pageVars.CleanSearchQuery = out.String()
+	case "metrics":
+		pageVars.DisableLinks = true
+
 	default:
 		pageVars.Headers = []string{
 			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
@@ -521,6 +532,11 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			}
 
 			pageVars.OtherTable = append(pageVars.OtherTable, row)
+		}
+
+		if authService != nil && authService.SessionCache != nil {
+			metrics := authService.SessionCache.GetMetrics()
+			pageVars.CacheMetrics = &metrics
 		}
 	}
 

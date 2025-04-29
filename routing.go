@@ -137,7 +137,6 @@ func initMiddlewareRegistry(auth *AuthService) *MiddlewareRegistry {
 		auth.RequestLogger,
 		auth.AuthContext,
 		auth.AuthRequired,
-		auth.SpoofMiddleware,
 	)
 
 	registry.RegisterChain("csrf-protected",
@@ -145,7 +144,6 @@ func initMiddlewareRegistry(auth *AuthService) *MiddlewareRegistry {
 		auth.RequestLogger,
 		auth.AuthContext,
 		auth.AuthRequired,
-		auth.SpoofMiddleware,
 		auth.CSRFProtection,
 	)
 
