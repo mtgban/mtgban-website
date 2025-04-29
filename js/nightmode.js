@@ -1,29 +1,29 @@
-// Select the theme preference from localStorage
-const themeSwitch = document.querySelector('input');
+const themeSwitch = document.querySelector('#nightmode-toggle');
 const themeTitle = document.querySelector('span[class="slider"]');
 
-// If the current theme in localStorage is "dark"...
-if (localStorage.getItem("theme") == "dark") {
-    themeSwitch.checked = true;
-    themeTitle.title = "Nightbound"
+function setTheme(darkMode) {
+    themeSwitch.checked = darkMode;
+    document.body.classList.toggle('dark-theme', darkMode);
+    themeTitle.title = darkMode ? "Nightbound" : "Daybound";
+}
+
+const savedTheme = localStorage.getItem("theme");
+if (savedTheme) {
+    setTheme(savedTheme === "dark");
 } else {
-    themeTitle.title = "Daybound"
+    const prefersDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setTheme(prefersDarkMode);
 }
 
 themeSwitch.addEventListener('change', () => {
-    document.body.classList.toggle('dark-theme');
+    const isDarkMode = themeSwitch.checked;
+    setTheme(isDarkMode);
+    localStorage.setItem("theme", isDarkMode ? "dark" : "light");
+});
 
-    let theme = "light";
 
-    // If the body contains the .dark-theme class...
-    if (document.body.classList.contains("dark-theme")) {
-        // ...then let's make the theme dark
-        theme = "dark";
-        themeTitle.title = "Nightbound"
-    } else {
-        themeTitle.title = "Daybound"
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (localStorage.getItem("theme") === null) {
+        setTheme(e.matches);
     }
-
-    // Then save the choice in localStorage
-    localStorage.setItem("theme", theme);
 });

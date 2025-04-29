@@ -23,8 +23,8 @@ function logout() {
 document.addEventListener('DOMContentLoaded', function() {
     // Close dropdown when clicking outside
     document.addEventListener('click', function(event) {
-        const dropdowns = document.getElementsByClassName('dropdown-content');
-        const dropdownButtons = document.getElementsByClassName('dropbtn');
+        const dropdowns = document.getElementsByClassName('.tap-dropdown');
+        const dropdownButtons = document.getElementsByClassName('.tap-menu-toggle');
         
         let clickedOnDropdown = false;
         
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Toggle dropdown on mobile
-    const dropdownButtons = document.getElementsByClassName('dropbtn');
+    const dropdownButtons = document.getElementsByClassName('.tap-menu-toggle');
     for (let i = 0; i < dropdownButtons.length; i++) {
         dropdownButtons[i].addEventListener('click', function(event) {
             // Only toggle on mobile devices
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const content = this.nextElementSibling;
                 
                 // Close all other dropdowns
-                const dropdowns = document.getElementsByClassName('dropdown-content');
+                const dropdowns = document.getElementsByClassName('.tap-dropdown');
                 for (let j = 0; j < dropdowns.length; j++) {
                     if (dropdowns[j] !== content && dropdowns[j].classList.contains('show')) {
                         dropdowns[j].classList.remove('show');
