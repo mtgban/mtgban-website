@@ -10,59 +10,100 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 )
 
-var navCache = make(map[string][]NavElem)
-var navCacheMutex sync.RWMutex
+type NavIdx struct {
+	i        map[string]int
+	j        map[string]int
+	k        map[string]int
+	NavArray [][]NavElem
+	Lookup   func(role string, tier string, dev bool) int
+}
 
-// precomputeNavigation precomputes and caches all possible navigation states based on user roles and tier combinations
-func precomputeNavigation() {
+var navIdx NavIdx
+var navBuildMutex sync.RWMutex
+
+func buildNavbars() {
 	// Check if ACL is properly initialized
 	if Config.ACL.Roles == nil || Config.ACL.Tiers == nil {
 		log.Println("[ERROR] Config.ACL or its Role/Tier maps are nil. Cannot perform navigation precomputation.")
 		return
 	}
-	// get all roles from ACL
-	allRoles := []string{""}
+
+	// Initialize the role and tier indices with the empty string at index 0
+	navIdx.i = map[string]int{"": 0}
+	navIdx.j = map[string]int{"": 0}
+
+	// Add all other roles and tiers with incrementing indices
+	roleIdx := 1
 	for role := range Config.ACL.Roles {
+		navIdx.i[role] = roleIdx
+		roleIdx++
 		if DebugMode {
-			log.Printf("[DEBUG] Role: %s", role)
+			log.Printf("[DEBUG] Indexed Role: %s -> %d", role, roleIdx-1)
 		}
-		allRoles = append(allRoles, role)
 	}
-	// get all tiers from ACL
-	allTiers := []string{""}
+
+	tierIdx := 1
 	for tier := range Config.ACL.Tiers {
+		navIdx.j[tier] = tierIdx
+		tierIdx++
 		if DebugMode {
-			log.Printf("[DEBUG] Tier: %s", tier)
+			log.Printf("[DEBUG] Indexed Tier: %s -> %d", tier, tierIdx-1)
 		}
-		allTiers = append(allTiers, tier)
 	}
-	// consider DevMode states due to `IsAlwaysOnForDev`
-	isDevMode := []bool{false, true}
+
+	// Define the lookup function for converting role, tier, and dev state to an array index
+	navIdx.Lookup = func(role string, tier string, dev bool) int {
+		roleIdx, exists := navIdx.i[role]
+		if !exists {
+			log.Printf("[ERROR] Role '%s' not found in ACL roles", role)
+			roleIdx = 0
+		}
+
+		tierIdx, exists := navIdx.j[tier]
+		if !exists {
+			log.Printf("[ERROR] Tier '%s' not found in ACL tiers", tier)
+			tierIdx = 0
+		}
+
+		devIdx := 0
+		if dev {
+			devIdx = 1
+		}
+
+		tierCount := len(navIdx.j)
+		devStates := 2
+
+		return roleIdx*(tierCount*devStates) + tierIdx*devStates + devIdx
+	}
+
+	// Create the array to hold all possible navbars
+	navIdx.NavArray = make([][]NavElem, len(navIdx.i)*len(navIdx.j)*2)
 
 	if DebugMode {
 		log.Printf("[DEBUG] Precomputing all possible navigation states...")
-		log.Printf("[DEBUG] Combinations: Roles (%d) * Tiers (%d) * DevMode (%d) = %d",
-			len(allRoles), len(allTiers), len(isDevMode),
-			len(allRoles)*len(allTiers)*len(isDevMode))
+		log.Printf("[DEBUG] Combinations: Roles (%d) * Tiers (%d) * DevMode (2) = %d",
+			len(navIdx.i), len(navIdx.j), len(navIdx.i)*len(navIdx.j)*2)
 	}
 
-	// aquire write lock
-	navCacheMutex.Lock()
-	defer navCacheMutex.Unlock()
+	// Acquire write lock
+	navBuildMutex.Lock()
+	defer navBuildMutex.Unlock()
 
-	// precompute all combinations
-	for _, role := range allRoles {
-		for _, tier := range allTiers {
-			for _, devState := range isDevMode {
-				// create permissions map for this combination
-				permissions := make(map[string]interface{})
-				// set permissions based on role and tier
+	// Precompute all combinations
+	for role, _ := range navIdx.i {
+		for tier, _ := range navIdx.j {
+			for _, devState := range []bool{false, true} {
+				idx := navIdx.Lookup(role, tier, devState)
+
+				permissions := make(map[string]any)
+
 				err := setPermissions(role, tier, &permissions)
 				if err != nil {
-					log.Printf("[ERROR] computeNavs: Error setting permissions for role '%s', tier '%s': %v", role, tier, err)
+					log.Printf("[ERROR] Error setting permissions for role '%s', tier '%s': %v", role, tier, err)
 					continue
 				}
-				// build dummy session using derived permissions and UserData (needed for buildNav)
+
+				// Build dummy session
 				userId := fmt.Sprintf("%s_%s", role, tier)
 				email := fmt.Sprintf("nav_%s@mtgban.com", userId)
 				dummySession := &UserSession{
@@ -73,19 +114,16 @@ func precomputeNavigation() {
 					Metadata:    nil,
 					CreatedAt:   time.Now(),
 				}
-				// cache key captures the profile + DevMode state
-				cacheKey := fmt.Sprintf("role:%s|tier:%s|dev:%t", role, tier, devState)
-				// build nav for that state
+
+				// Build nav for that state
 				builtNav := buildNav(dummySession, devState)
 
-				// Store a copy in the cache
-				navToCache := make([]NavElem, len(builtNav))
-				copy(navToCache, builtNav)
-
-				navCache[cacheKey] = navToCache
+				// Store directly in the indexed array
+				navIdx.NavArray[idx] = builtNav
 
 				if DebugMode {
-					log.Printf("[DEBUG] Precomputed key: '%s' -> %d nav items", cacheKey, len(navToCache))
+					cacheKey := fmt.Sprintf("role:%s|tier:%s|dev:%t", role, tier, devState)
+					log.Printf("[DEBUG] Precomputed key: '%s' -> %d nav items", cacheKey, len(builtNav))
 				}
 			}
 		}
@@ -166,6 +204,7 @@ func genPageNav(activeTab string, r *http.Request) PageVars {
 		log.Printf("[DEBUG] genPageNav called for activeTab: '%s', URL: '%s'", activeTab, r.URL.Path)
 	}
 
+	// Initialize page variables
 	pageVars := PageVars{
 		Title:        "BAN " + activeTab,
 		LastUpdate:   LastUpdate,
@@ -174,6 +213,8 @@ func genPageNav(activeTab string, r *http.Request) PageVars {
 		IsLoggedIn:   false,
 		ErrorMessage: "",
 	}
+
+	// Set game-specific properties
 	if Config.Game != "" {
 		pageVars.Title += " - " + Config.Game
 		pageVars.DisableChart = true
@@ -187,29 +228,26 @@ func genPageNav(activeTab string, r *http.Request) PageVars {
 		pageVars.CardBackURL = "img/backs/default.png"
 	}
 
-	// Declare variables with default values
+	// Default user values
 	userTier := "free"
 	userRole := "user"
 	userEmail := ""
 
-	// Get UserSession from context
+	// Get user info from session if available
 	var session *UserSession
 	sessionData := r.Context().Value(userContextKey)
 	if sessionData != nil {
 		var ok bool
 		session, ok = sessionData.(*UserSession)
 		if ok && session != nil {
-			// Populate pageVars based on UserSession
 			pageVars.IsLoggedIn = true
 			if session.User != nil {
-				// get values from session
 				userEmail = session.User.Email
 				userTier = session.User.Tier
 				userRole = session.User.Role
 			} else {
 				log.Printf("[WARNING] User session found but User is nil")
 			}
-			// dont show login button if user is logged in
 			pageVars.ShowLogin = false
 			if DebugMode {
 				log.Printf("[DEBUG] genPageNav: User session loaded from context: Email: %s, Role: %s, Tier: %s", maskEmail(userEmail), userRole, userTier)
@@ -219,86 +257,48 @@ func genPageNav(activeTab string, r *http.Request) PageVars {
 		}
 	}
 
-	// Update PageVars with final determined values
+	// Update PageVars with user info
 	pageVars.UserEmail = userEmail
 	pageVars.UserTier = userTier
 	pageVars.UserRole = userRole
 
-	cacheKey := fmt.Sprintf("role:%s|tier:%s|dev:%t", userRole, userTier, DevMode)
 	if DebugMode {
-		log.Printf("[DEBUG] genPageNav: Cache key: %s", cacheKey)
-	}
-	var finalNav []NavElem
-
-	// lookup in precomputed cache
-	navCacheMutex.RLock()
-	cachedNav, found := navCache[cacheKey]
-	navCacheMutex.RUnlock()
-
-	if !found {
-		log.Printf("[WARNING] genPageNav: Precomputed navigation state NOT FOUND for key: '%s'. Falling back to dynamic build.", cacheKey)
-		finalNav = buildNav(session, DevMode)
-	} else {
-		if DebugMode {
-			log.Printf("[DEBUG] genPageNav: Nav cache HIT for key: '%s'. Cache size: %d", cacheKey, len(navCache))
-		}
-		// copy is still needed due to 'Active' and 'Class' fields
-		// TODO: javascript should be able to handle this
-		finalNav = make([]NavElem, len(cachedNav))
-		copy(finalNav, cachedNav)
-		if DebugMode {
-			log.Printf("[DEBUG] genPageNav: Copied %d items from cache for key: '%s'", len(finalNav), cacheKey)
-		}
-	}
-	pageVars.Nav = finalNav
-
-	mainNavIndex := -1
-	if DebugMode {
-		log.Printf("[DEBUG] genPageNav: Marking active nav tab for URL: '%s' (activeTab: '%s')", r.URL.Path, activeTab)
-	}
-	for i := range pageVars.Nav {
-		// Reset any potential stale state from cache/copying
-		pageVars.Nav[i].Active = false
-		pageVars.Nav[i].Class = ""
-
-		if pageVars.Nav[i].Name == activeTab {
-			mainNavIndex = i
-			if DebugMode {
-				log.Printf("[DEBUG] genPageNav: Found active tab by Name match: '%s' at index %d", activeTab, i)
-			}
-			// Found main tab match, break outer loop
-			break
-		} else {
-			// Check subpages for active tab based on the current request URL
-			for _, subPage := range pageVars.Nav[i].SubPages {
-				if r.URL.Path == subPage {
-					mainNavIndex = i
-					if DebugMode {
-						log.Printf("[DEBUG] genPageNav: Found active tab by SubPage match: '%s' (parent '%s') at index %d", r.URL.Path, pageVars.Nav[i].Name, i)
-					}
-					// Found subpage match, break inner loop
-					break
-				}
-			}
-			if mainNavIndex != -1 {
-				// Found match in subpages, break outer loop
-				break
-			}
-		}
+		log.Printf("[DEBUG] genPageNav: Looking up nav for role: %s, tier: %s, dev: %t", userRole, userTier, DevMode)
 	}
 
-	if mainNavIndex >= 0 && mainNavIndex < len(pageVars.Nav) {
-		pageVars.Nav[mainNavIndex].Active = true
-		pageVars.Nav[mainNavIndex].Class = "active"
-		if DebugMode {
-			log.Printf("[DEBUG] genPageNav: Set active nav tab: '%s'", pageVars.Nav[mainNavIndex].Name)
-		}
-	} else if DebugMode {
-		log.Printf("[DEBUG] genPageNav: No nav item found matching activeTab '%s' or URL '%s' to mark active.", activeTab, r.URL.Path)
-	}
+	// Get the nav from index, JS will handle active state
+	pageVars.Nav = getNav(userRole, userTier, DevMode)
 
 	if DebugMode {
 		log.Printf("[DEBUG] genPageNav finished. Returning PageVars with %d nav items.", len(pageVars.Nav))
 	}
 	return pageVars
+}
+
+func getNav(role string, tier string, dev bool) []NavElem {
+	idx := navIdx.Lookup(role, tier, dev)
+	// check if index is out of bounds
+	if idx < 0 || idx >= len(navIdx.NavArray) {
+		if DebugMode {
+			log.Printf("[ERROR] getNav: Calculated index %d out of bounds for NavArray (size %d) for role='%s', tier='%s', dev=%t", idx, len(navIdx.NavArray), role, tier, dev)
+		}
+		// Return a default/empty nav
+		defaultIdx := navIdx.Lookup("", "", false)
+		if defaultIdx >= 0 && defaultIdx < len(navIdx.NavArray) && navIdx.NavArray[defaultIdx] != nil {
+			return navIdx.NavArray[defaultIdx]
+		}
+		if DebugMode {
+			log.Printf("[ERROR] getNav: No default nav found, returning empty nav.")
+		}
+		return []NavElem{} // Absolute fallback
+	}
+
+	nav := navIdx.NavArray[idx]
+	if nav == nil {
+		if DebugMode {
+			log.Printf("[ERROR] getNav: Precomputed nav is nil for index %d (role='%s', tier='%s', dev=%t). Returning empty nav.", idx, role, tier, dev)
+		}
+		return []NavElem{}
+	}
+	return nav
 }
