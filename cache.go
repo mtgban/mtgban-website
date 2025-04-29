@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,6 +53,7 @@ type SessionCache struct {
 	metrics       CacheMetrics
 	cleanerStop   chan struct{}
 	cleanerActive atomic.Bool
+	cleanerWg     sync.WaitGroup
 }
 
 // InitCacheConfig initializes the cache config
@@ -78,11 +80,20 @@ func NewSessionCache(config CacheConfig) *SessionCache {
 		metrics:      CacheMetrics{},
 		cleanerStop:  make(chan struct{}),
 	}
-	// initialize cleaner paused
-	cache.cleanerActive.Store(false)
 
 	if DebugMode {
 		log.Printf("[DEBUG] Session cache map created. Initial size: %d", len(cache.sessions))
+	}
+
+	if config.CleanupInterval > 0 {
+		cache.cleanerWg.Add(1)
+		go cache.startCleaner()
+		cache.cleanerActive.Store(true)
+		if DebugMode {
+			log.Printf("[DEBUG] Session cache cleaner started with interval: %d seconds", config.CleanupInterval)
+		}
+	} else if DebugMode {
+		log.Printf("[DEBUG] Session cache cleaner disabled due to interval: %d seconds", config.CleanupInterval)
 	}
 
 	return cache
@@ -90,14 +101,18 @@ func NewSessionCache(config CacheConfig) *SessionCache {
 
 // startCleanupWorker starts a background goroutine to periodically clean the session cache
 func (c *SessionCache) startCleaner() {
-	// mark active
-	c.cleanerActive.Store(true)
+	defer c.cleanerWg.Done()
 
+	if c.config.CleanupInterval <= 0 {
+		if DebugMode {
+			log.Printf("[DEBUG] Cache cleaner exiting due to invalid interval: %d", c.config.CleanupInterval)
+		}
+		c.cleanerActive.Store(false)
+		return
+	}
 	// create ticker
 	ticker := time.NewTicker(time.Duration(c.config.CleanupInterval) * time.Second)
 	defer ticker.Stop()
-	// mark inactive on exit
-	defer c.cleanerActive.Store(false)
 
 	// start cleaner loop
 	for {
@@ -105,27 +120,25 @@ func (c *SessionCache) startCleaner() {
 		case <-ticker.C:
 			// check if cache is empty
 			c.mutex.RLock()
-			cacheSize := len(c.sessions)
+			cacheSize := c.sessionsList.Len()
 			c.mutex.RUnlock()
 
 			if cacheSize >= 1 {
 				if DebugMode {
-					log.Printf("[DEBUG] Initiating Session cache cleaner")
+					log.Printf("[DEBUG] Initiating Session cache cleaner (size %d)", cacheSize)
 				}
 				// perform cleanup
 				c.Cleanup()
-				// reset pause
 			} else {
 				if DebugMode {
-					log.Printf("[DEBUG] Cache is empty, stopping cleaner")
+					log.Printf("[DEBUG] Cache is empty (%d), skipping cleanup cycle.", cacheSize)
 				}
-				// exit goroutine
-				return
 			}
 		case <-c.cleanerStop:
 			if DebugMode {
-				log.Printf("[DEBUG] Cache cleaner received stop signal")
+				log.Println("[DEBUG] Cache cleaner received stop signal")
 			}
+			c.cleanerActive.Store(false)
 			return
 		}
 	}
@@ -137,8 +150,8 @@ func (c *SessionCache) Get(userID string) (*UserSession, bool) {
 		log.Printf("[DEBUG] Session cache Get called for userID: %s", maskID(userID))
 	}
 	c.mutex.RLock()
-	element, found := c.sessions[userID]
-	if !found {
+	element, ok := c.sessions[userID]
+	if !ok {
 		c.mutex.RUnlock()
 		atomic.AddInt64(&c.metrics.Misses, 1)
 		if DebugMode {
@@ -160,8 +173,7 @@ func (c *SessionCache) Get(userID string) (*UserSession, bool) {
 		atomic.AddInt64(&c.metrics.Misses, 1)
 		return nil, false
 	}
-
-	// found and not expired, uptick hits and copy under RLock
+	// found and not expired, uptick hits
 	atomic.AddInt64(&c.metrics.Hits, 1)
 	// Deep copy under RLock
 	sessionCopy := deepCopySession(session)
@@ -176,16 +188,15 @@ func (c *SessionCache) Get(userID string) (*UserSession, bool) {
 		}
 		log.Printf("[DEBUG] Session cache returning deep copy for userID: %s", maskID(userID))
 	}
-
 	// Update recency (move to front of list) and LastActive
-	go func(userID string) {
+	go func(userID string, elementToMove *list.Element) {
 		c.mutex.Lock()
 		defer c.mutex.Unlock()
 		// Look up again under the write lock in case it was deleted concurrently
-		if elementToUpdate, foundAgain := c.sessions[userID]; foundAgain {
-			sessionToUpdate := elementToUpdate.Value.(*UserSession)
+		if foundAgainElement, foundAgain := c.sessions[userID]; foundAgain && foundAgainElement == elementToMove {
+			sessionToUpdate := elementToMove.Value.(*UserSession)
 			if time.Since(sessionToUpdate.LastActive) <= time.Duration(c.config.TTL)*time.Second {
-				c.sessionsList.MoveToFront(elementToUpdate)
+				c.sessionsList.MoveToFront(elementToMove)
 				sessionToUpdate.LastActive = time.Now()
 				if DebugMode {
 					log.Printf("[DEBUG] Session cache: Updated LastActive for userID: %s to %s", maskID(userID), sessionToUpdate.LastActive.Format(time.RFC3339))
@@ -200,8 +211,7 @@ func (c *SessionCache) Get(userID string) (*UserSession, bool) {
 				log.Printf("[DEBUG] Session cache: Could not update LastActive for userID: %s - session not found concurrently.", maskID(userID))
 			}
 		}
-	}(userID)
-
+	}(userID, element)
 	// return deep copy
 	return sessionCopy, true
 }
@@ -224,8 +234,6 @@ func (c *SessionCache) Set(session *UserSession) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	startCleaner := len(c.sessions) == 0 && !c.cleanerActive.Load() && c.config.CleanupInterval > 0
-
 	// Update session
 	session.LastActive = time.Now()
 	if session.CreatedAt.IsZero() {
@@ -233,7 +241,7 @@ func (c *SessionCache) Set(session *UserSession) error {
 	}
 	copiedSession := deepCopySession(session)
 
-	if element, found := c.sessions[userID]; found {
+	if element, ok := c.sessions[userID]; ok {
 		// Update existing element's value and move to front
 		element.Value = copiedSession
 		c.sessionsList.MoveToFront(element)
@@ -257,7 +265,7 @@ func (c *SessionCache) Set(session *UserSession) error {
 			for c.sessionsList.Len() > c.config.MaxSize {
 				// Get oldest element
 				oldestElement := c.sessionsList.Back()
-				if oldestElement == nil { // shouldn't happen if Len() > 0
+				if oldestElement == nil { // shouldn't happen if Len() > MaxSize
 					break
 				}
 				// Remove from list and get value
@@ -276,13 +284,6 @@ func (c *SessionCache) Set(session *UserSession) error {
 
 	// Update size metric
 	c.metrics.Size = int64(c.sessionsList.Len())
-
-	if startCleaner {
-		if DebugMode {
-			log.Printf("[DEBUG] Session cache cleaner started")
-		}
-		go c.startCleaner()
-	}
 
 	return nil
 }
@@ -444,6 +445,58 @@ func (c *SessionCache) GetMetrics() CacheMetrics {
 	return metrics
 }
 
+// GetAllSessions returns all active sessions from the cache.
+func (c *SessionCache) GetAllSessions() []*UserSession {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	sessions := make([]*UserSession, 0, c.sessionsList.Len())
+	now := time.Now()
+	ttlDuration := time.Duration(c.config.TTL) * time.Second
+
+	for e := c.sessionsList.Front(); e != nil; e = e.Next() {
+		session := e.Value.(*UserSession)
+		if now.Sub(session.LastActive) <= ttlDuration {
+			sessions = append(sessions, deepCopySession(session))
+		}
+	}
+
+	sort.Slice(sessions, func(i, j int) bool {
+		return sessions[i].LastActive.After(sessions[j].LastActive)
+	})
+
+	if DebugMode {
+		log.Printf("[DEBUG] Session cache GetAllSessions returning %d active sessions", len(sessions))
+	}
+	return sessions
+}
+
+// PurgeAll removes all sessions from the cache.
+func (c *SessionCache) PurgeAll() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	initialSize := len(c.sessions)
+	c.sessions = make(map[string]*list.Element)
+	c.sessionsList = list.New()
+
+	c.metrics.Size = 0
+	if DebugMode {
+		log.Printf("[DEBUG] Session cache PurgeAll completed. Removed %d sessions. New size: 0", initialSize)
+	}
+}
+
+// ResetMetrics... resets metrics.
+func (c *SessionCache) ResetMetrics() {
+	atomic.StoreInt64(&c.metrics.Hits, 0)
+	atomic.StoreInt64(&c.metrics.Misses, 0)
+	atomic.StoreInt64(&c.metrics.Evictions, 0)
+
+	if DebugMode {
+		log.Printf("[DEBUG] Session cache ResetMetrics completed.")
+	}
+}
+
 // ExportMetricsToJson writes the current cache metrics as JSON to the provided writer.
 func (c *SessionCache) ExportMetricsToJson(w io.Writer) error {
 	metrics := c.GetMetrics() // Get metrics
@@ -507,14 +560,14 @@ func deepCopySession(src *UserSession) *UserSession {
 	}
 
 	// Copy permissions
-	permsCopy := make(map[string]interface{}, len(src.Permissions))
+	permsCopy := make(map[string]any, len(src.Permissions))
 	for k, v := range src.Permissions {
 		permsCopy[k] = v
 	}
 	copied.Permissions = permsCopy
 
 	// Copy metadata
-	metaCopy := make(map[string]interface{}, len(src.Metadata))
+	metaCopy := make(map[string]any, len(src.Metadata))
 	for k, v := range src.Metadata {
 		metaCopy[k] = v
 	}
