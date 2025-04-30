@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"maps"
+
 	supabase "github.com/the-muppet/supabase-go"
 	"golang.org/x/exp/slices"
 )
@@ -375,14 +377,10 @@ func NewAuthService(config AuthConfig, extraNavs map[string]*NavElem) (*AuthServ
 	logger := log.New(os.Stdout, config.LogPrefix, log.LstdFlags)
 	// init Supabase client
 	client, err := supabaseClient(config.DB.URL, config.DB.RoleKey)
-	if client == nil {
-		clientErr := fmt.Errorf("failed to create Supabase client")
-		logger.Printf("NewAuthService: Supabase client error: %v", clientErr)
-		return nil, clientErr
+	if err != nil {
+		logger.Fatalf("NewAuthService: Supabase client error: %v", err)
 	}
-	logger.Printf("Supabase client initialized successfully.")
 
-	// Create the service instance
 	logger.Printf("NewAuthService: Creating AuthService struct instance...")
 	service := &AuthService{
 		Logger:       logger,
@@ -403,7 +401,6 @@ func NewAuthService(config AuthConfig, extraNavs map[string]*NavElem) (*AuthServ
 	service.CSRF = csrf
 	logger.Printf("NewAuthService: CSRF initialized.")
 
-	// init session cache
 	sessionCache := NewSessionCache(InitCacheConfig(config))
 	if sessionCache == nil {
 		logger.Printf("NewAuthService: SessionCache initialization failed")
@@ -482,11 +479,8 @@ func (a *AuthService) getUserByID(userID string) (*BanUser, bool) {
 			// safe access via deep copy
 			userCopy := *user
 			permsCopy := make(map[string]any, len(user.Permissions))
-			for k, v := range user.Permissions {
-				permsCopy[k] = v
-			}
+			maps.Copy(permsCopy, user.Permissions)
 			userCopy.Permissions = permsCopy
-
 			userDataCopy := *user.UserData
 			userCopy.UserData = &userDataCopy
 
@@ -505,36 +499,6 @@ func (a *AuthService) getUserByID(userID string) (*BanUser, bool) {
 	return nil, false
 }
 
-// getUserByEmail retrieves the BanUser struct for a given email
-func (a *AuthService) getUserByEmail(email string) (*BanUser, bool) {
-	if a.ACL == nil {
-		a.Logger.Println("Warning: getUserByEmail called before BanACL is initialized.")
-		return nil, false
-	}
-
-	// safe access
-	a.ACL.mux.RLock()
-	defer a.ACL.mux.RUnlock()
-
-	user, exists := a.ACL.Users[email]
-	if !exists {
-		return nil, false
-	}
-
-	// deep copy to prevent race conditions
-	userCopy := *user
-	permsCopy := make(map[string]any, len(user.Permissions))
-	for k, v := range user.Permissions {
-		permsCopy[k] = v
-	}
-	userCopy.Permissions = permsCopy
-
-	userDataCopy := *user.UserData
-	userCopy.UserData = &userDataCopy
-
-	return &userCopy, true
-}
-
 func (a *AuthService) getUserPermissions(userId string) (permissions map[string]any, userRole string, userTier string, err error) {
 	userRole = "user"
 	userTier = "free"
@@ -549,10 +513,8 @@ func (a *AuthService) getUserPermissions(userId string) (permissions map[string]
 
 		// deep copy to prevent race conditions
 		permsCopy := make(map[string]any, len(banUser.Permissions))
-		for k, v := range banUser.Permissions {
-			permsCopy[k] = v
-		}
-		permissions = permsCopy // then assign permissions
+		maps.Copy(permsCopy, banUser.Permissions)
+		permissions = permsCopy
 
 		if DebugMode {
 			a.Logger.Printf("[DEBUG] getUserPermissions: Found user %s in BAN ACL (Role: %s, Tier: %s)",
@@ -566,10 +528,10 @@ func (a *AuthService) getUserPermissions(userId string) (permissions map[string]
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	supaUser, supaErr := a.Supabase.Auth.User(ctx, userId)
-	if supaErr != nil {
-		a.Logger.Printf("Failed to get user details from Supabase for ID %s: %v", maskID(userId), supaErr)
-		err = fmt.Errorf("failed to get user details: %w", supaErr)
+	supaUser, err := a.Supabase.Auth.User(ctx, userId)
+	if err != nil {
+		a.Logger.Printf("Failed to get user details from Supabase for ID %s: %v", maskID(userId), err)
+		err = fmt.Errorf("failed to get user details: %w", err)
 		return nil, userRole, userTier, err
 	}
 
@@ -609,9 +571,7 @@ func setPermissions(userRole string, userTier string, permissions *map[string]an
 			result[k1] = make(map[string]map[string]any)
 			for k2, v2 := range v1 {
 				result[k1][k2] = make(map[string]any)
-				for k3, v3 := range v2 {
-					result[k1][k2][k3] = v3
-				}
+				maps.Copy(result[k1][k2], v2)
 			}
 		}
 		return result

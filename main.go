@@ -836,10 +836,9 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Prefix the name passed in with templates/
 	tmplPath := fmt.Sprintf("templates/%s", tmpl)
 	navbarPath := "templates/navbar.html"
-	metricsPath := "templates/metrics.html"
 
 	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New("").Funcs(funcMap).ParseFiles(tmplPath, navbarPath, metricsPath)
+	t, err := template.New("").Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
 	if err != nil {
 		log.Print("template parsing error: ", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
