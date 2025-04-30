@@ -2181,3 +2181,6 @@ func validateAuthToken(a *AuthService, ctx context.Context, token string) (*supa
 func calculateExpiresAt(createdAt time.Time, duration time.Duration) int64 {
 	return createdAt.Add(duration).Unix()
 }
+
+logoutHandler := http.HandlerFunc(auth.LogoutAPI)
+authAssetHandler := http.HandlerFunc(auth.handleAuthAsset)

@@ -1048,7 +1048,7 @@ func attemptMatch(query string) ([]string, error) {
 			Name:      query,
 			Variation: tag,
 		})
-		if err != nil && suberr != nil {
+		if suberr != nil {
 			var alias *mtgmatcher.AliasingError
 			if errors.As(suberr, &alias) {
 				for _, extra := range alias.Probe() {

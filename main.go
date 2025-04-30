@@ -14,7 +14,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -23,6 +22,7 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
 	"gopkg.in/Iwark/spreadsheet.v2"
@@ -431,51 +431,26 @@ func Favicon(w http.ResponseWriter, r *http.Request) {
 
 // FileSystem custom file system handler
 type FileSystem struct {
-	fs http.FileSystem
-}
-
-// ServeHTTP implements the http.Handler interface and ensures proper MIME types
-func (fs FileSystem) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Get the file path from the request URL, stripping any query parameters
-	path := r.URL.Path
-	if strings.Contains(path, "?") {
-		path = strings.Split(path, "?")[0]
-	}
-	// Set content type based on file extension
-	ext := filepath.Ext(path)
-	if mimeType := getMimeType(ext); mimeType != "" {
-		w.Header().Set("Content-Type", mimeType)
-	}
-	// Let the default file server handle the rest
-	http.FileServer(fs.fs).ServeHTTP(w, r)
+	httpfs http.FileSystem
 }
 
 // Open opens the file at name from the underlying http.FileSystem
-func (fs FileSystem) Open(name string) (http.File, error) {
-	// Clean the path to prevent directory traversal
-	name = path.Clean(name)
-
-	// Try to open the file
-	f, err := fs.fs.Open(name)
+func (fs FileSystem) Open(path string) (http.File, error) {
+	f, err := fs.httpfs.Open(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if it's a directory
-	stat, err := f.Stat()
+	s, err := f.Stat()
 	if err != nil {
-		f.Close()
 		return nil, err
 	}
-
-	// If it's a directory, try to serve the index.html file
-	if stat.IsDir() {
-		f.Close()
-		indexPath := path.Join(name, "index.html")
-		if index, err := fs.fs.Open(indexPath); err == nil {
-			return index, nil
+	if s.IsDir() {
+		index := strings.TrimSuffix(path, "/") + "/index.html"
+		_, err := fs.httpfs.Open(index)
+		if err != nil {
+			return nil, err
 		}
-		return nil, err
 	}
 
 	return f, nil
@@ -503,10 +478,6 @@ func loadVars(cfg, port, datastore string) error {
 	if Config.Port == "" {
 		Config.Port = DefaultConfigPort
 	}
-	if Config.Auth.DebugMode == "true" {
-		DebugMode = true
-	}
-
 	if datastore != "" {
 		Config.DatastorePath = datastore
 	}
@@ -560,6 +531,7 @@ func main() {
 	flag.StringVar(&Config.filePath, "cfg", DefaultConfigPath, "Load configuration file")
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
+
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	flag.BoolVar(&DebugMode, "debug", false, "Enable debug mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
@@ -570,21 +542,7 @@ func main() {
 	// parse flags
 	flag.Parse()
 
-	// Load necessary environmental variables
-	err := loadVars(Config.filePath, *port, *datastore)
-	if err != nil {
-		log.Fatalln("unable to load config file:", err)
-	}
-
-	// Apply overrides
-	if *port != "" {
-		Config.Port = *port
-	}
-	if *datastore != "" {
-		Config.DatastorePath = *datastore
-	}
-
-	// Initial state settings
+	// Initial state
 	SkipInitialRefresh = false
 	SigCheck = true
 	if DevMode {
@@ -592,7 +550,12 @@ func main() {
 		SkipInitialRefresh = *skipInitialRefresh
 	}
 
-	// Create necessary directories
+	// Load necessary environmental variables
+	err := loadVars(Config.filePath, *port, *datastore)
+	if err != nil {
+		log.Fatalln("unable to load config file:", err)
+	}
+
 	_, err = os.Stat(LogDir)
 	if errors.Is(err, os.ErrNotExist) {
 		err = os.MkdirAll(LogDir, 0700)
@@ -705,16 +668,80 @@ func main() {
 		log.Println("Error connecting to discord", err)
 	}
 
-	// Set seed in case we need to do random operations
-	rand.New(rand.NewSource(time.Now().UnixNano()))
+	rand.Seed(time.Now().UnixNano())
 
-	// setup http server with authService
-	srv := setupServer(authService)
+	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(&FileSystem{http.Dir("css")})))
+	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(&FileSystem{http.Dir("img")})))
+	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(&FileSystem{http.Dir("js")})))
 
-	// Wait for shutdown signal
+	http.HandleFunc("/go/", Redirect)
+	http.HandleFunc("/random", RandomSearch)
+	http.HandleFunc("/randomsealed", RandomSealedSearch)
+	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
+	})
+
+	http.Handle("/", noAuth(http.HandlerFunc(Home)))
+
+	http.Handle("/next-api/auth/login", LoginAPI)                    // noAuth
+	http.Handle("/next-api/auth/signup", SignupAPI)                  // noAuth
+	http.Handle("/next-api/auth/forgot-password", ForgotPasswordAPI) // noAuth
+	http.Handle("/next-api/auth/me", GetUserAPI)                     // useAuth
+	http.Handle("/next-api/auth/refresh-token", RefreshTokenAPI)     // noAuth
+	http.Handle("/next-api/auth/logout", logoutHandler)              // useAuth
+	http.Handle("/auth/", authAssetHandler)                          // noAuth
+	http.Handle("/_next/", authAssetHandler)                         // noAuth
+
+	for key, nav := range ExtraNavs {
+		// Set up logging
+		logFile, err := logfile.New(&logfile.LogFile{
+			FileName:    path.Join(LogDir, key+".log"),
+			MaxSize:     500 * 1024,
+			Flags:       logfile.FileOnly,
+			OldVersions: 2,
+		})
+		if err != nil {
+			log.Printf("Failed to create logFile for %s: %s", key, err)
+			LogPages[key] = log.New(os.Stderr, "", log.LstdFlags)
+		} else {
+			LogPages[key] = log.New(logFile, "", log.LstdFlags)
+		}
+
+		_, ExtraNavs[key].NoAuth = Config.ACL.Tiers["Free"][key]
+
+		// Set up the handler
+		handler := useAuth(http.HandlerFunc(nav.Handle))
+		if nav.NoAuth {
+			handler = noAuth(http.HandlerFunc(nav.Handle))
+		}
+		http.Handle(nav.Link, handler)
+
+		// Add any additional endpoints to it
+		for _, subPage := range nav.SubPages {
+			http.Handle(subPage, handler)
+		}
+	}
+
+	http.Handle("/search/oembed", noAuth(http.HandlerFunc(Search)))
+	http.Handle("/api/mtgban/", apiAuth(http.HandlerFunc(PriceAPI)))
+	http.Handle("/api/mtgjson/ck.json", apiAuth(http.HandlerFunc(API)))
+	http.Handle("/api/tcgplayer/", useAuth(http.HandlerFunc(TCGHandler)))
+	http.Handle("/api/search/", useAuth(http.HandlerFunc(SearchAPI)))
+	http.Handle("/api/cardkingdom/pricelist.json", noAuth(http.HandlerFunc(CKMirrorAPI)))
+	http.Handle("/api/suggest", noAuth(http.HandlerFunc(SuggestAPI)))
+	http.Handle("/api/opensearch.xml", noAuth(http.HandlerFunc(OpenSearchDesc)))
+	// compat
+	http.Handle("/img/opensearch.xml", noAuth(http.HandlerFunc(OpenSearchDesc)))
+
+	http.HandleFunc("/favicon.ico", Favicon)
+	http.HandleFunc("/auth", authHandler)
+
+	srv := &http.Server{
+		Addr: ":" + Config.Port,
+	}
+
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
 	go func() {
 		err := srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
@@ -724,25 +751,20 @@ func main() {
 
 	<-done
 
-	// Perform graceful shutdown
-	gracefulShutdown(srv)
-
-}
-
-// gracefulShutdown performs a graceful server shutdown
-func gracefulShutdown(srv *http.Server) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// Close any zombie connection and perform any extra cleanup
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		ServerNotify("shutdown", "Server cleaning up...")
 		cleanupDiscord()
 		cancel()
 	}()
 
-	err := srv.Shutdown(ctx)
+	err = srv.Shutdown(ctx)
 	if err != nil {
 		ServerNotify("shutdown", "Server shutdown failed: "+err.Error())
 		return
 	}
+
 	ServerNotify("shutdown", "Server shutdown correctly")
 }
 
@@ -828,26 +850,23 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		"base64enc": func(s string) string {
 			return base64.StdEncoding.EncodeToString([]byte(s))
 		},
-		"lower": strings.ToLower,
 	}
 
 	// Give each template a name
 	name := path.Base(tmpl)
 	// Prefix the name passed in with templates/
-	tmplPath := fmt.Sprintf("templates/%s", tmpl)
-	navbarPath := "templates/navbar.html"
+	tmpl = fmt.Sprintf("templates/%s", tmpl)
 
 	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New("").Funcs(funcMap).ParseFiles(tmplPath, navbarPath)
+	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmpl)
 	if err != nil {
 		log.Print("template parsing error: ", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	// Execute the template and pass in the variables to fill the gaps
-	err = t.ExecuteTemplate(w, name, pageVars)
+	err = t.Execute(w, pageVars)
 	if err != nil {
-		log.Printf("template executing error (%s): %v", name, err)
+		log.Print("template executing error: ", err)
 	}
 }
