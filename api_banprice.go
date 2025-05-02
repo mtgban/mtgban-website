@@ -70,7 +70,10 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		if filter == "singles" {
 			var filtered []string
 			for _, code := range sets {
-				set, _ := mtgmatcher.GetSet(code)
+				set, err := mtgmatcher.GetSet(code)
+				if err != nil {
+					continue
+				}
 				if len(set.Cards) > 0 {
 					filtered = append(filtered, code)
 				}
@@ -79,7 +82,10 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		} else if filter == "sealed" {
 			var filtered []string
 			for _, code := range sets {
-				set, _ := mtgmatcher.GetSet(code)
+				set, err := mtgmatcher.GetSet(code)
+				if err != nil {
+					continue
+				}
 				if len(set.SealedProduct) > 0 {
 					filtered = append(filtered, code)
 				}
@@ -808,7 +814,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 	sort.Strings(allScrapers)
 	sort.Strings(allScraperNames)
 
-	header := []string{"UUID", "Card Name", "Set Code", "Number", "Finish"}
+	header := []string{"Scryfall ID", "Card Name", "Set Code", "Number", "Finish"}
 	header = append(header, allScraperNames...)
 	header = append(header, "Loaded Price", "Loaded Condition", "Loaded Quantity", "Notes")
 	err := w.Write(header)
@@ -865,6 +871,11 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 		prices = append(prices, qty)
 
 		prices = append(prices, uploadedDada[j].Notes)
+
+		scryfallID, found := co.Identifiers["scryfallId"]
+		if found {
+			id = scryfallID
+		}
 
 		record := []string{id, cardName, code, number}
 		if co.Etched {

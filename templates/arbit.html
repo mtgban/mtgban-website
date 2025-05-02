@@ -387,9 +387,11 @@
                         </form>
                     {{end}}
 
+                    <!--
                     {{if eq $sourceKey "TCGDirect"}}
                         <span class="emoji" style="cursor: pointer;" onclick='getAllDirectQuantitiesFor({{$scraperKey}}); this.setAttribute("onclick", "javascript:void(0)")' title="Update ALL quantities for TCG Direct">⚡️</span>
                     {{end}}
+                    -->
 
                     <hr width=20%>
                 </div>
@@ -477,9 +479,11 @@
                                 </a>&nbsp;
                                 {{else}}
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{(index $.Metadata .CardId).Name}}')" title="Copy to clipboard">📝</span>&nbsp;
+                                    <!--
                                     {{if eq $sourceKey "TCGDirect"}}
                                         <span class="emoji" style="cursor: pointer;" onclick="getDirectQty(this, '{{.CardId}}')" title="Update quantities for TCG Direct" id="directqty-{{.CardId}}">⚡️</span>
                                     {{end}}
+                                    -->
                                 {{end}}
                                 <a href="{{(index $.Metadata .CardId).SearchURL}}">{{(index $.Metadata .CardId).Name}}</a>
                                 {{if (index $.Metadata .CardId).Reserved}} *{{end}}

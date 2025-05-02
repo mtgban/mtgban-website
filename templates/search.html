@@ -361,7 +361,7 @@
                                 You can filter by card properties using <pre>is:VALUE</pre> or <pre>not:VALUE</pre>, accepting these self-describing options:
                                 <ul class="indent">
                                     <li>Generic properties: <i>reserved, token, oversize, funny, wcd, commander,productless</i></li>
-                                    <li>Frame properties: <i>fullart (fa), extendedart (ea), showcase (sc), reskin, borderless (bd), gold, retro, future</i></li>
+                                    <li>Frame properties: <i>fullart (fa), extendedart (ea), showcase (sc), reskin, borderless (bd), gold, retro, future, foil, nonfoil</i></li>
                                     <li>Promo properties: <i>{{range $.PromoTags}}{{.}}, {{end}} promo</i></li>
                                     <li>Language properties: <i>japanese (jp, jpn), phyrexian (ph)</i></li>
                                     <li>Known card sets: <i>power9, dual, fastland, fetchland, painland, shockland, checkland, surveilland, filterland</i></li>
@@ -370,16 +370,18 @@
                                 Of course <pre>not</pre> and <pre>-is</pre> are equivalent.
                             </li>
                             <li>There is limited support for human readable tags, for example if <pre>(Extended Art)</pre> is appended to a card name, the search will only show cards that are Extended Art (similar to the <pre>is:extendedart</pre> filter). Note that this syntax will not work with regexp search mode.</li>
-                            <li>You can change the <b>search mode</b> with <pre>sm:VALUE</pre>, accepting <pre>exact</pre> (default), <pre>prefix</pre>, <pre>any</pre>, or <pre>regexp</pre>:</li>
+                            <li>You can change the <b>search mode</b> with <pre>sm:VALUE</pre>, accepting <pre>exact</pre> (default), <pre>prefix</pre>, <pre>any</pre>, <pre>regexp</pre>, or <pre>scryfall</pre>:</li>
                             <ul class="indent">
                                 <li>Normally a card is searched with an <b>exact</b> strategy, you will get only cards with exactly the same name as searched.
                                     <br>For example <pre>Vesuva</pre> will return the card named Vesuva and no other Vesuvan counterpart.</li>
                                 <li>If you search in <b>prefix</b> mode, you will get all the cards with the name starting with what you searched.
                                     <br>For example <pre>"Dragonlord"</pre> will return all the cards starting with "Dragonlord".</li>
-                                <li>If you search in in <b>any</b> mode, you will get all the cards containing any of the text present in card names.
+                                <li>If you search in <b>any</b> mode, you will get all the cards containing any of the text present in card names.
                                     <br>For example <pre>*Draco*</pre> will return the card named Draco and all the cards that have "draco" in their names.</li>
-                                <li>If you search in in <b>regexp</b> mode, you will get all the cards names matching the regular expresion.
+                                <li>If you search in <b>regexp</b> mode, you will get all the cards names matching the regular expresion.
                                     <br>For example <pre>Cluestone$</pre> will return the card that end with Cluestone in their name. Note this search mode is case sensitive.</li>
+                                <li>If you search in <b>scryfall</b> mode, your search will be forwarded to Scryfall and will get all the resulting cards. Note that BAN card filters will be disabled to avoid conficting result between the two search syntaxes, while store and price filters will still work.
+                                    <br>For example <pre>art:loot f:f</pre> will return all the foil cards tagged with "loot", looking up the results from Scryfall, and then filter by foil version.</li>
                             </ul>
                             <li>You can change the <b>sort mode</b> with <pre>sort:VALUE</pre>, accepting <pre>chrono</pre> (chonologically by print date, default), <pre>hybrid</pre> (for alphabetical order grouped by sets), <pre>alpha</pre> (for alphabetical order), <pre>retail</pre> (for TCG price order), or <pre>buylist</pre> (for CK buylist price order). Note that when this option is set, the sort UI will be disabled.<</li>
                             <li>You can set any option in any order, in any amount. When filtering for a group of values you can use a comma <pre>,</pre> to separate values.</li>
@@ -932,6 +934,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             <td rowspan=2>
                                                     <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 src="/img/logo/tcgapp.png"></a>
                                             </td>
+                                            <!--
                                             <td rowspan=2>
                                                 <a href="javascript:getLastSold('{{$cardId}}')" title="Retrieve last sales on TCG" id="lastsolda{{$cardId}}"><span class="emoji">💸</span></a>
                                             </td>
@@ -948,6 +951,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                     {{end}}
                                                 {{end}}
                                             {{end}}
+                                            -->
                                         {{end}}
                                         {{if and (not $.DisableChart) (eq $.ChartID "")}}
                                             <td rowspan=2>

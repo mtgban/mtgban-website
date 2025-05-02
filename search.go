@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/BlueMonday/go-scryfall"
 	"github.com/danielgtaylor/unistyle"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -938,6 +940,8 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		if err != nil {
 			uuids, err = mtgmatcher.SearchSealedContains(query)
 		}
+	case "scryfall":
+		uuids, err = searchScrfyall(query)
 	case "mixed":
 		uuids, err = mtgmatcher.SearchSealedEquals(query)
 		if err != nil {
@@ -969,6 +973,59 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		selectedUUIDs = append(selectedUUIDs, uuid)
 	}
 	return selectedUUIDs, nil
+}
+
+func searchScrfyall(query string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*30))
+	defer cancel()
+
+	client, err := scryfall.NewClient()
+	if err != nil {
+		return nil, err
+	}
+
+	i := 1
+	var out []string
+	for {
+		sco := scryfall.SearchCardsOptions{
+			Unique:        scryfall.UniqueModePrints,
+			IncludeExtras: true,
+			Page:          i,
+		}
+
+		result, err := client.SearchCards(ctx, query, sco)
+		if err != nil {
+			return nil, err
+		}
+
+		// Sort through the results, add the possible foil and etched variants
+		for _, card := range result.Cards {
+			id := mtgmatcher.Scryfall2UUID(card.ID)
+			if id == "" {
+				continue
+			}
+			out = append(out, id)
+
+			foilId, err := mtgmatcher.MatchId(id, true)
+			if err == nil && foilId != id {
+				out = append(out, foilId)
+			}
+
+			etchedId, err := mtgmatcher.MatchId(id, false, true)
+			if err == nil && etchedId != id {
+				out = append(out, etchedId)
+			}
+		}
+
+		// Exit the loop when there are no more results
+		// or when too many got pulled in
+		if !result.HasMore || i > 5 {
+			break
+		}
+		i++
+	}
+
+	return out, nil
 }
 
 // Try searching for cards usign the Match algorithm

@@ -30,8 +30,6 @@ const (
 )
 
 const (
-	PatreonClientId = "VrjStFvhtp7HhF1xItHm83FMY7PK3nptpls1xVkYL5IDufXNVW4Xb-pHPXBIuWZ4"
-
 	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
 	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
 	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/"
@@ -48,8 +46,22 @@ const (
 )
 
 func getUserToken(code, baseURL, ref string) (string, error) {
-	clientId := PatreonClientId
-	secret := Config.Patreon.Secret["ban"]
+	source := "ban"
+
+	// ref might point to a different patreon configuration
+	refs := strings.Split(ref, ";")
+	if len(refs) > 1 {
+		source = refs[1]
+	}
+
+	clientId, found := Config.Patreon.Client[source]
+	if !found {
+		return "", fmt.Errorf("missing client id for %s", source)
+	}
+	secret, found := Config.Patreon.Secret[source]
+	if !found {
+		return "", fmt.Errorf("missing secret for %s", source)
+	}
 
 	resp, err := cleanhttp.DefaultClient().PostForm(PatreonTokenURL, url.Values{
 		"code":          {code},
@@ -294,8 +306,10 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	putSignatureInCookies(w, r, sig)
 
 	// Redirect to the URL indicated in this query param, or go to homepage
-	redir := r.FormValue("state")
-	if redir == "" {
+	redir := strings.Split(r.FormValue("state"), ";")[0]
+
+	// Go back home if empty or if coming back from a logout
+	if redir == "" || strings.Contains(redir, "errmsg=logout") {
 		redir = getBaseURL(r)
 	}
 

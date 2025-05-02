@@ -210,7 +210,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "New config loaded!")
 		doReboot = true
 
-		err := loadVars(DefaultConfigPath)
+		err := loadVars(Config.filePath, "", "")
 		if err != nil {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}
@@ -362,17 +362,47 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		newConfig := r.FormValue("textArea")
 		if newConfig != "" {
 			var config ConfigType
+			configFilePath := Config.filePath
+
+			// Test if data can be unmarshaled
 			err := json.Unmarshal([]byte(newConfig), &config)
 			if err != nil {
 				pageVars.InfoMessage = err.Error()
 				pageVars.CleanSearchQuery = newConfig
 				break
 			}
-			pageVars.InfoMessage = "Config updated"
+
+			// Test if file is writable
+			file, err := os.Create(configFilePath)
+			if err != nil {
+				log.Println(err)
+				pageVars.InfoMessage = err.Error()
+				pageVars.CleanSearchQuery = newConfig
+				break
+			}
+			defer file.Close()
+
+			// Test if writing the permanent config is ok
+			err = writeConfigFile(config, file)
+			if err != nil {
+				log.Println(err)
+				pageVars.InfoMessage = err.Error()
+				pageVars.CleanSearchQuery = newConfig
+				break
+			}
+
+			// Only then update the running configuration
 			Config = config
+
+			// Preserve the current filepath
+			Config.filePath = configFilePath
+
+			pageVars.InfoMessage = "Config updated"
 		}
+
+		// Load the current configuration and save it in text
 		var out bytes.Buffer
-		err := writeConfigFile(&out)
+		err := writeConfigFile(Config, &out)
 		if err != nil {
 			pageVars.InfoMessage = err.Error()
 		}
@@ -652,12 +682,12 @@ func getDemoKey(link string) string {
 
 var apiUsersMutex sync.RWMutex
 
-func writeConfigFile(writer io.Writer) error {
+func writeConfigFile(config ConfigType, writer io.Writer) error {
 	e := json.NewEncoder(writer)
 	// Avoids & -> \u0026 and similar
 	e.SetEscapeHTML(false)
 	e.SetIndent("", "    ")
-	return e.Encode(&Config)
+	return e.Encode(&config)
 }
 
 func generateAPIKey(link, user string, duration time.Duration) (string, error) {
@@ -681,7 +711,7 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 		}
 		defer file.Close()
 
-		err = writeConfigFile(file)
+		err = writeConfigFile(Config, file)
 		if err != nil {
 			return "", err
 		}

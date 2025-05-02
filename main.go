@@ -37,7 +37,7 @@ type PageVars struct {
 	Nav      []NavElem
 	ExtraNav []NavElem
 
-	PatreonId    string
+	PatreonIds   map[string]string
 	PatreonURL   string
 	PatreonLogin bool
 	Hash         string
@@ -353,6 +353,7 @@ type ConfigType struct {
 	GlobalAllowList        []string          `json:"global_allow_list"`
 	GlobalProbeList        []string          `json:"global_probe_list"`
 	Patreon                struct {
+		Client map[string]string `json:"client"`
 		Secret map[string]string `json:"secret"`
 		Grants []struct {
 			Category string `json:"category"`
@@ -408,8 +409,10 @@ var Newspaper1dayDB *sql.DB
 var GoogleDocsClient *http.Client
 
 const (
-	DefaultConfigPort = "8080"
-	DefaultSecret     = "NotVerySecret!"
+	DefaultConfigPort    = "8080"
+	DefaultDatastorePath = "allprintings5.json"
+	DefaultConfigPath    = "config.json"
+	DefaultSecret        = "NotVerySecret!"
 )
 
 func Favicon(w http.ResponseWriter, r *http.Request) {
@@ -464,7 +467,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		ErrorMessage: msg,
 		LastUpdate:   LastUpdate,
 
-		PatreonId:    PatreonClientId,
+		PatreonIds:   Config.Patreon.Client,
 		PatreonURL:   PatreonHost,
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,
@@ -529,28 +532,37 @@ func genPageNav(activeTab, sig string) PageVars {
 	return pageVars
 }
 
-func loadVars(cfg string) error {
-	// Load from command line
+func loadVars(cfg, port, datastore string) error {
+	// Load from config file
 	file, err := os.Open(cfg)
-	if err != nil {
+	if !DevMode && err != nil {
 		return err
 	}
-	defer file.Close()
+	if err == nil {
+		defer file.Close()
 
-	d := json.NewDecoder(file)
-	err = d.Decode(&Config)
-	if err != nil {
-		return err
+		err = json.NewDecoder(file).Decode(&Config)
+		if err != nil {
+			return err
+		}
 	}
 
-	Config.filePath = cfg
-
+	// Load from command line
+	if port != "" {
+		Config.Port = port
+	}
 	if Config.Port == "" {
 		Config.Port = DefaultConfigPort
 	}
 
+	if datastore != "" {
+		Config.DatastorePath = datastore
+	}
 	if Config.DatastorePath == "" {
-		return errors.New("missing datastore path")
+		if Config.Game != "" {
+			return errors.New("no datastore specified for non-default game")
+		}
+		Config.DatastorePath = DefaultDatastorePath
 	}
 
 	// Load from env
@@ -592,38 +604,31 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-const DefaultConfigPath = "config.json"
-
 func main() {
-	config := flag.String("cfg", DefaultConfigPath, "Load configuration file")
-	devMode := flag.Bool("dev", false, "Enable developer mode")
-	sigCheck := flag.Bool("sig", false, "Enable signature verification")
-	skipInitialRefresh := flag.Bool("skip", true, "Skip initial refresh")
-	noload := flag.Bool("noload", false, "Do not load price data")
-	logdir := flag.String("log", "logs", "Directory for scrapers logs")
+	flag.StringVar(&Config.filePath, "cfg", DefaultConfigPath, "Load configuration file")
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
 
+	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
+	sigCheck := flag.Bool("sig", false, "Enable signature verification")
+	skipInitialRefresh := flag.Bool("skip", true, "Skip initial refresh")
+	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
+	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
+
 	flag.Parse()
-	DevMode = *devMode
-	SkipPrices = *noload
+
+	// Initial state
+	SkipInitialRefresh = false
 	SigCheck = true
 	if DevMode {
 		SigCheck = *sigCheck
 		SkipInitialRefresh = *skipInitialRefresh
 	}
-	LogDir = *logdir
 
 	// load necessary environmental variables
-	err := loadVars(*config)
+	err := loadVars(Config.filePath, *port, *datastore)
 	if err != nil {
 		log.Fatalln("unable to load config file:", err)
-	}
-	if *port != "" {
-		Config.Port = *port
-	}
-	if *datastore != "" {
-		Config.DatastorePath = *datastore
 	}
 
 	_, err = os.Stat(LogDir)

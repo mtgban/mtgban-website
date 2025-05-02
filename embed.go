@@ -269,7 +269,7 @@ func longestName(results []SearchEntry) (out int) {
 func grabLastSold(cardId string, lang string) ([]EmbedField, error) {
 	var fields []EmbedField
 
-	lastSales, err := getLastSold(cardId)
+	lastSales, err := getLastSold(cardId, false)
 	if err != nil {
 		return nil, err
 	}

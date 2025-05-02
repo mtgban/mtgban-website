@@ -179,7 +179,7 @@ func API(w http.ResponseWriter, r *http.Request) {
 
 var ErrMissingTCGId = errors.New("tcg id not found")
 
-func getLastSold(cardId string) ([]tcgplayer.LatestSalesData, error) {
+func getLastSold(cardId string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
 		return nil, err
@@ -190,17 +190,14 @@ func getLastSold(cardId string) ([]tcgplayer.LatestSalesData, error) {
 		return nil, ErrMissingTCGId
 	}
 
-	latestSales, err := tcgplayer.LatestSales(tcgId, co.Foil || co.Etched)
+	latestSales, err := tcgplayer.LatestSales(tcgId, co.Foil || co.Etched, anyLang)
 	if err != nil {
 		return nil, err
 	}
 
 	// If we got an empty response, try again with all the possible languages
-	if len(latestSales.Data) == 0 {
-		latestSales, err = tcgplayer.LatestSales(tcgId, co.Foil || co.Etched, true)
-		if err != nil {
-			return nil, err
-		}
+	if len(latestSales.Data) == 0 && !anyLang {
+		return getLastSold(cardId, true)
 	}
 
 	return latestSales.Data, nil
@@ -246,7 +243,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	var useCSV bool
 	if isLastSold {
 		UserNotify("tcgLastSold", cardId)
-		data, err = getLastSold(cardId)
+		data, err = getLastSold(cardId, false)
 	} else if isDirectQty {
 		UserNotify("tcgDirectQty", cardId)
 		data, err = getDrirectQty(cardId)
@@ -329,7 +326,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		return err
 	}
 
-	header := []string{"name", "set_name", "language", "finish", "quantity"}
+	header := []string{"quantity", "productid", "name", "set_name", "language", "finish"}
 	err = w.Write(header)
 	if err != nil {
 		return err
@@ -339,10 +336,8 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		if !found {
 			continue
 		}
-		name, found := blEntries[0].CustomFields["SCGName"]
-		if !found {
-			continue
-		}
+		productId := blEntries[0].CustomFields["scgSKU"]
+		name := blEntries[0].CustomFields["SCGName"]
 		edition := blEntries[0].CustomFields["SCGEdition"]
 		language := blEntries[0].CustomFields["SCGLanguage"]
 		finish := blEntries[0].CustomFields["SCGFinish"]
@@ -351,7 +346,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 			quantity = qtys[i]
 		}
 
-		err = w.Write([]string{name, edition, language, finish, quantity})
+		err = w.Write([]string{quantity, productId, name, edition, language, finish})
 		if err != nil {
 			return err
 		}
@@ -419,7 +414,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 			}
 		}
 		cond := "NM"
-		if conds != nil {
+		if conds != nil && conds[i] != "" {
 			cond = conds[i]
 		}
 		qty[id+cond] += quantity
@@ -434,7 +429,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		var prices [3]float64
 
 		cond := "NM"
-		if conds != nil {
+		if conds != nil && conds[i] != "" {
 			cond = conds[i]
 		}
 
@@ -462,7 +457,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		record := make([]string, 0, len(tcgcsvHeader))
 
 		record = append(record, tcgSkuId)
-		record = append(record, "")
+		record = append(record, "Magic")
 		record = append(record, co.Edition)
 		record = append(record, co.Name)
 		record = append(record, "")
@@ -475,7 +470,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		record = append(record, fmt.Sprintf("%0.2f", prices[2]))
 		record = append(record, "")
 		record = append(record, fmt.Sprint(qty[id+cond]))
-		record = append(record, "")
+		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
 		record = append(record, "")
 
 		err = w.Write(record)

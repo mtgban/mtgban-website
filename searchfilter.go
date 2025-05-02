@@ -333,6 +333,11 @@ func cardobject2sources(co *mtgmatcher.CardObject) []string {
 		values = co.SourceProducts["sealed"]
 	} else if co.Etched {
 		values = co.SourceProducts["etched"]
+		// Due to how `card` is represented in mtg-sealed-content,
+		// some etched cards get mapped to plain foil finish
+		if values == nil {
+			values = co.SourceProducts["foil"]
+		}
 	} else if co.Foil {
 		values = co.SourceProducts["foil"]
 	} else {
@@ -484,6 +489,7 @@ func init() {
 }
 
 func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) (config SearchConfig) {
+	rawQuery := query
 	var filters []FilterElem
 	var filterStores []FilterStoreElem
 	var filterPrices []*FilterPriceElem
@@ -910,6 +916,13 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			}
 			filterPrices = append(filterPrices, filter)
 		}
+	}
+
+	// Leave as much as possible intact and ignore what was parsed
+	if config.SearchMode == "scryfall" {
+		query = strings.Replace(rawQuery, "sm:scryfall", "", -1)
+		config.FullQuery = rawQuery
+		filters = nil
 	}
 
 	// Check if we can apply a finish filter through the custom syntax
@@ -1457,6 +1470,14 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 	"is": func(filters []string, co *mtgmatcher.CardObject) bool {
 		for _, value := range filters {
 			switch value {
+			case "foil":
+				if co.Foil || co.Etched {
+					return false
+				}
+			case "nonfoil":
+				if !co.Foil && !co.Etched {
+					return false
+				}
 			case "reserved":
 				if co.IsReserved {
 					return false

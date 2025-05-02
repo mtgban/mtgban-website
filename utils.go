@@ -430,7 +430,8 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		}
 		// Shrink icons to fit more of them
 		if len(co.Printings) > MaxBeforeShrink {
-			printings = strings.Replace(printings, "ss-2x", "ss-1x", -1)
+			// Make sure not to capture the 2X2 set code
+			printings = strings.Replace(printings, "ss-2x\"", "ss-1x\"", -1)
 		}
 	}
 
@@ -470,16 +471,8 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		hasDecklist = mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID)
 	}
 
-	var sourceSealed []string
-	if co.Sealed {
-		sourceSealed = co.SourceProducts["sealed"]
-	} else if co.Etched {
-		sourceSealed = co.SourceProducts["etched"]
-	} else if co.Foil {
-		sourceSealed = co.SourceProducts["foil"]
-	} else {
-		sourceSealed = co.SourceProducts["nonfoil"]
-	}
+	sourceSealed := cardobject2sources(co)
+
 	var products string
 	if len(sourceSealed) > 0 {
 		products += "<h4>"
