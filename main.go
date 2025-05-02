@@ -362,10 +362,11 @@ type ConfigType struct {
 			Tier     string `json:"tier"`
 		} `json:"grants"`
 	} `json:"patreon"`
-	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
-	GoogleCredentials string            `json:"google_credentials"`
-
-	ACL map[string]map[string]map[string]string `json:"acl"`
+	ApiUserSecrets    map[string]string                       `json:"api_user_secrets"`
+	GoogleCredentials string                                  `json:"google_credentials"`
+	Supabase          SupabaseConfig                          `json:"supabase"`
+	Stripe            StripeConfig                            `json:"stripe"`
+	ACL               map[string]map[string]map[string]string `json:"acl"`
 
 	Uploader struct {
 		Moxfield string `json:"moxfield"`
