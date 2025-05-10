@@ -1,39 +1,28 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha1"
+	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	"slices"
+
 	"github.com/NYTimes/gziphandler"
-	cleanhttp "github.com/hashicorp/go-cleanhttp"
-	"golang.org/x/oauth2"
 )
 
-var PatreonHost string
+var AuthHost string
 
 const (
 	DefaultHost              = "www.mtgban.com"
 	DefaultSignatureDuration = 11 * 24 * time.Hour
-)
-
-const (
-	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
-	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
-	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/"
-	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title"
 )
 
 const (
@@ -45,187 +34,680 @@ const (
 	ErrMsgUseAPI  = "Slow down, you're making too many requests! For heavy data use consider the BAN API"
 )
 
-func getUserToken(code, baseURL, ref string) (string, error) {
-	source := "ban"
-
-	// ref might point to a different patreon configuration
-	refs := strings.Split(ref, ";")
-	if len(refs) > 1 {
-		source = refs[1]
-	}
-
-	clientId, found := Config.Patreon.Client[source]
-	if !found {
-		return "", fmt.Errorf("missing client id for %s", source)
-	}
-	secret, found := Config.Patreon.Secret[source]
-	if !found {
-		return "", fmt.Errorf("missing secret for %s", source)
-	}
-
-	resp, err := cleanhttp.DefaultClient().PostForm(PatreonTokenURL, url.Values{
-		"code":          {code},
-		"grant_type":    {"authorization_code"},
-		"client_id":     {clientId},
-		"client_secret": {secret},
-		"redirect_uri":  {baseURL + "/auth"},
-	})
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var userTokens struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		Expires      int    `json:"expires_in"`
-		Scope        string `json:"scope"`
-		TokenType    string `json:"token_type"`
-	}
-	err = json.Unmarshal(data, &userTokens)
-	if err != nil {
-		return "", err
-	}
-
-	return userTokens.AccessToken, nil
-}
-
-type PatreonUserData struct {
-	UserIds  []string
-	FullName string
+type UserData struct {
+	ID       string
 	Email    string
+	FullName string
 }
 
-// Retrieve a user id for each membership of the current user
-func getUserIds(tc *http.Client) (*PatreonUserData, error) {
-	resp, err := tc.Get(PatreonIdentityURL)
+type AuthResult struct {
+	UserID      string
+	Permissions map[string]map[string]any
+	Signature   string
+	Token       string
+	APIKey      string
+	Error       error
+}
+
+func extractClaims(token string) (map[string]any, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return nil, fmt.Errorf("invalid JWT format")
+	}
+
+	// Decode JWT payload
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
+	// Parse JSON payload
+	var claims map[string]any
+	if err := json.Unmarshal(payload, &claims); err != nil {
 		return nil, err
 	}
 
-	var userData struct {
-		Errors []struct {
-			Title    string `json:"title"`
-			CodeName string `json:"code_name"`
-		} `json:"errors"`
-		Data struct {
-			Attributes struct {
-				Email    string `json:"email"`
-				FullName string `json:"full_name"`
-			} `json:"attributes"`
-			Relationships struct {
-				Memberships struct {
-					Data []struct {
-						Id   string `json:"id"`
-						Type string `json:"type"`
-					} `json:"data"`
-				} `json:"memberships"`
-			} `json:"relationships"`
-			IdV1 string `json:"id"`
-		} `json:"data"`
-	}
-
-	LogPages["Admin"].Println(string(data))
-	err = json.Unmarshal(data, &userData)
-	if err != nil {
-		return nil, err
-	}
-	if len(userData.Errors) > 0 {
-		return nil, errors.New(userData.Errors[0].CodeName)
-	}
-
-	userIds := []string{userData.Data.IdV1}
-	for _, memberData := range userData.Data.Relationships.Memberships.Data {
-		if memberData.Type == "member" {
-			userIds = append(userIds, memberData.Id)
-			break
-		}
-	}
-
-	return &PatreonUserData{
-		UserIds:  userIds,
-		FullName: userData.Data.Attributes.FullName,
-		Email:    strings.ToLower(userData.Data.Attributes.Email),
-	}, nil
+	return claims, nil
 }
 
-func getUserTier(tc *http.Client, userId string) (string, error) {
-	resp, err := tc.Get(PatreonMemberURL + userId + PatreonMemberOpts)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var membershipData struct {
-		Errors []struct {
-			Title    string `json:"title"`
-			CodeName string `json:"code_name"`
-			Detail   string `json:"detail"`
-		} `json:"errors"`
-		Data struct {
-			Relationships struct {
-				CurrentlyEntitledTiers struct {
-					Data []struct {
-						Id   string `json:"id"`
-						Type string `json:"type"`
-					} `json:"data"`
-				} `json:"currently_entitled_tiers"`
-			} `json:"relationships"`
-		} `json:"data"`
-		Included []struct {
-			Attributes struct {
-				Title string `json:"title"`
-			} `json:"attributes"`
-			Id   string `json:"id"`
-			Type string `json:"type"`
-		} `json:"included"`
-	}
-	tierId := ""
-	tierTitle := ""
-	LogPages["Admin"].Println(string(data))
-	err = json.Unmarshal(data, &membershipData)
-	if err != nil {
-		return "", err
-	}
-	if len(membershipData.Errors) > 0 {
-		return "", errors.New(membershipData.Errors[0].Detail)
-	}
-
-	for _, tierData := range membershipData.Data.Relationships.CurrentlyEntitledTiers.Data {
-		if tierData.Type == "tier" {
-			tierId = tierData.Id
-			break
+func getTokenFromRequest(r *http.Request) (string, error) {
+	// Try Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		parts := strings.Split(authHeader, " ")
+		if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
+			return parts[1], nil
 		}
 	}
-	for _, tierData := range membershipData.Included {
-		if tierData.Type == "tier" && tierId == tierData.Id {
-			tierTitle = tierData.Attributes.Title
-		}
-	}
-	if tierTitle == "" {
-		return "", errors.New("empty tier title")
+
+	// Try cookie
+	cookie, err := r.Cookie("auth-token")
+	if err == nil {
+		return cookie.Value, nil
 	}
 
-	return tierTitle, nil
+	return "", fmt.Errorf("no auth token found")
 }
 
-// Retrieve the main url, mostly for Patron auth -- we can't use the one provided
-// by the url since it can be relative and thus empty
+func getRefreshTokenFromRequest(r *http.Request) (string, error) {
+	cookie, err := r.Cookie("refresh-token")
+	if err == nil {
+		return cookie.Value, nil
+	}
+
+	return "", fmt.Errorf("no refresh token found")
+}
+
+func refreshAuthToken(ctx context.Context, token, refreshToken string) (string, error) {
+	client := getSupabaseClient()
+	if client == nil {
+		return "", fmt.Errorf("Supabase client not initialized")
+	}
+
+	result, err := client.Auth.RefreshUser(ctx, token, refreshToken)
+	if err != nil {
+		return "", err
+	}
+
+	return result.AccessToken, nil
+}
+
+func Authenticate(ctx context.Context, r *http.Request) AuthResult {
+	result := AuthResult{}
+
+	if DevMode {
+		log.Printf("[DEBUG] Starting authentication for request to %s", r.URL.Path)
+	}
+
+	if AuthHost == "" {
+		AuthHost = getBaseURL(r)
+		if DevMode {
+			log.Printf("[DEBUG] Setting AuthHost to %s", AuthHost)
+		}
+	}
+
+	token, err := getTokenFromRequest(r)
+	if err != nil {
+		if DevMode {
+			log.Printf("[DEBUG] Token extraction failed: %v", err)
+		}
+		result.Error = fmt.Errorf("authentication required: %v", err)
+		return result
+	}
+
+	if DevMode {
+		log.Printf("[DEBUG] Successfully extracted token (first 10 chars): %s...", token[:min(10, len(token))])
+	}
+
+	claims, err := extractClaims(token)
+	if err != nil {
+		if DevMode {
+			log.Printf("[DEBUG] Failed to extract claims: %v", err)
+		}
+		result.Error = fmt.Errorf("invalid token format: %v", err)
+		return result
+	}
+
+	if DevMode {
+		log.Printf("[DEBUG] Successfully extracted claims for subject: %v", claims["sub"])
+	}
+
+	exp, ok := claims["exp"].(float64)
+	if !ok {
+		if DevMode {
+			log.Printf("[DEBUG] No expiration claim found in token")
+		}
+		result.Error = fmt.Errorf("invalid token format: no expiration")
+		return result
+	}
+
+	expTime := time.Unix(int64(exp), 0)
+	if time.Now().After(expTime) {
+		if DevMode {
+			log.Printf("[DEBUG] Token expired at %v, attempting refresh", expTime)
+		}
+
+		refreshToken, _ := getRefreshTokenFromRequest(r)
+		if refreshToken != "" {
+			if DevMode {
+				log.Printf("[DEBUG] Found refresh token, attempting to refresh")
+			}
+
+			newToken, err := refreshAuthToken(ctx, token, refreshToken)
+			if err == nil {
+				if DevMode {
+					log.Printf("[DEBUG] Successfully refreshed token")
+				}
+				token = newToken
+				claims, err = extractClaims(token)
+				if err != nil {
+					if DevMode {
+						log.Printf("[DEBUG] Failed to extract claims from refreshed token: %v", err)
+					}
+					result.Error = fmt.Errorf("token expired: %v", err)
+					return result
+				}
+			} else {
+				if DevMode {
+					log.Printf("[DEBUG] Failed to refresh token: %v", err)
+				}
+				result.Error = fmt.Errorf("token expired: %v", err)
+				return result
+			}
+		} else {
+			if DevMode {
+				log.Printf("[DEBUG] No refresh token found, authentication failed")
+			}
+			result.Error = fmt.Errorf("token expired")
+			return result
+		}
+	}
+
+	userID, ok := claims["sub"].(string)
+	if !ok || userID == "" {
+		if DevMode {
+			log.Printf("[DEBUG] No user ID found in claims")
+		}
+		result.Error = fmt.Errorf("invalid user information")
+		return result
+	}
+
+	if DevMode {
+		log.Printf("[DEBUG] User ID extracted: %s", userID)
+	}
+
+	sig := extractSignature(ctx, userID, claims)
+	if SigCheck && sig == "" {
+		if DevMode {
+			log.Printf("[DEBUG] No signature found for user %s", userID)
+		}
+		result.Error = fmt.Errorf("no access signature found")
+		return result
+	}
+
+	if DevMode && sig != "" {
+		log.Printf("[DEBUG] Found signature for user %s (first 10 chars): %s...", userID, sig[:min(10, len(sig))])
+	}
+
+	permissions, err := decodeAndParseSignature(sig)
+	if SigCheck && err != nil {
+		if DevMode {
+			log.Printf("[DEBUG] Failed to decode signature: %v", err)
+		}
+		result.Error = fmt.Errorf("invalid signature format: %v", err)
+		return result
+	}
+
+	if DevMode {
+		log.Printf("[DEBUG] Successfully decoded permissions with %d categories", len(permissions))
+	}
+
+	result.UserID = userID
+	result.Permissions = permissions
+	result.Signature = sig
+	result.Token = token
+
+	if DevMode {
+		log.Printf("[DEBUG] Authentication successful for user %s", userID)
+	}
+
+	return result
+}
+
+func AuthMiddleware() func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+            defer recoverPanic(r, w)
+
+            if AuthHost == "" {
+                AuthHost = getBaseURL(r) + "/auth"
+            }
+            
+            emptyPermissions := map[string]map[string]any{}
+            var userToken string = ""
+            var userPreferences map[string]string = nil
+            
+            var activeNavItem *NavElem
+            var activeNavKey string
+            
+            for key, nav := range ExtraNavs {
+                if r.URL.Path == nav.Link || isSubPage(r.URL.Path, nav.SubPages) {
+                    activeNavItem = nav
+                    activeNavKey = key
+                    break
+                }
+            }
+            
+            staticPaths := []string{
+                "/css/", "/img/", "/js/", "/favicon.ico",
+            }
+            for _, prefix := range staticPaths {
+                if strings.HasPrefix(r.URL.Path, prefix) {
+                    next.ServeHTTP(w, r)
+                    return
+                }
+            }
+            
+            if r.URL.Path == "/auth" {
+                next.ServeHTTP(w, r)
+                return
+            }
+
+			isNoAuth := activeNavItem != nil && activeNavItem.NoAuth
+            isDevModeRoute := DevMode && activeNavItem != nil && activeNavItem.AlwaysOnForDev
+
+			if isNoAuth || isDevModeRoute {
+                if isNoAuth {
+                    if DevMode {
+                        log.Printf("[DEBUG] NoAuth route accessed: %s (%s)", activeNavItem.Name, r.URL.Path)
+                    }
+                } else {
+                    if DevMode {
+                        log.Printf("[DEBUG] DevMode route accessed: %s (%s)", activeNavItem.Name, r.URL.Path)
+                    }
+                }
+                
+                ctx := r.Context()
+                ctx = context.WithValue(ctx, "permissions", emptyPermissions)
+                ctx = context.WithValue(ctx, "token", "")
+                ctx = context.WithValue(ctx, "signature", "")
+                ctx = context.WithValue(ctx, "expiry_time", int64(0))
+                ctx = context.WithValue(ctx, "user_email", "")
+                ctx = context.WithValue(ctx, "user_preferences", userPreferences)
+                
+                gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
+                return
+            }
+
+			publicPaths := []string{
+                "/", "/go/", "/random", "/randomsealed", "/discord",
+                "/search/oembed",
+            }
+            
+            for _, path := range publicPaths {
+                if strings.HasPrefix(r.URL.Path, path) {
+                    ctx := r.Context()
+                    ctx = context.WithValue(ctx, "permissions", emptyPermissions)
+                    ctx = context.WithValue(ctx, "token", "")
+                    ctx = context.WithValue(ctx, "signature", "")
+                    ctx = context.WithValue(ctx, "expiry_time", int64(0))
+                    ctx = context.WithValue(ctx, "user_email", "")
+                    ctx = context.WithValue(ctx, "user_preferences", userPreferences)
+                    
+                    gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
+                    return
+                }
+            }
+            
+            publicAPIPaths := []string{
+                "/api/search/", "/api/suggest", "/api/opensearch.xml",
+                "/api/cardkingdom/pricelist.json",
+            }
+            
+            for _, path := range publicAPIPaths {
+                if strings.HasPrefix(r.URL.Path, path) {
+                    w.Header().Add("Content-Type", "application/json")
+                    
+                    ctx := r.Context()
+                    ctx = context.WithValue(ctx, "permissions", emptyPermissions)
+                    ctx = context.WithValue(ctx, "token", "")
+                    ctx = context.WithValue(ctx, "signature", "")
+                    ctx = context.WithValue(ctx, "expiry_time", int64(0))
+                    ctx = context.WithValue(ctx, "user_email", "anonymous@mtgban.com")
+                    ctx = context.WithValue(ctx, "user_preferences", userPreferences)
+                    
+                    gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
+                    return
+                }
+            }
+
+            isAPIRequest := strings.HasPrefix(r.URL.Path, "/api/")
+            if isAPIRequest {
+                w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
+
+                ip, err := IpAddress(r)
+                if err != nil {
+                    http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+                    return
+                }
+
+                if !APIRateLimiter.allow(string(ip)) {
+                    http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+                    return
+                }
+
+                if !DatabaseLoaded {
+                    http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+                    return
+                }
+
+                w.Header().Add("Content-Type", "application/json")
+            }
+            
+            authResult := Authenticate(r.Context(), r)
+            
+            if authResult.Error != nil {
+                if DevMode {
+                    log.Printf("[DEBUG] Authentication failed: %v", authResult.Error)
+                }
+                
+                if isAPIRequest {
+                    w.Header().Set("Content-Type", "application/json")
+                    w.WriteHeader(http.StatusUnauthorized)
+                    w.Write([]byte(fmt.Sprintf(`{"error": "%s"}`, authResult.Error.Error())))
+                    return
+                } else {
+                    pageVars := genPageNavWithPermissions("Login Required", emptyPermissions, 0)
+                    pageVars.Title = "Authentication Required"
+                    pageVars.ErrorMessage = ErrMsg
+                    pageVars.PatreonLogin = true
+                    render(w, "home.html", pageVars)
+                    return
+                }
+            }
+            
+            userToken = authResult.Token
+            permissions := authResult.Permissions
+            signature := authResult.Signature
+            
+            var expiryTime int64 = 0
+            if signature != "" {
+                exp := GetParamFromSig(signature, "Expires")
+                expiryTime, _ = strconv.ParseInt(exp, 10, 64)
+            }
+            
+            if userToken != "" {
+                prefs, err := getUserPreferences(r.Context(), userToken)
+                if err == nil {
+                    userPreferences = prefs
+                }
+            }
+            
+            if r.Method != "GET" {
+                var ok bool
+                if activeNavItem != nil {
+                    ok = activeNavItem.CanPOST
+                }
+                if !ok {
+                    http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+                    return
+                }
+            }
+            
+            if !UserRateLimiter.allow(authResult.UserID) && r.URL.Path != "/admin" {
+                pageVars := genPageNavWithPermissions("Error", emptyPermissions, 0)
+                pageVars.Title = "Too Many Requests"
+                pageVars.ErrorMessage = ErrMsgUseAPI
+                render(w, "home.html", pageVars)
+                return
+            }
+            
+            if activeNavItem != nil && activeNavKey != "" {
+                hasAccess := checkFeatureAccess(permissions, activeNavKey)
+                
+                if DevMode && activeNavItem.AlwaysOnForDev {
+                    hasAccess = true
+                }
+                
+                if SigCheck && !hasAccess {
+                    pageVars := genPageNavWithPermissions(activeNavItem.Name, emptyPermissions, 0)
+                    pageVars.Title = "This feature is BANned"
+                    pageVars.ErrorMessage = ErrMsgPlus
+                    render(w, activeNavItem.Page, pageVars)
+                    return
+                }
+            }
+            
+            if isAPIRequest && !checkAPIAccess(permissions) && SigCheck {
+                w.WriteHeader(http.StatusForbidden)
+                w.Write([]byte(`{"error": "API access not authorized"}`))
+                return
+            }
+            
+            ctx := r.Context()
+            ctx = context.WithValue(ctx, "permissions", permissions)
+            ctx = context.WithValue(ctx, "token", authResult.Token)
+            ctx = context.WithValue(ctx, "signature", signature)
+            ctx = context.WithValue(ctx, "expiry_time", expiryTime)
+            ctx = context.WithValue(ctx, "user_preferences", userPreferences)
+            
+            if claims, err := extractClaims(authResult.Token); err == nil {
+                if email, ok := claims["email"].(string); ok && email != "" {
+                    ctx = context.WithValue(ctx, "user_email", email)
+                }
+            } else {
+                ctx = context.WithValue(ctx, "user_email", "")
+            }
+            
+            gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
+        })
+    }
+}
+
+func isSubPage(path string, subPages []string) bool {
+    return slices.Contains(subPages, path)
+}
+
+
+func checkFeatureAccess(permissions map[string]map[string]any, featureName string) bool {
+	hasAccess := false
+
+	if navPerms, ok := permissions[featureName]; ok {
+		if enabled, ok := navPerms[featureName+"Enabled"]; ok {
+			if enabledStr, ok := enabled.(string); ok && (enabledStr == "true" || enabledStr == "ALL") {
+				hasAccess = true
+			}
+		}
+
+		if !hasAccess {
+			if enabled, ok := navPerms["Enabled"]; ok {
+				if enabledStr, ok := enabled.(string); ok && (enabledStr == "true" || enabledStr == "ALL") {
+					hasAccess = true
+				}
+			}
+		}
+	}
+
+	if !hasAccess && featureName != "Global" {
+		if globalPerms, ok := permissions["Global"]; ok {
+			if enabled, ok := globalPerms["AnyEnabled"]; ok {
+				if enabledStr, ok := enabled.(string); ok && enabledStr == "true" {
+					hasAccess = true
+				}
+			}
+		}
+	}
+	return hasAccess
+}
+
+func checkAPIAccess(permissions map[string]map[string]any) bool {
+	apiEnabled := false
+
+	if apiPerms, ok := permissions["API"]; ok {
+		if enabled, ok := apiPerms["Enabled"]; ok {
+			if enabledStr, ok := enabled.(string); ok && enabledStr == "true" {
+				apiEnabled = true
+			}
+		}
+	}
+
+	if !apiEnabled {
+		if globalPerms, ok := permissions["Global"]; ok {
+			if enabled, ok := globalPerms["APIEnabled"]; ok {
+				if enabledStr, ok := enabled.(string); ok && enabledStr == "true" {
+					apiEnabled = true
+				}
+			} else if enabled, ok := globalPerms["AnyEnabled"]; ok {
+				if enabledStr, ok := enabled.(string); ok && enabledStr == "true" {
+					apiEnabled = true
+				}
+			}
+		}
+	}
+
+	return apiEnabled
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+type PermissionChecker struct {
+	permissions map[string]map[string]any
+	userID      string
+}
+
+func NewPermissionChecker(perms map[string]map[string]any, userID string) *PermissionChecker {
+	if DevMode {
+		log.Printf("[DEBUG] Creating permission checker for user %s with %d permission categories",
+			userID, len(perms))
+	}
+
+	return &PermissionChecker{
+		permissions: perms,
+		userID:      userID,
+	}
+}
+
+func (pc *PermissionChecker) HasPermission(feature, permission string) bool {
+	if DevMode {
+		log.Printf("[DEBUG] Checking permission %s.%s for user %s", feature, permission, pc.userID)
+	}
+
+	if featurePerms, ok := pc.permissions[feature]; ok {
+		if permVal, ok := featurePerms[permission]; ok {
+			if permStr, ok := permVal.(string); ok && (permStr == "true" || permStr == "ALL") {
+				if DevMode {
+					log.Printf("[DEBUG] Permission %s.%s granted directly for user %s",
+						feature, permission, pc.userID)
+				}
+				return true
+			}
+		}
+	}
+
+	if featurePerms, ok := pc.permissions[feature]; ok {
+		if enabled, ok := featurePerms["Enabled"]; ok {
+			if enabledStr, ok := enabled.(string); ok && (enabledStr == "true" || enabledStr == "ALL") {
+				if DevMode {
+					log.Printf("[DEBUG] Permission %s.%s granted via %s.Enabled for user %s",
+						feature, permission, feature, pc.userID)
+				}
+				return true
+			}
+		}
+	}
+
+	if globalPerms, ok := pc.permissions["Global"]; ok {
+		if enabled, ok := globalPerms[feature+"Enabled"]; ok {
+			if enabledStr, ok := enabled.(string); ok && enabledStr == "true" {
+				if DevMode {
+					log.Printf("[DEBUG] Permission %s.%s granted via Global.%sEnabled for user %s",
+						feature, permission, feature, pc.userID)
+				}
+				return true
+			}
+		}
+
+		if enabled, ok := globalPerms["AnyEnabled"]; ok {
+			if enabledStr, ok := enabled.(string); ok && enabledStr == "true" {
+				if DevMode {
+					log.Printf("[DEBUG] Permission %s.%s granted via Global.AnyEnabled for user %s",
+						feature, permission, pc.userID)
+				}
+				return true
+			}
+		}
+	}
+
+	if DevMode && ExtraNavs[feature].AlwaysOnForDev {
+		log.Printf("[DEBUG] Permission %s.%s granted via DevMode.AlwaysOnForDev for user %s",
+			feature, permission, pc.userID)
+		return true
+	}
+
+	if DevMode {
+		log.Printf("[DEBUG] Permission %s.%s DENIED for user %s", feature, permission, pc.userID)
+	}
+
+	return false
+}
+
+func (pc *PermissionChecker) HasAPIAccess() bool {
+	if DevMode {
+		log.Printf("[DEBUG] Checking API access permission for user %s", pc.userID)
+	}
+
+	result := pc.HasPermission("API", "Enabled") ||
+		pc.HasPermission("Global", "APIEnabled")
+
+	if DevMode {
+		log.Printf("[DEBUG] API access %s for user %s",
+			map[bool]string{true: "GRANTED", false: "DENIED"}[result], pc.userID)
+	}
+
+	return result
+}
+
+func extractSignature(ctx context.Context, userID string, claims map[string]any) string {
+	sig := ""
+
+	if DevMode {
+		log.Printf("[DEBUG] Extracting signature for user %s", userID)
+	}
+
+	if sessionCache != nil {
+		if session, found := sessionCache.Get(userID); found && session.Signature != "" {
+			if DevMode {
+				log.Printf("[DEBUG] Found signature in session cache for user %s", userID)
+			}
+			return session.Signature
+		}
+	}
+
+	if appMeta, ok := claims["app_metadata"].(map[string]any); ok {
+		if sigValue, ok := appMeta["sig"].(string); ok && sigValue != "" {
+			if DevMode {
+				log.Printf("[DEBUG] Found signature in token claims for user %s", userID)
+			}
+			return sigValue
+		}
+	}
+
+	if DevMode {
+		log.Printf("[DEBUG] Signature not found in cache or claims, fetching from Supabase for user %s", userID)
+	}
+
+	client := getSupabaseClient()
+	if client == nil {
+		if DevMode {
+			log.Printf("[DEBUG] Supabase client not initialized, cannot fetch user data for user %s", userID)
+		}
+		sig = ""
+		return sig
+	}
+
+	userData, err := client.Auth.User(ctx, userID)
+	if err != nil {
+		if DevMode {
+			log.Printf("[DEBUG] Failed to fetch user data from Supabase: %v", err)
+		}
+		if userData == nil {
+			sig = ""
+		}
+		return sig
+	}
+
+	if DevMode {
+		log.Printf("[DEBUG] No signature found for user %s", userID)
+	}
+
+	return sig
+}
+
 func getBaseURL(r *http.Request) string {
 	host := r.Host
 	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
@@ -238,400 +720,11 @@ func getBaseURL(r *http.Request) string {
 	return baseURL
 }
 
-func Auth(w http.ResponseWriter, r *http.Request) {
-	baseURL := getBaseURL(r)
-	code := r.FormValue("code")
-	if code == "" {
-		http.Redirect(w, r, baseURL, http.StatusFound)
-		return
-	}
-
-	token, err := getUserToken(code, baseURL, r.FormValue("state"))
-	if err != nil {
-		LogPages["Admin"].Println("getUserToken", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=TokenNotFound", http.StatusFound)
-		return
-	}
-
-	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
-	tc := oauth2.NewClient(r.Context(), ts)
-
-	userData, err := getUserIds(tc)
-	if err != nil {
-		LogPages["Admin"].Println("getUserId", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=UserNotFound", http.StatusFound)
-		return
-	}
-
-	tierTitle := ""
-	for _, grant := range Config.Patreon.Grants {
-		if grant.Email == userData.Email {
-			tierTitle = grant.Tier
-			LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
-			break
-		}
-	}
-
-	if tierTitle == "" {
-		for _, userId := range userData.UserIds[1:] {
-			foundTitle, _ := getUserTier(tc, userId)
-			switch foundTitle {
-			case "PIONEER", "PIONEER (Early Adopters)":
-				tierTitle = "Pioneer"
-			case "MODERN", "MODERN (Early Adopters)":
-				tierTitle = "Modern"
-			case "LEGACY", "LEGACY (Early Adopters)":
-				tierTitle = "Legacy"
-			case "VINTAGE", "VINTAGE (Early Adopters)":
-				tierTitle = "Vintage"
-			case "Test Role":
-				tierTitle = "Test Role"
-			}
-		}
-	}
-
-	if tierTitle == "" {
-		LogPages["Admin"].Println("getUserTier returned an empty tier")
-		http.Redirect(w, r, baseURL+"?errmsg=TierNotFound", http.StatusFound)
-		return
-	}
-
-	LogPages["Admin"].Println(userData)
-	LogPages["Admin"].Println(tierTitle)
-
-	// Sign our base URL with our tier and other data
-	sig := sign(baseURL, tierTitle, userData)
-
-	// Keep it secret. Keep it safe.
-	putSignatureInCookies(w, r, sig)
-
-	// Redirect to the URL indicated in this query param, or go to homepage
-	redir := strings.Split(r.FormValue("state"), ";")[0]
-
-	// Go back home if empty or if coming back from a logout
-	if redir == "" || strings.Contains(redir, "errmsg=logout") {
-		redir = getBaseURL(r)
-	}
-
-	// Redirect, we're done here
-	http.Redirect(w, r, redir, http.StatusFound)
-}
-
-func signHMACSHA1Base64(key []byte, data []byte) string {
-	h := hmac.New(sha1.New, key)
-	h.Write(data)
-	return base64.StdEncoding.EncodeToString(h.Sum(nil))
-}
-
-func getSignatureFromCookies(r *http.Request) string {
-	var sig string
-	for _, cookie := range r.Cookies() {
-		if cookie.Name == "MTGBAN" {
-			sig = cookie.Value
-			break
-		}
-	}
-
-	querySig := r.FormValue("sig")
-	if sig == "" && querySig != "" {
-		sig = querySig
-	}
-
-	exp := GetParamFromSig(sig, "Expires")
-	if exp == "" {
-		return ""
-	}
-	expires, err := strconv.ParseInt(exp, 10, 64)
-	if err != nil || expires < time.Now().Unix() {
-		return ""
-	}
-
-	return sig
-}
-
-func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
-	baseURL := getBaseURL(r)
-
-	year, month, _ := time.Now().Date()
-	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
-	domain := "mtgban.com"
-	if strings.Contains(baseURL, "localhost") {
-		domain = "localhost"
-	}
-	cookie := http.Cookie{
-		Name:    "MTGBAN",
-		Domain:  domain,
-		Path:    "/",
-		Expires: endOfThisMonth,
-		Value:   sig,
-	}
-
-	http.SetCookie(w, &cookie)
-}
-
-// This function is mostly here only for initializing the host
-// and the signature from invite links
-func noSigning(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
-
-		if PatreonHost == "" {
-			PatreonHost = getBaseURL(r) + "/auth"
-		}
-
-		querySig := r.FormValue("sig")
-		if querySig != "" {
-			putSignatureInCookies(w, r, querySig)
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-func enforceAPISigning(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
-
-		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
-
-		ip, err := IpAddress(r)
-		if err != nil {
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-
-		if !APIRateLimiter.allow(string(ip)) {
-			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-			return
-		}
-
-		if !DatabaseLoaded {
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
-			return
-		}
-
-		w.Header().Add("Content-Type", "application/json")
-
-		sig := r.FormValue("sig")
-
-		// If signature is empty let it pass through
-		if sig == "" {
-			gziphandler.GzipHandler(next).ServeHTTP(w, r)
-			return
-		}
-
-		raw, err := base64.StdEncoding.DecodeString(sig)
-		if SigCheck && err != nil {
-			log.Println("API error, no sig", err)
-			w.Write([]byte(`{"error": "invalid signature"}`))
-			return
-		}
-
-		v, err := url.ParseQuery(string(raw))
-		if SigCheck && err != nil {
-			log.Println("API error, no b64", err)
-			w.Write([]byte(`{"error": "invalid b64 signature"}`))
-			return
-		}
-
-		q := url.Values{}
-		q.Set("API", v.Get("API"))
-
-		for _, optional := range OptionalFields {
-			val := v.Get(optional)
-			if val != "" {
-				q.Set(optional, val)
-			}
-		}
-
-		sig = v.Get("Signature")
-		exp := v.Get("Expires")
-
-		secret := os.Getenv("BAN_SECRET")
-		apiUsersMutex.RLock()
-		user_secret, found := Config.ApiUserSecrets[v.Get("UserEmail")]
-		apiUsersMutex.RUnlock()
-		if found {
-			secret = user_secret
-		}
-
-		var expires int64
-		if exp != "" {
-			expires, err = strconv.ParseInt(exp, 10, 64)
-			if err != nil {
-				log.Println("API error", err.Error())
-				w.Write([]byte(`{"error": "invalid or expired signature"}`))
-				return
-			}
-			q.Set("Expires", exp)
-		}
-
-		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
-		valid := signHMACSHA1Base64([]byte(secret), []byte(data))
-
-		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
-			log.Println("API error, invalid", data)
-			w.Write([]byte(`{"error": "invalid or expired signature"}`))
-			return
-		}
-
-		gziphandler.GzipHandler(next).ServeHTTP(w, r)
-	})
-}
-
-func enforceSigning(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer recoverPanic(r, w)
-
-		if PatreonHost == "" {
-			PatreonHost = getBaseURL(r) + "/auth"
-		}
-		sig := getSignatureFromCookies(r)
-		querySig := r.FormValue("sig")
-		if querySig != "" {
-			sig = querySig
-			putSignatureInCookies(w, r, querySig)
-		}
-
-		switch r.Method {
-		case "GET":
-		case "POST":
-			var ok bool
-			for _, nav := range ExtraNavs {
-				if nav.Link == r.URL.Path {
-					ok = nav.CanPOST
-				}
-			}
-			if !ok {
-				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-				return
-			}
-		default:
-			http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		pageVars := genPageNav("Error", sig)
-
-		if !UserRateLimiter.allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
-			pageVars.Title = "Too Many Requests"
-			pageVars.ErrorMessage = ErrMsgUseAPI
-
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		raw, err := base64.StdEncoding.DecodeString(sig)
-		if SigCheck && err != nil {
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
-			if DevMode {
-				pageVars.ErrorMessage += " - " + err.Error()
-			}
-
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		v, err := url.ParseQuery(string(raw))
-		if SigCheck && err != nil {
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
-			if DevMode {
-				pageVars.ErrorMessage += " - " + err.Error()
-			}
-
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		q := url.Values{}
-		for _, optional := range append(OrderNav, OptionalFields...) {
-			val := v.Get(optional)
-			if val != "" {
-				q.Set(optional, val)
-			}
-		}
-
-		expectedSig := v.Get("Signature")
-		exp := v.Get("Expires")
-
-		data := fmt.Sprintf("GET%s%s%s", exp, getBaseURL(r), q.Encode())
-		valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
-		expires, err := strconv.ParseInt(exp, 10, 64)
-		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
-			if r.Method != "GET" {
-				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-				return
-			}
-			pageVars.Title = "Unauthorized"
-			pageVars.ErrorMessage = ErrMsg
-			if valid == expectedSig && expires < time.Now().Unix() {
-				pageVars.ErrorMessage = ErrMsgExpired
-				pageVars.PatreonLogin = true
-				if DevMode {
-					pageVars.ErrorMessage += " - sig expired"
-				}
-			}
-
-			if DevMode {
-				if err != nil {
-					pageVars.ErrorMessage += " - " + err.Error()
-				} else {
-					pageVars.ErrorMessage += " - wrong host"
-				}
-			}
-
-			render(w, "home.html", pageVars)
-			return
-		}
-
-		if !DatabaseLoaded && r.URL.Path != "/admin" {
-			page := "home.html"
-			for _, navName := range OrderNav {
-				nav := ExtraNavs[navName]
-				if r.URL.Path == nav.Link {
-					pageVars = genPageNav(nav.Name, sig)
-					page = nav.Page
-				}
-			}
-			pageVars.Title = "Great things are coming"
-			pageVars.ErrorMessage = ErrMsgRestart
-
-			render(w, page, pageVars)
-			return
-		}
-
-		for _, navName := range OrderNav {
-			nav := ExtraNavs[navName]
-			if r.URL.Path == nav.Link {
-				param := GetParamFromSig(sig, navName)
-				canDo, _ := strconv.ParseBool(param)
-				if DevMode && nav.AlwaysOnForDev {
-					canDo = true
-				}
-				if SigCheck && !canDo {
-					pageVars = genPageNav(nav.Name, sig)
-					pageVars.Title = "This feature is BANned"
-					pageVars.ErrorMessage = ErrMsgPlus
-
-					render(w, nav.Page, pageVars)
-					return
-				}
-				break
-			}
-		}
-
-		gziphandler.GzipHandler(next).ServeHTTP(w, r)
-	})
-}
-
 func recoverPanic(r *http.Request, w http.ResponseWriter) {
 	errPanic := recover()
 	if errPanic != nil {
 		log.Println("panic occurred:", errPanic)
 
-		// Restrict stack size to fit into discord message
 		buf := make([]byte, 1<<16)
 		runtime.Stack(buf, true)
 		if len(buf) > 1024 {
@@ -645,6 +738,7 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 		} else {
 			msg = "unknown error"
 		}
+
 		ServerNotify("panic", msg, true)
 		ServerNotify("panic", string(buf))
 		ServerNotify("panic", "source request: "+r.URL.String())
@@ -652,50 +746,6 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-}
-
-func getValuesForTier(tierTitle string) url.Values {
-	v := url.Values{}
-	tier, found := Config.ACL[tierTitle]
-	if !found {
-		return v
-	}
-	for _, page := range OrderNav {
-		options, found := tier[page]
-		if !found {
-			continue
-		}
-		v.Set(page, "true")
-
-		for _, key := range OptionalFields {
-			val, found := options[key]
-			if !found {
-				continue
-			}
-			v.Set(key, val)
-		}
-	}
-	return v
-}
-
-func sign(link string, tierTitle string, userData *PatreonUserData) string {
-	v := getValuesForTier(tierTitle)
-	if userData != nil {
-		v.Set("UserName", userData.FullName)
-		v.Set("UserEmail", userData.Email)
-		v.Set("UserTier", tierTitle)
-	}
-
-	expires := time.Now().Add(DefaultSignatureDuration)
-	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
-	key := os.Getenv("BAN_SECRET")
-	sig := signHMACSHA1Base64([]byte(key), []byte(data))
-
-	v.Set("Expires", fmt.Sprintf("%d", expires.Unix()))
-	v.Set("Signature", sig)
-	str := base64.StdEncoding.EncodeToString([]byte(v.Encode()))
-
-	return str
 }
 
 func GetParamFromSig(sig, param string) string {
@@ -708,4 +758,49 @@ func GetParamFromSig(sig, param string) string {
 		return ""
 	}
 	return v.Get(param)
+}
+
+
+func handleAuthError(w http.ResponseWriter, r *http.Request, message string) {
+	if strings.HasPrefix(r.URL.Path, "/api/") {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(fmt.Sprintf(`{"error": "%s"}`, message)))
+		return
+	}
+
+	pageVars := genPageNav("Authentication Error", "")
+	pageVars.Title = "Authentication Error"
+	pageVars.ErrorMessage = message
+	pageVars.PatreonLogin = true
+	render(w, "home.html", pageVars)
+}
+
+func Auth(w http.ResponseWriter, r *http.Request) {
+	authResult := Authenticate(r.Context(), r)
+
+	if authResult.Error != nil {
+		handleAuthError(w, r, authResult.Error.Error())
+		return
+	}
+
+	if DevMode {
+		log.Printf("[DEBUG] Authentication successful for user %s", authResult.UserID)
+	}
+
+	ctx := r.Context()
+	ctx = context.WithValue(ctx, "permissions", authResult.Permissions)
+	ctx = context.WithValue(ctx, "token", authResult.Token)
+
+	if claims, err := extractClaims(authResult.Token); err == nil {
+		if email, ok := claims["email"].(string); ok && email != "" {
+			ctx = context.WithValue(ctx, "user_email", email)
+		}
+	}
+
+	gziphandler.GzipHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"message": "Authentication successful"}`))
+	})).ServeHTTP(w, r.WithContext(ctx))
 }
