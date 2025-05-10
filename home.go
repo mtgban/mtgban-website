@@ -9,6 +9,7 @@ import (
 // Handler for / renders the home.html page
 func Home(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
+
 	errmsg := r.FormValue("errmsg")
 	message := ""
 

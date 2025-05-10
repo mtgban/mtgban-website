@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -730,8 +732,10 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 	}
 
 	data := fmt.Sprintf("GET%s%s%s", exp, link, v.Encode())
-	sig := signHMACSHA1Base64([]byte(key), []byte(data))
-
+	sig := signHS256Base64([]byte(key), []byte(data))
+	if sig == "" {
+		return "", errors.New("failed to sign the request")
+	}
 	v.Set("Signature", sig)
 	return base64.StdEncoding.EncodeToString([]byte(v.Encode())), nil
 }
@@ -744,4 +748,53 @@ func randomString(l int) string {
 		bytes[i] = byte(33 + rand.Intn(126-33))
 	}
 	return string(bytes)
+}
+
+func signHS256Base64(key, data []byte) string {
+	h := hmac.New(sha256.New, key)
+	h.Write(data)
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+func sign(link, user string, expires *time.Time) string {
+	data := fmt.Sprintf("GET%s%s", user, link)
+	sig := signHS256Base64([]byte(Config.Auth.DB.RoleKey), []byte(data))
+	return sig
+}
+
+
+func getSignatureFromCookies(r *http.Request) string {
+    // Hijack getSignatureFromCookies function to extract from context first
+    if ctx := r.Context(); ctx != nil {
+        if sig, ok := ctx.Value("signature").(string); ok && sig != "" {
+            return sig
+        }
+    }
+    
+    // Fall back to original method
+    cookie, err := r.Cookie("MTGBAN")
+    if err != nil {
+        return ""
+    }
+    
+    sig := cookie.Value
+    if sig == "" {
+        return ""
+    }
+    
+    return sig
+}
+
+func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
+	domain := "mtgban.com"
+	if strings.Contains(getBaseURL(r), "localhost") {
+		domain = "localhost"
+	}
+	cookie := http.Cookie{
+		Name:   "MTGBAN",
+		Value:  sig,
+		Domain: domain,
+	}
+	http.SetCookie(w, &cookie)
+	log.Println("Signature set in cookies")
 }

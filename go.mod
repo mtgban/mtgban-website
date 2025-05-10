@@ -1,6 +1,6 @@
 module github.com/mtgban/mtgban-website
 
-go 1.23.0
+go 1.23.5
 
 toolchain go1.24.0
 
@@ -18,6 +18,8 @@ require (
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/mackerelio/go-osstat v0.2.4
 	github.com/mtgban/go-mtgban v0.5.10
+	github.com/stripe/stripe-go/v82 v82.1.0
+	github.com/the-muppet/supabase-go v0.6.3
 	github.com/xuri/excelize/v2 v2.8.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/oauth2 v0.13.0
@@ -59,6 +61,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.1 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.0 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.7 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
@@ -77,9 +80,7 @@ require (
 	github.com/richardlehane/msoleps v1.0.3 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
-	github.com/stripe/stripe-go/v82 v82.1.0 // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
-	github.com/the-muppet/supabase-go v0.6.1 // indirect
 	github.com/xuri/efp v0.0.0-20230802181842-ad255f2331ca // indirect
 	github.com/xuri/nfp v0.0.0-20230919160717-d98342af3f05 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect

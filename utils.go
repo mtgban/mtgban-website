@@ -632,10 +632,18 @@ func readSetFlag(w http.ResponseWriter, r *http.Request, queryParam, cookieName 
 	return flag
 }
 
-// Read a cookie from the request
 func readCookie(r *http.Request, cookieName string) string {
-	for _, cookie := range r.Cookies() {
-		if cookie.Name == cookieName {
+    // Hijack readCookie function to extract from context first
+    if ctx := r.Context(); ctx != nil {
+        if prefs, ok := ctx.Value("user_preferences").(map[string]string); ok {
+            if value, ok := prefs[cookieName]; ok {
+                return value
+            }
+        }
+    }
+    
+    for _, cookie := range r.Cookies() {
+    	if cookie.Name == cookieName {
 			return cookie.Value
 		}
 	}
@@ -760,4 +768,94 @@ func getTCGSimulationIQR(productId string) float64 {
 		return 0
 	}
 	return entries[0].ExtraValues["iqr"]
+}
+
+func genPageNavWithPermissions(activeTab string, permissions map[string]map[string]any, expiryTime int64) PageVars {
+    // These values need to be set for every rendered page
+    pageVars := PageVars{
+        Title:      "BAN " + activeTab,
+        LastUpdate: LastUpdate,
+        Hash:       BuildCommit,
+    }
+
+    // Set message and login status based on expiry
+    showPatreonLogin := false
+    if expiryTime > 0 {
+        if expiryTime < time.Now().Unix() {
+            pageVars.ErrorMessage = ErrMsgExpired
+        }
+    } else {
+        showPatreonLogin = true
+    }
+
+    if Config.Game != "" {
+        // Append which game this site is for
+        pageVars.Title += " - " + Config.Game
+
+        // Charts are available only for one game
+        pageVars.DisableChart = true
+    }
+
+    switch Config.Game {
+    case mtgban.GameMagic:
+        pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
+    case mtgban.GameLorcana:
+        pageVars.CardBackURL = "img/backs/lorcana.webp"
+    default:
+        panic("no pageVars.CardBackURL set")
+    }
+
+    // Allocate a new navigation bar
+    pageVars.Nav = make([]NavElem, len(DefaultNav))
+    copy(pageVars.Nav, DefaultNav)
+
+    // Enable buttons according to the enabled features
+    for _, feat := range OrderNav {
+        if expiryTime > time.Now().Unix() || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
+            // Check if this feature is allowed in permissions
+            allowed := false
+            
+            // Check feature-specific permissions
+            if featurePerms, ok := permissions[feat]; ok {
+                if enabledVal, ok := featurePerms[feat+"Enabled"]; ok {
+                    if enabledStr, ok := enabledVal.(string); ok && (enabledStr == "true" || enabledStr == "ALL") {
+                        allowed = true
+                    }
+                }
+                
+                if !allowed {
+                    if enabledVal, ok := featurePerms["Enabled"]; ok {
+                        if enabledStr, ok := enabledVal.(string); ok && (enabledStr == "true" || enabledStr == "ALL") {
+                            allowed = true
+                        }
+                    }
+                }
+            }
+            
+            if allowed || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
+                pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
+            }
+        }
+    }
+
+    mainNavIndex := 0
+    for i := range pageVars.Nav {
+        if pageVars.Nav[i].Name == activeTab {
+            mainNavIndex = i
+            break
+        }
+    }
+    pageVars.Nav[mainNavIndex].Active = true
+    pageVars.Nav[mainNavIndex].Class = "active"
+
+    if showPatreonLogin && pageVars.Nav[mainNavIndex].NoAuth {
+        extra := *&NavElem{
+            Active: true,
+            Class:  "beta",
+            Short:  "Beta Public Access",
+            Link:   "javascript:void(0)",
+        }
+        pageVars.Nav = append(pageVars.Nav, extra)
+    }
+    return pageVars
 }

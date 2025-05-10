@@ -22,6 +22,7 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/gorilla/mux"
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
@@ -218,6 +219,7 @@ var DefaultNav = []NavElem{
 		Short: "🏡",
 		Link:  "/",
 		Page:  "home.html",
+		NoAuth: true,
 	},
 }
 
@@ -362,13 +364,14 @@ type ConfigType struct {
 			Tier     string `json:"tier"`
 		} `json:"grants"`
 	} `json:"patreon"`
-	ApiUserSecrets    map[string]string                       `json:"api_user_secrets"`
-	GoogleCredentials string                                  `json:"google_credentials"`
-	Supabase          SupabaseConfig                          `json:"supabase"`
-	Stripe            StripeConfig                            `json:"stripe"`
-	ACL               map[string]map[string]map[string]string `json:"acl"`
+	ApiUserSecrets    map[string]string `json:"api_user_secrets"`
+	GoogleCredentials string            `json:"google_credentials"`
+	Auth              struct {
+		DB DBConfig `json:"supabase"`
+	} `json:"auth"`
+	ACL        map[string]map[string]map[string]string `json:"acl"`
 
-	Uploader struct {
+	Uploader   struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
@@ -448,89 +451,20 @@ func (fs *FileSystem) Open(path string) (http.File, error) {
 }
 
 func genPageNav(activeTab, sig string) PageVars {
-	exp := GetParamFromSig(sig, "Expires")
-	expires, _ := strconv.ParseInt(exp, 10, 64)
-	msg := ""
-	showPatreonLogin := false
-	if sig != "" {
-		if expires < time.Now().Unix() {
-			msg = ErrMsgExpired
-		}
-	} else {
-		showPatreonLogin = true
-	}
-
-	// These values need to be set for every rendered page
-	// In particular the Patreon variables are needed because the signature
-	// could expire in any page, and the button url needs these parameters
-	pageVars := PageVars{
-		Title:        "BAN " + activeTab,
-		ErrorMessage: msg,
-		LastUpdate:   LastUpdate,
-
-		PatreonIds:   Config.Patreon.Client,
-		PatreonURL:   PatreonHost,
-		PatreonLogin: showPatreonLogin,
-		Hash:         BuildCommit,
-	}
-
-	if Config.Game != "" {
-		// Append which game this site is for
-		pageVars.Title += " - " + Config.Game
-
-		// Charts are available only for one game
-		pageVars.DisableChart = true
-	}
-
-	switch Config.Game {
-	case mtgban.GameMagic:
-		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
-	case mtgban.GameLorcana:
-		pageVars.CardBackURL = "img/backs/lorcana.webp"
-	default:
-		panic("no pageVars.CardBackURL set")
-	}
-
-	// Allocate a new navigation bar
-	pageVars.Nav = make([]NavElem, len(DefaultNav))
-	copy(pageVars.Nav, DefaultNav)
-
-	// Enable buttons according to the enabled features
-	for _, feat := range OrderNav {
-		if expires > time.Now().Unix() || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
-			param := GetParamFromSig(sig, feat)
-			allowed, _ := strconv.ParseBool(param)
-			if DevMode && ExtraNavs[feat].AlwaysOnForDev {
-				allowed = true
-			}
-
-			if allowed || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
-				pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
-			}
-		}
-	}
-
-	mainNavIndex := 0
-	for i := range pageVars.Nav {
-		if pageVars.Nav[i].Name == activeTab {
-			mainNavIndex = i
-			break
-		}
-	}
-	pageVars.Nav[mainNavIndex].Active = true
-	pageVars.Nav[mainNavIndex].Class = "active"
-
-	// Add extra warning message if needed
-	if showPatreonLogin && pageVars.Nav[mainNavIndex].NoAuth {
-		extra := *&NavElem{
-			Active: true,
-			Class:  "beta",
-			Short:  "Beta Public Access",
-			Link:   "javascript:void(0)",
-		}
-		pageVars.Nav = append(pageVars.Nav, extra)
-	}
-	return pageVars
+    var expiryTime int64 = 0
+    var permissions map[string]map[string]any
+    
+    if sig != "" {
+        exp := GetParamFromSig(sig, "Expires")
+        expiryTime, _ = strconv.ParseInt(exp, 10, 64)
+        
+        permissions, _ = decodeAndParseSignature(sig)
+    } else {
+        permissions = map[string]map[string]any{
+            "Global": {"AnyEnabled": "false"},
+        }
+    }
+    return genPageNavWithPermissions(activeTab, permissions, expiryTime)
 }
 
 func loadVars(cfg, port, datastore string) error {
@@ -718,68 +652,71 @@ func main() {
 	// Set seed in case we need to do random operations
 	rand.Seed(time.Now().UnixNano())
 
-	// serve everything in known folders as a file
-	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(&FileSystem{http.Dir("css")})))
-	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(&FileSystem{http.Dir("img")})))
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(&FileSystem{http.Dir("js")})))
+	// Set up the server
+	router := mux.NewRouter()
+    // Use the auth middleware for all routes
+	router.Use(AuthMiddleware())
 
-	// custom redirector
-	http.HandleFunc("/go/", Redirect)
-	http.HandleFunc("/random", RandomSearch)
-	http.HandleFunc("/randomsealed", RandomSealedSearch)
-	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
-	})
-
-	// when navigating to /home it should serve the home page
-	http.Handle("/", noSigning(http.HandlerFunc(Home)))
-
-	for key, nav := range ExtraNavs {
-		// Set up logging
-		logFile, err := logfile.New(&logfile.LogFile{
-			FileName:    path.Join(LogDir, key+".log"),
-			MaxSize:     500 * 1024,
-			Flags:       logfile.FileOnly,
-			OldVersions: 2,
-		})
-		if err != nil {
-			log.Printf("Failed to create logFile for %s: %s", key, err)
-			LogPages[key] = log.New(os.Stderr, "", log.LstdFlags)
-		} else {
-			LogPages[key] = log.New(logFile, "", log.LstdFlags)
-		}
-
-		_, ExtraNavs[key].NoAuth = Config.ACL["Any"][key]
-
-		// Set up the handler
-		handler := enforceSigning(http.HandlerFunc(nav.Handle))
-		if nav.NoAuth {
-			handler = noSigning(http.HandlerFunc(nav.Handle))
-		}
-		http.Handle(nav.Link, handler)
-
-		// Add any additional endpoints to it
-		for _, subPage := range nav.SubPages {
-			http.Handle(subPage, handler)
-		}
-	}
-
-	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
-	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
-	http.Handle("/api/mtgjson/ck.json", enforceAPISigning(http.HandlerFunc(API)))
-	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
-	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
-	http.Handle("/api/cardkingdom/pricelist.json", noSigning(http.HandlerFunc(CKMirrorAPI)))
-	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
-	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
-	// compat
-	http.Handle("/img/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
-
-	http.HandleFunc("/favicon.ico", Favicon)
-	http.HandleFunc("/auth", Auth)
+    // Static file servers
+    fileSystemHandler := func(dir string) http.Handler {
+        return http.FileServer(&FileSystem{http.Dir(dir)})
+    }
+    
+	// Serve files from known locations
+    router.PathPrefix("/css/").Handler(http.StripPrefix("/css/", fileSystemHandler("css")))
+    router.PathPrefix("/img/").Handler(http.StripPrefix("/img/", fileSystemHandler("img")))
+    router.PathPrefix("/js/").Handler(http.StripPrefix("/js/", fileSystemHandler("js")))
+    
+	// Register API routes
+    router.HandleFunc("/api/mtgban/", PriceAPI)
+    router.HandleFunc("/api/mtgjson/ck.json", API)
+    router.HandleFunc("/api/tcgplayer/", TCGHandler)
+    router.HandleFunc("/api/search/", SearchAPI)
+    router.HandleFunc("/api/cardkingdom/pricelist.json", CKMirrorAPI)
+    router.HandleFunc("/api/suggest", SuggestAPI)
+    router.HandleFunc("/api/opensearch.xml", OpenSearchDesc)
+	
+	// Register public routes
+    router.HandleFunc("/", Home)
+    router.HandleFunc("/go/{path:.*}", Redirect)
+    router.HandleFunc("/random", RandomSearch)
+    router.HandleFunc("/randomsealed", RandomSealedSearch)
+    router.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
+        http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
+    })
+    router.HandleFunc("/search/oembed", Search)
+    router.HandleFunc("/favicon.ico", Favicon)
+    router.HandleFunc("/auth", Auth)
+    router.HandleFunc("/img/opensearch.xml", OpenSearchDesc)
+	
+	// Dynamic nav pages from config
+    for key, nav := range ExtraNavs {
+        // Set up logging
+        logFile, err := logfile.New(&logfile.LogFile{
+            FileName:    path.Join(LogDir, key+".log"),
+            MaxSize:     500 * 1024,
+            Flags:       logfile.FileOnly,
+            OldVersions: 2,
+        })
+        if err != nil {
+            log.Printf("Failed to create logFile for %s: %s", key, err)
+            LogPages[key] = log.New(os.Stderr, "", log.LstdFlags)
+        } else {
+            LogPages[key] = log.New(logFile, "", log.LstdFlags)
+        }
+        
+        // Register route
+        router.HandleFunc(nav.Link, nav.Handle)
+        
+        // Add subpages
+        for _, subPage := range nav.SubPages {
+            router.HandleFunc(subPage, nav.Handle)
+        }
+    }
 
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
+		Handler: router,
 	}
 
 	done := make(chan os.Signal, 1)
