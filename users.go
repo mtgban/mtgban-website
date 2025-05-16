@@ -42,7 +42,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
+	// TODO: check if anon or admin client needed here, think anon works though
 	client := getUserClient()
 	if client == nil {
 		http.Error(w, "Authentication service unavailable", http.StatusServiceUnavailable)
