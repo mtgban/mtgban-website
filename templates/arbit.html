@@ -342,10 +342,10 @@
                                 {{$deck = printf "%s\n%s" $deck $entry}}
                             {{end}}
                         {{end}}
-                        <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
+                        <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}{{$scraperKey}}deckbuilder" style="display: inline;" target="_blank">
                             <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                             <input type="hidden" name="deck" value="{{base64enc $deck}}"/>
-                            <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at Manapool</a>
+                            <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}{{$scraperKey}}deckbuilder").submit();'>Load at Manapool</a>
                             <noscript>
                                 <input type="submit" value="Load at Manapool"/>
                             </noscript>
