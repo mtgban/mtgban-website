@@ -813,6 +813,7 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 					ScraperName: name,
 					Shorthand:   seller.Info().Shorthand,
 					Price:       entry.Price,
+					Credit:      entry.Price / seller.Info().CreditMultiplier,
 					Quantity:    entry.Quantity,
 					URL:         entry.URL,
 					NoQuantity:  seller.Info().NoQuantityInventory || seller.Info().MetadataOnly,
