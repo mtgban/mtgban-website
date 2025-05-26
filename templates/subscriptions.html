@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+    <link href="https://fonts.googleapis.com/css?family=Rosario:400" rel="stylesheet" type="text/css">
+    <title>{{.Title}} - Subscription Plans</title>
+    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+    <script src="https://js.stripe.com/v3/"></script>
+    <script type="text/javascript" src="/js/subscription.js?hash={{.Hash}}"></script>
+</head>
+
+<body class="light-theme">
+    <script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
+    <nav>
+        <ul>
+            <li><a href="/"><img src="/img/misc/logo.png" width=48></a></li>
+            {{range .Nav}}
+            <li>
+                <a {{if .Active}}class="{{.Class}}" {{end}} href="{{.Link}}">
+                    <span>{{.Short}} {{.Name}}</span>
+                </a>
+            </li>
+            {{end}}
+            {{if .IsAuthenticated}}
+            <li><a href="/account">👤 Account</a></li>
+            <li><a href="#" onclick="handleLogout(); return false;">🚪 Logout</a></li>
+            {{else}}
+            <li><a href="/auth">🔑 Login</a></li>
+            {{end}}
+            <li>
+                <label class="switch">
+                    <div>
+                        <input type="checkbox" />
+                        <span class="slider"></span>
+                    </div>
+                    <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+                </label>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="mainbody" style="margin-top: 60px;">
+        <h1>Choose Your Subscription Plan</h1>
+
+        <div class="indent">
+            <p style="margin-bottom: 30px;">Select the plan that best fits your needs. All plans include core features
+                with additional benefits for higher tiers.</p>
+
+            <div id="subscriptionPlans" class="row" style="display: flex; justify-content: center; flex-wrap: wrap;">
+                <!-- Plans will be loaded dynamically -->
+                <p>Loading plans...</p>
+            </div>
+
+            <div id="errorMessage" class="danger" style="display: none; margin: 20px; text-align: center;"></div>
+
+            <div style="margin-top: 40px; text-align: center;">
+                <p style="color: var(--greytext);">All subscriptions are billed monthly. Cancel anytime.</p>
+                <p style="color: var(--greytext);">Prices are in USD. Taxes may apply based on your location.</p>
+            </div>
+        </div>
+    </div>
+
+    <br>
+    <div class="footer">&copy; 2019-2025 MTGBAN Inc<br>
+        <br>
+        <hr width=30% style="border: 1px dotted;">
+        Secure payments powered by Stripe.<br>
+    </div>
+
+    <script type="text/javascript" src="/js/auth.js?hash={{.Hash}}"></script>
+</body>
+
+</html>

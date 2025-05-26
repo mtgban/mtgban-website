@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+    <link href="https://fonts.googleapis.com/css?family=Rosario:400" rel="stylesheet" type="text/css">
+    <title>{{.Title}} - My Account</title>
+    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+    <script type="text/javascript" src="/js/account.js?hash={{.Hash}}"></script>
+</head>
+
+<body class="light-theme">
+    <script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
+    <nav>
+        <ul>
+            <li><a href="/"><img src="/img/misc/logo.png" width=48></a></li>
+            {{range .Nav}}
+            <li>
+                <a {{if .Active}}class="{{.Class}}" {{end}} href="{{.Link}}">
+                    <span>{{.Short}} {{.Name}}</span>
+                </a>
+            </li>
+            {{end}}
+            <li><a href="#" onclick="handleLogout(); return false;">🚪 Logout</a></li>
+            <li>
+                <label class="switch">
+                    <div>
+                        <input type="checkbox" />
+                        <span class="slider"></span>
+                    </div>
+                    <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+                </label>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="mainbody" style="margin-top: 60px;">
+        <h1>My Account</h1>
+
+        <div class="indent">
+            <!-- User Information Section -->
+            <div style="margin-bottom: 40px;">
+                <h2 style="color: var(--headingtext);">Account Information</h2>
+                <table style="margin: 20px 0;">
+                    <tr>
+                        <td style="font-weight: bold; padding-right: 20px;">Email:</td>
+                        <td>{{.UserEmail}}</td>
+                    </tr>
+                    {{if .UserName}}
+                    <tr>
+                        <td style="font-weight: bold; padding-right: 20px;">Name:</td>
+                        <td>{{.UserName}}</td>
+                    </tr>
+                    {{end}}
+                    <tr>
+                        <td style="font-weight: bold; padding-right: 20px;">Member Since:</td>
+                        <td>{{.MemberSince}}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Subscription Status Section -->
+            <div style="margin-bottom: 40px;">
+                <h2 style="color: var(--headingtext);">Subscription Status</h2>
+                <div id="subscriptionInfo" style="margin: 20px 0;">
+                    <p>Loading subscription details...</p>
+                </div>
+            </div>
+
+            <!-- Preferences Section -->
+            <div style="margin-bottom: 40px;">
+                <h2 style="color: var(--headingtext);">Preferences</h2>
+                <form id="preferencesForm" style="margin: 20px 0;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: inline-block; width: 200px;">Default View:</label>
+                        <select id="defaultView" class="select-css" style="width: 200px;">
+                            <option value="search">Search</option>
+                            <option value="newspaper">Newspaper</option>
+                            <option value="arbit">Arbitrage</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: inline-block; width: 200px;">Email Notifications:</label>
+                        <input type="checkbox" id="emailNotifications"
+                            style="transform: scale(1.5); margin-left: 10px;">
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: inline-block; width: 200px;">Show Buylist Prices:</label>
+                        <input type="checkbox" id="showBuylist" style="transform: scale(1.5); margin-left: 10px;">
+                    </div>
+                    <button type="submit" class="btn success" style="padding: 10px 20px; margin-top: 10px;">
+                        Save Preferences
+                    </button>
+                    <div id="prefMessage" style="display: none; margin-top: 10px;"></div>
+                </form>
+            </div>
+
+            <!-- API Access Section -->
+            {{if .HasAPIAccess}}
+            <div style="margin-bottom: 40px;">
+                <h2 style="color: var(--headingtext);">API Access</h2>
+                <div style="margin: 20px 0;">
+                    <p>Your API Key:</p>
+                    <div style="display: flex; align-items: center; margin-top: 10px;">
+                        <input type="text" id="apiKey" value="{{.APIKey}}" readonly
+                            class="w3-input w3-border w3-round-small" style="width: 400px; font-family: monospace;">
+                        <button onclick="copyAPIKey()" class="btn info" style="margin-left: 10px; padding: 8px 15px;">
+                            Copy
+                        </button>
+                    </div>
+                    <p style="margin-top: 10px; font-size: 14px; color: var(--greytext);">
+                        Keep your API key secure. Do not share it publicly.
+                    </p>
+                </div>
+            </div>
+            {{end}}
+
+            <!-- Danger Zone -->
+            <div style="margin-bottom: 40px; border: 1px solid var(--danger); padding: 20px; border-radius: 4px;">
+                <h2 style="color: var(--danger);">Danger Zone</h2>
+                <p style="margin: 10px 0;">Once you delete your account, there is no going back. Please be certain.</p>
+                <button onclick="confirmDeleteAccount()" class="btn danger" style="padding: 10px 20px;">
+                    Delete Account
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <br>
+    <div class="footer">&copy; 2019-2025 MTGBAN Inc<br>
+        <br>
+        <hr width=30% style="border: 1px dotted;">
+    </div>
+
+    <script type="text/javascript" src="/js/auth.js?hash={{.Hash}}"></script>
+</body>
+
+</html>

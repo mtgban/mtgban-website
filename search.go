@@ -435,12 +435,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if err != nil {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(`Not Found`))
-			return
-		}
-
 		payload, err := json.Marshal(embed)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)

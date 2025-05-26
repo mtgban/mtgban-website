@@ -22,7 +22,6 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/gorilla/mux"
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
@@ -174,6 +173,14 @@ type PageVars struct {
 	MissingCounts   map[string]int
 	MissingPrices   map[string]float64
 	ResultPrices    map[string]map[string]float64
+
+	UserEmail       string
+	UserName        string
+	MemberSince     string
+	HasAPIAccess    bool
+	APIKey          string
+	IsAuthenticated bool
+	Preferences     map[string]any
 }
 
 type NavElem struct {
@@ -215,10 +222,10 @@ var startTime = time.Now()
 
 var DefaultNav = []NavElem{
 	NavElem{
-		Name:  "Home",
-		Short: "🏡",
-		Link:  "/",
-		Page:  "home.html",
+		Name:   "Home",
+		Short:  "🏡",
+		Link:   "/",
+		Page:   "home.html",
 		NoAuth: true,
 	},
 }
@@ -326,6 +333,31 @@ func init() {
 			CanPOST:        true,
 			AlwaysOnForDev: true,
 		},
+		"Auth": {
+			Name:   "Login",
+			Short:  "🔑",
+			Link:   "/auth",
+			Handle: AuthPage,
+			Page:   "auth.html",
+			NoAuth: true,
+		},
+		"Account": {
+			Name:     "Account",
+			Short:    "👤",
+			Link:     "/account",
+			Handle:   AccountPage,
+			Page:     "account.html",
+			SubPages: []string{"/profile", "/settings"},
+		},
+		"Subscription": {
+			Name:     "Plans",
+			Short:    "💎",
+			Link:     "/subscription/plans",
+			Handle:   SubscriptionPlansPage,
+			Page:     "subscription_plans.html",
+			NoAuth:   true,
+			SubPages: []string{"/plans", "/pricing"},
+		},
 	}
 }
 
@@ -369,9 +401,9 @@ type ConfigType struct {
 	Auth              struct {
 		DB DBConfig `json:"supabase"`
 	} `json:"auth"`
-	ACL        map[string]map[string]map[string]string `json:"acl"`
+	ACL map[string]map[string]map[string]string `json:"acl"`
 
-	Uploader   struct {
+	Uploader struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
@@ -451,20 +483,20 @@ func (fs *FileSystem) Open(path string) (http.File, error) {
 }
 
 func genPageNav(activeTab, sig string) PageVars {
-    var expiryTime int64 = 0
-    var permissions map[string]map[string]any
-    
-    if sig != "" {
-        exp := GetParamFromSig(sig, "Expires")
-        expiryTime, _ = strconv.ParseInt(exp, 10, 64)
-        
-        permissions, _ = decodeAndParseSignature(sig)
-    } else {
-        permissions = map[string]map[string]any{
-            "Global": {"AnyEnabled": "false"},
-        }
-    }
-    return genPageNavWithPermissions(activeTab, permissions, expiryTime)
+	var expiryTime int64 = 0
+	var permissions map[string]map[string]any
+
+	if sig != "" {
+		exp := GetParamFromSig(sig, "Expires")
+		expiryTime, _ = strconv.ParseInt(exp, 10, 64)
+
+		permissions, _ = decodeAndParseSignature(sig)
+	} else {
+		permissions = map[string]map[string]any{
+			"Global": {"AnyEnabled": "false"},
+		}
+	}
+	return genPageNavWithPermissions(activeTab, permissions, expiryTime)
 }
 
 func loadVars(cfg, port, datastore string) error {
@@ -652,71 +684,76 @@ func main() {
 	// Set seed in case we need to do random operations
 	rand.Seed(time.Now().UnixNano())
 
-	// Set up the server
-	router := mux.NewRouter()
-    // Use the auth middleware for all routes
-	router.Use(AuthMiddleware())
+	// Helper function to wrap handlers with auth middleware
+	authWrap := func(handler http.HandlerFunc) http.Handler {
+		return AuthMiddleware()(handler)
+	}
 
-    // Static file servers
-    fileSystemHandler := func(dir string) http.Handler {
-        return http.FileServer(&FileSystem{http.Dir(dir)})
-    }
-    
-	// Serve files from known locations
-    router.PathPrefix("/css/").Handler(http.StripPrefix("/css/", fileSystemHandler("css")))
-    router.PathPrefix("/img/").Handler(http.StripPrefix("/img/", fileSystemHandler("img")))
-    router.PathPrefix("/js/").Handler(http.StripPrefix("/js/", fileSystemHandler("js")))
-    
-	// Register API routes
-    router.HandleFunc("/api/mtgban/", PriceAPI)
-    router.HandleFunc("/api/mtgjson/ck.json", API)
-    router.HandleFunc("/api/tcgplayer/", TCGHandler)
-    router.HandleFunc("/api/search/", SearchAPI)
-    router.HandleFunc("/api/cardkingdom/pricelist.json", CKMirrorAPI)
-    router.HandleFunc("/api/suggest", SuggestAPI)
-    router.HandleFunc("/api/opensearch.xml", OpenSearchDesc)
+	// Static file servers
+	fileSystemHandler := func(dir string) http.Handler {
+		return http.FileServer(&FileSystem{http.Dir(dir)})
+	}
+
+	http.Handle("/css/", http.StripPrefix("/css/", fileSystemHandler("css")))
+	http.Handle("/img/", http.StripPrefix("/img/", fileSystemHandler("img")))
+	http.Handle("/js/", http.StripPrefix("/js/", fileSystemHandler("js")))
+
+	http.Handle("/api/mtgban/", authWrap(PriceAPI))
+	http.Handle("/api/mtgjson/ck.json", authWrap(API))
+	http.Handle("/api/tcgplayer/", authWrap(TCGHandler))
+	http.Handle("/api/search/", authWrap(SearchAPI))
+	http.Handle("/api/cardkingdom/pricelist.json", authWrap(CKMirrorAPI))
+	http.Handle("/api/suggest", authWrap(SuggestAPI))
+	http.Handle("/api/opensearch.xml", authWrap(OpenSearchDesc))
+
+	http.Handle("/", authWrap(Home))
+	http.Handle("/random", authWrap(RandomSearch))
+	http.Handle("/randomsealed", authWrap(RandomSealedSearch))
+	http.Handle("/discord", authWrap(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
+	}))
+	http.Handle("/search/oembed", authWrap(Search))
+	http.Handle("/favicon.ico", authWrap(Favicon))
+	http.Handle("/img/opensearch.xml", authWrap(OpenSearchDesc))
+
+	http.Handle("/go/", authWrap(Redirect))
+	http.Handle("/checkout", authWrap(CreateCheckoutSessionHandler))
+	http.Handle("/subscription/success", authWrap(SubscriptionSuccessPage))
 	
-	// Register public routes
-    router.HandleFunc("/", Home)
-    router.HandleFunc("/go/{path:.*}", Redirect)
-    router.HandleFunc("/random", RandomSearch)
-    router.HandleFunc("/randomsealed", RandomSealedSearch)
-    router.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
-        http.Redirect(w, r, Config.DiscordInviteLink, http.StatusFound)
-    })
-    router.HandleFunc("/search/oembed", Search)
-    router.HandleFunc("/favicon.ico", Favicon)
-    router.HandleFunc("/auth", Auth)
-    router.HandleFunc("/img/opensearch.xml", OpenSearchDesc)
-	
-	// Dynamic nav pages from config
-    for key, nav := range ExtraNavs {
-        // Set up logging
-        logFile, err := logfile.New(&logfile.LogFile{
-            FileName:    path.Join(LogDir, key+".log"),
-            MaxSize:     500 * 1024,
-            Flags:       logfile.FileOnly,
-            OldVersions: 2,
-        })
-        if err != nil {
-            log.Printf("Failed to create logFile for %s: %s", key, err)
-            LogPages[key] = log.New(os.Stderr, "", log.LstdFlags)
-        } else {
-            LogPages[key] = log.New(logFile, "", log.LstdFlags)
-        }
-        
-        // Register route
-        router.HandleFunc(nav.Link, nav.Handle)
-        
-        // Add subpages
-        for _, subPage := range nav.SubPages {
-            router.HandleFunc(subPage, nav.Handle)
-        }
-    }
+	http.Handle("/api/auth/login", authWrap(HandleLogin))
+	http.Handle("/api/auth/signup", authWrap(HandleSignup))
+	http.Handle("/api/auth/logout", authWrap(HandleLogout))
+	http.Handle("/api/auth/oauth/signin", authWrap(HandleOAuthSignIn))
+	http.Handle("/auth/callback", authWrap(HandleOAuthCallback))
+
+	http.Handle("/api/user/preferences", authWrap(getUserPreferencesHandler))
+	http.Handle("/api/user/subscription", authWrap(UserSubscriptionHandler))
+	http.Handle("/api/user/subscription/cancel", authWrap(CancelSubscriptionHandler))
+
+	for key, nav := range ExtraNavs {
+		logFile, err := logfile.New(&logfile.LogFile{
+			FileName:    path.Join(LogDir, key+".log"),
+			MaxSize:     500 * 1024,
+			Flags:       logfile.FileOnly,
+			OldVersions: 2,
+		})
+		if err != nil {
+			log.Printf("Failed to create logFile for %s: %s", key, err)
+			LogPages[key] = log.New(os.Stderr, "", log.LstdFlags)
+		} else {
+			LogPages[key] = log.New(logFile, "", log.LstdFlags)
+		}
+
+		http.Handle(nav.Link, authWrap(nav.Handle))
+
+		for _, subPage := range nav.SubPages {
+			http.Handle(subPage, authWrap(nav.Handle))
+		}
+	}
 
 	srv := &http.Server{
-		Addr: ":" + Config.Port,
-		Handler: router,
+		Addr:    ":" + Config.Port,
+		Handler: nil,
 	}
 
 	done := make(chan os.Signal, 1)
@@ -743,6 +780,7 @@ func main() {
 		ServerNotify("shutdown", "Server shutdown failed: "+err.Error())
 		return
 	}
+
 	ServerNotify("shutdown", "Server shutdown correctly")
 }
 

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
-    <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
+    <link href="https://fonts.googleapis.com/css?family=Rosario:400" rel="stylesheet" type="text/css">
+    <meta name="impact-site-verification" value="77b54a05-53ed-42d4-b087-cb40fa950018">
     <title>{{.Title}}</title>
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
@@ -16,7 +17,7 @@
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
     <meta name="theme-color" content="#ff0000">
 
-    {{if .PatreonLogin}}
+    </head>{{if .PatreonLogin}}
         <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     {{end}}

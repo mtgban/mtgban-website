@@ -762,27 +762,26 @@ func sign(link, user string, expires *time.Time) string {
 	return sig
 }
 
-
 func getSignatureFromCookies(r *http.Request) string {
-    // Hijack getSignatureFromCookies function to extract from context first
-    if ctx := r.Context(); ctx != nil {
-        if sig, ok := ctx.Value("signature").(string); ok && sig != "" {
-            return sig
-        }
-    }
-    
-    // Fall back to original method
-    cookie, err := r.Cookie("MTGBAN")
-    if err != nil {
-        return ""
-    }
-    
-    sig := cookie.Value
-    if sig == "" {
-        return ""
-    }
-    
-    return sig
+	// Hijack getSignatureFromCookies function to extract from context first
+	if ctx := r.Context(); ctx != nil {
+		if sig, ok := ctx.Value("signature").(string); ok && sig != "" {
+			return sig
+		}
+	}
+
+	// Fall back to original method
+	cookie, err := r.Cookie("MTGBAN")
+	if err != nil {
+		return ""
+	}
+
+	sig := cookie.Value
+	if sig == "" {
+		return ""
+	}
+
+	return sig
 }
 
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {

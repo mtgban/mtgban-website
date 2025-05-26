@@ -255,239 +255,238 @@ func Authenticate(ctx context.Context, r *http.Request) AuthResult {
 }
 
 func AuthMiddleware() func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            defer recoverPanic(r, w)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer recoverPanic(r, w)
 
-            if AuthHost == "" {
-                AuthHost = getBaseURL(r) + "/auth"
-            }
-            
-            emptyPermissions := map[string]map[string]any{}
-            var userToken string = ""
-            var userPreferences map[string]string = nil
-            
-            var activeNavItem *NavElem
-            var activeNavKey string
-            
-            for key, nav := range ExtraNavs {
-                if r.URL.Path == nav.Link || isSubPage(r.URL.Path, nav.SubPages) {
-                    activeNavItem = nav
-                    activeNavKey = key
-                    break
-                }
-            }
-            
-            staticPaths := []string{
-                "/css/", "/img/", "/js/", "/favicon.ico",
-            }
-            for _, prefix := range staticPaths {
-                if strings.HasPrefix(r.URL.Path, prefix) {
-                    next.ServeHTTP(w, r)
-                    return
-                }
-            }
-            
-            if r.URL.Path == "/auth" {
-                next.ServeHTTP(w, r)
-                return
-            }
+			if AuthHost == "" {
+				AuthHost = getBaseURL(r) + "/auth"
+			}
+
+			emptyPermissions := map[string]map[string]any{}
+			var userToken string = ""
+			var userPreferences map[string]any = nil
+
+			var activeNavItem *NavElem
+			var activeNavKey string
+
+			for key, nav := range ExtraNavs {
+				if r.URL.Path == nav.Link || isSubPage(r.URL.Path, nav.SubPages) {
+					activeNavItem = nav
+					activeNavKey = key
+					break
+				}
+			}
+
+			staticPaths := []string{
+				"/css/", "/img/", "/js/", "/favicon.ico",
+			}
+			for _, prefix := range staticPaths {
+				if strings.HasPrefix(r.URL.Path, prefix) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			if r.URL.Path == "/auth" {
+				next.ServeHTTP(w, r)
+				return
+			}
 
 			isNoAuth := activeNavItem != nil && activeNavItem.NoAuth
-            isDevModeRoute := DevMode && activeNavItem != nil && activeNavItem.AlwaysOnForDev
+			isDevModeRoute := DevMode && activeNavItem != nil && activeNavItem.AlwaysOnForDev
 
 			if isNoAuth || isDevModeRoute {
-                if isNoAuth {
-                    if DevMode {
-                        log.Printf("[DEBUG] NoAuth route accessed: %s (%s)", activeNavItem.Name, r.URL.Path)
-                    }
-                } else {
-                    if DevMode {
-                        log.Printf("[DEBUG] DevMode route accessed: %s (%s)", activeNavItem.Name, r.URL.Path)
-                    }
-                }
-                
-                ctx := r.Context()
-                ctx = context.WithValue(ctx, "permissions", emptyPermissions)
-                ctx = context.WithValue(ctx, "token", "")
-                ctx = context.WithValue(ctx, "signature", "")
-                ctx = context.WithValue(ctx, "expiry_time", int64(0))
-                ctx = context.WithValue(ctx, "user_email", "")
-                ctx = context.WithValue(ctx, "user_preferences", userPreferences)
-                
-                gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
-                return
-            }
+				if isNoAuth {
+					if DevMode {
+						log.Printf("[DEBUG] NoAuth route accessed: %s (%s)", activeNavItem.Name, r.URL.Path)
+					}
+				} else {
+					if DevMode {
+						log.Printf("[DEBUG] DevMode route accessed: %s (%s)", activeNavItem.Name, r.URL.Path)
+					}
+				}
+
+				ctx := r.Context()
+				ctx = context.WithValue(ctx, "permissions", emptyPermissions)
+				ctx = context.WithValue(ctx, "token", "")
+				ctx = context.WithValue(ctx, "signature", "")
+				ctx = context.WithValue(ctx, "expiry_time", int64(0))
+				ctx = context.WithValue(ctx, "user_email", "")
+				ctx = context.WithValue(ctx, "user_preferences", userPreferences)
+
+				gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
 
 			publicPaths := []string{
-                "/", "/go/", "/random", "/randomsealed", "/discord",
-                "/search/oembed",
-            }
-            
-            for _, path := range publicPaths {
-                if strings.HasPrefix(r.URL.Path, path) {
-                    ctx := r.Context()
-                    ctx = context.WithValue(ctx, "permissions", emptyPermissions)
-                    ctx = context.WithValue(ctx, "token", "")
-                    ctx = context.WithValue(ctx, "signature", "")
-                    ctx = context.WithValue(ctx, "expiry_time", int64(0))
-                    ctx = context.WithValue(ctx, "user_email", "")
-                    ctx = context.WithValue(ctx, "user_preferences", userPreferences)
-                    
-                    gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
-                    return
-                }
-            }
-            
-            publicAPIPaths := []string{
-                "/api/search/", "/api/suggest", "/api/opensearch.xml",
-                "/api/cardkingdom/pricelist.json",
-            }
-            
-            for _, path := range publicAPIPaths {
-                if strings.HasPrefix(r.URL.Path, path) {
-                    w.Header().Add("Content-Type", "application/json")
-                    
-                    ctx := r.Context()
-                    ctx = context.WithValue(ctx, "permissions", emptyPermissions)
-                    ctx = context.WithValue(ctx, "token", "")
-                    ctx = context.WithValue(ctx, "signature", "")
-                    ctx = context.WithValue(ctx, "expiry_time", int64(0))
-                    ctx = context.WithValue(ctx, "user_email", "anonymous@mtgban.com")
-                    ctx = context.WithValue(ctx, "user_preferences", userPreferences)
-                    
-                    gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
-                    return
-                }
-            }
+				"/", "/go/", "/random", "/randomsealed", "/discord",
+				"/search/oembed",
+			}
 
-            isAPIRequest := strings.HasPrefix(r.URL.Path, "/api/")
-            if isAPIRequest {
-                w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
+			for _, path := range publicPaths {
+				if strings.HasPrefix(r.URL.Path, path) {
+					ctx := r.Context()
+					ctx = context.WithValue(ctx, "permissions", emptyPermissions)
+					ctx = context.WithValue(ctx, "token", "")
+					ctx = context.WithValue(ctx, "signature", "")
+					ctx = context.WithValue(ctx, "expiry_time", int64(0))
+					ctx = context.WithValue(ctx, "user_email", "")
+					ctx = context.WithValue(ctx, "user_preferences", userPreferences)
 
-                ip, err := IpAddress(r)
-                if err != nil {
-                    http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-                    return
-                }
+					gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
 
-                if !APIRateLimiter.allow(string(ip)) {
-                    http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
-                    return
-                }
+			publicAPIPaths := []string{
+				"/api/search/", "/api/suggest", "/api/opensearch.xml",
+				"/api/cardkingdom/pricelist.json",
+			}
 
-                if !DatabaseLoaded {
-                    http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
-                    return
-                }
+			for _, path := range publicAPIPaths {
+				if strings.HasPrefix(r.URL.Path, path) {
+					w.Header().Add("Content-Type", "application/json")
 
-                w.Header().Add("Content-Type", "application/json")
-            }
-            
-            authResult := Authenticate(r.Context(), r)
-            
-            if authResult.Error != nil {
-                if DevMode {
-                    log.Printf("[DEBUG] Authentication failed: %v", authResult.Error)
-                }
-                
-                if isAPIRequest {
-                    w.Header().Set("Content-Type", "application/json")
-                    w.WriteHeader(http.StatusUnauthorized)
-                    w.Write([]byte(fmt.Sprintf(`{"error": "%s"}`, authResult.Error.Error())))
-                    return
-                } else {
-                    pageVars := genPageNavWithPermissions("Login Required", emptyPermissions, 0)
-                    pageVars.Title = "Authentication Required"
-                    pageVars.ErrorMessage = ErrMsg
-                    pageVars.PatreonLogin = true
-                    render(w, "home.html", pageVars)
-                    return
-                }
-            }
-            
-            userToken = authResult.Token
-            permissions := authResult.Permissions
-            signature := authResult.Signature
-            
-            var expiryTime int64 = 0
-            if signature != "" {
-                exp := GetParamFromSig(signature, "Expires")
-                expiryTime, _ = strconv.ParseInt(exp, 10, 64)
-            }
-            
-            if userToken != "" {
-                prefs, err := getUserPreferences(r.Context(), userToken)
-                if err == nil {
-                    userPreferences = prefs
-                }
-            }
-            
-            if r.Method != "GET" {
-                var ok bool
-                if activeNavItem != nil {
-                    ok = activeNavItem.CanPOST
-                }
-                if !ok {
-                    http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
-                    return
-                }
-            }
-            
-            if !UserRateLimiter.allow(authResult.UserID) && r.URL.Path != "/admin" {
-                pageVars := genPageNavWithPermissions("Error", emptyPermissions, 0)
-                pageVars.Title = "Too Many Requests"
-                pageVars.ErrorMessage = ErrMsgUseAPI
-                render(w, "home.html", pageVars)
-                return
-            }
-            
-            if activeNavItem != nil && activeNavKey != "" {
-                hasAccess := checkFeatureAccess(permissions, activeNavKey)
-                
-                if DevMode && activeNavItem.AlwaysOnForDev {
-                    hasAccess = true
-                }
-                
-                if SigCheck && !hasAccess {
-                    pageVars := genPageNavWithPermissions(activeNavItem.Name, emptyPermissions, 0)
-                    pageVars.Title = "This feature is BANned"
-                    pageVars.ErrorMessage = ErrMsgPlus
-                    render(w, activeNavItem.Page, pageVars)
-                    return
-                }
-            }
-            
-            if isAPIRequest && !checkAPIAccess(permissions) && SigCheck {
-                w.WriteHeader(http.StatusForbidden)
-                w.Write([]byte(`{"error": "API access not authorized"}`))
-                return
-            }
-            
-            ctx := r.Context()
-            ctx = context.WithValue(ctx, "permissions", permissions)
-            ctx = context.WithValue(ctx, "token", authResult.Token)
-            ctx = context.WithValue(ctx, "signature", signature)
-            ctx = context.WithValue(ctx, "expiry_time", expiryTime)
-            ctx = context.WithValue(ctx, "user_preferences", userPreferences)
-            
-            if claims, err := extractClaims(authResult.Token); err == nil {
-                if email, ok := claims["email"].(string); ok && email != "" {
-                    ctx = context.WithValue(ctx, "user_email", email)
-                }
-            } else {
-                ctx = context.WithValue(ctx, "user_email", "")
-            }
-            
-            gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
-        })
-    }
+					ctx := r.Context()
+					ctx = context.WithValue(ctx, "permissions", emptyPermissions)
+					ctx = context.WithValue(ctx, "token", "")
+					ctx = context.WithValue(ctx, "signature", "")
+					ctx = context.WithValue(ctx, "expiry_time", int64(0))
+					ctx = context.WithValue(ctx, "user_email", "anonymous@mtgban.com")
+					ctx = context.WithValue(ctx, "user_preferences", userPreferences)
+
+					gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+
+			isAPIRequest := strings.HasPrefix(r.URL.Path, "/api/")
+			if isAPIRequest {
+				w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
+
+				ip, err := IpAddress(r)
+				if err != nil {
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+					return
+				}
+
+				if !APIRateLimiter.allow(string(ip)) {
+					http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+					return
+				}
+
+				if !DatabaseLoaded {
+					http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+					return
+				}
+
+				w.Header().Add("Content-Type", "application/json")
+			}
+
+			authResult := Authenticate(r.Context(), r)
+
+			if authResult.Error != nil {
+				if DevMode {
+					log.Printf("[DEBUG] Authentication failed: %v", authResult.Error)
+				}
+
+				if isAPIRequest {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte(fmt.Sprintf(`{"error": "%s"}`, authResult.Error.Error())))
+					return
+				} else {
+					pageVars := genPageNavWithPermissions("Login Required", emptyPermissions, 0)
+					pageVars.Title = "Authentication Required"
+					pageVars.ErrorMessage = ErrMsg
+					pageVars.PatreonLogin = true
+					render(w, "home.html", pageVars)
+					return
+				}
+			}
+
+			userToken = authResult.Token
+			permissions := authResult.Permissions
+			signature := authResult.Signature
+
+			var expiryTime int64 = 0
+			if signature != "" {
+				exp := GetParamFromSig(signature, "Expires")
+				expiryTime, _ = strconv.ParseInt(exp, 10, 64)
+			}
+
+			if userToken != "" {
+				prefs, err := getUserPreferences(r.Context(), userToken)
+				if err == nil {
+					userPreferences = prefs
+				}
+			}
+
+			if r.Method != "GET" {
+				var ok bool
+				if activeNavItem != nil {
+					ok = activeNavItem.CanPOST
+				}
+				if !ok {
+					http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
+					return
+				}
+			}
+
+			if !UserRateLimiter.allow(authResult.UserID) && r.URL.Path != "/admin" {
+				pageVars := genPageNavWithPermissions("Error", emptyPermissions, 0)
+				pageVars.Title = "Too Many Requests"
+				pageVars.ErrorMessage = ErrMsgUseAPI
+				render(w, "home.html", pageVars)
+				return
+			}
+
+			if activeNavItem != nil && activeNavKey != "" {
+				hasAccess := checkFeatureAccess(permissions, activeNavKey)
+
+				if DevMode && activeNavItem.AlwaysOnForDev {
+					hasAccess = true
+				}
+
+				if SigCheck && !hasAccess {
+					pageVars := genPageNavWithPermissions(activeNavItem.Name, emptyPermissions, 0)
+					pageVars.Title = "This feature is BANned"
+					pageVars.ErrorMessage = ErrMsgPlus
+					render(w, activeNavItem.Page, pageVars)
+					return
+				}
+			}
+
+			if isAPIRequest && !checkAPIAccess(permissions) && SigCheck {
+				w.WriteHeader(http.StatusForbidden)
+				w.Write([]byte(`{"error": "API access not authorized"}`))
+				return
+			}
+
+			ctx := r.Context()
+			ctx = context.WithValue(ctx, "permissions", permissions)
+			ctx = context.WithValue(ctx, "token", authResult.Token)
+			ctx = context.WithValue(ctx, "signature", signature)
+			ctx = context.WithValue(ctx, "expiry_time", expiryTime)
+			ctx = context.WithValue(ctx, "user_preferences", userPreferences)
+
+			if claims, err := extractClaims(authResult.Token); err == nil {
+				if email, ok := claims["email"].(string); ok && email != "" {
+					ctx = context.WithValue(ctx, "user_email", email)
+				}
+			} else {
+				ctx = context.WithValue(ctx, "user_email", "")
+			}
+
+			gziphandler.GzipHandler(next).ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 func isSubPage(path string, subPages []string) bool {
-    return slices.Contains(subPages, path)
+	return slices.Contains(subPages, path)
 }
-
 
 func checkFeatureAccess(permissions map[string]map[string]any, featureName string) bool {
 	hasAccess := false
@@ -760,7 +759,6 @@ func GetParamFromSig(sig, param string) string {
 	return v.Get(param)
 }
 
-
 func handleAuthError(w http.ResponseWriter, r *http.Request, message string) {
 	if strings.HasPrefix(r.URL.Path, "/api/") {
 		w.Header().Set("Content-Type", "application/json")
@@ -803,4 +801,10 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"message": "Authentication successful"}`))
 	})).ServeHTTP(w, r.WithContext(ctx))
+}
+
+func AuthPage(w http.ResponseWriter, r *http.Request) {
+	pageVars := genPageNav("Authentication", "")
+	pageVars.Title = "Login / Sign Up"
+	render(w, "auth.html", pageVars)
 }

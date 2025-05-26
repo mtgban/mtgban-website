@@ -18,9 +18,9 @@ type LoginRequest struct {
 
 // SignupRequest represents the signup form data from the client
 type SignupRequest struct {
-	Email     string `json:"email"`
-	Password  string `json:"password"`
-	FullName  string `json:"full_name,omitempty"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	FullName string `json:"full_name,omitempty"`
 }
 
 // AuthResponse represents the authentication response from supabase
@@ -53,7 +53,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 		Email:    loginReq.Email,
 		Password: loginReq.Password,
 	})
-	
+
 	if err != nil {
 		if DevMode {
 			log.Printf("[DEBUG] Login failed for %s: %v", loginReq.Email, err)
@@ -116,7 +116,7 @@ func HandleSignup(w http.ResponseWriter, r *http.Request) {
 		Password: signupReq.Password,
 		Data:     userData,
 	})
-	
+
 	if err != nil {
 		if DevMode {
 			log.Printf("[DEBUG] Signup failed for %s: %v", signupReq.Email, err)
@@ -143,7 +143,7 @@ func HandleSignup(w http.ResponseWriter, r *http.Request) {
 		Email:    signupReq.Email,
 		Password: signupReq.Password,
 	})
-	
+
 	if err != nil {
 		if DevMode {
 			log.Printf("[DEBUG] Auto sign-in failed after signup: %v", err)
@@ -190,7 +190,7 @@ func storeAuthenticatedDetails(authResult *supabase.AuthenticatedDetails) (*User
 
 	if authResult.User.AppMetadata != nil && authResult.User.AppMetadata.Sig != "" {
 		session.Signature = authResult.User.AppMetadata.Sig
-		
+
 		if session.Signature != "" {
 			permissions, err := decodeAndParseSignature(session.Signature)
 			if err == nil {
@@ -245,8 +245,8 @@ func HandleOAuthSignIn(w http.ResponseWriter, r *http.Request) {
 	providerDetails, err := client.Auth.SignInWithProvider(supabase.ProviderSignInOptions{
 		Provider:   req.Provider,
 		RedirectTo: redirectURL,
-		FlowType: supabase.PKCE,
-		Scopes: []string{"email", "profile"},
+		FlowType:   supabase.PKCE,
+		Scopes:     []string{"email", "profile"},
 	})
 
 	if err != nil {
@@ -397,4 +397,42 @@ func clearAuthCookies(w http.ResponseWriter) {
 		Secure:   !DevMode,
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func AccountPage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userEmail, _ := ctx.Value("user_email").(string)
+	permissions, _ := ctx.Value("permissions").(map[string]map[string]any)
+	signature, _ := ctx.Value("signature").(string)
+	token, _ := ctx.Value("token").(string)
+	prefs, err := getUserPreferences(ctx, token)
+	if err != nil {
+		log.Printf("[DEBUG] Failed to get user preferences: %v", err)
+	}
+	
+	pageVars := genPageNavWithPermissions("Account", permissions, 0)
+	pageVars.Title = "My Account"
+	pageVars.UserEmail = userEmail
+
+	if token != "" {
+		claims, err := extractClaims(token)
+		if err == nil {
+			if userMeta, ok := claims["user_metadata"].(map[string]any); ok {
+				if name, ok := userMeta["full_name"].(string); ok {
+					pageVars.UserName = name
+				}
+			}
+		}
+	}
+
+	pageVars.Preferences = prefs
+
+	checker := NewPermissionChecker(permissions, "")
+	pageVars.HasAPIAccess = checker.HasAPIAccess()
+
+	if pageVars.HasAPIAccess && signature != "" {
+		pageVars.APIKey = GetParamFromSig(signature, "api_key")
+	}
+	
+	render(w, "account.html", pageVars)
 }

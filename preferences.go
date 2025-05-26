@@ -54,7 +54,7 @@ func PreferencesAPI(w http.ResponseWriter, r *http.Request) {
 }
 
 // getUserPreferences retrieves user preferences from UserMetadata
-func getUserPreferences(ctx context.Context, userToken string) (map[string]string, error) {
+func getUserPreferences(ctx context.Context, userToken string) (map[string]any, error) {
 	if userToken == "" {
 		return nil, fmt.Errorf("no user token provided")
 	}
@@ -69,14 +69,12 @@ func getUserPreferences(ctx context.Context, userToken string) (map[string]strin
 		return nil, fmt.Errorf("failed to get user data: %v", err)
 	}
 
-	preferences := make(map[string]string)
+	preferences := make(map[string]any)
 	if user.UserMetadata != nil {
 		if prefsData, ok := user.UserMetadata[PreferencesNamespace]; ok {
 			if prefsMap, ok := prefsData.(map[string]any); ok {
 				for k, v := range prefsMap {
-					if strVal, ok := v.(string); ok {
-						preferences[k] = strVal
-					}
+					preferences[k] = v
 				}
 			}
 		}
@@ -136,14 +134,18 @@ func updateSinglePreference(ctx context.Context, userToken string, key, value st
 }
 
 // getPreferenceValue retrieves a single preference value
-func getPreferenceValue(ctx context.Context, userToken string, key string) (string, bool, error) {
+func getPreferenceValue(ctx context.Context, userToken string, key string) (any, bool, error) {
 	prefs, err := getUserPreferences(ctx, userToken)
 	if err != nil {
-		return "", false, err
+		return nil, false, err
 	}
 
 	val, exists := prefs[key]
-	return val, exists, nil
+	if !exists {
+		return nil, false, nil
+	}
+
+	return val, true, nil
 }
 
 // deletePreference removes a preference
@@ -176,4 +178,17 @@ func deletePreference(ctx context.Context, userToken string, key string) error {
 	}
 
 	return nil
+}
+
+func getUserPreferencesHandler(w http.ResponseWriter, r *http.Request) {
+	userToken := r.Header.Get("Authorization")
+	prefs, err := getUserPreferences(r.Context(), userToken)
+	if err != nil {
+		http.Error(w, "Failed to get user preferences", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(prefs)
+
 }

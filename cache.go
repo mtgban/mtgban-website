@@ -329,7 +329,7 @@ func (c *SessionCache) GetMetrics() CacheMetrics {
 	}
 }
 
-func (c *SessionCache) StoreSupabaseSession(authResponse map[string]interface{}) (*UserSession, error) {
+func (c *SessionCache) StoreSupabaseSession(authResponse map[string]any) (*UserSession, error) {
 	user, ok := authResponse["user"].(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("user data not found in auth response")

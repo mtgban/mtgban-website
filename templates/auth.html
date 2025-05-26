@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+    <link href="https://fonts.googleapis.com/css?family=Rosario:400" rel="stylesheet" type="text/css">
+    <title>{{.Title}} - Login / Sign Up</title>
+    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
+    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+    <script type="text/javascript" src="/js/auth.js?hash={{.Hash}}"></script>
+</head>
+
+<body class="light-theme">
+    <script type="text/javascript" src="/js/themechecker.js?hash={{.Hash}}"></script>
+    <nav>
+        <ul>
+            <li><a href="/"><img src="/img/misc/logo.png" width=48></a></li>
+            {{range .Nav}}
+            <li>
+                <a {{if .Active}}class="{{.Class}}" {{end}} href="{{.Link}}">
+                    <span>{{.Short}} {{.Name}}</span>
+                </a>
+            </li>
+            {{end}}
+            <li>
+                <label class="switch">
+                    <div>
+                        <input type="checkbox" />
+                        <span class="slider"></span>
+                    </div>
+                    <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+                </label>
+            </li>
+        </ul>
+    </nav>
+
+    <div class="bg">
+        <div class="mainbody"></div>
+    </div>
+
+    {{if ne .ErrorMessage ""}}
+    <h1 class="danger">{{.ErrorMessage}}</h1>
+    {{end}}
+    {{if ne .InfoMessage ""}}
+    <h1 class="info">{{.InfoMessage}}</h1>
+    {{end}}
+
+    <div class="indent">
+        <div class="row">
+            <div class="column">
+                <h1>Login</h1>
+                <form id="loginForm" class="auth-form">
+                    <div style="margin: 20px 0;">
+                        <input type="email" id="loginEmail" class="w3-input w3-border w3-round-small"
+                            placeholder="Email" required style="width: 300px; margin-bottom: 10px;">
+                        <input type="password" id="loginPassword" class="w3-input w3-border w3-round-small"
+                            placeholder="Password" required style="width: 300px; margin-bottom: 10px;">
+                        <button type="submit" class="btn normal" style="padding: 10px 20px; font-size: 16px;">
+                            Login
+                        </button>
+                    </div>
+                </form>
+
+                <div style="margin: 20px 0;">
+                    <p>Or login with:</p>
+                    <button onclick="handleOAuthLogin('google')" class="btn info"
+                        style="padding: 10px 20px; margin: 5px;">
+                        Login with Google
+                    </button>
+                    <button onclick="handleOAuthLogin('discord')" class="btn info"
+                        style="padding: 10px 20px; margin: 5px;">
+                        Login with Discord
+                    </button>
+                </div>
+
+                <div id="loginError" class="danger" style="display: none; margin: 10px 0;"></div>
+            </div>
+
+            <div class="column">
+                <h1>Sign Up</h1>
+                <form id="signupForm" class="auth-form">
+                    <div style="margin: 20px 0;">
+                        <input type="text" id="signupName" class="w3-input w3-border w3-round-small"
+                            placeholder="Full Name (optional)" style="width: 300px; margin-bottom: 10px;">
+                        <input type="email" id="signupEmail" class="w3-input w3-border w3-round-small"
+                            placeholder="Email" required style="width: 300px; margin-bottom: 10px;">
+                        <input type="password" id="signupPassword" class="w3-input w3-border w3-round-small"
+                            placeholder="Password (min 6 characters)" required minlength="6"
+                            style="width: 300px; margin-bottom: 10px;">
+                        <input type="password" id="signupPasswordConfirm" class="w3-input w3-border w3-round-small"
+                            placeholder="Confirm Password" required style="width: 300px; margin-bottom: 10px;">
+                        <button type="submit" class="btn success" style="padding: 10px 20px; font-size: 16px;">
+                            Sign Up
+                        </button>
+                    </div>
+                </form>
+
+                <div id="signupError" class="danger" style="display: none; margin: 10px 0;"></div>
+                <div id="signupSuccess" class="success" style="display: none; margin: 10px 0;"></div>
+            </div>
+        </div>
+
+        <div style="margin-top: 40px;">
+            <p><a href="/forgot-password">Forgot your password?</a></p>
+        </div>
+    </div>
+
+    <br>
+    <div class="footer">&copy; 2019-2025 MTGBAN Inc<br>
+        <br>
+        <hr width=30% style="border: 1px dotted;">
+        By creating an account, you agree to our Terms of Service and Privacy Policy.<br>
+    </div>
+</body>
+
+</html>
