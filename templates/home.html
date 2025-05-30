@@ -77,7 +77,7 @@
             </script>
 
             {{range $ref, $id := .PatreonIds}}
-                <a href="javascript:location.replace(getPatreonURL('{{$id}}', '{{$ref}}'))">
+                <a href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">
                     <img src="/img/misc/login-{{$ref}}.png" width=360 height=60>
                 </a>
 
