@@ -156,6 +156,7 @@ type PageVars struct {
 
 	ScraperKeys     []string
 	IndexKeys       []string
+	AltKeys         []string
 	SellerKeys      []string
 	VendorKeys      []string
 	UploadEntries   []UploadEntry

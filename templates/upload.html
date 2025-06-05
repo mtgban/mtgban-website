@@ -186,13 +186,9 @@
                                 <input type="checkbox" id="noprice" name="noprice" onClick="javascript:saveCheckbox('noprice')">
                                 <p class="h6inline">Ignore prices when loading data (<i>use
                                     <select id="altPrice" name="altPrice" onChange="javascript:saveText('altPrice')" style="text-align-last=center;">
-                                        <option value="TCGLow" selected>&nbsp;TCG Low (no S&H)</option>
-                                        <option value="TCGMarket">&nbsp;TCG Market (w/ S&H)</option>
-                                        <option value="TCGDirectLow">&nbsp;TCG Direct Low</option>
-                                        <option value="CT">&nbsp;Cardtrader</option>
-                                        <option value="CT0">&nbsp;Cardtrader Zero</option>
-                                        <option value="MKMLow">&nbsp;MKM Low</option>
-                                        <option value="MKMTrend">&nbsp;MKM Trend</option>
+                                        {{range $.AltKeys}}
+                                            <option value="{{.}}" selected>&nbsp;{{scraper_name .}}</option>
+                                        {{end}}
                                     </select>
                                     instead</i>)</p>
                             </label>

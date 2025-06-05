@@ -58,6 +58,11 @@ var UploadIndexKeysCSV = []string{
 	"TCGLow", "TCGMarket", "TCGDirect", "MKMLow", "MKMTrend",
 }
 
+// List of alternative prices sources
+var UploadIndexComparePriceList = []string{
+	"TCGLow", "TCGMarket", "TCGDirect", "CT", "CT0", "MKMLow", "MKMTrend",
+}
+
 var ErrUploadDecklist = errors.New("decklist")
 var ErrReloadFirstRow = errors.New("firstrow")
 
@@ -565,6 +570,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	indexResults := getSellerPrices("", indexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	pageVars.IndexKeys = UploadIndexKeysPublic
+	pageVars.AltKeys = UploadIndexComparePriceList
 
 	// Orders implies priority of argument search
 	pageVars.Metadata = map[string]GenericCard{}
