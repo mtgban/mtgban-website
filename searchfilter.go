@@ -1506,6 +1506,10 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 				if co.IsPromo {
 					return false
 				}
+			case "gamechanger", "gc":
+				if co.IsGameChanger {
+					return false
+				}
 			case "extendedart", "ea":
 				if co.HasFrameEffect(mtgjson.FrameEffectExtendedArt) {
 					return false
