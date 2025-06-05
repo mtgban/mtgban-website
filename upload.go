@@ -555,7 +555,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indexResults := getSellerPrices("", UploadIndexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+	indexKeys := UploadIndexKeys
+
+	// Choose the alternative reference pricing source when one is not loaded in
+	altPriceSource := r.FormValue("altPrice")
+	if altPriceSource != "" && !slices.Contains(indexKeys, altPriceSource) {
+		indexKeys = append(indexKeys, altPriceSource)
+	}
+
+	indexResults := getSellerPrices("", indexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	pageVars.IndexKeys = UploadIndexKeysPublic
 
 	// Orders implies priority of argument search
@@ -599,39 +607,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var highestTotal float64
-
-	// Choose the alternative reference pricing source when one is not loaded in
-	var backupResults map[string]map[string]*BanPrice
-	altPriceSource := r.FormValue("altPrice")
-	switch altPriceSource {
-	default:
-		altPriceSource = "TCGLow"
-	case "market":
-		altPriceSource = "TCGMarket"
-	case "direct":
-		altPriceSource = "TCGDirectLow"
-	case "cardtrader", "cardtraderZero", "mkmLow", "mkmTrend":
-		switch altPriceSource {
-		case "cardtrader":
-			altPriceSource = "CT"
-		case "cardtraderZero":
-			altPriceSource = "CT0"
-		case "mkmLow":
-			altPriceSource = "MKMLow"
-		case "mkmTrend":
-			altPriceSource = "MKMTrend"
-		}
-		backupResults = results
-		if blMode {
-			backupResults = getSellerPrices("", []string{altPriceSource}, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
-		}
-	case "directNet":
-		altPriceSource = "TCGDirectNet"
-		backupResults = results
-		if !blMode {
-			backupResults = getVendorPrices("", []string{altPriceSource}, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
-		}
-	}
 
 	optimizedResults := map[string][]OptimizedUploadEntry{}
 	optimizedTotals := map[string]float64{}
@@ -754,10 +729,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			comparePrice := uploadedData[i].OriginalPrice
 			if comparePrice == 0 || skipPrices {
 				compareConds := ""
-				prices, found := indexResults[cardId][altPriceSource]
-				if !found {
+				prices := indexResults[cardId][altPriceSource]
+				if slices.Index(indexKeys, altPriceSource) > len(UploadIndexKeys) {
 					compareConds = conds
-					prices = backupResults[cardId+conds][altPriceSource]
 				}
 
 				// Normally index has no conditions to check, but the price might be coming
