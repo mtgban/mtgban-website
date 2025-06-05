@@ -564,7 +564,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Choose the alternative reference pricing source when one is not loaded in
 	altPriceSource := r.FormValue("altPrice")
-	if altPriceSource != "" && !slices.Contains(indexKeys, altPriceSource) {
+	if !slices.Contains(UploadIndexComparePriceList, altPriceSource) {
+		altPriceSource = UploadIndexKeys[0]
+	}
+	if !slices.Contains(indexKeys, altPriceSource) {
 		indexKeys = append(indexKeys, altPriceSource)
 	}
 
