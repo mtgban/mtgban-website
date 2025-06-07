@@ -270,6 +270,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Set the store names for the <select> box
 	pageVars.SellerKeys = allSellers
 	pageVars.VendorKeys = allVendors
+	pageVars.AltKeys = UploadIndexComparePriceList
 
 	// Load the preferred list of enabled stores for the <select> box
 	// The first check is for when the cookie is not yet set
@@ -573,7 +574,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	indexResults := getSellerPrices("", indexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	pageVars.IndexKeys = UploadIndexKeysPublic
-	pageVars.AltKeys = UploadIndexComparePriceList
 
 	// Orders implies priority of argument search
 	pageVars.Metadata = map[string]GenericCard{}
