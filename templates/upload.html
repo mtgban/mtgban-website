@@ -883,7 +883,10 @@
                                                         {{printf "%.2f" $price}}
                                                     </a>
                                                     {{if .Price}}
-                                                        / $ {{printf "%.2f" .Price}}
+                                                        / $
+                                                        <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">
+                                                            {{printf "%.2f" .Price}}
+                                                        </a>
                                                         {{if and $.CanFilterByPrice (lt .VisualPrice $price)}}⚠️{{end}}
                                                     {{end}}
                                                 </td>

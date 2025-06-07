@@ -107,6 +107,9 @@ type OptimizedUploadEntry struct {
 	// Price of the card provided in the source data (or TCGLow)
 	Price float64
 
+	// Key of the source of alternative (comparison) pricing
+	CompareSource string
+
 	// Percentage of the store price vs uploaded price
 	Spread float64
 
@@ -785,6 +788,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				CardId:        cardId,
 				Condition:     conds,
 				Price:         comparePrice,
+				CompareSource: altPriceSource,
 				Spread:        factor,
 				BestPrice:     price,
 				Quantity:      qty,
