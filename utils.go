@@ -378,23 +378,15 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		variant = fmt.Sprintf("\"%s\" %s", co.FlavorName, variant)
 	}
 
-	query := co.Name
-	if !co.Sealed {
-		query = fmt.Sprintf("%s s:%s cn:%s", co.Name, co.SetCode, co.Number)
-		if co.Etched {
-			query += " f:etched"
-
-			// Append Etched information to the tag
-			if variant != "" {
-				variant += " "
-			}
-			variant += "Etched"
-		} else if co.Foil {
-			query += " f:foil"
-		} else if !co.Etched && !co.Foil {
-			query += " f:nonfoil"
+	// Append Etched information to the tag
+	if co.Etched {
+		if variant != "" {
+			variant += " "
 		}
+		variant += "Etched"
 	}
+
+	query := genQuery(co)
 
 	imgURL := co.Images["full"]
 	if len(flags) > 0 && flags[0] {
@@ -511,6 +503,21 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
 	}
+}
+
+func genQuery(co *mtgmatcher.CardObject) string {
+	query := co.Name
+	if !co.Sealed {
+		query = fmt.Sprintf("%s s:%s cn:%s", co.Name, co.SetCode, co.Number)
+		if co.Etched {
+			query += " f:etched"
+		} else if co.Foil {
+			query += " f:foil"
+		} else if !co.Etched && !co.Foil {
+			query += " f:nonfoil"
+		}
+	}
+	return query
 }
 
 func genPrintings(co *mtgmatcher.CardObject) string {
