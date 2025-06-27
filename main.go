@@ -373,8 +373,8 @@ type ConfigType struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
-	// Disable parallel loading during bootstrap
-	SlowStart bool `json:"slow_start"`
+	// Enable parallel loading during bootstrap
+	FastStart bool `json:"fast_start"`
 
 	/* The location of the configuation file */
 	filePath string

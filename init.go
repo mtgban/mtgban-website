@@ -996,13 +996,13 @@ func loadSellers(newbc *mtgban.BanClient) {
 		}(i)
 
 		// If not in initilization mode, run the routines sequentially
-		if !init || Config.SlowStart {
+		if !init || !Config.FastStart {
 			wg.Wait()
 		}
 	}
 
 	if init {
-		if !Config.SlowStart {
+		if Config.FastStart {
 			wg.Wait()
 		}
 
@@ -1136,13 +1136,13 @@ func loadVendors(newbc *mtgban.BanClient) {
 			log.Println(shorthand, "vendor -- OK")
 		}(i)
 
-		if !init || Config.SlowStart {
+		if !init || !Config.FastStart {
 			wg.Wait()
 		}
 	}
 
 	if init {
-		if !Config.SlowStart {
+		if Config.FastStart {
 			wg.Wait()
 		}
 
