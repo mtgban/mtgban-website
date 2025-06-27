@@ -284,8 +284,6 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 				tierTitle = "Legacy"
 			case "VINTAGE", "VINTAGE (Early Adopters)":
 				tierTitle = "Vintage"
-			case "Test Role":
-				tierTitle = "Test Role"
 			}
 		}
 	}
