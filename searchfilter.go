@@ -11,7 +11,6 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
 	"golang.org/x/exp/slices"
 )
 
@@ -1175,31 +1174,31 @@ func compareReleaseDate(filters []string, co *mtgmatcher.CardObject, cmpFunc fun
 }
 
 var isKnownPromo = map[string]string{
-	"bf":        mtgjson.PromoTypeBoosterfun,
-	"v":         mtgjson.PromoTypeBoosterfun,
-	"rewards":   mtgjson.PromoTypePlayerRewards,
-	"mpr":       mtgjson.PromoTypePlayerRewards,
-	"bab":       mtgjson.PromoTypeBuyABox,
-	"buyabox":   mtgjson.PromoTypeBuyABox,
-	"buy-a-box": mtgjson.PromoTypeBuyABox,
-	"arena":     mtgjson.PromoTypeArenaLeague,
-	"judge":     mtgjson.PromoTypeJudgeGift,
-	"confetti":  mtgjson.PromoTypeConfettiFoil,
-	"fracture":  mtgjson.PromoTypeFractureFoil,
-	"galaxy":    mtgjson.PromoTypeGalaxyFoil,
-	"halo":      mtgjson.PromoTypeHaloFoil,
-	"mana":      mtgjson.PromoTypeManaFoil,
-	"rainbow":   mtgjson.PromoTypeRainbowFoil,
-	"raised":    mtgjson.PromoTypeRaisedFoil,
-	"ripple":    mtgjson.PromoTypeRippleFoil,
-	"silver":    mtgjson.PromoTypeSilverFoil,
-	"surge":     mtgjson.PromoTypeSurgeFoil,
-	"wpn":       mtgjson.PromoTypeWPN,
-	"pre":       mtgjson.PromoTypePrerelease,
-	"pp":        mtgjson.PromoTypePromoPack,
-	"neon":      mtgjson.PromoTypeNeonInk,
-	"thicc":     mtgjson.PromoTypeThickDisplay,
-	"display":   mtgjson.PromoTypeThickDisplay,
+	"bf":        mtgmatcher.PromoTypeBoosterfun,
+	"v":         mtgmatcher.PromoTypeBoosterfun,
+	"rewards":   mtgmatcher.PromoTypePlayerRewards,
+	"mpr":       mtgmatcher.PromoTypePlayerRewards,
+	"bab":       mtgmatcher.PromoTypeBuyABox,
+	"buyabox":   mtgmatcher.PromoTypeBuyABox,
+	"buy-a-box": mtgmatcher.PromoTypeBuyABox,
+	"arena":     mtgmatcher.PromoTypeArenaLeague,
+	"judge":     mtgmatcher.PromoTypeJudgeGift,
+	"confetti":  mtgmatcher.PromoTypeConfettiFoil,
+	"fracture":  mtgmatcher.PromoTypeFractureFoil,
+	"galaxy":    mtgmatcher.PromoTypeGalaxyFoil,
+	"halo":      mtgmatcher.PromoTypeHaloFoil,
+	"mana":      mtgmatcher.PromoTypeManaFoil,
+	"rainbow":   mtgmatcher.PromoTypeRainbowFoil,
+	"raised":    mtgmatcher.PromoTypeRaisedFoil,
+	"ripple":    mtgmatcher.PromoTypeRippleFoil,
+	"silver":    mtgmatcher.PromoTypeSilverFoil,
+	"surge":     mtgmatcher.PromoTypeSurgeFoil,
+	"wpn":       mtgmatcher.PromoTypeWPN,
+	"pre":       mtgmatcher.PromoTypePrerelease,
+	"pp":        mtgmatcher.PromoTypePromoPack,
+	"neon":      mtgmatcher.PromoTypeNeonInk,
+	"thicc":     mtgmatcher.PromoTypeThickDisplay,
+	"display":   mtgmatcher.PromoTypeThickDisplay,
 }
 
 var specialTags = map[string]string{
@@ -1508,7 +1507,7 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 					return false
 				}
 			case "wcd", "gold":
-				if co.BorderColor == mtgjson.BorderColorGold {
+				if co.BorderColor == "gold" {
 					return false
 				}
 			case "fullart", "fa":
@@ -1524,15 +1523,15 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 					return false
 				}
 			case "extendedart", "ea":
-				if co.HasFrameEffect(mtgjson.FrameEffectExtendedArt) {
+				if co.HasFrameEffect(mtgmatcher.FrameEffectExtendedArt) {
 					return false
 				}
 			case "showcase", "sc", "sh":
-				if co.HasFrameEffect(mtgjson.FrameEffectShowcase) {
+				if co.HasFrameEffect(mtgmatcher.FrameEffectShowcase) {
 					return false
 				}
 			case "borderless", "bd", "bl":
-				if co.BorderColor == mtgjson.BorderColorBorderless {
+				if co.BorderColor == mtgmatcher.BorderColorBorderless {
 					return false
 				}
 			case "future":
@@ -1548,11 +1547,11 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 					return false
 				}
 			case "japanese", "jpn", "jp", "ja":
-				if co.Language == mtgjson.LanguageJapanese {
+				if co.Language == mtgmatcher.LanguageJapanese {
 					return false
 				}
 			case "phyrexian", "ph":
-				if co.Language == mtgjson.LanguagePhyrexian {
+				if co.Language == mtgmatcher.LanguagePhyrexian {
 					return false
 				}
 			case "commander":
@@ -1571,7 +1570,7 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 				if co.SetCode != "PAFR" {
 					continue
 				}
-				if co.HasPromoType(mtgjson.PromoTypeEmbossed) {
+				if co.HasPromoType(mtgmatcher.PromoTypeEmbossed) {
 					return false
 				}
 			case "p9":

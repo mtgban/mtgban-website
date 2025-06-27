@@ -19,7 +19,6 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
 )
 
 var Country2flag = map[string]string{
@@ -353,11 +352,11 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	variant := ""
 	if showVariant(cardId) {
 		switch {
-		case co.HasFrameEffect(mtgjson.FrameEffectShowcase):
+		case co.HasFrameEffect(mtgmatcher.FrameEffectShowcase):
 			variant = "Showcase "
-		case co.HasFrameEffect(mtgjson.FrameEffectExtendedArt):
+		case co.HasFrameEffect(mtgmatcher.FrameEffectExtendedArt):
 			variant = "Extended Art "
-		case co.BorderColor == mtgjson.BorderColorBorderless:
+		case co.BorderColor == mtgmatcher.BorderColorBorderless:
 			variant = "Borderless "
 		case co.FrameVersion == "1997":
 			variant = "Retro Frame "
@@ -365,7 +364,7 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	}
 	// Loop through the supported promo types, skipping Boosterfun already processed above
 	for _, promoType := range co.PromoTypes {
-		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != mtgjson.PromoTypeBoosterfun {
+		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != mtgmatcher.PromoTypeBoosterfun {
 			variant += mtgmatcher.Title(promoType) + " "
 		}
 	}

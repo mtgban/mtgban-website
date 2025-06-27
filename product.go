@@ -10,7 +10,6 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
 )
 
 type EditionEntry struct {
@@ -313,8 +312,8 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 		if co.IsReserved || mtgmatcher.IsToken(co.Name) ||
 			co.BorderColor == "gold" || co.BorderColor == "silver" ||
 			co.Rarity == "oversize" ||
-			co.HasPromoType(mtgjson.PromoTypePromoPack) ||
-			co.HasPromoType(mtgjson.PromoTypePrerelease) {
+			co.HasPromoType(mtgmatcher.PromoTypePromoPack) ||
+			co.HasPromoType(mtgmatcher.PromoTypePrerelease) {
 			continue
 		}
 

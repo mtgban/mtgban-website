@@ -12,7 +12,6 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/mtgmatcher/mtgjson"
 	"golang.org/x/exp/slices"
 )
 
@@ -207,8 +206,8 @@ func getBulks(skipEditions []string) map[string]int {
 				continue
 			}
 			if co.Foil || co.Etched || co.IsPromo ||
-				co.HasPromoType(mtgjson.PromoTypeBoosterfun) ||
-				co.HasPromoType(mtgjson.PromoTypePromoPack) {
+				co.HasPromoType(mtgmatcher.PromoTypeBoosterfun) ||
+				co.HasPromoType(mtgmatcher.PromoTypePromoPack) {
 				continue
 			}
 
