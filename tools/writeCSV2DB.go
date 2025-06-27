@@ -41,6 +41,7 @@ func main() {
 	defer file.Close()
 
 	csvReader := csv.NewReader(file)
+	csvReader.ReuseRecord = true
 
 	_, err = csvReader.Read()
 	if err == io.EOF {

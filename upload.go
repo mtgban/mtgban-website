@@ -1530,7 +1530,7 @@ func loadXlsx(reader io.Reader, maxRows int) ([]UploadEntry, error) {
 
 func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, error) {
 	csvReader := csv.NewReader(reader)
-
+	csvReader.ReuseRecord = true
 	csvReader.Comma = comma
 
 	// In case we are not using a sane csv
@@ -1570,6 +1570,7 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 
 		// Rebuild the reader as previously used
 		csvReader = csv.NewReader(reader)
+		csvReader.ReuseRecord = true
 		csvReader.Comma = comma
 		if comma != ',' {
 			csvReader.LazyQuotes = true
