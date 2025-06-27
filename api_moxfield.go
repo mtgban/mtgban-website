@@ -115,7 +115,7 @@ func loadMoxfieldDeck(urlPath string, maxRows int) ([]UploadEntry, error) {
 	sort.Slice(moxCards, func(i, j int) bool {
 		uuidI := mtgmatcher.Scryfall2UUID(moxCards[i].Card.ScryfallID)
 		uuidJ := mtgmatcher.Scryfall2UUID(moxCards[j].Card.ScryfallID)
-		return !sortSetsAlphabeticalSet(uuidI, uuidJ)
+		return !sortSetsAlphabeticalSet(uuidI, uuidJ, false)
 	})
 
 	return prepareUploadEntries(moxCards, maxRows)

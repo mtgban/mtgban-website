@@ -667,7 +667,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	}
 
 	// Prepare card data
-	card := uuid2card(searchRes.CardId, true, false)
+	card := uuid2card(searchRes.CardId, true, false, false)
 	co, _ := mtgmatcher.GetUUID(searchRes.CardId)
 
 	printings := printings2line(co.Printings)

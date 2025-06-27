@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -566,6 +567,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	var query, defSort string
 	var pages int
 
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+
 	pageVars.Nav = insertNavBar("Newspaper", pageVars.Nav, []NavElem{
 		NavElem{
 			Name:   "TCG Syp List",
@@ -635,7 +639,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardId] = uuid2card(cardId, true, false)
+			pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
 			if pageVars.Metadata[cardId].Reserved {
 				pageVars.HasReserved = true
 			}
@@ -657,7 +661,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				if arbit[i].CardId == arbit[j].CardId {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId)
+				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId, preferFlavor)
 			})
 		case "available":
 			sort.Slice(arbit, func(i, j int) bool {
@@ -955,7 +959,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		// Will iterate over card data in the template, since it's limited
 		// to the results actually available
-		pageVars.Cards = append(pageVars.Cards, uuid2card(result[1], true, false))
+		pageVars.Cards = append(pageVars.Cards, uuid2card(result[1], true, false, preferFlavor))
 		pageVars.CardHashes = append(pageVars.CardHashes, result[1])
 
 		// Allocate a table row with as many fields as returned by the SELECT

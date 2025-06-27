@@ -737,6 +737,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		opts.Editions = strings.Split(skipEditionsOpt, ",")
 	}
 
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+
 	// The pool of scrapers that source will be compared against
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {
@@ -887,7 +890,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 				if arbit[i].CardId == arbit[j].CardId {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId)
+				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId, preferFlavor)
 			})
 		}
 		pageVars.SortOption = sorting
@@ -926,7 +929,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardId] = uuid2card(cardId, true, false)
+			pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
 			if pageVars.Metadata[cardId].Reserved {
 				pageVars.HasReserved = true
 			}

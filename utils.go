@@ -329,7 +329,7 @@ func showVariant(cardId string) bool {
 	return setDate.After(mtgmatcher.PromosForEverybodyYay)
 }
 
-func uuid2card(cardId string, useThumbs, genPrints bool) GenericCard {
+func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) GenericCard {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
 		return GenericCard{}
@@ -370,12 +370,16 @@ func uuid2card(cardId string, useThumbs, genPrints bool) GenericCard {
 	}
 	variant = strings.TrimSpace(variant)
 
-	name := co.Name
-	if co.FlavorName != "" {
+	name, flavor := co.Name, co.FlavorName
+	if flavor != "" {
+		if preferFlavorName {
+			name, flavor = co.FlavorName, co.Name
+		}
+
 		if variant != "" {
 			variant = " - " + variant
 		}
-		variant = fmt.Sprintf("\"%s\" %s", co.FlavorName, variant)
+		variant = fmt.Sprintf("\"%s\" %s", flavor, variant)
 	}
 
 	// Append Etched information to the tag

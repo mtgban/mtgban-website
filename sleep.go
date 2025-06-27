@@ -135,12 +135,15 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+
 	pageVars.Metadata = map[string]GenericCard{}
 	for _, cardIds := range sleepers {
 		for _, cardId := range cardIds {
 			_, found := pageVars.Metadata[cardId]
 			if !found {
-				pageVars.Metadata[cardId] = uuid2card(cardId, true, false)
+				pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
 			}
 		}
 	}

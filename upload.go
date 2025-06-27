@@ -527,6 +527,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	tagPref := "tags"
 	download, _ := strconv.ParseBool(r.FormValue("download"))
 
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+
 	// Search
 	var results map[string]map[string]*BanPrice
 	if blMode {
@@ -554,7 +557,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		err = SimplePrice2CSV(csvWriter, results, uploadedData)
+		err = SimplePrice2CSV(csvWriter, results, uploadedData, preferFlavor)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			UserNotify("upload", err.Error())
@@ -607,7 +610,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		pageVars.Metadata[data.CardId] = uuid2card(data.CardId, true, false)
+		pageVars.Metadata[data.CardId] = uuid2card(data.CardId, true, false, preferFlavor)
 		if pageVars.Metadata[data.CardId].Reserved {
 			pageVars.HasReserved = true
 		}
@@ -817,7 +820,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				})
 			case "alphabetical":
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
-					return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId)
+					return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
 				})
 			case "profitability":
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
@@ -849,7 +852,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		})
 	case "alphabetical":
 		sort.Slice(uploadedData, func(i, j int) bool {
-			return sortSetsAlphabeticalSet(uploadedData[i].CardId, uploadedData[j].CardId)
+			return sortSetsAlphabeticalSet(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
 		})
 	case "setnum":
 		sort.Slice(uploadedData, func(i, j int) bool {

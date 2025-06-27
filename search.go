@@ -270,6 +270,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if oembed {
 		miscSearchOpts = append(miscSearchOpts, "oembed")
 	}
+	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
@@ -342,11 +343,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	switch pageVars.SearchSort {
 	case "alpha":
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsAlphabetical(allKeys[i], allKeys[j])
+			return sortSetsAlphabetical(allKeys[i], allKeys[j], preferFlavor)
 		})
 	case "hybrid":
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsAlphabeticalSet(allKeys[i], allKeys[j])
+			return sortSetsAlphabeticalSet(allKeys[i], allKeys[j], preferFlavor)
 		})
 	case "number":
 		sort.Slice(allKeys, func(i, j int) bool {
@@ -399,7 +400,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		pageVars.Metadata[cardId] = uuid2card(cardId, false, true)
+		pageVars.Metadata[cardId] = uuid2card(cardId, false, true, preferFlavor)
 		if pageVars.Metadata[cardId].Reserved {
 			pageVars.HasReserved = true
 		}
@@ -1224,7 +1225,7 @@ func sortSets(uuidI, uuidJ string) bool {
 
 // Sort card by their names, trying to keep cards grouped by edition, following
 // the same rules as sortSets
-func sortSetsAlphabetical(uuidI, uuidJ string) bool {
+func sortSetsAlphabetical(uuidI, uuidJ string, preferFlavor bool) bool {
 	sortingI, err := getSortingData(uuidI)
 	if err != nil {
 		return false
@@ -1236,7 +1237,16 @@ func sortSetsAlphabetical(uuidI, uuidJ string) bool {
 	cI, setDateI := sortingI.co, sortingI.releaseDate
 	cJ, setDateJ := sortingJ.co, sortingJ.releaseDate
 
-	if cI.Name == cJ.Name {
+	cIname := cI.Name
+	cJname := cJ.Name
+	if preferFlavor && cI.FlavorName != "" {
+		cIname = cI.FlavorName
+	}
+	if preferFlavor && cJ.FlavorName != "" {
+		cJname = cJ.FlavorName
+	}
+
+	if cIname == cJname {
 		if setDateI.Equal(setDateJ) {
 			// We need not to strip to keep set ordered wrt Promos etc
 			return sortByNumberAndFinish(uuidI, uuidJ, false)
@@ -1245,11 +1255,11 @@ func sortSetsAlphabetical(uuidI, uuidJ string) bool {
 		return setDateI.After(setDateJ)
 	}
 
-	return cI.Name < cJ.Name
+	return cIname < cJname
 }
 
 // Sort card by their names, keeping cards grouped by edition alphabetically
-func sortSetsAlphabeticalSet(uuidI, uuidJ string) bool {
+func sortSetsAlphabeticalSet(uuidI, uuidJ string, preferFlavor bool) bool {
 	sortingI, err := getSortingData(uuidI)
 	if err != nil {
 		return false
@@ -1262,7 +1272,7 @@ func sortSetsAlphabeticalSet(uuidI, uuidJ string) bool {
 	cJ := sortingJ.co
 
 	if cI.SetCode == cJ.SetCode {
-		return sortSetsAlphabetical(uuidI, uuidJ)
+		return sortSetsAlphabetical(uuidI, uuidJ, preferFlavor)
 	}
 
 	return cI.Edition < cJ.Edition

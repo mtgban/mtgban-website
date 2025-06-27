@@ -776,7 +776,7 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 }
 
 // Convert uploadedData to CSV, using the associated map of uuid->keys->prices
-func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedDada []UploadEntry) error {
+func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedDada []UploadEntry, preferFlavor bool) error {
 	var allScraperNames []string
 	var allScrapers []string
 	var isIndex []string
@@ -839,6 +839,9 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			continue
 		}
 		cardName = co.Name
+		if preferFlavor && co.FlavorName != "" {
+			cardName = co.FlavorName
+		}
 		code = co.SetCode
 		number = co.Number
 
