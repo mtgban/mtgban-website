@@ -571,6 +571,15 @@ var mtgScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
+	"manapool_sealed": &scraperOption{
+		DevEnabled: true,
+		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
+			scraper := manapool.NewScraperSealed()
+			scraper.LogCallback = logger.Printf
+			scraper.Partner = Config.Affiliate["MP"]
+			return scraper, nil
+		},
+	},
 }
 
 var lorcanaScraperOptions = map[string]*scraperOption{
