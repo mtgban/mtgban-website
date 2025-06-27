@@ -434,8 +434,10 @@ var FilterOperations = map[string][]string{
 	"skip":      []string{":"},
 	"sort":      []string{":"},
 	"edition":   []string{":"},
+	"e":         []string{":"},
 	"s":         []string{":"},
 	"se":        []string{":"},
+	"ee":        []string{":"},
 	"number":    []string{":", ">", "<"},
 	"cn":        []string{":", ">", "<"},
 	"cne":       []string{":"},
@@ -651,13 +653,13 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			}
 
 		// Options that modify the card searches
-		case "s", "edition":
+		case "s", "edition", "e":
 			filters = append(filters, FilterElem{
 				Name:   "edition",
 				Negate: negate,
 				Values: fixupEditionNG(code),
 			})
-		case "se":
+		case "se", "ee":
 			filters = append(filters, FilterElem{
 				Name:   "edition_regexp",
 				Negate: negate,
@@ -1178,15 +1180,26 @@ var isKnownPromo = map[string]string{
 	"rewards":   mtgjson.PromoTypePlayerRewards,
 	"mpr":       mtgjson.PromoTypePlayerRewards,
 	"bab":       mtgjson.PromoTypeBuyABox,
+	"buyabox":   mtgjson.PromoTypeBuyABox,
 	"buy-a-box": mtgjson.PromoTypeBuyABox,
 	"arena":     mtgjson.PromoTypeArenaLeague,
 	"judge":     mtgjson.PromoTypeJudgeGift,
 	"confetti":  mtgjson.PromoTypeConfettiFoil,
+	"fracture":  mtgjson.PromoTypeFractureFoil,
 	"galaxy":    mtgjson.PromoTypeGalaxyFoil,
 	"halo":      mtgjson.PromoTypeHaloFoil,
+	"mana":      mtgjson.PromoTypeManaFoil,
+	"rainbow":   mtgjson.PromoTypeRainbowFoil,
+	"raised":    mtgjson.PromoTypeRaisedFoil,
+	"ripple":    mtgjson.PromoTypeRippleFoil,
+	"silver":    mtgjson.PromoTypeSilverFoil,
+	"surge":     mtgjson.PromoTypeSurgeFoil,
 	"wpn":       mtgjson.PromoTypeWPN,
+	"pre":       mtgjson.PromoTypePrerelease,
 	"pp":        mtgjson.PromoTypePromoPack,
 	"neon":      mtgjson.PromoTypeNeonInk,
+	"thicc":     mtgjson.PromoTypeThickDisplay,
+	"display":   mtgjson.PromoTypeThickDisplay,
 }
 
 var specialTags = map[string]string{
@@ -1559,6 +1572,11 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 					continue
 				}
 				if co.HasPromoType(mtgjson.PromoTypeEmbossed) {
+					return false
+				}
+			case "p9":
+				customTag, found := specialTags[co.Name]
+				if found && customTag == "power9" {
 					return false
 				}
 			default:

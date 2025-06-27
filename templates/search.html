@@ -352,7 +352,7 @@
                         <ul class="indent">
                             <li>You can search using the Pricefall bot notation: <pre>name[|code[|number]]{&amp;*~}</pre>.</li>
                             <li>If you append a special character to any search, you can filter by finish: <pre>&amp;</pre> for nonfoil-only, <pre>*</pre> for foil-only, or <pre>~</pre> for etched-only results. Note that this syntax is disabled if you used a regular expression option to avoid aliasing.</li>
-                            <li>You can filter by <b>edition</b> using the Scryfall notation <pre>s:CODE</pre> and the full edition name (enclosed in quotes) <pre>s:"Aether Revolt"</pre>. Regular expressions are supported with the <pre>se</pre> option.</li>
+                            <li>You can filter by <b>edition</b> using the Scryfall notation <pre>s:CODE</pre> and the full edition name (enclosed in quotes) <pre>s:"Aether Revolt"</pre>. Regular expressions are supported with the <pre>se</pre> option. As compatibility layer, <pre>e:CODE</pre> and <pre>ee:CODE</pre> are supported for their respective case.</li>
                             <li>
                                 You can filter by <b>collector number</b> using the Scryfall notation <pre>cn:NUMBER</pre>.
                                 For simple numbers (without any prefix or suffix) you may also filter with <pre>cn&gt;NUMBER</pre> and <pre>cn&lt;NUMBER</pre>, or with a range such as <pre>cn:NUMBER-NUMBER</pre>.
@@ -374,7 +374,7 @@
                                     <li>Frame properties: <i>fullart (fa), extendedart (ea), showcase (sc), reskin, borderless (bd), gold, retro, future, foil, nonfoil</i></li>
                                     <li>Promo properties: <i>{{range $.PromoTags}}{{.}}, {{end}} promo</i></li>
                                     <li>Language properties: <i>japanese (jp, jpn), phyrexian (ph)</i></li>
-                                    <li>Known card sets: <i>power9, dual, fastland, fetchland, painland, shockland, checkland, surveilland, filterland</i></li>
+                                    <li>Known card sets: <i>power9 (p9), dual, fastland, fetchland, painland, shockland, checkland, surveilland, filterland</i></li>
                                     <li>Known edition sets: <i>abu4h</i></li>
                                 </ul>
                                 Of course <pre>not</pre> and <pre>-is</pre> are equivalent.
