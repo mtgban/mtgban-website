@@ -365,6 +365,10 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	// Loop through the supported promo types, skipping Boosterfun already processed above
 	for _, promoType := range co.PromoTypes {
 		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != mtgmatcher.PromoTypeBoosterfun {
+			if strings.HasPrefix(promoType, "ff") {
+				variant += strings.ToUpper(promoType) + " "
+				continue
+			}
 			variant += mtgmatcher.Title(promoType) + " "
 		}
 	}
