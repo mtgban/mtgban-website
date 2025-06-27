@@ -400,65 +400,10 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	if len(flags) > 0 && flags[0] {
 		imgURL = co.Images["thumbnail"]
 	}
+
 	printings := ""
 	if len(flags) > 1 && flags[1] {
-		// Hack to generate HTML in the template
-		for i, setCode := range co.Printings {
-			set, err := mtgmatcher.GetSet(setCode)
-			if err != nil {
-				continue
-			}
-			printings += fmt.Sprintf(`<a class="pagination" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
-
-			keyruneCode := strings.ToLower(set.KeyruneCode)
-			if keyruneCode == "" {
-				printings += fmt.Sprintf(`
-                    <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-                        <circle r="15" cx="16" cy="16" fill="var(--normal)"/>
-                        <text font-size="20" x="50%%" y="60%%" text-anchor="middle" fill="var(--background)">%s</text>
-                    </svg>`, setCode)
-			} else {
-				printings += fmt.Sprintf(`<i class="ss ss-%s ss-2x"></i>`, keyruneCode)
-			}
-			printings += fmt.Sprintf(`</a>`)
-
-			if i == MaxRuneSymbols && len(co.Printings) > MaxRuneSymbols {
-				printings += "<br>and many more (too many to list)..."
-				break
-			}
-		}
-		// Shrink icons to fit more of them
-		if len(co.Printings) > MaxBeforeShrink {
-			// Make sure not to capture the 2X2 set code
-			printings = strings.Replace(printings, "ss-2x\"", "ss-1x\"", -1)
-		}
-	}
-
-	if co.Sealed {
-		// The first chunk is always present, even for foil-only sets
-		printings = "<h6>Set Value</h6><table class='setValue'>"
-
-		for i, title := range ProductTitles {
-			entries, found := Infos[ProductKeys[i]][co.SetCode]
-			if found {
-				printings += fmt.Sprintf("<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
-			}
-		}
-		printings += "</table>"
-
-		// The second chunk is optional, check for the first key
-		if len(Infos[ProductFoilKeys[0]][co.SetCode]) > 0 {
-			printings += "<br>"
-			printings += "<h6>Foil Set Value</h6><table class='setValue'>"
-
-			for i, title := range ProductTitles {
-				entries, found := Infos[ProductFoilKeys[i]][co.SetCode]
-				if found {
-					printings += fmt.Sprintf("<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
-				}
-			}
-			printings += "</table>"
-		}
+		printings = genPrintings(co)
 	}
 
 	var canBoosterGen bool
@@ -566,6 +511,68 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
 	}
+}
+
+func genPrintings(co *mtgmatcher.CardObject) string {
+	printings := ""
+	// Hack to generate HTML in the template
+	for i, setCode := range co.Printings {
+		set, err := mtgmatcher.GetSet(setCode)
+		if err != nil {
+			continue
+		}
+		printings += fmt.Sprintf(`<a class="pagination" title="%s" href="/search?q=%s">`, set.Name, url.QueryEscape(co.Name+" s:"+setCode))
+
+		keyruneCode := strings.ToLower(set.KeyruneCode)
+		if keyruneCode == "" {
+			printings += fmt.Sprintf(`
+                    <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
+                        <circle r="15" cx="16" cy="16" fill="var(--normal)"/>
+                        <text font-size="20" x="50%%" y="60%%" text-anchor="middle" fill="var(--background)">%s</text>
+                    </svg>`, setCode)
+		} else {
+			printings += fmt.Sprintf(`<i class="ss ss-%s ss-2x"></i>`, keyruneCode)
+		}
+		printings += fmt.Sprintf(`</a>`)
+
+		if i == MaxRuneSymbols && len(co.Printings) > MaxRuneSymbols {
+			printings += "<br>and many more (too many to list)..."
+			break
+		}
+	}
+	// Shrink icons to fit more of them
+	if len(co.Printings) > MaxBeforeShrink {
+		// Make sure not to capture the 2X2 set code
+		printings = strings.Replace(printings, "ss-2x\"", "ss-1x\"", -1)
+	}
+
+	if co.Sealed {
+		// The first chunk is always present, even for foil-only sets
+		printings = "<h6>Set Value</h6><table class='setValue'>"
+
+		for i, title := range ProductTitles {
+			entries, found := Infos[ProductKeys[i]][co.SetCode]
+			if found {
+				printings += fmt.Sprintf("<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
+			}
+		}
+		printings += "</table>"
+
+		// The second chunk is optional, check for the first key
+		if len(Infos[ProductFoilKeys[0]][co.SetCode]) > 0 {
+			printings += "<br>"
+			printings += "<h6>Foil Set Value</h6><table class='setValue'>"
+
+			for i, title := range ProductTitles {
+				entries, found := Infos[ProductFoilKeys[i]][co.SetCode]
+				if found {
+					printings += fmt.Sprintf("<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
+				}
+			}
+			printings += "</table>"
+		}
+	}
+	return printings
 }
 
 type Notification struct {
