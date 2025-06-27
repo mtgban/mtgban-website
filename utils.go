@@ -329,7 +329,7 @@ func showVariant(cardId string) bool {
 	return setDate.After(mtgmatcher.PromosForEverybodyYay)
 }
 
-func uuid2card(cardId string, flags ...bool) GenericCard {
+func uuid2card(cardId string, useThumbs, genPrints bool) GenericCard {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
 		return GenericCard{}
@@ -389,12 +389,12 @@ func uuid2card(cardId string, flags ...bool) GenericCard {
 	query := genQuery(co)
 
 	imgURL := co.Images["full"]
-	if len(flags) > 0 && flags[0] {
+	if useThumbs {
 		imgURL = co.Images["thumbnail"]
 	}
 
 	printings := ""
-	if len(flags) > 1 && flags[1] {
+	if genPrints {
 		printings = genPrintings(co)
 	}
 

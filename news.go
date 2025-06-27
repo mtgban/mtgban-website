@@ -635,7 +635,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardId] = uuid2card(cardId, true)
+			pageVars.Metadata[cardId] = uuid2card(cardId, true, false)
 			if pageVars.Metadata[cardId].Reserved {
 				pageVars.HasReserved = true
 			}
@@ -955,7 +955,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		// Will iterate over card data in the template, since it's limited
 		// to the results actually available
-		pageVars.Cards = append(pageVars.Cards, uuid2card(result[1], true))
+		pageVars.Cards = append(pageVars.Cards, uuid2card(result[1], true, false))
 		pageVars.CardHashes = append(pageVars.CardHashes, result[1])
 
 		// Allocate a table row with as many fields as returned by the SELECT

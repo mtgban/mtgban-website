@@ -604,9 +604,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		_, found := pageVars.Metadata[data.CardId]
-		if !found {
-			pageVars.Metadata[data.CardId] = uuid2card(data.CardId, true, false)
+		if found {
+			continue
 		}
+		pageVars.Metadata[data.CardId] = uuid2card(data.CardId, true, false)
 		if pageVars.Metadata[data.CardId].Reserved {
 			pageVars.HasReserved = true
 		}

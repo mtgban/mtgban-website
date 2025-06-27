@@ -396,9 +396,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Load up image links and other metadata
 	for _, cardId := range allKeys {
 		_, found := pageVars.Metadata[cardId]
-		if !found {
-			pageVars.Metadata[cardId] = uuid2card(cardId, false, true)
+		if found {
+			continue
 		}
+		pageVars.Metadata[cardId] = uuid2card(cardId, false, true)
 		if pageVars.Metadata[cardId].Reserved {
 			pageVars.HasReserved = true
 		}

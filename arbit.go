@@ -926,7 +926,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardId] = uuid2card(cardId, true)
+			pageVars.Metadata[cardId] = uuid2card(cardId, true, false)
 			if pageVars.Metadata[cardId].Reserved {
 				pageVars.HasReserved = true
 			}

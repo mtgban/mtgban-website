@@ -140,7 +140,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		for _, cardId := range cardIds {
 			_, found := pageVars.Metadata[cardId]
 			if !found {
-				pageVars.Metadata[cardId] = uuid2card(cardId, true)
+				pageVars.Metadata[cardId] = uuid2card(cardId, true, false)
 			}
 		}
 	}
