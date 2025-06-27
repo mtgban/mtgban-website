@@ -485,7 +485,7 @@ func init() {
 		return len(opts[i]) < len(opts[j])
 	})
 
-	regexpOptions = fmt.Sprintf(`-?(%s)[:<>](("([^"]+)"|\S+))+`, strings.Join(opts, "|"))
+	regexpOptions = fmt.Sprintf(`-?(%s%s)[:<>](("([^"]+)"|\S+))+`, strings.Join(opts, "|"), strings.ToUpper(strings.Join(opts, "|")))
 
 	re = regexp.MustCompile(regexpOptions)
 }
@@ -584,7 +584,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			continue
 		}
 
-		option := field[:index]
+		option := strings.ToLower(field[:index])
 		operation := string(field[index])
 		code := field[index+1:]
 
