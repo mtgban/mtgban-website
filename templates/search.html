@@ -245,6 +245,9 @@
                 <input type="checkbox" id="preferFlavor" name="preferFlavor">
                 <label for="preferFlavor">Prefer <i>flavor name</i> when available (global setting)</label>
                 <br>
+                <input type="checkbox" id="allFlavorVersions" name="allFlavorVersions">
+                <label for="allFlavorVersions">When searching for a <i>flavor name</i> show all versions of the card</label>
+                <br>
                 <input type="checkbox" id="hideBLconds" name="hideBLconds">
                 <label for="hideBLconds">Hide non-NM Buylist entries</label>
                 <br>
@@ -422,6 +425,7 @@
                     <li>This percentage is available only if the seller is selling copies of the same card at the same conditions.</li>
                     <li>Inventory prices refer to the stated conditions (and their accuracy depends on the data provider).</li>
                     <li>Buylist prices are always referring to NM conditions.</li>
+                    <li>When searching for the <i>flavor name</i> of a card, only those specific versions will appear (unless you disable this option in the Other Preferences section), however this only works when searching for a single specific card, and won't be available for complex search queries (they will still be perfomed using the canonical name of the card).</li>
                     <li>TCG Low is a special value referring to TCG algorithms that may differ from quantity and quality of listings.</li>
                     <li>If you hover on a buylist price, a small tooltip will appear displaying the corresponding trade-in price, if available.</li>
                     <li>In case of mistakes or incongruities, please notify the devs in the BAN Discord.</li>

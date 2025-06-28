@@ -1042,6 +1042,19 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		}
 	}
 
+	// By default, check if a single card name was searched and if an alternate
+	// name was used, filter away any other version
+	if !slices.Contains(miscSearchOpts, "allFlavorVersions") {
+		altName := mtgmatcher.Normalize(query)
+		allNames := mtgmatcher.AllNames("alternate", false)
+		if slices.Contains(allNames, altName) {
+			filters = append(filters, FilterElem{
+				Name:   "altname",
+				Values: []string{altName},
+			})
+		}
+	}
+
 	config.CleanQuery = strings.TrimSpace(query)
 	config.CardFilters = filters
 	config.StoreFilters = filterStores
@@ -1451,6 +1464,10 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 		return compareReleaseDate(filters, co, func(a, b time.Time) bool {
 			return a.After(b)
 		})
+	},
+	"altname": func(filters []string, co *mtgmatcher.CardObject) bool {
+		return (co.FlavorName != "" && mtgmatcher.Normalize(co.FlavorName) != filters[0]) ||
+			(co.FaceFlavorName != "" && mtgmatcher.Normalize(co.FaceFlavorName) != filters[0])
 	},
 	"on": func(filters []string, co *mtgmatcher.CardObject) bool {
 		for _, value := range filters {
