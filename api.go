@@ -632,6 +632,16 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
+	// Expand blocklist as needed
+	skipSellersOpt := readCookie(r, "SearchSellersList")
+	if skipSellersOpt != "" {
+		blocklistRetail = append(blocklistRetail, strings.Split(skipSellersOpt, ",")...)
+	}
+	skipVendorsOpt := readCookie(r, "SearchVendorsList")
+	if skipVendorsOpt != "" {
+		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
+	}
+
 	isRetail := strings.Contains(r.URL.Path, "/retail/")
 	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
 	isSealed := strings.Contains(r.URL.Path, "/sealed/")
