@@ -1555,13 +1555,18 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 
 	// If there is a single element, parsing didn't work
 	// try again with a different delimiter
-	if len(first) == 1 && comma == ',' {
+	if len(first) == 1 && (comma == ',' || comma == '\t') {
 		log.Println("Using a different delimiter for csv")
 		_, err = reader.Seek(0, io.SeekStart)
 		if err != nil {
 			return nil, err
 		}
-		return loadCsv(reader, '\t', maxRows)
+		if comma == ',' {
+			comma = '\t'
+		} else if comma == '\t' {
+			comma = ';'
+		}
+		return loadCsv(reader, comma, maxRows)
 	}
 
 	indexMap, err := parseHeader(first)
