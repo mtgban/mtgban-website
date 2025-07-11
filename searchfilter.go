@@ -1088,17 +1088,6 @@ func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc
 	return cmpFunc(values[0], values[1])
 }
 
-func parseCardDate(co *mtgmatcher.CardObject) (time.Time, error) {
-	cardDateStr := co.OriginalReleaseDate
-	if cardDateStr == "" {
-		set, err := mtgmatcher.GetSet(co.SetCode)
-		if err == nil {
-			cardDateStr = set.ReleaseDate
-		}
-	}
-	return time.Parse("2006-01-02", cardDateStr)
-}
-
 func findInDeck(sealedUUID, opt string) []string {
 	var output []string
 
@@ -1170,7 +1159,7 @@ func compareReleaseDate(filters []string, co *mtgmatcher.CardObject, cmpFunc fun
 		return true
 	}
 
-	cardDate, err := parseCardDate(co)
+	cardDate, err := mtgmatcher.CardReleaseDate(co.UUID)
 	if err != nil {
 		return true
 	}

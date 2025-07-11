@@ -329,11 +329,7 @@ func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
 		dupes = append(dupes, co.Identifiers["scryfallId"])
 
 		// Load the date for the card
-		releaseDate := set.ReleaseDate
-		if co.OriginalReleaseDate != "" {
-			releaseDate = co.OriginalReleaseDate
-		}
-		printDate, err := time.Parse("2006-01-02", releaseDate)
+		printDate, err := mtgmatcher.CardReleaseDate(co.UUID)
 		if err != nil {
 			continue
 		}

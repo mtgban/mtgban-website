@@ -1114,17 +1114,13 @@ func getSortingData(uuid string) (*SortingData, error) {
 	if err != nil {
 		return nil, err
 	}
-	releaseDate := set.ReleaseDate
-	if co.OriginalReleaseDate != "" {
-		releaseDate = co.OriginalReleaseDate
-	}
-	setDate, err := time.Parse("2006-01-02", releaseDate)
+	releaseDate, err := mtgmatcher.CardReleaseDate(uuid)
 	if err != nil {
 		return nil, err
 	}
 	return &SortingData{
 		co:          co,
-		releaseDate: setDate,
+		releaseDate: releaseDate,
 		parentCode:  set.ParentCode,
 	}, nil
 }

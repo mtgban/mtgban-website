@@ -310,19 +310,7 @@ var allLanguageFlags = map[string]string{
 }
 
 func showVariant(cardId string) bool {
-	co, err := mtgmatcher.GetUUID(cardId)
-	if err != nil {
-		return false
-	}
-	set, err := mtgmatcher.GetSet(co.SetCode)
-	if err != nil {
-		return false
-	}
-	releaseDate := set.ReleaseDate
-	if co.OriginalReleaseDate != "" {
-		releaseDate = co.OriginalReleaseDate
-	}
-	setDate, err := time.Parse("2006-01-02", releaseDate)
+	setDate, err := mtgmatcher.CardReleaseDate(cardId)
 	if err != nil {
 		return false
 	}
