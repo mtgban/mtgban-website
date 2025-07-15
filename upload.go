@@ -379,6 +379,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Set upload limit
 	maxRows := MaxUploadEntries
+	download, _ := strconv.ParseBool(r.FormValue("download"))
 
 	// Increase upload limit if allowed
 	optimizerOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadOptimizer"))
@@ -388,7 +389,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	// Allow a larger upload limit if set, if dev, or if it's an external call
 	limitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
-	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate || deckbox
+	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate || deckbox || (download && canBuylist)
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
 	}
@@ -525,8 +526,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tagPref := "tags"
-	download, _ := strconv.ParseBool(r.FormValue("download"))
-
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
