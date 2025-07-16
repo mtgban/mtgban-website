@@ -1125,6 +1125,7 @@ func getSortingData(uuid string) (*SortingData, error) {
 	}, nil
 }
 
+// Sort cards by their collector number and finish (nonfoil-foil-etched)
 func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
 	sortingI, err := getSortingData(uuidI)
 	if err != nil {
@@ -1183,6 +1184,7 @@ func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
 	return cI.Card.Number < cJ.Card.Number
 }
 
+// Sort cards grouping them by edition, and then by their collector number
 func sortSets(uuidI, uuidJ string) bool {
 	sortingI, err := getSortingData(uuidI)
 	if err != nil {
