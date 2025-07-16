@@ -817,9 +817,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
 					return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
 				})
-			case "alphabetical":
+			case "setalpha":
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
 					return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
+				})
+			case "alphabetical":
+				sort.Slice(optimizedResults[store], func(i, j int) bool {
+					return sortSetsAlphabetical(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
 				})
 			case "profitability":
 				sort.Slice(optimizedResults[store], func(i, j int) bool {
@@ -851,9 +855,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		})
 	case "alphabetical":
 		sort.Slice(uploadedData, func(i, j int) bool {
+			return sortSetsAlphabetical(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
+		})
+	case "setalpha":
+		sort.Slice(uploadedData, func(i, j int) bool {
 			return sortSetsAlphabeticalSet(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
 		})
-	case "setnum":
+	case "setchrono":
 		sort.Slice(uploadedData, func(i, j int) bool {
 			return sortSets(uploadedData[i].CardId, uploadedData[j].CardId)
 		})
