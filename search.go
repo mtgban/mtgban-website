@@ -1209,6 +1209,26 @@ func sortSets(uuidI, uuidJ string) bool {
 		if cI.Edition == cJ.Edition {
 			// Special case for sealed products
 			if cI.Sealed && cJ.Sealed {
+				// Always keep these products in this order
+				for _, prodTag := range []string{"Booster Box", "Booster Pack", "Bundle", "Fat Pack"} {
+					bbI := strings.Contains(cI.Name, prodTag) && !strings.Contains(cI.Name, "Case")
+					bbJ := strings.Contains(cJ.Name, prodTag) && !strings.Contains(cJ.Name, "Case")
+					if bbI && !bbJ {
+						return true
+					} else if !bbI && bbJ {
+						return false
+					}
+				}
+
+				// Keep Cases and sets last
+				bbI := strings.Contains(cI.Name, "Case") || strings.Contains(cI.Name, "Display") || strings.Contains(cI.Name, "Set of")
+				bbJ := strings.Contains(cJ.Name, "Case") || strings.Contains(cJ.Name, "Display") || strings.Contains(cJ.Name, "Set of")
+				if bbI && !bbJ {
+					return !true
+				} else if !bbI && bbJ {
+					return !false
+				}
+
 				return cI.Name < cJ.Name
 			}
 
