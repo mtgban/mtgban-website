@@ -1179,6 +1179,11 @@ func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
 		}
 	}
 
+	// At this point, numbers look pretty similar, check for languages
+	if cI.Card.Language != cJ.Card.Language {
+		return cI.Card.Language < cJ.Card.Language
+	}
+
 	// If either one is not a number (due to extra letters) just
 	// do a normal string comparison
 	return cI.Card.Number < cJ.Card.Number
