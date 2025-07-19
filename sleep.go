@@ -127,7 +127,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "gap":
 		pageVars.Subtitle = "Ocean Gap"
 
-		tiers = getGap(skipEditions)
+		tiers = getGap(r.FormValue("target"), skipEditions)
 	}
 
 	sleepers, err := sleepersLayout(tiers)
@@ -382,8 +382,10 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 	return tiers
 }
 
-func getGap(skipEditions []string) map[string]int {
+func getGap(target string, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
+
+	LogPages["Sleepers"].Println("Sleepers Comparing TCGLow with", target)
 
 	var tcgSeller mtgban.Seller
 	var mkmSeller mtgban.Seller
@@ -391,7 +393,7 @@ func getGap(skipEditions []string) map[string]int {
 		if seller != nil && seller.Info().Shorthand == "TCGLow" {
 			tcgSeller = seller
 		}
-		if seller != nil && seller.Info().Shorthand == "MKMTrend" {
+		if seller != nil && seller.Info().Shorthand == target {
 			mkmSeller = seller
 		}
 	}
