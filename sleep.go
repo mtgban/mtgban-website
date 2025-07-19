@@ -124,6 +124,10 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		pageVars.Subtitle = "Market Mismatch"
 
 		tiers = getTiers(blocklistRetail, blocklistBuylist, skipEditions)
+	case "gap":
+		pageVars.Subtitle = "Ocean Gap"
+
+		tiers = getGap(skipEditions)
 	}
 
 	sleepers, err := sleepersLayout(tiers)
@@ -373,6 +377,71 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 				tiers[mismatch[i].CardId]++
 			}
 		}
+	}
+
+	return tiers
+}
+
+func getGap(skipEditions []string) map[string]int {
+	tiers := map[string]int{}
+
+	var tcgSeller mtgban.Seller
+	var mkmSeller mtgban.Seller
+	for _, seller := range Sellers {
+		if seller != nil && seller.Info().Shorthand == "TCGLow" {
+			tcgSeller = seller
+		}
+		if seller != nil && seller.Info().Shorthand == "MKMTrend" {
+			mkmSeller = seller
+		}
+	}
+
+	if mkmSeller == nil || tcgSeller == nil {
+		return nil
+	}
+
+	// By default skip problematic sets
+	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI", "OLGC", "OLEP", "OVNT", "O90P", "VAN")
+
+	opts := &mtgban.ArbitOpts{
+		MinSpread: MinSpread,
+		MaxSpread: MaxSpread,
+		MinPrice:  SleepersMinPrice * 2,
+		MinDiff:   SleepersMinPrice * 4,
+		Editions:  skipEditions,
+	}
+
+	mismatch, err := mtgban.Mismatch(opts, tcgSeller, mkmSeller)
+	if err != nil {
+		return nil
+	}
+
+	marketCheck, _ := findSellerInventory("TCGMarket")
+
+	// Filter out entries that are invalid
+	for i := range mismatch {
+		cardId := mismatch[i].CardId
+
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			continue
+		}
+		if co.HasPromoType(mtgmatcher.PromoTypeSerialized) {
+			continue
+		}
+
+		// Validate prices, skip in case anything is sus
+		checkPrice := 0.0
+		entries, found := marketCheck[cardId]
+		if found {
+			checkPrice = entries[0].Price
+		}
+		// tcg low cannot be higher than tcg market
+		if mismatch[i].ReferenceEntry.Price > checkPrice {
+			continue
+		}
+
+		tiers[cardId] = int(mismatch[i].Spread)
 	}
 
 	return tiers
