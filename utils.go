@@ -236,7 +236,7 @@ func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord
 		if seller == nil {
 			continue
 		}
-		if seller.Info().SealedMode == sealed && strings.ToLower(seller.Info().Shorthand) == strings.ToLower(name) {
+		if seller.Info().SealedMode == sealed && strings.ToLower(seller.Info().Name) == strings.ToLower(name) {
 			return seller.Inventory()
 		}
 	}
