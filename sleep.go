@@ -305,9 +305,12 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 	}
 
 	opts := &mtgban.ArbitOpts{
-		MinSpread: MinSpread,
-		MinPrice:  SleepersMinPrice,
-		Editions:  skipEditions,
+		MinSpread:     MinSpread,
+		MaxSpread:     MaxSpread,
+		MinPrice:      SleepersMinPrice,
+		Editions:      skipEditions,
+		Conditions:    []string{"MP", "HP", "PO"},
+		MaxPriceRatio: MaxPriceRatio,
 	}
 
 	for _, seller := range Sellers {
@@ -352,11 +355,9 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 				continue
 			}
 
-			// Filter out entries that are invalid
+			// Load the tiers
 			for i := range arbit {
-				if math.Abs(arbit[i].BuylistEntry.PriceRatio) < MaxPriceRatio && arbit[i].Spread < MaxSpread && arbit[i].InventoryEntry.Conditions == "NM" {
-					tiers[arbit[i].CardId]++
-				}
+				tiers[arbit[i].CardId]++
 			}
 		}
 
@@ -367,11 +368,9 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 				continue
 			}
 
-			// Filter out entries that are invalid
+			// Load the tiers
 			for i := range mismatch {
-				if mismatch[i].InventoryEntry.Conditions == "NM" {
-					tiers[mismatch[i].CardId]++
-				}
+				tiers[mismatch[i].CardId]++
 			}
 		}
 	}
