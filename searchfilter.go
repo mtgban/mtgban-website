@@ -952,6 +952,12 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		if len(elements) > 2 {
 			extraQuery += " cn:" + strings.TrimSpace(elements[2])
 		}
+		if len(elements) > 3 {
+			extraQuery += " f:" + strings.TrimSpace(elements[3])
+		}
+		if len(elements) > 4 {
+			extraQuery += " cond:" + strings.TrimSpace(elements[4])
+		}
 		extraConfig := parseSearchOptionsNG(extraQuery, nil, nil, miscSearchOpts)
 		filters = append(filters, extraConfig.CardFilters...)
 	}
