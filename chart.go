@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"sort"
+	"time"
 )
 
 type Dataset struct {
@@ -108,37 +108,21 @@ var enabledDatasets = []scraperConfig{
 }
 
 // Get all the keys that will be used as x asis labels
-func getDateAxisValues(cardId string) ([]string, error) {
-	db, found := ScraperOptions["tcg_index"].RDBs["TCGMarket"]
-	if !found {
-		return nil, errors.New("tcg market db not found")
+func getDateAxisValues(cardId string) []string {
+	var dates []string
+
+	// Set the current date
+	today := time.Now()
+
+	// Set the earliest date as six months ago
+	sixMonthsAgo := today.AddDate(0, -6, 0)
+
+	// Loop from today back to six months ago
+	for d := today; !d.Before(sixMonthsAgo); d = d.AddDate(0, 0, -1) {
+		dates = append(dates, d.Format("2006-01-02"))
 	}
 
-	keys, err := db.HKeys(context.Background(), cardId).Result()
-	if err != nil {
-		return nil, err
-	}
-	if len(keys) == 0 {
-		db, found = ScraperOptions["tcg_index"].RDBs["TCGLow"]
-		if !found {
-			return nil, errors.New("tcg low db not found")
-		}
-
-		keys, err = db.HKeys(context.Background(), cardId).Result()
-		if err != nil {
-			return nil, err
-		}
-		if len(keys) == 0 {
-			return nil, errors.New("no data available")
-		}
-	}
-
-	// Sort labels from older to newer
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
-
-	return keys, nil
+	return dates
 }
 
 func getDataset(cardId string, labels []string, config scraperConfig) (*Dataset, error) {

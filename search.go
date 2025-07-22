@@ -580,8 +580,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
-		labels, err := getDateAxisValues(chartId)
-		if err != nil {
+		labels := getDateAxisValues(chartId)
+		if len(labels) == 0 {
 			pageVars.InfoMessage = "No chart data available"
 		} else {
 			pageVars.AxisLabels = labels
