@@ -62,6 +62,7 @@
                         <li><a href="?page=gap&ref=MKMTrend&target=SCG">MKMTrend vs SCG</a></li>
                         <li><a href="?page=gap&ref=MKMTrend&target=MP">MKMTrend vs Manapool</a></li>
 
+                    {{if .CanShowAll}}
                         <li>Choose your adventure:
                             <form action="sleepers" method="GET">
                                 <input type="hidden" name="page" value="gap">
@@ -79,6 +80,11 @@
                                 </select>
                             </form>
                         </li>
+                    {{else if $.ShowUpsell}}
+                        <li>
+                            <i>Increase your tier to be able to compare any seller on Sleepers!</i>
+                        </li>
+                    {{end}}
                     </ul>
                     <li><a href="?page=options">Options</a></li>
                 </ul>
@@ -103,6 +109,8 @@
                     These cards have a higher buylist price than what market is selling them at, or they are simply priced below TCG Low.<br>
                 <li><b>Ocean Gap</b><br>
                     Compare two sellers, one of them may have cheaper cards. Some data might need more validation, but it should be pretty easy to find gems.<br>
+                    As Legacy, feel free to use our most common comparison links.<br>
+                    As Vintage, you can select among any of our supported Sellers.<br>
             </ul>
         </div>
 

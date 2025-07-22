@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -75,6 +76,9 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
 	}
+
+	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
+	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
 	var tiers map[string]int
 
@@ -155,6 +159,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
 
 	pageVars.Metadata = map[string]GenericCard{}
 	for _, cardIds := range sleepers {

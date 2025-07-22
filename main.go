@@ -242,6 +242,7 @@ var OptionalFields = []string{
 	"AnyExperimentsEnabled",
 	"AnySpread",
 	"APImode",
+	"SleepersCYOA",
 }
 
 // The key matches the query parameter of the permissions defined in sign()
