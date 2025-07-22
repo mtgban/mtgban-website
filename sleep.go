@@ -66,6 +66,16 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		skipEditions = strings.Split(skipEditionsOpt, ",")
 	}
 
+	for _, seller := range Sellers {
+		if seller == nil ||
+			seller.Info().SealedMode ||
+			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+			continue
+		}
+
+		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
+	}
+
 	var tiers map[string]int
 
 	start := time.Now()
@@ -81,6 +91,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "options":
 		pageVars.Subtitle = "Options"
 
+		var sellerKeys, vendorKeys []string
 		for _, seller := range Sellers {
 			if seller == nil ||
 				seller.Info().CountryFlag != "" ||
@@ -90,7 +101,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
+			sellerKeys = append(sellerKeys, seller.Info().Shorthand)
 		}
 
 		for _, vendor := range Vendors {
@@ -102,11 +113,13 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			pageVars.VendorKeys = append(pageVars.VendorKeys, vendor.Info().Shorthand)
+			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
 		}
 
 		pageVars.Editions = AllEditionsKeys
 		pageVars.EditionsMap = AllEditionsMap
+		pageVars.SellerKeys = sellerKeys
+		pageVars.VendorKeys = vendorKeys
 
 		render(w, "sleep.html", pageVars)
 
@@ -127,7 +140,8 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	case "gap":
 		pageVars.Subtitle = "Ocean Gap"
 
-		tiers = getGap(r.FormValue("target"), skipEditions)
+		ref, target := r.FormValue("ref"), r.FormValue("target")
+		tiers = getGap(blocklistRetail, ref, target, skipEditions)
 	}
 
 	sleepers, err := sleepersLayout(tiers)
@@ -382,23 +396,28 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 	return tiers
 }
 
-func getGap(target string, skipEditions []string) map[string]int {
+func getGap(blocklistRetail []string, ref, target string, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
-	LogPages["Sleepers"].Println("Sleepers Comparing TCGLow with", target)
+	log.Println("Sleepers comparing", ref, "with", target)
 
-	var tcgSeller mtgban.Seller
-	var mkmSeller mtgban.Seller
+	var referenceSeller mtgban.Seller
+	var targetSeller mtgban.Seller
 	for _, seller := range Sellers {
-		if seller != nil && seller.Info().Shorthand == "TCGLow" {
-			tcgSeller = seller
+		if seller == nil ||
+			seller.Info().SealedMode ||
+			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+			continue
 		}
-		if seller != nil && seller.Info().Shorthand == target {
-			mkmSeller = seller
+		if seller.Info().Shorthand == ref {
+			referenceSeller = seller
+		}
+		if seller.Info().Shorthand == target {
+			targetSeller = seller
 		}
 	}
 
-	if mkmSeller == nil || tcgSeller == nil {
+	if targetSeller == nil || referenceSeller == nil {
 		return nil
 	}
 
@@ -413,7 +432,7 @@ func getGap(target string, skipEditions []string) map[string]int {
 		Editions:  skipEditions,
 	}
 
-	mismatch, err := mtgban.Mismatch(opts, tcgSeller, mkmSeller)
+	mismatch, err := mtgban.Mismatch(opts, referenceSeller, targetSeller)
 	if err != nil {
 		return nil
 	}

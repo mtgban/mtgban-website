@@ -54,7 +54,32 @@
                     <li><a href="?page=bulk">Bulk Me Up</a></li>
                     <li><a href="?page=reprint">Long Time No Reprint</a></li>
                     <li><a href="?page=mismatch">Market Mismatch</a></li>
-                    <li><a href="?page=gap&target=MKMLow">Ocean Gap (Low)</a> // <a href="?page=gap&target=MKMTrend">Ocean Gap (Trend)</a></li>
+                    <li>Ocean Gap (beta)
+                    <ul class="indent">
+                        <li><a href="?page=gap&ref=TCGLow&target=MKMLow">TCGLow vs MKMLow</a></li>
+                        <li><a href="?page=gap&ref=TCGLow&target=MKMTrend">TCGLow vs MKMTrend</a></li>
+                        <li><a href="?page=gap&ref=MKMTrend&target=CK">MKMTrend vs CK</a></li>
+                        <li><a href="?page=gap&ref=MKMTrend&target=SCG">MKMTrend vs SCG</a></li>
+                        <li><a href="?page=gap&ref=MKMTrend&target=MP">MKMTrend vs Manapool</a></li>
+
+                        <li>Choose your adventure:
+                            <form action="sleepers" method="GET">
+                                <input type="hidden" name="page" value="gap">
+                                <select name="ref" id="ref" class="select-css" style="width: 300px; line-height: inherit;" onchange="if (document.getElementById('target').value !== '' && document.getElementById('target').value !== this.value) { this.form.submit() }">
+                                    <option value="" disabled selected>&nbsp;&nbsp;&nbsp;Pick a reference</option>
+                                    {{range .SellerKeys}}
+                                        <option value="{{.}}">&nbsp;&nbsp;&nbsp;{{scraper_name .}}</option>
+                                    {{end}}
+                                </select>
+                                vs
+                                <select name="target" id="target" class="select-css" style="width: 300px; line-height: inherit;" onchange="if (document.getElementById('ref').value !== '' && document.getElementById('ref').value !== this.value) { this.form.submit() }">
+                                    <option value="" disabled selected>&nbsp;&nbsp;&nbsp;Pick where to buy</option>                                    {{range .SellerKeys}}
+                                        <option value="{{.}}">&nbsp;&nbsp;&nbsp;{{scraper_name .}}</option>
+                                    {{end}}
+                                </select>
+                            </form>
+                        </li>
+                    </ul>
                     <li><a href="?page=options">Options</a></li>
                 </ul>
                 </h3>
@@ -77,7 +102,7 @@
                 <li><b>Market Mismatch</b><br>
                     These cards have a higher buylist price than what market is selling them at, or they are simply priced below TCG Low.<br>
                 <li><b>Ocean Gap</b><br>
-                    These cards are cheaper in Europe, way cheaper (two modes because the data can be inaccurate).<br>
+                    Compare two sellers, one of them may have cheaper cards. Some data might need more validation, but it should be pretty easy to find gems.<br>
             </ul>
         </div>
 
