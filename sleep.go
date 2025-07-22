@@ -328,12 +328,13 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 	}
 
 	opts := &mtgban.ArbitOpts{
-		MinSpread:     MinSpread,
-		MaxSpread:     MaxSpread,
-		MinPrice:      SleepersMinPrice,
-		Editions:      skipEditions,
-		Conditions:    []string{"MP", "HP", "PO"},
-		MaxPriceRatio: MaxPriceRatio,
+		MinSpread:        MinSpread,
+		MaxSpread:        MaxSpread,
+		MinPrice:         SleepersMinPrice,
+		Editions:         skipEditions,
+		Conditions:       []string{"MP", "HP", "PO"},
+		MaxPriceRatio:    MaxPriceRatio,
+		CustomCardFilter: noOversize,
 	}
 
 	for _, seller := range Sellers {
@@ -427,14 +428,15 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 	}
 
 	// By default skip problematic sets
-	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI", "OLGC", "OLEP", "OVNT", "O90P", "VAN")
+	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI")
 
 	opts := &mtgban.ArbitOpts{
-		MinSpread: MinSpread,
-		MaxSpread: MaxSpread,
-		MinPrice:  SleepersMinPrice * 2,
-		MinDiff:   SleepersMinPrice * 4,
-		Editions:  skipEditions,
+		MinSpread:        MinSpread,
+		MaxSpread:        MaxSpread,
+		MinPrice:         SleepersMinPrice * 2,
+		MinDiff:          SleepersMinPrice * 4,
+		Editions:         skipEditions,
+		CustomCardFilter: noOversize,
 	}
 
 	mismatch, err := mtgban.Mismatch(opts, referenceSeller, targetSeller)
@@ -471,6 +473,13 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 	}
 
 	return tiers
+}
+
+func noOversize(co *mtgmatcher.CardObject) (float64, bool) {
+	if co.Rarity == "oversize" {
+		return 0, true
+	}
+	return 1, false
 }
 
 // Return a map of letter : []cardId from a map of cardId : amount
