@@ -431,12 +431,11 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI")
 
 	opts := &mtgban.ArbitOpts{
-		MinSpread:        MinSpread,
 		MaxSpread:        MaxSpread,
 		MinPrice:         SleepersMinPrice * 2,
-		MinDiff:          SleepersMinPrice * 4,
 		Editions:         skipEditions,
 		CustomCardFilter: noOversize,
+		Conditions:       []string{"MP", "HP", "PO"},
 	}
 
 	mismatch, err := mtgban.Mismatch(opts, referenceSeller, targetSeller)
@@ -469,7 +468,9 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 			continue
 		}
 
-		tiers[cardId] = int(mismatch[i].Spread)
+		// Multiply by 100 to preseve the mantissa and have more
+		// values to distribute across the table
+		tiers[cardId] = int(mismatch[i].Spread * 100)
 	}
 
 	return tiers
