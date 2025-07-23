@@ -276,7 +276,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		for _, userId := range userData.UserIds[1:] {
 			foundTitle, _ := getUserTier(tc, userId)
 			switch foundTitle {
-			case "PIONEER", "PIONEER (Early Adopters)":
+			case "PIONEER", "PIONEER (Early Adopters)", "STANDARD":
 				tierTitle = "Pioneer"
 			case "MODERN", "MODERN (Early Adopters)":
 				tierTitle = "Modern"
