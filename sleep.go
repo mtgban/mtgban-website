@@ -458,14 +458,16 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 		}
 
 		// Validate prices, skip in case anything is sus
-		checkPrice := 0.0
-		entries, found := marketCheck[cardId]
-		if found {
-			checkPrice = entries[0].Price
-		}
-		// tcg low cannot be higher than tcg market
-		if mismatch[i].ReferenceEntry.Price > checkPrice {
-			continue
+		if ref == "TCGLow" {
+			checkPrice := 0.0
+			entries, found := marketCheck[cardId]
+			if found {
+				checkPrice = entries[0].Price
+			}
+			// tcg low cannot be higher than tcg market
+			if mismatch[i].ReferenceEntry.Price > checkPrice {
+				continue
+			}
 		}
 
 		// Multiply by 100 to preseve the mantissa and have more
