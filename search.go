@@ -499,6 +499,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 			switch indexArray[i].ScraperName {
 			case MKM_LOW:
+				indexArray[i].ScraperName = "Cardmarket Low"
 				// Save reference to the array
 				tmp = append(tmp, indexArray[i])
 				mkmIndex = len(tmp) - 1
@@ -507,8 +508,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				// otherwise just leave it as is
 				if mkmIndex >= 0 {
 					tmp[mkmIndex].Secondary = indexArray[i].Price
-					tmp[mkmIndex].ScraperName = "MKM (Low / Trend)"
+					tmp[mkmIndex].ScraperName = "CM (Low / Trend)"
 				} else {
+					indexArray[i].ScraperName = "Cardmarket Trend"
 					tmp = append(tmp, indexArray[i])
 				}
 			case TCG_LOW:
