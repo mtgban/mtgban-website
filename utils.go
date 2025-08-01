@@ -300,6 +300,16 @@ func findInstanceId(sellerName, cardId, cond string) string {
 	return ""
 }
 
+// Look for the original id (product id) of a card in a given inventory
+func findOriginalId(sellerName, cardId string) string {
+	tcgplayer, _ := findSellerInventory(sellerName)
+	entries, found := tcgplayer[cardId]
+	if found {
+		return entries[0].OriginalId
+	}
+	return ""
+}
+
 var allLanguageFlags = map[string]string{
 	"Chinese Simplified":  "🇨🇳",
 	"Chinese Traditional": "🇹🇼",

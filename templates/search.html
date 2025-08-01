@@ -914,6 +914,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         <img width=28 src="/img/misc/decklist.png">
                                                     </a>
                                                 </td>
+                                                <td rowspan=2>
+                                                    <a href='/api/cardmarket/decklist/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist">
+                                                        <img width=28 src="/img/misc/decklist-mkm.png">
+                                                    </a>
+                                                </td>
                                             {{end}}
                                             <td rowspan=2>
                                                 <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>

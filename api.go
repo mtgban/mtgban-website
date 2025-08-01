@@ -533,6 +533,183 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 	return nil
 }
 
+func MKMHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	isDecklist := strings.Contains(r.URL.Path, "decklist")
+
+	cardId := r.URL.Path
+	cardId = strings.TrimPrefix(cardId, "/api/cardmarket/decklist/")
+
+	var data any
+	var err error
+	var useCSV bool
+	if isDecklist {
+		UserNotify("mkmDecklist", cardId)
+		data, err = getDecklist(cardId)
+		useCSV = true
+	} else {
+		err = errors.New("invalid endpoint")
+	}
+	if err != nil {
+		log.Println(err)
+		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		return
+	}
+
+	if useCSV {
+		co, _ := mtgmatcher.GetUUID(cardId)
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
+
+		csvWriter := csv.NewWriter(w)
+		err = UUID2MKMCSV(csvWriter, data.([]string), nil, nil)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+			return
+		}
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(data)
+	if err != nil {
+		log.Println(err)
+		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		return
+	}
+}
+
+var mkmcsvHeader = []string{
+	"cardmarketId",
+	"quantity",
+	"name",
+	"set",
+	"setCode",
+	"cn",
+	"condition",
+	"language",
+	"isFoil",
+	"isPlayset",
+	"isSigned",
+	"price",
+	"comment",
+	"nameDE",
+	"nameES",
+	"nameFR",
+	"nameIT",
+	"rarity",
+	"listedAt",
+}
+
+var mkmConditionMap = map[string]string{
+	"NM": "NM",
+	"SP": "EX",
+	"MP": "GD",
+	"HP": "HP",
+	"PO": "PO",
+}
+
+// Convert a slice of ids (BAN uuids) to a list of TCG product SKUs on a CSV
+//
+// If present, qtys and conds need to be the same size of ids.
+// If absent, quantity will be computed on the fly and entries will be merged
+// in a single entry (tcgplayer does not support csv operations with identical
+// items) and conditions will be set to NM.
+func UUID2MKMCSV(w *csv.Writer, ids, qtys, conds []string) error {
+	trend, _ := findSellerInventory("MKMTrend")
+	low, _ := findSellerInventory("MKMLow")
+
+	err := w.Write(mkmcsvHeader)
+	if err != nil {
+		return err
+	}
+
+	// Track total quantity, and skip repeats
+	qty := map[string]int{}
+	var cleanedIds []string
+	for i, id := range ids {
+		quantity := 1
+		if qtys != nil {
+			q, err := strconv.Atoi(qtys[i])
+			if err == nil {
+				quantity = q
+			}
+		}
+		cond := "NM"
+		if conds != nil && conds[i] != "" {
+			cond = conds[i]
+		}
+		qty[id+cond] += quantity
+
+		if slices.Contains(cleanedIds, id) {
+			continue
+		}
+		cleanedIds = append(cleanedIds, id)
+	}
+
+	for i, id := range cleanedIds {
+		cond := "NM"
+		if conds != nil && conds[i] != "" {
+			cond = conds[i]
+		}
+
+		co, err := mtgmatcher.GetUUID(id)
+		if err != nil {
+			continue
+		}
+
+		mkmId := findOriginalId("MKMTrend", id)
+		if mkmId == "" {
+			mkmId = findOriginalId("MKMLow", id)
+		}
+
+		var price float64
+		entries, found := trend[id]
+		if !found {
+			entries, found = low[id]
+		}
+		if found {
+			price = entries[0].Price
+		}
+
+		foil := ""
+		if co.Foil || co.Etched {
+			foil = "Y"
+		}
+
+		record := make([]string, 0, len(mkmcsvHeader))
+
+		record = append(record, mkmId)
+		record = append(record, fmt.Sprint(qty[id+cond]))
+		record = append(record, co.Name)
+		record = append(record, co.Edition)
+		record = append(record, co.SetCode)
+		record = append(record, co.Number)
+		record = append(record, mkmConditionMap[cond])
+		record = append(record, co.Language)
+		record = append(record, foil)
+		record = append(record, "") //isPlayset
+		record = append(record, "") //isSigned
+		record = append(record, fmt.Sprintf("%0.2f", price))
+		record = append(record, "") //comment
+		record = append(record, "")
+		record = append(record, "")
+		record = append(record, "")
+		record = append(record, "")
+		record = append(record, mtgmatcher.Title(co.Rarity))
+		record = append(record, "") //listedAt
+
+		err = w.Write(record)
+		if err != nil {
+			return err
+		}
+
+		w.Flush()
+	}
+	return nil
+}
+
 type OpenSearchDescriptionType struct {
 	XMLName       xml.Name          `xml:"OpenSearchDescription"`
 	Text          string            `xml:",chardata"`
