@@ -267,7 +267,7 @@ func getDrirectQty(cardId string) ([]tcgplayer.ListingData, error) {
 	return tcgplayer.GetDirectQtysForProductId(tcgId, true), nil
 }
 
-func tcgDecklist(uuid string) ([]string, error) {
+func getDecklist(uuid string) ([]string, error) {
 	co, err := mtgmatcher.GetUUID(uuid)
 	if err != nil {
 		return nil, err
@@ -299,7 +299,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 		data, err = getDrirectQty(cardId)
 	} else if isDecklist {
 		UserNotify("tcgDecklist", cardId)
-		data, err = tcgDecklist(cardId)
+		data, err = getDecklist(cardId)
 		useCSV = true
 	} else {
 		err = errors.New("invalid endpoint")
@@ -497,7 +497,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 			continue
 		}
 
-		tcgSkuId := findTCGproductSKU(id, cond)
+		tcgSkuId := findInstanceId("TCGPlayer", id, cond)
 
 		condLong := tcgConditionMap[cond]
 		if co.Foil || co.Etched {

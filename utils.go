@@ -289,9 +289,9 @@ func findTCGproductId(cardId string) string {
 	return tcgId
 }
 
-// Look for a the SKU of a tcgplayer listing
-func findTCGproductSKU(cardId string, cond string) string {
-	tcgplayer, _ := findSellerInventory("TCGPlayer")
+// Look for the instance id (sku) of a card in a given inventory
+func findInstanceId(sellerName, cardId, cond string) string {
+	tcgplayer, _ := findSellerInventory(sellerName)
 	for _, entry := range tcgplayer[cardId] {
 		if entry.Conditions == cond {
 			return entry.InstanceId
