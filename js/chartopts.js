@@ -52,7 +52,7 @@ Chart.Tooltip.positioners.bottom = function(elements, position) {
     }
 };
 
-function getChartOpts(len) {
+function getChartOpts(xAxisLabels) {
     return {
         responsive: true,
         // Controls the gaps in the graph when data is missing
