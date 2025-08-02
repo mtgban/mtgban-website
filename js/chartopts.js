@@ -87,6 +87,7 @@ function getChartOpts(len) {
         scales: {
             xAxes: [
                 {
+                    id: 'x-time',
                     display: true,
                     type: "time",
                     distribution: "linear",
@@ -98,6 +99,7 @@ function getChartOpts(len) {
             ],
             yAxes: [
                 {
+                    id: 'y-data',
                     display: true,
                     ticks: {
                         beginAtZero: true,
