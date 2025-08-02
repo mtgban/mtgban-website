@@ -582,27 +582,25 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
-		labels := getDateAxisValues(chartId)
-		if len(labels) == 0 {
-			pageVars.InfoMessage = "No chart data available"
-		} else {
-			pageVars.AxisLabels = labels
-			pageVars.ChartID = chartId
+		pageVars.AxisLabels = getDateAxisValues(chartId)
+		pageVars.ChartID = chartId
 
-			for _, config := range enabledDatasets {
-				if co.Sealed && !config.HasSealed {
-					continue
-				}
-				if !co.Sealed && config.OnlySealed {
-					continue
-				}
-				dataset, err := getDataset(chartId, labels, config)
-				if err != nil {
-					log.Println(err)
-					continue
-				}
-				pageVars.Datasets = append(pageVars.Datasets, dataset)
+		for _, config := range enabledDatasets {
+			if co.Sealed && !config.HasSealed {
+				continue
 			}
+			if !co.Sealed && config.OnlySealed {
+				continue
+			}
+			dataset, err := getDataset(chartId, pageVars.AxisLabels, config)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			pageVars.Datasets = append(pageVars.Datasets, dataset)
+		}
+		if len(pageVars.Datasets) == 0 {
+			pageVars.InfoMessage = "No chart data available"
 		}
 
 		altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
