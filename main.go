@@ -894,6 +894,10 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		"base64enc": func(s string) string {
 			return base64.StdEncoding.EncodeToString([]byte(s))
 		},
+		"sixMonthsAgo": func(t time.Time) bool {
+			sixMonthsAgo := time.Now().AddDate(0, -6, 0)
+			return sixMonthsAgo.After(t)
+		},
 	}
 
 	// Give each template a name

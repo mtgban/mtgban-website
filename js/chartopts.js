@@ -96,6 +96,25 @@ function getChartOpts(xAxisLabels) {
                         stepSize: 7,
                     },
                 },
+                // This is an invisible axis so that we have better sizing
+                // and positioning for our set symbols
+                {
+                    id: 'x-top',
+                    type: 'category',
+                    position: 'top',
+                    display: true,
+                    // These labels are not going to be visible but will serve
+                    // as input ticks to check for where to put symbols
+                    labels: xAxisLabels,
+                    gridLines: {
+                        display: false,
+                    },
+                    ticks: {
+                        fontColor: 'transparent',
+                        fontSize: 4,
+                        reverse: true,
+                    },
+                },
             ],
             yAxes: [
                 {

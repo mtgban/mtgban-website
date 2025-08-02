@@ -812,6 +812,25 @@ Sims are not required for pre-constructed decks and other products where the sam
                         </p>
                     </div>
                     <script>
+                        var productDict = {
+                            {{range $key := .EditionSort}}
+                                {{$editionList := index $.EditionList $key }}
+                                    {{range $editionList}}
+                                        {{if sixMonthsAgo .Date}}
+                                            {{continue}}
+                                        {{end}}
+                                        "{{.FmtDate}}": "{{.Keyrune}}",
+                                    {{end}}
+                            {{end}}
+                        }
+
+                        const productImg = {}
+                        for (var key in productDict) {
+                            const img = new Image();
+                            img.src = "https://raw.githubusercontent.com/andrewgioia/keyrune/master/svg/"+productDict[key]+".svg";
+                            productImg[key] = img;
+                        }
+
                         var ctx = document.getElementById('cardChart').getContext('2d');
                         var cardChart = new Chart(ctx, {
                             type: 'banWithLine',
@@ -831,6 +850,27 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 ]
                             },
                             options: getChartOpts({{.AxisLabels}}),
+                            plugins: [{
+                                afterDraw: chart => {
+                                    var ctx = chart.chart.ctx;
+                                    var xBottomAxis = chart.scales['x-time'];
+                                    var xTopAxis = chart.scales['x-top'];
+                                    xTopAxis.ticks.forEach((value, index) => {
+                                        if (value in productImg) {
+                                            const padding = 32;
+
+                                            var x = xTopAxis.getPixelForTick(index);
+                                            if (x + padding/2 > chart.width) {
+                                                x = chart.width - padding;
+                                            } else if (x - padding/2 < 0) {
+                                                x = padding;
+                                            }
+
+                                            ctx.drawImage(productImg[value], x, xTopAxis.bottom - 36);
+                                        }
+                                    });
+                                }
+                            }],
                         });
 
                         function toggleGaps() {

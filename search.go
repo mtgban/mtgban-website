@@ -577,6 +577,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// CHART ALL THE THINGS
 	if chartId != "" {
+		pageVars.EditionSort = SealedEditionsSorted
+		pageVars.EditionList = SealedEditionsList
+
 		// Rebuild the search query by faking a uuid lookup
 		cfg := parseSearchOptionsNG(chartId, nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
