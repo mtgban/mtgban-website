@@ -92,8 +92,8 @@ function getChartOpts(xAxisLabels) {
                     type: "time",
                     distribution: "linear",
                     time: {
-                        unit: (len > 45) ? "month" : "day",
-                        stepSize: 1,
+                        unit: "day",
+                        stepSize: 7,
                     },
                 },
             ],
