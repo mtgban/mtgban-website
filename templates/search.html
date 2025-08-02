@@ -807,7 +807,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                         <canvas id="cardChart" width="740" height="420"></canvas>
                         <br>
                         <hr>
-                        <br>
+                        <p style="text-align: right;">
+                            <a href="javascript:toggleGaps()">Toggle gaps</a>
+                        </p>
                     </div>
                     <script>
                         var ctx = document.getElementById('cardChart').getContext('2d');
@@ -831,6 +833,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                             },
                             options: getChartOpts({{len .AxisLabels}}),
                         });
+
+                        function toggleGaps() {
+                            cardChart.options.spanGaps = !cardChart.options.spanGaps;
+                            cardChart.update();
+                        }
                     </script>
                 {{end}}
 

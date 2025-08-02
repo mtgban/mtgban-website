@@ -55,8 +55,8 @@ Chart.Tooltip.positioners.bottom = function(elements, position) {
 function getChartOpts(len) {
     return {
         responsive: true,
-        // Keep "holes" in the graph when data is missing
-        spanGaps: false,
+        // Controls the gaps in the graph when data is missing
+        spanGaps: true,
         legend: {
             position: "top",
             align: "center",
