@@ -19,6 +19,7 @@ import (
 
 	"github.com/NYTimes/gziphandler"
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
+	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2"
 )
 
@@ -478,6 +479,20 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if this endpoint can be bypassed
+		_, checkNoAuth := Config.ACL["Any"]
+		if checkNoAuth {
+			for _, nav := range ExtraNavs {
+				if nav.Link == r.URL.Path || slices.Contains(nav.SubPages, r.URL.Path) {
+					_, noAuth := Config.ACL["Any"][nav.Name]
+					if noAuth {
+						noSigning(next).ServeHTTP(w, r)
+						return
+					}
+				}
+			}
+		}
+
 		defer recoverPanic(r, w)
 
 		if PatreonHost == "" {

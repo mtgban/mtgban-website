@@ -206,9 +206,6 @@ type NavElem struct {
 
 	// Alternative endpoints connected to this handler
 	SubPages []string
-
-	// Whether authentication is disabled for the endpoint
-	NoAuth bool
 }
 
 var startTime = time.Now()
@@ -499,14 +496,15 @@ func genPageNav(activeTab, sig string) PageVars {
 
 	// Enable buttons according to the enabled features
 	for _, feat := range OrderNav {
-		if expires > time.Now().Unix() || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
+		_, noAuth := Config.ACL["Any"][feat]
+		if expires > time.Now().Unix() || (DevMode && !SigCheck) || noAuth {
 			param := GetParamFromSig(sig, feat)
 			allowed, _ := strconv.ParseBool(param)
 			if DevMode && ExtraNavs[feat].AlwaysOnForDev {
 				allowed = true
 			}
 
-			if allowed || (DevMode && !SigCheck) || ExtraNavs[feat].NoAuth {
+			if allowed || (DevMode && !SigCheck) || noAuth {
 				pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
 			}
 		}
@@ -523,7 +521,8 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars.Nav[mainNavIndex].Class = "active"
 
 	// Add extra warning message if needed
-	if showPatreonLogin && pageVars.Nav[mainNavIndex].NoAuth {
+	_, noAuth := Config.ACL["Any"][pageVars.Nav[mainNavIndex].Name]
+	if showPatreonLogin && noAuth {
 		extra := *&NavElem{
 			Active: true,
 			Class:  "beta",
@@ -739,14 +738,9 @@ func main() {
 	// Set up logging
 	setLoggers(OrderNav)
 
-	for key, nav := range ExtraNavs {
-		_, ExtraNavs[key].NoAuth = Config.ACL["Any"][key]
-
+	for _, nav := range ExtraNavs {
 		// Set up the handler
 		handler := enforceSigning(http.HandlerFunc(nav.Handle))
-		if nav.NoAuth {
-			handler = noSigning(http.HandlerFunc(nav.Handle))
-		}
 		http.Handle(nav.Link, handler)
 
 		// Add any additional endpoints to it
