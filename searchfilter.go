@@ -553,9 +553,10 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 
 	// Clean any special characters from the main query, handle it later
 	var lastChar string
-	if strings.HasSuffix(query, "&") || strings.HasSuffix(query, "*") || strings.HasSuffix(query, "~") {
+	switch query[len(query)-1] {
+	case '&', '*', '~', '`':
 		lastChar = query[len(query)-1:]
-		query = strings.TrimRight(query, "&*~")
+		query = strings.TrimRight(query, "&*~`")
 	}
 
 	// Iterate over the various possible filters
@@ -933,6 +934,13 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				finish = "foil"
 			case "~":
 				finish = "etched"
+			case "`":
+				finish = "foil"
+
+				filters = append(filters, FilterElem{
+					Name:   "is",
+					Values: []string{"altfoil"},
+				})
 			}
 			filters = append(filters, FilterElem{
 				Name:   "finish",
@@ -1199,6 +1207,33 @@ var isKnownPromo = map[string]string{
 	"neon":      mtgmatcher.PromoTypeNeonInk,
 	"thicc":     mtgmatcher.PromoTypeThickDisplay,
 	"display":   mtgmatcher.PromoTypeThickDisplay,
+}
+
+var altFoilTags = []string{
+	"confettifoil",
+	"cosmicfoil",
+	"doubleexposure",
+	"doublerainbow",
+	"dragonscalefoil",
+	"embossed",
+	"firstplacefoil",
+	"fracturefoil",
+	"galaxyfoil",
+	"gilded",
+	"halofoil",
+	"headliner",
+	"invisibleink",
+	"manafoil",
+	"neonink",
+	"oilslick",
+	"rainbowfoil",
+	"raisedfoil",
+	"ripplefoil",
+	"silverfoil",
+	"singularityfoil",
+	"stepandcompleat",
+	"surgefoil",
+	"textured",
 }
 
 var specialTags = map[string]string{
@@ -1581,6 +1616,12 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 				customTag, found := specialTags[co.Name]
 				if found && customTag == "power9" {
 					return false
+				}
+			case "altfoil":
+				for _, tag := range altFoilTags {
+					if co.HasPromoType(tag) {
+						return false
+					}
 				}
 			default:
 				// Adjust input for these known cases
