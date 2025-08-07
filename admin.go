@@ -116,18 +116,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spoof := r.FormValue("spoof")
-	if spoof != "" {
-		baseURL := getBaseURL(r)
-		sig := sign(baseURL, spoof, nil)
-
-		// Overwrite the current signature
-		putSignatureInCookies(w, r, sig)
-
-		http.Redirect(w, r, baseURL, http.StatusFound)
-		return
-	}
-
 	reboot := r.FormValue("reboot")
 	doReboot := false
 	var v url.Values
@@ -309,6 +297,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			msg = "error: " + err.Error()
 		}
+
+		v.Set("msg", msg)
+		v.Set("html", "textfield")
+
+	case "spoof":
+		v = url.Values{}
+		doReboot = true
+
+		tier := r.FormValue("tier")
+		baseURL := getBaseURL(r)
+		msg := baseURL + "/?sig=" + sign(baseURL, tier, nil)
 
 		v.Set("msg", msg)
 		v.Set("html", "textfield")
