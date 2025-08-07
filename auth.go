@@ -135,7 +135,7 @@ func getUserIds(tc *http.Client) (*PatreonUserData, error) {
 		} `json:"data"`
 	}
 
-	LogPages["Admin"].Println(string(data))
+	LogPages["Admin"].Println("getUserIds:", string(data))
 	err = json.Unmarshal(data, &userData)
 	if err != nil {
 		return nil, err
@@ -196,7 +196,7 @@ func getUserTier(tc *http.Client, userId string) (string, error) {
 	}
 	tierId := ""
 	tierTitle := ""
-	LogPages["Admin"].Println(string(data))
+	LogPages["Admin"].Println("getUserTier:", string(data))
 	err = json.Unmarshal(data, &membershipData)
 	if err != nil {
 		return "", err
