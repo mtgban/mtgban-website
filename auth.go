@@ -32,8 +32,7 @@ const (
 const (
 	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
 	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
-	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/"
-	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title"
+	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/%s?include=currently_entitled_tiers&fields%5Btier%5D=title"
 )
 
 const (
@@ -161,7 +160,7 @@ func getUserIds(tc *http.Client) (*PatreonUserData, error) {
 }
 
 func getUserTier(tc *http.Client, userId string) (string, error) {
-	resp, err := tc.Get(PatreonMemberURL + userId + PatreonMemberOpts)
+	resp, err := tc.Get(fmt.Sprintf(PatreonMemberURL, userId))
 	if err != nil {
 		return "", err
 	}
