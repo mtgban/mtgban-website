@@ -974,7 +974,7 @@ func parseHeader(first []string) (map[string]int, error) {
 	// If there is a single element, try using a different mode
 	if len(first) == 1 {
 		indexMap["cardName"] = 0
-		log.Println("No Header map, decklist mode (single element)")
+		LogPages["Upload"].Println("No Header map, decklist mode (single element)")
 		return indexMap, ErrUploadDecklist
 	}
 
@@ -1062,7 +1062,7 @@ func parseHeader(first []string) (map[string]int, error) {
 	// after the names
 	if len(indexMap) < 2 && strings.Contains(strings.Join(first, ","), ", ") {
 		indexMap["cardName"] = 0
-		log.Println("No Header map, decklist mode (comma in card name)")
+		LogPages["Upload"].Println("No Header map, decklist mode (comma in card name)")
 		return indexMap, ErrUploadDecklist
 	}
 
@@ -1096,11 +1096,11 @@ func parseHeader(first []string) (map[string]int, error) {
 
 	// If nothing at all was found, send an error to reprocess the first line
 	if !foundName && !foundEdition && !foundId {
-		log.Println("Fake Header map:", indexMap)
+		LogPages["Upload"].Println("Fake Header map:", indexMap)
 		return indexMap, ErrReloadFirstRow
 	}
 
-	log.Println("Header map:", indexMap)
+	LogPages["Upload"].Println("Header map:", indexMap)
 	return indexMap, nil
 }
 
@@ -1555,15 +1555,15 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 		return nil, errors.New("empty input file")
 	}
 	if err != nil {
-		log.Println("Error reading header:", err)
+		LogPages["Upload"].Println("Error reading header:", err)
 		return nil, errors.New("error reading file header")
 	}
-	log.Println("Found", len(first), "headers")
+	LogPages["Upload"].Println("Found", len(first), "headers")
 
 	// If there is a single element, parsing didn't work
 	// try again with a different delimiter
 	if len(first) == 1 && (comma == ',' || comma == '\t') {
-		log.Println("Using a different delimiter for csv")
+		LogPages["Upload"].Println("Using a different delimiter for csv")
 		_, err = reader.Seek(0, io.SeekStart)
 		if err != nil {
 			return nil, err
