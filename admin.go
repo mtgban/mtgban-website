@@ -322,10 +322,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	case "people":
 		pageVars.DisableLinks = true
 
-		pageVars.Headers = []string{
-			"", "#", "Category", "Email", "Name", "Tier",
+		pageVars.Headers = [][]string{
+			[]string{"", "#", "Category", "Email", "Name", "Tier"},
+			[]string{"", "#", "API User"},
 		}
 
+		var userTable [][]string
 		for i, person := range Config.Patreon.Grants {
 			row := []string{
 				fmt.Sprintf("%d", i+1),
@@ -335,12 +337,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				person.Tier,
 			}
 
-			pageVars.Table = append(pageVars.Table, row)
+			userTable = append(userTable, row)
 		}
-
-		pageVars.OtherHeaders = []string{
-			"", "#", "API User",
-		}
+		pageVars.Tables = append(pageVars.Tables, userTable)
 
 		// Sort before show
 		var emails []string
@@ -349,14 +348,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		sort.Strings(emails)
 
+		var apiTable [][]string
 		for i, email := range emails {
 			row := []string{
 				fmt.Sprintf("%d", i+1),
 				email,
 			}
 
-			pageVars.OtherTable = append(pageVars.OtherTable, row)
+			apiTable = append(apiTable, row)
 		}
+		pageVars.Tables = append(pageVars.Tables, apiTable)
+
 	case "config":
 		newConfig := r.FormValue("textArea")
 		if newConfig != "" {
@@ -406,18 +408,15 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			pageVars.InfoMessage = err.Error()
 		}
 		pageVars.CleanSearchQuery = out.String()
-	default:
-		pageVars.Headers = []string{
-			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
-		}
-		pageVars.OtherHeaders = pageVars.Headers
 
+	default:
+		var sellerTable [][]string
 		for i := range Sellers {
 			if Sellers[i] == nil {
 				row := []string{
 					fmt.Sprintf("Error at Seller %d", i), "", "", "", "", "",
 				}
-				pageVars.Table = append(pageVars.Table, row)
+				sellerTable = append(sellerTable, row)
 				continue
 			}
 
@@ -461,15 +460,20 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				status,
 			}
 
-			pageVars.Table = append(pageVars.Table, row)
+			sellerTable = append(sellerTable, row)
 		}
+		pageVars.Headers = append(pageVars.Headers, []string{
+			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
+		})
+		pageVars.Tables = append(pageVars.Tables, sellerTable)
 
+		var vendorTable [][]string
 		for i := range Vendors {
 			if Vendors[i] == nil {
 				row := []string{
 					fmt.Sprintf("Error at Vendor %d", i), "", "", "", "", "",
 				}
-				pageVars.OtherTable = append(pageVars.Table, row)
+				vendorTable = append(vendorTable, row)
 				continue
 			}
 
@@ -513,8 +517,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				status,
 			}
 
-			pageVars.OtherTable = append(pageVars.OtherTable, row)
+			vendorTable = append(vendorTable, row)
 		}
+		pageVars.Headers = append(pageVars.Headers, []string{
+			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
+		})
+		pageVars.Tables = append(pageVars.Tables, vendorTable)
 	}
 
 	var tiers []string

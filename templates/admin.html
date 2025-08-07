@@ -70,93 +70,52 @@
             </div>
         {{end}}
 
-        <div class="indent">
-            <table style="float: left;">
-                <tr>
-                    {{range $.Headers}}
-                        <th class="wrap stickyHeader" style="top:48px">
-                            {{.}}
-                        </th>
-                    {{end}}
-                </tr>
-                {{range $i, $row := $.Table}}
+        {{range $idx, $table := .Tables}}
+            <div class="indent">
+                <table style="float: left;">
                     <tr>
-                        <td>
-                            &nbsp;
-                        </td>
-                        {{range $j, $cell := $row}}
-                            <td>
-                                {{if eq $j 0}}
-                                    {{if $.DisableLinks}}
-                                        {{$cell}}
-                                    {{else}}
-                                        <a href="?refresh={{index $row 1}}" onclick="return confirm('Are you sure you want to refresh {{$cell}}?')">{{$cell}}</a>
-                                    {{end}}
-                                {{else if eq $j 1}}
-                                    {{if $.DisableLinks}}
-                                        {{$cell}}
-                                    {{else}}
-                                        <a href="?logs={{$cell}}" download="{{$cell}}.txt">{{$cell}}</a>
-                                    {{end}}
-                                {{else}}
-                                    {{if eq $j 4}}
-                                        <center>
-                                    {{end}}
-                                    {{$cell}}
-                                    {{if eq $j 4}}
-                                        </center>
-                                    {{end}}
-                                {{end}}
-                            </td>
+                        {{$header := index $.Headers $idx}}
+                        {{range $header}}
+                            <th class="wrap stickyHeader" style="top:48px">
+                                {{.}}
+                            </th>
                         {{end}}
                     </tr>
-                {{end}}
-            </table>
-        </div>
-
-        <div class="indent">
-            <table style="float: left;">
-                <tr>
-                    {{range $.OtherHeaders}}
-                        <th class="wrap stickyHeader" style="top:48px">
-                            {{.}}
-                        </th>
-                    {{end}}
-                </tr>
-                {{range $i, $row := $.OtherTable}}
-                    <tr>
-                        <td>
-                            &nbsp;
-                        </td>
-                        {{range $j, $cell := $row}}
+                    {{range $i, $row := $table}}
+                        <tr>
                             <td>
-                                {{if eq $j 0}}
-                                    {{if $.DisableLinks}}
-                                        {{$cell}}
-                                    {{else}}
-                                        <a href="?refresh={{index $row 1}}" onclick="return confirm('Are you sure you want to refresh {{$cell}}?')">{{$cell}}</a>
-                                    {{end}}
-                                {{else if eq $j 1}}
-                                    {{if $.DisableLinks}}
-                                        {{$cell}}
-                                    {{else}}
-                                        <a href="?logs={{$cell}}" download="{{$cell}}.txt">{{$cell}}</a>
-                                    {{end}}
-                                {{else}}
-                                    {{if eq $j 4}}
-                                        <center>
-                                    {{end}}
-                                    {{$cell}}
-                                    {{if eq $j 4}}
-                                        </center>
-                                    {{end}}
-                                {{end}}
+                                &nbsp;
                             </td>
-                        {{end}}
-                    </tr>
-                {{end}}
-            </table>
-        </div>
+                            {{range $j, $cell := $row}}
+                                <td>
+                                    {{if eq $j 0}}
+                                        {{if $.DisableLinks}}
+                                            {{$cell}}
+                                        {{else}}
+                                            <a href="?refresh={{index $row 1}}" onclick="return confirm('Are you sure you want to refresh {{$cell}}?')">{{$cell}}</a>
+                                        {{end}}
+                                    {{else if eq $j 1}}
+                                        {{if $.DisableLinks}}
+                                            {{$cell}}
+                                        {{else}}
+                                            <a href="?logs={{$cell}}" download="{{$cell}}.txt">{{$cell}}</a>
+                                        {{end}}
+                                    {{else}}
+                                        {{if eq $j 4}}
+                                            <center>
+                                        {{end}}
+                                        {{$cell}}
+                                        {{if eq $j 4}}
+                                            </center>
+                                        {{end}}
+                                    {{end}}
+                                </td>
+                            {{end}}
+                        </tr>
+                    {{end}}
+                </table>
+            </div>
+        {{end}}
         <br>
         <div style="clear:both;"></div>
         <br>

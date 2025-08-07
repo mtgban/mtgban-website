@@ -124,9 +124,8 @@ type PageVars struct {
 	SleepersKeys   []string
 	SleepersColors []string
 
-	Headers      []string
-	OtherHeaders []string
-	OtherTable   [][]string
+	Headers      [][]string
+	Tables       [][][]string
 	CurrentTime  time.Time
 	Uptime       string
 	DiskStatus   string
