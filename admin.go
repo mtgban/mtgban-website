@@ -109,11 +109,18 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	if logs != "" {
 		key, found := ScraperMap[logs]
 		if !found {
-			pageVars.InfoMessage = key + " not found"
+			key = logs
+			_, found = LogPages[logs]
+			if !found {
+				pageVars.InfoMessage = key + " not found"
+			}
 		}
-		log.Println(path.Join(LogDir, key+".log"))
-		http.ServeFile(w, r, path.Join(LogDir, key+".log"))
-		return
+		if found {
+			logfilePath := path.Join(LogDir, key+".log")
+			LogPages["Admin"].Println("Serving", logfilePath)
+			http.ServeFile(w, r, logfilePath)
+			return
+		}
 	}
 
 	reboot := r.FormValue("reboot")
@@ -523,6 +530,23 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
 		})
 		pageVars.Tables = append(pageVars.Tables, vendorTable)
+
+		var pageTable [][]string
+		for _, navName := range OrderNav {
+			nav := ExtraNavs[navName]
+
+			row := []string{
+				nav.Short,
+				nav.Name,
+				nav.Link,
+				nav.Page,
+			}
+			pageTable = append(pageTable, row)
+		}
+		pageVars.Headers = append(pageVars.Headers, []string{
+			"", "Icon", "Logs", "Link", "Template",
+		})
+		pageVars.Tables = append(pageVars.Tables, pageTable)
 	}
 
 	var tiers []string
