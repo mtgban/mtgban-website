@@ -118,6 +118,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		if found {
 			logfilePath := path.Join(LogDir, key+".log")
 			LogPages["Admin"].Println("Serving", logfilePath)
+			if fileExists(logfilePath + ".1") {
+				http.ServeFile(w, r, logfilePath+".1")
+			}
 			http.ServeFile(w, r, logfilePath)
 			return
 		}
