@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/go-redis/redis/v8"
 )
 
 type Dataset struct {
@@ -154,4 +156,19 @@ func getDataset(cardId string, labels []string, config scraperConfig) (*Dataset,
 		Color:  config.Color,
 		Hidden: config.Hidden,
 	}, nil
+}
+
+func deleteEntry(cardId, dataset, key string) error {
+	var db *redis.Client
+	for _, config := range enabledDatasets {
+		if config.PublicName == dataset {
+			db = ScraperOptions[config.ScraperName].RDBs[config.KindName]
+			break
+		}
+	}
+	if db == nil {
+		return errors.New("redis database not found")
+	}
+
+	return db.HDel(context.Background(), cardId, key).Err()
 }

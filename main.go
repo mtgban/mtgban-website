@@ -74,6 +74,7 @@ type PageVars struct {
 	CardBackURL  string
 	ShowUpsell   bool
 
+	CanDeleteChart   bool
 	CanShowAll       bool
 	CleanSearchQuery string
 
@@ -227,6 +228,7 @@ var OptionalFields = []string{
 	"SearchDisabled",
 	"SearchBuylistDisabled",
 	"SearchDownloadCSV",
+	"SearchChartDelete",
 	"ArbitEnabled",
 	"ArbitDisabledVendors",
 	"NewsEnabled",

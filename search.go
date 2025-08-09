@@ -577,6 +577,23 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// CHART ALL THE THINGS
 	if chartId != "" {
+		canDeleteChart, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchChartDelete"))
+		pageVars.CanDeleteChart = canDeleteChart || (DevMode && !SigCheck)
+
+		dataset := r.FormValue("dataset")
+		dateKey := r.FormValue("datekey")
+		if dataset != "" && dateKey != "" {
+			err := deleteEntry(chartId, dataset, dateKey)
+			if err != nil {
+				pageVars.InfoMessage = err.Error()
+			} else {
+				user := GetParamFromSig(sig, "UserEmail")
+				msg := fmt.Sprintf("%s in %s was deleted by %s", dateKey, dataset, user)
+				UserNotify("chart", msg)
+				LogPages["Search"].Println(msg)
+			}
+		}
+
 		pageVars.EditionSort = SealedEditionsSorted
 		pageVars.EditionList = SealedEditionsList
 

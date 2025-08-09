@@ -807,9 +807,34 @@ Sims are not required for pre-constructed decks and other products where the sam
                         <canvas id="cardChart" width="740" height="420"></canvas>
                         <br>
                         <hr>
-                        <p style="text-align: right;">
-                            <a href="javascript:toggleGaps()">Toggle gaps</a>
-                        </p>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <p style="margin: 0;">
+                                {{if $.CanDeleteChart}}
+                                    <form action="/{{if .IsSealed}}sealed{{else}}search{{end}}" id=deletechart method="get" style="width: 800px; display: none;">
+                                        <select name="dataset" id="dataset" style="width: 110px">
+                                            <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick dataset</option>
+                                            {{range .Datasets}}
+                                                <option value="{{.Name}}">&nbsp;&nbsp;&nbsp;{{.Name}}</option>
+                                            {{end}}
+                                        </select>
+                                        <select name="datekey" id="datekey" style="width: 105px">
+                                            <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick a date</option>
+                                            {{range .AxisLabels}}
+                                                <option value="{{.}}">&nbsp;&nbsp;&nbsp;{{.}}</option>
+                                            {{end}}
+                                        </select>
+                                        <input id="chart" type="hidden" name="chart" value="{{.ChartID}}"/>
+                                        <a class="btn danger" style="text-align: center;" onclick='this.parentNode.submit(); return false;'>Delete</a>
+                                    </form>
+                                {{end}}
+                            </p>
+                            <p style="margin: 0;">
+                                {{if $.CanDeleteChart}}
+                                    <a class="btn warning" onclick="document.getElementById('deletechart').style='inline'">Show delete options</a>
+                                {{end}}
+                                <a href="javascript:toggleGaps()">Toggle gaps</a>
+                            </p>
+                        </div>
                     </div>
                     <script>
                         var productDict = {
