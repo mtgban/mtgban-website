@@ -42,7 +42,7 @@ Chart.Tooltip.positioners.bottom = function(elements, position) {
 
     elements.forEach(function(element) {
         if (element._view.y > pos - tooltipHeight) {
-            pos = topPos;
+            pos = topPos + tooltipHeight * 2 / 3;
         }
     });
 
