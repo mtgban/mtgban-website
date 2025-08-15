@@ -832,7 +832,8 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 {{if $.CanDeleteChart}}
                                     <a class="btn warning" onclick="document.getElementById('deletechart').style='inline'">Show delete options</a>
                                 {{end}}
-                                <a href="javascript:toggleGaps()">Toggle gaps</a>
+                                <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
+                                <a class="btn success" href="javascript:downloadAsImg()">Download</a>
                             </p>
                         </div>
                     </div>
@@ -875,6 +876,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     ctx.textAlign = 'center';
                                     ctx.textBaseline = 'bottom';
                                     ctx.font = '32px Keyrune';
+                                    ctx.fillStyle = '#666666';
 
                                     var xBottomAxis = chart.scales['x-time'];
                                     var xTopAxis = chart.scales['x-top'];
@@ -905,6 +907,26 @@ Sims are not required for pre-constructed decks and other products where the sam
                         function toggleGaps() {
                             cardChart.options.spanGaps = !cardChart.options.spanGaps;
                             cardChart.update();
+                        }
+                        function downloadAsImg() {
+                            var chartImg = document.createElement('a');
+                            {{$card := (index $.Metadata .ChartID)}}
+                            chartImg.download = '{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png';
+
+                            var scaleFactor = 2;
+                            var border = 10;
+
+                            var exportCanvas = document.createElement('canvas');
+                            exportCanvas.width = cardChart.width * scaleFactor;
+                            exportCanvas.height = cardChart.height * scaleFactor;
+
+                            var exportCtx = exportCanvas.getContext('2d');
+                            exportCtx.fillStyle = "#ffffff";
+                            exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+                            exportCtx.drawImage(cardChart.canvas, border, border, exportCanvas.width - border * 3, exportCanvas.height - border * 2);
+
+                            chartImg.href = exportCanvas.toDataURL("image/png");
+                            chartImg.click();
                         }
                     </script>
                 {{end}}
