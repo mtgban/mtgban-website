@@ -837,7 +837,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                         </div>
                     </div>
                     <script>
-                        var productDict = {
+                        var productKeyrunes = {
                             {{range $key := .EditionSort}}
                                 {{$editionList := index $.EditionList $key }}
                                     {{range $editionList}}
@@ -847,13 +847,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         "{{.FmtDate}}": "{{.Keyrune}}",
                                     {{end}}
                             {{end}}
-                        }
-
-                        const productImg = {}
-                        for (var key in productDict) {
-                            const img = new Image();
-                            img.src = "https://raw.githubusercontent.com/andrewgioia/keyrune/master/svg/"+productDict[key]+".svg";
-                            productImg[key] = img;
                         }
 
                         var ctx = document.getElementById('cardChart').getContext('2d');
@@ -878,20 +871,31 @@ Sims are not required for pre-constructed decks and other products where the sam
                             plugins: [{
                                 afterDraw: chart => {
                                     var ctx = chart.chart.ctx;
+
+                                    ctx.textAlign = 'center';
+                                    ctx.textBaseline = 'bottom';
+                                    ctx.font = '32px Keyrune';
+
                                     var xBottomAxis = chart.scales['x-time'];
                                     var xTopAxis = chart.scales['x-top'];
                                     xTopAxis.ticks.forEach((value, index) => {
-                                        if (value in productImg) {
+                                        if (value in productKeyrunes) {
                                             const padding = 32;
 
                                             var x = xTopAxis.getPixelForTick(index);
                                             if (x + padding/2 > chart.width) {
-                                                x = chart.width - padding;
-                                            } else if (x - padding/2 < 0) {
-                                                x = padding;
+                                                x = chart.width - padding / 2;
                                             }
 
-                                            ctx.drawImage(productImg[value], x, xTopAxis.bottom - 36);
+                                            let el = document.createElement('i');
+                                            el.className = 'ss-' + productKeyrunes[value];
+
+                                            document.body.appendChild(el);
+                                            let content = window.getComputedStyle(el, '::before').content;
+                                            content = content.replace(/^"(.*)"$/, '$1');
+                                            document.body.removeChild(el);
+
+                                            ctx.fillText(content, x, xTopAxis.top + 20);
                                         }
                                     });
                                 }
