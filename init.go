@@ -547,7 +547,7 @@ var mtgScraperOptions = map[string]*scraperOption{
 			scraper.LogCallback = logger.Printf
 			return scraper, nil
 		},
-		KeepersBL: abugames.NewScraperSealed().TraderNames(),
+		KeepersBL: []string{"ABU Games", "ABU Games (credit)"},
 	},
 	"mintcard": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
