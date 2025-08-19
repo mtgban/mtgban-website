@@ -532,7 +532,7 @@ var mtgScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 	},
-	"tcgplayer_syp": {
+	"tcg_syplist": {
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper := tcgplayer.NewScraperSYP(Config.Api["tcg_auth"])
@@ -548,13 +548,6 @@ var mtgScraperOptions = map[string]*scraperOption{
 			return scraper, nil
 		},
 		KeepersBL: abugames.NewScraperSealed().TraderNames(),
-	},
-	"trollandtoad_sealed": &scraperOption{
-		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := trollandtoad.NewScraperSealed()
-			scraper.LogCallback = logger.Printf
-			return scraper, nil
-		},
 	},
 	"mintcard": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
