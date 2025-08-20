@@ -576,7 +576,7 @@ var mtgScraperOptions = map[string]*scraperOption{
 }
 
 var lorcanaScraperOptions = map[string]*scraperOption{
-	"tcg_lorcana_index": &scraperOption{
+	"tcg_index_lorcana": &scraperOption{
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper, err := tcgplayer.NewLorcanaIndex(Config.Api["tcg_public"], Config.Api["tcg_private"])
@@ -593,7 +593,7 @@ var lorcanaScraperOptions = map[string]*scraperOption{
 			TCG_MARKET,
 		},
 	},
-	"tcg_lorcana": &scraperOption{
+	"tcg_market_lorcana": &scraperOption{
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
 			scraper, err := tcgplayer.NewLorcanaScraper(Config.Api["tcg_public"], Config.Api["tcg_private"])
