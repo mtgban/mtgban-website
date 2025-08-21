@@ -75,9 +75,29 @@ func loadDatastore() error {
 	}
 	defer allPrintingsReader.Close()
 
-	return mtgmatcher.LoadDatastore(allPrintingsReader)
+	err = mtgmatcher.LoadDatastore(allPrintingsReader)
+	if err != nil {
+		return err
+	}
+
+	SKUMap, err = loadSkuMap(Config.Api["tcg_skus_path"])
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
+func loadSkuMap(path string) (tcgplayer.SKUMap, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	log.Println("Loading SKU map from", path)
+	return tcgplayer.LoadTCGSKUs(file)
+}
 func loadInventoryFromFile(fname string) (mtgban.Seller, error) {
 	// Get file path from symlink
 	link, err := os.Readlink(fname)
@@ -252,6 +272,8 @@ var allScraperOptions = map[string]map[string]*scraperOption{
 	"Lorcana": lorcanaScraperOptions,
 }
 
+var SKUMap tcgplayer.SKUMap
+
 var mtgScraperOptions = map[string]*scraperOption{
 	"abugames": &scraperOption{
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
@@ -344,6 +366,8 @@ var mtgScraperOptions = map[string]*scraperOption{
 			scraper.Affiliate = Config.Affiliate["TCG"]
 			scraper.LogCallback = logger.Printf
 			scraper.MaxConcurrency = 6
+
+			scraper.SKUsData = SKUMap
 			return scraper, nil
 		},
 		Keepers:   []string{TCG_MAIN, TCG_DIRECT},
@@ -466,6 +490,8 @@ var mtgScraperOptions = map[string]*scraperOption{
 			scraper.Affiliate = Config.Affiliate["TCG"]
 			scraper.LogCallback = logger.Printf
 			scraper.MaxConcurrency = 4
+
+			scraper.SKUsData = SKUMap
 			return scraper, nil
 		},
 		StashInventory: true,
@@ -558,6 +584,7 @@ var mtgScraperOptions = map[string]*scraperOption{
 			scraper := tcgplayer.NewScraperSYP(Config.Api["tcg_auth"])
 			scraper.LogCallback = logger.Printf
 			scraper.Affiliate = Config.Affiliate["TCG"]
+			scraper.SKUsData = SKUMap
 			return scraper, nil
 		},
 	},
