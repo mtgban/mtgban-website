@@ -100,6 +100,12 @@
                                         {{else}}
                                             <a href="?logs={{$cell}}">{{$cell}}</a>
                                         {{end}}
+                                    {{else if eq $j 2}}
+                                        {{if $.DisableLinks}}
+                                            {{$cell}}
+                                        {{else}}
+                                            <a href="?refresh_new={{index $row 1}}" onclick="return confirm('Are you sure you want to refresh {{$cell}} (new method)?')">{{$cell}}</a>
+                                        {{end}}
                                     {{else}}
                                         {{if eq $j 4}}
                                             <center>

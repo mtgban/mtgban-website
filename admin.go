@@ -34,6 +34,8 @@ import (
 const (
 	mtgjsonURL = "https://mtgjson.com/api/v5/AllPrintings.json"
 
+	dispatchURL = "https://api.github.com/repos/mtgban/go-mtgban/dispatches"
+	workflowURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/workflows/"
 	gaStatusURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/runs?status="
 )
 
@@ -109,6 +111,41 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 					r.URL.RawQuery = v.Encode()
 				} else {
 					go reload(key)
+				}
+
+				http.Redirect(w, r, r.URL.String(), http.StatusFound)
+				return
+			}
+		}
+	}
+
+	refreshNew := r.FormValue("refresh_new")
+	if refreshNew != "" {
+		key, found := ScraperMap[refreshNew]
+		if !found {
+			pageVars.InfoMessage = refreshNew + " not found"
+		}
+		if key != "" {
+			_, found := ScraperOptions[key]
+			if !found {
+				pageVars.InfoMessage = key + " not found"
+			} else {
+				// Strip the request parameter to avoid accidental repeats
+				// and to give a chance to table to update
+				r.URL.RawQuery = ""
+				if ScraperOptions[key].Busy() {
+					v := url.Values{
+						"msg": {key + " is already being refreshed"},
+					}
+					r.URL.RawQuery = v.Encode()
+				} else {
+					err := sendGithubAction(key)
+					if err != nil {
+						v := url.Values{
+							"msg": {key + " error: " + err.Error()},
+						}
+						r.URL.RawQuery = v.Encode()
+					}
 				}
 
 				http.Redirect(w, r, r.URL.String(), http.StatusFound)
@@ -599,6 +636,86 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.DemoKey = url.QueryEscape(getDemoKey(getBaseURL(r)))
 
 	render(w, "admin.html", pageVars)
+}
+
+func isBusyGithubAction(key string) (bool, error) {
+	totProgres, err := queryGithubAction(key, "in_progress")
+	if err != nil {
+		return false, errors.New("cannot retrieve in_progress status")
+	}
+	totQueue, err := queryGithubAction(key, "queued")
+	if err != nil {
+		return false, errors.New("cannot retrieve queued status")
+	}
+	if totProgres+totQueue > 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
+func queryGithubAction(key, state string) (int, error) {
+	url := fmt.Sprintf(workflowURL + "bantool-" + strings.Replace(key, "_", "-", -1) + ".yml/runs?status=" + state)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+Config.Api["github_action_token"])
+
+	resp, err := cleanhttp.DefaultClient().Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode/100 != 2 {
+		return 0, errors.New("unsupported status code")
+	}
+
+	var payload struct {
+		TotalCount int `json:"total_count"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&payload)
+	if err != nil {
+		return 0, err
+	}
+	return payload.TotalCount, nil
+}
+
+func sendGithubAction(key string) error {
+	_, found := ScraperOptions[key]
+	if !found {
+		return errors.New("key not found")
+	}
+
+	busy, err := isBusyGithubAction(key)
+	if err != nil {
+		return err
+	}
+	if busy {
+		return errors.New("job already running")
+	}
+
+	payload := strings.NewReader(`{"event_type":"` + key + `"}`)
+	req, err := http.NewRequest(http.MethodPost, dispatchURL, payload)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+Config.Api["github_action_token"])
+
+	resp, err := cleanhttp.DefaultClient().Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 204 {
+		return fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 func snapshotGithubAction(state string) ([]string, error) {
