@@ -868,7 +868,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     {{end}}
                                 ]
                             },
-                            options: getChartOpts({{.AxisLabels}}),
+                            options: getChartOpts({{.AxisLabels}}, localStorage.getItem("chartSpanGaps")),
                             plugins: [{
                                 afterDraw: chart => {
                                     var ctx = chart.chart.ctx;
@@ -907,6 +907,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                         function toggleGaps() {
                             cardChart.options.spanGaps = !cardChart.options.spanGaps;
                             cardChart.update();
+                            localStorage.setItem("chartSpanGaps", cardChart.options.spanGaps);
                         }
                         function downloadAsImg() {
                             var chartImg = document.createElement('a');

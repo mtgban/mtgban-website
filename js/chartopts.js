@@ -52,11 +52,16 @@ Chart.Tooltip.positioners.bottom = function(elements, position) {
     }
 };
 
-function getChartOpts(xAxisLabels) {
+function getChartOpts(xAxisLabels, gaps) {
+    if (gaps === null) {
+        gaps = true;
+    } else {
+        gaps = (gaps === "true");
+    }
     return {
         responsive: true,
         // Controls the gaps in the graph when data is missing
-        spanGaps: true,
+        spanGaps: gaps,
         legend: {
             position: "top",
             align: "center",
