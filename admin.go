@@ -739,6 +739,9 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 	if !found {
 		key = randomString(15)
 		apiUsersMutex.Lock()
+		if Config.ApiUserSecrets == nil {
+			return "", errors.New("config not loaded")
+		}
 		Config.ApiUserSecrets[user] = key
 		apiUsersMutex.Unlock()
 
