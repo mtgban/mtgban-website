@@ -121,8 +121,8 @@ github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd5E/OeU=
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
-github.com/mtgban/go-mtgban v0.5.33 h1:nJRePi0EoaWamOjtdMu4LDHIIvdftsbAk7JKnbnjzp8=
-github.com/mtgban/go-mtgban v0.5.33/go.mod h1:WGtDetQovvfXym1w8irVVwgdh4/4wFVnwZ+YKKH7t74=
+github.com/mtgban/go-mtgban v0.5.34 h1:xltcRxlAVRghFfsNIFWQNsn9OnRcYwo4+b8l3L0QqEU=
+github.com/mtgban/go-mtgban v0.5.34/go.mod h1:dTtmV/qlNMvmRrc88hVhLVaf3AeKj8p5xOUouezK4UE=
 github.com/mtgban/go-tcgplayer v0.0.0-20250314170048-a37ce47d0d4a h1:eCwPEHqvq1H+QOO/nKJCtfQK9kSVgUbBanMvL+B9pyo=
 github.com/mtgban/go-tcgplayer v0.0.0-20250314170048-a37ce47d0d4a/go.mod h1:bBKN+PMIyVmjaUP0uVpCEfvKBbC2WzUYS0lZZvvtrlU=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
@@ -156,8 +156,6 @@ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXl
 github.com/temoto/robotstxt v1.1.1/go.mod h1:+1AmkuG3IYkh1kv0d2qEB9Le88ehNO0zwOr3ujewlOo=
 github.com/temoto/robotstxt v1.1.2 h1:W2pOjSJ6SWvldyEuiFXNxz3xZ8aiWX5LbfDiOFd7Fxg=
 github.com/temoto/robotstxt v1.1.2/go.mod h1:+1AmkuG3IYkh1kv0d2qEB9Le88ehNO0zwOr3ujewlOo=
-github.com/ulikunitz/xz v0.5.11 h1:kpFauv27b6ynzBNT/Xy+1k+fK4WswhN/6PN5WhFAGw8=
-github.com/ulikunitz/xz v0.5.11/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
 github.com/xuri/efp v0.0.0-20230802181842-ad255f2331ca h1:uvPMDVyP7PXMMioYdyPH+0O+Ta/UO1WFfNYMO3Wz0eg=
 github.com/xuri/efp v0.0.0-20230802181842-ad255f2331ca/go.mod h1:ybY/Jr0T0GTCnYjKqmdwxyxn2BQf2RcQIIvex5QldPI=
 github.com/xuri/excelize/v2 v2.8.0 h1:Vd4Qy809fupgp1v7X+nCS/MioeQmYVVzi495UCTqB7U=

@@ -337,7 +337,10 @@ var mtgScraperOptions = map[string]*scraperOption{
 	"tcg_market": &scraperOption{
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := tcgplayer.NewScraperMarket(Config.Api["tcg_public"], Config.Api["tcg_private"])
+			scraper, err := tcgplayer.NewScraperMarket(Config.Api["tcg_public"], Config.Api["tcg_private"])
+			if err != nil {
+				return nil, err
+			}
 			scraper.Affiliate = Config.Affiliate["TCG"]
 			scraper.LogCallback = logger.Printf
 			scraper.MaxConcurrency = 6
@@ -349,7 +352,10 @@ var mtgScraperOptions = map[string]*scraperOption{
 	"tcg_index": &scraperOption{
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := tcgplayer.NewScraperIndex(Config.Api["tcg_public"], Config.Api["tcg_private"])
+			scraper, err := tcgplayer.NewScraperIndex(Config.Api["tcg_public"], Config.Api["tcg_private"])
+			if err != nil {
+				return nil, err
+			}
 			scraper.Affiliate = Config.Affiliate["TCG"]
 			scraper.LogCallback = logger.Printf
 			scraper.MaxConcurrency = 4
@@ -453,7 +459,10 @@ var mtgScraperOptions = map[string]*scraperOption{
 	"tcg_sealed": &scraperOption{
 		DevEnabled: true,
 		Init: func(logger *log.Logger) (mtgban.Scraper, error) {
-			scraper := tcgplayer.NewScraperSealed(Config.Api["tcg_public"], Config.Api["tcg_private"])
+			scraper, err := tcgplayer.NewScraperSealed(Config.Api["tcg_public"], Config.Api["tcg_private"])
+			if err != nil {
+				return nil, err
+			}
 			scraper.Affiliate = Config.Affiliate["TCG"]
 			scraper.LogCallback = logger.Printf
 			scraper.MaxConcurrency = 4
