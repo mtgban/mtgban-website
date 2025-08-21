@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -32,6 +33,8 @@ import (
 
 const (
 	mtgjsonURL = "https://mtgjson.com/api/v5/AllPrintings.json"
+
+	gaStatusURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/runs?status="
 )
 
 var BuildCommit = func() string {
@@ -66,6 +69,15 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			Class:  "selected",
 		},
 	})
+
+	var gaScrapers []string
+	for _, state := range []string{"in_progress", "queued"} {
+		scrapers, err := snapshotGithubAction(state)
+		if err != nil {
+			log.Println(err)
+		}
+		gaScrapers = append(gaScrapers, scrapers...)
+	}
 
 	msg := r.FormValue("msg")
 	if msg != "" {
@@ -433,7 +445,12 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			scraperOptions, found := ScraperOptions[ScraperMap[Sellers[i].Info().Shorthand]]
+			key, found := ScraperMap[Sellers[i].Info().Shorthand]
+			if !found {
+				continue
+			}
+
+			scraperOptions, found := ScraperOptions[key]
 			if !found {
 				continue
 			}
@@ -447,6 +464,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				status = "🔶"
 			} else if len(inv) == 0 {
 				status = "🔴"
+			}
+			if slices.Contains(gaScrapers, key) {
+				status += "💭"
 			}
 
 			name := Sellers[i].Info().Name
@@ -490,7 +510,11 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			scraperOptions, found := ScraperOptions[ScraperMap[Vendors[i].Info().Shorthand]]
+			key, found := ScraperMap[Vendors[i].Info().Shorthand]
+			if !found {
+				continue
+			}
+			scraperOptions, found := ScraperOptions[key]
 			if !found {
 				continue
 			}
@@ -504,6 +528,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				status = "🔶"
 			} else if len(bl) == 0 {
 				status = "🔴"
+			}
+			if slices.Contains(gaScrapers, key) {
+				status += "💭"
 			}
 
 			name := Vendors[i].Info().Name
@@ -572,6 +599,45 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.DemoKey = url.QueryEscape(getDemoKey(getBaseURL(r)))
 
 	render(w, "admin.html", pageVars)
+}
+
+func snapshotGithubAction(state string) ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, gaStatusURL+state, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+Config.Api["github_action_token"])
+
+	resp, err := cleanhttp.DefaultClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode/100 != 2 {
+		return nil, errors.New("unsupported status code")
+	}
+
+	var payload struct {
+		TotalCount   int `json:"total_count"`
+		WorkflowRuns []struct {
+			Name string `json:"name"`
+		} `json:"workflow_runs"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&payload)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, payload.TotalCount)
+	for _, run := range payload.WorkflowRuns {
+		names = append(names, run.Name)
+	}
+
+	return names, nil
 }
 
 func pullCode() (string, error) {
