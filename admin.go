@@ -90,7 +90,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				// Strip the request parameter to avoid accidental repeats
 				// and to give a chance to table to update
 				r.URL.RawQuery = ""
-				if ScraperOptions[key].Busy {
+				if ScraperOptions[key].Busy() {
 					v := url.Values{
 						"msg": {key + " is already being refreshed"},
 					}
@@ -224,7 +224,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 		skip := false
 		for key, opt := range ScraperOptions {
-			if opt.Busy {
+			if opt.Busy() {
 				v.Set("msg", "Cannot reload everything while "+key+" is refreshing")
 				skip = true
 				break
@@ -443,7 +443,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			inv, _ := Sellers[i].Inventory()
 
 			status := "✅"
-			if scraperOptions.Busy {
+			if scraperOptions.Busy() {
 				status = "🔶"
 			} else if len(inv) == 0 {
 				status = "🔴"
@@ -500,7 +500,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			bl, _ := Vendors[i].Buylist()
 
 			status := "✅"
-			if scraperOptions.Busy {
+			if scraperOptions.Busy() {
 				status = "🔶"
 			} else if len(bl) == 0 {
 				status = "🔴"

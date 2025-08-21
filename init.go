@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -176,10 +177,7 @@ func dumpVendorToFile(vendor mtgban.Vendor, fname string) error {
 
 type scraperOption struct {
 	// Scraper is busy, and there are active network requests
-	Busy bool
-
-	// The mutex to programmatically make a scraper busy
-	Mutex sync.Mutex
+	busy atomic.Bool
 
 	// Load data for this scraper in dev mode too
 	DevEnabled bool
@@ -218,6 +216,19 @@ type scraperOption struct {
 
 	// Log where scrapers... log
 	Logger *log.Logger
+}
+
+// Returns true if we flipped from false -> true (i.e., we acquired it).
+func (s *scraperOption) TryStart() bool {
+	return s.busy.CompareAndSwap(false, true)
+}
+
+func (s *scraperOption) Done() {
+	s.busy.Store(false)
+}
+
+func (s *scraperOption) Busy() bool {
+	return s.busy.Load()
 }
 
 // Map of indices for all scrapers stashed in the db

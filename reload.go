@@ -45,11 +45,11 @@ func reload(name string) {
 	}
 
 	// Lock because we plan to load both sides of the scraper
-	opt.Mutex.Lock()
-	opt.Busy = true
+	if !opt.TryStart() {
+		return
+	}
 	defer func() {
-		opt.Busy = false
-		opt.Mutex.Unlock()
+		opt.Done()
 	}()
 
 	scraper, err := opt.Init(opt.Logger)
@@ -141,11 +141,11 @@ func updateSellerAtPosition(seller mtgban.Seller, i int, andLock bool) error {
 	}
 
 	if andLock {
-		opts.Mutex.Lock()
-		opts.Busy = true
+		if !opts.TryStart() {
+			return errors.New("busy")
+		}
 		defer func() {
-			opts.Busy = false
-			opts.Mutex.Unlock()
+			opts.Done()
 		}()
 	}
 
@@ -215,11 +215,11 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int, andLock bool) error {
 	}
 
 	if andLock {
-		opts.Mutex.Lock()
-		opts.Busy = true
+		if !opts.TryStart() {
+			return errors.New("busy")
+		}
 		defer func() {
-			opts.Busy = false
-			opts.Mutex.Unlock()
+			opts.Done()
 		}()
 	}
 
