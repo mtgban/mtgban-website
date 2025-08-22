@@ -159,11 +159,27 @@ func fixupStoreCodeNG(code string) []string {
 		filters[i] = strings.TrimSuffix(filters[i], "\"")
 
 		// Validate the input against the registered scrapers
-		for shorthand, name := range ScraperNames {
-			if strings.ToLower(name) == filters[i] ||
-				strings.ToLower(shorthand) == filters[i] {
-				filters[i] = strings.ToLower(shorthand)
+		for _, seller := range Sellers {
+			if seller == nil {
+				continue
 			}
+			if filters[i] != strings.ToLower(seller.Info().Name) &&
+				filters[i] != strings.ToLower(seller.Info().Shorthand) {
+				continue
+			}
+			filters[i] = strings.ToLower(seller.Info().Shorthand)
+			break
+		}
+		for _, vendor := range Vendors {
+			if vendor == nil {
+				continue
+			}
+			if filters[i] != strings.ToLower(vendor.Info().Name) &&
+				filters[i] != strings.ToLower(vendor.Info().Shorthand) {
+				continue
+			}
+			filters[i] = strings.ToLower(vendor.Info().Shorthand)
+			break
 		}
 
 		// The manual renames from search.go
