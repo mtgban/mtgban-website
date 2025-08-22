@@ -682,6 +682,9 @@ func main() {
 			}
 		})
 
+		// Take a snapshot twice a day
+		c.AddFunc("0 */12 * * *", stashInTimeseries)
+
 		c.Start()
 	}
 
