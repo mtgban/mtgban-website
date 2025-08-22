@@ -794,7 +794,11 @@ func loadScrapers() {
 		ScraperNames = map[string]string{}
 	}
 	if ScraperOptions == nil {
-		ScraperOptions = allScraperOptions[Config.Game]
+		var found bool
+		ScraperOptions, found = allScraperOptions[Config.Game]
+		if !found {
+			panic(Config.Game + " configuration not found")
+		}
 	}
 
 	loadOptions()
