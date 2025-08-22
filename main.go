@@ -830,7 +830,23 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			return fmt.Sprintf("$ %0.2f", n)
 		},
 		"scraper_name": func(s string) string {
-			return ScraperNames[s]
+			for _, seller := range Sellers {
+				if seller == nil {
+					continue
+				}
+				if s == seller.Info().Shorthand {
+					return seller.Info().Name
+				}
+			}
+			for _, vendor := range Vendors {
+				if vendor == nil {
+					continue
+				}
+				if s == vendor.Info().Shorthand {
+					return vendor.Info().Name
+				}
+			}
+			return ""
 		},
 		"slice_has": func(s []string, p string) bool {
 			return slices.Contains(s, p)
