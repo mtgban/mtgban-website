@@ -710,9 +710,9 @@ func main() {
 		// Refresh everything daily at 2am (after MTGJSON update)
 		c.AddFunc("35 11 * * *", loadScrapers)
 
-		// MTGJSON builds go live 7am EST, pull the update 30 minutes after
-		c.AddFunc("30 11 * * *", func() {
-			log.Println("Reloading MTGJSONv5")
+		// MTGJSON builds go live 1-2pm EST, pull the update 30 minutes after
+		c.AddFunc("30 19 * * *", func() {
+			log.Println("Reloading datastore from", Config.DatastorePath)
 			err := loadDatastore()
 			if err != nil {
 				log.Println(err)
