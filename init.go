@@ -80,7 +80,7 @@ func loadDatastore() error {
 		return err
 	}
 
-	if Config.Game == "" {
+	if Config.Game == "magic" {
 		SKUMap, err = loadSkuMap(Config.Api["tcg_skus_path"])
 		if err != nil {
 			return err
@@ -270,7 +270,7 @@ var DBs = map[string]int{
 var ScraperOptions map[string]*scraperOption
 
 var allScraperOptions = map[string]map[string]*scraperOption{
-	"":        mtgScraperOptions,
+	"magic":   mtgScraperOptions,
 	"lorcana": lorcanaScraperOptions,
 }
 
@@ -904,7 +904,7 @@ func updateStaticData() {
 
 	// Load prices for API users
 	if !DevMode {
-		if Config.Game == "" {
+		if Config.Game == "magic" {
 			go prepareCKAPI()
 		}
 	}

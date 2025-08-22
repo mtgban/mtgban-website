@@ -443,7 +443,7 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		default:
 			// The default version is a compatibility mode that uses store names
 			// when multiple are present (only for mtg)
-			if Config.Game == "" {
+			if Config.Game == "magic" {
 				shorthand := seller.Info().Shorthand
 				if len(ScraperOptions[ScraperMap[shorthand]].Keepers) > 0 {
 					sellerTag = ScraperNames[shorthand]
@@ -615,7 +615,7 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		default:
 			// The default version is a compatibility mode that uses store names
 			// when multiple are present (only for mtg)
-			if Config.Game == "" {
+			if Config.Game == "magic" {
 				shorthand := vendor.Info().Shorthand
 				if len(ScraperOptions[ScraperMap[shorthand]].KeepersBL) > 0 {
 					vendorTag = ScraperNames[shorthand]

@@ -466,7 +466,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		Hash:         BuildCommit,
 	}
 
-	if Config.Game != "" {
+	if Config.Game != "magic" {
 		// Append which game this site is for
 		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
 
@@ -475,7 +475,7 @@ func genPageNav(activeTab, sig string) PageVars {
 	}
 
 	switch Config.Game {
-	case mtgban.GameMagic:
+	case "magic", "":
 		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
 	case "lorcana":
 		pageVars.CardBackURL = "img/backs/lorcana.webp"
@@ -569,6 +569,10 @@ func loadVars(cfg, port, datastore string) error {
 
 	InventoryDir = path.Join("cache_inv", Config.Game)
 	BuylistDir = path.Join("cache_bl", Config.Game)
+
+	if Config.Game == "" {
+		Config.Game = "magic"
+	}
 
 	return nil
 }
