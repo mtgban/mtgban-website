@@ -87,6 +87,8 @@ func loadDatastore() error {
 		}
 	}
 
+	go updateStaticData()
+
 	return nil
 }
 
@@ -881,39 +883,13 @@ func loadScrapers() {
 		return
 	}
 
-	go updateStaticData()
+	go runSealedAnalysis()
 
 	if init {
 		ServerNotify("init", "loading completed")
 	} else {
 		ServerNotify("refresh", "full refresh completed")
 	}
-}
-
-func updateStaticData() {
-	SealedEditionsSorted, SealedEditionsList = getSealedEditions()
-	AllEditionsKeys, AllEditionsMap = getAllEditions()
-	TreeEditionsKeys, TreeEditionsMap = getTreeEditions()
-	ReprintsKeys, ReprintsMap = getReprintsGlobal()
-
-	TotalSets = len(AllEditionsKeys)
-	TotalUnique = len(mtgmatcher.GetUUIDs())
-	var totalCards int
-	for _, key := range AllEditionsKeys {
-		totalCards += AllEditionsMap[key].Size
-	}
-	TotalCards = totalCards
-
-	go runSealedAnalysis()
-
-	// Load prices for API users
-	if !DevMode {
-		if Config.Game == "magic" {
-			go prepareCKAPI()
-		}
-	}
-
-	LastUpdate = time.Now().Format(time.RFC3339)
 }
 
 func loadSellers(newbc *mtgban.BanClient) {
