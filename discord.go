@@ -372,7 +372,7 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 // message is created on any channel that the authenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	// Ignore requests if starting up
-	if !DatabaseLoaded {
+	if len(Sellers) == 0 || len(Vendors) == 0 {
 		return
 	}
 

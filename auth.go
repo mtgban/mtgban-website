@@ -415,7 +415,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			return
 		}
 
-		if !DatabaseLoaded {
+		if len(Sellers) == 0 || len(Vendors) == 0 {
 			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 			return
 		}
@@ -607,22 +607,6 @@ func enforceSigning(next http.Handler) http.Handler {
 			}
 
 			render(w, "home.html", pageVars)
-			return
-		}
-
-		if !DatabaseLoaded && r.URL.Path != "/admin" {
-			page := "home.html"
-			for _, navName := range OrderNav {
-				nav := ExtraNavs[navName]
-				if r.URL.Path == nav.Link {
-					pageVars = genPageNav(nav.Name, sig)
-					page = nav.Page
-				}
-			}
-			pageVars.Title = "Great things are coming"
-			pageVars.ErrorMessage = ErrMsgRestart
-
-			render(w, page, pageVars)
 			return
 		}
 

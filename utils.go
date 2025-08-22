@@ -702,6 +702,9 @@ func randomUUID(sealed bool) string {
 	if sealed {
 		uuids = mtgmatcher.GetSealedUUIDs()
 	}
+	if len(uuids) == 0 {
+		return ""
+	}
 	index := rand.Intn(len(uuids))
 	return uuids[index]
 }

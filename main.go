@@ -654,7 +654,6 @@ func main() {
 
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
-		DatabaseLoaded = true
 	} else {
 		go func() {
 			log.Println("Loading", len(Config.ScraperConfig.Config), "Scrapers")
@@ -663,7 +662,6 @@ func main() {
 				log.Fatalln("error loading scrapers:", err)
 			}
 
-			DatabaseLoaded = true
 		}()
 	}
 
