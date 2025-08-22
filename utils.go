@@ -27,7 +27,7 @@ var Country2flag = map[string]string{
 }
 
 var colorRarityMap = map[string]map[string]string{
-	"Lorcana": {
+	"lorcana": {
 		"common":    "var(--normal)",
 		"uncommon":  "#707883",
 		"rare":      "#CD7F32",

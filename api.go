@@ -740,7 +740,7 @@ type OpenSearchURL struct {
 func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 	host := ""
 	gameName := "Magic: the Gathering"
-	if Config.Game == "Lorcana" {
+	if Config.Game == "lorcana" {
 		host = "lorcana."
 		gameName = "Lorcana"
 	}

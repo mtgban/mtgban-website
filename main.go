@@ -29,6 +29,7 @@ import (
 	cron "gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 type PageVars struct {
@@ -467,7 +468,7 @@ func genPageNav(activeTab, sig string) PageVars {
 
 	if Config.Game != "" {
 		// Append which game this site is for
-		pageVars.Title += " - " + Config.Game
+		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
 
 		// Charts are available only for one game
 		pageVars.DisableChart = true
@@ -476,7 +477,7 @@ func genPageNav(activeTab, sig string) PageVars {
 	switch Config.Game {
 	case mtgban.GameMagic:
 		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
-	case mtgban.GameLorcana:
+	case "lorcana":
 		pageVars.CardBackURL = "img/backs/lorcana.webp"
 	default:
 		panic("no pageVars.CardBackURL set")

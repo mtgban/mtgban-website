@@ -271,7 +271,7 @@ var ScraperOptions map[string]*scraperOption
 
 var allScraperOptions = map[string]map[string]*scraperOption{
 	"":        mtgScraperOptions,
-	"Lorcana": lorcanaScraperOptions,
+	"lorcana": lorcanaScraperOptions,
 }
 
 var SKUMap tcgplayer.SKUMap
@@ -757,7 +757,7 @@ func loadOptions() {
 		if err != nil {
 			continue
 		}
-		if scraper.Info().Game != Config.Game {
+		if strings.ToLower(scraper.Info().Game) != strings.ToLower(Config.Game) {
 			continue
 		}
 
@@ -814,7 +814,7 @@ func loadScrapers() {
 			ServerNotify("init", msg, true)
 			continue
 		}
-		if scraper.Info().Game != Config.Game {
+		if strings.ToLower(scraper.Info().Game) != strings.ToLower(Config.Game) {
 			continue
 		}
 
