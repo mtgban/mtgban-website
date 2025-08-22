@@ -526,9 +526,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				} else {
 					tmp = append(tmp, indexArray[i])
 				}
-			case TCG_DIRECT_LOW:
-				// Skip this one for search results
-				continue
 			default:
 				if slices.Contains(ScraperOptions["sealed_ev"].Keepers, indexArray[i].ScraperName) {
 					if getTCGSimulationIQR(cardId) > IQRThreshold {
