@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -24,7 +23,6 @@ import (
 	"time"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
-	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"golang.org/x/exp/slices"
 
@@ -90,35 +88,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.SelectableField = true
 	}
 
-	refresh := r.FormValue("refresh")
-	if refresh != "" {
-		key, found := ScraperMap[refresh]
-		if !found {
-			pageVars.InfoMessage = refresh + " not found"
-		}
-		if key != "" {
-			_, found := ScraperOptions[key]
-			if !found {
-				pageVars.InfoMessage = key + " not found"
-			} else {
-				// Strip the request parameter to avoid accidental repeats
-				// and to give a chance to table to update
-				r.URL.RawQuery = ""
-				if ScraperOptions[key].Busy() {
-					v := url.Values{
-						"msg": {key + " is already being refreshed"},
-					}
-					r.URL.RawQuery = v.Encode()
-				} else {
-					go reload(key)
-				}
-
-				http.Redirect(w, r, r.URL.String(), http.StatusFound)
-				return
-			}
-		}
-	}
-
 	refreshNew := r.FormValue("refresh_new")
 	if refreshNew != "" {
 		key, found := ScraperMap[refreshNew]
@@ -156,19 +125,14 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	logs := r.FormValue("logs")
 	if logs != "" {
-		key, found := ScraperMap[logs]
+		_, found := LogPages[logs]
 		if !found {
-			key = logs
-			_, found = LogPages[logs]
-			if !found {
-				pageVars.InfoMessage = key + " not found"
-			}
-		}
-		if found {
-			logfilePath := path.Join(LogDir, key+".log")
+			pageVars.InfoMessage = logs + " not found"
+		} else {
+			logfilePath := path.Join(LogDir, logs+".log")
 			LogPages["Admin"].Println("Serving", logfilePath)
 			w.Header().Set("Content-Type", "text/plain")
-			w.Header().Set("Content-Disposition", "inline; filename="+key+".log")
+			w.Header().Set("Content-Disposition", "inline; filename="+logs+".log")
 
 			if fileExists(logfilePath + ".1") {
 				http.ServeFile(w, r, logfilePath+".1")
@@ -248,13 +212,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			v.Set("msg", out)
 		}
 
-	case "cache":
-		v = url.Values{}
-		v.Set("msg", "Deleting old cache...")
-		doReboot = true
-
-		go deleteOldCache()
-
 	case "config":
 		v = url.Values{}
 		v.Set("msg", "New config loaded!")
@@ -263,75 +220,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		err := loadVars(Config.filePath, "", "")
 		if err != nil {
 			v.Set("msg", "Failed to reload config: "+err.Error())
-		}
-
-	case "scrapers", "sellers", "vendors":
-		v = url.Values{}
-		v.Set("msg", fmt.Sprintf("Reloading %s in the background...", reboot))
-
-		doReboot = true
-
-		skip := false
-		for key, opt := range ScraperOptions {
-			if opt.Busy() {
-				v.Set("msg", "Cannot reload everything while "+key+" is refreshing")
-				skip = true
-				break
-			}
-		}
-
-		if !skip && reboot == "scrapers" {
-			go loadScrapers()
-		}
-
-		if !skip {
-			go func() {
-				newbc := mtgban.NewClient()
-				for key, opt := range ScraperOptions {
-					if DevMode && !opt.DevEnabled {
-						continue
-					}
-
-					scraper, err := opt.Init(opt.Logger)
-					if err != nil {
-						msg := fmt.Sprintf("error initializing %s: %s", key, err.Error())
-						ServerNotify("init", msg, true)
-						return
-					}
-
-					if len(opt.Keepers) > 0 || len(opt.KeepersBL) > 0 {
-						if !opt.OnlyVendor {
-							if len(opt.Keepers) == 0 {
-								newbc.RegisterSeller(scraper)
-							}
-							for _, keeper := range opt.Keepers {
-								newbc.RegisterMarket(scraper.(mtgban.Market), keeper)
-							}
-						}
-						if !opt.OnlySeller {
-							if len(opt.KeepersBL) == 0 {
-								newbc.RegisterVendor(scraper)
-							}
-							for _, keeper := range opt.KeepersBL {
-								newbc.RegisterTrader(scraper.(mtgban.Trader), keeper)
-								ScraperMap[keeper] = key
-								ScraperNames[keeper] = keeper
-							}
-						}
-					} else if opt.OnlySeller {
-						newbc.RegisterSeller(scraper)
-					} else if opt.OnlyVendor {
-						newbc.RegisterVendor(scraper)
-					} else {
-						newbc.Register(scraper)
-					}
-				}
-				if reboot == "sellers" {
-					loadSellers(newbc)
-				} else if reboot == "vendors" {
-					loadVendors(newbc)
-				}
-			}()
 		}
 
 	case "server":
@@ -813,73 +701,6 @@ func build() (string, error) {
 	}
 
 	return "", errors.New(out.String())
-}
-
-const fifteenDays = 15 * 24 * time.Hour
-
-// Delete cache of inventory and buylist files older than 15 days
-func deleteOldCache() {
-	var size int64
-
-	log.Println("Wiping cache")
-	for _, directory := range []string{"cache_inv/", "cache_bl/"} {
-		directory += strings.TrimSuffix(Config.Game, "magic")
-		// Open the directory and read all its files.
-		dirRead, err := os.Open(directory)
-		if err != nil {
-			continue
-		}
-		defer dirRead.Close()
-
-		dirFiles, err := dirRead.Readdir(0)
-		if err != nil {
-			continue
-		}
-
-		for _, subdir := range dirFiles {
-			if time.Since(subdir.ModTime()) < fifteenDays {
-				continue
-			}
-
-			// Read and list subdirectories
-			subPath := path.Join(directory, subdir.Name())
-			subDirRead, err := os.Open(subPath)
-			if err != nil {
-				continue
-			}
-			defer subDirRead.Close()
-
-			subDirFiles, err := subDirRead.Readdir(0)
-			if err != nil {
-				continue
-			}
-
-			// Loop over the directory's files and remove them
-			for _, files := range subDirFiles {
-				fullPath := path.Join(directory, subdir.Name(), files.Name())
-
-				// Skip deleting if there is a reference
-				storeTagExt := filepath.Base(fullPath)
-				storeBaseName := strings.Replace(storeTagExt, ".json", "-latest.json", 1)
-				link, err := os.Readlink(path.Join(directory, storeBaseName))
-				if err != nil {
-					continue
-				}
-				if link == fullPath {
-					continue
-				}
-
-				log.Println("Deleting", fullPath)
-				os.Remove(fullPath)
-				size += files.Size()
-			}
-
-			// Remove containing directory (if empty)
-			log.Println("Deleting", subPath)
-			os.Remove(subPath)
-		}
-	}
-	log.Printf("Cache is wiped, %dkb freed", size/1024)
 }
 
 // Custom time.Duration format to print days as well

@@ -702,9 +702,6 @@ func main() {
 			}
 		})
 
-		// Slean up the csv cache every 3 days
-		c.AddFunc("0 0 */3 * *", deleteOldCache)
-
 		c.Start()
 	}()
 
