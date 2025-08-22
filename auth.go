@@ -46,6 +46,17 @@ const (
 	ErrMsgUseAPI  = "Slow down, you're making too many requests! For heavy data use consider the BAN API"
 )
 
+type PatreonConfig struct {
+	Client map[string]string `json:"client"`
+	Secret map[string]string `json:"secret"`
+	Grants []struct {
+		Category string `json:"category"`
+		Email    string `json:"email"`
+		Name     string `json:"name"`
+		Tier     string `json:"tier"`
+	} `json:"grants"`
+}
+
 func getUserToken(code, baseURL, ref string) (string, error) {
 	source := "ban"
 
