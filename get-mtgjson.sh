@@ -10,14 +10,3 @@ then
 fi
 
 rm AllPrintings.json.xz
-
-curl -O "https://mtgjson.com/api/v5/TcgplayerSkus.json.xz"
-
-xz -dc TcgplayerSkus.json.xz | jq > /tmp/tcgskus.json.new
-
-if [[ $? == 0 ]]
-then
-    mv /tmp/tcgskus.json.new ./tcgskus.json
-fi
-
-rm TcgplayerSkus.json.xz

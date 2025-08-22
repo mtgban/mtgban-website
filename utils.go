@@ -90,14 +90,6 @@ func fileExists(filename string) bool {
 	return !fi.IsDir()
 }
 
-func mkDirIfNotExisting(dirName string) error {
-	_, err := os.Stat(dirName)
-	if errors.Is(err, os.ErrNotExist) {
-		err = os.MkdirAll(dirName, 0700)
-	}
-	return err
-}
-
 func keyruneForCardSet(cardId string) string {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {

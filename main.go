@@ -338,7 +338,6 @@ type ConfigType struct {
 	ScraperConfig          ScraperConfig     `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig  `json:"timeseries_config"`
 	DBAddress              string            `json:"db_address"`
-	RedisAddr              string            `json:"redis_addr"`
 	DiscordHook            string            `json:"discord_hook"`
 	DiscordNotifHook       string            `json:"discord_notif_hook"`
 	DiscordInviteLink      string            `json:"discord_invite_link"`
@@ -366,21 +365,16 @@ type ConfigType struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
-	// Enable parallel loading during bootstrap
-	FastStart bool `json:"fast_start"`
-
 	/* The location of the configuation file */
 	filePath string
 }
 
 var DevMode bool
 var SigCheck bool
-var SkipInitialRefresh bool
 var SkipPrices bool
 var BenchMode bool
 var LogDir string
-var LastUpdate string
-var DatabaseLoaded bool
+
 var Sellers []mtgban.Seller
 var Vendors []mtgban.Vendor
 
@@ -460,7 +454,6 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars := PageVars{
 		Title:        "BAN " + activeTab,
 		ErrorMessage: msg,
-		LastUpdate:   LastUpdate,
 
 		PatreonIds:   Config.Patreon.Client,
 		PatreonURL:   PatreonHost,
@@ -569,9 +562,6 @@ func loadVars(cfg, port, datastore string) error {
 		os.Setenv("BAN_SECRET", DefaultSecret)
 	}
 
-	InventoryDir = path.Join("cache_inv", Config.Game)
-	BuylistDir = path.Join("cache_bl", Config.Game)
-
 	if Config.Game == "" {
 		Config.Game = "magic"
 	}
@@ -617,13 +607,6 @@ func loadDatastore() error {
 		return err
 	}
 
-	if Config.Game == "magic" {
-		SKUMap, err = loadSkuMap(Config.Api["tcg_skus_path"])
-		if err != nil {
-			return err
-		}
-	}
-
 	go updateStaticData()
 	ServerNotify("init", "Datastore installed")
 
@@ -637,18 +620,15 @@ func main() {
 
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
-	skipInitialRefresh := flag.Bool("skip", true, "Skip initial refresh")
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 
 	flag.Parse()
 
 	// Initial state
-	SkipInitialRefresh = false
 	SigCheck = true
 	if DevMode {
 		SigCheck = *sigCheck
-		SkipInitialRefresh = *skipInitialRefresh
 	}
 
 	// load necessary environmental variables

@@ -606,6 +606,4 @@ func updateStaticData() {
 			go prepareCKAPI()
 		}
 	}
-
-	LastUpdate = time.Now().Format(time.RFC3339)
 }
