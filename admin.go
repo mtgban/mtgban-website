@@ -88,39 +88,29 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.SelectableField = true
 	}
 
-	refreshNew := r.FormValue("refresh_new")
-	if refreshNew != "" {
-		key, found := ScraperMap[refreshNew]
-		if !found {
-			pageVars.InfoMessage = refreshNew + " not found"
+	refresh := r.FormValue("refresh")
+	if refresh != "" {
+		v := url.Values{}
+		v.Set("msg", "Scheduling a refresh for "+refresh+" in the background...")
+		err := sendGithubAction(refresh)
+		if err != nil {
+			v.Set("msg", "refresh of "+refresh+" error: "+err.Error())
 		}
-		if key != "" {
-			_, found := ScraperOptions[key]
-			if !found {
-				pageVars.InfoMessage = key + " not found"
-			} else {
-				// Strip the request parameter to avoid accidental repeats
-				// and to give a chance to table to update
-				r.URL.RawQuery = ""
-				if ScraperOptions[key].Busy() {
-					v := url.Values{
-						"msg": {key + " is already being refreshed"},
-					}
-					r.URL.RawQuery = v.Encode()
-				} else {
-					err := sendGithubAction(key)
-					if err != nil {
-						v := url.Values{
-							"msg": {key + " error: " + err.Error()},
-						}
-						r.URL.RawQuery = v.Encode()
-					}
-				}
-
-				http.Redirect(w, r, r.URL.String(), http.StatusFound)
-				return
-			}
+		r.URL.RawQuery = v.Encode()
+		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		return
+	}
+	reload := r.FormValue("reload")
+	if reload != "" {
+		v := url.Values{}
+		v.Set("msg", reload+" reloaded")
+		err := loadScraper(Config.ScraperConfig.BucketPath, Config.Game, reload, r.FormValue("table"), r.FormValue("tag"), Config.ScraperConfig.BucketFileFormat)
+		if err != nil {
+			v.Set("msg", "reload of "+reload+" error: "+err.Error())
 		}
+		r.URL.RawQuery = v.Encode()
+		http.Redirect(w, r, r.URL.String(), http.StatusFound)
+		return
 	}
 
 	logs := r.FormValue("logs")
@@ -573,11 +563,6 @@ func queryGithubAction(key, state string) (int, error) {
 }
 
 func sendGithubAction(key string) error {
-	_, found := ScraperOptions[key]
-	if !found {
-		return errors.New("key not found")
-	}
-
 	busy, err := isBusyGithubAction(key)
 	if err != nil {
 		return err
