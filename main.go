@@ -141,7 +141,7 @@ type PageVars struct {
 
 	DisableChart bool
 	AxisLabels   []string
-	Datasets     []*Dataset
+	Datasets     []Dataset
 	ChartID      string
 	Alternative  string
 	StocksURL    string
@@ -336,6 +336,7 @@ type ConfigType struct {
 	DatastorePath          string            `json:"datastore_path"`
 	Game                   string            `json:"game"`
 	ScraperConfig          ScraperConfig     `json:"scraper_config"`
+	TimeseriesConfig       TimeseriesConfig  `json:"timeseries_config"`
 	DBAddress              string            `json:"db_address"`
 	RedisAddr              string            `json:"redis_addr"`
 	DiscordHook            string            `json:"discord_hook"`

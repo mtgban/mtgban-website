@@ -720,11 +720,6 @@ var ScraperMap map[string]string
 // Assiciate Scraper shorthands to Scraper Names
 var ScraperNames map[string]string
 
-// A default scale for converting non-NM prices to NM
-var defaultGradeMap = map[string]float64{
-	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
-}
-
 // Create log and ScraperMap
 func loadOptions() {
 	if ScraperMap == nil {

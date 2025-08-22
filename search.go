@@ -602,20 +602,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.AxisLabels = getDateAxisValues(chartId)
 		pageVars.ChartID = chartId
 
-		for _, config := range enabledDatasets {
-			if co.Sealed && !config.HasSealed {
-				continue
-			}
-			if !co.Sealed && config.OnlySealed {
-				continue
-			}
-			dataset, err := getDataset(chartId, pageVars.AxisLabels, config)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			pageVars.Datasets = append(pageVars.Datasets, dataset)
-		}
+		pageVars.Datasets = getDatasets(chartId, co.Sealed, pageVars.AxisLabels)
 		if len(pageVars.Datasets) == 0 {
 			pageVars.InfoMessage = "No chart data available"
 		}
