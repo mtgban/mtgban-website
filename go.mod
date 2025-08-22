@@ -5,11 +5,13 @@ go 1.24
 toolchain go1.24.5
 
 require (
+	github.com/Backblaze/blazer v0.7.2
 	github.com/BlueMonday/go-scryfall v0.9.0
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/bwmarrin/discordgo v0.27.1
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
+	github.com/dsnet/compress v0.0.1
 	github.com/extrame/xls v0.0.1
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.7.1
@@ -18,6 +20,7 @@ require (
 	github.com/mackerelio/go-osstat v0.2.4
 	github.com/mtgban/go-mtgban v0.5.35
 	github.com/redis/go-redis/v9 v9.12.1
+	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	github.com/xuri/excelize/v2 v2.8.0
 	golang.org/x/exp v0.0.0-20250808145144-a408d31f581a
 	golang.org/x/oauth2 v0.27.0

@@ -335,6 +335,7 @@ type ConfigType struct {
 	Port                   string            `json:"port"`
 	DatastorePath          string            `json:"datastore_path"`
 	Game                   string            `json:"game"`
+	ScraperConfig          ScraperConfig     `json:"scraper_config"`
 	DBAddress              string            `json:"db_address"`
 	RedisAddr              string            `json:"redis_addr"`
 	DiscordHook            string            `json:"discord_hook"`
