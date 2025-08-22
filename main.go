@@ -605,6 +605,30 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
+func loadDatastore() error {
+	allPrintingsReader, err := os.Open(Config.DatastorePath)
+	if err != nil {
+		return err
+	}
+	defer allPrintingsReader.Close()
+
+	err = mtgmatcher.LoadDatastore(allPrintingsReader)
+	if err != nil {
+		return err
+	}
+
+	if Config.Game == "magic" {
+		SKUMap, err = loadSkuMap(Config.Api["tcg_skus_path"])
+		if err != nil {
+			return err
+		}
+	}
+
+	go updateStaticData()
+
+	return nil
+}
+
 func main() {
 	flag.StringVar(&Config.filePath, "cfg", DefaultConfigPath, "Load configuration file")
 	port := flag.String("port", "", "Override server port")

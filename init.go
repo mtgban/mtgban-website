@@ -36,7 +36,6 @@ import (
 	"github.com/mtgban/go-mtgban/trollandtoad"
 
 	"github.com/mtgban/go-mtgban/mtgban"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 const (
@@ -67,30 +66,6 @@ const (
 
 var InventoryDir string
 var BuylistDir string
-
-func loadDatastore() error {
-	allPrintingsReader, err := os.Open(Config.DatastorePath)
-	if err != nil {
-		return err
-	}
-	defer allPrintingsReader.Close()
-
-	err = mtgmatcher.LoadDatastore(allPrintingsReader)
-	if err != nil {
-		return err
-	}
-
-	if Config.Game == "magic" {
-		SKUMap, err = loadSkuMap(Config.Api["tcg_skus_path"])
-		if err != nil {
-			return err
-		}
-	}
-
-	go updateStaticData()
-
-	return nil
-}
 
 func loadSkuMap(path string) (tcgplayer.SKUMap, error) {
 	file, err := os.Open(path)
