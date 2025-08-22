@@ -13,7 +13,6 @@ type Dataset struct {
 	Data   []string
 	Color  string
 	AxisID string
-	Hidden bool
 	Sealed bool
 }
 
@@ -22,7 +21,6 @@ type scraperConfig struct {
 	ScraperName string
 	KindName    string
 	Color       string
-	Hidden      bool
 	HasSealed   bool
 	OnlySealed  bool
 }
@@ -51,7 +49,6 @@ var enabledDatasets = []scraperConfig{
 		ScraperName: "tcg_index",
 		KindName:    "TCGMarket",
 		Color:       "rgb(255, 159, 64)",
-		Hidden:      true,
 	},
 	{
 		PublicName:  "Card Kingdom Retail",
@@ -79,7 +76,6 @@ var enabledDatasets = []scraperConfig{
 		ScraperName: "cardmarket",
 		KindName:    "MKMTrend",
 		Color:       "rgb(201, 203, 207)",
-		Hidden:      true,
 	},
 	{
 		PublicName:  "Star City Games Buylist",
@@ -151,10 +147,9 @@ func getDataset(cardId string, labels []string, config scraperConfig) (*Dataset,
 	}
 
 	return &Dataset{
-		Name:   config.PublicName,
-		Data:   data,
-		Color:  config.Color,
-		Hidden: config.Hidden,
+		Name:  config.PublicName,
+		Data:  data,
+		Color: config.Color,
 	}, nil
 }
 
