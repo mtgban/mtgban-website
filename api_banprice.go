@@ -760,27 +760,39 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			if slices.Contains(allScrapers, scraperKey) {
 				continue
 			}
-			// If this scraper doesn't have a name (usually due to dev) skip it
-			name, found := ScraperNames[scraperKey]
-			if !found {
-				continue
-			}
-
-			// Add to the arrays
-			allScraperNames = append(allScraperNames, name)
-			allScrapers = append(allScrapers, scraperKey)
 
 			// Determine whether scraper is an index and should appear regardless of conditions
 			for _, scraper := range Sellers {
-				if scraper != nil && scraper.Info().Shorthand == scraperKey && !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
+				if scraper == nil {
+					continue
+				}
+				if scraper.Info().Shorthand != scraperKey {
+					continue
+				}
+				if !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
 					isIndex = append(isIndex, scraperKey)
+				}
+				if !slices.Contains(allScraperNames, scraper.Info().Name) {
+					allScraperNames = append(allScraperNames, scraper.Info().Name)
 				}
 			}
 			for _, scraper := range Vendors {
-				if scraper != nil && scraper.Info().Shorthand == scraperKey && !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
+				if scraper == nil {
+					continue
+				}
+				if scraper.Info().Shorthand != scraperKey {
+					continue
+				}
+				if !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
 					isIndex = append(isIndex, scraperKey)
 				}
+				if !slices.Contains(allScraperNames, scraper.Info().Name) {
+					allScraperNames = append(allScraperNames, scraper.Info().Name)
+				}
 			}
+
+			// Add to the arrays
+			allScrapers = append(allScrapers, scraperKey)
 		}
 	}
 
