@@ -625,6 +625,7 @@ func loadDatastore() error {
 	}
 
 	go updateStaticData()
+	ServerNotify("init", "Datastore installed")
 
 	return nil
 }
@@ -685,30 +686,33 @@ func main() {
 
 	// load website up
 	go func() {
-		var err error
-
 		log.Println("Loading", Config.DatastorePath)
-		err = loadDatastore()
+		err := loadDatastore()
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
+	}()
 
-		loadScrapers()
-
+	if SkipPrices {
+		log.Println("no prices loaded as requested")
 		DatabaseLoaded = true
+	} else {
+		go func() {
+			log.Println("Loading", len(Config.ScraperConfig.Config), "Scrapers")
+			err := loadScrapersNG(Config.ScraperConfig)
+			if err != nil {
+				log.Fatalln("error loading scrapers:", err)
+			}
 
-		// Nothing else to do if hacking around
-		if DevMode {
-			return
-		}
+			DatabaseLoaded = true
+		}()
+	}
 
+	if !DevMode {
 		// Set up new refreshes as needed
 		c := cron.New()
 
 		// Times are in UTC
-
-		// Refresh everything daily at 2am (after MTGJSON update)
-		c.AddFunc("35 11 * * *", loadScrapers)
 
 		// MTGJSON builds go live 1-2pm EST, pull the update 30 minutes after
 		c.AddFunc("30 19 * * *", func() {
@@ -720,7 +724,7 @@ func main() {
 		})
 
 		c.Start()
-	}()
+	}
 
 	err = setupDiscord()
 	if err != nil {
