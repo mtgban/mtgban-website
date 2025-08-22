@@ -813,18 +813,11 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 					continue
 				}
 
-				icon := ""
+				icon := Config.ScraperConfig.Icons[seller.Info().Shorthand]
 				name := seller.Info().Name
-				switch name {
-				case TCG_MAIN:
-					name = "TCGplayer"
-				case TCG_DIRECT:
-					name = "TCGplayer Direct"
-					icon = "/img/misc/direct.png"
-				case CT_ZERO:
-					icon = "/img/misc/zero.png"
-				case CT_1DR:
-					icon = "/img/misc/1dr.png"
+				override, found := Config.ScraperConfig.NameOverride[seller.Info().Name]
+				if found {
+					name = override
 				}
 
 				// Prepare all the deets
@@ -903,13 +896,11 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 					conditions = "INDEX"
 				}
 
-				icon := ""
+				icon := Config.ScraperConfig.Icons[vendor.Info().Shorthand]
 				name := vendor.Info().Name
-				switch name {
-				case TCG_DIRECT_NET:
-					icon = "/img/misc/direct.png"
-				case "Sealed EV Scraper":
-					name = "CK Buylist for Singles"
+				override, found := Config.ScraperConfig.NameOverride[vendor.Info().Name]
+				if found {
+					name = override
 				}
 
 				res := SearchEntry{

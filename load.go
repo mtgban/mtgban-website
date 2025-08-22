@@ -28,6 +28,9 @@ type ScraperConfig struct {
 	BucketFileFormat string `json:"bucket_file_format"`
 
 	Config map[string]map[string][]string `json:"config"`
+
+	Icons        map[string]string `json:"icons"`
+	NameOverride map[string]string `json:"name_override"`
 }
 
 func loadScrapersNG(config ScraperConfig) error {
