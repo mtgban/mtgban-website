@@ -170,12 +170,6 @@
                     </form>
                 </li>
                 <li>
-                    API Demo Key
-                    <form>
-                        <input value="{{.DemoKey}}" onClick="this.setSelectionRange(0, this.value.length)" class="input-css">
-                    </form>
-                </li>
-                <li>
                     Generate New Key
                     <form>
                         <input type="hidden" name="reboot" value="newKey"/>
@@ -188,6 +182,17 @@
                                 <option value="183">Half year</option>
                                 <option value="365">One year</option>
                         </select>
+                    </form>
+                </li>
+                <li>
+                    API Demo Key
+                    <form {{if not .DemoKey}}action="admin" method="GET"{{end}}>
+                        {{if .DemoKey}}
+                            <input value="{{.DemoKey}}" onClick="this.setSelectionRange(0, this.value.length)" class="input-css">
+                        {{else}}
+                            <input type="hidden" name="reboot" value="demokey"/>
+                            <input type="submit" value="&nbsp;&nbsp;Click to get a Demo API Key&nbsp;&nbsp;"/>
+                        {{end}}
                     </form>
                 </li>
             </ul>

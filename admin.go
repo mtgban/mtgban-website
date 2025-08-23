@@ -346,6 +346,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			os.Exit(0)
 		}()
 
+	case "demokey":
+		key, err := generateAPIKey(getBaseURL(r), DefaultAPIDemoUser, DefaultAPIDemoKeyDuration)
+		if err != nil {
+			log.Println(err)
+			pageVars.InfoMessage = err.Error()
+			break
+		}
+		pageVars.DemoKey = url.QueryEscape(key)
+
+		log.Println(pageVars.DemoKey)
+
 	case "newKey":
 		v = url.Values{}
 		doReboot = true
@@ -633,7 +644,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.MemoryStatus = mem()
 	pageVars.LatestHash = BuildCommit
 	pageVars.CurrentTime = time.Now()
-	pageVars.DemoKey = url.QueryEscape(getDemoKey(getBaseURL(r)))
 
 	render(w, "admin.html", pageVars)
 }
@@ -895,11 +905,6 @@ const (
 	DefaultAPIDemoUser        = "demo@mtgban.com"
 )
 
-func getDemoKey(link string) string {
-	key, _ := generateAPIKey(link, DefaultAPIDemoUser, DefaultAPIDemoKeyDuration)
-	return key
-}
-
 var apiUsersMutex sync.RWMutex
 
 func writeConfigFile(config ConfigType, writer io.Writer) error {
@@ -921,10 +926,12 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 
 	if !found {
 		key = randomString(15)
-		apiUsersMutex.Lock()
+
 		if Config.ApiUserSecrets == nil {
 			return "", errors.New("config not loaded")
 		}
+
+		apiUsersMutex.Lock()
 		Config.ApiUserSecrets[user] = key
 		apiUsersMutex.Unlock()
 
