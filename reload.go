@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -59,7 +60,7 @@ func reload(name string) {
 		ServerNotify("refresh", msg, true)
 		return
 	}
-	if scraper.Info().Game != Config.Game {
+	if strings.ToLower(scraper.Info().Game) != strings.ToLower(strings.TrimSuffix(Config.Game, "magic")) {
 		return
 	}
 

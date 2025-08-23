@@ -466,7 +466,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		Hash:         BuildCommit,
 	}
 
-	if Config.Game != "magic" {
+	if Config.Game != "magic" && Config.Game != "" {
 		// Append which game this site is for
 		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
 

@@ -813,7 +813,7 @@ func deleteOldCache() {
 
 	log.Println("Wiping cache")
 	for _, directory := range []string{"cache_inv/", "cache_bl/"} {
-		directory += Config.Game
+		directory += strings.TrimSuffix(Config.Game, "magic")
 		// Open the directory and read all its files.
 		dirRead, err := os.Open(directory)
 		if err != nil {

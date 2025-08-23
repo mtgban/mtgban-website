@@ -759,7 +759,7 @@ func loadOptions() {
 		if err != nil {
 			continue
 		}
-		if strings.ToLower(scraper.Info().Game) != strings.ToLower(Config.Game) {
+		if strings.ToLower(scraper.Info().Game) != strings.ToLower(strings.TrimSuffix(Config.Game, "magic")) {
 			continue
 		}
 
@@ -820,7 +820,7 @@ func loadScrapers() {
 			ServerNotify("init", msg, true)
 			continue
 		}
-		if strings.ToLower(scraper.Info().Game) != strings.ToLower(Config.Game) {
+		if strings.ToLower(scraper.Info().Game) != strings.ToLower(strings.TrimSuffix(Config.Game, "magic")) {
 			continue
 		}
 
