@@ -80,9 +80,11 @@ func loadDatastore() error {
 		return err
 	}
 
-	SKUMap, err = loadSkuMap(Config.Api["tcg_skus_path"])
-	if err != nil {
-		return err
+	if Config.Game == "" {
+		SKUMap, err = loadSkuMap(Config.Api["tcg_skus_path"])
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
