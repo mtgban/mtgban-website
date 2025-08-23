@@ -865,3 +865,33 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Path
+	name = strings.TrimPrefix(name, "/api/load/")
+
+	if GetParamFromSig(r.FormValue("sig"), "API") != name {
+		w.Write([]byte(`{"error": "not found"}`))
+		return
+	}
+
+	config := Config.ScraperConfig
+	scrapersConfig, found := config.Config[name]
+	if !found {
+		w.Write([]byte(`{"error": "not found"}`))
+		return
+	}
+
+	for kind, list := range scrapersConfig {
+		for _, shorthand := range list {
+			err := loadScraper(config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+		}
+	}
+
+	ServerNotify("reload", "Server reloaded "+name)
+	w.Write([]byte(`{"status": "ok"}`))
+}

@@ -425,7 +425,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 		sig := r.FormValue("sig")
 
 		// If signature is empty let it pass through
-		if sig == "" {
+		if sig == "" && !strings.HasPrefix(r.URL.Path, "/api/load") {
 			gziphandler.GzipHandler(next).ServeHTTP(w, r)
 			return
 		}
