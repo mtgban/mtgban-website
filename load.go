@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/Backblaze/blazer/b2"
@@ -194,6 +195,15 @@ func updateSellerAtPosition(seller mtgban.Seller, i int) error {
 	// Save seller in global array
 	if i < 0 {
 		Sellers = append(Sellers, seller)
+
+		// Keep slices sorted
+		slices.SortFunc(Sellers, func(a, b mtgban.Seller) int {
+			ret := strings.Compare(a.Info().Name, b.Info().Name)
+			if ret == 0 {
+				ret = strings.Compare(a.Info().Shorthand, b.Info().Shorthand)
+			}
+			return ret
+		})
 		return nil
 	}
 
@@ -246,6 +256,15 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int) error {
 	// Save vendor in global array
 	if i < 0 {
 		Vendors = append(Vendors, vendor)
+
+		// Keep slices sorted
+		slices.SortFunc(Vendors, func(a, b mtgban.Vendor) int {
+			ret := strings.Compare(a.Info().Name, b.Info().Name)
+			if ret == 0 {
+				ret = strings.Compare(a.Info().Shorthand, b.Info().Shorthand)
+			}
+			return ret
+		})
 		return nil
 	}
 
