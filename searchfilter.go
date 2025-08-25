@@ -1754,10 +1754,6 @@ var FilterStoreFuncs = map[string]func(filters []string, scraper mtgban.Scraper,
 }
 
 func shouldSkipStoreNG(scraper mtgban.Scraper, filters []FilterStoreElem) bool {
-	if scraper == nil {
-		return true
-	}
-
 	_, isSeller := scraper.(mtgban.Seller)
 	_, isVendor := scraper.(mtgban.Vendor)
 

@@ -743,9 +743,6 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 
 			// Determine whether scraper is an index and should appear regardless of conditions
 			for _, scraper := range Sellers {
-				if scraper == nil {
-					continue
-				}
 				if scraper.Info().Shorthand != scraperKey {
 					continue
 				}
@@ -757,9 +754,6 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 				}
 			}
 			for _, scraper := range Vendors {
-				if scraper == nil {
-					continue
-				}
 				if scraper.Info().Shorthand != scraperKey {
 					continue
 				}
