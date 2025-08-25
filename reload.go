@@ -3,9 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
-	"path"
 	"strings"
-	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -118,20 +116,12 @@ func updateSellers(scraper mtgban.Scraper) {
 	if err != nil {
 		msg := fmt.Sprintf("seller %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
 		ServerNotify("refresh", msg, true)
-	} else {
-		msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
-		ServerNotify("refresh", msg)
-
-		currentDir := path.Join(InventoryDir, fmt.Sprintf("%03d", time.Now().YearDay()))
-		mkDirIfNotExisting(currentDir)
-
-		fname := path.Join(InventoryDir, scraper.Info().Shorthand+"-latest.json")
-		err = dumpInventoryToFile(scraper.(mtgban.Seller), currentDir, fname)
-		if err != nil {
-			msg := fmt.Sprintf("%s seller dump failed: %s", scraper.Info().Shorthand, err.Error())
-			ServerNotify("refresh", msg, true)
-		}
+		return
 	}
+
+	msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
+	ServerNotify("refresh", msg)
+
 	return
 }
 
@@ -192,20 +182,12 @@ func updateVendors(scraper mtgban.Scraper) {
 	if err != nil {
 		msg := fmt.Sprintf("vendor %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
 		ServerNotify("refresh", msg, true)
-	} else {
-		msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
-		ServerNotify("refresh", msg)
-
-		currentDir := path.Join(BuylistDir, fmt.Sprintf("%03d", time.Now().YearDay()))
-		mkDirIfNotExisting(currentDir)
-
-		fname := path.Join(BuylistDir, scraper.Info().Shorthand+"-latest.json")
-		err = dumpBuylistToFile(scraper.(mtgban.Vendor), currentDir, fname)
-		if err != nil {
-			msg := fmt.Sprintf("%s buylist dump failed: %s", scraper.Info().Shorthand, err.Error())
-			ServerNotify("refresh", msg, true)
-		}
+		return
 	}
+
+	msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
+	ServerNotify("refresh", msg)
+
 	return
 }
 
