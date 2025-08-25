@@ -181,7 +181,18 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 			output = filtered
 		}
 
+		// Keep sorted
 		sort.Strings(output)
+
+		// See if the user requested names instead (preserving order above)
+		tagName := r.FormValue("tag")
+		if tagName == "names" {
+			var filtered []string
+			for _, tag := range output {
+				filtered = append(filtered, scraperName(tag))
+			}
+			output = filtered
+		}
 
 		if strings.HasSuffix(urlPath, ".json") {
 			json.NewEncoder(w).Encode(&output)
