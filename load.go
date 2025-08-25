@@ -215,16 +215,7 @@ func updateSellerAtPosition(seller mtgban.Seller, i int) error {
 		return errors.New("new inventory is missing too many entries")
 	}
 
-	// Make sure the input seller is _only_ a Seller and not anything
-	// else, so that filtering works like expected
-	outSeller := mtgban.NewSellerFromInventory(inv, seller.Info())
-
-	// Save seller in global array
-	if i < 0 {
-		Sellers = append(Sellers, outSeller)
-	} else {
-		Sellers[i] = outSeller
-	}
+	Sellers[i] = seller
 
 	return nil
 }
@@ -276,16 +267,7 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int) error {
 		return errors.New("new buylist is missing too many entries")
 	}
 
-	// Save vendor in global array, making sure it's _only_ a Vendor
-	// and not anything esle, so that filtering works like expected
-	outVendor := mtgban.NewVendorFromBuylist(bl, vendor.Info())
-
-	// Save vendor in global array
-	if i < 0 {
-		Vendors = append(Vendors, outVendor)
-	} else {
-		Vendors[i] = outVendor
-	}
+	Vendors[i] = vendor
 
 	return nil
 }
