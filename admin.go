@@ -432,7 +432,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			sellerTable = append(sellerTable, row)
 		}
 		pageVars.Headers = append(pageVars.Headers, []string{
-			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
+			"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status",
 		})
 		pageVars.Tables = append(pageVars.Tables, sellerTable)
 
@@ -496,7 +496,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			vendorTable = append(vendorTable, row)
 		}
 		pageVars.Headers = append(pageVars.Headers, []string{
-			"", "Name", "Id+Logs", "Tag", "Last Update", "Entries", "Ref", "Status",
+			"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status",
 		})
 		pageVars.Tables = append(pageVars.Tables, vendorTable)
 
