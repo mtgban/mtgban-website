@@ -810,17 +810,11 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		},
 		"scraper_name": func(s string) string {
 			for _, seller := range Sellers {
-				if seller == nil {
-					continue
-				}
 				if s == seller.Info().Shorthand {
 					return seller.Info().Name
 				}
 			}
 			for _, vendor := range Vendors {
-				if vendor == nil {
-					continue
-				}
 				if s == vendor.Info().Shorthand {
 					return vendor.Info().Name
 				}

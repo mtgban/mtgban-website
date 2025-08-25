@@ -171,7 +171,7 @@ func loadData(pathOpt string) (io.ReadCloser, error) {
 func updateSellers(scraper mtgban.Scraper) {
 	sellerIndex := -1
 	for i, seller := range Sellers {
-		if seller != nil && seller.Info().Shorthand == scraper.Info().Shorthand {
+		if seller.Info().Shorthand == scraper.Info().Shorthand {
 			sellerIndex = i
 			break
 		}
@@ -223,7 +223,7 @@ func updateSellerAtPosition(seller mtgban.Seller, i int) error {
 func updateVendors(scraper mtgban.Scraper) {
 	vendorIndex := -1
 	for i, vendor := range Vendors {
-		if vendor != nil && vendor.Info().Shorthand == scraper.Info().Shorthand {
+		if vendor.Info().Shorthand == scraper.Info().Shorthand {
 			vendorIndex = i
 			break
 		}

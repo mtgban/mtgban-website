@@ -203,9 +203,6 @@ const (
 // Look up a seller and return its inventory
 func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
 	for _, seller := range Sellers {
-		if seller == nil {
-			continue
-		}
 		if strings.ToLower(seller.Info().Shorthand) == strings.ToLower(shorthand) {
 			return seller.Inventory()
 		}
@@ -216,9 +213,6 @@ func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
 // Look up a vendor and return its buylist
 func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 	for _, vendor := range Vendors {
-		if vendor == nil {
-			continue
-		}
 		if strings.ToLower(vendor.Info().Shorthand) == strings.ToLower(shorthand) {
 			return vendor.Buylist()
 		}
@@ -229,9 +223,6 @@ func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 // Look up a seller with its name and return its inventory
 func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord, error) {
 	for _, seller := range Sellers {
-		if seller == nil {
-			continue
-		}
 		if seller.Info().SealedMode == sealed && strings.ToLower(seller.Info().Name) == strings.ToLower(name) {
 			return seller.Inventory()
 		}
@@ -242,9 +233,6 @@ func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord
 // Look up a vendor with its name and return its inventory
 func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, error) {
 	for _, vendor := range Vendors {
-		if vendor == nil {
-			continue
-		}
 		if vendor.Info().SealedMode == sealed && strings.ToLower(vendor.Info().Name) == strings.ToLower(name) {
 			return vendor.Buylist()
 		}

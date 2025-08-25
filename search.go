@@ -133,8 +133,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Title = "Options"
 
 		for _, seller := range Sellers {
-			if seller == nil ||
-				slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+			if slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 				continue
 			}
 
@@ -142,8 +141,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, vendor := range Vendors {
-			if vendor == nil ||
-				slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
+			if slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
 				continue
 			}
 

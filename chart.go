@@ -138,9 +138,6 @@ func stashInTimeseries() {
 	ServerNotify("timeseries", "Taking snapshot...")
 
 	for _, seller := range Sellers {
-		if seller == nil {
-			continue
-		}
 		for _, config := range Config.TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Retail, seller.Info().Shorthand) {
 				continue
@@ -176,9 +173,6 @@ func stashInTimeseries() {
 	}
 
 	for _, vendor := range Vendors {
-		if vendor == nil {
-			continue
-		}
 		for _, config := range Config.TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Buylist, vendor.Info().Shorthand) {
 				continue

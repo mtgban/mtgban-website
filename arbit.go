@@ -340,7 +340,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	if allowlistSellersOpt == "ALL" || (DevMode && !SigCheck) {
 		for _, seller := range Sellers {
-			if seller == nil || seller.Info().MetadataOnly {
+			if seller.Info().MetadataOnly {
 				continue
 			}
 			allowlistSellers = append(allowlistSellers, seller.Info().Shorthand)
@@ -371,14 +371,14 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 		var vendorKeys []string
 		if reverse {
 			for _, seller := range Sellers {
-				if seller == nil || slices.Contains(blocklistVendors, seller.Info().Shorthand) {
+				if slices.Contains(blocklistVendors, seller.Info().Shorthand) {
 					continue
 				}
 				vendorKeys = append(vendorKeys, seller.Info().Shorthand)
 			}
 		} else {
 			for _, vendor := range Vendors {
-				if vendor == nil || slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
+				if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
 					continue
 				}
 				vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
@@ -432,9 +432,6 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	// The "menu" section, the reference
 	var allowlistSellers []string
 	for _, seller := range Sellers {
-		if seller == nil {
-			continue
-		}
 		if anyEnabled {
 			// This is the list of allowed global sellers, minus the ones blocked from search
 			if slices.Contains(Config.GlobalAllowList, seller.Info().Shorthand) {
@@ -455,9 +452,6 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	// The "Jump to" section, the probe
 	var blocklistVendors []string
 	for _, seller := range Sellers {
-		if seller == nil {
-			continue
-		}
 		if slices.Contains(Config.GlobalProbeList, seller.Info().Shorthand) {
 			continue
 		}
@@ -473,7 +467,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 		// Load all available vendors
 		var vendorKeys []string
 		for _, vendor := range Vendors {
-			if vendor == nil || slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
+			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
 				continue
 			}
 			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
@@ -536,9 +530,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 				}
 
 				for _, vendor := range Vendors {
-					if vendor == nil {
-						continue
-					}
 					if vendor.Info().Shorthand == v[0] {
 						source = vendor
 						break
@@ -552,10 +543,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 				}
 
 				for _, seller := range Sellers {
-					if seller == nil {
-						continue
-					}
-
 					if seller.Info().Shorthand == v[0] {
 						source = seller
 						break
@@ -602,14 +589,14 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	var menuScrapers []mtgban.Scraper
 	if pageVars.ReverseMode {
 		for _, vendor := range Vendors {
-			if vendor == nil || slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
+			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
 				continue
 			}
 			menuScrapers = append(menuScrapers, vendor)
 		}
 	} else {
 		for _, seller := range Sellers {
-			if seller == nil || !slices.Contains(allowlistSellers, seller.Info().Shorthand) {
+			if !slices.Contains(allowlistSellers, seller.Info().Shorthand) {
 				continue
 			}
 			menuScrapers = append(menuScrapers, seller)
@@ -744,10 +731,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {
 		for _, seller := range Sellers {
-			if seller == nil {
-				continue
-			}
-
 			// Skip unactionable sellers
 			if seller.Info().SealedMode && seller.Info().MetadataOnly {
 				continue
@@ -762,7 +745,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 	} else {
 		for _, vendor := range Vendors {
-			if vendor == nil || source.Info().SealedMode != vendor.Info().SealedMode {
+			if source.Info().SealedMode != vendor.Info().SealedMode {
 				continue
 			}
 

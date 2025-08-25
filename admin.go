@@ -352,15 +352,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		var sellerTable [][]string
-		for i, seller := range Sellers {
-			if seller == nil {
-				row := []string{
-					fmt.Sprintf("Error at Seller %d", i), "", "", "", "", "",
-				}
-				sellerTable = append(sellerTable, row)
-				continue
-			}
-
+		for _, seller := range Sellers {
 			key := "UNKNOWN"
 			for name, scrapersConfig := range Config.ScraperConfig.Config {
 				if slices.Contains(scrapersConfig["retail"], seller.Info().Shorthand) {
@@ -412,15 +404,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.Tables = append(pageVars.Tables, sellerTable)
 
 		var vendorTable [][]string
-		for i, vendor := range Vendors {
-			if vendor == nil {
-				row := []string{
-					fmt.Sprintf("Error at Vendor %d", i), "", "", "", "", "",
-				}
-				vendorTable = append(vendorTable, row)
-				continue
-			}
-
+		for _, vendor := range Vendors {
 			key := "UNKNOWN"
 			for name, scrapersConfig := range Config.ScraperConfig.Config {
 				if slices.Contains(scrapersConfig["buylist"], vendor.Info().Shorthand) {

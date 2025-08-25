@@ -68,8 +68,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, seller := range Sellers {
-		if seller == nil ||
-			seller.Info().SealedMode ||
+		if seller.Info().SealedMode ||
 			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 			continue
 		}
@@ -97,8 +96,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 		var sellerKeys, vendorKeys []string
 		for _, seller := range Sellers {
-			if seller == nil ||
-				seller.Info().CountryFlag != "" ||
+			if seller.Info().CountryFlag != "" ||
 				seller.Info().SealedMode ||
 				seller.Info().MetadataOnly ||
 				slices.Contains(blocklistRetail, seller.Info().Shorthand) {
@@ -109,8 +107,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, vendor := range Vendors {
-			if vendor == nil ||
-				vendor.Info().CountryFlag != "" ||
+			if vendor.Info().CountryFlag != "" ||
 				vendor.Info().SealedMode ||
 				vendor.Info().MetadataOnly ||
 				slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
@@ -338,10 +335,6 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 	}
 
 	for _, seller := range Sellers {
-		if seller == nil {
-			continue
-		}
-
 		if seller.Info().MetadataOnly {
 			continue
 		}
@@ -358,9 +351,6 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 		}
 
 		for _, vendor := range Vendors {
-			if vendor == nil {
-				continue
-			}
 			if vendor.Info().Shorthand == seller.Info().Shorthand {
 				continue
 			}
@@ -410,8 +400,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 	var referenceSeller mtgban.Seller
 	var targetSeller mtgban.Seller
 	for _, seller := range Sellers {
-		if seller == nil ||
-			seller.Info().SealedMode ||
+		if seller.Info().SealedMode ||
 			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 			continue
 		}
