@@ -23,7 +23,6 @@ import (
 	"time"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
-	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"golang.org/x/exp/slices"
 
 	"github.com/mackerelio/go-osstat/memory"
@@ -139,28 +138,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	doReboot := false
 	var v url.Values
 	switch reboot {
-	case "mtgjson":
-		v = url.Values{}
-		v.Set("msg", "Reloading MTGJSON in the background...")
-		doReboot = true
-
-		go func() {
-			log.Println("Retrieving the latest version of mtgjson")
-			resp, err := cleanhttp.DefaultClient().Get(mtgjsonURL)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			defer resp.Body.Close()
-
-			log.Println("Loading the new mtgjson version")
-			err = mtgmatcher.LoadDatastore(resp.Body)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			log.Println("New mtgjson is ready")
-		}()
+	case "datastore":
+		loadDatastore()
+		pageVars.InfoMessage = "Datastore reloaded..."
 
 	case "update":
 		v = url.Values{}
