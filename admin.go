@@ -352,8 +352,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	default:
 		var sellerTable [][]string
-		for i := range Sellers {
-			if Sellers[i] == nil {
+		for i, seller := range Sellers {
+			if seller == nil {
 				row := []string{
 					fmt.Sprintf("Error at Seller %d", i), "", "", "", "", "",
 				}
@@ -363,15 +363,15 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 			key := "UNKNOWN"
 			for name, scrapersConfig := range Config.ScraperConfig.Config {
-				if slices.Contains(scrapersConfig["retail"], Sellers[i].Info().Shorthand) {
+				if slices.Contains(scrapersConfig["retail"], seller.Info().Shorthand) {
 					key = name
 					break
 				}
 			}
 
-			lastUpdate := Sellers[i].Info().InventoryTimestamp.Format(time.Stamp)
+			lastUpdate := seller.Info().InventoryTimestamp.Format(time.Stamp)
 
-			inv, _ := Sellers[i].Inventory()
+			inv, _ := seller.Inventory()
 
 			status := "✅"
 			if slices.Contains(gaScrapers, key) {
@@ -380,23 +380,23 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				status = "🔴"
 			}
 
-			name := Sellers[i].Info().Name
-			if Sellers[i].Info().SealedMode {
+			name := seller.Info().Name
+			if seller.Info().SealedMode {
 				name += " 📦"
 			}
-			if Sellers[i].Info().MetadataOnly {
+			if seller.Info().MetadataOnly {
 				name += " 🎯"
 			}
 
 			ref := ""
-			if slices.Contains(Config.AffiliatesList, Sellers[i].Info().Shorthand) ||
+			if slices.Contains(Config.AffiliatesList, seller.Info().Shorthand) ||
 				slices.Contains(Config.AffiliatesList, key) {
 				ref = "👍"
 			}
 
 			row := []string{
 				name,
-				Sellers[i].Info().Shorthand,
+				seller.Info().Shorthand,
 				key,
 				lastUpdate,
 				fmt.Sprint(len(inv)),
@@ -412,8 +412,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.Tables = append(pageVars.Tables, sellerTable)
 
 		var vendorTable [][]string
-		for i := range Vendors {
-			if Vendors[i] == nil {
+		for i, vendor := range Vendors {
+			if vendor == nil {
 				row := []string{
 					fmt.Sprintf("Error at Vendor %d", i), "", "", "", "", "",
 				}
@@ -423,15 +423,15 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 			key := "UNKNOWN"
 			for name, scrapersConfig := range Config.ScraperConfig.Config {
-				if slices.Contains(scrapersConfig["buylist"], Vendors[i].Info().Shorthand) {
+				if slices.Contains(scrapersConfig["buylist"], vendor.Info().Shorthand) {
 					key = name
 					break
 				}
 			}
 
-			lastUpdate := Vendors[i].Info().BuylistTimestamp.Format(time.Stamp)
+			lastUpdate := vendor.Info().BuylistTimestamp.Format(time.Stamp)
 
-			bl, _ := Vendors[i].Buylist()
+			bl, _ := vendor.Buylist()
 
 			status := "✅"
 			if slices.Contains(gaScrapers, key) {
@@ -440,23 +440,23 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				status = "🔴"
 			}
 
-			name := Vendors[i].Info().Name
-			if Vendors[i].Info().SealedMode {
+			name := vendor.Info().Name
+			if vendor.Info().SealedMode {
 				name += " 📦"
 			}
-			if Vendors[i].Info().MetadataOnly {
+			if vendor.Info().MetadataOnly {
 				name += " 🎯"
 			}
 
 			ref := ""
-			if slices.Contains(Config.AffiliatesBuylistList, Vendors[i].Info().Shorthand) ||
+			if slices.Contains(Config.AffiliatesBuylistList, vendor.Info().Shorthand) ||
 				slices.Contains(Config.AffiliatesBuylistList, key) {
 				ref = "👍"
 			}
 
 			row := []string{
 				name,
-				Vendors[i].Info().Shorthand,
+				vendor.Info().Shorthand,
 				key,
 				lastUpdate,
 				fmt.Sprint(len(bl)),
