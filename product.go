@@ -27,6 +27,28 @@ type EditionEntry struct {
 	Colors   []string
 }
 
+// Contains all the set value computations shown on sealed products
+var Infos map[string]mtgban.InventoryRecord
+
+// All editions containing sealed products
+var SealedEditionsSorted []string
+var SealedEditionsList map[string][]EditionEntry
+
+// All different editions
+var AllEditionsKeys []string
+var AllEditionsMap map[string]EditionEntry
+
+// Editions with parent sets
+var TreeEditionsKeys []string
+var TreeEditionsMap map[string][]EditionEntry
+
+// Long time no reprint data
+var ReprintsKeys []string
+var ReprintsMap map[string][]ReprintEntry
+
+// The number of editions, cards, and printings
+var TotalSets, TotalCards, TotalUnique int
+
 var categoryEdition = map[string]string{
 	"archenemy":        "Boxed Sets",
 	"arsenal":          "Commander Supplements",

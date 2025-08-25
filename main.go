@@ -28,7 +28,6 @@ import (
 	"gopkg.in/Iwark/spreadsheet.v2"
 	cron "gopkg.in/robfig/cron.v2"
 
-	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -209,8 +208,6 @@ type NavElem struct {
 	SubPages []string
 }
 
-var startTime = time.Now()
-
 var DefaultNav = []NavElem{
 	NavElem{
 		Name:  "Home",
@@ -374,23 +371,6 @@ var SigCheck bool
 var SkipPrices bool
 var BenchMode bool
 var LogDir string
-
-var Sellers []mtgban.Seller
-var Vendors []mtgban.Vendor
-
-// Contains all the set value computations shown on sealed products
-var Infos map[string]mtgban.InventoryRecord
-
-var SealedEditionsSorted []string
-var SealedEditionsList map[string][]EditionEntry
-var AllEditionsKeys []string
-var AllEditionsMap map[string]EditionEntry
-var TreeEditionsKeys []string
-var TreeEditionsMap map[string][]EditionEntry
-var ReprintsKeys []string
-var ReprintsMap map[string][]ReprintEntry
-
-var TotalSets, TotalCards, TotalUnique int
 
 var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB

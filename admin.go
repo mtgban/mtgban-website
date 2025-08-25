@@ -37,6 +37,9 @@ const (
 	gaStatusURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/runs?status="
 )
 
+// Time when server started
+var StartTime = time.Now()
+
 var BuildCommit = func() string {
 	if info, ok := debug.ReadBuildInfo(); ok {
 		for _, setting := range info.Settings {
@@ -681,7 +684,7 @@ func build() (string, error) {
 
 // Custom time.Duration format to print days as well
 func uptime() string {
-	since := time.Since(startTime)
+	since := time.Since(StartTime)
 	days := int(since.Hours() / 24)
 	hours := int(since.Hours()) % 24
 	minutes := int(since.Minutes()) % 60

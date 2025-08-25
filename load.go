@@ -22,6 +22,12 @@ import (
 
 var B2Bucket *b2.Bucket
 
+// Slice containing all the loaded retail data
+var Sellers []mtgban.Seller
+
+// Slice containing all the loaded buylist data
+var Vendors []mtgban.Vendor
+
 type ScraperConfig struct {
 	BucketAccessKey  string `json:"bucket_access_key"`
 	BucketSecretKey  string `json:"bucket_access_secret"`
