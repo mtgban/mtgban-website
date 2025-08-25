@@ -191,6 +191,11 @@ func updateSellerAtPosition(seller mtgban.Seller, i int) error {
 		return nil
 	}
 
+	// Check timestamp
+	if seller.Info().InventoryTimestamp.Before(*Sellers[i].Info().InventoryTimestamp) {
+		return errors.New("new inventory is older than current one")
+	}
+
 	// Load inventory
 	inv, err := seller.Inventory()
 	if err != nil {
@@ -245,6 +250,11 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int) error {
 	if i < 0 {
 		Vendors = append(Vendors, vendor)
 		return nil
+	}
+
+	// Check timestamp
+	if vendor.Info().BuylistTimestamp.Before(*Vendors[i].Info().BuylistTimestamp) {
+		return errors.New("new buylist is older than current one")
 	}
 
 	// Load buylist
