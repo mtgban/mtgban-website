@@ -749,9 +749,6 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 				if !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
 					isIndex = append(isIndex, scraperKey)
 				}
-				if !slices.Contains(allScraperNames, scraper.Info().Name) {
-					allScraperNames = append(allScraperNames, scraper.Info().Name)
-				}
 			}
 			for _, scraper := range Vendors {
 				if scraper.Info().Shorthand != scraperKey {
@@ -760,13 +757,11 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 				if !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
 					isIndex = append(isIndex, scraperKey)
 				}
-				if !slices.Contains(allScraperNames, scraper.Info().Name) {
-					allScraperNames = append(allScraperNames, scraper.Info().Name)
-				}
 			}
 
 			// Add to the arrays
 			allScrapers = append(allScrapers, scraperKey)
+			allScraperNames = append(allScraperNames, scraperName(scraperKey))
 		}
 	}
 

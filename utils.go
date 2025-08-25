@@ -770,3 +770,18 @@ func getTCGSimulationIQR(productId string) float64 {
 	}
 	return entries[0].ExtraValues["iqr"]
 }
+
+// Return the full display name displayed from the input shorthand
+func scraperName(shorthand string) string {
+	for _, seller := range Sellers {
+		if shorthand == seller.Info().Shorthand {
+			return seller.Info().Name
+		}
+	}
+	for _, vendor := range Vendors {
+		if shorthand == vendor.Info().Shorthand {
+			return vendor.Info().Name
+		}
+	}
+	return ""
+}
