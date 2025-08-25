@@ -369,7 +369,6 @@ type ConfigType struct {
 var DevMode bool
 var SigCheck bool
 var SkipPrices bool
-var BenchMode bool
 var LogDir string
 
 var Newspaper3dayDB *sql.DB

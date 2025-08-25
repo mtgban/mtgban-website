@@ -14,21 +14,29 @@ var EditionToBeFound string
 var NumberToBeFound string
 
 func TestMain(m *testing.M) {
-	InventoryDir = "cache_inv"
-	BuylistDir = "cache_bl"
 	LogDir = "logs"
 	Config.DatastorePath = "allprintings5.json"
+	Config.Game = "magic"
 
 	err := loadDatastore()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	DevMode = true
-	BenchMode = true
+	Config.ScraperConfig.BucketAccessKey = os.Getenv("B2_KEY_ID")
+	Config.ScraperConfig.BucketSecretKey = os.Getenv("B2_APP_KEY")
+	Config.ScraperConfig.BucketPath = os.Getenv("PATH_DATA")
+	Config.ScraperConfig.BucketFileFormat = os.Getenv("PATH_SUFFIX")
+	Config.ScraperConfig.Config = map[string]map[string][]string{
+		"cardkingdom": {
+			"retail": {"CK"},
+		},
+	}
 
-	loadScrapers()
-	DatabaseLoaded = true
+	err = loadScrapersNG(Config.ScraperConfig)
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	uuid := randomUUID(false)
 	co, err := mtgmatcher.GetUUID(uuid)
