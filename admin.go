@@ -552,7 +552,7 @@ func isBusyGithubAction(key string) (bool, error) {
 }
 
 func queryGithubAction(key, state string) (int, error) {
-	url := fmt.Sprintf(workflowURL + "bantool-" + strings.Replace(key, "_", "-", -1) + ".yml/runs?status=" + state)
+	url := workflowURL + "bantool-" + strings.Replace(key, "_", "-", -1) + ".yml/runs?status=" + state
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
