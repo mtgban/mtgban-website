@@ -957,7 +957,7 @@ func loadSellers(newbc *mtgban.BanClient) {
 					time.Since(*Sellers[sellerIndex].Info().InventoryTimestamp) > SkipRefreshCooldown {
 					ServerNotify("reload", "Loading from seller "+shorthand)
 					start := time.Now()
-					err := updateSellerAtPosition(newSellers[i], sellerIndex, true)
+					err := updateSellerAtPosition(newSellers[i], sellerIndex)
 					if err != nil {
 						msg := fmt.Sprintf("seller %s - %s", shorthand, err.Error())
 						ServerNotify("reload", msg, true)
@@ -1102,7 +1102,7 @@ func loadVendors(newbc *mtgban.BanClient) {
 				if vendorIndex < 0 || time.Since(*Vendors[vendorIndex].Info().BuylistTimestamp) > SkipRefreshCooldown {
 					ServerNotify("reload", "Loading from vendor "+shorthand)
 					start := time.Now()
-					err := updateVendorAtPosition(newVendors[i], vendorIndex, true)
+					err := updateVendorAtPosition(newVendors[i], vendorIndex)
 					if err != nil {
 						msg := fmt.Sprintf("vendor %s - %s", shorthand, err.Error())
 						ServerNotify("reload", msg, true)
