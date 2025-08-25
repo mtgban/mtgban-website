@@ -195,6 +195,13 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}
 
+	case "snapshot":
+		v = url.Values{}
+		v.Set("msg", "Moving data to timeseries in the background...")
+		doReboot = true
+
+		go stashInTimeseries()
+
 	case "server":
 		v = url.Values{}
 		v.Set("msg", "Restarting the server...")
