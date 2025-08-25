@@ -34,6 +34,7 @@ const (
 	dispatchURL = "https://api.github.com/repos/mtgban/go-mtgban/dispatches"
 	workflowURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/workflows/"
 	gaStatusURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/runs?status="
+	gaLogURL    = "https://github.com/mtgban/go-mtgban/actions/workflows/bantool-%s.yml"
 )
 
 // Time when server started
@@ -117,10 +118,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	logs := r.FormValue("logs")
 	if logs != "" {
+		// Check among the Page loggers
 		_, found := LogPages[logs]
-		if !found {
-			pageVars.InfoMessage = logs + " not found"
-		} else {
+		if found {
 			logfilePath := path.Join(LogDir, logs+".log")
 			LogPages["Admin"].Println("Serving", logfilePath)
 			w.Header().Set("Content-Type", "text/plain")
@@ -132,6 +132,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			http.ServeFile(w, r, logfilePath)
 			return
 		}
+
+		// If it's not a Page, look if there is anything configured with that name
+		_, found = Config.ScraperConfig.Config[strings.Replace(logs, "_", "-", -1)]
+		if found {
+			link := fmt.Sprintf(gaLogURL, logs)
+			http.Redirect(w, r, link, http.StatusFound)
+			return
+		}
+
+		// Otherwise, 404
+		pageVars.InfoMessage = logs + " not found"
 	}
 
 	reboot := r.FormValue("reboot")
