@@ -175,7 +175,6 @@ tr:nth-child(odd).no-hover:hover{
 }
 
 th.wrap {
-    white-space;
     text-overflow: ellipsis;
     overflow: hidden;
     max-width: 354px;
@@ -601,7 +600,7 @@ span.emoji {
     display: none;
 }
 
-/* For samll resolutions, hide full text and show short text */
+/* For small resolutions, hide full text and show short text */
 @media (max-width: 1550px) {
     .short-text {
         display: inline-block;
@@ -753,7 +752,7 @@ input:checked + .slider {
   clear: both;
 }
 
-/* Responsive layout - when the screen is toosmall, make the columns stack on
+/* Responsive layout - when the screen is too small, make the columns stack on
  * top of each other instead of next to each other */
 @media screen and (max-width: 1300px) {
   .column {
@@ -796,7 +795,6 @@ div.stores-select {
 img.hoverImage {
     position: absolute;
     z-index: 3;
-    width: auto;
     width: auto;
     max-width: 640px;
     max-height: 360px;
