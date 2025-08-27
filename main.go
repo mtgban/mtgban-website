@@ -502,6 +502,13 @@ func genPageNav(activeTab, sig string) PageVars {
 }
 
 func loadVars(cfg, port, datastore string) error {
+	if cfg == "" {
+		cfg = DefaultConfigPath
+	}
+
+	// Save source, so we can reload later
+	Config.filePath = cfg
+
 	// Load from config file
 	file, err := os.Open(cfg)
 	if !DevMode && err != nil {
@@ -593,7 +600,7 @@ func loadDatastore() error {
 }
 
 func main() {
-	flag.StringVar(&Config.filePath, "cfg", DefaultConfigPath, "Load configuration file")
+	configFilePath := flag.String("cfg", "", "Load configuration file")
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
 
@@ -611,7 +618,7 @@ func main() {
 	}
 
 	// load necessary environmental variables
-	err := loadVars(Config.filePath, *port, *datastore)
+	err := loadVars(*configFilePath, *port, *datastore)
 	if err != nil {
 		log.Fatalln("unable to load config file:", err)
 	}
