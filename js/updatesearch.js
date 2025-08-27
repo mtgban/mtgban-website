@@ -2,7 +2,7 @@ function getDirectQty(obj, uuid) {
     if (obj) {
         obj.style.opacity = '0';
         window.setTimeout(function restore() {
-            obj.style.opacity = '100';
+            obj.style.opacity = '1';
         }, 150);
     }
 
