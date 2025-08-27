@@ -467,6 +467,10 @@ a.selected:hover{
 .w3-animate-input:focus{
     width: 100%!important
 }
+@media (prefers-reduced-motion: reduce) { .w3-animate-input {
+        transition: none;
+    }
+}
 
 .search {
     padding: 8px 8px;
