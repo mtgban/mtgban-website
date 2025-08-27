@@ -1,5 +1,5 @@
 // Select the theme preference from localStorage
-const themeSwitch = document.querySelector('input');
+const themeSwitch = document.getElementById('theme-toggle');
 const themeTitle = document.querySelector('span[class="slider"]');
 
 // If the current theme in localStorage is "dark"...
