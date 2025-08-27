@@ -134,9 +134,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// If it's not a Page, look if there is anything configured with that name
-		_, found = Config.ScraperConfig.Config[strings.Replace(logs, "_", "-", -1)]
+		_, found = Config.ScraperConfig.Config[logs]
 		if found {
-			link := fmt.Sprintf(gaLogURL, logs)
+			link := fmt.Sprintf(gaLogURL, strings.Replace(logs, "_", "-", -1))
 			http.Redirect(w, r, link, http.StatusFound)
 			return
 		}
