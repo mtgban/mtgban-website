@@ -132,8 +132,8 @@
                     <a href="?reboot=build" onclick="return confirm('Are you sure you want to build the code?')">Build</a> +
                     <a href="?reboot=server" onclick="return confirm('Are you sure you want to restart the server?')">Restart</a>)
                 <li><a href="?reboot=config" onclick="return confirm('Are you sure you want to reload config?')">⚙️ Reload config</a></li>
-                <li><a href="?reboot=snapshot" onclick="return confirm('Are you sure you want to take a data snapshot')">📸Take snapshot</a></li>
-                <li><a href="?reboot=server" onclick="return confirm('Are you sure you want to restart the server?')">⚠️ Restart the server</a></li>
+                <li><a href="?reboot=snapshot" onclick="return confirm('Are you sure you want to take a data snapshot')">📸Take snapshot</a> {{if .DisableChart}}<span class=emoji title="Stashing in progress">⚠️</span>{{end}}</li>
+                <li><a href="?reboot=server" onclick="return confirm('Are you sure you want to restart the server?')">⚠️ Restart the server</a> {{if .DisableChart}}<span class=emoji title="Stashing in progress">⚠️</span>{{end}}</li>
             </ul>
         </div>
 

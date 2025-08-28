@@ -128,6 +128,8 @@ var defaultGradeMap = map[string]float64{
 	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
 }
 
+var StashingInProgress bool
+
 func stashInTimeseries() {
 	if Config.TimeseriesConfig.Address == "" {
 		log.Println("Timeseries address not set")
@@ -136,6 +138,7 @@ func stashInTimeseries() {
 
 	start := time.Now()
 	ServerNotify("timeseries", "Taking snapshot...")
+	StashingInProgress = true
 
 	for _, seller := range Sellers {
 		for _, config := range Config.TimeseriesConfig.Datasets {
@@ -206,5 +209,7 @@ func stashInTimeseries() {
 			}
 		}
 	}
+
+	StashingInProgress = false
 	ServerNotify("timeseries", "Snapshot completed in "+fmt.Sprint(time.Since(start)))
 }

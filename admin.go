@@ -211,7 +211,11 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "Moving data to timeseries in the background...")
 		doReboot = true
 
-		go stashInTimeseries()
+		if StashingInProgress {
+			v.Set("msg", "Stashing is already in progress")
+		} else {
+			go stashInTimeseries()
+		}
 
 	case "server":
 		v = url.Values{}
@@ -498,6 +502,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.MemoryStatus = mem()
 	pageVars.LatestHash = BuildCommit
 	pageVars.CurrentTime = time.Now()
+
+	pageVars.DisableChart = StashingInProgress
 
 	render(w, "admin.html", pageVars)
 }
