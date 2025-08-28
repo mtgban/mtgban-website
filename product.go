@@ -621,11 +621,4 @@ func updateStaticData() {
 		totalCards += AllEditionsMap[key].Size
 	}
 	TotalCards = totalCards
-
-	// Load prices for API users
-	if !DevMode {
-		if Config.Game == "magic" {
-			go prepareCKAPI()
-		}
-	}
 }
