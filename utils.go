@@ -423,24 +423,13 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 
 	// Retrieve the CK URL from the in memory api list, which uses mtgjson ids
 	var restockURL string
-	CKAPIMutex.RLock()
-	restock, found := CKAPIOutput[co.Identifiers["mtgjsonId"]]
-	CKAPIMutex.RUnlock()
+	ckInv, _ := findSellerInventory("CK")
+	if co.Sealed {
+		ckInv, _ = findSellerInventory("CKSealed")
+	}
+	entries, found := ckInv[co.UUID]
 	if found {
-		if co.Etched && restock.Etched != nil {
-			restockURL = restock.Etched.URL
-		} else if co.Foil && restock.Foil != nil {
-			restockURL = restock.Foil.URL
-		} else if !co.Etched && !co.Foil && restock.Normal != nil {
-			restockURL = restock.Normal.URL
-			if co.Sealed {
-				restockURL = strings.Replace(restockURL, "-sealed", "/"+restock.Normal.path, 1)
-			}
-		}
-		if restockURL != "" {
-			restockURL = strings.Replace(restockURL, "mtg", "catalog/restock_notice", 1)
-			restockURL += "?partner=" + Config.Affiliate["CK"]
-		}
+		restockURL = strings.Replace(entries[0].URL, "mtg", "catalog/restock_notice", 1)
 	}
 
 	scryfallURL := ""
