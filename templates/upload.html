@@ -459,12 +459,68 @@
                 </ul>
              </div>
         {{else}}
+            <script>
+                function getCardHashes() {
+                    return Array.from(document.querySelectorAll('.searchResults tr[data-hash]')).map(row => row.dataset.hash);
+                }
+
+                function updateRowHash(e) {
+                    // Enable buttons
+                    const fields = [
+                        'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
+                    ];
+
+                    fields.forEach(element => {
+                        var btn = document.getElementById(element);
+                        if (btn) {
+                            btn.disabled = false;
+                        }
+                    });
+
+                    // Load the form
+                    const form = document.getElementById("upload_form");
+
+                    // If hashes is empty load it with the ones we have
+                    if (form.querySelectorAll('input[name="hashes"]').length === 0) {
+                        // Remove encoding mode since we're potentially POSTing a lot of data
+                        form.removeAttribute("enctype");
+
+                        // Load the hashes and create the input elements
+                        let hashes = getCardHashes()
+                        hashes.forEach(hash => {
+                            const input = document.createElement("input");
+                            input.type = "hidden";
+                            input.name = "hashes";
+                            input.id = "row-" + hash
+                            input.value = hash;
+                            form.appendChild(input);
+                        });
+
+                        console.log("Loaded", hashes.length, "hashes");
+                    }
+
+                    // Now process the event, load the old and new hashs
+                    const select = e.target;
+                    const newHash = select.value;
+                    const oldHash = select.dataset.hash;
+
+                    // Retrieve the input field and replace the value
+                    let input = document.getElementById("row-" + oldHash);
+                    if (input) {
+                        input.value = newHash;
+                        console.log("Updated", oldHash, "to", newHash);
+                    }
+                }
+            </script>
+
             <div class="indent sticky">
                 <table class="searchResults" >
                     {{range $.UploadEntries}}
                         {{$qty := .Quantity}}
                         {{$card := (index $.Metadata .CardId)}}
-                        <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}>
+                        <tr class="no-hover"
+                            {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}
+                            data-hash="{{.CardId}}">
                             <td class="fullAnchor" rowspan=2>
                                 <center>
                                     {{if .MismatchError}}
@@ -518,6 +574,18 @@
                                                 </h6>
                                             </a>
                                         </td>
+                                        {{if .MismatchAlias}}
+                                            <td>
+                                                <form>
+                                                    <select data-hash="{{.CardId}}" class="select-css" style="width: auto; line-height: inherit;" onchange="javascript:updateRowHash(event); return false;">
+                                                        <option selected disabled>&nbsp;Pick printing</option>
+                                                        {{range .PossibleAliases}}
+                                                            <option value={{.}}>&nbsp;{{uuid2edition .}}&nbsp;</option>
+                                                        {{end}}
+                                                    </select>
+                                                </form>
+                                            </td>
+                                        {{end}}
                                         <td width=100%>
                                         {{if .OriginalPrice}}
                                             <h6>

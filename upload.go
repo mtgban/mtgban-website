@@ -80,6 +80,9 @@ type UploadEntry struct {
 	// Error when multiple results are found
 	MismatchAlias bool
 
+	// UUIDs of possible alternatives
+	PossibleAliases []string
+
 	// Price as found in the source data
 	OriginalPrice float64
 
@@ -1283,6 +1286,7 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 		})
 		cardId = aliases[0]
 		res.MismatchAlias = true
+		res.PossibleAliases = aliases
 	} else {
 		res.MismatchError = err
 	}

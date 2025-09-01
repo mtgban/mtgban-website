@@ -870,6 +870,9 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 			sixMonthsAgo := time.Now().AddDate(0, -6, 0)
 			return sixMonthsAgo.After(t)
 		},
+		"uuid2edition": func(s string) string {
+			return editionTitle(s)
+		},
 	}
 
 	// Give each template a name
