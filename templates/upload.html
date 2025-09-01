@@ -274,6 +274,19 @@
                 }
             })
 
+            function enabledButtons() {
+                const fields = [
+                    'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
+                ];
+
+                fields.forEach(element => {
+                    var btn = document.getElementById(element);
+                    if (btn) {
+                        btn.disabled = false;
+                    }
+                });
+            }
+
             window.reloadSelect = function(mode) {
                 var selectBox = document.getElementById('storesBox');
                 if (selectBox) {
@@ -323,16 +336,8 @@
                     var url = document.getElementById('urlLabel');
                     url.innerHTML = "Select spreadsheet";
 
-                    const fields = [
-                        'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
-                    ];
-
-                    fields.forEach(element => {
-                        var btn = document.getElementById(element);
-                        if (btn) {
-                            btn.disabled = false;
-                        }
-                    })
+                    // Enable buttons
+                    enabledButtons();
                 }
             };
             window.askForURL = function(){
@@ -354,16 +359,8 @@
                     var input = document.getElementById('gdocURL');
                     input.value = url;
 
-                    const fields = [
-                        'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
-                    ];
-
-                    fields.forEach(element => {
-                        var btn = document.getElementById(element);
-                        if (btn) {
-                            btn.disabled = (url == "");
-                        }
-                    })
+                    // Enable buttons
+                    enabledButtons();
                 } else if (url != null) {
                     alert("Invalid URL");
                 }
@@ -372,16 +369,8 @@
                 var textArea = document.getElementById('textArea');
                 textArea.style.display = "block";
 
-                const fields = [
-                    'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
-                ];
-
-                fields.forEach(element => {
-                    var btn = document.getElementById(element);
-                    if (btn) {
-                        btn.disabled = false;
-                    }
-                })
+                // Enable buttons
+                enabledButtons();
             }
 
             window.onload = (event) => {
@@ -475,16 +464,7 @@
 
                 function updateRowHash(e) {
                     // Enable buttons
-                    const fields = [
-                        'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
-                    ];
-
-                    fields.forEach(element => {
-                        var btn = document.getElementById(element);
-                        if (btn) {
-                            btn.disabled = false;
-                        }
-                    });
+                    enabledButtons();
 
                     // Load the form
                     const form = document.getElementById("upload_form");
