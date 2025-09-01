@@ -463,6 +463,15 @@
                 function getCardHashes() {
                     return Array.from(document.querySelectorAll('.searchResults tr[data-hash]')).map(row => row.dataset.hash);
                 }
+                function getCardQty() {
+                    return Array.from(document.querySelectorAll('.searchResults tr[data-qtys]')).map(row => row.dataset.qtys);
+                }
+                function getCardCond() {
+                    return Array.from(document.querySelectorAll('.searchResults tr[data-cond]')).map(row => row.dataset.cond);
+                }
+                function getCardPrice() {
+                    return Array.from(document.querySelectorAll('.searchResults tr[data-price]')).map(row => row.dataset.price);
+                }
 
                 function updateRowHash(e) {
                     // Enable buttons
@@ -496,6 +505,33 @@
                             form.appendChild(input);
                         });
 
+                        let qtys = getCardQty()
+                        qtys.forEach(qty => {
+                            const input = document.createElement("input");
+                            input.type = "hidden";
+                            input.name = "hashesQtys";
+                            input.value = qty;
+                            form.appendChild(input);
+                        });
+
+                        let conds = getCardCond()
+                        conds.forEach(cond => {
+                            const input = document.createElement("input");
+                            input.type = "hidden";
+                            input.name = "hashesCond";
+                            input.value = cond;
+                            form.appendChild(input);
+                        });
+
+                        let prices = getCardPrice()
+                        prices.forEach(price => {
+                            const input = document.createElement("input");
+                            input.type = "hidden";
+                            input.name = "hashesPrice";
+                            input.value = price;
+                            form.appendChild(input);
+                        });
+
                         console.log("Loaded", hashes.length, "hashes");
                     }
 
@@ -520,7 +556,10 @@
                         {{$card := (index $.Metadata .CardId)}}
                         <tr class="no-hover"
                             {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}
-                            data-hash="{{.CardId}}">
+                            data-hash="{{.CardId}}"
+                            data-qtys="{{.Quantity}}"
+                            data-cond="{{.OriginalCondition}}"
+                            data-price="{{.OriginalPrice}}">
                             <td class="fullAnchor" rowspan=2>
                                 <center>
                                     {{if .MismatchError}}

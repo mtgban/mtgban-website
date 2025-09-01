@@ -400,7 +400,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Load data
 	var uploadedData []UploadEntry
 	if len(hashes) != 0 {
-		uploadedData, err = loadHashes(hashes)
+		uploadedData, err = loadHashes(hashes, r.Form["hashesQtys"], r.Form["hashesCond"], r.Form["hashesPrice"])
 	} else if textArea != "" {
 		uploadedData, err = loadCsv(strings.NewReader(textArea), ',', maxRows)
 	} else if handler != nil {
@@ -1295,13 +1295,29 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	return res, nil
 }
 
-func loadHashes(hashes []string) ([]UploadEntry, error) {
+func loadHashes(hashes, qtys, cond, prices []string) ([]UploadEntry, error) {
 	var uploadEntries []UploadEntry
 
 	for i := range hashes {
-		uploadEntries = append(uploadEntries, UploadEntry{
+		entry := UploadEntry{
 			CardId: hashes[i],
-		})
+		}
+
+		if len(qtys) > i {
+			qty, err := strconv.Atoi(qtys[i])
+			entry.HasQuantity = (err == nil)
+			entry.Quantity = qty
+		}
+
+		if len(cond) > i {
+			entry.OriginalCondition = cond[i]
+		}
+
+		if len(prices) > i {
+			entry.OriginalPrice, _ = strconv.ParseFloat(prices[i], 64)
+		}
+
+		uploadEntries = append(uploadEntries, entry)
 	}
 
 	return uploadEntries, nil
