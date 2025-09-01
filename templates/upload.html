@@ -330,8 +330,19 @@
                     var theSplit = label.value.split('\\');
                     fileLabel.innerHTML = theSplit[theSplit.length-1];
 
+                    // Reset URL prompt
                     var input = document.getElementById('gdocURL');
                     input.value = "";
+
+                    // Reset text area
+                    var textArea = document.getElementById('textArea');
+                    if (textArea) {
+                        textArea.value = "";
+                    }
+
+                    // Reset hashes
+                    const form = document.getElementById("upload_form");
+                    form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
 
                     var url = document.getElementById('urlLabel');
                     url.innerHTML = "Select spreadsheet";
@@ -348,10 +359,15 @@
                     } else {
                         urlLabel.innerHTML = "Remote URL ready";
 
+                        // Reset text area
                         var textArea = document.getElementById('textArea');
                         if (textArea) {
                             textArea.value = "";
                         }
+
+                        // Reset hashes
+                        const form = document.getElementById("upload_form");
+                        form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
                     }
                     urlLabel.title = url
                     fileLabel.innerHTML = "Select local csv/xls";
@@ -368,6 +384,10 @@
             window.displayTextArea = function(){
                 var textArea = document.getElementById('textArea');
                 textArea.style.display = "block";
+
+                // Reset hashes
+                const form = document.getElementById("upload_form");
+                form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
 
                 // Enable buttons
                 enabledButtons();
