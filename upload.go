@@ -1163,11 +1163,12 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 				res.Card.Edition = set.Name
 			}
 
+			// Move anything that is not parsed to Variation
 			// Parse the number from "Flagstones of Trokair (tsr) 278"
-			if strings.HasPrefix(line, vars[0]) && unicode.IsDigit(rune(line[len(line)-1])) {
-				res.Card.Variation = strings.TrimPrefix(line, vars[0])
-				line = vars[0]
-			}
+			// or long verbose lines like
+			// Altar of the Brood [KTK] (Normal, Lightly Played, English) - $10.35 ($10.35 ea)
+			res.Card.Variation = strings.TrimPrefix(line, vars[0])
+			line = vars[0]
 		}
 
 		// Parse "10 Swamp <462> [CLB]"
