@@ -352,9 +352,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		var err error
 		csvWriter := csv.NewWriter(w)
 		if out.Retail != nil {
-			err = BanPrice2CSV(csvWriter, out.Retail, qty, conds, isSealed)
+			err = BanPrice2CSV(csvWriter, out.Retail, nil, qty, conds, isSealed)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(csvWriter, out.Buylist, qty, conds, isSealed)
+			err = BanPrice2CSV(csvWriter, out.Buylist, nil, qty, conds, isSealed)
 		}
 		if err != nil {
 			log.Println(err)
@@ -627,7 +627,7 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 	return false
 }
 
-func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, shouldCond, sealed bool) error {
+func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, sorted []string, shouldQty, shouldCond, sealed bool) error {
 	skuHeader := "UUID"
 	header := []string{skuHeader, "TCG Product Id", "Store", "Name", "Edition"}
 	if !sealed {
@@ -647,7 +647,14 @@ func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, shouldQty, 
 		return err
 	}
 
-	for id := range pm {
+	// If sorting does not need to be preserved, we retrieve the list at random
+	if sorted == nil {
+		for id := range pm {
+			sorted = append(sorted, id)
+		}
+	}
+
+	for _, id := range sorted {
 		co, err := mtgmatcher.GetUUID(id)
 		if err != nil {
 			co, err = mtgmatcher.GetUUID(mtgmatcher.Scryfall2UUID(id))

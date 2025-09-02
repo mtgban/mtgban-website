@@ -667,7 +667,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+".csv\"")
 	csvWriter := csv.NewWriter(w)
-	err := BanPrice2CSV(csvWriter, results, true, true, isSealed)
+	err := BanPrice2CSV(csvWriter, results, allKeys, true, true, isSealed)
 	if err != nil {
 		w.Header().Del("Content-Type")
 		w.Header().Del("Content-Disposition")
