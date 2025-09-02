@@ -350,9 +350,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasSuffix(urlPath, ".csv") {
 		var err error
 		if out.Retail != nil {
-			err = BanPrice2CSV(w, out.Retail, nil, qty, conds, isSealed)
+			err = BanPrice2CSV(w, out.Retail, nil, qty, conds, isSealed, false)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(w, out.Buylist, nil, qty, conds, isSealed)
+			err = BanPrice2CSV(w, out.Buylist, nil, qty, conds, isSealed, false)
 		}
 		if err != nil {
 			log.Println(err)
@@ -625,22 +625,27 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 	return false
 }
 
-func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string, shouldQty, shouldCond, sealed bool) error {
+func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string, shouldQty, shouldCond, sealed, decklist bool) error {
 	httpWriter.Header().Set("Content-Type", "text/csv")
 	w := csv.NewWriter(httpWriter)
 
-	skuHeader := "UUID"
-	header := []string{skuHeader, "TCG Product Id", "Store", "Name", "Edition"}
+	header := []string{"UUID", "TCG Product Id"}
+	if !decklist {
+		header = append(header, "Store")
+	}
+	header = append(header, "Name", "Edition")
 	if !sealed {
 		header = append(header, "Number", "Finish", "Rarity")
 	}
 
-	header = append(header, "Price")
-	if shouldCond && !sealed {
-		header = append(header, "Condition")
-	}
-	if shouldQty {
-		header = append(header, "Quantity")
+	if !decklist {
+		header = append(header, "Price")
+		if shouldCond && !sealed {
+			header = append(header, "Condition")
+		}
+		if shouldQty {
+			header = append(header, "Quantity")
+		}
 	}
 
 	err := w.Write(header)
@@ -665,6 +670,32 @@ func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanP
 		}
 
 		tcgId := findTCGproductId(co.UUID)
+
+		if decklist {
+			record := []string{
+				co.UUID, tcgId, co.Name, co.Edition,
+			}
+
+			finish := "nonfoil"
+			if co.Etched {
+				finish = "etched"
+			} else if co.Foil {
+				finish = "foil"
+			} else if co.Sealed {
+				finish = "sealed"
+			}
+			if !sealed {
+				record = append(record, co.Number, finish, co.Rarity)
+			}
+
+			err = w.Write(record)
+			if err != nil {
+				return err
+			}
+
+			w.Flush()
+			continue
+		}
 
 		for scraper, entry := range pm[id] {
 			prices := []float64{entry.Regular, entry.Foil, entry.Etched, entry.Sealed}

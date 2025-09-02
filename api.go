@@ -609,11 +609,13 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
 	}
 
+	isList := strings.Contains(r.URL.Path, "/list/")
 	isRetail := strings.Contains(r.URL.Path, "/retail/")
 	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
 	isSealed := strings.Contains(r.URL.Path, "/sealed/")
 
 	query := r.URL.Path
+	query = strings.TrimPrefix(query, "/api/search/list/")
 	query = strings.TrimPrefix(query, "/api/search/retail/")
 	query = strings.TrimPrefix(query, "/api/search/buylist/")
 	query = strings.TrimPrefix(query, "sealed/")
@@ -656,7 +658,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		results = getVendorPrices(mode, enabledStores, "", allKeys, "", true, true, isSealed, "names")
 	}
 
-	err := BanPrice2CSV(w, results, allKeys, true, true, isSealed)
+	err := BanPrice2CSV(w, results, allKeys, true, true, isSealed, isList)
 	if err != nil {
 		w.Header().Del("Content-Type")
 		w.Header().Del("Content-Disposition")
