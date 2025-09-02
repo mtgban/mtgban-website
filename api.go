@@ -44,7 +44,7 @@ func getLastSold(cardId string, anyLang bool) ([]tcgplayer.LatestSalesData, erro
 	return latestSales.Data, nil
 }
 
-func getDrirectQty(cardId string) ([]tcgplayer.ListingData, error) {
+func getDirectQty(cardId string) ([]tcgplayer.ListingData, error) {
 	tcgProductId := findTCGproductId(cardId)
 	if tcgProductId == "" {
 		return nil, ErrMissingTCGId
@@ -87,7 +87,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 		data, err = getLastSold(cardId, false)
 	} else if isDirectQty {
 		UserNotify("tcgDirectQty", cardId)
-		data, err = getDrirectQty(cardId)
+		data, err = getDirectQty(cardId)
 	} else if isDecklist {
 		UserNotify("tcgDecklist", cardId)
 		data, err = getDecklist(cardId)
