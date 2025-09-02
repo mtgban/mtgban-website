@@ -731,11 +731,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                             <td>
                                 <center>
                                     Download prices as CSV<br>
-                                    <a class="btn success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
-                                    <a class="btn warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
+                                    <a class="btn success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
+                                    <a class="btn warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
                                     <br>
                                     Get card list<br>
-                                    <a class="btn normal" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">Download</a>
+                                    <a class="btn normal" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">Download</a>
                                 </center>
                             </td>
                         </tr>

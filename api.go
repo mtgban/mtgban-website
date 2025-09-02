@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -585,11 +586,23 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 
 func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
+	if sig == "" {
+		sig = r.FormValue("sig")
+	}
+
+	out := PriceAPIOutput{}
+	out.Meta.Date = time.Now()
+	out.Meta.Version = APIVersion
+	out.Meta.BaseURL = getBaseURL(r) + "/go/"
+
+	query := r.URL.Path
+	isJSON := strings.HasSuffix(query, ".json")
+	isCSV := strings.HasSuffix(query, ".csv")
 
 	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
 	canDownloadCSV = canDownloadCSV || (DevMode && !SigCheck)
-	if !canDownloadCSV {
+	if isCSV && !canDownloadCSV {
 		pageVars := genPageNav("Error", sig)
 		pageVars.Title = "Unauthorized"
 		pageVars.ErrorMessage = "Unable to download CSV"
@@ -614,18 +627,33 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
 	isSealed := strings.Contains(r.URL.Path, "/sealed/")
 
-	query := r.URL.Path
 	query = strings.TrimPrefix(query, "/api/search/list/")
 	query = strings.TrimPrefix(query, "/api/search/retail/")
 	query = strings.TrimPrefix(query, "/api/search/buylist/")
 	query = strings.TrimPrefix(query, "sealed/")
 
-	mode := "scryfall"
+	query = strings.TrimSuffix(query, ".json")
+	query = strings.TrimSuffix(query, ".csv")
+
+	// Load some defaults
+	enabledModes := strings.Split(GetParamFromSig(sig, "APImode"), ",")
+	if enabledModes[0] == "" {
+		enabledModes[0] = "all"
+	}
+	idOpt := r.FormValue("id")
+	if idOpt == "" {
+		idOpt = "scryfall"
+	}
+	tagName := r.FormValue("tag")
+	if tagName == "" {
+		tagName = "names"
+	}
+
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	if isSealed {
 		config.SearchMode = "sealed"
-		mode = "mtgjson"
+		idOpt = "mtgjson"
 	}
 
 	// Perform search
@@ -636,9 +664,11 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		allKeys = allKeys[:MaxUploadProEntries]
 	}
 
+	canRetail := slices.Contains(enabledModes, "retail") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
+	canBuylist := slices.Contains(enabledModes, "buylist") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
+
 	// Retrieve prices
-	var results map[string]map[string]*BanPrice
-	if isRetail {
+	if isRetail && canRetail {
 		var enabledStores []string
 		for _, seller := range Sellers {
 			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
@@ -646,8 +676,9 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		results = getSellerPrices(mode, enabledStores, "", allKeys, "", true, true, isSealed, "names")
-	} else if isBuylist {
+		out.Retail = getSellerPrices(idOpt, enabledStores, "", allKeys, "", true, true, isSealed, tagName)
+	}
+	if isBuylist && canBuylist {
 		var enabledStores []string
 		for _, vendor := range Vendors {
 			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
@@ -655,18 +686,31 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		results = getVendorPrices(mode, enabledStores, "", allKeys, "", true, true, isSealed, "names")
+		out.Buylist = getVendorPrices(idOpt, enabledStores, "", allKeys, "", true, true, isSealed, tagName)
 	}
 
-	err := BanPrice2CSV(w, results, allKeys, true, true, isSealed, isList)
-	if err != nil {
-		w.Header().Del("Content-Type")
-		w.Header().Del("Content-Disposition")
-		UserNotify("search", err.Error())
-		pageVars := genPageNav("Error", sig)
-		pageVars.Title = "Error"
-		pageVars.InfoMessage = "Unable to download CSV right now"
-		render(w, "home.html", pageVars)
+	if isJSON {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(&out)
+		return
+	}
+
+	if isCSV {
+		results := out.Retail
+		if isBuylist {
+			results = out.Buylist
+		}
+		err := BanPrice2CSV(w, results, allKeys, true, true, isSealed, isList)
+		if err != nil {
+			w.Header().Del("Content-Type")
+			w.Header().Del("Content-Disposition")
+			UserNotify("search", err.Error())
+			pageVars := genPageNav("Error", sig)
+			pageVars.Title = "Error"
+			pageVars.InfoMessage = "Unable to download CSV right now"
+			render(w, "home.html", pageVars)
+			return
+		}
 		return
 	}
 }
