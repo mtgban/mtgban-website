@@ -731,8 +731,8 @@ Sims are not required for pre-constructed decks and other products where the sam
                             <td>
                                 <center>
                                     Download prices as CSV<br>
-                                    <a class="btn success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}">Retail</a>
-                                    <a class="btn warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}">Buylist</a>
+                                    <a class="btn success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
+                                    <a class="btn warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
                                 </center>
                             </td>
                         </tr>

@@ -636,10 +636,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Retrieve prices
 	var results map[string]map[string]*BanPrice
-	var filename string
 	if isRetail {
-		filename = "mtgban_retail_prices"
-
 		var enabledStores []string
 		for _, seller := range Sellers {
 			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
@@ -649,8 +646,6 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 		results = getSellerPrices(mode, enabledStores, "", allKeys, "", true, true, isSealed, "names")
 	} else if isBuylist {
-		filename = "mtgban_buylist_prices"
-
 		var enabledStores []string
 		for _, vendor := range Vendors {
 			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
@@ -660,14 +655,8 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 		results = getVendorPrices(mode, enabledStores, "", allKeys, "", true, true, isSealed, "names")
 	}
-	if isSealed {
-		filename += "_sealed"
-	}
 
-	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", "attachment; filename=\""+filename+".csv\"")
-	csvWriter := csv.NewWriter(w)
-	err := BanPrice2CSV(csvWriter, results, allKeys, true, true, isSealed)
+	err := BanPrice2CSV(w, results, allKeys, true, true, isSealed)
 	if err != nil {
 		w.Header().Del("Content-Type")
 		w.Header().Del("Content-Disposition")

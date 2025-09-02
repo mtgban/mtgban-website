@@ -348,13 +348,11 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(&out)
 		return
 	} else if strings.HasSuffix(urlPath, ".csv") {
-		w.Header().Set("Content-Type", "text/csv")
 		var err error
-		csvWriter := csv.NewWriter(w)
 		if out.Retail != nil {
-			err = BanPrice2CSV(csvWriter, out.Retail, nil, qty, conds, isSealed)
+			err = BanPrice2CSV(w, out.Retail, nil, qty, conds, isSealed)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(csvWriter, out.Buylist, nil, qty, conds, isSealed)
+			err = BanPrice2CSV(w, out.Buylist, nil, qty, conds, isSealed)
 		}
 		if err != nil {
 			log.Println(err)
@@ -627,7 +625,10 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 	return false
 }
 
-func BanPrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, sorted []string, shouldQty, shouldCond, sealed bool) error {
+func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string, shouldQty, shouldCond, sealed bool) error {
+	httpWriter.Header().Set("Content-Type", "text/csv")
+	w := csv.NewWriter(httpWriter)
+
 	skuHeader := "UUID"
 	header := []string{skuHeader, "TCG Product Id", "Store", "Name", "Edition"}
 	if !sealed {
