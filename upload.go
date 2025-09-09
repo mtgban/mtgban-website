@@ -1131,12 +1131,13 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	if len(record) == 1 {
 		line := record[indexMap["cardName"]]
 
-		// Support setting a card foil
-		if strings.HasSuffix(line, "*F*") {
-			res.Card.Foil = true
-			line = strings.TrimSuffix(line, "*F*")
-			line = strings.TrimSpace(line)
+		// Try setting the card finish
+		res.Card.Foil = strings.HasSuffix(line, "*F*")
+		if strings.HasSuffix(line, "*E*") {
+			res.Card.Variation = "etched"
 		}
+		line = strings.TrimRight(line, "FE*")
+		line = strings.TrimSpace(line)
 
 		if line != "" && unicode.IsDigit(rune(line[0])) {
 			// Parse both "4 x <name>" and "4x <name>"
@@ -1170,7 +1171,11 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 			// Parse the number from "Flagstones of Trokair (tsr) 278"
 			// or long verbose lines like
 			// Altar of the Brood [KTK] (Normal, Lightly Played, English) - $10.35 ($10.35 ea)
-			res.Card.Variation = strings.TrimPrefix(line, vars[0])
+			variation := strings.TrimPrefix(line, vars[0])
+			if res.Card.Variation != "" {
+				res.Card.Variation += " "
+			}
+			res.Card.Variation += variation
 			line = vars[0]
 		}
 
