@@ -446,7 +446,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		Hash:         BuildCommit,
 	}
 
-	if Config.Game != "magic" && Config.Game != "" {
+	if Config.Game != DefaultGame {
 		// Append which game this site is for
 		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
 
@@ -455,7 +455,7 @@ func genPageNav(activeTab, sig string) PageVars {
 	}
 
 	switch Config.Game {
-	case "magic", "":
+	case DefaultGame:
 		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
 	case "lorcana":
 		pageVars.CardBackURL = "img/backs/lorcana.webp"

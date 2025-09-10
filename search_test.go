@@ -16,7 +16,7 @@ var NumberToBeFound string
 func TestMain(m *testing.M) {
 	LogDir = "logs"
 	Config.DatastorePath = "allprintings5.json"
-	Config.Game = "magic"
+	Config.Game = DefaultGame
 
 	err := loadDatastore()
 	if err != nil {
