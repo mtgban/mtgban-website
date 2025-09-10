@@ -136,7 +136,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		// If it's not a Page, look if there is anything configured with that name
 		_, found = Config.ScraperConfig.Config[logs]
 		if found {
-			link := fmt.Sprintf(gaLogURL, strings.Replace(logs, "_", "-", -1))
+			link := fmt.Sprintf(gaLogURL, logs)
 			http.Redirect(w, r, link, http.StatusFound)
 			return
 		}
@@ -524,7 +524,7 @@ func isBusyGithubAction(key string) (bool, error) {
 }
 
 func queryGithubAction(key, state string) (int, error) {
-	url := workflowURL + "bantool-" + strings.Replace(key, "_", "-", -1) + ".yml/runs?status=" + state
+	url := workflowURL + "bantool-" + key + ".yml/runs?status=" + state
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
