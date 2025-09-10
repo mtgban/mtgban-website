@@ -704,17 +704,6 @@ func main() {
 		// Set up new refreshes as needed
 		c := cron.New()
 
-		// Times are in UTC
-
-		// MTGJSON builds go live 1-2pm EST, pull the update 30 minutes after
-		c.AddFunc("30 19 * * *", func() {
-			log.Println("Reloading datastore from", Config.DatastorePath)
-			err := loadDatastore()
-			if err != nil {
-				log.Println(err)
-			}
-		})
-
 		// Take a snapshot twice a day
 		c.AddFunc("0 */12 * * *", stashInTimeseries)
 
