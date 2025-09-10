@@ -383,10 +383,10 @@ var Newspaper1dayDB *sql.DB
 var GoogleDocsClient *http.Client
 
 const (
-	DefaultConfigPort    = "8080"
-	DefaultDatastorePath = "allprintings5.json"
-	DefaultConfigPath    = "config.json"
-	DefaultSecret        = "NotVerySecret!"
+	DefaultConfigPort = "8080"
+	DefaultConfigPath = "config.json"
+	DefaultSecret     = "NotVerySecret!"
+	DefaultGame       = "magic"
 )
 
 func Favicon(w http.ResponseWriter, r *http.Request) {
@@ -507,16 +507,19 @@ func genPageNav(activeTab, sig string) PageVars {
 	return pageVars
 }
 
-func loadVars(cfg, port, datastore string) error {
-	if cfg == "" {
-		cfg = DefaultConfigPath
+func loadVars(configPath, port, datastorePath string) error {
+	if configPath == "" {
+		configPath = os.Getenv("BAN_CONFIG_PATH")
+	}
+	if configPath == "" {
+		configPath = DefaultConfigPath
 	}
 
 	// Save source, so we can reload later
-	Config.filePath = cfg
+	Config.filePath = configPath
 
 	// Load from config file
-	file, err := os.Open(cfg)
+	file, err := os.Open(Config.filePath)
 	if !DevMode && err != nil {
 		return err
 	}
@@ -537,14 +540,16 @@ func loadVars(cfg, port, datastore string) error {
 		Config.Port = DefaultConfigPort
 	}
 
-	if datastore != "" {
-		Config.DatastorePath = datastore
+	// Ensure default
+	if Config.Game == "" {
+		Config.Game = DefaultGame
+	}
+
+	if datastorePath != "" {
+		Config.DatastorePath = datastorePath
 	}
 	if Config.DatastorePath == "" {
-		if Config.Game != "" {
-			return errors.New("no datastore specified for non-default game")
-		}
-		Config.DatastorePath = DefaultDatastorePath
+		return errors.New("missing datastore configuration")
 	}
 
 	// Load from env
@@ -552,10 +557,6 @@ func loadVars(cfg, port, datastore string) error {
 	if v == "" {
 		log.Printf("BAN_SECRET not set, using a default one")
 		os.Setenv("BAN_SECRET", DefaultSecret)
-	}
-
-	if Config.Game == "" {
-		Config.Game = "magic"
 	}
 
 	return nil
