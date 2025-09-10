@@ -23,6 +23,7 @@ import (
 	"time"
 
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/simplecloud"
 	"golang.org/x/exp/slices"
 
 	"github.com/mackerelio/go-osstat/memory"
@@ -201,7 +202,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "New config loaded!")
 		doReboot = true
 
-		err := loadVars(Config.filePath, "", "")
+		err := loadVars("", "")
 		if err != nil {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}
@@ -319,7 +320,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		newConfig := r.FormValue("textArea")
 		if newConfig != "" {
 			var config ConfigType
-			configFilePath := Config.filePath
+			configSourcePath := Config.sourcePath
 
 			// Test if data can be unmarshaled
 			err := json.Unmarshal([]byte(newConfig), &config)
@@ -329,18 +330,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			// Test if file is writable
-			file, err := os.Create(configFilePath)
+			// Open bucket
+			writer, err := simplecloud.InitWriter(context.TODO(), ConfigBucket, Config.sourcePath)
 			if err != nil {
-				log.Println(err)
 				pageVars.InfoMessage = err.Error()
 				pageVars.CleanSearchQuery = newConfig
 				break
 			}
-			defer file.Close()
+			defer writer.Close()
 
 			// Test if writing the permanent config is ok
-			err = writeConfigFile(config, file)
+			err = writeConfigFile(config, writer)
 			if err != nil {
 				log.Println(err)
 				pageVars.InfoMessage = err.Error()
@@ -352,7 +352,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			Config = config
 
 			// Preserve the current filepath
-			Config.filePath = configFilePath
+			Config.sourcePath = configSourcePath
 
 			pageVars.InfoMessage = "Config updated"
 		}
@@ -723,13 +723,13 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 		Config.ApiUserSecrets[user] = key
 		apiUsersMutex.Unlock()
 
-		file, err := os.Create(Config.filePath)
+		writer, err := simplecloud.InitWriter(context.TODO(), ConfigBucket, Config.sourcePath)
 		if err != nil {
 			return "", err
 		}
-		defer file.Close()
+		defer writer.Close()
 
-		err = writeConfigFile(Config, file)
+		err = writeConfigFile(Config, writer)
 		if err != nil {
 			return "", err
 		}

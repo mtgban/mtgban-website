@@ -368,8 +368,8 @@ type ConfigType struct {
 		Moxfield string `json:"moxfield"`
 	} `json:"uploader"`
 
-	/* The location of the configuation file */
-	filePath string
+	// The location of the configuation file
+	sourcePath string
 }
 
 var DevMode bool
@@ -381,6 +381,8 @@ var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
 
 var GoogleDocsClient *http.Client
+
+var ConfigBucket simplecloud.ReadWriter
 
 const (
 	DefaultConfigPort = "8080"
@@ -507,7 +509,7 @@ func genPageNav(activeTab, sig string) PageVars {
 	return pageVars
 }
 
-func loadVars(configPath, port, datastorePath string) error {
+func preloadConfig(configPath string) error {
 	if configPath == "" {
 		configPath = os.Getenv("BAN_CONFIG_PATH")
 	}
@@ -516,20 +518,42 @@ func loadVars(configPath, port, datastorePath string) error {
 	}
 
 	// Save source, so we can reload later
-	Config.filePath = configPath
+	Config.sourcePath = configPath
 
-	// Load from config file
-	file, err := os.Open(Config.filePath)
-	if !DevMode && err != nil {
+	u, err := url.Parse(Config.sourcePath)
+	if err != nil {
 		return err
 	}
-	if err == nil {
-		defer file.Close()
 
-		err = json.NewDecoder(file).Decode(&Config)
+	var bucket simplecloud.ReadWriter
+
+	switch u.Scheme {
+	case "":
+		bucket = &simplecloud.FileBucket{}
+	case "b2":
+		bucket, err = simplecloud.NewB2Client(context.Background(), os.Getenv("BAN_CONFIG_KEY"), os.Getenv("BAN_CONFIG_SECRET"), u.Host)
 		if err != nil {
 			return err
 		}
+	default:
+		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
+	}
+
+	ConfigBucket = bucket
+	return nil
+}
+
+func loadVars(port, datastorePath string) error {
+	reader, err := simplecloud.InitReader(context.TODO(), ConfigBucket, Config.sourcePath)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	// Load from config file
+	err = json.NewDecoder(reader).Decode(&Config)
+	if err != nil && !DevMode {
+		return err
 	}
 
 	// Load from command line
@@ -647,7 +671,11 @@ func main() {
 	}
 
 	// load necessary environmental variables
-	err := loadVars(*configFilePath, *port, *datastore)
+	err := preloadConfig(*configFilePath)
+	if err != nil {
+		log.Fatalln("unable to preload config file:", err)
+	}
+	err = loadVars(*port, *datastore)
 	if err != nil {
 		log.Fatalln("unable to load config file:", err)
 	}
