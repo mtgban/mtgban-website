@@ -1,13 +1,18 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/csv"
 	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -743,4 +748,54 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 
 	ServerNotify("reload", "Server reloaded "+name)
 	w.Write([]byte(`{"status": "ok"}`))
+}
+
+func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	err := verify(r)
+	if err != nil {
+		w.Write([]byte(`{"error", "` + err.Error() + `"}`))
+		return
+	}
+
+	err = loadDatastore()
+	if err != nil {
+		w.Write([]byte(`{"error", "Failed to reload datastore: ` + err.Error() + `"}`))
+		return
+	}
+
+	ServerNotify("reload", "Datastore reloaded from "+Config.DatastorePath)
+	w.Write([]byte(`{"status": "ok"}`))
+}
+
+// Simple function to check a simple signature, the body is just the timestamp
+func verify(r *http.Request) error {
+	sig := r.Header.Get("X-Signature")
+	ts := r.Header.Get("X-Timestamp")
+	if sig == "" || ts == "" {
+		return errors.New("bad headers")
+	}
+
+	// Reject old requests (e.g., > 1 minute)
+	t, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil || time.Since(time.Unix(t, 0)) > 1*time.Minute {
+		return errors.New("expired")
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+
+	mac := hmac.New(sha256.New, []byte(os.Getenv("BAN_SECRET")))
+	mac.Write(body)
+	expected := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	if !hmac.Equal([]byte(expected), []byte(sig)) {
+		return errors.New("unauthorized")
+	}
+
+	return nil
 }
