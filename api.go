@@ -733,7 +733,7 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 
 	for kind, list := range scrapersConfig {
 		for _, shorthand := range list {
-			err := loadScraper(config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
+			err := loadScraper(DataBucket, config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
 			if err != nil {
 				log.Println(err)
 				continue

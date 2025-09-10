@@ -1,27 +1,20 @@
 package main
 
 import (
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/url"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
-	"github.com/Backblaze/blazer/b2"
-	"github.com/dsnet/compress/bzip2"
-	cleanhttp "github.com/hashicorp/go-cleanhttp"
-	xzReader "github.com/xi2/xz"
-
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/simplecloud"
 )
 
-var B2Bucket *b2.Bucket
+var DataBucket simplecloud.Reader
 
 // Slice containing all the loaded retail data
 var Sellers []mtgban.Seller
@@ -48,19 +41,16 @@ func loadScrapersNG(config ScraperConfig) error {
 	}
 
 	switch u.Scheme {
-	case "", "http", "https":
+	case "":
+		DataBucket = &simplecloud.FileBucket{}
 	case "b2":
-		if B2Bucket == nil {
-			client, err := b2.NewClient(context.Background(), config.BucketAccessKey, config.BucketSecretKey)
-			if err != nil {
-				return err
-			}
-
-			B2Bucket, err = client.Bucket(context.Background(), u.Host)
-			if err != nil {
-				return err
-			}
+		b2Bucket, err := simplecloud.NewB2Client(context.Background(), config.BucketAccessKey, config.BucketSecretKey, u.Host)
+		if err != nil {
+			return err
 		}
+		b2Bucket.ConcurrentDownloads = 20
+
+		DataBucket = b2Bucket
 	default:
 		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
 	}
@@ -68,7 +58,7 @@ func loadScrapersNG(config ScraperConfig) error {
 	for name, scrapersConfig := range config.Config {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
-				err := loadScraper(config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
+				err := loadScraper(DataBucket, config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
 				if err != nil {
 					log.Println(err)
 					continue
@@ -82,7 +72,7 @@ func loadScrapersNG(config ScraperConfig) error {
 	return nil
 }
 
-func loadScraper(path, game, name, kind, shorthand, format string) error {
+func loadScraper(bucket simplecloud.Reader, path, game, name, kind, shorthand, format string) error {
 	u, err := url.Parse(path)
 	if err != nil {
 		return err
@@ -92,7 +82,7 @@ func loadScraper(path, game, name, kind, shorthand, format string) error {
 
 	log.Println("loading", u.String())
 
-	reader, err := loadData(u.String())
+	reader, err := simplecloud.InitReader(context.TODO(), bucket, u.String())
 	if err != nil {
 		return err
 	}
@@ -114,59 +104,6 @@ func loadScraper(path, game, name, kind, shorthand, format string) error {
 	}
 
 	return nil
-}
-
-func loadData(pathOpt string) (io.ReadCloser, error) {
-	var reader io.ReadCloser
-
-	u, err := url.Parse(pathOpt)
-	if err != nil {
-		return nil, err
-	}
-	switch u.Scheme {
-	case "http", "https":
-		resp, err := cleanhttp.DefaultClient().Get(pathOpt)
-		if err != nil {
-			return nil, err
-		}
-
-		reader = resp.Body
-	case "b2":
-		src := strings.TrimPrefix(u.Path, "/")
-		obj := B2Bucket.Object(src).NewReader(context.Background())
-		obj.ConcurrentDownloads = 20
-
-		reader = obj
-	default:
-		file, err := os.Open(pathOpt)
-		if err != nil {
-			return nil, err
-		}
-
-		reader = file
-	}
-
-	if strings.HasSuffix(pathOpt, "xz") {
-		xzReader, err := xzReader.NewReader(reader, 0)
-		if err != nil {
-			return nil, err
-		}
-		reader = io.NopCloser(xzReader)
-	} else if strings.HasSuffix(pathOpt, "bz2") {
-		bz2Reader, err := bzip2.NewReader(reader, nil)
-		if err != nil {
-			return nil, err
-		}
-		reader = bz2Reader
-	} else if strings.HasSuffix(pathOpt, "gz") {
-		zipReader, err := gzip.NewReader(reader)
-		if err != nil {
-			return nil, err
-		}
-		reader = zipReader
-	}
-
-	return reader, err
 }
 
 func updateSellers(scraper mtgban.Scraper) {

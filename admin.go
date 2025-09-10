@@ -107,7 +107,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	if reload != "" {
 		v := url.Values{}
 		v.Set("msg", reload+" reloaded")
-		err := loadScraper(Config.ScraperConfig.BucketPath, Config.Game, reload, r.FormValue("table"), r.FormValue("tag"), Config.ScraperConfig.BucketFileFormat)
+		err := loadScraper(DataBucket, Config.ScraperConfig.BucketPath, Config.Game, reload, r.FormValue("table"), r.FormValue("tag"), Config.ScraperConfig.BucketFileFormat)
 		if err != nil {
 			v.Set("msg", "reload of "+reload+" error: "+err.Error())
 		}
