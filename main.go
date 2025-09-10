@@ -11,6 +11,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path"
@@ -29,6 +30,7 @@ import (
 	cron "gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/simplecloud"
 )
 
 type PageVars struct {
@@ -329,8 +331,12 @@ func init() {
 var Config ConfigType
 
 type ConfigType struct {
-	Port                   string            `json:"port"`
-	DatastorePath          string            `json:"datastore_path"`
+	Port          string `json:"port"`
+	DatastorePath string `json:"datastore_path"`
+	Datastore     struct {
+		BucketAccessKey string `json:"bucket_access_key"`
+		BucketSecretKey string `json:"bucket_access_secret"`
+	} `json:"datastore"`
 	Game                   string            `json:"game"`
 	ScraperConfig          ScraperConfig     `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig  `json:"timeseries_config"`
@@ -582,13 +588,35 @@ func loadGoogleCredentials(credentials string) (*http.Client, error) {
 }
 
 func loadDatastore() error {
-	allPrintingsReader, err := os.Open(Config.DatastorePath)
+	u, err := url.Parse(Config.DatastorePath)
 	if err != nil {
 		return err
 	}
-	defer allPrintingsReader.Close()
 
-	err = mtgmatcher.LoadDatastore(allPrintingsReader)
+	var bucket simplecloud.Reader
+
+	switch u.Scheme {
+	case "":
+		bucket = &simplecloud.FileBucket{}
+	case "b2":
+		b2Bucket, err := simplecloud.NewB2Client(context.Background(), Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
+		if err != nil {
+			return err
+		}
+		b2Bucket.ConcurrentDownloads = 20
+
+		bucket = b2Bucket
+	default:
+		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
+	}
+
+	reader, err := simplecloud.InitReader(context.TODO(), bucket, Config.DatastorePath)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	err = mtgmatcher.LoadDatastore(reader)
 	if err != nil {
 		return err
 	}
