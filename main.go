@@ -31,6 +31,8 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/simplecloud"
+
+	_ "net/http/pprof"
 )
 
 type PageVars struct {
