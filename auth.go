@@ -243,11 +243,11 @@ func getBaseURL(r *http.Request) string {
 	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
 		host = DefaultHost
 	}
-	baseURL := "http://" + host
+	scheme := "http"
 	if r.TLS != nil {
-		baseURL = strings.Replace(baseURL, "http", "https", 1)
+		scheme = "https"
 	}
-	return baseURL
+	return scheme + "://" + host
 }
 
 func Auth(w http.ResponseWriter, r *http.Request) {
