@@ -20,8 +20,8 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		// Invalidate the current cookie
 		setCookie(w, "MTGBAN", "", time.Now(), true)
 
-		// Delete signature
-		sig = ""
+		http.Redirect(w, r, ServerURL, http.StatusFound)
+		return
 	}
 
 	pageVars := genPageNav("Home", sig)
