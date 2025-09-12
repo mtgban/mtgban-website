@@ -612,8 +612,8 @@ func openDBs() (err error) {
 	return nil
 }
 
-func loadGoogleCredentials(credentialsPath string) (*http.Client, error) {
-	u, err := url.Parse(credentialsPath)
+func loadGoogleCredentials() (*http.Client, error) {
+	u, err := url.Parse(Config.GoogleCredentials)
 	if err != nil {
 		return nil, err
 	}
@@ -714,7 +714,7 @@ func main() {
 	}
 	LogPages = map[string]*log.Logger{}
 
-	GoogleDocsClient, err = loadGoogleCredentials(Config.GoogleCredentials)
+	GoogleDocsClient, err = loadGoogleCredentials()
 	if err != nil {
 		if DevMode {
 			log.Println("error creating a Google client:", err)
