@@ -623,7 +623,7 @@ func readSetFlag(w http.ResponseWriter, r *http.Request, queryParam, cookieName 
 		flag, _ = strconv.ParseBool(readCookie(r, cookieName))
 		return flag
 	}
-	setCookie(w, cookieName, val)
+	setForeverCookie(w, cookieName, val)
 	return flag
 }
 
@@ -637,18 +637,23 @@ func readCookie(r *http.Request, cookieName string) string {
 	return ""
 }
 
+// There is no forever in cookies, so pick a really large interval
+func setForeverCookie(w http.ResponseWriter, cookieName, value string) {
+	tenYears := time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second)
+	setCookie(w, cookieName, value, tenYears)
+}
+
 // Set a cookie in the response with no expiration at the default root
-func setCookie(w http.ResponseWriter, cookieName, value string) {
+func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Time) {
 	domain := "mtgban.com"
 	if strings.Contains(ServerURL, "localhost") {
 		domain = "localhost"
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:   cookieName,
-		Domain: domain,
-		Path:   "/",
-		// No expiration
-		Expires: time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second),
+		Name:    cookieName,
+		Domain:  domain,
+		Path:    "/",
+		Expires: expires,
 		Value:   value,
 		// Enforce first party cookies only
 		SameSite: http.SameSiteStrictMode,

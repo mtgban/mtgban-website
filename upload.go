@@ -362,16 +362,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Reset the cookie for this preference
 	if len(hashes) == 0 && cachedGdocURL != gdocURL {
-		setCookie(w, "gdocURL", gdocURL)
+		setForeverCookie(w, "gdocURL", gdocURL)
 		pageVars.RemoteLinkURL = gdocURL
 	}
 
 	// Save user preferred stores in cookies and make sure the page is updated with those
 	if blMode {
-		setCookie(w, "enabledVendors", strings.Join(enabledStores, "|"))
+		setForeverCookie(w, "enabledVendors", strings.Join(enabledStores, "|"))
 		pageVars.EnabledVendors = enabledStores
 	} else {
-		setCookie(w, "enabledSellers", strings.Join(enabledStores, "|"))
+		setForeverCookie(w, "enabledSellers", strings.Join(enabledStores, "|"))
 		pageVars.EnabledSellers = enabledStores
 	}
 
