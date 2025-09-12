@@ -786,6 +786,7 @@ func main() {
 	}
 
 	http.Handle("/search/oembed", noSigning(http.HandlerFunc(Search)))
+	http.Handle("/api/mtgban/search/", enforceAPISigning(http.HandlerFunc(SearchAPI)))
 	http.Handle("/api/mtgban/", enforceAPISigning(http.HandlerFunc(PriceAPI)))
 	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
 	http.Handle("/api/cardmarket/", enforceSigning(http.HandlerFunc(MKMHandler)))

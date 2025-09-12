@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -600,9 +601,17 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	out.Meta.Version = APIVersion
 	out.Meta.BaseURL = ServerURL + "/go/"
 
-	query := r.URL.Path
-	isJSON := strings.HasSuffix(query, ".json")
-	isCSV := strings.HasSuffix(query, ".csv")
+	isJSON := strings.HasSuffix(r.URL.Path, ".json")
+	isCSV := strings.HasSuffix(r.URL.Path, ".csv")
+
+	// Only allow JSON from a different (protected) endpoint
+	if isJSON && !strings.HasPrefix(r.URL.Path, "/api/mtgban/search/") {
+		pageVars := genPageNav("Error", sig)
+		pageVars.Title = "Unauthorized"
+		pageVars.ErrorMessage = "Invalid endpoint for JSON"
+		render(w, "home.html", pageVars)
+		return
+	}
 
 	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
@@ -632,11 +641,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
 	isSealed := strings.Contains(r.URL.Path, "/sealed/")
 
-	query = strings.TrimPrefix(query, "/api/search/list/")
-	query = strings.TrimPrefix(query, "/api/search/retail/")
-	query = strings.TrimPrefix(query, "/api/search/buylist/")
-	query = strings.TrimPrefix(query, "sealed/")
-
+	query := path.Base(r.URL.Path)
 	query = strings.TrimSuffix(query, ".json")
 	query = strings.TrimSuffix(query, ".csv")
 
@@ -681,6 +686,11 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Override for the public endpoint
+		if sig == "" && isJSON {
+			enabledStores = Config.ApiDemoStores
+		}
+
 		out.Retail = getSellerPrices(idOpt, enabledStores, "", allKeys, "", true, true, isSealed, tagName)
 	}
 	if isBuylist && canBuylist {
@@ -689,6 +699,10 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
 				enabledStores = append(enabledStores, vendor.Info().Shorthand)
 			}
+		}
+
+		if sig == "" && isJSON {
+			enabledStores = Config.ApiDemoStores
 		}
 
 		out.Buylist = getVendorPrices(idOpt, enabledStores, "", allKeys, "", true, true, isSealed, tagName)
@@ -701,6 +715,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if isCSV {
+		w.Header().Set("Content-Type", "text/csv")
 		results := out.Retail
 		if isBuylist {
 			results = out.Buylist
