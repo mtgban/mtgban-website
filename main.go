@@ -391,6 +391,9 @@ const (
 	DefaultConfigPath = "config.json"
 	DefaultSecret     = "NotVerySecret!"
 	DefaultGame       = "magic"
+	DefaultHost       = "www.mtgban.com"
+
+	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
 
 func Favicon(w http.ResponseWriter, r *http.Request) {

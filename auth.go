@@ -26,11 +26,6 @@ import (
 var PatreonHost string
 
 const (
-	DefaultHost              = "www.mtgban.com"
-	DefaultSignatureDuration = 11 * 24 * time.Hour
-)
-
-const (
 	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
 	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
 	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/"
