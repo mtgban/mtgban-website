@@ -231,7 +231,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}()
 
 	case "demokey":
-		key, err := generateAPIKey(getBaseURL(r), DefaultAPIDemoUser, DefaultAPIDemoKeyDuration)
+		key, err := generateAPIKey(getSignatureURL(r), DefaultAPIDemoUser, DefaultAPIDemoKeyDuration)
 		if err != nil {
 			log.Println(err)
 			pageVars.InfoMessage = err.Error()
@@ -249,7 +249,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		dur := r.FormValue("duration")
 		duration, _ := strconv.Atoi(dur)
 
-		key, err := generateAPIKey(getBaseURL(r), user, time.Duration(duration)*24*time.Hour)
+		key, err := generateAPIKey(getSignatureURL(r), user, time.Duration(duration)*24*time.Hour)
 		msg := key
 		if err != nil {
 			msg = "error: " + err.Error()
@@ -263,8 +263,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		doReboot = true
 
 		tier := r.FormValue("tier")
-		baseURL := getBaseURL(r)
-		msg := baseURL + "/?sig=" + sign(baseURL, tier, nil)
+		msg := getServerURL(r) + "/?sig=" + sign(getSignatureURL(r), tier, nil)
 
 		v.Set("msg", msg)
 		v.Set("html", "textfield")

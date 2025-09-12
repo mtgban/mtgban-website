@@ -23,7 +23,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	if len(prefix) < 3 {
 		return
 	}
-	baseURL := getBaseURL(r)
+	baseURL := getServerURL(r)
 
 	AllLowerCaseNames := mtgmatcher.AllNames("lowercase", false)
 

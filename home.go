@@ -19,7 +19,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		message = ErrMsg
 	case "logout":
 		domain := "mtgban.com"
-		if strings.Contains(getBaseURL(r), "localhost") {
+		if strings.Contains(getServerURL(r), "localhost") {
 			domain = "localhost"
 		}
 

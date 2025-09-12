@@ -238,7 +238,19 @@ func getUserTier(tc *http.Client, userId string) (string, error) {
 
 // Retrieve the main url, mostly for Patron auth -- we can't use the one provided
 // by the url since it can be relative and thus empty
-func getBaseURL(r *http.Request) string {
+func getServerURL(r *http.Request) string {
+	host := r.Host
+	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
+		host = DefaultHost
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	return scheme + "://" + host
+}
+
+func getSignatureURL(r *http.Request) string {
 	host := r.Host
 	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
 		host = DefaultHost
@@ -251,7 +263,7 @@ func getBaseURL(r *http.Request) string {
 }
 
 func Auth(w http.ResponseWriter, r *http.Request) {
-	baseURL := getBaseURL(r)
+	baseURL := getServerURL(r)
 	code := r.FormValue("code")
 	if code == "" {
 		http.Redirect(w, r, baseURL, http.StatusFound)
@@ -310,7 +322,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	LogPages["Admin"].Println(tierTitle)
 
 	// Sign our base URL with our tier and other data
-	sig := sign(baseURL, tierTitle, userData)
+	sig := sign(getSignatureURL(r), tierTitle, userData)
 
 	// Keep it secret. Keep it safe.
 	putSignatureInCookies(w, r, sig)
@@ -320,7 +332,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 
 	// Go back home if empty or if coming back from a logout
 	if redir == "" || strings.Contains(redir, "errmsg=logout") {
-		redir = getBaseURL(r)
+		redir = getServerURL(r)
 	}
 
 	// Redirect, we're done here
@@ -360,7 +372,7 @@ func getSignatureFromCookies(r *http.Request) string {
 }
 
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
-	baseURL := getBaseURL(r)
+	baseURL := getServerURL(r)
 
 	year, month, _ := time.Now().Date()
 	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
@@ -386,7 +398,7 @@ func noSigning(next http.Handler) http.Handler {
 		defer recoverPanic(r, w)
 
 		if PatreonHost == "" {
-			PatreonHost = getBaseURL(r) + "/auth"
+			PatreonHost = getServerURL(r) + "/auth"
 		}
 
 		querySig := r.FormValue("sig")
@@ -476,7 +488,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			q.Set("Expires", exp)
 		}
 
-		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getBaseURL(r), q.Encode())
+		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getSignatureURL(r), q.Encode())
 		valid := signHMACSHA1Base64([]byte(secret), []byte(data))
 
 		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
@@ -508,7 +520,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		defer recoverPanic(r, w)
 
 		if PatreonHost == "" {
-			PatreonHost = getBaseURL(r) + "/auth"
+			PatreonHost = getServerURL(r) + "/auth"
 		}
 		sig := getSignatureFromCookies(r)
 		querySig := r.FormValue("sig")
@@ -580,7 +592,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		expectedSig := v.Get("Signature")
 		exp := v.Get("Expires")
 
-		data := fmt.Sprintf("GET%s%s%s", exp, getBaseURL(r), q.Encode())
+		data := fmt.Sprintf("GET%s%s%s", exp, getSignatureURL(r), q.Encode())
 		valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 		expires, err := strconv.ParseInt(exp, 10, 64)
 		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {

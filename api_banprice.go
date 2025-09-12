@@ -53,7 +53,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	out := PriceAPIOutput{}
 	out.Meta.Date = time.Now()
 	out.Meta.Version = APIVersion
-	out.Meta.BaseURL = getBaseURL(r) + "/go/"
+	out.Meta.BaseURL = getServerURL(r) + "/go/"
 
 	urlPath := strings.TrimPrefix(r.URL.Path, "/api/mtgban/")
 

@@ -640,7 +640,7 @@ func readCookie(r *http.Request, cookieName string) string {
 // Set a cookie in the response with no expiration at the default root
 func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
 	domain := "mtgban.com"
-	if strings.Contains(getBaseURL(r), "localhost") {
+	if strings.Contains(getServerURL(r), "localhost") {
 		domain = "localhost"
 	}
 	http.SetCookie(w, &http.Cookie{
