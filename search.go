@@ -272,9 +272,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
-	link := getServerURL(r)
-	pageVars.Embed.PageURL = link + r.URL.String()
-	pageVars.Embed.OEmbedURL = link + "/search/oembed?format=json&url=" + url.QueryEscape(link+"/search?q="+query)
+	pageVars.Embed.PageURL = ServerURL + r.URL.String()
+	pageVars.Embed.OEmbedURL = ServerURL + "/search/oembed?format=json&url=" + url.QueryEscape(ServerURL+"/search?q="+query)
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")

@@ -23,8 +23,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var PatreonHost string
-
 const (
 	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
 	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
@@ -266,17 +264,16 @@ func getSignatureURL(r *http.Request) string {
 }
 
 func Auth(w http.ResponseWriter, r *http.Request) {
-	baseURL := getServerURL(r)
 	code := r.FormValue("code")
 	if code == "" {
-		http.Redirect(w, r, baseURL, http.StatusFound)
+		http.Redirect(w, r, ServerURL, http.StatusFound)
 		return
 	}
 
-	token, err := getUserToken(code, baseURL, r.FormValue("state"))
+	token, err := getUserToken(code, ServerURL, r.FormValue("state"))
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=TokenNotFound", http.StatusFound)
+		http.Redirect(w, r, ServerURL+"?errmsg=TokenNotFound", http.StatusFound)
 		return
 	}
 
@@ -286,7 +283,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	userData, err := getUserIds(tc)
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
-		http.Redirect(w, r, baseURL+"?errmsg=UserNotFound", http.StatusFound)
+		http.Redirect(w, r, ServerURL+"?errmsg=UserNotFound", http.StatusFound)
 		return
 	}
 
@@ -317,7 +314,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 
 	if tierTitle == "" {
 		LogPages["Admin"].Println("getUserTier returned an empty tier")
-		http.Redirect(w, r, baseURL+"?errmsg=TierNotFound", http.StatusFound)
+		http.Redirect(w, r, ServerURL+"?errmsg=TierNotFound", http.StatusFound)
 		return
 	}
 
@@ -335,7 +332,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 
 	// Go back home if empty or if coming back from a logout
 	if redir == "" || strings.Contains(redir, "errmsg=logout") {
-		redir = getServerURL(r)
+		redir = ServerURL
 	}
 
 	// Redirect, we're done here
@@ -375,12 +372,10 @@ func getSignatureFromCookies(r *http.Request) string {
 }
 
 func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
-	baseURL := getServerURL(r)
-
 	year, month, _ := time.Now().Date()
 	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
 	domain := "mtgban.com"
-	if strings.Contains(baseURL, "localhost") {
+	if strings.Contains(ServerURL, "localhost") {
 		domain = "localhost"
 	}
 	cookie := http.Cookie{
@@ -400,8 +395,8 @@ func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		if PatreonHost == "" {
-			PatreonHost = getServerURL(r) + "/auth"
+		if ServerURL == "" {
+			ServerURL = getServerURL(r)
 		}
 
 		querySig := r.FormValue("sig")
@@ -522,8 +517,8 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		defer recoverPanic(r, w)
 
-		if PatreonHost == "" {
-			PatreonHost = getServerURL(r) + "/auth"
+		if ServerURL == "" {
+			ServerURL = getServerURL(r)
 		}
 		sig := getSignatureFromCookies(r)
 		querySig := r.FormValue("sig")

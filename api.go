@@ -598,7 +598,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	out := PriceAPIOutput{}
 	out.Meta.Date = time.Now()
 	out.Meta.Version = APIVersion
-	out.Meta.BaseURL = getServerURL(r) + "/go/"
+	out.Meta.BaseURL = ServerURL + "/go/"
 
 	query := r.URL.Path
 	isJSON := strings.HasSuffix(query, ".json")

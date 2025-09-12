@@ -263,7 +263,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		doReboot = true
 
 		tier := r.FormValue("tier")
-		msg := getServerURL(r) + "/?sig=" + sign(getSignatureURL(r), tier, nil)
+		msg := ServerURL + "/?sig=" + sign(getSignatureURL(r), tier, nil)
 
 		v.Set("msg", msg)
 		v.Set("html", "textfield")

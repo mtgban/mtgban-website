@@ -386,6 +386,9 @@ var GoogleDocsClient *http.Client
 
 var ConfigBucket simplecloud.ReadWriter
 
+// External address from which server is reachable, loaded at the first request
+var ServerURL string
+
 const (
 	DefaultConfigPort = "8080"
 	DefaultConfigPath = "config.json"
@@ -448,7 +451,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		ErrorMessage: msg,
 
 		PatreonIds:   Config.Patreon.Client,
-		PatreonURL:   PatreonHost,
+		PatreonURL:   ServerURL + "/auth",
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,
 	}

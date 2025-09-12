@@ -23,7 +23,6 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	if len(prefix) < 3 {
 		return
 	}
-	baseURL := getServerURL(r)
 
 	AllLowerCaseNames := mtgmatcher.AllNames("lowercase", false)
 
@@ -35,7 +34,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 			suggestions = append(suggestions, AllNames[i])
 			printings, _ := mtgmatcher.Printings4Card(name)
 			results = append(results, printings2line(printings))
-			links = append(links, baseURL+"/search?q="+url.QueryEscape(AllNames[i]))
+			links = append(links, ServerURL+"/search?q="+url.QueryEscape(AllNames[i]))
 		}
 	}
 	// This argument is mandatory
