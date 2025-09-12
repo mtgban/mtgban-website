@@ -365,9 +365,9 @@ func getSignatureFromCookies(r *http.Request) string {
 	return sig
 }
 
+// Put signature in cookies for one month, all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, sig string) {
-	year, month, _ := time.Now().Date()
-	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
+	oneMonth := time.Now().Add(31 * 24 * 60 * 60 * time.Second)
 	domain := "mtgban.com"
 	if strings.Contains(ServerURL, "localhost") {
 		domain = "localhost"
@@ -376,7 +376,7 @@ func putSignatureInCookies(w http.ResponseWriter, sig string) {
 		Name:    "MTGBAN",
 		Domain:  domain,
 		Path:    "/",
-		Expires: endOfThisMonth,
+		Expires: oneMonth,
 		Value:   sig,
 	}
 
