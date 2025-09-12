@@ -325,7 +325,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	sig := sign(getSignatureURL(r), tierTitle, userData)
 
 	// Keep it secret. Keep it safe.
-	putSignatureInCookies(w, r, sig)
+	putSignatureInCookies(w, sig)
 
 	// Redirect to the URL indicated in this query param, or go to homepage
 	redir := strings.Split(r.FormValue("state"), ";")[0]
@@ -371,7 +371,7 @@ func getSignatureFromCookies(r *http.Request) string {
 	return sig
 }
 
-func putSignatureInCookies(w http.ResponseWriter, r *http.Request, sig string) {
+func putSignatureInCookies(w http.ResponseWriter, sig string) {
 	year, month, _ := time.Now().Date()
 	endOfThisMonth := time.Date(year, month+1, 1, 0, 0, 0, 0, time.Now().Location())
 	domain := "mtgban.com"
@@ -401,7 +401,7 @@ func noSigning(next http.Handler) http.Handler {
 
 		querySig := r.FormValue("sig")
 		if querySig != "" {
-			putSignatureInCookies(w, r, querySig)
+			putSignatureInCookies(w, querySig)
 		}
 
 		next.ServeHTTP(w, r)
@@ -524,7 +524,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		querySig := r.FormValue("sig")
 		if querySig != "" {
 			sig = querySig
-			putSignatureInCookies(w, r, querySig)
+			putSignatureInCookies(w, querySig)
 		}
 
 		switch r.Method {

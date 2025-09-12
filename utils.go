@@ -623,7 +623,7 @@ func readSetFlag(w http.ResponseWriter, r *http.Request, queryParam, cookieName 
 		flag, _ = strconv.ParseBool(readCookie(r, cookieName))
 		return flag
 	}
-	setCookie(w, r, cookieName, val)
+	setCookie(w, cookieName, val)
 	return flag
 }
 
@@ -638,7 +638,7 @@ func readCookie(r *http.Request, cookieName string) string {
 }
 
 // Set a cookie in the response with no expiration at the default root
-func setCookie(w http.ResponseWriter, r *http.Request, cookieName, value string) {
+func setCookie(w http.ResponseWriter, cookieName, value string) {
 	domain := "mtgban.com"
 	if strings.Contains(ServerURL, "localhost") {
 		domain = "localhost"
