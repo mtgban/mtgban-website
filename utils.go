@@ -640,24 +640,36 @@ func readCookie(r *http.Request, cookieName string) string {
 // There is no forever in cookies, so pick a really large interval
 func setForeverCookie(w http.ResponseWriter, cookieName, value string) {
 	tenYears := time.Now().Add(10 * 365 * 24 * 60 * 60 * time.Second)
-	setCookie(w, cookieName, value, tenYears)
+	setCookie(w, cookieName, value, tenYears, false)
 }
 
 // Set a cookie in the response with no expiration at the default root
-func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Time) {
-	domain := "mtgban.com"
-	if strings.Contains(ServerURL, "localhost") {
-		domain = "localhost"
+func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Time, global bool) {
+	u, err := url.Parse(ServerURL)
+	if err != nil {
+		ServerNotify("cookie", "unable to parse ServerURL", true)
+		return
 	}
-	http.SetCookie(w, &http.Cookie{
+
+	domain := u.Hostname()
+	if global {
+		fields := strings.Split(domain, ".")
+		domain = strings.Join(fields[1:], ".")
+	}
+
+	cookie := http.Cookie{
 		Name:    cookieName,
 		Domain:  domain,
 		Path:    "/",
 		Expires: expires,
 		Value:   value,
+	}
+
+	if !global {
 		// Enforce first party cookies only
-		SameSite: http.SameSiteStrictMode,
-	})
+		cookie.SameSite = http.SameSiteStrictMode
+	}
+	http.SetCookie(w, &cookie)
 }
 
 // Retrieve default blocklists according to the signature contents
