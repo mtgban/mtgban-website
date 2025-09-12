@@ -239,27 +239,35 @@ func getUserTier(tc *http.Client, userId string) (string, error) {
 // Retrieve the main url, mostly for Patron auth -- we can't use the one provided
 // by the url since it can be relative and thus empty
 func getServerURL(r *http.Request) string {
-	host := r.Host
-	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
-		host = DefaultHost
+	scheme := r.Header.Get("X-Forwarded-Proto")
+	if scheme == "" {
+		if r.TLS != nil {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
 	}
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
+
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
 	}
+
 	return scheme + "://" + host
 }
 
+// Only two values are allowed - either on localhost or on the mtgban.com domain
 func getSignatureURL(r *http.Request) string {
-	host := r.Host
-	if host == "localhost:"+fmt.Sprint(Config.Port) && !DevMode {
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+
+	if strings.HasSuffix(host, "mtgban.com") {
 		host = DefaultHost
 	}
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	return scheme + "://" + host
+
+	return "http://" + host
 }
 
 func Auth(w http.ResponseWriter, r *http.Request) {
