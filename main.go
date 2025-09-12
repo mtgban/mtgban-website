@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -611,8 +612,19 @@ func openDBs() (err error) {
 	return nil
 }
 
-func loadGoogleCredentials(credentials string) (*http.Client, error) {
-	data, err := os.ReadFile(credentials)
+func loadGoogleCredentials(credentialsPath string) (*http.Client, error) {
+	u, err := url.Parse(credentialsPath)
+	if err != nil {
+		return nil, err
+	}
+
+	reader, err := simplecloud.InitReader(context.TODO(), ConfigBucket, u.Path)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, err
 	}
