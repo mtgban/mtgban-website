@@ -595,6 +595,11 @@ func loadVars(port, datastorePath string) error {
 }
 
 func openDBs() (err error) {
+	if Config.DBAddress == "" {
+		log.Println("no DB address, skipping")
+		return nil
+	}
+
 	Newspaper3dayDB, err = sql.Open("mysql", Config.DBAddress+"/three_day_newspaper")
 	if err != nil {
 		return err
@@ -708,11 +713,7 @@ func main() {
 
 	err = openDBs()
 	if err != nil {
-		if DevMode {
-			log.Println("error opening databases:", err)
-		} else {
-			log.Fatalln("error opening databases:", err)
-		}
+		log.Fatalln("error opening databases:", err)
 	}
 
 	// load website up
