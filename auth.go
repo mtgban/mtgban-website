@@ -249,20 +249,6 @@ func getServerURL(r *http.Request) string {
 	return scheme + "://" + host
 }
 
-// Only two values are allowed - either on localhost or on the mtgban.com domain
-func getSignatureURL(r *http.Request) string {
-	host := r.Header.Get("X-Forwarded-Host")
-	if host == "" {
-		host = r.Host
-	}
-
-	if strings.HasSuffix(host, "mtgban.com") {
-		host = DefaultHost
-	}
-
-	return "http://" + host
-}
-
 func Auth(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	if code == "" {
@@ -322,7 +308,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	LogPages["Admin"].Println(tierTitle)
 
 	// Sign our base URL with our tier and other data
-	sig := sign(getSignatureURL(r), tierTitle, userData)
+	sig := sign(tierTitle, userData)
 
 	// Keep it secret. Keep it safe.
 	putSignatureInCookies(w, sig)
@@ -468,7 +454,11 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			q.Set("Expires", exp)
 		}
 
-		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, getSignatureURL(r), q.Encode())
+		link := DefaultServerURL
+		if !strings.HasSuffix(ServerURL, "mtgban.com") {
+			link = "http://localhost:" + fmt.Sprint(Config.Port)
+		}
+		data := fmt.Sprintf("%s%s%s%s", r.Method, exp, link, q.Encode())
 		valid := signHMACSHA1Base64([]byte(secret), []byte(data))
 
 		if SigCheck && (valid != sig || (exp != "" && (expires < time.Now().Unix()))) {
@@ -572,7 +562,11 @@ func enforceSigning(next http.Handler) http.Handler {
 		expectedSig := v.Get("Signature")
 		exp := v.Get("Expires")
 
-		data := fmt.Sprintf("GET%s%s%s", exp, getSignatureURL(r), q.Encode())
+		link := DefaultServerURL
+		if !strings.HasSuffix(ServerURL, "mtgban.com") {
+			link = "http://localhost:" + fmt.Sprint(Config.Port)
+		}
+		data := fmt.Sprintf("GET%s%s%s", exp, link, q.Encode())
 		valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
 		expires, err := strconv.ParseInt(exp, 10, 64)
 		if SigCheck && (err != nil || valid != expectedSig || expires < time.Now().Unix()) {
@@ -678,7 +672,7 @@ func getValuesForTier(tierTitle string) url.Values {
 	return v
 }
 
-func sign(link string, tierTitle string, userData *PatreonUserData) string {
+func sign(tierTitle string, userData *PatreonUserData) string {
 	v := getValuesForTier(tierTitle)
 	if userData != nil {
 		v.Set("UserName", userData.FullName)
@@ -686,6 +680,11 @@ func sign(link string, tierTitle string, userData *PatreonUserData) string {
 		v.Set("UserTier", tierTitle)
 	}
 
+	// This is constant or localhost for legacy reason
+	link := DefaultServerURL
+	if !strings.HasSuffix(ServerURL, "mtgban.com") {
+		link = "http://localhost:" + fmt.Sprint(Config.Port)
+	}
 	expires := time.Now().Add(DefaultSignatureDuration)
 	data := fmt.Sprintf("GET%d%s%s", expires.Unix(), link, v.Encode())
 	key := os.Getenv("BAN_SECRET")

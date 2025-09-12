@@ -231,7 +231,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}()
 
 	case "demokey":
-		key, err := generateAPIKey(getSignatureURL(r), DefaultAPIDemoUser, DefaultAPIDemoKeyDuration)
+		key, err := generateAPIKey(DefaultAPIDemoUser, DefaultAPIDemoKeyDuration)
 		if err != nil {
 			log.Println(err)
 			pageVars.InfoMessage = err.Error()
@@ -249,7 +249,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		dur := r.FormValue("duration")
 		duration, _ := strconv.Atoi(dur)
 
-		key, err := generateAPIKey(getSignatureURL(r), user, time.Duration(duration)*24*time.Hour)
+		key, err := generateAPIKey(user, time.Duration(duration)*24*time.Hour)
 		msg := key
 		if err != nil {
 			msg = "error: " + err.Error()
@@ -263,7 +263,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		doReboot = true
 
 		tier := r.FormValue("tier")
-		msg := ServerURL + "/?sig=" + sign(getSignatureURL(r), tier, nil)
+		msg := ServerURL + "/?sig=" + sign(tier, nil)
 
 		v.Set("msg", msg)
 		v.Set("html", "textfield")
@@ -702,7 +702,7 @@ func writeConfigFile(config ConfigType, writer io.Writer) error {
 	return e.Encode(&config)
 }
 
-func generateAPIKey(link, user string, duration time.Duration) (string, error) {
+func generateAPIKey(user string, duration time.Duration) (string, error) {
 	if user == "" {
 		return "", errors.New("missing user")
 	}
@@ -746,6 +746,10 @@ func generateAPIKey(link, user string, duration time.Duration) (string, error) {
 		v.Set("Expires", exp)
 	}
 
+	link := DefaultServerURL
+	if !strings.HasSuffix(ServerURL, "mtgban.com") {
+		link = "http://localhost:" + fmt.Sprint(Config.Port)
+	}
 	data := fmt.Sprintf("GET%s%s%s", exp, link, v.Encode())
 	sig := signHMACSHA1Base64([]byte(key), []byte(data))
 

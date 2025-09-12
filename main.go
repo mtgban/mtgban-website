@@ -394,7 +394,7 @@ const (
 	DefaultConfigPath = "config.json"
 	DefaultSecret     = "NotVerySecret!"
 	DefaultGame       = "magic"
-	DefaultHost       = "www.mtgban.com"
+	DefaultServerURL  = "http://www.mtgban.com"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
