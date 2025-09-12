@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -18,19 +17,8 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	case "UserNotFound", "TierNotFound":
 		message = ErrMsg
 	case "logout":
-		domain := "mtgban.com"
-		if strings.Contains(ServerURL, "localhost") {
-			domain = "localhost"
-		}
-
 		// Invalidate the current cookie
-		cookie := http.Cookie{
-			Name:    "MTGBAN",
-			Domain:  domain,
-			Path:    "/",
-			Expires: time.Now(),
-		}
-		http.SetCookie(w, &cookie)
+		setCookie(w, "MTGBAN", "", time.Now(), true)
 
 		// Delete signature
 		sig = ""
