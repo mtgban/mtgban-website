@@ -346,13 +346,7 @@ func signHMACSHA1Base64(key []byte, data []byte) string {
 }
 
 func getSignatureFromCookies(r *http.Request) string {
-	var sig string
-	for _, cookie := range r.Cookies() {
-		if cookie.Name == "MTGBAN" {
-			sig = cookie.Value
-			break
-		}
-	}
+	sig := readCookie(r, "MTGBAN")
 
 	querySig := r.FormValue("sig")
 	if sig == "" && querySig != "" {
