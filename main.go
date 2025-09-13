@@ -132,6 +132,7 @@ type PageVars struct {
 	Headers      [][]string
 	Tables       [][][]string
 	LastUpdate   time.Time
+	LastStash    time.Time
 	CurrentTime  time.Time
 	Uptime       string
 	DiskStatus   string
@@ -380,6 +381,9 @@ var DevMode bool
 var SigCheck bool
 var SkipPrices bool
 var LogDir string
+
+var LastDatastoreUpdate time.Time
+var LastStashUpdate time.Time
 
 var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
@@ -671,6 +675,7 @@ func loadDatastore() error {
 		return err
 	}
 
+	LastDatastoreUpdate = time.Now()
 	go updateStaticData()
 	ServerNotify("init", "Datastore installed")
 

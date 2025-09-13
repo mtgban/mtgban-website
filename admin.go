@@ -74,6 +74,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
+	pageVars.LastUpdate = LastDatastoreUpdate
+	pageVars.LastStash = LastStashUpdate
+
 	var gaScrapers []string
 	for _, state := range []string{"in_progress", "queued"} {
 		scrapers, err := snapshotGithubAction(state)

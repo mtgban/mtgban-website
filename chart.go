@@ -210,6 +210,7 @@ func stashInTimeseries() {
 		}
 	}
 
+	LastStashUpdate = time.Now()
 	StashingInProgress = false
 	ServerNotify("timeseries", "Snapshot completed in "+fmt.Sprint(time.Since(start)))
 }

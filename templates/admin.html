@@ -142,8 +142,11 @@
                 <li>Server uptime: {{.Uptime}}</li>
                 <li>Disk status: {{.DiskStatus}}</li>
                 <li>Memory status: {{.MemoryStatus}}</li>
-                <li>Current time: {{.CurrentTime}}</li>
                 <li>Latest Hash: <a target="_blank" href="https://github.com/mtgban/mtgban-website/commit/{{.LatestHash}}">{{.LatestHash}}</a></li>
+                <br>
+                <li>Datastore updated at: {{.LastUpdate}}</li>
+                <li>Last data stashing at: {{.LastStash}}</li>
+                <li>Current time is: {{.CurrentTime}}</li>
             </ul>
         </div>
 
