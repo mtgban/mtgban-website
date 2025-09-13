@@ -351,6 +351,25 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 		},
 	},
 	{
+		Trigger:       "manapool.com/card",
+		Name:          "Manapool",
+		Handle:        "MP",
+		DefaultFields: []string{"ref"},
+	},
+	{
+		Trigger:       "manapool.com/sealed",
+		Name:          "Manapool",
+		Handle:        "MP",
+		DefaultFields: []string{"ref"},
+		TitleFunc: func(URLpath string) string {
+			base := path.Base(URLpath)
+			title := mtgmatcher.Title(strings.Replace(base, "-", " ", -1))
+			URLpath = strings.TrimSuffix(URLpath, "/"+base)
+			title += " from " + strings.ToUpper(path.Base(URLpath))
+			return title
+		},
+	},
+	{
 		Trigger:       "amazon.com/",
 		Skip:          []string{"images"},
 		Name:          "Amazon",
