@@ -103,16 +103,14 @@ func guildCreate(s *discordgo.Session, gc *discordgo.GuildCreate) {
 		return
 	}
 
-	// Otherwise we print a message, pick our stuff, and leave
+	// Otherwise we print a message, and ask to try again
 	s.ChannelMessageSendEmbed(gc.Guild.SystemChannelID, &discordgo.MessageEmbed{
-		Description: "Looks like I'm not authorized to be here ⋋〳 ᵕ _ʖ ᵕ 〵⋌",
+		Description: "I'm not in the enabled list! Please verify and invite me again",
 		Footer:      &poweredByFooter,
 	})
 
 	msg := fmt.Sprintf("%s (%s) attempted to install the bot", gc.Guild.Name, gc.Guild.ID)
 	UserNotify("bot", msg, true)
-	log.Println("unauthorized installation attempt:", msg)
-	s.GuildLeave(gc.Guild.ID)
 }
 
 var filteredEditions = []string{
