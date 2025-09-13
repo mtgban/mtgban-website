@@ -365,6 +365,7 @@ func noSigning(next http.Handler) http.Handler {
 
 		if ServerURL == "" {
 			ServerURL = getServerURL(r)
+			log.Println("Setting server URL as", ServerURL)
 		}
 
 		querySig := r.FormValue("sig")
@@ -491,6 +492,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		if ServerURL == "" {
 			ServerURL = getServerURL(r)
+			log.Println("Setting server URL as", ServerURL)
 		}
 		sig := getSignatureFromCookies(r)
 		querySig := r.FormValue("sig")
