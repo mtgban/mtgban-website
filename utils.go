@@ -580,14 +580,12 @@ func ServerNotify(kind, message string, flags ...bool) {
 
 // Only send the notification for a user action
 func UserNotify(kind, message string, flags ...bool) {
-	if DevMode {
-		log.Println(kind, "-", message)
-	}
 	if Config.DiscordHook == "" {
 		return
 	}
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
+		log.Println(kind, "-", message)
 	}
 	go notify(kind, message, Config.DiscordHook)
 }
