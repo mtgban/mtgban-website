@@ -384,6 +384,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		ip, err := IpAddress(r)
 		if err != nil {
+			log.Println(err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
