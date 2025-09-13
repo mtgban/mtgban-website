@@ -234,10 +234,9 @@ func getUserTier(tc *http.Client, userId string) (string, error) {
 func getServerURL(r *http.Request) string {
 	scheme := r.Header.Get("X-Forwarded-Proto")
 	if scheme == "" {
+		scheme = "http"
 		if r.TLS != nil {
 			scheme = "https"
-		} else {
-			scheme = "http"
 		}
 	}
 
