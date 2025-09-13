@@ -813,6 +813,17 @@ func main() {
 	http.HandleFunc("/favicon.ico", Favicon)
 	http.HandleFunc("/auth", Auth)
 
+	// /healthz: returns 200 only if dependencies are OK.
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if len(Sellers) == 0 || len(Vendors) == 0 {
+			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
 	}
