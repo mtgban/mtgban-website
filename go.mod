@@ -62,7 +62,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
 	github.com/mtgban/go-tcgplayer v0.0.0-20250314170048-a37ce47d0d4a // indirect
-	github.com/mtgban/simplecloud v0.0.3 // indirect
+	github.com/mtgban/simplecloud v0.0.4 // indirect
 	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
