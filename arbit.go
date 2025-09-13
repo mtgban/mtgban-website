@@ -408,7 +408,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	user := GetParamFromSig(sig, "UserEmail")
 	msg := fmt.Sprintf("Request by %s took %v", user, time.Since(start))
 	UserNotify("arbit", msg)
-	LogPages["Arbit"].Println(msg)
+	LogPages["Arbitrage"].Println(msg)
 }
 
 func Global(w http.ResponseWriter, r *http.Request) {

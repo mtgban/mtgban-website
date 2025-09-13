@@ -780,10 +780,21 @@ func main() {
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
 
-	// Set up logging
-	setLoggers(OrderNav)
-
 	for _, nav := range ExtraNavs {
+		// Set up logging
+		logFile, err := logfile.New(&logfile.LogFile{
+			FileName:    path.Join(LogDir, nav.Name+".log"),
+			MaxSize:     500 * 1024,
+			Flags:       logfile.FileOnly,
+			OldVersions: 2,
+		})
+		if err != nil {
+			log.Printf("Failed to create logFile for %s: %s", nav.Name, err)
+			LogPages[nav.Name] = log.New(os.Stderr, "", log.LstdFlags)
+		} else {
+			LogPages[nav.Name] = log.New(logFile, "", log.LstdFlags)
+		}
+
 		// Set up the handler
 		handler := enforceSigning(http.HandlerFunc(nav.Handle))
 		http.Handle(nav.Link, handler)
@@ -848,23 +859,6 @@ func main() {
 		return
 	}
 	ServerNotify("shutdown", "Server shutdown correctly")
-}
-
-func setLoggers(keys []string) {
-	for _, key := range keys {
-		logFile, err := logfile.New(&logfile.LogFile{
-			FileName:    path.Join(LogDir, key+".log"),
-			MaxSize:     500 * 1024,
-			Flags:       logfile.FileOnly,
-			OldVersions: 2,
-		})
-		if err != nil {
-			log.Printf("Failed to create logFile for %s: %s", key, err)
-			LogPages[key] = log.New(os.Stderr, "", log.LstdFlags)
-		} else {
-			LogPages[key] = log.New(logFile, "", log.LstdFlags)
-		}
-	}
 }
 
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
