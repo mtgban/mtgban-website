@@ -341,6 +341,7 @@ type ConfigType struct {
 		BucketSecretKey string `json:"bucket_access_secret"`
 	} `json:"datastore"`
 	Game                   string            `json:"game"`
+	CardBackImage          string            `json:"card_back_image"`
 	ScraperConfig          ScraperConfig     `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig  `json:"timeseries_config"`
 	DBAddress              string            `json:"db_address"`
@@ -465,14 +466,8 @@ func genPageNav(activeTab, sig string) PageVars {
 		pageVars.DisableChart = true
 	}
 
-	switch Config.Game {
-	case DefaultGame:
-		pageVars.CardBackURL = "https://cards.scryfall.io/back.png"
-	case "lorcana":
-		pageVars.CardBackURL = "img/backs/lorcana.webp"
-	default:
-		panic("no pageVars.CardBackURL set")
-	}
+	// Set card back
+	pageVars.CardBackURL = Config.CardBackImage
 
 	// Allocate a new navigation bar
 	pageVars.Nav = make([]NavElem, len(DefaultNav))
