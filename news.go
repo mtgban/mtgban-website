@@ -526,6 +526,15 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav("Newspaper", sig)
 
+	// Check if any DB connection was made
+	if Config.DBAddress == "" {
+		pageVars.Title = "This feature is not enabled"
+		pageVars.ErrorMessage = ErrMsgDenied
+
+		render(w, "news.html", pageVars)
+		return
+	}
+
 	var db *sql.DB
 	enabled := GetParamFromSig(sig, "NewsEnabled")
 	if enabled == "1day" {
