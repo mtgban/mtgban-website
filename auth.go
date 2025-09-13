@@ -644,7 +644,7 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 		ServerNotify("panic", string(buf))
 		ServerNotify("panic", "source request: "+r.URL.String())
 
-		http.Error(w, "500 Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 }
