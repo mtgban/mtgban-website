@@ -1,0 +1,22 @@
+name: lorcana-deploy
+
+on:
+  push:
+    tags:
+      - 'lorcana-*' # deploy only when a new tag is created
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_API_TOKEN }}
+
+      - name: Create deployment
+        run: doctl apps create-deployment ${{ secrets.DO_LORCANA_APP_ID }} --wait
+
