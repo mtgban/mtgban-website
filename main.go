@@ -404,35 +404,10 @@ const (
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
 
-func Favicon(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "img/favicon/favicon.ico")
-}
-
-// FileSystem custom file system handler
-type FileSystem struct {
-	httpfs http.FileSystem
-}
-
-// Open opens file
-func (fs *FileSystem) Open(path string) (http.File, error) {
-	f, err := fs.httpfs.Open(path)
-	if err != nil {
-		return nil, err
-	}
-
-	s, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if s.IsDir() {
-		index := strings.TrimSuffix(path, "/") + "/index.html"
-		_, err := fs.httpfs.Open(index)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return f, nil
+// Cache for a week as these assets either never change or have a snapshot key in the URL
+func ServeFile(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	http.ServeFile(w, r, r.URL.Path[1:])
 }
 
 func genPageNav(activeTab, sig string) PageVars {
@@ -768,10 +743,11 @@ func main() {
 	// Set seed in case we need to do random operations
 	rand.Seed(time.Now().UnixNano())
 
-	// serve everything in known folders as a file
-	http.Handle("/css/", http.StripPrefix("/css/", http.FileServer(&FileSystem{http.Dir("css")})))
-	http.Handle("/img/", http.StripPrefix("/img/", http.FileServer(&FileSystem{http.Dir("img")})))
-	http.Handle("/js/", http.StripPrefix("/js/", http.FileServer(&FileSystem{http.Dir("js")})))
+	// Serve everything in known folders as a file
+	http.HandleFunc("/css/", ServeFile)
+	http.HandleFunc("/img/", ServeFile)
+	http.HandleFunc("/js/", ServeFile)
+	http.HandleFunc("/favicon.ico", ServeFile)
 
 	// custom redirector
 	http.HandleFunc("/go/", Redirect)
@@ -820,7 +796,6 @@ func main() {
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
 
-	http.HandleFunc("/favicon.ico", Favicon)
 	http.HandleFunc("/auth", Auth)
 
 	// /healthz: returns 200 only if dependencies are OK.
