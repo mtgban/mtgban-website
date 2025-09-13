@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -512,13 +513,13 @@ var NewspaperAllRarities = []string{
 	"", "M", "R", "U", "C", "S", "M/R", "U/C",
 }
 
-func getLastDBUpdate(db *sql.DB) (string, error) {
+func getLastDBUpdate(db *sql.DB) (time.Time, error) {
 	var lastUpdate string
 	err := db.QueryRow("SELECT data_value FROM newspaper_updated").Scan(&lastUpdate)
 	if err != nil {
-		return "", err
+		return time.Now(), err
 	}
-	return lastUpdate, nil
+	return time.Parse("2006-01-02", lastUpdate)
 }
 
 func Newspaper(w http.ResponseWriter, r *http.Request) {
@@ -593,7 +594,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.LastUpdate, err = getLastDBUpdate(db)
 	if err != nil {
 		log.Println(err)
-		pageVars.LastUpdate = "unknown"
 	}
 
 	switch page {

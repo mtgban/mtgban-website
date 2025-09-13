@@ -63,7 +63,6 @@ type PageVars struct {
 	ErrorMessage   string
 	WarningMessage string
 	InfoMessage    string
-	LastUpdate     string
 
 	AllKeys      []string
 	SearchQuery  string
@@ -132,6 +131,7 @@ type PageVars struct {
 
 	Headers      [][]string
 	Tables       [][][]string
+	LastUpdate   time.Time
 	CurrentTime  time.Time
 	Uptime       string
 	DiskStatus   string
