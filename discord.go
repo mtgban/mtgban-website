@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"golang.org/x/exp/slices"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
@@ -94,22 +93,7 @@ func guildCreate(s *discordgo.Session, gc *discordgo.GuildCreate) {
 	// Set a "is playing" status
 	s.UpdateGameStatus(0, "http://mtgban.com")
 
-	// If guild is authorized, then we can proceed as normal
-	if slices.Contains(Config.DiscordAllowList, gc.Guild.ID) {
-		return
-	}
-	// Skip this check when running on dev
-	if DevMode {
-		return
-	}
-
-	// Otherwise we print a message, and ask to try again
-	s.ChannelMessageSendEmbed(gc.Guild.SystemChannelID, &discordgo.MessageEmbed{
-		Description: "I'm not in the enabled list! Please verify and invite me again",
-		Footer:      &poweredByFooter,
-	})
-
-	msg := fmt.Sprintf("%s (%s) attempted to install the bot", gc.Guild.Name, gc.Guild.ID)
+	msg := fmt.Sprintf("New bot install at %s (%s)", gc.Guild.Name, gc.Guild.ID)
 	UserNotify("bot", msg, true)
 }
 
@@ -393,11 +377,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	// Ignore messages coming from unauthorized discords
-	if !slices.Contains(Config.DiscordAllowList, m.GuildID) {
-		return
-	}
-
 	// Ignore all messages created by a bot
 	if m.Author.Bot {
 		return
@@ -417,11 +396,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if !strings.HasPrefix(m.Content, "!") &&
 		!strings.HasPrefix(m.Content, "?") &&
 		!strings.HasPrefix(m.Content, "$$") {
-		// Early exit if not running on the main server
-		if m.GuildID != Config.DiscordAllowList[0] {
-			return
-		}
-
 		switch {
 		// Check if selected channels can replace scryfall searches
 		case (m.ChannelID == DevChannelID || m.ChannelID == RecapChannelID || m.ChannelID == ChatChannelID) && strings.Contains(m.Content, "[["):
@@ -776,7 +750,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 		embed.Footer.Text += "On TCGplayer SYP list\n"
 	}
 	// Show data source on non-ban servers
-	if len(Config.DiscordAllowList) > 0 && guildId != Config.DiscordAllowList[0] {
+	if guildId != "637563728711385091" {
 		embed.Footer.IconURL = poweredByFooter.IconURL
 		embed.Footer.Text += poweredByFooter.Text
 	}

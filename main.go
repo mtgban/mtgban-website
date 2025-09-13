@@ -355,7 +355,6 @@ type ConfigType struct {
 	Api                    map[string]string `json:"api"`
 	ApiDemoStores          []string          `json:"api_demo_stores"`
 	DiscordToken           string            `json:"discord_token"`
-	DiscordAllowList       []string          `json:"discord_allowlist"`
 	ArbitDefaultSellers    []string          `json:"arbit_default_sellers"`
 	ArbitBlockVendors      []string          `json:"arbit_block_vendors"`
 	SearchRetailBlockList  []string          `json:"search_block_list"`
