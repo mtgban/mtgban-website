@@ -535,12 +535,8 @@ type OpenSearchURL struct {
 }
 
 func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
-	host := ""
-	gameName := "Magic: the Gathering"
-	if Config.Game == "lorcana" {
-		host = "lorcana."
-		gameName = "Lorcana"
-	}
+	host := Config.Game
+	gameName := mtgmatcher.Title(Config.Game)
 
 	images := []OpenSearchImage{
 		{
@@ -562,17 +558,17 @@ func OpenSearchDesc(w http.ResponseWriter, r *http.Request) {
 			Method:   "get",
 			Rel:      "results",
 			Type:     "text/html",
-			Template: "https://" + host + "mtgban.com/search?q={searchTerms}",
+			Template: "https://" + host + ".mtgban.com/search?q={searchTerms}",
 		},
 		{
 			Rel:      "self",
 			Type:     "application/opensearchdescription+xml",
-			Template: "https://" + host + "mtgban.com/api/opensearch.xml",
+			Template: "https://" + host + ".mtgban.com/api/opensearch.xml",
 		},
 		{
 			Rel:      "suggestions",
 			Type:     "application/json",
-			Template: "http://" + host + "mtgban.com/api/suggest?q={searchTerms}",
+			Template: "http://" + host + ".mtgban.com/api/suggest?q={searchTerms}",
 		},
 	}
 
