@@ -1157,8 +1157,6 @@ func findInDeck(sealedUUID, opt string) []string {
 
 				var board []mtgmatcher.DeckCard
 				switch opt {
-				case "bonus":
-					board = deck.Bonus
 				case "commander":
 					board = deck.Commander
 				case "main":
