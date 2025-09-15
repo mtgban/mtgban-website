@@ -238,13 +238,24 @@ func fixupTypeNG(code string) []string {
 func fixupDateNG(code string) string {
 	set, err := mtgmatcher.GetSet(strings.ToUpper(code))
 	if err == nil {
-		code = set.ReleaseDate
+		return set.ReleaseDate
 	}
-	_, err = time.Parse("2006-01-02", code)
-	if err == nil {
-		return code
+	_, err = parseDate(code)
+	if err != nil {
+		return ""
 	}
-	return ""
+	return code
+}
+
+func parseDate(code string) (time.Time, error) {
+	date, err := time.Parse("2006-01-02", code)
+	if err != nil {
+		date, err = time.Parse("2006-01", code)
+		if err != nil {
+			return time.Parse("2006", code)
+		}
+	}
+	return date, nil
 }
 
 var colorMap = map[string][]string{
@@ -1178,7 +1189,7 @@ func compareReleaseDate(filters []string, co *mtgmatcher.CardObject, cmpFunc fun
 	}
 	value := filters[0]
 
-	releaseDate, err := time.Parse("2006-01-02", value)
+	releaseDate, err := parseDate(value)
 	if err != nil {
 		return true
 	}
