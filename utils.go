@@ -301,6 +301,7 @@ var allLanguageFlags = map[string]string{
 	"Portuguese (Brazil)": "🇧🇷",
 	"Russian":             "🇷🇺",
 	"Spanish":             "🇪🇸",
+	"Phyrexian":           "phi",
 }
 
 func showVariant(cardId string) bool {
@@ -358,7 +359,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 
 	name, flavor := co.Name, co.FlavorName
 	if flavor != "" {
-		if preferFlavorName {
+		if preferFlavorName || co.Language == "Phyrexian" {
 			name, flavor = co.FlavorName, co.Name
 		}
 

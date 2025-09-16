@@ -803,3 +803,10 @@ img.hoverImage {
     max-width: 640px;
     max-height: 360px;
 }
+
+@font-face {
+    font-family: 'phyrexian';
+    src: url('phyrexian.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+}

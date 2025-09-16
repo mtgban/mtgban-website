@@ -1255,10 +1255,10 @@ func sortSetsAlphabetical(uuidI, uuidJ string, preferFlavor bool) bool {
 
 	cIname := cI.Name
 	cJname := cJ.Name
-	if preferFlavor && cI.FlavorName != "" {
+	if preferFlavor && cI.FlavorName != "" && cI.Language != "Phyrexian" {
 		cIname = cI.FlavorName
 	}
-	if preferFlavor && cJ.FlavorName != "" {
+	if preferFlavor && cJ.FlavorName != "" && cJ.Language != "Phyrexian" {
 		cJname = cJ.FlavorName
 	}
 
