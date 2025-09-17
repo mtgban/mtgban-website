@@ -1403,7 +1403,8 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 			for _, value := range filters {
 				if slices.Contains(co.Subtypes, value) ||
 					slices.Contains(co.Types, value) ||
-					slices.Contains(co.Supertypes, value) {
+					slices.Contains(co.Supertypes, value) ||
+					co.PrintedType == value {
 					return false
 				}
 			}
