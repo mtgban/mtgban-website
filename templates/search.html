@@ -937,9 +937,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                 <table style="background-color: var(--background); float:left;" {{if .IsSealed}}onmouseout="document.getElementById('hoverImage').src='{{$emptyImg}}';"{{end}}>
                     {{if .AllKeys}}
                         <tr>
-                            <th class="stickyCategory"><h2 align=center>Sellers</h2></th>
-                            <th class="stickyCategory"><h2 align=center>Buyers</h2></th>
-                            <th class="stickyCategory"><h2 align=center style="display:none" id="lastsalesth">Last Sales</h2></th>
+                            <th class="stickyCategory" style="z-index: 99"><h2 align=center>Sellers</h2></th>
+                            <th class="stickyCategory" style="z-index: 99"><h2 align=center>Buyers</h2></th>
+                            <th class="stickyCategory" style="z-index: 99"><h2 align=center style="display:none" id="lastsalesth">Last Sales</h2></th>
                         </tr>
                     {{end}}
 
@@ -955,7 +955,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                         </defs>
                     </svg>
 
-                    {{range $cardId := .AllKeys}}
+                    {{range $i, $cardId := .AllKeys}}
                         {{$card := (index $.Metadata $cardId)}}
                         {{if eq $firstImg ""}}
                             {{$firstImg = $card.ImageURL}}
@@ -964,7 +964,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                         {{end}}
 
                         <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" title="[{{$card.SetCode}}] {{$card.Title}}">
-                            <th colspan="3" class="wrap stickyHeader" style="text-align: left; vertical-align: middle;">
+                            <th colspan="3" class="wrap stickyHeader" style="text-align: left; vertical-align: middle; z-index: {{inc $i 1}}">
                                 <table style="margin:0 0 0 18">
                                     <tr style="background-color:rgba(0, 0, 0, 0);">
                                         <td rowspan=2>
@@ -1098,7 +1098,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                             </th>
                         </tr>
 
-                        <tr class="no-hover" style="background-color:rgba(0,0,0,0);" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" style="background-color:rgba(0, 0, 0, 0);">
+                        <tr class="no-hover" style="background-color: var(--background); position: relative; z-index: {{$i}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});">
                             {{$condsEntry := (index $.FoundSellers $cardId)}}
                             <td style="vertical-align: {{if not $condsEntry}}middle{{else}}top{{end}}; padding: 0; margin: 0;">
                                 <table class="searchResults" style="margin: 0 6px 0 12px;">
@@ -1208,7 +1208,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                             </td>
 
                             {{$condsEntry := (index $.FoundVendors $cardId)}}
-                            <td style="vertical-align: {{if not $condsEntry}}middle{{else}}top{{end}}; padding: 0; margin: 0;">
+                            <td style="vertical-align: {{if not $condsEntry}}middle{{else}}top{{end}}; padding: 0; margin: 0; position: relative;  z-index: {{$i}}">
                                 <table class="searchResults" style="margin: 0 6px 0 12px;">
                                     {{if not $condsEntry}}
                                         <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" style="background-color:rgba(0, 0, 0, 0);">
