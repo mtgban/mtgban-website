@@ -762,7 +762,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 
 		// Set custom scraper options
-		opts.Conditions = nil
 		if pageVars.GlobalMode && scraper.Info().Shorthand == "TCGDirect" {
 			opts.Conditions = BadConditions
 		}
