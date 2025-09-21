@@ -503,7 +503,7 @@ func init() {
 		return len(opts[i]) < len(opts[j])
 	})
 
-	regexpOptions = fmt.Sprintf(`-?(%s%s)[:<>](("([^"]+)"|\S+))+`, strings.Join(opts, "|"), strings.ToUpper(strings.Join(opts, "|")))
+	regexpOptions = fmt.Sprintf(`-?(%s|%s)[:<>](("([^"]+)"|\S+))+`, strings.Join(opts, "|"), strings.ToUpper(strings.Join(opts, "|")))
 
 	re = regexp.MustCompile(regexpOptions)
 }
