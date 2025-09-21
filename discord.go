@@ -401,14 +401,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		case (m.ChannelID == DevChannelID || m.ChannelID == RecapChannelID || m.ChannelID == ChatChannelID) && strings.Contains(m.Content, "[["):
 			fields := squareBracketsRE.FindAllString(m.Content, -1)
 			for _, field := range fields {
-				m.Content = "!" + strings.TrimRight(strings.TrimLeft(field, "["), "]")
+				m.Content = "!" + strings.Trim(field, "[]")
 				messageCreate(s, m)
 			}
 		// Check if the message uses the Pricefall syntax
 		case strings.Contains(m.Content, "{{"):
 			fields := curlyBracketsRE.FindAllString(m.Content, -1)
 			for _, field := range fields {
-				m.Content = "!" + strings.TrimRight(strings.TrimLeft(field, "{"), "}")
+				m.Content = "!" + strings.Trim(field, "{}")
 				messageCreate(s, m)
 			}
 		// Check if we can intercept Gatherer requests

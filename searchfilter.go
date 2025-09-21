@@ -129,8 +129,7 @@ func fixupEditionNG(code string) []string {
 
 	code = strings.TrimSpace(code)
 	for _, field := range strings.Split(code, ",") {
-		field = strings.TrimPrefix(field, "\"")
-		field = strings.TrimSuffix(field, "\"")
+		field = strings.Trim(field, "\"")
 
 		set, err := mtgmatcher.GetSet(field)
 		if err == nil {
@@ -155,8 +154,7 @@ func fixupStoreCodeNG(code string) []string {
 
 	filters := strings.Split(code, ",")
 	for i := range filters {
-		filters[i] = strings.TrimPrefix(filters[i], "\"")
-		filters[i] = strings.TrimSuffix(filters[i], "\"")
+		filters[i] = strings.Trim(filters[i], "\"")
 
 		// Validate the input against the registered scrapers
 		for _, seller := range Sellers {
@@ -227,9 +225,7 @@ func fixupFinishNG(code string) []string {
 func fixupTypeNG(code string) []string {
 	filters := strings.Split(code, ",")
 	for i := range filters {
-		filters[i] = strings.TrimPrefix(filters[i], "\"")
-		filters[i] = strings.TrimSuffix(filters[i], "\"")
-
+		filters[i] = strings.Trim(filters[i], "\"")
 		filters[i] = mtgmatcher.Title(filters[i])
 	}
 	return filters
@@ -339,7 +335,7 @@ func fixupIDs(code string) []string {
 }
 
 func sealedname2uuid(name string) string {
-	name = strings.TrimLeft(strings.TrimRight(name, "\" "), "\" ")
+	name = strings.TrimSpace(strings.Trim(name, "\""))
 	res, err := mtgmatcher.SearchSealedEquals(name)
 	if err != nil {
 		return ""
