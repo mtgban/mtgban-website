@@ -115,8 +115,8 @@ github.com/hashicorp/go-cleanhttp v0.5.2 h1:035FKYIWjmULyFRBKPs8TBQoi0x6d9G4xc9n
 github.com/hashicorp/go-cleanhttp v0.5.2/go.mod h1:kO/YDlP8L1346E6Sodw+PrpBSV4/SoxCXGY6BqNFT48=
 github.com/hashicorp/go-hclog v1.6.3 h1:Qr2kF+eVWjTiYmU7Y31tYlP1h0q/X3Nl3tPGdaB11/k=
 github.com/hashicorp/go-hclog v1.6.3/go.mod h1:W4Qnvbt70Wk/zYJryRzDRU/4r0kIg0PVHBcfoyhpF5M=
-github.com/hashicorp/go-retryablehttp v0.7.7 h1:C8hUCYzor8PIfXHa4UrZkU4VvK8o9ISHxT2Q8+VepXU=
-github.com/hashicorp/go-retryablehttp v0.7.7/go.mod h1:pkQpWZeYWskR+D1tR2O5OcBFOxfA7DoAO6xtkuQnHTk=
+github.com/hashicorp/go-retryablehttp v0.7.8 h1:ylXZWnqa7Lhqpk0L1P1LzDtGcCR0rPVUrx/c8Unxc48=
+github.com/hashicorp/go-retryablehttp v0.7.8/go.mod h1:rjiScheydd+CxvumBsIrFKlx3iS0jrZ7LvzFGFmuKbw=
 github.com/klauspost/compress v1.4.1/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=
 github.com/klauspost/cpuid v1.2.0/go.mod h1:Pj4uuM528wm8OyEC2QMXAi2YiTZ96dNQPGgoMS4s3ek=
 github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10 h1:u9y/Zac8wI/044pGaAx/rBgSkDWZ3ke3fkO/G9n/L/Q=
@@ -131,10 +131,10 @@ github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 h1:RWengNIwukTxcDr9
 github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826/go.mod h1:TaXosZuwdSHYgviHp1DAtfrULt5eUgsSMsZf+YrPgl8=
 github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd5E/OeU=
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
-github.com/mtgban/go-mtgban v0.5.37 h1:nXpjGD4Mav+4XLHWeojL3AhhjOngPvC41xEy8d6Gd1k=
-github.com/mtgban/go-mtgban v0.5.37/go.mod h1:Lj2xFN5ul4h4DZitVJC3NdppZQuwmUxcflZXzBzDkWE=
-github.com/mtgban/go-tcgplayer v0.0.0-20250314170048-a37ce47d0d4a h1:eCwPEHqvq1H+QOO/nKJCtfQK9kSVgUbBanMvL+B9pyo=
-github.com/mtgban/go-tcgplayer v0.0.0-20250314170048-a37ce47d0d4a/go.mod h1:bBKN+PMIyVmjaUP0uVpCEfvKBbC2WzUYS0lZZvvtrlU=
+github.com/mtgban/go-mtgban v0.5.38 h1:BHZ2o2LIFs3A5+Sm5NXofJkEIOVisNh85jDjkvxnDnM=
+github.com/mtgban/go-mtgban v0.5.38/go.mod h1:yX3+afijXb6G7qBRZu0eK4ON7Yos40rP6bsPpLxSsK0=
+github.com/mtgban/go-tcgplayer v0.0.1 h1:0IJvApKMKyDqbMqjRtjFMzCKI3MZQEKuDIkA43zoPdo=
+github.com/mtgban/go-tcgplayer v0.0.1/go.mod h1:l0BmeIiHMkZXkdNSAcAyu9yZLEn6ryOKoOzn8e2xtn0=
 github.com/mtgban/simplecloud v0.0.4 h1:Bj7pWc+EguWc6vJpke4vpgvcs3Y6QE5tqSKeydftSMc=
 github.com/mtgban/simplecloud v0.0.4/go.mod h1:cdrKKYrUPT7+MTsiqTWGF2FNrGunR29Td6mK+cbc18w=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
