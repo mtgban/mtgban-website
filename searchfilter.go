@@ -462,6 +462,8 @@ var FilterOperations = map[string][]string{
 	"cn":        []string{":", ">", "<"},
 	"cne":       []string{":"},
 	"date":      []string{":", ">", "<"},
+	"name":      []string{":"},
+	"namee":     []string{":"},
 	"r":         []string{":", ">", "<"},
 	"t":         []string{":"},
 	"f":         []string{":"},
@@ -666,6 +668,21 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			}
 
 		// Options that modify the card searches
+		case "name":
+			filters = append(filters, FilterElem{
+				Name:   "name",
+				Negate: negate,
+				// No fixup because names will be normalized
+				Values: []string{code},
+			})
+		case "namee":
+			filters = append(filters, FilterElem{
+				Name:   "name_regexp",
+				Negate: negate,
+				// No fixup because we need to trust input
+				// but remove any possible containing characters on the sides
+				Values: []string{strings.Trim(code, "\"()")},
+			})
 		case "s", "edition", "e":
 			filters = append(filters, FilterElem{
 				Name:   "edition",
@@ -1365,6 +1382,13 @@ var rarityMap = map[string]int{
 }
 
 var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObject) bool{
+	"name": func(filters []string, co *mtgmatcher.CardObject) bool {
+		return !mtgmatcher.Equals(filters[0], co.Name)
+	},
+	"name_regexp": func(filters []string, co *mtgmatcher.CardObject) bool {
+		matched, _ := regexp.MatchString(filters[0], co.Name)
+		return !matched
+	},
 	"edition": func(filters []string, co *mtgmatcher.CardObject) bool {
 		return !slices.Contains(filters, co.SetCode)
 	},
