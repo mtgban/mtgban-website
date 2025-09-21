@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -80,11 +79,6 @@ func getUserToken(code, baseURL, ref string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
 	var userTokens struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
@@ -92,9 +86,9 @@ func getUserToken(code, baseURL, ref string) (string, error) {
 		Scope        string `json:"scope"`
 		TokenType    string `json:"token_type"`
 	}
-	err = json.Unmarshal(data, &userTokens)
+	err = json.NewDecoder(resp.Body).Decode(&userTokens)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot decode user tokens: %w", err)
 	}
 
 	return userTokens.AccessToken, nil
@@ -113,11 +107,6 @@ func getUserIds(tc *http.Client) (*PatreonUserData, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
 
 	var userData struct {
 		Errors []struct {
@@ -141,11 +130,11 @@ func getUserIds(tc *http.Client) (*PatreonUserData, error) {
 		} `json:"data"`
 	}
 
-	LogPages["Admin"].Println("getUserIds:", string(data))
-	err = json.Unmarshal(data, &userData)
+	err = json.NewDecoder(resp.Body).Decode(&userData)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot decode user data: %w", err)
 	}
+	LogPages["Admin"].Println("getUserIds:", userData)
 	if len(userData.Errors) > 0 {
 		return nil, errors.New(userData.Errors[0].CodeName)
 	}
@@ -171,10 +160,6 @@ func getUserTier(tc *http.Client, userId string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
 
 	var membershipData struct {
 		Errors []struct {
@@ -202,11 +187,11 @@ func getUserTier(tc *http.Client, userId string) (string, error) {
 	}
 	tierId := ""
 	tierTitle := ""
-	LogPages["Admin"].Println("getUserTier:", string(data))
-	err = json.Unmarshal(data, &membershipData)
+	err = json.NewDecoder(resp.Body).Decode(&membershipData)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("cannot decode membership data: %w", err)
 	}
+	LogPages["Admin"].Println("getUserTier:", membershipData)
 	if len(membershipData.Errors) > 0 {
 		return "", errors.New(membershipData.Errors[0].Detail)
 	}

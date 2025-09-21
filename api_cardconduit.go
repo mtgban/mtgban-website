@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"time"
 
@@ -63,13 +62,8 @@ func sendCardConduitEstimate(items []CCItem) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
 	var response CCResponse
-	err = json.Unmarshal(data, &response)
+	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		return "", err
 	}

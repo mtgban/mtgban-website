@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"path"
@@ -41,12 +40,6 @@ func getMoxDeck(deckID string) (*MoxfieldDeck, error) {
 	}
 	defer resp.Body.Close()
 
-	// Read response body into slice.
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
 	// Check response status code.
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("status code: %d", resp.StatusCode)
@@ -54,7 +47,7 @@ func getMoxDeck(deckID string) (*MoxfieldDeck, error) {
 
 	// Parse deck data from response body.
 	var deck MoxfieldDeck
-	err = json.Unmarshal(data, &deck)
+	err = json.NewDecoder(resp.Body).Decode(&deck)
 	if err != nil {
 		return nil, err
 	}
