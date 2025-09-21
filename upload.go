@@ -24,6 +24,7 @@ import (
 	"gopkg.in/Iwark/spreadsheet.v2"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/cardconduit"
 )
 
 const (
@@ -437,7 +438,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Allow estimating on a separate page
 	if estimate {
-		var items []CCItem
+		var items []cardconduit.Item
 		for i := range uploadedData {
 			if uploadedData[i].CardId == "" {
 				continue
@@ -467,7 +468,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			qty *= multiplier
 
-			items = append(items, CCItem{
+			items = append(items, cardconduit.Item{
 				ScryfallID: scryfallId,
 				Condition:  cond,
 				Quantity:   qty,
@@ -476,7 +477,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		link, err := sendCardConduitEstimate(items)
+		link, err := cardconduit.SendEstimate(r.Context(), Config.Api["cardconduit"], items)
 		if err != nil {
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to process your list to CardConduit right now"

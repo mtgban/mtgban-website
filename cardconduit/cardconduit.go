@@ -1,7 +1,8 @@
-package main
+package cardconduit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,10 +12,10 @@ import (
 )
 
 const (
-	CCEstimateURL = "https://cardconduit.com/api/v1.0/estimate"
+	EstimateURL = "https://cardconduit.com/api/v1.0/estimate"
 )
 
-type CCItem struct {
+type Item struct {
 	ScryfallID string `json:"scryfall_id"`
 	Condition  string `json:"condition,omitempty"`
 	Quantity   int    `json:"quantity,omitempty"`
@@ -23,11 +24,11 @@ type CCItem struct {
 	IsEtched   bool   `json:"is_etched,omitempty"`
 }
 
-type CCPayload struct {
-	Items []CCItem `json:"items"`
+type Payload struct {
+	Items []Item `json:"items"`
 }
 
-type CCResponse struct {
+type Response struct {
 	Success  bool   `json:"success"`
 	Message  string `json:"message"`
 	HTTPCode int    `json:"http_code"`
@@ -40,19 +41,20 @@ type CCResponse struct {
 	} `json:"data"`
 }
 
-func sendCardConduitEstimate(items []CCItem) (string, error) {
-	var payload CCPayload
+// Forward items to CC and retrieve the URL containing the results
+func SendEstimate(ctx context.Context, bearer string, items []Item) (string, error) {
+	var payload Payload
 	payload.Items = items
 	reqBytes, err := json.Marshal(&payload)
 	if err != nil {
 		return "", err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, CCEstimateURL, bytes.NewReader(reqBytes))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, EstimateURL, bytes.NewReader(reqBytes))
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+Config.Api["cardconduit"])
+	req.Header.Set("Authorization", "Bearer "+bearer)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
@@ -62,7 +64,7 @@ func sendCardConduitEstimate(items []CCItem) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	var response CCResponse
+	var response Response
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
 		return "", err
