@@ -23,6 +23,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 
 	prefix := strings.ToLower(r.FormValue("q"))
 	if len(prefix) < 3 {
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
