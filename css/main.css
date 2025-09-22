@@ -816,3 +816,15 @@ img.hoverImage {
 :lang(phi) {
     font-family: 'phyrexian', sans-serif;
 }
+
+@font-face {
+    font-family: 'quenya';
+    src: url('quenya.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+:lang(qya) {
+    font-family: 'quenya', sans-serif;
+}
