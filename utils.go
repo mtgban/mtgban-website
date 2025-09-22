@@ -359,7 +359,9 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 
 	name, flavor := co.Name, co.FlavorName
 	if flavor != "" {
-		if preferFlavorName || co.Language == "Phyrexian" {
+		// Use allLanguageFlags to check whether the card should always
+		// be displayed with the alternative name (ie for different fonts)
+		if preferFlavorName || allLanguageFlags[co.Language] == "" {
 			name, flavor = co.FlavorName, co.Name
 		}
 

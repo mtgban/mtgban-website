@@ -844,7 +844,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			continue
 		}
 		cardName = co.Name
-		if (preferFlavor || co.Language == "Phyrexian") && co.FlavorName != "" {
+		if preferFlavor && co.FlavorName != "" && allLanguageFlags[co.Language] != "" {
 			cardName = co.FlavorName
 		}
 		code = co.SetCode
