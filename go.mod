@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/BlueMonday/go-scryfall v0.9.0
 	github.com/NYTimes/gziphandler v1.1.1
-	github.com/PuerkitoBio/goquery v1.8.1
+	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/bwmarrin/discordgo v0.27.1
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
 	github.com/extrame/xls v0.0.1
@@ -14,7 +14,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/mackerelio/go-osstat v0.2.4
-	github.com/mtgban/go-mtgban v0.5.38
+	github.com/mtgban/go-mtgban v0.5.39
 	github.com/mtgban/simplecloud v0.0.4
 	github.com/redis/go-redis/v9 v9.12.1
 	github.com/xuri/excelize/v2 v2.8.0
@@ -40,7 +40,7 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.53.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.53.0 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
-	github.com/andybalholm/cascadia v1.3.2 // indirect
+	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect

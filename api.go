@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -37,7 +38,7 @@ func getLastSold(cardId string, anyLang bool) ([]tcgplayer.LatestSalesData, erro
 		return nil, ErrMissingTCGId
 	}
 
-	latestSales, err := tcgplayer.LatestSales(tcgId, co.Foil || co.Etched, anyLang)
+	latestSales, err := tcgplayer.LatestSales(context.TODO(), tcgId, co.Foil || co.Etched, anyLang)
 	if err != nil {
 		return nil, err
 	}
