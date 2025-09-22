@@ -9,6 +9,10 @@ if [[ "${1}" == "latest" ]]
 then
     echo "Using latest hash"
     TIP=$(git ls-remote https://github.com/mtgban/go-mtgban.git HEAD | awk '{ print $1}')
+elif [[ -e "${1}" ]]
+then
+    echo "unknown argument"
+    exit 1
 fi
 
 go get -u github.com/mtgban/go-mtgban@$TIP
