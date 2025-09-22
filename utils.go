@@ -63,6 +63,7 @@ type GenericCard struct {
 	Booster   bool
 	HasDeck   bool
 	Flag      string
+	LangTag   string
 
 	RarityColor  string
 	ScryfallURL  string
@@ -301,7 +302,6 @@ var allLanguageFlags = map[string]string{
 	"Portuguese (Brazil)": "🇧🇷",
 	"Russian":             "🇷🇺",
 	"Spanish":             "🇪🇸",
-	"Phyrexian":           "phi",
 }
 
 func showVariant(cardId string) bool {
@@ -476,6 +476,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		Booster:   canBoosterGen,
 		HasDeck:   hasDecklist,
 		Flag:      allLanguageFlags[co.Language],
+		LangTag:   mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
 		RarityColor:  rarityColor,
 		ScryfallURL:  scryfallURL,

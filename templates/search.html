@@ -984,13 +984,13 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             </a>
                                         </td>
                                         <td width=100%>
-                                            <a href="{{$card.SearchURL}}" {{if eq $card.Flag "phi"}}style="font-family: 'phyrexian';"{{end}}>
+                                            <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">
                                                 {{$card.Name}}
                                             </a>
                                             {{if ne $card.Variant ""}}
                                                 <i>({{$card.Variant}})</i>
                                             {{end}}
-                                            {{if and $card.Flag (not (eq $card.Flag "phi"))}}
+                                            {{if $card.Flag}}
                                                 &nbsp;<span class="emoji" style="line-height:0">{{$card.Flag}}</span>
                                             {{end}}
                                             {{if $card.Reserved}}

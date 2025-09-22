@@ -484,7 +484,7 @@
                                     {{end}}
                                     -->
                                 {{end}}
-                                <a href="{{(index $.Metadata .CardId).SearchURL}}" {{if eq $card.Flag "phi"}}style="font-family: 'phyrexian';"{{end}}>{{$card.Name}}</a>
+                                <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
                                 {{if (index $.Metadata .CardId).Reserved}} *{{end}}
                                 {{if (index $.Metadata .CardId).Stocks}} •{{end}}
                                 {{if not (eq $.ScraperShort "SYP")}}
