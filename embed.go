@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"path"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 )
@@ -266,10 +268,14 @@ func longestName(results []SearchEntry) (out int) {
 	return
 }
 
+// Called from a discord session, so there is no context information available
 func grabLastSold(cardId string, lang string) ([]EmbedField, error) {
 	var fields []EmbedField
 
-	lastSales, err := getLastSold(cardId, false)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	lastSales, err := getLastSold(ctx, cardId, false)
 	if err != nil {
 		return nil, err
 	}
