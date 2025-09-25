@@ -36,10 +36,11 @@ async function autocomplete(form, inp, sealed) {
 
         /* For each item in the array... */
         for (i = 0; i < arr.length; i++) {
+            let inputText = val.toUpperCase();
             /* Check if the item starts with the same letters as the text field value */
-            if (arr[i].substr(0, val.length).toUpperCase() == val.toUpperCase() ||
-                arr[i].substr(0, val.length).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() == val.toUpperCase() ||
-                arr[i].replace(/[^A-Za-z0-9 ]/g, "").substr(0, val.length).toUpperCase() == val.toUpperCase()) {
+            if (arr[i].substr(0, val.length).toUpperCase() == inputText ||
+                arr[i].substr(0, val.length).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase() == inputText ||
+                arr[i].replace(/[^A-Za-z0-9 ]/g, "").substr(0, val.length).toUpperCase() == inputText) {
                 /* Create a DIV element for each matching element */
                 b = document.createElement("DIV");
 
