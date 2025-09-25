@@ -139,7 +139,6 @@ type PageVars struct {
 	MemoryStatus string
 	LatestHash   string
 	Tiers        []string
-	DemoKey      string
 
 	SelectableField bool
 	DisableLinks    bool

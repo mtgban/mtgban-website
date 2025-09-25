@@ -233,23 +233,18 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			os.Exit(0)
 		}()
 
-	case "demokey":
-		key, err := generateAPIKey(DefaultAPIDemoUser, DefaultAPIDemoKeyDuration)
-		if err != nil {
-			log.Println(err)
-			pageVars.InfoMessage = err.Error()
-			break
-		}
-		pageVars.DemoKey = url.QueryEscape(key)
-
-		log.Println(pageVars.DemoKey)
-
-	case "newKey":
+	case "newKey", "demokey":
 		v = url.Values{}
 		doReboot = true
 
 		user := r.FormValue("user")
+		if user == "" {
+			user = DefaultAPIDemoUser
+		}
 		dur := r.FormValue("duration")
+		if dur == "" {
+			dur = DefaultAPIDemoKeyDuration
+		}
 		duration, _ := strconv.Atoi(dur)
 
 		key, err := generateAPIKey(user, time.Duration(duration)*24*time.Hour)
@@ -691,7 +686,7 @@ func mem() string {
 }
 
 const (
-	DefaultAPIDemoKeyDuration = 30 * 24 * time.Hour
+	DefaultAPIDemoKeyDuration = "30"
 	DefaultAPIDemoUser        = "demo@mtgban.com"
 )
 
