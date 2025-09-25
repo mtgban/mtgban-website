@@ -459,6 +459,13 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer recoverPanic(r, w)
+
+		if ServerURL == "" {
+			ServerURL = getServerURL(r)
+			log.Println("Setting server URL as", ServerURL)
+		}
+
 		// Check if this endpoint can be bypassed
 		_, checkNoAuth := Config.ACL["Any"]
 		if checkNoAuth {
@@ -473,12 +480,6 @@ func enforceSigning(next http.Handler) http.Handler {
 			}
 		}
 
-		defer recoverPanic(r, w)
-
-		if ServerURL == "" {
-			ServerURL = getServerURL(r)
-			log.Println("Setting server URL as", ServerURL)
-		}
 		sig := getSignatureFromCookies(r)
 		querySig := r.FormValue("sig")
 		if querySig != "" {
