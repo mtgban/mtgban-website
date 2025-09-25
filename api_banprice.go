@@ -317,9 +317,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 
 	user := GetParamFromSig(sig, "UserEmail")
 	if sig == "" && user == "" {
-		user = "DEMO"
+		user = "anonymous"
 	}
-	msg := fmt.Sprintf("[%v] %s requested a '%s' API dump ('%s','%q','%s')", time.Since(start), user, dumpType, filterByEdition, filterByHash, filterByFinish)
+	msg := fmt.Sprintf("[%v] %s (%s / %s) requested a '%s' API dump ('%s','%q','%s')", time.Since(start), user, r.Header.Get("X-Forwarded-For"), r.RemoteAddr, dumpType, filterByEdition, filterByHash, filterByFinish)
 	if qty {
 		msg += " with quantities"
 	}
