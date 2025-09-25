@@ -594,6 +594,19 @@ func UserNotify(kind, message string, flags ...bool) {
 	go notify(kind, message, Config.DiscordHook)
 }
 
+// Only send the notification for a user action
+func APINotify(message string, flags ...bool) {
+	kind := Config.Game
+	log.Println(kind, "-", message)
+	if Config.DiscordAPINotifHook == "" {
+		return
+	}
+	if len(flags) > 0 && flags[0] {
+		message = "@here " + message
+	}
+	go notify(kind, message, Config.DiscordHook)
+}
+
 func notify(kind, message, hook string) {
 	var payload Notification
 	payload.Username = kind

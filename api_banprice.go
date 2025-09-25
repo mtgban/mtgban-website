@@ -335,7 +335,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println(msg)
 	} else {
-		UserNotify("api", msg)
+		APINotify(msg)
 	}
 
 	if out.Retail == nil && out.Buylist == nil {

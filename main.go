@@ -348,6 +348,7 @@ type ConfigType struct {
 	DBAddress              string            `json:"db_address"`
 	DiscordHook            string            `json:"discord_hook"`
 	DiscordNotifHook       string            `json:"discord_notif_hook"`
+	DiscordAPINotifHook    string            `json:"discord_api_notif_hook"`
 	DiscordInviteLink      string            `json:"discord_invite_link"`
 	Affiliate              map[string]string `json:"affiliate"`
 	AffiliatesList         []string          `json:"affiliates_list"`
