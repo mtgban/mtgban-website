@@ -2,11 +2,10 @@ package main
 
 import (
 	"log"
+	"slices"
 	"sort"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"

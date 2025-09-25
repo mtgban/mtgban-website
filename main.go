@@ -28,7 +28,7 @@ import (
 	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
 	"gopkg.in/Iwark/spreadsheet.v2"
-	cron "gopkg.in/robfig/cron.v2"
+	"gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/simplecloud"

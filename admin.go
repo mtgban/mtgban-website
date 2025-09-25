@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	cleanhttp "github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/simplecloud"
 	"golang.org/x/exp/slices"
 

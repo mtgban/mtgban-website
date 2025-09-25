@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -18,9 +19,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/extrame/xls"
-	cleanhttp "github.com/hashicorp/go-cleanhttp"
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/xuri/excelize/v2"
-	"golang.org/x/exp/slices"
 	"gopkg.in/Iwark/spreadsheet.v2"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"

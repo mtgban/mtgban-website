@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +23,6 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
-	"golang.org/x/exp/slices"
 )
 
 var ErrMissingTCGId = errors.New("tcg id not found")

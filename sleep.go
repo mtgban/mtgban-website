@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,7 +14,6 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"golang.org/x/exp/slices"
 )
 
 type Sleeper struct {

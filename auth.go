@@ -12,13 +12,13 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-	cleanhttp "github.com/hashicorp/go-cleanhttp"
-	"golang.org/x/exp/slices"
+	"github.com/hashicorp/go-cleanhttp"
 	"golang.org/x/oauth2"
 )
 
