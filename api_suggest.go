@@ -11,8 +11,6 @@ import (
 )
 
 func SuggestAPI(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
 	sealed, _ := strconv.ParseBool(r.FormValue("sealed"))
 
 	AllNames := mtgmatcher.AllNames("canonical", sealed)
