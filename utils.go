@@ -669,7 +669,10 @@ func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Tim
 	domain := u.Hostname()
 	if global {
 		fields := strings.Split(domain, ".")
-		domain = strings.Join(fields[1:], ".")
+		// Guard against hostname being "mtgban.com"
+		if fields[0] != "mtgban" {
+			domain = strings.Join(fields[1:], ".")
+		}
 	}
 
 	cookie := http.Cookie{
