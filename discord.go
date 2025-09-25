@@ -691,9 +691,14 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	link := "https://www.mtgban.com/" + searchEndpoint + "?q=" + co.UUID + "&utm_source=banbot&utm_affiliate=" + guildId
 
 	// Set title of the main message
-	title := "Prices for " + card.Name
+	name := card.Name
+	// We need to restore the original English text if Language is a fantasy one
+	if allLanguageFlags[co.Language] == "" {
+		name = co.Name
+	}
+	title := "Prices for " + name
 	if lastSold {
-		title = "TCG Last Sold prices for " + card.Name
+		title = "TCG Last Sold prices for " + name
 
 		tcgId := findTCGproductId(co.UUID)
 		productId, _ := strconv.Atoi(tcgId)
