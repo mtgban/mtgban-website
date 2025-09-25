@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
@@ -49,7 +50,7 @@ type PatreonConfig struct {
 	} `json:"grants"`
 }
 
-func getUserToken(code, baseURL, ref string) (string, error) {
+func getUserToken(ctx context.Context, code, baseURL, ref string) (string, error) {
 	source := "ban"
 
 	// ref might point to a different patreon configuration
@@ -67,13 +68,21 @@ func getUserToken(code, baseURL, ref string) (string, error) {
 		return "", fmt.Errorf("missing secret for %s", source)
 	}
 
-	resp, err := cleanhttp.DefaultClient().PostForm(PatreonTokenURL, url.Values{
+	payload := url.Values{
 		"code":          {code},
 		"grant_type":    {"authorization_code"},
 		"client_id":     {clientId},
 		"client_secret": {secret},
 		"redirect_uri":  {baseURL + "/auth"},
-	})
+	}.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, PatreonTokenURL, strings.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -101,8 +110,12 @@ type PatreonUserData struct {
 }
 
 // Retrieve a user id for each membership of the current user
-func getUserIds(tc *http.Client) (*PatreonUserData, error) {
-	resp, err := tc.Get(PatreonIdentityURL)
+func getUserIds(ctx context.Context, patreonClient *http.Client) (*PatreonUserData, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, PatreonIdentityURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := patreonClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -154,8 +167,13 @@ func getUserIds(tc *http.Client) (*PatreonUserData, error) {
 	}, nil
 }
 
-func getUserTier(tc *http.Client, userId string) (string, error) {
-	resp, err := tc.Get(PatreonMemberURL + userId + PatreonMemberOpts)
+func getUserTier(ctx context.Context, patreonClient *http.Client, userId string) (string, error) {
+	link := PatreonMemberURL + userId + PatreonMemberOpts
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, http.NoBody)
+	if err != nil {
+		return "", err
+	}
+	resp, err := patreonClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -240,7 +258,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := getUserToken(code, ServerURL, r.FormValue("state"))
+	token, err := getUserToken(r.Context(), code, ServerURL, r.FormValue("state"))
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
 		http.Redirect(w, r, ServerURL+"?errmsg=TokenNotFound", http.StatusFound)
@@ -248,9 +266,9 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
-	tc := oauth2.NewClient(r.Context(), ts)
+	client := oauth2.NewClient(r.Context(), ts)
 
-	userData, err := getUserIds(tc)
+	userData, err := getUserIds(r.Context(), client)
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
 		http.Redirect(w, r, ServerURL+"?errmsg=UserNotFound", http.StatusFound)
@@ -268,7 +286,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 
 	if tierTitle == "" {
 		for _, userId := range userData.UserIds[1:] {
-			foundTitle, _ := getUserTier(tc, userId)
+			foundTitle, _ := getUserTier(r.Context(), client, userId)
 			switch foundTitle {
 			case "PIONEER", "PIONEER (Early Adopters)", "STANDARD":
 				tierTitle = "Pioneer"
