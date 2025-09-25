@@ -651,7 +651,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 	user := GetParamFromSig(sig, "UserEmail")
 	if user == "" {
-		user = "anonymous"
+		user = fmt.Sprintf("anonymous (%s / %s)", r.Header.Get("X-Forwarded-For"), r.RemoteAddr)
 	}
 	msg := fmt.Sprintf("[%s] from %s by %s (took %v)", query, source, user, time.Since(start))
 	UserNotify(notifyTitle, msg)
