@@ -146,10 +146,6 @@ func stashInTimeseries() {
 				continue
 			}
 
-			inv, err := seller.Inventory()
-			if err != nil {
-				continue
-			}
 			key := seller.Info().InventoryTimestamp.Format("2006-01-02")
 
 			db := redis.NewClient(&redis.Options{
@@ -159,7 +155,7 @@ func stashInTimeseries() {
 
 			log.Println("Stashing", seller.Info().Shorthand, "in", config.PublicName, "timeseries")
 
-			for uuid, entries := range inv {
+			for uuid, entries := range seller.Inventory() {
 				// Adjust price through defaultGradeMap in case NM is not available
 				price := entries[0].Price * defaultGradeMap[entries[0].Conditions]
 				if price == 0 {
@@ -181,10 +177,6 @@ func stashInTimeseries() {
 				continue
 			}
 
-			inv, err := vendor.Buylist()
-			if err != nil {
-				continue
-			}
 			key := vendor.Info().BuylistTimestamp.Format("2006-01-02")
 
 			db := redis.NewClient(&redis.Options{
@@ -194,7 +186,7 @@ func stashInTimeseries() {
 
 			log.Println("Stashing", vendor.Info().Shorthand, "in", config.PublicName, "timeseries")
 
-			for uuid, entries := range inv {
+			for uuid, entries := range vendor.Buylist() {
 				// Adjust price through defaultGradeMap in case NM is not available
 				price := entries[0].BuyPrice * defaultGradeMap[entries[0].Conditions]
 				if price == 0 {

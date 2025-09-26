@@ -150,14 +150,11 @@ func updateSellerAtPosition(seller mtgban.Seller, i int) error {
 	}
 
 	// Load inventory
-	inv, err := seller.Inventory()
-	if err != nil {
-		return err
-	}
+	inv := seller.Inventory()
 
 	// Do not update in case the new inventory wasn't completely loaded
 	// for example due to API problems
-	old, _ := Sellers[i].Inventory()
+	old := Sellers[i].Inventory()
 	if len(inv) > 0 && len(inv) < len(old)/2 {
 		return errors.New("new inventory is missing too many entries")
 	}
@@ -211,14 +208,11 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int) error {
 	}
 
 	// Load buylist
-	bl, err := vendor.Buylist()
-	if err != nil {
-		return err
-	}
+	bl := vendor.Buylist()
 
 	// Do not update in case the new buylist wasn't completely loaded
 	// for example due to API problems
-	old, _ := Vendors[i].Buylist()
+	old := Vendors[i].Buylist()
 	if len(bl) > 0 && len(bl) < len(old)/2 {
 		return errors.New("new buylist is missing too many entries")
 	}

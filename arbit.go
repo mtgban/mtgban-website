@@ -767,21 +767,15 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 
 		var arbit []mtgban.ArbitEntry
-		var err error
 		if pageVars.GlobalMode && source.Info().SealedMode {
-			arbit, err = mtgban.Mismatch(opts, source.(mtgban.Seller), scraper.(mtgban.Seller))
+			arbit = mtgban.Mismatch(opts, source.(mtgban.Seller), scraper.(mtgban.Seller))
 		} else if pageVars.GlobalMode {
-			arbit, err = mtgban.Mismatch(opts, scraper.(mtgban.Seller), source.(mtgban.Seller))
+			arbit = mtgban.Mismatch(opts, scraper.(mtgban.Seller), source.(mtgban.Seller))
 		} else if pageVars.ReverseMode {
-			arbit, err = mtgban.Arbit(opts, source.(mtgban.Vendor), scraper.(mtgban.Seller))
+			arbit = mtgban.Arbit(opts, source.(mtgban.Vendor), scraper.(mtgban.Seller))
 		} else {
-			arbit, err = mtgban.Arbit(opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
+			arbit = mtgban.Arbit(opts, scraper.(mtgban.Vendor), source.(mtgban.Seller))
 		}
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
 		if len(arbit) == 0 {
 			continue
 		}

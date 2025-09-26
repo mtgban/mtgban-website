@@ -425,11 +425,7 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		}
 
 		// Get inventory
-		inventory, err := seller.Inventory()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
+		inventory := seller.Inventory()
 
 		var sellerTag string
 		switch tagName {
@@ -580,11 +576,7 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		}
 
 		// Get buylist
-		buylist, err := vendor.Buylist()
-		if err != nil {
-			log.Println(err)
-			continue
-		}
+		buylist := vendor.Buylist()
 
 		var vendorTag string
 		switch tagName {

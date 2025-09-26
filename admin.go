@@ -375,7 +375,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 			lastUpdate := seller.Info().InventoryTimestamp.Format(time.Stamp)
 
-			inv, _ := seller.Inventory()
+			inv := seller.Inventory()
 
 			status := "✅"
 			if slices.Contains(gaScrapers, key) {
@@ -427,7 +427,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 			lastUpdate := vendor.Info().BuylistTimestamp.Format(time.Stamp)
 
-			bl, _ := vendor.Buylist()
+			bl := vendor.Buylist()
 
 			status := "✅"
 			if slices.Contains(gaScrapers, key) {

@@ -757,10 +757,7 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 		}
 
 		// Get inventory
-		inventory, err := seller.Inventory()
-		if err != nil {
-			continue
-		}
+		inventory := seller.Inventory()
 
 		for _, cardId := range cardIds {
 			entries, found := inventory[cardId]
@@ -851,10 +848,7 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 			continue
 		}
 
-		buylist, err := vendor.Buylist()
-		if err != nil {
-			continue
-		}
+		buylist := vendor.Buylist()
 
 		for _, cardId := range cardIds {
 			entries, found := buylist[cardId]

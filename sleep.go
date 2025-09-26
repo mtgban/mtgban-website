@@ -363,11 +363,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 				continue
 			}
 
-			arbit, err := mtgban.Arbit(opts, vendor, seller)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
+			arbit := mtgban.Arbit(opts, vendor, seller)
 
 			// Load the tiers
 			for i := range arbit {
@@ -376,11 +372,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 		}
 
 		if tcgSeller != nil {
-			mismatch, err := mtgban.Mismatch(opts, tcgSeller, seller)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
+			mismatch := mtgban.Mismatch(opts, tcgSeller, seller)
 
 			// Load the tiers
 			for i := range mismatch {
@@ -427,10 +419,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 		Conditions:       []string{"MP", "HP", "PO"},
 	}
 
-	mismatch, err := mtgban.Mismatch(opts, referenceSeller, targetSeller)
-	if err != nil {
-		return nil
-	}
+	mismatch := mtgban.Mismatch(opts, referenceSeller, targetSeller)
 
 	marketCheck, _ := findSellerInventory("TCGMarket")
 
