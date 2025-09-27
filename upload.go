@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -418,9 +419,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			switch u.Host {
 			case "store.tcgplayer.com":
-				uploadedData, err = loadCollection(gdocURL, maxRows)
+				uploadedData, err = loadCollection(r.Context(), gdocURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
-				uploadedData, err = loadMoxfieldDeck(u.Path, maxRows)
+				uploadedData, err = loadMoxfieldDeck(r.Context(), u.Path, maxRows)
 			case "docs.google.com":
 				uploadedData, err = loadSpreadsheet(u.Path, maxRows)
 			default:
@@ -1329,12 +1330,16 @@ func loadHashes(hashes, qtys, cond, prices []string) ([]UploadEntry, error) {
 	return uploadEntries, nil
 }
 
-func loadCollection(link string, maxRows int) ([]UploadEntry, error) {
+func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
 	if !strings.Contains(link, "/collection/view/") {
 		return nil, errors.New("unsupported URL")
 	}
 
-	resp, err := cleanhttp.DefaultClient().Get(link)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
 		return nil, err
 	}

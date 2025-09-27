@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,11 +31,15 @@ type MoxCard struct {
 	} `json:"card"`
 }
 
-func getMoxDeck(deckID string) (*MoxfieldDeck, error) {
+func getMoxDeck(ctx context.Context, deckID string) (*MoxfieldDeck, error) {
 	moxURL := fmt.Sprintf("%s/%s", Config.Uploader.Moxfield, deckID)
 	log.Println("Querying:", moxURL)
 
-	resp, err := cleanhttp.DefaultClient().Get(moxURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, moxURL, http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -90,13 +95,13 @@ func prepareUploadEntries(MoxCards []MoxCard, maxRows int) ([]UploadEntry, error
 	return uploadEntries, nil
 }
 
-func loadMoxfieldDeck(urlPath string, maxRows int) ([]UploadEntry, error) {
+func loadMoxfieldDeck(ctx context.Context, urlPath string, maxRows int) ([]UploadEntry, error) {
 	deckID := path.Base(urlPath)
 	if deckID == "" {
 		return nil, errors.New("invalid Moxfield deck URL")
 	}
 
-	moxDeck, err := getMoxDeck(deckID)
+	moxDeck, err := getMoxDeck(ctx, deckID)
 	if err != nil {
 		log.Println(err)
 		return nil, errors.New("failed to fetch Moxfield deck")
