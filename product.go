@@ -35,6 +35,7 @@ var SealedEditionsList map[string][]EditionEntry
 
 // All different editions
 var AllEditionsKeys []string
+var AllEditionsKeysNoFoilOrPromos []string
 var AllEditionsMap map[string]EditionEntry
 
 // Editions with parent sets
@@ -612,6 +613,20 @@ func updateStaticData() {
 	AllEditionsKeys, AllEditionsMap = getAllEditions()
 	TreeEditionsKeys, TreeEditionsMap = getTreeEditions()
 	ReprintsKeys, ReprintsMap = getReprintsGlobal()
+
+	for _, code := range AllEditionsKeys {
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil {
+			continue
+		}
+		if set.IsFoilOnly {
+			continue
+		}
+		if strings.HasSuffix(set.Name, "Promos") {
+			continue
+		}
+		AllEditionsKeysNoFoilOrPromos = append(AllEditionsKeysNoFoilOrPromos, code)
+	}
 
 	TotalSets = len(AllEditionsKeys)
 	TotalUnique = len(mtgmatcher.GetUUIDs())
