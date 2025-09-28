@@ -40,6 +40,7 @@ const (
 )
 
 type PatreonConfig struct {
+	Source string            `json:"source"`
 	Client map[string]string `json:"client"`
 	Secret map[string]string `json:"secret"`
 	Grants []struct {
@@ -51,7 +52,7 @@ type PatreonConfig struct {
 }
 
 func getUserToken(ctx context.Context, code, baseURL, ref string) (string, error) {
-	source := "ban"
+	source := Config.Patreon.Source
 
 	// ref might point to a different patreon configuration
 	refs := strings.Split(ref, ";")
