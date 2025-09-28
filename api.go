@@ -717,7 +717,29 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		if isBuylist {
 			results = out.Buylist
 		}
-		err := BanPrice2CSV(w, results, allKeys, true, true, isSealed, isList)
+
+		// Convert to keep the same order of the search results, but convert to
+		// scryfall ids since it's what we performed the search with
+		sorted := allKeys
+		if !isSealed {
+			sorted = make([]string, 0, len(allKeys))
+			for _, key := range allKeys {
+				co, err := mtgmatcher.GetUUID(key)
+				if err != nil {
+					continue
+				}
+				id, found := co.Identifiers["scryfallId"]
+				if !found {
+					continue
+				}
+				if slices.Contains(sorted, id) {
+					continue
+				}
+				sorted = append(sorted, id)
+			}
+		}
+
+		err := BanPrice2CSV(w, results, sorted, true, true, isSealed, isList)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
