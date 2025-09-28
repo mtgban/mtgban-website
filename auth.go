@@ -60,6 +60,7 @@ func getUserIds(ctx context.Context, client *patreon.Client) (*PatreonUserData, 
 		return nil, fmt.Errorf("user data error: %q", userData.Errors)
 	}
 
+	// Look for the membership id of the user and this account
 	membershipId := ""
 	for _, memberData := range userData.Data.Relationships.Memberships.Data {
 		if memberData.Type == "member" {
@@ -87,6 +88,7 @@ func getUserTier(ctx context.Context, client *patreon.Client, userId string) (st
 		return "", fmt.Errorf("user data error: %q", membershipData.Errors)
 	}
 
+	// Look for the tier id of the user
 	tierId := ""
 	for _, tierData := range membershipData.Data.Relationships.CurrentlyEntitledTiers.Data {
 		if tierData.Type == "tier" {
@@ -95,6 +97,7 @@ func getUserTier(ctx context.Context, client *patreon.Client, userId string) (st
 		}
 	}
 
+	// Get a human-readable name for the tier
 	tierTitle := ""
 	for _, tierData := range membershipData.Included {
 		if tierData.Type == "tier" && tierId == tierData.Id {
@@ -135,6 +138,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the access token for this connection
 	source := Config.Patreon.Source
 	clientId := Config.Patreon.Client[source]
 	secret := Config.Patreon.Secret[source]
@@ -145,8 +149,10 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The client to interface with Patreon
 	client := patreon.NewPatreonClient(r.Context(), tokens.AccessToken)
 
+	// Retrieve information about the user who just authenticated
 	userData, err := getUserIds(r.Context(), client)
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
@@ -155,6 +161,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	tierTitle := ""
+	// If user is in the allowed list, load the tier from here
 	for _, grant := range Config.Patreon.Grants {
 		if grant.Email == userData.Email {
 			tierTitle = grant.Tier
@@ -163,6 +170,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Else, load the tier from the API
 	if tierTitle == "" {
 		foundTitle, err := getUserTier(r.Context(), client, userData.MembershipId)
 		if err != nil {
@@ -180,6 +188,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Handle error
 	if tierTitle == "" {
 		LogPages["Admin"].Println("getUserTier returned an empty tier")
 		http.Redirect(w, r, ServerURL+"?errmsg=TierNotFound", http.StatusFound)
