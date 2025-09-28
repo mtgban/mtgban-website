@@ -43,9 +43,10 @@ type PatreonConfig struct {
 }
 
 type PatreonUserData struct {
-	UserIds  []string
-	FullName string
-	Email    string
+	UserId       string
+	MembershipId string
+	FullName     string
+	Email        string
 }
 
 func getUserIds(ctx context.Context, client *patreon.Client) (*PatreonUserData, error) {
@@ -59,18 +60,19 @@ func getUserIds(ctx context.Context, client *patreon.Client) (*PatreonUserData, 
 		return nil, fmt.Errorf("user data error: %q", userData.Errors)
 	}
 
-	userIds := []string{userData.Data.IdV1}
+	membershipId := ""
 	for _, memberData := range userData.Data.Relationships.Memberships.Data {
 		if memberData.Type == "member" {
-			userIds = append(userIds, memberData.Id)
+			membershipId = memberData.Id
 			break
 		}
 	}
 
 	return &PatreonUserData{
-		UserIds:  userIds,
-		FullName: userData.Data.Attributes.FullName,
-		Email:    strings.ToLower(userData.Data.Attributes.Email),
+		UserId:       userData.Data.IdV1,
+		MembershipId: membershipId,
+		FullName:     userData.Data.Attributes.FullName,
+		Email:        strings.ToLower(userData.Data.Attributes.Email),
 	}, nil
 }
 
@@ -162,18 +164,19 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if tierTitle == "" {
-		for _, userId := range userData.UserIds[1:] {
-			foundTitle, _ := getUserTier(r.Context(), client, userId)
-			switch foundTitle {
-			case "PIONEER", "PIONEER (Early Adopters)", "STANDARD":
-				tierTitle = "Pioneer"
-			case "MODERN", "MODERN (Early Adopters)":
-				tierTitle = "Modern"
-			case "LEGACY", "LEGACY (Early Adopters)":
-				tierTitle = "Legacy"
-			case "VINTAGE", "VINTAGE (Early Adopters)", "TYPE ONE":
-				tierTitle = "Vintage"
-			}
+		foundTitle, err := getUserTier(r.Context(), client, userData.MembershipId)
+		if err != nil {
+			LogPages["Admin"].Println("getUserTier error", err)
+		}
+		switch foundTitle {
+		case "PIONEER", "PIONEER (Early Adopters)", "STANDARD":
+			tierTitle = "Pioneer"
+		case "MODERN", "MODERN (Early Adopters)":
+			tierTitle = "Modern"
+		case "LEGACY", "LEGACY (Early Adopters)":
+			tierTitle = "Legacy"
+		case "VINTAGE", "VINTAGE (Early Adopters)", "TYPE ONE":
+			tierTitle = "Vintage"
 		}
 	}
 
