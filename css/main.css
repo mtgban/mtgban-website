@@ -262,59 +262,82 @@ a.pagination {
     display: inline;
 }
 
-nav ul {
-    list-style-type: none;
-    margin: 0;
-    padding: 0;
-    background-color: var(--navbackground);
+
+/*********** TOP NAVBAR ***********/
+
+/* Make the bar itself fixed; let the list grow in height */
+nav {
     position: fixed;
     top: 0;
-    width: 100%;
+    left: 0;
+    right: 0;
     z-index: 100;
+    background: var(--navbackground);
 }
 
+/* FLEX + WRAP */
+nav ul {
+    display: flex;
+    flex-wrap: wrap;          /* allow items to flow to the next line */
+    align-items: center;      /* vertical centering within each row */
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-height: 48px;         /* at least one row tall */
+}
+
+/* Each item is a fixed-height chip that can wrap as a unit */
 nav li {
-    float: left;
-    border-right: 1px solid var(--greytext);
-    background-color: var(--navbackground);
+    display: flex;
+    align-items: center;
     height: 48px;
+    flex: 0 0 auto;           /* size to content, don’t stretch */
+    border-right: 1px solid var(--greytext);
+    background: var(--navbackground);
 }
 
 nav li.optional {
-    background-color: var(--navbackground);
     border-right: none;
 }
 
+/* push the last items to the right, preserving order */
 nav li:last-child {
-    float: right;
-    color:  var(--activetext);
-    text-align: center;
-    padding: 14px;
-    font-style: italic;
-    height: 20px; /* 48 - 14*2 (top and bottom) */
+    padding: 0 16px;
+    border-right: none;
 }
 
+/* links fill the li height; text stays one line */
 nav li a {
-    display: inline-block;
-    color:  var(--activetext);
-    text-align: center;
-    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 16px;
     text-decoration: none;
-}
-
-nav li:first-child a {
-    display: inline-block;
-    padding: 0;
-}
-
-nav li:nth-child(2) a {
-    display: inline-block;
-    padding: 0;
+    color: var(--activetext);
 }
 
 nav li a:hover {
     color: var(--background);
 }
+
+/* keep label on one line */
+nav li a span {
+    white-space: nowrap;
+}
+
+nav li:first-child a, nav li:nth-child(2) a {
+    padding: 0;
+}
+
+/* images = 48px tall, no extra gaps */
+nav li img {
+    height: 48px;
+    width: auto;
+    display: block;
+}
+
+/*********** END OF TOP NAVBAR ***********/
+
 
 .index ol {
     padding: 14px 16px;
@@ -678,7 +701,6 @@ td.tiers {
 }
 
 .switch {
-    width: 55px;
     display: flex;
     align-items: center;
     justify-content: space-between;
