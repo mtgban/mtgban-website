@@ -5,7 +5,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -19,15 +18,7 @@ import (
 	"time"
 
 	"github.com/NYTimes/gziphandler"
-	"github.com/hashicorp/go-cleanhttp"
-	"golang.org/x/oauth2"
-)
-
-const (
-	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
-	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
-	PatreonMemberURL   = "https://www.patreon.com/api/oauth2/v2/members/"
-	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title"
+	"github.com/mtgban/mtgban-website/patreon"
 )
 
 const (
@@ -51,106 +42,21 @@ type PatreonConfig struct {
 	} `json:"grants"`
 }
 
-func getUserToken(ctx context.Context, code, baseURL, ref string) (string, error) {
-	source := Config.Patreon.Source
-
-	// ref might point to a different patreon configuration
-	refs := strings.Split(ref, ";")
-	if len(refs) > 1 {
-		source = refs[1]
-	}
-
-	clientId, found := Config.Patreon.Client[source]
-	if !found {
-		return "", fmt.Errorf("missing client id for %s", source)
-	}
-	secret, found := Config.Patreon.Secret[source]
-	if !found {
-		return "", fmt.Errorf("missing secret for %s", source)
-	}
-
-	payload := url.Values{
-		"code":          {code},
-		"grant_type":    {"authorization_code"},
-		"client_id":     {clientId},
-		"client_secret": {secret},
-		"redirect_uri":  {baseURL + "/auth"},
-	}.Encode()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, PatreonTokenURL, strings.NewReader(payload))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-	resp, err := cleanhttp.DefaultClient().Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var userTokens struct {
-		AccessToken  string `json:"access_token"`
-		RefreshToken string `json:"refresh_token"`
-		Expires      int    `json:"expires_in"`
-		Scope        string `json:"scope"`
-		TokenType    string `json:"token_type"`
-	}
-	err = json.NewDecoder(resp.Body).Decode(&userTokens)
-	if err != nil {
-		return "", fmt.Errorf("cannot decode user tokens: %w", err)
-	}
-
-	return userTokens.AccessToken, nil
-}
-
 type PatreonUserData struct {
 	UserIds  []string
 	FullName string
 	Email    string
 }
 
-// Retrieve a user id for each membership of the current user
-func getUserIds(ctx context.Context, patreonClient *http.Client) (*PatreonUserData, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, PatreonIdentityURL, http.NoBody)
+func getUserIds(ctx context.Context, client *patreon.Client) (*PatreonUserData, error) {
+	userData, err := client.GetUserData(ctx)
 	if err != nil {
-		return nil, err
-	}
-	resp, err := patreonClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var userData struct {
-		Errors []struct {
-			Title    string `json:"title"`
-			CodeName string `json:"code_name"`
-		} `json:"errors"`
-		Data struct {
-			Attributes struct {
-				Email    string `json:"email"`
-				FullName string `json:"full_name"`
-			} `json:"attributes"`
-			Relationships struct {
-				Memberships struct {
-					Data []struct {
-						Id   string `json:"id"`
-						Type string `json:"type"`
-					} `json:"data"`
-				} `json:"memberships"`
-			} `json:"relationships"`
-			IdV1 string `json:"id"`
-		} `json:"data"`
+		return nil, fmt.Errorf("cannot retrieve user data: %w", err)
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&userData)
-	if err != nil {
-		return nil, fmt.Errorf("cannot decode user data: %w", err)
-	}
 	LogPages["Admin"].Println("getUserIds:", userData)
 	if len(userData.Errors) > 0 {
-		return nil, errors.New(userData.Errors[0].CodeName)
+		return nil, fmt.Errorf("user data error: %q", userData.Errors)
 	}
 
 	userIds := []string{userData.Data.IdV1}
@@ -168,64 +74,32 @@ func getUserIds(ctx context.Context, patreonClient *http.Client) (*PatreonUserDa
 	}, nil
 }
 
-func getUserTier(ctx context.Context, patreonClient *http.Client, userId string) (string, error) {
-	link := PatreonMemberURL + userId + PatreonMemberOpts
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, http.NoBody)
-	if err != nil {
-		return "", err
-	}
-	resp, err := patreonClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var membershipData struct {
-		Errors []struct {
-			Title    string `json:"title"`
-			CodeName string `json:"code_name"`
-			Detail   string `json:"detail"`
-		} `json:"errors"`
-		Data struct {
-			Relationships struct {
-				CurrentlyEntitledTiers struct {
-					Data []struct {
-						Id   string `json:"id"`
-						Type string `json:"type"`
-					} `json:"data"`
-				} `json:"currently_entitled_tiers"`
-			} `json:"relationships"`
-		} `json:"data"`
-		Included []struct {
-			Attributes struct {
-				Title string `json:"title"`
-			} `json:"attributes"`
-			Id   string `json:"id"`
-			Type string `json:"type"`
-		} `json:"included"`
-	}
-	tierId := ""
-	tierTitle := ""
-	err = json.NewDecoder(resp.Body).Decode(&membershipData)
+func getUserTier(ctx context.Context, client *patreon.Client, userId string) (string, error) {
+	membershipData, err := client.GetMembershipData(ctx, userId)
 	if err != nil {
 		return "", fmt.Errorf("cannot decode membership data: %w", err)
 	}
+
 	LogPages["Admin"].Println("getUserTier:", membershipData)
 	if len(membershipData.Errors) > 0 {
-		return "", errors.New(membershipData.Errors[0].Detail)
+		return "", fmt.Errorf("user data error: %q", membershipData.Errors)
 	}
 
+	tierId := ""
 	for _, tierData := range membershipData.Data.Relationships.CurrentlyEntitledTiers.Data {
 		if tierData.Type == "tier" {
 			tierId = tierData.Id
 			break
 		}
 	}
+
+	tierTitle := ""
 	for _, tierData := range membershipData.Included {
 		if tierData.Type == "tier" && tierId == tierData.Id {
 			tierTitle = tierData.Attributes.Title
 		}
 	}
+
 	if tierTitle == "" {
 		return "", errors.New("empty tier title")
 	}
@@ -259,15 +133,17 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := getUserToken(r.Context(), code, ServerURL, r.FormValue("state"))
+	source := Config.Patreon.Source
+	clientId := Config.Patreon.Client[source]
+	secret := Config.Patreon.Secret[source]
+	tokens, err := patreon.GetAuthToken(r.Context(), clientId, secret, ServerURL, code)
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
 		http.Redirect(w, r, ServerURL+"?errmsg=TokenNotFound", http.StatusFound)
 		return
 	}
 
-	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
-	client := oauth2.NewClient(r.Context(), ts)
+	client := patreon.NewPatreonClient(r.Context(), tokens.AccessToken)
 
 	userData, err := getUserIds(r.Context(), client)
 	if err != nil {
