@@ -477,17 +477,22 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars.Nav[mainNavIndex].Active = true
 	pageVars.Nav[mainNavIndex].Class = "active"
 
-	// Add extra warning message if needed
-	_, noAuth := Config.ACL["Any"][pageVars.Nav[mainNavIndex].Name]
-	if showPatreonLogin && noAuth {
-		extra := *&NavElem{
-			Active: true,
-			Class:  "beta",
-			Short:  "Beta Public Access",
-			Link:   "javascript:void(0)",
+	// Add user information if needed, or public
+	user := GetParamFromSig(sig, "UserEmail")
+	if user == "" {
+		user = "Anonymous"
+		_, noAuth := Config.ACL["Any"][pageVars.Nav[mainNavIndex].Name]
+		if noAuth {
+			user = "Beta Public Access"
 		}
-		pageVars.Nav = append(pageVars.Nav, extra)
 	}
+	extra := *&NavElem{
+		Active: true,
+		Class:  "beta",
+		Short:  user,
+		Link:   "javascript:void(0)",
+	}
+	pageVars.Nav = append(pageVars.Nav, extra)
 	return pageVars
 }
 

@@ -301,6 +301,10 @@ nav li.optional {
 }
 
 /* push the last items to the right, preserving order */
+nav li:nth-last-child(2) {
+    margin-left: auto;
+}
+
 nav li:last-child {
     padding: 0 16px;
     border-right: none;
