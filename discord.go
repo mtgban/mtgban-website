@@ -299,9 +299,11 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 		},
 	},
 	{
-		Trigger: "tcgplayer.com",
-		Skip:    []string{"seller", "help", "infinite", "@", "admin"},
-		Name:    "TCGplayer",
+		Trigger: "tcgplayer.com/product",
+		Skip: []string{
+			"seller", "help", "infinite", "@", "admin", "categories",
+		},
+		Name: "TCGplayer",
 		URLFunc: func(u *url.URL) *url.URL {
 			// Work around wrong tcgplayer defaults
 			v := u.Query()
