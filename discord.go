@@ -37,6 +37,8 @@ const (
 	DevChannelID   = "769323295526748160"
 	RecapChannelID = "798588735259279453"
 	ChatChannelID  = "736007847560609794"
+
+	MainDiscordID = "637563728711385091"
 )
 
 var DiscordRetailBlocklist []string
@@ -755,7 +757,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 		embed.Footer.Text += "On TCGplayer SYP list\n"
 	}
 	// Show data source on non-ban servers
-	if guildId != "637563728711385091" {
+	if guildId != MainDiscordID {
 		embed.Footer.IconURL = poweredByFooter.IconURL
 		embed.Footer.Text += poweredByFooter.Text
 	}
