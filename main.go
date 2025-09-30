@@ -480,7 +480,9 @@ func genPageNav(activeTab, sig string) PageVars {
 	// Add user information if needed, or public
 	user := GetParamFromSig(sig, "UserEmail")
 	if user == "" {
-		user = "Anonymous"
+		if !showPatreonLogin {
+			user = "Anonymous"
+		}
 		_, noAuth := Config.ACL["Any"][pageVars.Nav[mainNavIndex].Name]
 		if noAuth {
 			user = "Beta Public Access"
