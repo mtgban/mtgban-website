@@ -604,7 +604,7 @@ func APINotify(message string, flags ...bool) {
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 	}
-	go notify(kind, message, Config.DiscordHook)
+	go notify(kind, message, Config.DiscordAPINotifHook)
 }
 
 func notify(kind, message, hook string) {
