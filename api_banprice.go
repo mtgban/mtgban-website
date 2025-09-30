@@ -331,12 +331,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasSuffix(urlPath, ".csv") {
 		msg += " in csv"
 	}
-
-	if DevMode {
-		log.Println(msg)
-	} else {
-		APINotify(msg)
-	}
+	APINotify(msg)
 
 	if out.Retail == nil && out.Buylist == nil {
 		out.Error = "Not found"
