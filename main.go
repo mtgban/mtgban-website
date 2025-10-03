@@ -729,6 +729,8 @@ func main() {
 				log.Fatalln("error loading scrapers:", err)
 			}
 
+			// Update set values after loading prices
+			runSealedAnalysis()
 		}()
 	}
 
@@ -738,6 +740,9 @@ func main() {
 
 		// Take a snapshot twice a day
 		c.AddFunc("0 */12 * * *", stashInTimeseries)
+
+		// Update set values with new prices
+		c.AddFunc("30 */12 * * *", runSealedAnalysis)
 
 		c.Start()
 	}
