@@ -28,7 +28,7 @@ const (
 
 	SleepersMinPrice = 3.0
 
-	ErrNoSleepers = "No Sleepers Available"
+	ErrNoSleepers = "No Sleepers Available (please try again in a few minutes)"
 )
 
 var SleeperLetters = []string{
@@ -147,6 +147,8 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 	sleepers, err := sleepersLayout(tiers)
 	if err != nil {
+		ServerNotify("sleep", "unable to generate sleepers: "+err.Error())
+
 		pageVars.Title = "Errors have been made"
 		pageVars.InfoMessage = ErrNoSleepers
 
