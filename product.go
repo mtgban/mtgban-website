@@ -304,10 +304,7 @@ const (
 )
 
 // Produce a map of card : []ReprintEntry containing array reprints sorted by age
-func getReprintsGlobal() ([]string, map[string][]ReprintEntry) {
-	tcgLow, _ := findSellerInventory("TCGLow")
-	tcgMarket, _ := findSellerInventory("TCGMarket")
-
+func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[string][]ReprintEntry) {
 	uuids := mtgmatcher.GetUUIDs()
 
 	var names []string
@@ -495,10 +492,12 @@ func runSealedAnalysis() {
 	log.Println("Running set analysis")
 
 	tcgInventory, _ := findSellerInventory("TCGLow")
+	tcgMarket, _ := findSellerInventory("TCGMarket")
 	tcgDirect, _ := findSellerInventory("TCGDirect")
 	ckBuylist, _ := findVendorBuylist("CK")
 	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 
+	ReprintsKeys, ReprintsMap = getReprintsGlobal(tcgInventory, tcgMarket)
 	runRawSetValue(tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
 }
 
@@ -612,7 +611,6 @@ func updateStaticData() {
 	SealedEditionsSorted, SealedEditionsList = getSealedEditions()
 	AllEditionsKeys, AllEditionsMap = getAllEditions()
 	TreeEditionsKeys, TreeEditionsMap = getTreeEditions()
-	ReprintsKeys, ReprintsMap = getReprintsGlobal()
 
 	for _, code := range AllEditionsKeys {
 		set, err := mtgmatcher.GetSet(code)
