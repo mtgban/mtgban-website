@@ -482,6 +482,7 @@ var FilterOperations = map[string][]string{
 	"buy_price": []string{">", "<"},
 	"arb_price": []string{">", "<"},
 	"rev_price": []string{">", "<"},
+	"ratio":     []string{">", "<"},
 	"store":     []string{":"},
 	"seller":    []string{":"},
 	"vendor":    []string{":"},
@@ -892,6 +893,23 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Values:        strings.Split(strings.ToUpper(code), ","),
 				OnlyForSeller: option == "condr",
 				OnlyForVendor: option == "condb",
+			})
+		case "ratio":
+			opt := "ratio_greater_than"
+			if operation == "<" {
+				opt = "ratio_less_than"
+			}
+			filterEntries = append(filterEntries, FilterEntryElem{
+				Name:          opt,
+				Negate:        negate,
+				Values:        strings.Split(strings.ToUpper(code), ","),
+				OnlyForVendor: true,
+			})
+
+			// Remove any empty entry if no results
+			filterPost = append(filterPost, FilterPostElem{
+				Name:          "empty",
+				OnlyForVendor: true,
 			})
 		case "price", "buy_price", "arb_price", "rev_price":
 			var isSeller, isVendor bool
@@ -1928,6 +1946,22 @@ var FilterEntryFuncs = map[string]func(filters []string, entry mtgban.GenericEnt
 			return true
 		}
 		return condIndex <= conditionMap[entry.Condition()]
+	},
+	"ratio_greater_than": func(filters []string, entry mtgban.GenericEntry) bool {
+		buylist, ok := entry.(mtgban.BuylistEntry)
+		if !ok || buylist.PriceRatio == 0 {
+			return true
+		}
+		value, _ := strconv.ParseFloat(filters[0], 64)
+		return value >= buylist.PriceRatio
+	},
+	"ratio_less_than": func(filters []string, entry mtgban.GenericEntry) bool {
+		buylist, ok := entry.(mtgban.BuylistEntry)
+		if !ok || buylist.PriceRatio == 0 {
+			return true
+		}
+		value, _ := strconv.ParseFloat(filters[0], 64)
+		return value <= buylist.PriceRatio
 	},
 }
 
