@@ -57,6 +57,7 @@ var categoryEdition = map[string]string{
 	"core":             "Core Sets",
 	"draft_innovation": "Draft Experiments",
 	"duel_deck":        "Deck Series",
+	"eternal":          "Eternal",
 	"expansion":        "Expansions",
 	"from_the_vault":   "From the Vault Sets",
 	"funny":            "Funny Sets",
