@@ -15,6 +15,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/tcgplayer"
 )
 
@@ -324,11 +325,17 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 		},
 	},
 	{
-		Trigger:       "starcitygames.com/",
-		Skip:          []string{"sellyourcards", "articles"},
-		Name:          "Star City Games",
-		Handle:        "SCG",
-		DefaultFields: []string{"aff"},
+		Trigger: "starcitygames.com/",
+		Skip:    []string{"sellyourcards", "articles", "goto"},
+		Name:    "Star City Games",
+		URLFunc: func(u *url.URL) *url.URL {
+			link := u.String()
+			u, _ = u.Parse(fmt.Sprintf(starcitygames.PartnerProductURL, Config.Affiliate["SCG"]))
+			v := url.Values{}
+			v.Set("u", link)
+			u.RawQuery = v.Encode()
+			return u
+		},
 		TitleFunc: func(URLpath string) string {
 			urlpath := strings.ToLower(URLpath)
 			if strings.Contains(urlpath, "-sgl-") {
