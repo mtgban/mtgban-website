@@ -456,7 +456,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 					continue
 				}
 				shouldSkip := false
-				for _, skip := range store.Skip {
+				for _, skip := range append(store.Skip, store.DefaultFields...) {
 					if strings.Contains(m.Content, skip) {
 						shouldSkip = true
 						break
