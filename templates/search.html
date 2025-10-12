@@ -34,7 +34,7 @@
     </title>
         <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
-    {{if not (eq .ChartID "")}}
+    {{if .ChartID}}
         <script type="text/javascript"
                  src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.bundle.js"
            integrity="sha512-zO8oeHCxetPn1Hd9PdDleg5Tw1bAaP0YmNvPY8CwcRyUk7d7/+nyElmFrB6f7vg4f7Fv4sui1mcep8RIEShczg=="
@@ -786,23 +786,23 @@ Sims are not required for pre-constructed decks and other products where the sam
                         <td style="background-color: var(--background);">
                             {{if .HasReserved}}
                                 <h4>
-                                    {{if not (eq .ChartID "")}}<center>{{else}}* ={{end}}
+                                    {{if .ChartID}}<center>{{else}}* ={{end}}
                                     Part of the <a href="https://mtg.gamepedia.com/Reserved_List">Reserved List</a>
-                                    {{if not (eq .ChartID "")}}</center>{{end}}
+                                    {{if .ChartID}}</center>{{end}}
                                 </h4>
                             {{end}}
                             {{if .HasStocks}}
                                 <h4>
-                                    {{if not (eq .ChartID "")}}<center>{{else}}• ={{end}}
+                                    {{if .ChartID}}<center>{{else}}• ={{end}}
                                     On <a href="https://mtgstocks.com/interests">MTGStocks Interests</a> page
-                                    {{if not (eq .ChartID "")}}</center>{{end}}
+                                    {{if .ChartID}}</center>{{end}}
                                 </h4>
                             {{end}}
                             {{if .HasSypList}}
                                 <h4>
-                                    {{if not (eq .ChartID "")}}<center>{{else}}† ={{end}}
+                                    {{if .ChartID}}<center>{{else}}† ={{end}}
                                     Found in the <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a>
-                                    {{if not (eq .ChartID "")}}</center>{{end}}
+                                    {{if .ChartID}}</center>{{end}}
                                 </h4>
                             {{end}}
                         </td>
@@ -816,7 +816,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                 {{$firstPrint := ""}}
                 {{$firstProduct := ""}}
 
-                {{if not (eq .ChartID "")}}
+                {{if .ChartID}}
                     <div style="margin-left: 10px; float: left;">
                         <canvas id="cardChart" width="740" height="420"></canvas>
                         <br>
