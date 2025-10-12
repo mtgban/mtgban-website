@@ -177,7 +177,7 @@ tr:nth-child(odd).no-hover:hover{
 th.wrap {
     text-overflow: ellipsis;
     overflow: hidden;
-    max-width: 354px;
+    max-width: 360px;
 }
 
 table.searchResults {
@@ -504,7 +504,7 @@ a.selected:hover{
 .search {
     padding: 8px 8px;
     display: inline-block;
-    width: 350px;
+    width: 354px;
 }
 
 .sticky {

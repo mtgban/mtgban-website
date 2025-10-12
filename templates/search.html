@@ -667,11 +667,11 @@ Sims are not required for pre-constructed decks and other products where the sam
 
             {{$emptyImg := "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}}
             <div>
-                <table style="float: left; background-color: var(--background); width:354px">
+                <table style="float: left; background-color: var(--background); width: 360px">
                     {{if .IsSealed}}
                         <tr class="no-hover" style="background-color: var(--background)">
                             <td>
-                                <div id="printings" style="text-align: center; max-width:354px; display: block;"></div>
+                                <div id="printings" style="text-align: center; max-width: 360px; display: block;"></div>
                             </td>
                         </tr>
                         {{if .HasAvailable}}
@@ -680,19 +680,19 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     <center>
                                         <h4>Available in</h4>
                                     </center>
-                                    <div id="products" style="text-align: center; max-width:354px; display: block;"></div>
+                                    <div id="products" style="text-align: center; max-width: 360px; display: block;"></div>
                                 </td>
                             </tr>
                         {{end}}
                     {{else}}
                         <tr class="no-hover" style="background-color: var(--background)" >
                             <td>
-                                <img id="cardImage" src="" width="354" height="493" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
+                                <img id="cardImage" src="" width="360" height="502" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
                             </td>
                         </tr>
                         <tr>
                             <td>
-                                <div id="printings" style="text-align: center; max-width:354px; display: block;"></div>
+                                <div id="printings" style="text-align: center; max-width: 360px; display: block;"></div>
                                 {{if .CanShowAll}}
                                     <center>
                                         <a class="btn info" href="search?q={{.CleanSearchQuery}}">Show all versions</a>
@@ -706,7 +706,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     <center>
                                         <h4>Available in</h4>
                                     </center>
-                                    <div id="products" style="text-align: center; max-width:354px; display: block;"></div>
+                                    <div id="products" style="text-align: center; max-width: 360px; display: block;"></div>
                                 </td>
                             </tr>
                         {{end}}
@@ -818,7 +818,7 @@ Sims are not required for pre-constructed decks and other products where the sam
 
                 {{if .ChartID}}
                     <div style="margin-left: 10px; float: left;">
-                        <canvas id="cardChart" width="740" height="420"></canvas>
+                        <canvas id="cardChart" width="760" height="480"></canvas>
                         <br>
                         <hr>
                         <div style="display: flex; justify-content: space-between; align-items: center;">
