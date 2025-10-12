@@ -266,20 +266,30 @@
 
     {{else}}
         <h1>
-            Welcome to {{$.Title}}
+            {{if .ChartID}}
+                {{$card := (index $.Metadata .ChartID)}}
+                <h1 lang="{{$card.LangTag}}" class=indent style="width: fit-content">
+                    {{$card.Name}}
+                    <hr>
+                    <h3 lang="en" class=indent>{{$card.Variant}}</h4>
+                    <h5 lang="en" class=indent>{{$card.Title}}</h5>
+                </h1>
+            {{else}}
+                Welcome to {{$.Title}}
 
-            {{if .TotalUnique}}
-                -
-                <small><small><small>
-                    {{.TotalUnique}}
-                    {{if .TotalCards}}
-                        / {{.TotalCards}}
-                    {{end}}
-                    {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
-                    {{if gt .TotalUnique (len .AllKeys)}}
-                        ({{len .AllKeys}} shown)
-                    {{end}}
-                </small></small></small>
+                {{if .TotalUnique}}
+                    -
+                    <small><small><small>
+                        {{.TotalUnique}}
+                        {{if .TotalCards}}
+                            / {{.TotalCards}}
+                        {{end}}
+                        {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
+                        {{if gt .TotalUnique (len .AllKeys)}}
+                            ({{len .AllKeys}} shown)
+                        {{end}}
+                    </small></small></small>
+                {{end}}
             {{end}}
         </h1>
 
