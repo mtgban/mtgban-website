@@ -193,3 +193,59 @@ function rethemeFirstAxes(chart) {
     // Redraw
     chart.update();
 }
+
+// Extend chart options to capture clicks and save state in local storage
+function withLegendPersistence(legendStorageKey, opts) {
+    var orig = (Chart.defaults.global.legend && Chart.defaults.global.legend.onClick) || function(){};
+
+    opts.legend = opts.legend || {};
+    opts.legend.onClick = function(e, legendItem) {
+        // Run the default toggle
+        orig.call(this, e, legendItem);
+
+        // Save the legends flags as array of true/false
+        var chart = this.chart;
+        var hidden = chart.data.datasets.map(function(ds, i) {
+            var meta = chart.getDatasetMeta(i);
+            return meta.hidden === true || ds.hidden === true;
+        });
+        localStorage.setItem(legendStorageKey, JSON.stringify(hidden));
+    };
+
+    return opts;
+}
+
+// Load legend state from local storage and apply it
+function applySavedLegendState(chart) {
+    var raw = localStorage.getItem(legendStorageKey);
+    if (!raw) {
+        return;
+    }
+
+    try {
+        var hidden = JSON.parse(raw);
+
+        hidden.forEach(function(isHidden, i) {
+            // Guard for dataset count changes
+            if (!chart.data.datasets[i]) {
+                return;
+            }
+
+            if (isHidden) {
+                chart.data.datasets[i].hidden = true;   // baseline
+                chart.getDatasetMeta(i).hidden = true;  // ensure legend reflects it
+            } else {
+                chart.data.datasets[i].hidden = false;
+                chart.getDatasetMeta(i).hidden = null;  // null = visible (default)
+            }
+        });
+
+        // Redraw chart
+        chart.update();
+    } catch (e) {
+        console.error('Failed to parse legend state:', e);
+
+        // Delete bad state
+        localStorage.removeItem(legendStorageKey);
+    }
+}
