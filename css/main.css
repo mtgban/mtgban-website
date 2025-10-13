@@ -75,7 +75,12 @@ nearly black #292929
     --darkeryellow: #c7a44c;
 
     --mainImage: url("/img/misc/background.png");
-    --darkImage: url("/img/misc/background-dark.png")
+    --darkImage: url("/img/misc/background-dark.png");
+
+    --chartjs-default-grid: rgba(0,0,0,0.1);
+    --chartjs-dark-grid: rgba(140,140,140,0.2);
+    --chartjs-default-text: #666666;
+    --chartjs-dark-text: var(--darkgrey);
 }
 
 .light-theme {
@@ -103,6 +108,8 @@ nearly black #292929
     --antialiasing: var(--lighteryellow);
     --slider: var(--yellow);
     --backgroundImage: var(--mainImage);
+    --chartjs-grid: var(--chartjs-default-grid);
+    --chartjs-text: var(--chartjs-default-text);
 }
 
 .dark-theme {
@@ -130,6 +137,8 @@ nearly black #292929
     --antialiasing: var(--darkeryellow);
     --slider: var(--navbackground);
     --backgroundImage: var(--darkImage);
+    --chartjs-grid: var(--chartjs-dark-grid);
+    --chartjs-text: var(--chartjs-dark-text);
 }
 
 /* reset all margins and padding*/

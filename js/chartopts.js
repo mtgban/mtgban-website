@@ -140,3 +140,56 @@ function getChartOpts(xAxisLabels, gaps) {
         },
     }
 }
+
+// Read a CSS variable from the current document
+function readVar(name) {
+    let el = document.documentElement;
+    if (document.body.classList.contains('light-theme') || document.body.classList.contains('dark-theme')) {
+        el = document.body;
+    }
+    // Trim to remove possible whitespaces
+    return window.getComputedStyle(el).getPropertyValue(name).trim();
+}
+
+// Read chart options and set the appropriate theme color for grid and text
+// Only the first two axis are set to let invisible ones alone
+function rethemeFirstAxes(chart) {
+    if (!chart || !chart.options) {
+        return;
+    }
+
+    const grid = readVar('--chartjs-grid');
+    const text = readVar('--chartjs-text');
+
+    // Legend + title text
+    chart.options.legend = chart.options.legend || {};
+    chart.options.legend.labels = chart.options.legend.labels || {};
+    chart.options.legend.labels.fontColor = text;
+    if (chart.options.title) {
+        chart.options.title.fontColor = text;
+    }
+
+    // Only first x axis and first y axis
+    const scales = chart.options.scales || (chart.options.scales = {});
+    const x0 = (scales.xAxes && scales.xAxes[0]) || null;
+    const y0 = (scales.yAxes && scales.yAxes[0]) || null;
+
+    if (x0) {
+        x0.ticks = x0.ticks || {};
+        x0.ticks.fontColor = text;
+        x0.gridLines = x0.gridLines || {};
+        x0.gridLines.color = grid;
+        x0.gridLines.zeroLineColor = grid;
+    }
+
+    if (y0) {
+        y0.ticks = y0.ticks || {};
+        y0.ticks.fontColor = text;
+        y0.gridLines = y0.gridLines || {};
+        y0.gridLines.color = grid;
+        y0.gridLines.zeroLineColor = grid;
+    }
+
+    // Redraw
+    chart.update();
+}

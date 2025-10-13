@@ -864,6 +864,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                             {{end}}
                         }
 
+                        var opts = getChartOpts({{.AxisLabels}}, localStorage.getItem("chartSpanGaps"));
                         var ctx = document.getElementById('cardChart').getContext('2d');
                         var cardChart = new Chart(ctx, {
                             type: 'banWithLine',
@@ -882,7 +883,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     {{end}}
                                 ]
                             },
-                            options: getChartOpts({{.AxisLabels}}, localStorage.getItem("chartSpanGaps")),
+                            options: opts,
                             plugins: [{
                                 afterDraw: chart => {
                                     var ctx = chart.chart.ctx;
@@ -890,7 +891,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     ctx.textAlign = 'center';
                                     ctx.textBaseline = 'bottom';
                                     ctx.font = '32px Keyrune';
-                                    ctx.fillStyle = '#666666';
+                                    ctx.fillStyle = readVar('--chartjs-text');
 
                                     var xBottomAxis = chart.scales['x-time'];
                                     var xTopAxis = chart.scales['x-top'];
@@ -918,6 +919,23 @@ Sims are not required for pre-constructed decks and other products where the sam
                             }],
                         });
 
+                        // Apply theme (light/dark)
+                        rethemeFirstAxes(cardChart);
+
+                        // Re-run on theme flips (class changes on <body>/<html>)
+                        const rerun = () => cardChart && rethemeFirstAxes(cardChart);
+                        const mo = new MutationObserver(rerun);
+                        if (document.body) {
+                            mo.observe(document.body, {
+                                attributes: true,
+                                attributeFilter: ['class'],
+                            });
+                        }
+                        mo.observe(document.documentElement, {
+                            attributes: true,
+                            attributeFilter: ['class'],
+                        });
+
                         function toggleGaps() {
                             cardChart.options.spanGaps = !cardChart.options.spanGaps;
                             cardChart.update();
@@ -936,7 +954,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                             exportCanvas.height = cardChart.height * scaleFactor;
 
                             var exportCtx = exportCanvas.getContext('2d');
-                            exportCtx.fillStyle = "#ffffff";
+                            exportCtx.fillStyle = readVar('--background');
                             exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
                             exportCtx.drawImage(cardChart.canvas, border, border, exportCanvas.width - border * 3, exportCanvas.height - border * 2);
 
