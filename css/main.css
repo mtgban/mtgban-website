@@ -733,14 +733,14 @@ td.tiers {
     background-color: var(--slider);
     transition: 0.4s;
     border-radius: 34px;
-    height: 12px;
-    width: 12px;
+    height: 13px;
+    width: 13px;
     display: inline-block;
     position: relative;
 }
 
 input:checked + .slider {
-    transform: translateX(4px);
+    transform: translateX(6px);
 }
 
 .arrow {
