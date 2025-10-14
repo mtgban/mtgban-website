@@ -271,7 +271,9 @@
                 <h1 lang="{{$card.LangTag}}" class=indent style="width: fit-content">
                     {{$card.Name}}
                     <hr>
-                    <h3 lang="en" class=indent>{{$card.Variant}}</h4>
+                    {{if not $.IsSealed}}
+                        <h3 lang="en" class=indent>{{$card.Variant}}</h4>
+                    {{end}}
                     <h5 lang="en" class=indent>{{$card.Title}}</h5>
                 </h1>
             {{else}}
