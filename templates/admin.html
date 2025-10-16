@@ -60,8 +60,7 @@
         {{if .CleanSearchQuery}}
             <div class="indent">
                 <h2>⚠️caution when editing this file⚠️</h2>
-                <form action="/admin" method="post">
-                    <input type="hidden" name="page" value="config">
+                <form action="/admin?page=config" method="post">
                     <textarea id="textArea" name="textArea" rows="40" cols="80">{{.CleanSearchQuery}}</textarea><br><br>
                     <input type="submit" value="&nbsp;&nbsp;Update&nbsp;&nbsp;"/>
                     <input type="button" value="&nbsp;&nbsp;Reset&nbsp;&nbsp;" onclick="window.location.replace(window.location)" style="display:inline">
