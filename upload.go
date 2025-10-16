@@ -811,41 +811,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Keep cards sorted by edition, following the same rules of search
-		for store := range optimizedResults {
-			switch sorting {
-			case "highprice":
-				sort.Slice(optimizedResults[store], func(i, j int) bool {
-					return optimizedResults[store][i].BestPrice > optimizedResults[store][j].BestPrice
-				})
-			case "highspread":
-				sort.Slice(optimizedResults[store], func(i, j int) bool {
-					return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
-				})
-			case "setalpha":
-				sort.Slice(optimizedResults[store], func(i, j int) bool {
-					return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
-				})
-			case "alphabetical":
-				sort.Slice(optimizedResults[store], func(i, j int) bool {
-					return sortSetsAlphabetical(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
-				})
-			case "profitability":
-				sort.Slice(optimizedResults[store], func(i, j int) bool {
-					if optimizedResults[store][i].Spread < 0 || optimizedResults[store][j].Spread < 0 {
-						return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
-					}
-					// Remember profitability here is computed over the factor to the base price
-					// not from the actual traditional spread, so they are reversed
-					return optimizedResults[store][i].Profitability < optimizedResults[store][j].Profitability
-				})
-			default:
-				sort.Slice(optimizedResults[store], func(i, j int) bool {
-					return sortSets(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId)
-				})
-			}
-		}
-
 		pageVars.Optimized = optimizedResults
 		pageVars.OptimizedTotals = optimizedTotals
 		pageVars.HighestTotal = highestTotal
@@ -858,18 +823,64 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		sort.Slice(uploadedData, func(i, j int) bool {
 			return uploadedData[i].OriginalPrice > uploadedData[j].OriginalPrice
 		})
+
+		for store := range optimizedResults {
+			sort.Slice(optimizedResults[store], func(i, j int) bool {
+				return optimizedResults[store][i].BestPrice > optimizedResults[store][j].BestPrice
+			})
+		}
 	case "alphabetical":
 		sort.Slice(uploadedData, func(i, j int) bool {
 			return sortSetsAlphabetical(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
 		})
+
+		for store := range optimizedResults {
+			sort.Slice(optimizedResults[store], func(i, j int) bool {
+				return sortSetsAlphabetical(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
+			})
+		}
 	case "setalpha":
 		sort.Slice(uploadedData, func(i, j int) bool {
 			return sortSetsAlphabeticalSet(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
 		})
+
+		for store := range optimizedResults {
+			sort.Slice(optimizedResults[store], func(i, j int) bool {
+				return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
+			})
+		}
 	case "setchrono":
 		sort.Slice(uploadedData, func(i, j int) bool {
 			return sortSets(uploadedData[i].CardId, uploadedData[j].CardId)
 		})
+
+		for store := range optimizedResults {
+			sort.Slice(optimizedResults[store], func(i, j int) bool {
+				return sortSets(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId)
+			})
+		}
+
+	case "highspread":
+		// Leave main results as-is
+
+		for store := range optimizedResults {
+			sort.Slice(optimizedResults[store], func(i, j int) bool {
+				return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
+			})
+		}
+	case "profitability":
+		// Leave main results as-is
+
+		for store := range optimizedResults {
+			sort.Slice(optimizedResults[store], func(i, j int) bool {
+				if optimizedResults[store][i].Spread < 0 || optimizedResults[store][j].Spread < 0 {
+					return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
+				}
+				// Remember profitability here is computed over the factor to the base price
+				// not from the actual traditional spread, so they are reversed
+				return optimizedResults[store][i].Profitability < optimizedResults[store][j].Profitability
+			})
+		}
 	default:
 		// Leave input order
 	}
