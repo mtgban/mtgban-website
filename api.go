@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -20,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
@@ -202,6 +204,57 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		w.Flush()
 	}
 	return nil
+}
+
+func SCGRetailRedirect(ctx context.Context, ids, qtys, conds []string) (string, error) {
+	var data strings.Builder
+	for i, hash := range ids {
+		co, err := mtgmatcher.GetUUID(hash)
+		if err != nil {
+			continue
+		}
+		sku := findInstanceId("SCG", hash, conds[i])
+
+		data.WriteString(qtys[i])
+		data.WriteString(" ")
+		data.WriteString(co.Name)
+		data.WriteString(" [sku: '")
+		data.WriteString(sku)
+		data.WriteString("']||")
+	}
+
+	var requestPayload struct {
+		Redirect bool   `json:"redirect"`
+		Data     string `json:"data"`
+	}
+	requestPayload.Data = data.String()
+
+	payload, err := json.Marshal(requestPayload)
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.starcitygames.com/ajax/affiliate", bytes.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("X-API-KEY", Config.Api["scg_mass_entry"])
+
+	resp, err := cleanhttp.DefaultClient().Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var responsePayload struct {
+		AffiliateDataId string `json:"affiliateDataId"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&responsePayload)
+	if err != nil {
+		return "", err
+	}
+
+	return responsePayload.AffiliateDataId, nil
 }
 
 var tcgcsvHeader = []string{

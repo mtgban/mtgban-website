@@ -142,10 +142,27 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// See if we need to download the ck csv only
 	hashTag := r.FormValue("tag")
 	switch hashTag {
-	case "CK", "SCG", "TCG":
+	case "CK", "SCG", "SCGRetail", "TCG":
 		hashes := r.Form[hashTag+"hashes"]
 		hashesQtys := r.Form[hashTag+"hashesQtys"]
 		hashesCond := r.Form[hashTag+"hashesCond"]
+
+		if hashes != nil && hashTag == "SCGRetail" {
+			log.Println("Preparing a mass-entry call to SCG")
+			dataId, err := SCGRetailRedirect(r.Context(), hashes, hashesQtys, hashesCond)
+			if err != nil {
+				log.Println(err)
+				pageVars.ErrorMessage = "Unable to forward data to SCG: " + err.Error()
+				render(w, "upload.html", pageVars)
+				return
+			}
+			log.Println("SCG dataId:", dataId)
+
+			url := "https://goto.starcitygames.com/c/" + Config.Affiliate["SCG"] + `/3052179/37198/?u=https%3A%2F%2Fstarcitygames.com%2Fshop%2Fdeck-builder%2F%3Fdata%3D` + dataId
+			http.Redirect(w, r, url, http.StatusFound)
+			return
+		}
+
 		if hashes != nil {
 			w.Header().Set("Content-Type", "text/csv")
 			w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_"+strings.ToLower(hashTag)+".csv\"")

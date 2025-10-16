@@ -903,6 +903,21 @@
                                             </noscript>
                                         </form>
                                     {{end}}
+                                    {{if and (not $.IsBuylist) (eq $sourceKey "SCG")}}
+                                        <form action="/upload" method="post" id="{{$scraperKey}}{{$sourceKey}}hashes" style="display: inline;" target="_blank">
+                                            <input type="hidden" name="tag" value="{{$sourceKey}}Retail"/>
+                                            <input type="hidden" name="mode" value="false"/>
+                                            {{range $entries}}
+                                                <input type="hidden" name="{{$sourceKey}}Retailhashes" value="{{.CardId}}"/>
+                                                <input type="hidden" name="{{$sourceKey}}RetailhashesQtys" value="{{.Quantity}}"/>
+                                                <input type="hidden" name="{{$sourceKey}}RetailhashesCond" value="{{.Condition}}"/>
+                                            {{end}}
+                                            <a class="btn warning" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
+                                            <noscript>
+                                                <input type="submit" value="Load at {{$sourceKey}}"/>
+                                            </noscript>
+                                        </form>
+                                    {{end}}
 
                                     |
 
