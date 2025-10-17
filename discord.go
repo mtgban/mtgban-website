@@ -446,6 +446,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		// Check if the message contains potential links
 		default:
+			// Only for the main discord
+			if m.GuildID != MainDiscordID {
+				return
+			}
+
 			// Only for the main game
 			if Config.Game != DefaultGame {
 				return
