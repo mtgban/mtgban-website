@@ -380,6 +380,76 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 	},
 }
 
+// Check if a essage contains well-known links that can be tagged with BAN's links
+func checkForLinks(mGuildID, mContent string) (string, string) {
+	// Only for the main discord and only for the main game
+	if mGuildID != MainDiscordID || Config.Game != DefaultGame {
+		return "", ""
+	}
+
+	for _, store := range AffiliateStores {
+		if !strings.Contains(mContent, store.Trigger) {
+			continue
+		}
+		shouldSkip := false
+		for _, skip := range append(store.Skip, store.DefaultFields...) {
+			if strings.Contains(mContent, skip) {
+				shouldSkip = true
+				break
+			}
+		}
+		if shouldSkip {
+			continue
+		}
+
+		// Iterate over each segment of the message and look for known links
+		fields := strings.Fields(mContent)
+		for _, field := range fields {
+			if !strings.Contains(field, store.Trigger) {
+				continue
+			}
+			u, err := url.Parse(field)
+			if err != nil {
+				continue
+			}
+
+			// Tweak base URL if necessary
+			if store.URLFunc != nil {
+				u = store.URLFunc(u)
+			}
+
+			// Extract a sensible link title
+			title := mtgmatcher.Title(strings.Replace(path.Base(u.Path), "-", " ", -1))
+
+			var customTitle string
+			if store.TitleFunc != nil {
+				if store.FullURL {
+					customTitle = store.TitleFunc(u.String())
+				} else {
+					customTitle = store.TitleFunc(u.Path)
+				}
+				if customTitle != "" {
+					title = customTitle
+				}
+			}
+			title += " at " + store.Name
+
+			// Add the MTGBAN affiliation
+			v := u.Query()
+			for _, value := range store.DefaultFields {
+				v.Set(value, Config.Affiliate[store.Handle])
+			}
+			for storeField, value := range store.CustomFields {
+				v.Set(storeField, value)
+			}
+			u.RawQuery = v.Encode()
+
+			return title, u.String()
+		}
+	}
+	return "", ""
+}
+
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the authenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -446,83 +516,19 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			}
 		// Check if the message contains potential links
 		default:
-			// Only for the main discord
-			if m.GuildID != MainDiscordID {
-				return
+			title, link := checkForLinks(m.GuildID, m.Content)
+			if title == "" || link == "" {
+				break
 			}
 
-			// Only for the main game
-			if Config.Game != DefaultGame {
-				return
-			}
-
-			for _, store := range AffiliateStores {
-				if !strings.Contains(m.Content, store.Trigger) {
-					continue
-				}
-				shouldSkip := false
-				for _, skip := range append(store.Skip, store.DefaultFields...) {
-					if strings.Contains(m.Content, skip) {
-						shouldSkip = true
-						break
-					}
-				}
-				if shouldSkip {
-					continue
-				}
-
-				// Iterate over each segment of the message and look for known links
-				fields := strings.Fields(m.Content)
-				for _, field := range fields {
-					if !strings.Contains(field, store.Trigger) {
-						continue
-					}
-					u, err := url.Parse(field)
-					if err != nil {
-						continue
-					}
-
-					// Tweak base URL if necessary
-					if store.URLFunc != nil {
-						u = store.URLFunc(u)
-					}
-
-					// Extract a sensible link title
-					title := mtgmatcher.Title(strings.Replace(path.Base(u.Path), "-", " ", -1))
-
-					var customTitle string
-					if store.TitleFunc != nil {
-						if store.FullURL {
-							customTitle = store.TitleFunc(u.String())
-						} else {
-							customTitle = store.TitleFunc(u.Path)
-						}
-						if customTitle != "" {
-							title = customTitle
-						}
-					}
-					title += " at " + store.Name
-
-					// Add the MTGBAN affiliation
-					v := u.Query()
-					for _, value := range store.DefaultFields {
-						v.Set(value, Config.Affiliate[store.Handle])
-					}
-					for storeField, value := range store.CustomFields {
-						v.Set(storeField, value)
-					}
-					u.RawQuery = v.Encode()
-
-					// Spam time!
-					_, err = s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
-						Title:       title,
-						URL:         u.String(),
-						Description: "Support **MTGBAN** by using this link",
-					})
-					if err != nil {
-						log.Println(err)
-					}
-				}
+			// Spam time!
+			_, err := s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+				Title:       title,
+				URL:         link,
+				Description: "Support **MTGBAN** by using this link",
+			})
+			if err != nil {
+				log.Println(err)
 			}
 		}
 		return
