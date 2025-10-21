@@ -203,11 +203,10 @@ function withLegendPersistence(legendStorageKey, opts) {
         // Run the default toggle
         orig.call(this, e, legendItem);
 
-        // Save the legends flags as array of true/false
+        // Save hidden flags using computed visibility
         var chart = this.chart;
         var hidden = chart.data.datasets.map(function(ds, i) {
-            var meta = chart.getDatasetMeta(i);
-            return meta.hidden === true || ds.hidden === true;
+            return !chart.isDatasetVisible(i);
         });
         localStorage.setItem(legendStorageKey, JSON.stringify(hidden));
     };
@@ -231,13 +230,11 @@ function applySavedLegendState(chart) {
                 return;
             }
 
-            if (isHidden) {
-                chart.data.datasets[i].hidden = true;   // baseline
-                chart.getDatasetMeta(i).hidden = true;  // ensure legend reflects it
-            } else {
-                chart.data.datasets[i].hidden = false;
-                chart.getDatasetMeta(i).hidden = null;  // null = visible (default)
-            }
+            // Source of truth: dataset.hidden
+            chart.data.datasets[i].hidden = !!isHidden;
+
+            // Let the default legend logic control visibility going forward
+            chart.getDatasetMeta(i).hidden = null;
         });
 
         // Redraw chart
