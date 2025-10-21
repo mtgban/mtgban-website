@@ -65,6 +65,8 @@ function getChartOpts(xAxisLabels, gaps) {
         legend: {
             position: "top",
             align: "center",
+            onHover: function(e) { this.chart.canvas.style.cursor = 'pointer'; },
+            onLeave: function(e) { this.chart.canvas.style.cursor = 'default'; },
         },
         // Speed up initial animation
         animation: {
