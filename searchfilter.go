@@ -1179,8 +1179,16 @@ func findInDeck(sealedUUID, opt string) []string {
 					board = deck.Commander
 				case "main":
 					board = deck.MainBoard
+				case "display_commander":
+					board = deck.DisplayCommander
+				case "schemes":
+					board = deck.Schemes
+				case "planes":
+					board = deck.Planes
 				case "sideboard":
 					board = deck.SideBoard
+				case "tokens":
+					board = deck.Tokens
 				}
 
 				isEtched := strings.HasSuffix(deck.Name, "etched")
