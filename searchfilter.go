@@ -1397,11 +1397,12 @@ var rarityMap = map[string]int{
 
 var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObject) bool{
 	"name": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return !mtgmatcher.Equals(filters[0], co.Name)
+		return !mtgmatcher.Equals(filters[0], co.Name) && !mtgmatcher.Equals(filters[0], co.FlavorName)
 	},
 	"name_regexp": func(filters []string, co *mtgmatcher.CardObject) bool {
 		matched, _ := regexp.MatchString(filters[0], co.Name)
-		return !matched
+		matchedFlavor, _ := regexp.MatchString(filters[0], co.FlavorName)
+		return !matched && !matchedFlavor
 	},
 	"edition": func(filters []string, co *mtgmatcher.CardObject) bool {
 		return !slices.Contains(filters, co.SetCode)
