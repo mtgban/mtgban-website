@@ -981,9 +981,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                 <table style="background-color: var(--background); float:left;" {{if .IsSealed}}onmouseout="document.getElementById('hoverImage').src='{{$emptyImg}}';"{{end}}>
                     {{if .AllKeys}}
                         <tr>
-                            <th class="stickyCategory" style="z-index: 99"><h2 align=center>Sellers</h2></th>
-                            <th class="stickyCategory" style="z-index: 99"><h2 align=center>Buyers</h2></th>
-                            <th class="stickyCategory" style="z-index: 99"><h2 align=center style="display:none" id="lastsalesth">Last Sales</h2></th>
+                            <th class="stickyCategory" style="z-index: {{len .AllKeys}}"><h2 align=center>Sellers</h2></th>
+                            <th class="stickyCategory" style="z-index: {{len .AllKeys}}"><h2 align=center>Buyers</h2></th>
+                            <th class="stickyCategory" style="z-index: {{len .AllKeys}}"><h2 align=center style="display:none" id="lastsalesth">Last Sales</h2></th>
                         </tr>
                     {{end}}
 
