@@ -665,10 +665,8 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 				tag = fmt.Sprintf(" (%s)", value.Tag)
 			}
 			msg += fmt.Sprintf("• **[`%s%s%s`](%s)** %s", value.ScraperName, tag, value.ExtraSpaces, value.Link, value.Price)
-			if value.HasFire {
-				msg += " 🔥"
-			} else if value.HasFire {
-				msg += " 🚨"
+			if value.SuffixEmoji != "" {
+				msg += " " + value.SuffixEmoji
 			}
 			msg += "\n"
 		}

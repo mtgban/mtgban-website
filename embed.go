@@ -59,21 +59,13 @@ type EmbedFieldValue struct {
 	ExtraSpaces string
 	Link        string
 	Price       string
-	HasAlarm    bool
-	HasFire     bool
+	SuffixEmoji string
 }
 
 func embedfieldlength(value EmbedFieldValue) int {
 	// Buffer for formatting
 	extra := 12
-
-	if value.HasAlarm {
-		extra += 2
-	}
-	if value.HasFire {
-		extra += 2
-	}
-	return len(value.ScraperName) + len(value.Tag) + len(value.ExtraSpaces) + len(value.Link) + len(value.Price) + extra
+	return len(value.ScraperName) + len(value.Tag) + len(value.ExtraSpaces) + len(value.Link) + len(value.Price) + len(value.SuffixEmoji) + extra
 }
 
 var EmbedFieldsNames = []string{
@@ -144,7 +136,7 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 			value.Link = link + "/" + path.Join("go", kind, store, searchRes.CardId)
 
 			if entry.Ratio > 60 {
-				value.HasFire = true
+				value.SuffixEmoji += "🔥"
 			}
 			if EmbedFieldsNames[i] == "Index" {
 				var shouldSkip bool
@@ -219,7 +211,7 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 				for _, subres := range searchRes.ResultsSellers {
 					// 90% of sell price is the minimum for arbit
 					if subres.Price < entry.Price*0.9 {
-						value.HasAlarm = true
+						value.SuffixEmoji += "🚨"
 						break
 					}
 				}
