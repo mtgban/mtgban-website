@@ -1568,6 +1568,11 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 				if found {
 					return false
 				}
+			case "hotlist":
+				_, found := Infos["hotlist"][co.UUID]
+				if found {
+					return false
+				}
 			}
 		}
 		return true

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
@@ -499,7 +502,81 @@ func runSealedAnalysis() {
 	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 
 	ReprintsKeys, ReprintsMap = getReprintsGlobal(tcgInventory, tcgMarket)
+
+	if Infos == nil {
+		Infos = map[string]mtgban.InventoryRecord{}
+	}
+
 	runRawSetValue(tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
+	checkHighestBuylists("CK")
+}
+
+func checkHighestBuylists(store string) {
+	bl, err := findVendorBuylist(store)
+	if err != nil {
+		return
+	}
+
+	var db *redis.Client
+	for _, config := range Config.TimeseriesConfig.Datasets {
+		if !slices.Contains(config.Buylist, store) {
+			continue
+		}
+		db = redis.NewClient(&redis.Options{
+			Addr: Config.TimeseriesConfig.Address,
+			DB:   config.Index,
+		})
+	}
+	if db == nil {
+		log.Println(store, "does not have any db configured")
+		return
+	}
+
+	log.Println("Running hotlist checks for", store)
+
+	highestBuylistInThreeMonths := mtgban.InventoryRecord{}
+	threeMonthsAgo := time.Now().AddDate(0, 0, -90)
+	dates := getDateAxisValues("")
+
+	for cardId, entries := range bl {
+		// Sanity check
+		buylistPrice := entries[0].BuyPrice
+		if buylistPrice == 0 {
+			continue
+		}
+
+		// Skip cards that are too recent
+		cardDate, err := mtgmatcher.CardReleaseDate(cardId)
+		if err != nil || cardDate.After(threeMonthsAgo) {
+			continue
+		}
+
+		// Query history
+		results, err := db.HGetAll(context.Background(), cardId).Result()
+		if err != nil {
+			panic(err)
+		}
+
+		// Look for the first date where old price is higher than current
+		var i int
+		for i = range dates {
+			price, _ := strconv.ParseFloat(results[dates[i]], 64)
+			if price > 0 && price > buylistPrice {
+				break
+			}
+		}
+
+		// Skip cards that don't meet the threshold
+		date, err := time.Parse("2006-01-02", dates[i])
+		if err != nil || date.After(threeMonthsAgo) {
+			continue
+		}
+
+		highestBuylistInThreeMonths[cardId] = nil
+	}
+
+	Infos["hotlist"] = highestBuylistInThreeMonths
+	log.Printf("Found %d prices on hotlist", len(highestBuylistInThreeMonths))
 }
 
 func runRawSetValue(tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, directNetBuylist mtgban.BuylistRecord) {
@@ -573,10 +650,6 @@ func runRawSetValue(tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, d
 				blDirectNet[co.SetCode] += entriesBl[0].BuyPrice
 			}
 		}
-	}
-
-	if Infos == nil {
-		Infos = map[string]mtgban.InventoryRecord{}
 	}
 
 	for i, records := range []map[string]float64{

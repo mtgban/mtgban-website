@@ -423,7 +423,12 @@
                             </ul>
                             <li>You can filter by <b>price</b> with <pre>price&gt;VALUE</pre>, or <pre>price&lt;VALUE</pre> to exclude results that are above or below your range.</li>
                             <li>If you are interested in the price ratio only, you can simply search with <pre>ratio&gt;VALUE</pre>.</li>
-                            <li>You can check if a cards is on a particular list of card with <b>on</b> supporting <pre>mtgstocks</pre> and <pre>tcgsyp</pre>.</li>
+                            <li>You can check if a cards is on a particular list of card with <b>on</b> supporting:
+                                <ul>
+                                    <li><pre>hotlist</pre>: cards with highest buylist over 3 months</li>
+                                    <li><pre>tcgsyp</pre>: cards on TCGplayer SYP List</li>
+                                    <li><pre>mtgstocks</pre>: cards on MTGStocks Interests page</li>
+                                </ul>
                             <li>You can filter by <b>name</b> itself, for example to select or remove specific cards from a query, using <pre>name:NAME</pre> (enclosed in quotes or parentheses: <pre>name:"Adaptive Shimmerer"</pre>). Regular expressions are supported with the <pre>namee</pre> option.</li>
                         </ul>
                     </li>
