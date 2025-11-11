@@ -143,6 +143,10 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 		ref, target := r.FormValue("ref"), r.FormValue("target")
 		tiers = getGap(blocklistRetail, ref, target, skipEditions)
+	case "hotlist":
+		pageVars.Subtitle = "Highest buylist growth"
+
+		tiers = getHotlist(skipEditions)
 	}
 
 	sleepers, err := sleepersLayout(tiers)
@@ -272,6 +276,43 @@ func getBulks(skipEditions []string) map[string]int {
 				tiers[uuid] += 1
 			}
 		}
+	}
+
+	return tiers
+}
+
+func getHotlist(skipEditions []string) map[string]int {
+	tiers := map[string]int{}
+
+	bl, _ := findVendorBuylist("CK")
+
+	// Skip bad editions
+	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI", "CMB1", "CMB2")
+
+	for cardId, hotlistEntries := range Infos["hotlist"] {
+		// Make sure the older price is set, otherwise a lot of cards that were
+		// previously not being bought will show up and pollute results
+		oldPrice := hotlistEntries[0].Price
+		if oldPrice == 0 {
+			continue
+		}
+
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil || slices.Contains(skipEditions, co.SetCode) {
+			continue
+		}
+
+		var currentPrice float64
+		currentEntries, found := bl[cardId]
+		if found {
+			currentPrice = currentEntries[0].BuyPrice
+		}
+
+		difference := currentPrice - oldPrice
+		spread := 100 * (currentPrice - oldPrice) / oldPrice
+
+		// Modeled after the "profitability" formula, coupling spread and difference
+		tiers[cardId] = int(100 * difference / (currentPrice + 10) * math.Log(1+spread))
 	}
 
 	return tiers

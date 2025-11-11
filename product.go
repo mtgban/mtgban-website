@@ -559,10 +559,15 @@ func checkHighestBuylists(store string) {
 
 		// Look for the first date where old price is higher than current
 		var i int
+		var lowestPrice float64
 		for i = range dates {
 			price, _ := strconv.ParseFloat(results[dates[i]], 64)
 			if price > 0 && price > buylistPrice {
 				break
+			}
+			// Keep track of the lowest price in the last 3 months, ignoring no prices
+			if lowestPrice == 0 || (i < 90 && price > 0 && price < lowestPrice) {
+				lowestPrice = price
 			}
 		}
 
@@ -572,7 +577,7 @@ func checkHighestBuylists(store string) {
 			continue
 		}
 
-		highestBuylistInThreeMonths[cardId] = nil
+		highestBuylistInThreeMonths[cardId] = []mtgban.InventoryEntry{{Price: lowestPrice}}
 	}
 
 	Infos["hotlist"] = highestBuylistInThreeMonths
