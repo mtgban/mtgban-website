@@ -70,6 +70,7 @@ type GenericCard struct {
 	DeckboxURL   string
 	CKRestockURL string
 	SourceSealed []string
+	HotlistStore string
 }
 
 func fileExists(filename string) bool {
@@ -453,6 +454,12 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		rarityColor = colorRarityMap[Config.Game][co.Rarity]
 	}
 
+	var hotlistStore string
+	_, found = Infos["hotlist"][cardId]
+	if found {
+		hotlistStore = "CK"
+	}
+
 	return GenericCard{
 		UUID:      co.UUID,
 		Name:      name,
@@ -485,6 +492,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		DeckboxURL:   deckboxURL,
 		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
+		HotlistStore: hotlistStore,
 	}
 }
 

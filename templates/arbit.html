@@ -523,6 +523,9 @@
                                 {{if not (eq $.ScraperShort "SYP")}}
                                     {{if (index $.Metadata .CardId).SypList}} †{{end}}
                                 {{end}}
+                                {{if eq $.ScraperShort $card.HotlistStore}}
+                                    <span class=emoji title="Highest price in 3 months">🌟</span>
+                                {{end}}
                             </td>
                             <td>
                                 {{$keyrune := (index $.Metadata .CardId).Keyrune}}

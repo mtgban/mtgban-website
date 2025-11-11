@@ -770,6 +770,9 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	if card.SypList {
 		embed.Footer.Text += "On TCGplayer SYP list\n"
 	}
+	if card.HotlistStore == "CK" {
+		embed.Footer.Text += "Highest buylist price in three months\n"
+	}
 
 	// Show data source on non-ban servers
 	if guildId != MainDiscordID {

@@ -1012,6 +1012,10 @@
                                                         </a>
                                                         {{if and $.CanFilterByPrice (lt .VisualPrice $price)}}⚠️{{end}}
                                                     {{end}}
+
+                                                    {{if eq $scraperKey $card.HotlistStore}}
+                                                        <span class=emoji title="Highest price in 3 months">🌟</span>
+                                                    {{end}}
                                                 </td>
                                                 <td>
                                                     {{if .Price}}

@@ -1286,6 +1286,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         <a class="btn normal" href="{{.URL}}" target="_blank" rel="nofollow">
                                                     {{end}}
                                                         {{.ScraperName}} {{.Country}}
+                                                        {{if eq .Shorthand $card.HotlistStore}}
+                                                            <span class=emoji title="Highest price in 3 months">🌟</span>
+                                                        {{end}}
                                                     </a>
                                                 </td>
                                                 <td style="text-align: center; vertical-align: middle;" {{if .Credit}}title="Credit: $ {{printf "%.2f" .Credit}}"{{end}}>
