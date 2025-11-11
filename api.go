@@ -720,8 +720,8 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	allKeys, _ := searchAndFilter(config)
 
 	// Limit results to be processed
-	if len(allKeys) > MaxUploadProEntries {
-		allKeys = allKeys[:MaxUploadProEntries]
+	if len(allKeys) > MaxSearchTotalResults {
+		allKeys = allKeys[:MaxSearchTotalResults]
 	}
 
 	canRetail := slices.Contains(enabledModes, "retail") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
