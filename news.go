@@ -920,6 +920,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(query)
 	if err != nil {
 		log.Println(query, err)
+		pageVars.InfoMessage = "Newspaper is on strike (notify devs!)"
+		if DevMode {
+			pageVars.InfoMessage += " - " + err.Error()
+		}
+		render(w, "news.html", pageVars)
 		return
 	}
 
@@ -927,6 +932,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	cols, err := rows.Columns()
 	if err != nil {
 		log.Println("Failed to get columns", err)
+		pageVars.InfoMessage = "Newspaper is on strike (notify devs!)"
+		if DevMode {
+			pageVars.InfoMessage += " - " + err.Error()
+		}
+		render(w, "news.html", pageVars)
 		return
 	}
 
