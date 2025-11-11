@@ -766,16 +766,13 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	if card.Reserved {
 		embed.Footer.Text = "Part of the Reserved List\n"
 	}
-	inv, _ := findSellerInventory("STKS")
-	_, onStocks := inv[searchRes.CardId]
-	if onStocks {
+	if card.Stocks {
 		embed.Footer.Text += "On MTGStocks Interests page\n"
 	}
-	bl, _ := findVendorBuylist("SYP")
-	_, onSyplist := bl[searchRes.CardId]
-	if onSyplist {
+	if card.SypList {
 		embed.Footer.Text += "On TCGplayer SYP list\n"
 	}
+
 	// Show data source on non-ban servers
 	if guildId != MainDiscordID {
 		embed.Footer.IconURL = poweredByFooter.IconURL
