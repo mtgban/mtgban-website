@@ -410,6 +410,10 @@ func ServeFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, r.URL.Path[1:])
 }
 
+func RiotVerification(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte(Config.Api["riot_verification"]))
+}
+
 func genPageNav(activeTab, sig string) PageVars {
 	exp := GetParamFromSig(sig, "Expires")
 	expires, _ := strconv.ParseInt(exp, 10, 64)
@@ -763,6 +767,7 @@ func main() {
 
 	// custom redirector
 	http.HandleFunc("/go/", Redirect)
+	http.HandleFunc("/random/riot.txt", RiotVerification)
 	http.HandleFunc("/random", RandomSearch)
 	http.HandleFunc("/randomsealed", RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
