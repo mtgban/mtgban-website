@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/danielgtaylor/unistyle"
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 const (
@@ -406,4 +408,80 @@ func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]Searc
 	}
 
 	return foundVendors[sortedKeysVendor[0]]["NM"]
+}
+
+func GenerateEmbed(allKeys []string, foundSellers, foundVendors map[string]map[string][]SearchEntry) *OEmbed {
+	title := "Search Preview"
+	img := ""
+	htmlBody := ""
+	var results []EmbedSearchResult
+
+	for i, cardId := range allKeys {
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			continue
+		}
+
+		if i == 0 {
+			title = co.Name
+			if co.Sealed {
+				title += " 📦"
+			} else if co.Etched {
+				title += " 💫"
+			} else if co.Foil {
+				title += " ✨"
+			}
+			if len(co.Printings) > 0 {
+				htmlBody += fmt.Sprintf("Printed in %s.\n\n", printings2line(co.Printings))
+			}
+			img = co.Images["full"]
+		}
+
+		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, editionTitle(cardId))
+
+		results = append(results, EmbedSearchResult{
+			CardId:        cardId,
+			ResultsIndex:  ProcessEmbedSearchResultsSellers(foundSellers, true),
+			NamesOverride: []string{fieldName},
+		})
+
+		if i > MaxCustomEntries {
+			break
+		}
+	}
+
+	for _, result := range results {
+		fields := FormatEmbedSearchResult(&result)
+
+		for _, field := range fields {
+			htmlBody += unistyle.BoldSans(field.Name) + "\n"
+			if field.Raw != "" {
+				htmlBody += field.Raw + "\n"
+			}
+
+			for _, value := range field.Values {
+				tag := ""
+				if value.Tag != "" {
+					tag = fmt.Sprintf(" (%s)", value.Tag)
+				}
+				htmlBody += "• " + value.ScraperName + tag + ": " + value.Price + "\n"
+			}
+			htmlBody += "\n"
+		}
+	}
+
+	// Trim any extra space or carriage feed from the final response
+	htmlBody = strings.TrimSpace(htmlBody)
+
+	return &OEmbed{
+		Version:         "1.0",
+		ProviderName:    "MTGBAN Price Search",
+		ProviderURL:     "https://mtgban.com",
+		Title:           title,
+		Type:            "link",
+		HTML:            htmlBody,
+		ThumbnailURL:    img,
+		ThumbnailWidth:  488,
+		ThumbnailHeight: 680,
+	}
 }
