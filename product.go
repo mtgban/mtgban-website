@@ -691,6 +691,7 @@ func updateStaticData() {
 	AllEditionsKeys, AllEditionsMap = getAllEditions()
 	TreeEditionsKeys, TreeEditionsMap = getTreeEditions()
 
+	var filteredEditions []string
 	for _, code := range AllEditionsKeys {
 		set, err := mtgmatcher.GetSet(code)
 		if err != nil {
@@ -702,8 +703,9 @@ func updateStaticData() {
 		if strings.HasSuffix(set.Name, "Promos") {
 			continue
 		}
-		AllEditionsKeysNoFoilOrPromos = append(AllEditionsKeysNoFoilOrPromos, code)
+		filteredEditions = append(filteredEditions, code)
 	}
+	AllEditionsKeysNoFoilOrPromos = filteredEditions
 
 	TotalSets = len(AllEditionsKeys)
 	TotalUnique = len(mtgmatcher.GetUUIDs())
