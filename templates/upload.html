@@ -550,6 +550,10 @@
             </script>
 
             <div class="indent sticky">
+                {{if and .SearchQuery (not (eq .SearchQuery "hashes"))}}
+                    <h2 >Results from {{.SearchQuery}}</h2>
+                    <br>
+                {{end}}
                 <table class="searchResults" >
                     {{range $.UploadEntries}}
                         {{$qty := .Quantity}}
