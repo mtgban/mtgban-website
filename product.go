@@ -503,18 +503,18 @@ func runSealedAnalysis() {
 
 	ReprintsKeys, ReprintsMap = getReprintsGlobal(tcgInventory, tcgMarket)
 
-	if Infos == nil {
-		Infos = map[string]mtgban.InventoryRecord{}
-	}
+	infos := map[string]mtgban.InventoryRecord{}
 
-	runRawSetValue(tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
-	checkHighestBuylists("CK")
+	runRawSetValue(infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
+	infos["hotlist"] = checkHighestBuylists("CK")
+
+	Infos = infos
 }
 
-func checkHighestBuylists(store string) {
+func checkHighestBuylists(store string) mtgban.InventoryRecord {
 	bl, err := findVendorBuylist(store)
 	if err != nil {
-		return
+		return nil
 	}
 
 	var db *redis.Client
@@ -529,7 +529,7 @@ func checkHighestBuylists(store string) {
 	}
 	if db == nil {
 		log.Println(store, "does not have any db configured")
-		return
+		return nil
 	}
 
 	log.Println("Running hotlist checks for", store)
@@ -580,11 +580,11 @@ func checkHighestBuylists(store string) {
 		highestBuylistInThreeMonths[cardId] = []mtgban.InventoryEntry{{Price: lowestPrice}}
 	}
 
-	Infos["hotlist"] = highestBuylistInThreeMonths
 	log.Printf("Found %d prices on hotlist", len(highestBuylistInThreeMonths))
+	return highestBuylistInThreeMonths
 }
 
-func runRawSetValue(tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, directNetBuylist mtgban.BuylistRecord) {
+func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, directNetBuylist mtgban.BuylistRecord) {
 	inv := map[string]float64{}
 	invFoil := map[string]float64{}
 	invDirect := map[string]float64{}
@@ -682,7 +682,7 @@ func runRawSetValue(tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, d
 		} else {
 			key = ProductKeys[i]
 		}
-		Infos[key] = record
+		infos[key] = record
 	}
 }
 
