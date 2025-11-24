@@ -954,14 +954,13 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	tmpl = fmt.Sprintf("templates/%s", tmpl)
 
 	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New(name).Funcs(funcMap).ParseFiles(tmpl)
+	t, err := template.New(name).Funcs(funcMap).ParseFiles("templates/partials/syntax.html", tmpl)
 	if err != nil {
 		log.Print("template parsing error: ", err)
 		return
 	}
-
 	// Execute the template and pass in the variables to fill the gaps
-	err = t.Execute(w, pageVars)
+	err = t.ExecuteTemplate(w, name, pageVars)
 	if err != nil {
 		log.Print("template executing error: ", err)
 	}
