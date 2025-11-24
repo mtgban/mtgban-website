@@ -48,6 +48,7 @@
     <link rel="manifest" href="/img/favicon/site.webmanifest">
     <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
     <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
     <meta name="theme-color" content="#ff0000">
@@ -360,96 +361,9 @@
             <script type="text/javascript">
                 autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
             </script>
-        {{if and (eq .SearchQuery "") (not .IsSealed)}}
-            <div class="indent">
-                <h2>Instructions</h2>
-                <br>
-                <ul class="indent">
-                    <li><h4><i>Syntax</i></h4>
-                        <ul class="indent">
-                            <li>You can search using the Pricefall bot notation: <pre>name[|code[|number]]{&amp;*~`}</pre>.</li>
-                            <li>If you append a special character to any search, you can filter by finish: <pre>&amp;</pre> for nonfoil-only, <pre>*</pre> for foil-only, <pre>~</pre> for etched-only results, <pre>`</pre> for alt-foil (surge, ripple, galaxy etc) results. Note that this syntax is disabled if you used a regular expression option to avoid aliasing.</li>
-                            <li>You can filter by <b>edition</b> using the Scryfall notation <pre>s:CODE</pre> and the full edition name (enclosed in quotes) <pre>s:"Aether Revolt"</pre>. Regular expressions are supported with the <pre>se</pre> option. As compatibility layer, <pre>e:CODE</pre> and <pre>ee:CODE</pre> are supported for their respective case.</li>
-                            <li>
-                                You can filter by <b>collector number</b> using the Scryfall notation <pre>cn:NUMBER</pre>.
-                                For simple numbers (without any prefix or suffix) you may also filter with <pre>cn&gt;NUMBER</pre> and <pre>cn&lt;NUMBER</pre>, or with a range such as <pre>cn:NUMBER-NUMBER</pre>.
-                                Regular expressions are also supported if you use <pre>cne:REGEXP</pre>.
-                                If you prepend the set code like so <pre>cn:CODE:NUMBER</pre>, then the number pick will operate only on cards from that set, leaving the other results untouched.
-                            </li>
-                            <li>You can filter by <b>condition</b> with <pre>cond:COND</pre>, accepting <pre>NM</pre>, <pre>SP</pre>, <pre>MP</pre>, <pre>HP</pre>, and <pre>PO</pre>. You can be selective and filter only retail or buylist prices with <pre>condr:COND</pre> and <pre>condb:COND</pre> respectively. For standard values, you can filter with <pre>cond&gt;VALUE</pre>, and <pre>cond&lt;VALUE</pre> too.</li>
-                            <li>You can filter by <b>rarity</b> with <pre>r:RARITY</pre>, accepting <pre>mythic</pre>, <pre>rare</pre>, <pre>uncommon</pre>, <pre>common</pre>, <pre>special</pre>, <pre>token</pre>, and <pre>oversize</pre>. You can also use the first letter of the rarity as shorthand. For standard values, you can also use <pre>r&lt;RARITY</pre> and <pre>r&gt;RARITY</pre>.</li>
-                            <li>You can filter by <b>color</b> and <b>color_identity</b >with <pre>c:COLOR</pre> and <pre>ci:COLOR</pre>, using standard WURGB letters, or guilds, shards, college, and quad color names.</li>
-                            <li>You can filter by <b>finish</b> with <pre>f:VALUE</pre>, accepting <pre>nonfoil</pre>, <pre>foil</pre>, and <pre>etched</pre>. Short form is available as <pre>nf</pre>, <pre>f</pre>, and <pre>e</pre>.</li>
-                            <li>You can filter by <b>card type</b> with <pre>t:VALUE</pre>, accepting any valid supertype, subtype, or type.</li>
-                            <li>The same option works on sealed product types too, with a bit of looser search: it accept any chunk of the name, or the category and subtypes terms listed below.</li>
-                            <li>You can filter by <b>release date</b> of the card or set <pre>date:VALUE</pre>, <pre>date&gt;VALUE</pre>, and <pre>date&lt;VALUE</pre>. The value may be a date in the ISO format (<pre>YYYY-MM-DD</pre>) or a short version in the form of (<pre>YYYY-MM</pre>) or (<pre>YYYY</pre>), or a set code.</li>
-                            <li>You can filter by <b>id</b> of the card with <pre>id:VALUE</pre>, support MTGBAN, MTGJSON, Scryfall, and TCGplayer Product Ids.</li>
-                            <li>
-                                You can filter by card properties using <pre>is:VALUE</pre> or <pre>not:VALUE</pre>, accepting these self-describing options:
-                                <ul class="indent">
-                                    <li>Generic properties: <i>reserved, token, oversize, funny, wcd, commander, productless, gamechanger (gc)</i></li>
-                                    <li>Frame properties: <i>fullart (fa), extendedart (ea), showcase (sc), reskin, borderless (bd), gold, retro, future, foil, nonfoil, altfoil</i></li>
-                                    <li>Promo properties: <i>{{range $.PromoTags}}{{.}}, {{end}} promo</i></li>
-                                    <li>Language properties: <i>japanese (jp, jpn), phyrexian (ph)</i></li>
-                                    <li>Known card sets: <i>power9 (p9), dual, fastland, fetchland, painland, shockland, checkland, surveilland, filterland</i></li>
-                                    <li>Known edition sets: <i>abu4h</i></li>
-                                </ul>
-                                Of course <pre>not</pre> and <pre>-is</pre> are equivalent.
-                            </li>
-                            <li>There is limited support for human readable tags, for example if <pre>(Extended Art)</pre> is appended to a card name, the search will only show cards that are Extended Art (similar to the <pre>is:extendedart</pre> filter). Note that this syntax will not work with regexp search mode.</li>
-                            <li>You can change the <b>search mode</b> with <pre>sm:VALUE</pre>, accepting <pre>exact</pre> (default), <pre>prefix</pre>, <pre>any</pre>, <pre>regexp</pre>, or <pre>scryfall</pre>:</li>
-                            <ul class="indent">
-                                <li>Normally a card is searched with an <b>exact</b> strategy, you will get only cards with exactly the same name as searched.
-                                    <br>For example <pre>Vesuva</pre> will return the card named Vesuva and no other Vesuvan counterpart.</li>
-                                <li>If you search in <b>prefix</b> mode, you will get all the cards with the name starting with what you searched.
-                                    <br>For example <pre>"Dragonlord"</pre> will return all the cards starting with "Dragonlord".</li>
-                                <li>If you search in <b>any</b> mode, you will get all the cards containing any of the text present in card names.
-                                    <br>For example <pre>*Draco*</pre> will return the card named Draco and all the cards that have "draco" in their names.</li>
-                                <li>If you search in <b>regexp</b> mode, you will get all the cards names matching the regular expresion.
-                                    <br>For example <pre>Cluestone$</pre> will return the card that end with Cluestone in their name. Note this search mode is case sensitive.</li>
-                                <li>If you search in <b>scryfall</b> mode, your search will be forwarded to Scryfall and will get all the resulting cards. Note that BAN card filters will be disabled to avoid conficting result between the two search syntaxes, while store and price filters will still work.
-                                    <br>For example <pre>art:loot f:f</pre> will return all the foil cards tagged with "loot", looking up the results from Scryfall, and then filter by foil version.</li>
-                            </ul>
-                            <li>You can change the <b>sort mode</b> with <pre>sort:VALUE</pre>, accepting <pre>chrono</pre> (chonologically by print date, default), <pre>hybrid</pre> (for alphabetical order grouped by sets), <pre>alpha</pre> (for alphabetical order), <pre>number</pre> (for collector number order), <pre>retail</pre> (for TCG price order), or <pre>buylist</pre> (for CK buylist price order). Note that when this option is set, the sort UI will be disabled.<</li>
-                            <li>You can set any option in any order, in any amount. When filtering for a group of values you can use a comma <pre>,</pre> to separate values.</li>
-                            <li>You can invert filter results by prepending a <pre>-</pre> to the option name.</li>
-                            <li>You can filter by <b>seller/vendor name</b> with <pre>store:shorthand</pre>, or specific types of store with <pre>seller:shorthand</pre> and <pre>vendor:shorthand</pre>.</li>
-                            <ul class="indent">
-                                <li>These filters will drop any result where the sepcified scraper is not preset. If you want to see results from a specific scraper, you may prefix the list of stores with <pre>only</pre>, for example <pre>store:only:shorthand</pre>>.</li>
-                                <li>You can filter results to include only retail or buylist prices with <pre>skip:retail</pre> and <pre>skip:buylist</pre>.</li>
-                                <li>You can also skip results that do not have retail or buylist prices, with <pre>skip:emptyretail</pre> and <pre>skip:emptybuylist</pre>, or results that do not have results at all, with <pre>skip:empty</pre>.</li>
-                                <li>You may filter by the store <b>region</b> with <pre>region:VALUE</pre> using <pre>us</pre>, <pre>eu</pre>, or <pre>jp</pre> options.</li>
-                                <li>Note that these options leave index results availabe - if you to hide them, you can use the <pre>skip:index</pre> option (or be even more specific with <pre>skip:indexretail</pre> and <pre>skip:indexbuylist</pre>).</li>
-                            </ul>
-                            <li>You can filter by <b>price</b> with <pre>price&gt;VALUE</pre>, or <pre>price&lt;VALUE</pre> to exclude results that are above or below your range.</li>
-                            <li>If you are interested in the price ratio only, you can simply search with <pre>ratio&gt;VALUE</pre>.</li>
-                            <li>You can check if a cards is on a particular list of card with <b>on</b> supporting:
-                                <ul>
-                                    <li><pre>hotlist</pre>: cards with highest buylist over 3 months</li>
-                                    <li><pre>tcgsyp</pre>: cards on TCGplayer SYP List</li>
-                                    <li><pre>mtgstocks</pre>: cards on MTGStocks Interests page</li>
-                                </ul>
-                            <li>You can filter by <b>name</b> itself, for example to select or remove specific cards from a query, using <pre>name:NAME</pre> (enclosed in quotes or parentheses: <pre>name:"Adaptive Shimmerer"</pre>). Regular expressions are supported with the <pre>namee</pre> option.</li>
-                        </ul>
-                    </li>
-                    <br>
 
-                    <li>You can access <b>historical data</b> from a few major vendors by clicking on 📊 for each card.</li>
-                    <li>Data is refreshed periodically over the day.</li>
-                    <li>Entries are formatted as <i>card name (finish) - edition (collector #) - # of prints</i>.</li>
-                    <li>It is possible to retrieve the source product of a card or a sealed product by pressing on the "Found in * products".</li>
-                    <li>Similarly, pressing on the 📖 button on a card will return every possible products containing any kind of reprint of the given card.</li>
-                    <li>The percentage found in buylist offers is the <b>price ratio</b>, the higher it is, the more a vendor is looking to purchase that card.</li>
-                    <li>This percentage is available only if the seller is selling copies of the same card at the same conditions.</li>
-                    <li>Inventory prices refer to the stated conditions (and their accuracy depends on the data provider).</li>
-                    <li>Buylist prices are always referring to NM conditions.</li>
-                    <li>When searching for the <i>flavor name</i> of a card, only those specific versions will appear (unless you disable this option in the Other Preferences section), however this only works when searching for a single specific card, and won't be available for complex search queries (they will still be perfomed using the canonical name of the card).</li>
-                    <li>TCG Low is a special value referring to TCG algorithms that may differ from quantity and quality of listings.</li>
-                    <li>If you hover on a buylist price, a small tooltip will appear displaying the corresponding trade-in price, if available.</li>
-                    <li>In case of mistakes or incongruities, please notify the devs in the BAN Discord.</li>
-                    <li>Should you find this content useful, consider clicking on one of the provided links to make a purchase on the website, and directly support BAN.</li>
-                </ul>
-             </div>
+        {{if and (eq .SearchQuery "") (not .IsSealed)}}
+            {{template "syntax" .}}
         {{else if and (eq .SearchQuery "") (.IsSealed)}}
             <p style="max-width: 70%">
                 Make sure to read the <a class="btn normal" href="#faq">F.A.Q.</a>
