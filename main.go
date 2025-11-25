@@ -950,11 +950,17 @@ var funcMap = template.FuncMap{
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Give each template a name
 	name := path.Base(tmpl)
+
 	// Prefix the name passed in with templates/
-	tmpl = fmt.Sprintf("templates/%s", tmpl)
+	templates := []string{fmt.Sprintf("templates/%s", tmpl)}
+
+	// Add partials if needed
+	if name == "search.html" {
+		templates = append(templates, "templates/partials/syntax.html")
+	}
 
 	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New(name).Funcs(funcMap).ParseFiles("templates/partials/syntax.html", tmpl)
+	t, err := template.New(name).Funcs(funcMap).ParseFiles(templates...)
 	if err != nil {
 		log.Print("template parsing error: ", err)
 		return
