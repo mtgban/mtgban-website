@@ -857,97 +857,97 @@ func main() {
 	ServerNotify("shutdown", "Server shutdown correctly")
 }
 
-func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
-	funcMap := template.FuncMap{
-		"inc": func(i, j int) int {
-			return i + j
-		},
-		"dec": func(i, j int) int {
-			return i - j
-		},
-		"mul": func(i float64, j int) float64 {
-			return i * float64(j)
-		},
-		"mulf": func(i, j float64) float64 {
-			return i * j
-		},
-		"print_perc": func(s string) string {
-			n, _ := strconv.ParseFloat(s, 64)
-			return fmt.Sprintf("%0.2f %%", n*100)
-		},
-		"print_price": func(s string) string {
-			n, _ := strconv.ParseFloat(s, 64)
-			return fmt.Sprintf("$ %0.2f", n)
-		},
-		"scraper_name": func(s string) string {
-			return scraperName(s)
-		},
-		"slice_has": func(s []string, p string) bool {
-			return slices.Contains(s, p)
-		},
-		"has_prefix": func(s, p string) bool {
-			return strings.HasPrefix(s, p)
-		},
-		"contains": func(s, p string) bool {
-			return strings.Contains(s, p)
-		},
-		"triple_column_start": func(i int, length int) bool {
-			return i == 0 || i == length/3 || i == length*2/3
-		},
-		"triple_column_end": func(i int, length int) bool {
-			return i == length/3-1 || i == length*2/3-1 || i == length-1
-		},
-		"load_partner": func(s string) string {
-			return Config.Affiliate[s]
-		},
-		"uuid2ckid": func(s string) string {
-			bl, err := findVendorBuylist("CK")
-			if err != nil {
-				return ""
+var funcMap = template.FuncMap{
+	"inc": func(i, j int) int {
+		return i + j
+	},
+	"dec": func(i, j int) int {
+		return i - j
+	},
+	"mul": func(i float64, j int) float64 {
+		return i * float64(j)
+	},
+	"mulf": func(i, j float64) float64 {
+		return i * j
+	},
+	"print_perc": func(s string) string {
+		n, _ := strconv.ParseFloat(s, 64)
+		return fmt.Sprintf("%0.2f %%", n*100)
+	},
+	"print_price": func(s string) string {
+		n, _ := strconv.ParseFloat(s, 64)
+		return fmt.Sprintf("$ %0.2f", n)
+	},
+	"scraper_name": func(s string) string {
+		return scraperName(s)
+	},
+	"slice_has": func(s []string, p string) bool {
+		return slices.Contains(s, p)
+	},
+	"has_prefix": func(s, p string) bool {
+		return strings.HasPrefix(s, p)
+	},
+	"contains": func(s, p string) bool {
+		return strings.Contains(s, p)
+	},
+	"triple_column_start": func(i int, length int) bool {
+		return i == 0 || i == length/3 || i == length*2/3
+	},
+	"triple_column_end": func(i int, length int) bool {
+		return i == length/3-1 || i == length*2/3-1 || i == length-1
+	},
+	"load_partner": func(s string) string {
+		return Config.Affiliate[s]
+	},
+	"uuid2ckid": func(s string) string {
+		bl, err := findVendorBuylist("CK")
+		if err != nil {
+			return ""
+		}
+		entries, found := bl[s]
+		if !found {
+			return ""
+		}
+		return entries[0].OriginalId
+	},
+	"uuid2tcgid": func(s string) string {
+		return findTCGproductId(s)
+	},
+	"isSussy": func(m map[string]float64, s string) bool {
+		_, found := m[s]
+		return found
+	},
+	"color2hex": func(s string) string {
+		color, found := colorValues[s]
+		if !found {
+			return "#111111"
+		}
+		return color
+	},
+	"credit_factor": func(s string) float64 {
+		for _, vendor := range Vendors {
+			if vendor != nil && vendor.Info().Shorthand == s {
+				return vendor.Info().CreditMultiplier
 			}
-			entries, found := bl[s]
-			if !found {
-				return ""
-			}
-			return entries[0].OriginalId
-		},
-		"uuid2tcgid": func(s string) string {
-			return findTCGproductId(s)
-		},
-		"isSussy": func(m map[string]float64, s string) bool {
-			_, found := m[s]
-			return found
-		},
-		"color2hex": func(s string) string {
-			color, found := colorValues[s]
-			if !found {
-				return "#111111"
-			}
-			return color
-		},
-		"credit_factor": func(s string) float64 {
-			for _, vendor := range Vendors {
-				if vendor != nil && vendor.Info().Shorthand == s {
-					return vendor.Info().CreditMultiplier
-				}
-			}
-			return 0
-		},
-		"tcg_market_price": func(s string) float64 {
-			return getTCGMarketPrice(s)
-		},
-		"base64enc": func(s string) string {
-			return base64.StdEncoding.EncodeToString([]byte(s))
-		},
-		"sixMonthsAgo": func(t time.Time) bool {
-			sixMonthsAgo := time.Now().AddDate(0, -6, 0)
-			return sixMonthsAgo.After(t)
-		},
-		"uuid2edition": func(s string) string {
-			return editionTitle(s)
-		},
-	}
+		}
+		return 0
+	},
+	"tcg_market_price": func(s string) float64 {
+		return getTCGMarketPrice(s)
+	},
+	"base64enc": func(s string) string {
+		return base64.StdEncoding.EncodeToString([]byte(s))
+	},
+	"sixMonthsAgo": func(t time.Time) bool {
+		sixMonthsAgo := time.Now().AddDate(0, -6, 0)
+		return sixMonthsAgo.After(t)
+	},
+	"uuid2edition": func(s string) string {
+		return editionTitle(s)
+	},
+}
 
+func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Give each template a name
 	name := path.Base(tmpl)
 	// Prefix the name passed in with templates/
