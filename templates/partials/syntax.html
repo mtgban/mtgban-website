@@ -30,10 +30,10 @@
                 <span class="icon">📋</span> Card Condition
             </button>
             <button class="sidebar-item" data-section="types">
-                <span class="icon">⚔️</span> Card Types
+                <span class="icon">⚔️</span> Card Type
             </button>
             <button class="sidebar-item" data-section="dates">
-                <span class="icon">📅</span> Release Dates
+                <span class="icon">📅</span> Release Date
             </button>
             <button class="sidebar-item" data-section="properties">
                 <span class="icon">🏷️</span> Card Properties
@@ -42,28 +42,25 @@
                 <span class="icon">🎁</span> Promos and Variants
             </button>
             <button class="sidebar-item" data-section="lands">
-                <span class="icon">🏔️</span> Land Cycles
+                <span class="icon">🏔️</span> Land and Set Cycles
             </button>
             <button class="sidebar-item" data-section="prices">
-                <span class="icon">💰</span> Prices and Ratios
+                <span class="icon">💰</span> Price Filters
             </button>
             <button class="sidebar-item" data-section="stores">
-                <span class="icon">🏪</span> Stores and Vendors
+                <span class="icon">🏪</span> Stores and Regions
             </button>
             <button class="sidebar-item" data-section="modes">
                 <span class="icon">🔎</span> Search Modes
             </button>
             <button class="sidebar-item" data-section="sorting">
-                <span class="icon">📊</span> Sorting Results
+                <span class="icon">📊</span> Sorting Options
             </button>
             <button class="sidebar-item" data-section="lists">
                 <span class="icon">📋</span> Special Lists
             </button>
             <button class="sidebar-item" data-section="names">
                 <span class="icon">🏷️</span> Name Filters
-            </button>
-            <button class="sidebar-item" data-section="negating">
-                <span class="icon">🚫</span> Negating Filters
             </button>
             <button class="sidebar-item" data-section="tips">
                 <span class="icon">💡</span> General Tips
@@ -78,9 +75,12 @@
                 <h3><span>⌨️</span> Basic Syntax</h3>
                 <div class="syntax-grid">
                     <div class="syntax-info">
-                        <p>You can search using the Pricefall bot notation:</p>
-                        <p><code>name[|code[|number]]{&amp;*~`}</code></p>
-                        <p>Append a special character to filter by finish:</p>
+                        <p>Start typing for a card name and a dropdown shall appear! You can keep typing or select the card with arrow keys. You can also set specific options to further narrow your search.</p>
+                        <p>You may also search using the Pricefall bot notation, such as:</p>
+                        <p><code>name[|code[|number[|finish]]]</code></p>
+                        <p>There is also limited support for human readable tags. For example, appending <code>(Extended Art)</code> to a card name will show only Extended Art versions. This won't work with regexp search mode.</p>
+                        <p>You can set options in any order and any amount. Use comma <code>,</code> to separate multiple values.</p>
+                        <p>The finish option can be :</p>
                         <table class="syntax-table">
                             <tr><th>Suffix</th><th>Meaning</th></tr>
                             <tr><td>&amp;</td><td>Non-foil only</td></tr>
@@ -89,8 +89,7 @@
                             <tr><td>`</td><td>Alt-foil (surge, ripple, galaxy, etc)</td></tr>
                         </table>
                         <p style="margin-top:12px">Note: This syntax is disabled if you use a regular expression option to avoid aliasing.</p>
-                        <p>There is also limited support for human readable tags. For example, appending <code>(Extended Art)</code> to a card name will show only Extended Art versions. This won't work with regexp search mode.</p>
-                        <p>You can set options in any order and any amount. Use comma <code>,</code> to separate multiple values.</p>
+
                     </div>
                     <div class="syntax-examples">
                         <div class="example-card">
@@ -216,7 +215,7 @@
                 <h3><span>🎨</span> Colors and Color Identity</h3>
                 <div class="syntax-grid">
                     <div class="syntax-info">
-                        <p>Filter by color with <code>c:COLOR</code> and color identity with <code>ci:COLOR</code>, using standard WUBRG letters.</p>
+                        <p>Filter by color with <code>c:COLOR</code> and color identity with <code>ci:COLOR</code>, using either the color name or the initial. For example for Magic the color option uses the standard WUBRG letters for each respective color, C for colorless, and M for multicolor.</p>
                         <p>You can also use guild, shard, college, and quad color names:</p>
 
                         <div class="syntax-subsection">
@@ -395,11 +394,13 @@
                     <div class="syntax-info">
                         <p>Filter by release date of the card or set with <code>date:VALUE</code>, <code>date&gt;VALUE</code>, and <code>date&lt;VALUE</code>.</p>
                         <p>The value may be:</p>
-                        <ul style="margin-left: 20px; color: var(--text-secondary);">
-                            <li>ISO format: <code>YYYY-MM-DD</code></li>
-                            <li>Short versions: <code>YYYY-MM</code> or <code>YYYY</code></li>
-                            <li>A set code</li>
-                        </ul>
+                        <table class="syntax-table">
+                            <tr><th>Format</th><th>Meaning</th></tr>
+                            <tr><td>YYYY-MM-DD</td><td>ISO format</td></tr>
+                            <tr><td>YYYY-MM</td><td>Year and Month</td></tr>
+                            <tr><td>YYYY</td><td>Only Year</td></tr>
+                            <tr><td>Set code</td><td>Any available set code</td></tr>
+                        </table>                        
                     </div>
                     <div class="syntax-examples">
                         <div class="example-card">
@@ -436,18 +437,18 @@
                                 <span class="syntax-tag">wcd</span>
                                 <span class="syntax-tag">commander</span>
                                 <span class="syntax-tag">productless</span>
-                                <span class="syntax-tag">gamechanger (gc)</span>
+                                <span class="syntax-tag">gamechanger</span>
                             </div>
                         </div>
 
                         <div class="syntax-subsection">
                             <h4>Frame Properties</h4>
                             <div class="tag-list">
-                                <span class="syntax-tag">fullart (fa)</span>
-                                <span class="syntax-tag">extendedart (ea)</span>
-                                <span class="syntax-tag">showcase (sc)</span>
+                                <span class="syntax-tag">fullart</span>
+                                <span class="syntax-tag">extendedart</span>
+                                <span class="syntax-tag">showcase</span>
                                 <span class="syntax-tag">reskin</span>
-                                <span class="syntax-tag">borderless (bd)</span>
+                                <span class="syntax-tag">borderless</span>
                                 <span class="syntax-tag">gold</span>
                                 <span class="syntax-tag">retro</span>
                                 <span class="syntax-tag">future</span>
@@ -460,9 +461,23 @@
                         <div class="syntax-subsection">
                             <h4>Language Properties</h4>
                             <div class="tag-list">
-                                <span class="syntax-tag">japanese (jp, jpn)</span>
-                                <span class="syntax-tag">phyrexian (ph)</span>
+                                <span class="syntax-tag">japanese</span>
+                                <span class="syntax-tag">phyrexian</span>
                             </div>
+                        </div>
+
+                        <div class="syntax-subsection">
+                        <p>Some operators can be shortened</p>
+                        <table class="syntax-table">
+                            <tr><th>Short</th><th>Meaning</th></tr>
+                            <tr><td>gc</td><td>gamechanger</td></tr>
+                            <tr><td>ea</td><td>fullart</td></tr>
+                            <tr><td>sc</td><td>showcase</td></tr>
+                            <tr><td>bd</td><td>borderless</td></tr>
+                            <tr><td>jp</td><td>japanese</td></tr>
+                            <tr><td>jpn</td><td>japanese</td></tr>
+                            <tr><td>ph</td><td>phyrexian</td></tr>
+                        </table>
                         </div>
                     </div>
                     <div class="syntax-examples">
@@ -476,7 +491,7 @@
                         </div>
                         <div class="example-card">
                             <div class="example-query">is:showcase is:foil</div>
-                            <div class="example-desc">Foil showcase cards</div>
+                            <div class="example-desc">Foil and Etched Showcase cards</div>
                         </div>
                         <div class="example-card">
                             <div class="example-query">not:foil</div>
@@ -522,27 +537,32 @@
 
             <!-- Land Cycles -->
             <div class="syntax-section" id="section-lands">
-                <h3><span>🏔️</span> Known Card & Land Cycles</h3>
+                <h3><span>🏔️</span> Land and Set Cycles</h3>
                 <div class="syntax-grid">
                     <div class="syntax-info">
-                        <p>Filter by well-known card and land cycles:</p>
-                        <table class="syntax-table">
-                            <tr><th>Filter</th><th>Description</th></tr>
-                            <tr><td>is:dual</td><td>Original dual lands</td></tr>
-                            <tr><td>is:fetchland</td><td>Fetch lands</td></tr>
-                            <tr><td>is:shockland</td><td>Shock lands</td></tr>
-                            <tr><td>is:painland</td><td>Pain lands</td></tr>
-                            <tr><td>is:checkland</td><td>Check lands</td></tr>
-                            <tr><td>is:fastland</td><td>Fast lands</td></tr>
-                            <tr><td>is:filterland</td><td>Filter lands</td></tr>
-                            <tr><td>is:surveilland</td><td>Surveil lands</td></tr>
-                        </table>
+                        <p>Filter by editions and land cycles:</p>
+                        <div class="syntax-subsection">
+                            <h4>Land Cycles</h4>
+                            <table class="syntax-table">
+                                <tr><th>Filter</th><th>Description</th></tr>
+                                <tr><td>is:dual</td><td>Original dual lands</td></tr>
+                                <tr><td>is:fetchland</td><td>Fetch lands</td></tr>
+                                <tr><td>is:shockland</td><td>Shock lands</td></tr>
+                                <tr><td>is:painland</td><td>Pain lands</td></tr>
+                                <tr><td>is:checkland</td><td>Check lands</td></tr>
+                                <tr><td>is:fastland</td><td>Fast lands</td></tr>
+                                <tr><td>is:filterland</td><td>Filter lands</td></tr>
+                                <tr><td>is:surveilland</td><td>Surveil lands</td></tr>
+                            </table>
+                        </div>
                         <div class="syntax-subsection">
                             <h4>Known Edition Sets</h4>
-                            <div class="tag-list">
-                                <span class="syntax-tag">is:power9 (p9)</span>
-                                <span class="syntax-tag">abu4h</span>
-                            </div>
+                            <table class="syntax-table">
+                                <tr><th>Filter</th><th>Description</th></tr>
+                                <tr><td>is:power9</td><td>All cards belonging to the Power9</td></tr>
+                                <tr><td>is:p9</td><td>Same as above</td></tr>
+                                <tr><td>is:abu4h</td><td>Only cards in the Alpha, Beta, Unlimited editions, and the first 4 expansions (Arabian Nights, Antiquities, Legends, The Dark)</td></tr>
+                            </table>
                         </div>
                     </div>
                     <div class="syntax-examples">
@@ -554,34 +574,49 @@
                             <div class="example-query">is:dual</div>
                             <div class="example-desc">Original dual lands</div>
                         </div>
-                        <div class="example-card">
-                            <div class="example-query">is:shockland f:foil</div>
-                            <div class="example-desc">Foil shocklands</div>
-                        </div>
                     </div>
                 </div>
             </div>
 
             <!-- Prices and Ratios -->
             <div class="syntax-section" id="section-prices">
-                <h3><span>💰</span> Prices and Ratios</h3>
+                <h3><span>💰</span> Price filtering</h3>
                 <div class="syntax-grid">
                     <div class="syntax-info">
-                        <p>Filter by price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code> to exclude results outside your range.</p>
-                        <p>Filter by buylist price ratio with <code>ratio&gt;VALUE</code>. Higher ratios indicate vendors are paying more relative to retail.</p>
+                        <p>Filter by price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code> to look for a particular retail price. Similarly <code>buy_price</code> will filter according to available buylist prices.</p>
+                        <p>These filters can also work referencing the value present on another store. For example <code>price&gt;TCGLow</code> will return all the stores whose prices are greater than TCG Low for any given card.</p>
+                        <p>Note that the store prices can be only referenced for the same category: if you use <code>price&gt;CK</code> the prices loaded will from CK retail. If you want to use the buylist price for a retail search you need to use <code>arb_price</code>, and, vice versa, if you want to use the retail price for a buylist search you need to use <code>rev_price</code>.
+                        <p>Filter by buylist price ratio with <code>ratio&gt;VALUE</code>. Higher ratios indicate vendors are paying more relative to retail. The maximum value fo this filter should not be higher than 64.</p>
+
+                        <div class="syntax-subsection">
+                            <h4>Price options recap</h4>
+                            <table class="syntax-table">
+                                <tr><th>Filter</th><th>Description</th></tr>
+                                <tr><td>price</td><td>Results with a certain retail price</td></tr>
+                                <tr><td>buy_price</td><td>Results with a certain buylist pricee</td></tr>
+                                <tr><td>arb_price</td><td>Retail results with a certain buylist price</td></tr>
+                                <tr><td>rev_price</td><td>Buylist results with a certain retail price</td></tr>
+                                <tr><td>ratio</td><td>All cards with a set desiderability on buylists</td></tr>
+                            </table>
+                        </div>
                     </div>
+
                     <div class="syntax-examples">
                         <div class="example-card">
-                            <div class="example-query">price&gt;10</div>
-                            <div class="example-desc">Cards above $10</div>
+                            <div class="example-query">price&lt;10</div>
+                            <div class="example-desc">Cards selling at less than $10 retail</div>
                         </div>
                         <div class="example-card">
-                            <div class="example-query">price&lt;5</div>
-                            <div class="example-desc">Cards under $5</div>
+                            <div class="example-query">price&gt;TCGLow</div>
+                            <div class="example-desc">Stores selling at more than the TCGLow price of the card</div>
                         </div>
                         <div class="example-card">
-                            <div class="example-query">ratio&gt;80</div>
-                            <div class="example-desc">High buylist demand (80%+)</div>
+                            <div class="example-query">buy_price&gt;5</div>
+                            <div class="example-desc">Cards on buylists at more than $5</div>
+                        </div>
+                        <div class="example-card">
+                            <div class="example-query">ratio&gt;50</div>
+                            <div class="example-desc">Cards with high buylist demand</div>
                         </div>
                     </div>
                 </div>
@@ -700,22 +735,17 @@
                 <h3><span>📋</span> Special Lists</h3>
                 <div class="syntax-grid">
                     <div class="syntax-info">
-                        <p>Check if cards are on particular lists with <code>on:VALUE</code>:</p>
+                        <p>Check if cards are on particular group of cards with <code>on:VALUE</code>:</p>
                         <table class="syntax-table">
-                            <tr><th>List</th><th>Description</th></tr>
-                            <tr><td>on:hotlist</td><td>Highest buylist over 3 months</td></tr>
-                            <tr><td>on:tcgsyp</td><td>TCGplayer SYP List</td></tr>
-                            <tr><td>on:mtgstocks</td><td>MTGStocks Interests page</td></tr>
+                            <tr><th>Value</th><th>Description</th></tr>
+                            <tr><td>hotlist</td><td>Highest buylist over 3 months</td></tr>
+                            <tr><td>tcgsyp</td><td>Present on TCGplayer SYP List</td></tr>
                         </table>
                     </div>
                     <div class="syntax-examples">
                         <div class="example-card">
-                            <div class="example-query">on:hotlist</div>
-                            <div class="example-desc">Cards vendors are seeking</div>
-                        </div>
-                        <div class="example-card">
-                            <div class="example-query">on:mtgstocks</div>
-                            <div class="example-desc">Trending on MTGStocks</div>
+                            <div class="example-query">on:tcgsyp</div>
+                            <div class="example-desc">Cards available on TCGplayer SYP</div>
                         </div>
                     </div>
                 </div>
@@ -752,65 +782,65 @@
                 </div>
             </div>
 
-            <!-- Negative Filters -->
-            <div class="syntax-section" id="section-negating">
-                <h3><span>🚫</span>Exclusion Filters</h3>
-                <div class="syntax-grid">
-                    <div class="syntax-info">
-                        <p>Invert any filter by prepending a <code>-</code> to the option name.</p>
-                        <p><code>not:</code> and <code>-is:</code> are equivalent.</p>
-                        <p>Use commas to combine values: <code>r:rare,mythic</code></p>
-                    </div>
-                    <div class="syntax-examples">
-                        <div class="example-card">
-                            <div class="example-query">-s:MKM</div>
-                            <div class="example-desc">Exclude MKM cards</div>
-                        </div>
-                        <div class="example-card">
-                            <div class="example-query">-r:common</div>
-                            <div class="example-desc">Exclude commons</div>
-                        </div>
-                        <div class="example-card">
-                            <div class="example-query">-is:reserved</div>
-                            <div class="example-desc">Exclude Reserved List</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- General Tips -->
             <div class="syntax-section" id="section-tips">
                 <h3><span>💡</span> General Tips</h3>
                 <div class="syntax-grid">
                     <div class="syntax-info">
-                        <p><strong>Historical Data:</strong> Access price history from a few major vendors by clicking 📊 for each card.</p>
-                        <p><strong>Data Refresh:</strong> Data is refreshed periodically over the day.</p>
-                        <p><strong>Entry Format:</strong> Entries are formatted as <em>card name (finish) - edition (collector #) - # of prints</em>.</p>
-                        <p><strong>Source Products:</strong> Retrieve the source product of a card or sealed product by pressing "Found in * products". Similarly, pressing 📖 on a card will return every possible product containing any kind of reprint of that card.</p>
-                        <p><strong>Price Ratio:</strong> The percentage found in buylist offers is the price ratio — the higher it is, the more a vendor is looking to purchase that card. This percentage is available only if the seller is selling copies of the same card at the same conditions.</p>
-                        <p><strong>Conditions:</strong> Inventory prices refer to the stated conditions (and their accuracy depends on the data provider). Buylist prices are always referring to NM conditions.</p>
-                        <p><strong>Flavor Names:</strong> When searching for the <em>flavor name</em> of a card, only those specific versions will appear (unless you disable this option in the Other Preferences section). However this only works when searching for a single specific card, and won't be available for complex search queries (they will still be performed using the canonical name of the card).</p>
-                        <p><strong>TCG Low:</strong> TCG Low is a special value referring to TCG algorithms that may differ from quantity and quality of listings.</p>
-                        <p><strong>Trade-In:</strong> If you hover on a buylist price, a small tooltip will appear displaying the corresponding trade-in price, if available.</p>
-                        <p><strong>Feedback:</strong> In case of mistakes or incongruities, please notify the devs in the BAN Discord.</p>
-                        <p><strong>Support BAN:</strong> Should you find this content useful, consider clicking on one of the provided links to make a purchase on the website, and directly support BAN.</p>
+                        <p>Our <strong>price data</strong> is refreshed periodically over the day, but the precise delay is randomized to avoid sniping. <strong>Historical data</strong> is also available for most cards and products. You may access price history from a few major vendors by clicking 📊 for each card.</p>
+                        <p>It is possible to look for <strong>Source Products</strong>. You may retrieve the source product of a card or sealed product by pressing "Found in * products". Similarly, pressing 📖 on a card will return every possible product containing any kind of reprint of that card. The most acurate location for this information is on the left side panel below the card image.</p>
+                        <p>Buylist results feature a <strong>Price Ratio</strong>. The percentage represents the card deiserability from each buyer: the higher it is, the more a vendor is looking to purchase that card. This percentage is available only if the seller is selling copies of the same card at the same conditions.</p>
+                        <p>Please not that a card <strong>condition</strong> may refer to different things: Inventory prices refer to the stated conditions (and their accuracy depends on the data provider). Buylist prices are always referring to NM conditions. Sealed products are always reflect the sealed, unopened condition</p>
+                        <p>The <strong>Index</strong> condition refers to specilized data providers that do not separate entries by conditions (ie TCG Low) and it's suited for trends only, so there are no quantities associated either.</p>
+                        <p>When searching for the <strong>Flavor Name</strong> of a card, only those specific versions will appear (unless you disable this option in the Other Preferences section). However this only works when searching for a single specific card, and won't be available for complex search queries (they will still be performed using the canonical name of the card).</p>
+                        <p>If you hover on a buylist price, a small tooltip will appear displaying the corresponding <strong>Trade Credit</strong> price, if available.</p>
+                        <p>In case of mistakes or incongruities, please leave a message in <strong>#feedback</strong> channel in the BAN Discord, with as much details as possible, and with a URL or screenshot of the problem. Some errors may be actually coming from upstream provides, and we'll kindly ask to forward a support request there.</p>
+                        <p>Should you find this content useful, consider clicking on one of the provided links to make a purchase on the website, and directly support BAN.</p>
                     </div>
                     <div class="syntax-examples">
                         <div class="example-card" style="border-left-color: var(--border-example);">
                             <div class="example-query">📊 Historical Data</div>
-                            <div class="example-desc">Click to view price charts</div>
+                            <div class="example-desc">View price charts</div>
                         </div>
                         <div class="example-card" style="border-left-color: var(--border-example);">
-                            <div class="example-query">📖 Reprint Finder</div>
-                            <div class="example-desc">Find all products with card</div>
+                            <div class="example-query"><img width=14 src="/img/logo/tcgapp.png"> TCGplayer Seller</div>
+                            <div class="example-desc">Access the TCGplayer Seller page to adjust prices or quantities</div>
                         </div>
                         <div class="example-card" style="border-left-color: var(--border-example);">
-                            <div class="example-query">💰 Buylist Ratio</div>
-                            <div class="example-desc">Higher % = more demand</div>
+                            <div class="example-query"><img width=14 src="/img/logo/scryfall.svg"> Scryfall</div>
+                            <div class="example-desc">Load this card on Scryfall</div>
                         </div>
-                        <div class="example-card" style="border-left-color: #22c55e;">
-                            <div class="example-query">🛒 Support BAN</div>
-                            <div class="example-desc">Use affiliate links when purchasing</div>
+                        <div class="example-card" style="border-left-color: var(--border-example);">
+                            <div class="example-query">🏰 Restock at CK</div>
+                            <div class="example-desc">Set a restock notification at Card Kingdom (if on catalog)</div>
+                        </div>
+                        <div class="example-card" style="border-left-color: var(--border-example);">
+                            <div class="example-query"><img width=14 src="/img/logo/deckbox.webp"> Deckbox</div>
+                            <div class="example-desc">Load this card on Deckbox</div>
+                        </div>
+                        <div class="example-card" style="border-left-color: var(--border-example);">
+                            <div class="example-query">📝 Copy card name</div>
+                            <div class="example-desc">Quickly copy the card name</div>
+                        </div>
+                        <div class="example-card" style="border-left-color: var(--border-example);">
+                            <div class="example-query">📖 Reprint finder</div>
+                            <div class="example-desc">Find all products with may contain a card with the same name</div>
+                        </div>
+                        <div class="example-card" style="border-left-color: var(--border-example);">
+                            <div class="example-query">🔎 Product opener</div>
+                            <div class="example-desc">For sealed products, search which cards can be found inside</div>
+                        </div>
+                        <div class="example-card" style="border-left-color: var(--border-example);">
+                            <div class="example-query"><img width=14 src="/img/misc/decklist-mkm.png"> CM Decklist</div>
+                            <div class="example-desc">For sealed decks, download the decklist in a format compatible with Card Market</div>
+                        </div>
+                        <div class="example-card" style="border-left-color: var(--border-example);">
+                            <div class="example-query"><img width=14 src="/img/misc/decklist.png"> TCG Decklist</div>
+                            <div class="example-desc">For sealed decks, download the decklist in a format compatible with TCGplayer</div>
+                        </div>
+                        <div class="example-card" style="border-left-color: var(--border-example);">
+                            <div class="example-query">🎁 Open booster</div>
+                            <div class="example-desc">For randomized seaped products, similate opening it</div>
                         </div>
                     </div>
                 </div>
