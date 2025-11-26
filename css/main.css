@@ -111,18 +111,18 @@ nearly black #292929
     --chartjs-grid: var(--chartjs-default-grid);
     --chartjs-text: var(--chartjs-default-text);
 
-    --bg-active: #ae96f8;
-    --bg-example: #ae96f8;
-    --bg-hover: #2d2640;
+    --bg-active: var(--headerbackground);
+    --bg-example: var(--headerbackground);
+    --bg-hover: var(--hover);
 
-    --text-tag: #6d28d9;
-    --text-primary: #f0edf5;
-    --text-secondary: #475569;
+    --text-tag: var(--normal);
+    --text-primary: var(--headingtext);
+    --text-secondary: var(--normaltext);
 
-    --border-example: #fbbf24;
+    --border-example: var(--ainfo);
 
-    --syntax-text: #c026d3;
-    --syntax-border-color: #3d3455;
+    --syntax-text: var(--ainfo);
+    --syntax-border-color: var(--navbackground);
 }
 
 .dark-theme {
@@ -153,18 +153,18 @@ nearly black #292929
     --chartjs-grid: var(--chartjs-dark-grid);
     --chartjs-text: var(--chartjs-dark-text);
 
-    --bg-active: #3d3455;
-    --bg-example: #2a2339;
-    --bg-hover: #2d2640;
+    --bg-active: var(--headerbackground);
+    --bg-example: var(--headerbackground);
+    --bg-hover: var(--hover);
 
-    --text-tag: #e9d5ff;
-    --text-primary: #f0edf5;
-    --text-secondary: #b8b0c8;
+    --text-tag: var(--normal);
+    --text-primary: var(--headingtext);
+    --text-secondary: var(--normaltext);
 
-    --border-example: #fbbf24;
+    --border-example: var(--awarning);
 
-    --syntax-text: #f0abfc;
-    --syntax-border-color: #3d3455;
+    --syntax-text: var(--awarning);
+    --syntax-border-color: var(--navbackground);
 }
 
 /* reset all margins and padding*/
