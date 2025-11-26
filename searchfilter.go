@@ -232,6 +232,9 @@ func fixupTypeNG(code string) []string {
 }
 
 func fixupDateNG(code string) string {
+	if code == "now" || code == "today" {
+		return time.Now().Format("2006-01-02")
+	}
 	set, err := mtgmatcher.GetSet(strings.ToUpper(code))
 	if err == nil {
 		return set.ReleaseDate
