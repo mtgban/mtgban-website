@@ -1,0 +1,30 @@
+{{define "header"}}
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    {{ if eq .Page "home" }}
+        <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
+        {{if .PatreonLogin}}
+            <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+            <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+        {{ end }}
+    {{ end }}
+    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    {{ if eq .Page "upload" }}
+        <link rel="stylesheet" type="text/css" href="/css/tooltip.css?hash={{.Hash}}">
+    {{ end }}
+    <title>{{.Title}}{{ if or (eq .Page "news") (eq .Page "sleep") }} - {{.Subtitle}}{{ end }}</title>
+
+    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/img/favicon/site.webmanifest">
+    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
+    <meta name="theme-color" content="#ff0000">
+</head>
+{{end}}
