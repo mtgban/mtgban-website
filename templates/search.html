@@ -56,29 +56,7 @@
 
 <body class="light-theme">
 <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
-<nav>
-    <ul>
-        <li><a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" width=48></a></li>
-        <li {{if .PatreonLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
-        {{range .Nav}}
-            <li>
-                <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
-                    <span>{{.Short}} {{.Name}}</span>
-                </a>
-            </li>
-        {{end}}
-        <li>
-            <label class="switch">
-                <div>
-                    <input id="theme-toggle" type="checkbox"/>
-                    <span class="slider"></span>
-                </div>
-                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
-            </label>
-        </li>
-    </ul>
-</nav>
-
+{{template "navbar" .}}
 <div class="mainbody">
     {{if ne .ErrorMessage ""}}
         <h1>{{.ErrorMessage}}</h1>
@@ -363,155 +341,11 @@
             </script>
 
         {{if and (eq .SearchQuery "") (not .IsSealed)}}
+            <script type="text/javascript" src="/js/syntax.js?hash={{.Hash}}"></script>
             {{template "syntax" .}}
         {{else if and (eq .SearchQuery "") (.IsSealed)}}
-            <p style="max-width: 70%">
-                Make sure to read the <a class="btn normal" href="#faq">F.A.Q.</a>
-                <br>
-                Jump to
-                {{range $key := .EditionSort}}
-                    <a class="btn normal" href="#{{.}}">{{.}}</a>
-                {{end}}
-                <br>
-                Filter by <input type="text" style="margin-left: 8px;" id="filterInput" onkeyup="filterPageContent()" placeholder="Edition...">
-            </p>
-
-            {{range $key := .EditionSort}}
-                <div class="sticky" style="top: 48px; background-color: var(--background);">
-                    <span class="anchor" id="{{.}}"></span>
-                    <h3 class="storename">{{.}}</a></h3>
-                    <hr width=15%>
-                </div>
-
-                <div class="indent" style="max-width: 85%; padding-top:10px">
-                    {{$editionList := index $.EditionList $key }}
-                    {{range $editionList}}
-                        <nobr>
-                            <i class="ss ss-{{.Keyrune}} ss-2x ss-fw"></i>
-                            <a class="btn normal" href="/sealed?q=s:{{.Code}}">
-                                {{.Name}}
-                            </a>
-                        </nobr>
-                    {{end}}
-                </div>
-                <br>
-            {{end}}
-
-            <div style="max-width: 85%; padding-top:10px">
-                <span class="anchor" id="faq"></span>
-                <h3>F.A.Q.</h3>
-                <br>
-                <ul class="indent">
-                    <li>
-                        <h4>Understanding EV and SIM at BAN</h4>
-                        <ul class="indent">
-                            At BAN, we aim to empower our users with data-driven insight into the potential value of their sealed MTG products through two distinct but complementary methods: Expected Value (EV) and Simulated Box Openings (SIM).<br>
-                            For any product with a static decklist, the card values are just summed up and provided as is, and there is no difference between the two methods, while for product with randomness associated with it (ie. booster packs and certain decks) there can be profound differences between predicted value and typical openings, especially at low sample sizes. Thus, we take both approaches to help the user decide the spread and likely value of opening moderate to large amount of product vs. selling it outright.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>How is EV calculated?</h4>
-                        <ul class="indent">
-                            EV calculates a product's average value by analyzing the distribution of cards on print sheets, using each card's drop rate and market value. This approach offers a theoretical perspective on what a product might be worth, providing a foundational understanding of its potential value. In other words the final value of the box is linearly dependent on the drop rate (or probability) for each card to appear in any given booster slot.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>How is SIM calculated?</h4>
-                        <ul class="indent">
-                            SIM, in contrast, brings the experience of opening booster packs and boxes closer to reality. We take the known probabilities of each card appearing in a product and use a random number generator to generate a random box from this information. This is repeated thousands of times leading to a large data set in which we can get some useful insights that the EV number alone cannot show us such as the Median and Standard Deviation.<br>
-Sims are not required for pre-constructed decks and other products where the same cards appear every time.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>What are the median and standard deviation representing?</h4>
-                        <ul class="indent">
-                            The Median is the middle value of a data set. For example, if we simulate 5000 boxes and organise the box values from smallest to largest, the Median value would be the value of the 2500th box. The metric in itself does not say much, but comparing the Median to the EV is useful. If the Median is a lot lower than the EV then we can assume the EV is being skewed higher by some top-heavy chase cards where a lot of the value in a product may be.<br>
-
-                            The Standard Deviation measures the spread of values in a data set. The higher the Standard Deviation, the more variance you will experience opening a product. For example, if the EV of a box is $100 and all other boxes are either $99 or $101, we have Standard Deviation of 1. All values are extremely clustered and you can expect your opening to be extremely consistent and low risk.<br>
-
-                            If the EV is $100 and the Standard Deviation is $40 then expect some swings. The more boxes you open, the more likely you are to get closer to the true EV of $100 a box but, depending on the product, the number of boxes required for that to be likely may vary.
-                       </ul>
-                    </li>
-                    <li>
-                        <h4>Which is the one I should follow?</h4>
-                        <ul class="indent">
-                            Our objective at BAN is to furnish our members with detailed and actionable insights into their collectibles. By merging the theoretical calculations of EV with the practical applications of SIM, we ensure a comprehensive analysis that supports informed decision-making. As always the "best" method is wildly dependant on individual business and use case.<br>
-                            Large openers may want to focus purely on EV, safe in the knowledge that over months and years they are likely to be close to EV. Smaller openers may decide to forgo high variance products if a bad showing will put them in a tough financial situation, even if a product is tehnically +EV to open.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>Why are some products tagged with high IQR?</h4>
-                        <ul class="indent">
-                            Simplifying a bit, IQR is a statistical method to find how many outliers are present in the data. This value basically tells you how your data is distributed and how many prices deviate from the typical range (and by how much). A high IQR indicates thate there are a lot of cards with very high prices, meaning the chances of hitting this cards is lower than the norm, but when performing box simulations, even in high number, they may skew the final prospect value.
-                            In order to warn BAN users that something may be off, either due to an unlucky simulation, or due to plain bad data, we tag those products accordingly, and exclude them when appropriate. The computation is proportional to the market condition, meaning it accounts for both older sealed product with cards in the thousands of dollars, as well as recent product with a small number of chase cards (as reminder, serialized cards are not used in any of our computations).
-                            Always make sure to understand the data well and perform your own research, before making any financial decision, and doubly more so for any product tagged with high IQR.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>How do you emulate booster openings?</h4>
-                        <ul class="indent">
-                            We use data from multiple projects, in paritcular we derive the collation information from the <a href="https://www.lethe.xyz/mtg/collation/">Lethe project</a>, the distribution of cards in the boosters from <a href="https://github.com/taw/magic-search-engine">mtg.wft search engine</a>, the contents description from <a href="https://github.com/mtgjson/mtg-sealed-content">MTGJSON</a>, and the decklists come from <a href="https://github.com/taw/magic-preconstructed-decks">this repository</a>. Please refer to each project website to know more how estimations works (and to help out with data ingestion).<br>
-                            If you are interested in the BAN algorithm, you can check <a href="https://github.com/mtgban/go-mtgban/blob/master/sealedev/api.go">this file</a> for the estimation model, and <a href="https://github.com/mtgban/go-mtgban/blob/master/sealedev/sealedev.go">this file</a> for the actual computation.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>Can you describe the data sources available?</h4>
-                        <ul class="indent">
-                            There are three EV-dependent data sources: <i>TCG Low</i>, which reflects the lowest possible value on TCG (excluding shipping), <i>TCG Direct</i>, which represents the Direct price <u>minus fees</u> that the cards could be sold at, and <i>CK buylist</i>, which shows how much a given set of cards could be sold to the vendor. Note that TCG Direct prices could be sometimes skewed due to ridiculous prices being set by sellers "parking" their cards - we try to work around this by capping the maximum value to twice as much as TCG Low when we're able to detect such an offset. <br>
-                            The other prices shown under <i>Purchase from</i> and <i>Sell to</i> represent the prices of the sealed products as available from different stores.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>Why is this set missing?</h4>
-                        <ul class="indent">
-                           Given there is a three way dependency on the source data, it might be that the information for the given set or product simply hasn't been filled and has not propagated to us yet. Retry in a few days or, if you're able to code, try contributing to one of the open source projects mentioned above.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>What's up with these odd prices for this just released set?</h4>
-                        <ul class="indent">
-                           Our prices reflect the price of the actual printing of the card, they do not reflect the value of the card before the reprint. As such it takes a few days for all the listings to be filled in and for prices to propagate to the calculator -- in particular, in case of Direct prices might look a bit off until the whole TCG Direct inventory appears, and in the meantime we'll do our best estimates using the market price. Also keep in mind that in the early days, the expected values will reflect preorder prices, which are almost always higher than normal.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>How is Set Value computed and why does it differs from buylist?</h4>
-                        <ul class="indent">
-                            The set value is the daily sum of every single printing of every single card within the same set, for nonfoil and foil printings when available. It may be considered as indicating the value of the entire collection in NM condition. As such the set value is not affected by any element of randomness, which is instead taken into account by the listed entry.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>What are the custom buttons next to product titles for?</h4>
-                        <ul class="indent">
-                            These two buttons lead to different search options:<br>
-                            * the 🎁 (when available) will similuate opening a pack using the information available. Every run is fully randomized and unpredictable;<br>
-                            * the 🔍 will unpack a product and list all its possible contents. This means that a booster box will only list a single booster pack, while a booster pack will display all possible picks.<br>
-                            * the <img width=14 src=img/misc/decklist.png> (when available) will let you download a CSV of the decklist, TCGplayer-formatted, ready for uplaod.<br>
-                            In both cases, once in the search page, you can add search terms normally to filter for color, rarities, and names using the common search syntax.<br>
-                            Note that depending on the content type, the search result might show you at most one copy per card or list the same card multiple times: this to show accurate and easy to import results for decklists and box sets, while displaying compact results for other sealed types.<br>
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>This product has multiple copies of the same card, but I see only one, what gives?</h4>
-                        <ul class="indent">
-                            In order to avoid polluting the results with multiple instances of the same information, duplicated copies of the same cards are hidden in the search results. Even though the search only lists one card, the presented EV and SIM calcs do take into account the possibility of opening multiple copies of the same card.
-                        </ul>
-                    </li>
-                    <li>
-                        <h4>Is there a minimum or maxumum value for a card to be considered?</h4>
-                        <ul class="indent">
-                           Yes. Initially we considered every single price found and added it up, but we found out that counting up "worthless cards" and "extremely expensive cards" skew the results even on repeated runs. So we're now excluding all bulk (sub $0.30) and all serialized cards, since the odds of opening are low, but impact the result too optimistically. This is true for both EV and SIM, and in the latter case the multiple runs should take care of the variance for computation for all other cards.
-                        </ul>
-                    </li>
-                </ul>
-
-                <br>
-                <h3>Disclaimer</h3>
-                <br>
-                <p>
-                    Information in this EV calculation is not guaranteed and should not be used solely to make financial decisions.
-                </p>
-            </div>
-
+            <script type="text/javascript" src="/js/faq.js?hash={{.Hash}}"></script>
+            {{template "_editions" .}}
         {{else}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
             <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
