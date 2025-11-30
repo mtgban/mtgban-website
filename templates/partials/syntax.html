@@ -80,13 +80,13 @@
                         <p><code>name[|code[|number[|finish]]]</code></p>
                         <p>There is also limited support for human readable tags. For example, appending <code>(Extended Art)</code> to a card name will show only Extended Art versions. This won't work with regexp search mode.</p>
                         <p>You can set options in any order and any amount. Use comma <code>,</code> to separate multiple values.</p>
-                        <p>The finish option can be :</p>
+                        <p>The finish option can be as follows:</p>
                         <table class="syntax-table">
-                            <tr><th>Suffix</th><th>Meaning</th></tr>
-                            <tr><td>&amp;</td><td>Non-foil only</td></tr>
-                            <tr><td>*</td><td>Foil only</td></tr>
-                            <tr><td>~</td><td>Etched only</td></tr>
-                            <tr><td>`</td><td>Alt-foil (surge, ripple, galaxy, etc)</td></tr>
+                            <tr><th>Option</th><th>Suffix</th><th>Meaning</th></tr>
+                            <tr><td>nonfoil</td><td><code>&amp;</code></code></td><td>Non-foil only</td></tr>
+                            <tr><td>foil</td><td><code>*</code></td><td>Foil only</td></tr>
+                            <tr><td>etched</td><td><code>~</code></td><td>Etched only</td></tr>
+                            <tr><td>is:altfoil</td><td><code>`</code></td><td>Alt-foil (surge, ripple, galaxy, etc)</td></tr>
                         </table>
                         <p style="margin-top:12px">Note: This syntax is disabled if you use a regular expression option to avoid aliasing.</p>
 
@@ -179,7 +179,7 @@
                 <div class="syntax-grid">
                     <div class="syntax-info">
                         <p>Filter by finish with <code>f:VALUE</code>, accepting <code>nonfoil</code>, <code>foil</code>, and <code>etched</code>.</p>
-                        <p>Short forms available: <code>nf</code>, <code>f</code>, and <code>e</code>.</p>
+                        <p>Short forms available: <code>nf</code>, <code>f</code>, and <code>e</code>. If you are looking for special foil variants like Galaxy or Surge, you can use <code>is:altfoil</code> as additional filter</p>
                         <p>Or use the suffix syntax on any search:</p>
                         <table class="syntax-table">
                             <tr><th>Suffix</th><th>Meaning</th></tr>
