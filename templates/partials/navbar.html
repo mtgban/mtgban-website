@@ -1,0 +1,120 @@
+{{define "navbar"}}
+<script type="text/javascript" src="/js/nav.js?hash={{.Hash}}"></script>
+<nav>
+    <ul>
+        <li><a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" width=48></a></li>
+        <li {{if .PatreonLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
+        <!-- base nav -->
+        {{range .Nav}}
+            {{if eq .Class "beta"}}
+                {{continue}}
+            {{end}}
+            <li class="nav-item">
+                <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+                    <span class="full-text">{{.Short}} {{.Name}}</span>
+                    <span class="short-text">{{.Short}}</span>
+                </a>
+            </li>
+        {{end}}
+        <!-- Extra nav items -->
+        {{if .ExtraNav}}
+            {{$showSealedMenu := false}}
+            <li class="nav-item nav-dropdown">
+                <div class="dropdown">
+                    <button class="dropbtn">Select store</button>
+                    <div class="dropdown-content">
+                        {{range .ExtraNav}}
+                            {{if not (contains .Name "Sealed")}}
+                                <a href="{{.Link}}">{{.Name}}</a>
+                            {{else}}
+                                {{$showSealedMenu = true}}
+                            {{end}}
+                        {{end}}
+                    </div>
+                </div>
+            </li>
+            <!-- conditionals -->
+            {{if $showSealedMenu}}
+                <li class="nav-item nav-dropdown">
+                    <div class="dropdown">
+                        <button class="dropbtn">Select sealed</button>
+                        <div class="dropdown-content">
+                            {{range .ExtraNav}}
+                                {{if contains .Name "Sealed"}}
+                                    <a href="{{.Link}}">{{.Name}}</a>
+                                {{end}}
+                            {{end}}
+                        </div>
+                    </div>
+                </li>
+            {{end}}
+        {{end}}
+        <!-- beta nav -->
+        {{range .Nav}}
+            {{if not (eq .Class "beta")}}
+                {{continue}}
+            {{end}}
+            <li class="nav-item">
+                <a class="{{.Class}}" href="{{.Link}}">
+                    <span class="full-text">{{.Short}} {{.Name}}</span>
+                    <span class="short-text">{{.Short}}</span>
+                </a>
+            </li>
+        {{end}}
+
+        <!-- Hamburger -->
+        <li class="nav-toggle-wrapper">
+            <button class="nav-toggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </li>
+        <li>
+            <label class="switch">
+                <div>
+                    <input id="theme-toggle" type="checkbox"/>
+                    <span class="slider"></span>
+                </div>
+                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+            </label>
+        </li>
+    </ul>
+
+    <!-- Mobile menu -->
+    <div class="nav-menu">
+        {{range .Nav}}
+            {{if eq .Class "beta"}}{{continue}}{{end}}
+            <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+                <span>{{.Short}} {{.Name}}</span>
+            </a>
+        {{end}}
+        <!-- Extra menu items -->
+        {{if .ExtraNav}}
+            <div class="nav-menu-section">
+                <div class="nav-menu-label">Stores</div>
+                {{range .ExtraNav}}
+                    {{if not (contains .Name "Sealed")}}
+                        <a href="{{.Link}}">{{.Name}}</a>
+                    {{end}}
+                {{end}}
+            </div>
+            <div class="nav-menu-section">
+                <div class="nav-menu-label">Sealed</div>
+                {{range .ExtraNav}}
+                    {{if contains .Name "Sealed"}}
+                        <a href="{{.Link}}">{{.Name}}</a>
+                    {{end}}
+                {{end}}
+            </div>
+        {{end}}
+        <!-- beta menu -->
+        {{range .Nav}}
+            {{if not (eq .Class "beta")}}{{continue}}{{end}}
+            <a class="{{.Class}}" href="{{.Link}}">
+                <span>{{.Short}} {{.Name}}</span>
+            </a>
+        {{end}}
+    </div>
+</nav>
+{{end}}

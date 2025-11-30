@@ -1,52 +1,9 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
-    <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
-    <title>{{.Title}}</title>
-
-    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
-    <link rel="manifest" href="/img/favicon/site.webmanifest">
-    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
-    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
-    <meta name="msapplication-TileColor" content="#da532c">
-    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
-    <meta name="theme-color" content="#ff0000">
-
-    {{if .PatreonLogin}}
-        <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
-    {{end}}
-</head>
-
+{{template "header" .}}
 <body class="light-theme">
-    <nav>
-    <ul>
-        <li><a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" width=48></a></li>
-        <li {{if .PatreonLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
-        <li style="display:none"><!--If you're reading this, and would like to help, join our Discord, it's the right place for any talented developer with a passion for card games!--></li>
-        {{range .Nav}}
-            <li>
-                <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
-                    <span>{{.Short}} {{.Name}}</span>
-                </a>
-            </li>
-        {{end}}
-        <li>
-            <label class="switch">
-                <div>
-                    <input id="theme-toggle" type="checkbox"/>
-                    <span class="slider"></span>
-                </div>
-                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
-            </label>
-        </li>
-    </ul>
-    </nav>
-
+<script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
+{{template "navbar" .}}
     <div class="bg">
         <div class="mainbody">
             {{if .PatreonLogin}}
