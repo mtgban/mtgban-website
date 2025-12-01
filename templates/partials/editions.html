@@ -1,0 +1,69 @@
+{{define "editions"}}
+<script type="text/javascript" src="/js/editions.js?hash={{.Hash}}"></script>
+<!-- Sealed Editions Header -->
+<div class="editions-container">
+  <div class="editions-header">
+    <div class="editions-title">
+      <h2>Sealed Editions</h2>
+    </div>
+    <!-- Search Filter -->
+    <div class="edition-search">
+      <input
+        type="text"
+        id="filterInput"
+        placeholder="Search for edition name..."
+        class="edition-search-input"
+      />
+    </div>
+    <!-- Sidebar category filter -->
+    <button class="editions-toggle">
+      <span>Categories</span>
+      <span class="editions-toggle-icon">▼</span>
+    </button>
+  </div>
+  <!-- Body with sidebar and content -->
+  <div class="syntax-body" id="sealed-editions-body">
+    <div class="syntax-sidebar" id="editions-sidebar">
+      {{range $index, $key := .EditionSort}} {{if eq $index 0}}
+      <button
+        class="sidebar-item active"
+        data-section="edition-{{$key}}"
+        data-group="editions"
+      >
+        <span class="icon">🔎</span> {{$key}}
+      </button>
+      {{else}}
+      <button
+        class="sidebar-item"
+        data-section="edition-{{$key}}"
+        data-group="editions"
+      >
+        <span class="icon">🔎</span> {{$key}}
+      </button>
+      {{end}} {{end}}
+    </div>
+    <!-- Content Panel -->
+    <div class="syntax-content">
+      {{range $index, $key := .EditionSort}} {{if eq $index 0}}
+      <div class="syntax-section active" id="section-edition-{{$key}}">
+        {{else}}
+        <div class="syntax-section" id="section-edition-{{$key}}">
+          {{end}}
+          <h3><span>🔍</span> {{$key}}</h3>
+          <div class="edition-grid">
+            {{$editionList := index $.EditionList $key}} {{range $editionList}}
+            <!-- Keyrune Rendering -->
+            <div class="edition-item">
+              <i class="ss ss-rare ss-{{.Keyrune}} ss-2x ss-fw"></i>
+              <a class="btn normal" href="/sealed?q=s:{{.Code}}"> {{.Name}} </a>
+            </div>
+            {{end}}
+          </div>
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{end}}
