@@ -1267,3 +1267,161 @@ img.hoverImage {
         padding: 0.15rem 0.4rem !important;
     }
 }
+
+/** Editions Table/Section **/
+.editions-container {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    max-width: 100%;
+    background: var(--background);
+    border: 0.1rem solid var(--syntax-border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 1rem auto 0;
+}
+
+.editions-header {
+    display: flex;
+    position: relative;
+    flex-direction: row;
+    align-items: center;
+    gap: 2.6rem;
+    padding: 0.5rem;
+    background: var(--headerbackground);
+    border-bottom: 1px solid var(--syntax-border-color);
+}
+
+.editions-header h2 {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.editions-header h2::before {
+    content: '📖';
+}
+
+.editions-body {
+    display: grid;
+    grid-template-columns: 15% 2fr;
+}
+
+.editions-content {
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+.edition-item {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.15rem 0.15rem;
+    background: var(--headerbackground);
+    border-radius: 6px;
+    transition: background 0.2s, transform 0.15s;
+    min-width: 0;
+    border: 1px solid var(--verydarkgrey)#393939;
+    box-shadow: 1px 1px 1px var(--quasiblack), 3px 3px 3px rgba(0, 0, 0, 0.9);
+}
+
+.edition-item:hover {
+    background: var(--background-hover);
+    transform: translateY(-1px);
+}
+
+.edition-item i {
+    flex-shrink: 0;
+}
+
+.edition-item a {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    text-shadow: 0 1px 1px rgba(20, 20, 20, 0.9);
+}
+
+
+@keyframes gradient-shift {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* Mobile toggle button - hidden on desktop */
+.editions-toggle {
+    display: none;
+    background: var(--background-alt);
+    border: 1px solid var(--syntax-border-color);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    color: var(--syntax-text);
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: background 0.2s;
+}
+
+.editions-toggle:hover {
+    background: var(--background-hover);
+}
+
+.editions-toggle-icon {
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.editions-toggle.active .editions-toggle-icon {
+    transform: rotate(180deg);
+}
+
+/* Main body layout */
+#sealed-editions-body {
+    display: grid;
+    grid-template-columns: minmax(140px, 180px) 1fr;
+    min-height: 400px;
+    max-height: 70vh;
+}
+
+/* Edition grid - responsive columns */
+.edition-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+}
+
+.edition-search {
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    margin-left: auto;
+    border-radius: 8px;
+    width: 36rem;
+    margin-right: 65rem;
+    background: var(--background-alt);
+}
+
+.edition-search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--syntax-border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+    color: var(--text-primary);
+    background: var(--background);
+    width: 36rem;
+    margin-right: 65rem;
+}
