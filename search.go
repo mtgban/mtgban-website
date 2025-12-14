@@ -424,6 +424,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				_, found = foundVendors[cardId][cond]
 				if found {
 					sort.Slice(foundVendors[cardId][cond], func(i, j int) bool {
+						if foundVendors[cardId][cond][i].Price == foundVendors[cardId][cond][j].Price {
+							return foundVendors[cardId][cond][i].Credit > foundVendors[cardId][cond][j].Credit
+						}
 						return foundVendors[cardId][cond][i].Price > foundVendors[cardId][cond][j].Price
 					})
 				}
