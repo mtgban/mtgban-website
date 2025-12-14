@@ -461,6 +461,7 @@ var FilterOperations = map[string][]string{
 	"cn":        []string{":", ">", "<"},
 	"cne":       []string{":"},
 	"date":      []string{":", ">", "<"},
+	"year":      []string{":", ">", "<"},
 	"name":      []string{":"},
 	"namee":     []string{":"},
 	"r":         []string{":", ">", "<"},
@@ -782,7 +783,11 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Negate: negate,
 				Values: strings.Split(strings.ToLower(code), ","),
 			})
-		case "date":
+		case "date", "year":
+			// Only use the first chunk of the ISO date if only year is requested
+			if option == "year" {
+				code = strings.Split(code, "-")[0]
+			}
 			opt := "date"
 			switch operation {
 			case ">":
