@@ -19,6 +19,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/tcgplayer"
 )
 
 const (
@@ -560,6 +561,18 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					tmp = append(tmp, indexArray[i])
 				}
 			}
+		}
+
+		// If the TCG index is missing, but ID is known, we manually add one to get the link
+		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed && pageVars.Metadata[cardId].TCGId != "" {
+			tcgId, _ := strconv.Atoi(pageVars.Metadata[cardId].TCGId)
+
+			link := tcgplayer.GenerateProductURL(tcgId, "", Config.Affiliate["TCG"], "", "", false)
+			tmp = append(tmp, SearchEntry{
+				ScraperName: "TCGplayer",
+				URL:         link,
+				NoQuantity:  true,
+			})
 		}
 
 		foundSellers[cardId]["INDEX"] = tmp

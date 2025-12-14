@@ -1136,7 +1136,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         <td></td>
                                                     {{end}}
                                                     <td style="text-align: center; vertical-align: middle;">
-                                                        $ {{printf "%.2f" .Price}}
+                                                        {{if .Price}}
+                                                            $ {{printf "%.2f" .Price}}
+                                                        {{else}}
+                                                            n/a
+                                                        {{end}}
                                                         {{if eq .Shorthand "TCGDirect"}}
                                                             {{$marketPrice := tcg_market_price $cardId}}
                                                             {{if gt .Price (mul $marketPrice 2)}}
