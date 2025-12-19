@@ -30,7 +30,7 @@
                 <span class="icon">📋</span> Card Condition
             </button>
             <button class="sidebar-item" data-section="types">
-                <span class="icon">⚔️</span> Card Type
+                <span class="icon">⚔️</span> Card/Product Type
             </button>
             <button class="sidebar-item" data-section="dates">
                 <span class="icon">📅</span> Release Date
@@ -368,7 +368,7 @@
                 <div class="syntax-grid">
                     <div class="syntax-info">
                         <p>Filter by card type with <code>t:VALUE</code>, accepting any valid supertype, subtype, or type.</p>
-                        <p>The same option works on sealed product types too, with a looser search: it accepts any chunk of the name, or category and subtype terms.</p>
+                        <p>The same option works on sealed product types too. You can search for either a category (ie. booster, box, deck) or subtye (ie intro, draft, collector) but also any chunk of the name.</p>
                     </div>
                     <div class="syntax-examples">
                         <div class="example-card">
@@ -382,6 +382,14 @@
                         <div class="example-card">
                             <div class="example-query">t:goblin</div>
                             <div class="example-desc">Goblin creatures</div>
+                        </div>
+                        <div class="example-card">
+                            <div class="example-query">t:booster s:blb</div>
+                            <div class="example-desc">All Booster products in BLB</div>
+                        </div>
+                        <div class="example-card">
+                            <div class="example-query">t:redemption</div>
+                            <div class="example-desc">All the MTGO Redemption products</div>
                         </div>
                     </div>
                 </div>
