@@ -784,16 +784,31 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Values: strings.Split(strings.ToLower(code), ","),
 			})
 		case "date", "year":
-			// Only use the first chunk of the ISO date if only year is requested
-			if option == "year" {
-				code = strings.Split(code, "-")[0]
-			}
 			opt := "date"
 			switch operation {
 			case ">":
 				opt = "date_greater_than"
 			case "<":
 				opt = "date_less_than"
+			}
+			if option == "year" {
+				// Only use the first chunk of the ISO date if only year is requested
+				code = strings.Split(code, "-")[0]
+
+				// If a single year is selected, then we enable a range
+				if opt == "date" {
+					filters = append(filters, FilterElem{
+						Name:   "date_greater_than",
+						Negate: negate,
+						Values: []string{fixupDateNG(code + "-01-01")},
+					})
+					opt = "date_less_than"
+				}
+				// If > then fixupDateNG will start from 01-01 which is fine, but
+				// if < then we need to include as much time as possible
+				if opt == "date_less_than" {
+					code += "-12-31"
+				}
 			}
 			filters = append(filters, FilterElem{
 				Name:   opt,
