@@ -527,6 +527,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				} else {
 					tmp = append(tmp, indexArray[i])
 				}
+				// Set the index so we know TCG was present
+				tcgIndex = 0
 			default:
 				if slices.Contains(Config.ScraperConfig.Config["sealed_ev"]["retail"], indexArray[i].Shorthand) {
 					if getTCGSimulationIQR(cardId) > IQRThreshold {
