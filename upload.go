@@ -763,8 +763,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			cardId := uploadedData[i].CardId
 
 			// Load comparison price, either the loaded one or one of the alternatives
-			comparePrice := uploadedData[i].OriginalPrice
-			if comparePrice == 0 || skipPrices {
+			comparePrice := 0.0
+			if skipPrices {
 				compareConds := ""
 				prices := indexResults[cardId][altPriceSource]
 				if slices.Index(indexKeys, altPriceSource) > len(UploadIndexKeys) {
@@ -774,6 +774,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				// Normally index has no conditions to check, but the price might be coming
 				// from a regular store (in which case we attempt to match it)
 				comparePrice = getPrice(prices, compareConds)
+			} else {
+				comparePrice = uploadedData[i].OriginalPrice
 			}
 
 			// Load the single item priceprice
