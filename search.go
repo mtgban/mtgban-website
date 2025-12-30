@@ -185,7 +185,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") == "prices")
+	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") != "stores")
 
 	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
@@ -413,6 +413,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Optionally sort according to price
 	if pageVars.SearchBest || oembed {
+		blSortPref := readCookie(r, "SearchListingPriority")
+
 		for _, cardId := range allKeys {
 			// This skips INDEX and PO conditions
 			for _, cond := range mtgban.DefaultGradeTags {
@@ -424,12 +426,29 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				}
 				_, found = foundVendors[cardId][cond]
 				if found {
-					sort.Slice(foundVendors[cardId][cond], func(i, j int) bool {
-						if foundVendors[cardId][cond][i].Price == foundVendors[cardId][cond][j].Price {
+					switch blSortPref {
+					default:
+						sort.Slice(foundVendors[cardId][cond], func(i, j int) bool {
+							if foundVendors[cardId][cond][i].Price == foundVendors[cardId][cond][j].Price {
+								if foundVendors[cardId][cond][i].Credit == foundVendors[cardId][cond][j].Credit {
+									return foundVendors[cardId][cond][i].MarketCredit > foundVendors[cardId][cond][j].MarketCredit
+								}
+								return foundVendors[cardId][cond][i].Credit > foundVendors[cardId][cond][j].Credit
+							}
+							return foundVendors[cardId][cond][i].Price > foundVendors[cardId][cond][j].Price
+						})
+					case "credit":
+						sort.Slice(foundVendors[cardId][cond], func(i, j int) bool {
+							if foundVendors[cardId][cond][i].Credit == foundVendors[cardId][cond][j].Credit {
+								return foundVendors[cardId][cond][i].MarketCredit > foundVendors[cardId][cond][j].MarketCredit
+							}
 							return foundVendors[cardId][cond][i].Credit > foundVendors[cardId][cond][j].Credit
-						}
-						return foundVendors[cardId][cond][i].Price > foundVendors[cardId][cond][j].Price
-					})
+						})
+					case "market":
+						sort.Slice(foundVendors[cardId][cond], func(i, j int) bool {
+							return foundVendors[cardId][cond][i].MarketCredit > foundVendors[cardId][cond][j].MarketCredit
+						})
+					}
 				}
 			}
 		}
