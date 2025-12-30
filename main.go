@@ -340,31 +340,32 @@ type ConfigType struct {
 		BucketAccessKey string `json:"bucket_access_key"`
 		BucketSecretKey string `json:"bucket_access_secret"`
 	} `json:"datastore"`
-	Game                   string            `json:"game"`
-	CardBackImage          string            `json:"card_back_image"`
-	ScraperConfig          ScraperConfig     `json:"scraper_config"`
-	TimeseriesConfig       TimeseriesConfig  `json:"timeseries_config"`
-	DBAddress              string            `json:"db_address"`
-	DiscordHook            string            `json:"discord_hook"`
-	DiscordNotifHook       string            `json:"discord_notif_hook"`
-	DiscordAPINotifHook    string            `json:"discord_api_notif_hook"`
-	DiscordInviteLink      string            `json:"discord_invite_link"`
-	Affiliate              map[string]string `json:"affiliate"`
-	AffiliatesList         []string          `json:"affiliates_list"`
-	AffiliatesBuylistList  []string          `json:"affiliates_buylist_list"`
-	Api                    map[string]string `json:"api"`
-	ApiDemoStores          []string          `json:"api_demo_stores"`
-	DiscordToken           string            `json:"discord_token"`
-	ArbitDefaultSellers    []string          `json:"arbit_default_sellers"`
-	ArbitBlockVendors      []string          `json:"arbit_block_vendors"`
-	SearchRetailBlockList  []string          `json:"search_block_list"`
-	SearchBuylistBlockList []string          `json:"search_buylist_block_list"`
-	SleepersBlockList      []string          `json:"sleepers_block_list"`
-	GlobalAllowList        []string          `json:"global_allow_list"`
-	GlobalProbeList        []string          `json:"global_probe_list"`
-	Patreon                PatreonConfig     `json:"patreon"`
-	ApiUserSecrets         map[string]string `json:"api_user_secrets"`
-	GoogleCredentials      string            `json:"google_credentials"`
+	Game                   string             `json:"game"`
+	CardBackImage          string             `json:"card_back_image"`
+	ScraperConfig          ScraperConfig      `json:"scraper_config"`
+	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
+	DBAddress              string             `json:"db_address"`
+	DiscordHook            string             `json:"discord_hook"`
+	DiscordNotifHook       string             `json:"discord_notif_hook"`
+	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
+	DiscordInviteLink      string             `json:"discord_invite_link"`
+	Affiliate              map[string]string  `json:"affiliate"`
+	AffiliatesList         []string           `json:"affiliates_list"`
+	AffiliatesBuylistList  []string           `json:"affiliates_buylist_list"`
+	Api                    map[string]string  `json:"api"`
+	ApiDemoStores          []string           `json:"api_demo_stores"`
+	DiscordToken           string             `json:"discord_token"`
+	ArbitDefaultSellers    []string           `json:"arbit_default_sellers"`
+	ArbitBlockVendors      []string           `json:"arbit_block_vendors"`
+	SearchRetailBlockList  []string           `json:"search_block_list"`
+	SearchBuylistBlockList []string           `json:"search_buylist_block_list"`
+	SleepersBlockList      []string           `json:"sleepers_block_list"`
+	GlobalAllowList        []string           `json:"global_allow_list"`
+	GlobalProbeList        []string           `json:"global_probe_list"`
+	Patreon                PatreonConfig      `json:"patreon"`
+	ApiUserSecrets         map[string]string  `json:"api_user_secrets"`
+	GoogleCredentials      string             `json:"google_credentials"`
+	BuylistMarketCredit    map[string]float64 `json:"buylist_market_credit"`
 
 	ACL map[string]map[string]map[string]string `json:"acl"`
 

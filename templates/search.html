@@ -1209,7 +1209,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         {{end}}
                                                     </a>
                                                 </td>
-                                                <td style="text-align: center; vertical-align: middle;" {{if .Credit}}title="Credit: $ {{printf "%.2f" .Credit}}"{{end}}>
+                                                <td style="text-align: center; vertical-align: middle;" {{if .Credit}}title="Credit: $ {{printf "%.2f" .Credit}}{{if .MarketCredit}}&#10;&#13;Market: $ {{printf "%.2f" .MarketCredit}}{{end}}"{{end}}>
                                                     {{if ne .Shorthand "SYP"}}
                                                         $ {{printf "%.2f" .Price}}
                                                         {{if eq .Shorthand "TCGDirectNet"}}

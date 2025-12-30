@@ -40,15 +40,16 @@ var (
 )
 
 type SearchEntry struct {
-	ScraperName string
-	Shorthand   string
-	Price       float64
-	Credit      float64
-	Ratio       float64
-	Quantity    int
-	URL         string
-	NoQuantity  bool
-	BundleIcon  string
+	ScraperName  string
+	Shorthand    string
+	Price        float64
+	Credit       float64
+	MarketCredit float64
+	Ratio        float64
+	Quantity     int
+	URL          string
+	NoQuantity   bool
+	BundleIcon   string
 
 	Country string
 
@@ -826,15 +827,16 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 				}
 
 				res := SearchEntry{
-					ScraperName: name,
-					Shorthand:   vendor.Info().Shorthand,
-					Price:       entry.BuyPrice,
-					Credit:      entry.BuyPrice * vendor.Info().CreditMultiplier,
-					Ratio:       entry.PriceRatio,
-					Quantity:    entry.Quantity,
-					URL:         entry.URL,
-					BundleIcon:  icon,
-					Country:     Country2flag[vendor.Info().CountryFlag],
+					ScraperName:  name,
+					Shorthand:    vendor.Info().Shorthand,
+					Price:        entry.BuyPrice,
+					Credit:       entry.BuyPrice * vendor.Info().CreditMultiplier,
+					MarketCredit: entry.BuyPrice * vendor.Info().CreditMultiplier * Config.BuylistMarketCredit[vendor.Info().Shorthand],
+					Ratio:        entry.PriceRatio,
+					Quantity:     entry.Quantity,
+					URL:          entry.URL,
+					BundleIcon:   icon,
+					Country:      Country2flag[vendor.Info().CountryFlag],
 				}
 
 				skip := false
