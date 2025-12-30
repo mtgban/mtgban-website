@@ -52,5 +52,8 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		out = append(out, tags)
 	}
 
+	// Cache response for 5 minutes
+	w.Header().Set("Cache-Control", "public, max-age=300")
+
 	json.NewEncoder(w).Encode(&out)
 }
