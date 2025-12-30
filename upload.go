@@ -767,7 +767,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if skipPrices {
 				compareConds := ""
 				prices := indexResults[cardId][altPriceSource]
-				if slices.Index(indexKeys, altPriceSource) > len(UploadIndexKeys) {
+				if slices.Index(indexKeys, altPriceSource) >= len(UploadIndexKeys) {
 					compareConds = conds
 				}
 
