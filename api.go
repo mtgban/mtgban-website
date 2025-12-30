@@ -858,6 +858,8 @@ func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 
 // Simple function to check a simple signature, the body is just the timestamp
 func verify(r *http.Request) error {
+	defer r.Body.Close()
+
 	sig := r.Header.Get("X-Signature")
 	ts := r.Header.Get("X-Timestamp")
 	if sig == "" || ts == "" {
@@ -874,7 +876,6 @@ func verify(r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	defer r.Body.Close()
 
 	mac := hmac.New(sha256.New, []byte(os.Getenv("BAN_SECRET")))
 	mac.Write(body)
