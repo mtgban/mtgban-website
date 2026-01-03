@@ -1202,7 +1202,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});">
+                                            <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'>
                                                 <td>
                                                     {{if eq .URL ""}}
                                                         <a class="btn default">
@@ -1215,7 +1215,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         {{end}}
                                                     </a>
                                                 </td>
-                                                <td style="text-align: center; vertical-align: middle;" {{if .Credit}}title="Credit: $ {{printf "%.2f" .Credit}}{{if .MarketCredit}}&#10;&#13;Market: $ {{printf "%.2f" .MarketCredit}}{{end}}"{{end}}>
+                                                <td style="text-align: center; vertical-align: middle;">
                                                     {{if ne .Shorthand "SYP"}}
                                                         $ {{printf "%.2f" .Price}}
                                                         {{if eq .Shorthand "TCGDirectNet"}}
