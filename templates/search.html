@@ -34,6 +34,7 @@
     </title>
         <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     {{if .ChartID}}
         <script type="text/javascript"
                  src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.bundle.js"
@@ -83,7 +84,6 @@
     {{if ne .ErrorMessage ""}}
         <h1>{{.ErrorMessage}}</h1>
     {{else if eq .Title "Options"}}
-        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
         <br>
 
         <script type="text/javascript">
@@ -93,6 +93,7 @@
                 loadForm("SearchMiscOpts", "miscOpts");
                 loadRadio("SearchDefaultSort", "defaultSort");
                 loadRadio("SearchListingPriority", "listingPriority");
+                loadRadio("SearchBuylistSecondary", "buylistSecondary");
                 loadDropdown("SearchSellersPriority", "sellersPriority");
                 loadDropdown("SearchVendorsPriority", "vendorsPriority");
             }
@@ -227,6 +228,30 @@
                 <br>
                 <input type="radio" id="market" name="priority" value="market">
                 <label for="credit">Asc for Retail, Desc for Buylist, by credit market prices</label>
+                <br>
+            </div>
+        </div>
+
+        <br>
+        <div class="indent">
+            <h2>Buylist secondary entry</h2>
+            Choose which information you'd like to display next to the buylist price (if available).
+            <br>
+
+            <a class="btn success" onclick="javascript:saveRadio('SearchBuylistSecondary', 'buylistSecondary'); window.location.href = '/search'"><b>SAVE</b></a>
+        </div>
+
+        <br>
+        <div class="indent row">
+            <div class="column" id="buylistSecondary">
+                <input type="radio" id="priceRatio" name="blSecondary" value="priceRatio" checked>
+                <label for="priceRatio">Price ratio, the indication how much a vendor is seeking a card</label>
+                <br>
+                <input type="radio" id="creditPrice" name="blSecondary" value="creditPrice">
+                <label for="creditPrice">Credit price, how much the prices would be in store credit</label>
+                <br>
+                <input type="radio" id="marketCredit" name="blSecondary" value="marketCredit">
+                <label for="marketCredit">Credit price converted to market value, as in, how much the credit is worth by reselling it. <i>Note: this is a completely arbitrary metric, and should not be used for financially sensitive operations.</i></label>
                 <br>
             </div>
         </div>
@@ -1228,10 +1253,12 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         # {{.Quantity}}
                                                     {{end}}
                                                 </td>
-                                                <td style="text-align: center; vertical-align: middle;">
-                                                    {{if eq $conditions "NM"}}
-                                                        {{if ne .Ratio 0.0}}{{printf "%.2f" .Ratio}} %{{end}}
-                                                    {{end}}
+                                                <td class="secondaryBuylistEntry"
+                                                    style="text-align: center; vertical-align: middle;"
+                                                    data-ratio='{{if and .Ratio (eq $conditions "NM")}}{{printf "%.02f" .Ratio}}{{end}}'
+                                                    data-credit='{{if .Credit}}{{printf "%.02f" .Credit}}{{end}}'
+                                                    data-marketcredit='{{if .MarketCredit}}{{printf "%.02f" .MarketCredit}}{{end}}'>
+                                                    hi
                                                 </td>
                                                 <td style="text-align: center; vertical-align: middle;">
                                                     {{if and .Quantity (eq $conditions "NM")}}
@@ -1291,5 +1318,36 @@ Sims are not required for pre-constructed decks and other products where the sam
     {{end}}
     <br>
 </div>
+
+<script>
+    (function () {
+        let secondaryValue = getCookie("SearchBuylistSecondary");
+
+        function renderCell(td) {
+            td.textContent = "";
+
+            switch (secondaryValue) {
+            case "marketCredit":
+                if (td.dataset.marketcredit) {
+                    td.textContent = "$ " + td.dataset.marketcredit;
+                }
+                break;
+            case "creditPrice":
+                if (td.dataset.credit) {
+                    td.textContent = "$ " + td.dataset.credit;
+                }
+                break;
+            default:
+                if (td.dataset.ratio) {
+                    td.textContent = td.dataset.ratio + " %";
+                }
+                break;
+            }
+        }
+
+        document.querySelectorAll("td.secondaryBuylistEntry").forEach(renderCell);
+    })();
+</script>
+
 </body>
 </html>
