@@ -1354,6 +1354,12 @@ func loadHashes(hashes, qtys, cond, prices []string) ([]UploadEntry, error) {
 			entry.OriginalPrice, _ = strconv.ParseFloat(prices[i], 64)
 		}
 
+		// Force a quantity to be set to avoid empty values in the UI
+		if !entry.HasQuantity {
+			entry.HasQuantity = true
+			entry.Quantity = 1
+		}
+
 		uploadEntries = append(uploadEntries, entry)
 	}
 
