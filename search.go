@@ -1094,8 +1094,14 @@ func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
 
 	// If their number is the same, check for foiling status
 	if numI == numJ {
-		if len(cI.PromoTypes) > 0 && len(cJ.PromoTypes) > 0 && cI.PromoTypes[0] != cJ.PromoTypes[0] {
-			return cI.PromoTypes[0] < cJ.PromoTypes[0]
+		// Compare promo types first, they are presorted anyway
+		if len(cI.PromoTypes) == len(cJ.PromoTypes) {
+			for e, promoTypeI := range cI.PromoTypes {
+				promoTypeJ := cJ.PromoTypes[e]
+				if promoTypeI != promoTypeJ {
+					return promoTypeI < promoTypeJ
+				}
+			}
 		}
 		if cI.Etched || cJ.Etched {
 			if cI.Etched && !cJ.Etched {
