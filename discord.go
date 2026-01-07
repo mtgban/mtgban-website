@@ -364,20 +364,6 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 			return title
 		},
 	},
-	{
-		Trigger:       "amazon.com/",
-		Skip:          []string{"images"},
-		Name:          "Amazon",
-		Handle:        "AMZN",
-		DefaultFields: []string{"tag"},
-		TitleFunc: func(URLpath string) string {
-			if strings.Contains(URLpath, "/dp/") {
-				fields := strings.Split(URLpath, "/")
-				return strings.Replace(fields[2], "-", " ", -1)
-			}
-			return "Your search"
-		},
-	},
 }
 
 // Check if a essage contains well-known links that can be tagged with BAN's links
