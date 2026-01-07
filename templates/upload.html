@@ -222,6 +222,14 @@
                                 <p class="h6inline">Set a quantity multiplier for operations on loaded data:</p>
                                 <input type="text" class="w3-border w3-round-small" id="multiplier" name="multiplier" value=1 size=1 style="text-align:center;" onchange="javascript:saveText('multiplier')">
                             </label>
+                            <br>
+                            <label for="pricesource">
+                                <p class="h6inline">Optimize buylists by</p>
+                                <select id="pricesource" name="pricesource" onChange="javascript:saveText('pricesource')" style="text-align-last=center;">
+                                    <option value="" selected>&nbsp;cash prices</option>
+                                    <option value="credit">&nbsp;store credit</option>
+                                    <option value="marketCredit">&nbsp;market store credit</option>
+                                </select>
                         </div>
                     </div>
                 </form>
@@ -266,6 +274,7 @@
                 "custompercmax",
                 "altPrice",
                 "multiplier",
+                "pricesource",
             ];
             textInputs.forEach(element => {
                 var input = localStorage.getItem(element);
@@ -835,7 +844,7 @@
                             {{if $entries}}
                                 <a class="btn default" href="#{{$scraperKey}}-opt">
                                     {{len $entries}} cards {{if $.IsBuylist}}to{{else}}at{{end}} <b>{{scraper_name $scraperKey}}</b>: $ {{printf "%.2f" $total}}
-                                    {{if $factor}}
+                                    {{if and $.CanFilterByPrice $factor}}
                                         {{$credit := mulf $total $factor}}
                                         ($ {{printf "%.2f" $credit}} in credit)
                                     {{end}}

@@ -550,11 +550,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	tagPref := "tags"
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+	priceSource := r.FormValue("pricesource")
 
 	// Search
 	var results map[string]map[string]*BanPrice
+	var credits map[string]float64
 	if blMode {
 		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+
+		if priceSource != "" {
+			credits = map[string]float64{}
+			for _, store := range enabledStores {
+				credits[store] = findCredit(store)
+			}
+		}
 	} else {
 		results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	}
@@ -712,6 +721,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			price := getPrice(banPrice, conds)
 
+			// Adjust for preferred price source
+			if blMode {
+				if priceSource == "credit" {
+					price *= credits[shorthand]
+				} else if priceSource == "marketCredit" {
+					price *= credits[shorthand] * Config.BuylistMarketCredit[shorthand]
+				}
+			}
+
 			// Store computed price
 			if resultPrices[cardId+conds] == nil {
 				resultPrices[cardId+conds] = map[string]float64{}
@@ -835,6 +853,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.HighestTotal = highestTotal
 		pageVars.Editions = AllEditionsKeys
 		pageVars.EditionsMap = AllEditionsMap
+
+		// Avoid printing the credit conversion if the price source is already in store credit
+		pageVars.CanFilterByPrice = priceSource == ""
 	}
 
 	switch sorting {
