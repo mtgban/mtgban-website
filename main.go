@@ -925,14 +925,7 @@ var funcMap = template.FuncMap{
 		}
 		return color
 	},
-	"credit_factor": func(s string) float64 {
-		for _, vendor := range Vendors {
-			if vendor != nil && vendor.Info().Shorthand == s {
-				return vendor.Info().CreditMultiplier
-			}
-		}
-		return 0
-	},
+	"credit_factor": findCredit,
 	"tcg_market_price": func(s string) float64 {
 		return getTCGMarketPrice(s)
 	},

@@ -202,6 +202,16 @@ const (
 	MaxRuneSymbols = 57
 )
 
+// Return the CreditMultiplier for any given vendor
+func findCredit(shorthand string) float64 {
+	for _, vendor := range Vendors {
+		if strings.ToLower(vendor.Info().Shorthand) == strings.ToLower(shorthand) {
+			return vendor.Info().CreditMultiplier
+		}
+	}
+	return 0
+}
+
 // Look up a seller and return its inventory
 func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
 	for _, seller := range Sellers {
