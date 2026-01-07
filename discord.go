@@ -364,6 +364,12 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 			return title
 		},
 	},
+	{
+		Trigger:       "https://www.cardtrader.com/",
+		Name:          "CardTrader",
+		Handle:        "CT",
+		DefaultFields: []string{"share_code"},
+	},
 }
 
 // Check if a essage contains well-known links that can be tagged with BAN's links
