@@ -407,26 +407,7 @@
                 Filter by <input type="text" style="margin-left: 8px;" id="filterInput" onkeyup="filterPageContent()" placeholder="Edition...">
             </p>
 
-            {{range $key := .EditionSort}}
-                <div class="sticky" style="top: 48px; background-color: var(--background);">
-                    <span class="anchor" id="{{.}}"></span>
-                    <h3 class="storename">{{.}}</a></h3>
-                    <hr width=15%>
-                </div>
-
-                <div class="indent" style="max-width: 85%; padding-top:10px">
-                    {{$editionList := index $.EditionList $key }}
-                    {{range $editionList}}
-                        <nobr>
-                            <i class="ss ss-{{.Keyrune}} ss-2x ss-fw"></i>
-                            <a class="btn normal" href="/sealed?q=s:{{.Code}}">
-                                {{.Name}}
-                            </a>
-                        </nobr>
-                    {{end}}
-                </div>
-                <br>
-            {{end}}
+            {{template "editions" .}}
 
             <div style="max-width: 85%; padding-top:10px">
                 <span class="anchor" id="faq"></span>
@@ -542,7 +523,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                     Information in this EV calculation is not guaranteed and should not be used solely to make financial decisions.
                 </p>
             </div>
-
         {{else}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
             <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
