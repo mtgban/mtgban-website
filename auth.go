@@ -163,7 +163,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	tierTitle := ""
 	// If user is in the allowed list, load the tier from here
 	for _, grant := range Config.Patreon.Grants {
-		if grant.Email == userData.Email {
+		if strings.ToLower(grant.Email) == userData.Email {
 			tierTitle = grant.Tier
 			LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
 			break
