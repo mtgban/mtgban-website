@@ -244,13 +244,10 @@ type AffiliateConfig struct {
 	CustomFields map[string]string
 
 	// Function to build the displayed title
-	TitleFunc func(string) string
+	TitleFunc func(*url.URL) string
 
 	// Function to build the complete URL
 	URLFunc func(*url.URL) *url.URL
-
-	// Whether to parse the entire URL or just its path
-	FullURL bool
 }
 
 var AffiliateStores []AffiliateConfig = []AffiliateConfig{
@@ -271,13 +268,8 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 		CustomFields: map[string]string{
 			"utm_medium": "affiliate",
 		},
-		FullURL: true,
-		TitleFunc: func(URL string) string {
+		TitleFunc: func(u *url.URL) string {
 			title := "Your search"
-			u, err := url.Parse(URL)
-			if err != nil {
-				return title
-			}
 			name := u.Query().Get("filter[name]")
 			cleanName, err := url.QueryUnescape(name)
 			if err != nil {
@@ -291,11 +283,8 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 		Name:          "Cool Stuff Inc",
 		Handle:        "CSI",
 		DefaultFields: []string{"utm_referrer"},
-		TitleFunc: func(URLpath string) string {
-			base, err := url.QueryUnescape(path.Base(URLpath))
-			if err != nil {
-				return ""
-			}
+		TitleFunc: func(u *url.URL) string {
+			base, _ := url.QueryUnescape(path.Base(u.Path))
 			return mtgmatcher.Title(base)
 		},
 	},
@@ -320,7 +309,7 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 			u.RawQuery = v.Encode()
 			return u
 		},
-		TitleFunc: func(_ string) string {
+		TitleFunc: func(u *url.URL) string {
 			return "Your search"
 		},
 	},
@@ -336,8 +325,8 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 			u.RawQuery = v.Encode()
 			return u
 		},
-		TitleFunc: func(URLpath string) string {
-			urlpath := strings.ToLower(URLpath)
+		TitleFunc: func(u *url.URL) string {
+			urlpath := strings.ToLower(u.Path)
 			if strings.Contains(urlpath, "-sgl-") {
 				index := strings.Index(urlpath, "-sgl-")
 				return mtgmatcher.Title(strings.Replace(urlpath[1:index], "-", " ", -1))
@@ -356,11 +345,11 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 		Name:          "Manapool",
 		Handle:        "MP",
 		DefaultFields: []string{"ref"},
-		TitleFunc: func(URLpath string) string {
-			base := path.Base(URLpath)
+		TitleFunc: func(u *url.URL) string {
+			base := path.Base(u.Path)
 			title := mtgmatcher.Title(strings.Replace(base, "-", " ", -1))
-			URLpath = strings.TrimSuffix(URLpath, "/"+base)
-			title += " from " + strings.ToUpper(path.Base(URLpath))
+			urlpath := strings.TrimSuffix(u.Path, "/"+base)
+			title += " from " + strings.ToUpper(path.Base(urlpath))
 			return title
 		},
 	},
@@ -412,17 +401,8 @@ func checkForLinks(mGuildID, mContent string) (string, string) {
 
 			// Extract a sensible link title
 			title := mtgmatcher.Title(strings.Replace(path.Base(u.Path), "-", " ", -1))
-
-			var customTitle string
 			if store.TitleFunc != nil {
-				if store.FullURL {
-					customTitle = store.TitleFunc(u.String())
-				} else {
-					customTitle = store.TitleFunc(u.Path)
-				}
-				if customTitle != "" {
-					title = customTitle
-				}
+				title = store.TitleFunc(u)
 			}
 			title += " at " + store.Name
 
