@@ -406,6 +406,11 @@ func checkForLinks(mGuildID, mContent string) (string, string) {
 			}
 			title += " at " + store.Name
 
+			// Add a tag for ease of debugging
+			if DevMode {
+				title = "[DEV] " + title
+			}
+
 			// Add the MTGBAN affiliation
 			v := u.Query()
 			for _, value := range store.DefaultFields {
