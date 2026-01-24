@@ -394,11 +394,6 @@ func checkForLinks(mGuildID, mContent string) (string, string) {
 				continue
 			}
 
-			// Tweak base URL if necessary
-			if store.URLFunc != nil {
-				u = store.URLFunc(u)
-			}
-
 			// Extract a sensible link title
 			title := mtgmatcher.Title(strings.Replace(path.Base(u.Path), "-", " ", -1))
 			if store.TitleFunc != nil {
@@ -409,6 +404,11 @@ func checkForLinks(mGuildID, mContent string) (string, string) {
 			// Add a tag for ease of debugging
 			if DevMode {
 				title = "[DEV] " + title
+			}
+
+			// Tweak base URL if necessary
+			if store.URLFunc != nil {
+				u = store.URLFunc(u)
 			}
 
 			// Add the MTGBAN affiliation
