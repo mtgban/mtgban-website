@@ -554,7 +554,8 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 		// Query history
 		results, err := db.HGetAll(context.Background(), cardId).Result()
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			break
 		}
 
 		// Look for the first date where old price is higher than current
