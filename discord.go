@@ -310,7 +310,35 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 			return u
 		},
 		TitleFunc: func(u *url.URL) string {
-			return "Your search"
+			v := u.Query()
+			var id string
+			for _, id = range strings.Split(u.Path, "/") {
+				_, err := strconv.Atoi(id)
+				if err == nil {
+					break
+				}
+			}
+			cardId, err := mtgmatcher.MatchId(id, v.Get("Printing") == "Foil")
+			if err != nil {
+				return "Your search"
+			}
+			co, err := mtgmatcher.GetUUID(cardId)
+			if err != nil {
+				return "Your search"
+			}
+
+			title := fmt.Sprintf("%s [%s]", co.Name, co.SetCode)
+			if co.Number != "" {
+				title += " #" + co.Number
+			}
+			if co.Sealed {
+				title += " 📦"
+			} else if co.Etched {
+				title += " 💫"
+			} else if co.Foil {
+				title += " ✨"
+			}
+			return title
 		},
 	},
 	{
