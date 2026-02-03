@@ -759,6 +759,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				subQuery += " AND "
 				if strings.Contains(rarity, "/") {
 					subQuery += fmt.Sprintf("(a.Rarity = \"%c\" OR a.Rarity = \"%c\")", rarity[0], rarity[2])
+				} else if rarity == "S" {
+					// FIXME: this should be fixed in the DB
+					subQuery += "a.Rarity = \"special\""
 				} else {
 					subQuery += "a.Rarity = \"" + rarity + "\""
 				}
@@ -842,6 +845,8 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		query += " AND "
 		if strings.Contains(rarity, "/") {
 			query += fmt.Sprintf("(a.Rarity = \"%c\" OR a.Rarity = \"%c\")", rarity[0], rarity[2])
+		} else if rarity == "S" {
+			query += "a.Rarity = \"special\""
 		} else {
 			query += "a.Rarity = \"" + rarity + "\""
 		}
