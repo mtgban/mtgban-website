@@ -154,7 +154,6 @@ type PageVars struct {
 	EditionSort []string
 	EditionList map[string][]EditionEntry
 	IsSealed    bool
-	IsSets      bool
 	TotalSets   int
 	TotalCards  int
 	TotalUnique int

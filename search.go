@@ -101,7 +101,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pageVars.IsSealed = r.URL.Path == "/sealed"
-	pageVars.IsSets = r.URL.Path == "/sets"
+	isSetsPage := r.URL.Path == "/sets"
 	if query == "" {
 		pageVars.PromoTags = mtgmatcher.AllPromoTypes()
 	}
@@ -111,7 +111,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			Name:   "Sets",
 			Short:  "📦",
 			Link:   "/sets",
-			Active: pageVars.IsSets,
+			Active: isSetsPage,
 			Class:  "selected",
 		},
 	})
@@ -224,7 +224,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			pageVars.EditionList = SealedEditionsList
 			render(w, "search.html", pageVars)
 			return
-		} else if pageVars.IsSets {
+		} else if isSetsPage {
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Editions", 1)
 
 			pageVars.EditionSort = TreeEditionsKeys
