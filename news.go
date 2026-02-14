@@ -648,7 +648,14 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
+
+			meta := uuid2card(cardId, true, false, preferFlavor)
+
+			// This is the SYP-specific page, turn off the small reminder
+			// character that says whether a card is on SYP or not
+			meta.SypList = false
+
+			pageVars.Metadata[cardId] = meta
 			if pageVars.Metadata[cardId].Reserved {
 				pageVars.HasReserved = true
 			}

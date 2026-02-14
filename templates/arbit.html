@@ -520,9 +520,7 @@
                                 <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
                                 {{if (index $.Metadata .CardId).Reserved}} *{{end}}
                                 {{if (index $.Metadata .CardId).Stocks}} •{{end}}
-                                {{if not (eq $.ScraperShort "SYP")}}
-                                    {{if (index $.Metadata .CardId).SypList}} †{{end}}
-                                {{end}}
+                                {{if (index $.Metadata .CardId).SypList}} †{{end}}
                                 {{if eq $.ScraperShort $card.HotlistStore}}
                                     <span class=emoji title="Highest price in 3 months">🌟</span>
                                 {{end}}
