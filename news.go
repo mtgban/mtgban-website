@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -60,6 +61,62 @@ type NewspaperPage struct {
 	Priced string
 	// Which field to use for percentage change comparison
 	PercChanged string
+}
+
+func getResults(db *sql.DB, query string) ([][]string, error) {
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	// Retrieve columns to know how many fields to read
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cols) < 2 {
+		return nil, errors.New("not enough data in rows")
+	}
+
+	// Result is your slice string
+	rawResult := make([][]byte, len(cols))
+
+	// A temporary interface{} slice, containing a variable number of fields
+	dest := make([]interface{}, len(cols))
+	for e := range rawResult {
+		// Put pointers to each string in the interface slice
+		dest[e] = &rawResult[e]
+	}
+
+	// Allocate the main table scheleton
+	var results [][]string
+
+	count := 0
+	for rows.Next() {
+		result := make([]string, len(cols))
+		err := rows.Scan(dest...)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		// Convert the parsed fields into usable strings
+		for j, raw := range rawResult {
+			if raw != nil {
+				result[j] = string(raw)
+			}
+		}
+
+		// Allocate a table row with as many fields as returned by the SELECT
+		results = append(results, result)
+
+		// Next row!
+		count++
+	}
+
+	return results, nil
 }
 
 var NewspaperPages = []NewspaperPage{
@@ -930,79 +987,18 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	query = fmt.Sprintf("%s LIMIT %d OFFSET %d", query, newsPageSize, newsPageSize*(pageIndex-1))
 
 	// GO GO GO
-	rows, err := db.Query(query + ";")
+	results, err := getResults(db, query)
 	if err != nil {
 		log.Println(query, err)
-		pageVars.InfoMessage = "Newspaper is on strike (notify devs!)"
-		if DevMode {
-			pageVars.InfoMessage += " - " + err.Error()
-		}
-		render(w, "news.html", pageVars)
-		return
 	}
 
-	// Retrieve columns to know how many fields to read
-	cols, err := rows.Columns()
-	if err != nil {
-		log.Println("Failed to get columns", err)
-		pageVars.InfoMessage = "Newspaper is on strike (notify devs!)"
-		if DevMode {
-			pageVars.InfoMessage += " - " + err.Error()
-		}
-		render(w, "news.html", pageVars)
-		return
-	}
+	pageVars.Table = results
 
-	// Result is your slice string
-	rawResult := make([][]byte, len(cols))
-	result := make([]string, len(cols))
-
-	// A temporary interface{} slice, containing a variable number of fields
-	dest := make([]interface{}, len(cols))
-	for i := range rawResult {
-		// Put pointers to each string in the interface slice
-		dest[i] = &rawResult[i]
-	}
-
-	// Allocate the main table scheleton
-	pageVars.Table = make([][]string, newsPageSize)
-
-	i := 0
-	for rows.Next() {
-		err := rows.Scan(dest...)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-
-		// Convert the parsed fields into usable strings
-		for j, raw := range rawResult {
-			if raw != nil {
-				result[j] = string(raw)
-			}
-		}
-
-		if len(result) < 2 {
-			log.Println("empty row")
-			continue
-		}
-
-		// Will iterate over card data in the template, since it's limited
-		// to the results actually available
-		pageVars.Cards = append(pageVars.Cards, uuid2card(result[1], true, false, preferFlavor))
+	for _, result := range pageVars.Table {
+		c := uuid2card(result[1], true, false, preferFlavor)
+		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, result[1])
 
-		// Allocate a table row with as many fields as returned by the SELECT
-		pageVars.Table[i] = make([]string, len(result))
-		for j := range pageVars.Table[i] {
-			pageVars.Table[i][j] = result[j]
-		}
-
-		// Next row!
-		i++
-	}
-
-	for _, c := range pageVars.Cards {
 		if c.Reserved {
 			pageVars.HasReserved = true
 		}
