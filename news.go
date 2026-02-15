@@ -572,10 +572,8 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	maxPrice, _ := strconv.ParseFloat(r.FormValue("max_price"), 64)
 	minPercChange, _ := strconv.ParseFloat(r.FormValue("min_change"), 64)
 	maxPercChange, _ := strconv.ParseFloat(r.FormValue("max_change"), 64)
-	pageIndexStr := r.FormValue("index")
-	pageIndex, _ := strconv.Atoi(pageIndexStr)
+	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
 	var query, defSort string
-	var pages int
 
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
@@ -793,30 +791,33 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Sub Go!
-			err := db.QueryRow(subQuery + ";").Scan(&pages)
+			var elements int
+			err := db.QueryRow(subQuery + ";").Scan(&elements)
 			if err != nil {
 				log.Println(subQuery)
-				log.Println("pages disabled", err)
+				log.Println("pagination disabled", err)
 			}
-			// This integer division is equivalent to math.Floor()
-			pages /= newsPageSize
+			// Ceiling division to get number of pages
+			pages := (elements+newsPageSize-1)/newsPageSize - 1
+			if DevMode {
+				log.Println(page, "page has", elements, "elements, for a total of", pages, "pages")
+			}
 
 			pageVars.TotalIndex = pages
-			if pageIndex >= 0 && pageIndex <= pages {
-				pageVars.CurrentIndex = pageIndex
-			} else {
-				// Reset the index if we over or underflow
-				pageIndex = 0
-			}
-			if pageVars.CurrentIndex > 0 {
-				pageVars.PrevIndex = pageVars.CurrentIndex - 1
-			}
-			if pageVars.CurrentIndex < pages {
-				pageVars.NextIndex = pageVars.CurrentIndex + 1
+			if pageIndex <= 1 {
+				pageIndex = 1
+			} else if pageIndex > pageVars.TotalIndex {
+				pageIndex = pageVars.TotalIndex
 			}
 
-			query = newspage.Query
-			defSort = newspage.Sort
+			pageVars.CurrentIndex = pageIndex
+
+			if pageVars.CurrentIndex > 1 {
+				pageVars.PrevIndex = pageVars.CurrentIndex - 1
+			}
+			if pageVars.CurrentIndex < pageVars.TotalIndex {
+				pageVars.NextIndex = pageVars.CurrentIndex + 1
+			}
 
 			// Repeat as above to retrieve the possible editions
 			subQuery = "SELECT DISTINCT a.Set FROM" + strings.Join(qs[1:], "FROM") + skipEditions + " ORDER BY a.Set ASC"
@@ -925,7 +926,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		query += " ORDER BY " + defSort
 	}
 	// Keep things limited + pagination
-	query = fmt.Sprintf("%s LIMIT %d OFFSET %d", query, newsPageSize, newsPageSize*pageIndex)
+	query = fmt.Sprintf("%s LIMIT %d OFFSET %d", query, newsPageSize, newsPageSize*(pageIndex-1))
 
 	// GO GO GO
 	rows, err := db.Query(query + ";")
