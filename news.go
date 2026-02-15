@@ -802,6 +802,13 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.LargeTable = newspage.Large
 		pageVars.OffsetCards = newspage.Offset
 
+		if newspage.Priced != "" {
+			pageVars.CanFilterByPrice = true
+		}
+		if newspage.PercChanged != "" {
+			pageVars.CanFilterByPercentage = true
+		}
+
 		// Get the total number of rows for the query
 		qs := strings.Split(newspage.Query, "FROM")
 		if len(qs) < 2 {
@@ -841,13 +848,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 
 		subQuery += skipEditions
-
-		if newspage.Priced != "" {
-			pageVars.CanFilterByPrice = true
-		}
-		if newspage.PercChanged != "" {
-			pageVars.CanFilterByPercentage = true
-		}
 
 		// Sub Go!
 		var elements int
