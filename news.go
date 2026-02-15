@@ -276,11 +276,11 @@ var NewspaperPages = []NewspaperPage{
 		Option: "buylist_inc",
 		Query: `SELECT DISTINCT n.row_names, n.uuid,
                        a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg
+                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg * 100
                 FROM buylist_levels n
                 LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
                 WHERE n.Week_Ago_BL_Chg is not NULL and n.Week_Ago_BL_Chg != 0 and n.Yesterday_BL >= 1.25 and n.Todays_BL >= 1.25`,
-		Sort: "n.Week_Ago_BL_Chg DESC",
+		Sort: "n.Week_Ago_BL_Chg * 100 DESC",
 		Head: []Heading{
 			Heading{
 				IsHidden: true,
@@ -346,11 +346,11 @@ var NewspaperPages = []NewspaperPage{
 		Option: "buylist_dec",
 		Query: `SELECT DISTINCT n.row_names, n.uuid,
                        a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg
+                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg * 100
                 FROM buylist_levels n
                 LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
                 WHERE n.Week_Ago_BL_Chg is not NULL and n.Week_Ago_BL_Chg != 0 and n.Yesterday_BL >= 1.25 and n.Todays_BL >= 1.25`,
-		Sort: "n.Week_Ago_BL_Chg ASC",
+		Sort: "n.Week_Ago_BL_Chg * 100 ASC",
 		Head: []Heading{
 			Heading{
 				IsHidden: true,
