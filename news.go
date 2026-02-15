@@ -75,7 +75,7 @@ var NewspaperPages = []NewspaperPage{
                        n.Retail, n.Buylist, n.Vendors
                 FROM top_25 n
                 LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.uuid <> ""`,
+                WHERE n.uuid <> ''`,
 		Sort: "Ranking",
 		Head: []Heading{
 			Heading{
@@ -419,7 +419,7 @@ var NewspaperPages = []NewspaperPage{
                        n.Recent_BL, n.Historical_plus_minus, n.Historical_Median, n.Historical_Max, n.Forecasted_BL, n.Forecast_plus_minus, n.Target_Date, n.Tier, n.Behavior, n.custom_sort
                 FROM ensemble_forecast n
                 LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.uuid <> ""`,
+                WHERE n.uuid <> ''`,
 		Sort:  "n.custom_sort",
 		Large: true,
 		Head: []Heading{
@@ -730,7 +730,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			skipEditions += " AND a.Set <> \"" + set.Name + "\""
+			skipEditions += " AND a.Set <> '" + set.Name + "'"
 		}
 	}
 
@@ -757,17 +757,17 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		// Add any extra filter that might affect number of results
 		if filter != "" {
-			subQuery += " AND a.Set = \"" + filter + "\""
+			subQuery += " AND a.Set = '" + filter + "'"
 		}
 		if rarity != "" {
 			subQuery += " AND "
 			if strings.Contains(rarity, "/") {
-				subQuery += fmt.Sprintf("(a.Rarity = \"%c\" OR a.Rarity = \"%c\")", rarity[0], rarity[2])
+				subQuery += fmt.Sprintf("(a.Rarity = '%c' OR a.Rarity = '%c')", rarity[0], rarity[2])
 			} else if rarity == "S" {
 				// FIXME: this should be fixed in the DB
-				subQuery += "a.Rarity = \"special\""
+				subQuery += "a.Rarity = 'special'"
 			} else {
-				subQuery += "a.Rarity = \"" + rarity + "\""
+				subQuery += "a.Rarity = '" + rarity + "'"
 			}
 		}
 		if newspage.Priced != "" && minPrice != 0 {
@@ -845,16 +845,16 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	// Add any extra filter before sorting
 	// Note that this requires every query to end with an applicable WHERE clause
 	if filter != "" {
-		query += " AND a.Set = \"" + filter + "\""
+		query += " AND a.Set = '" + filter + "'"
 	}
 	if rarity != "" {
 		query += " AND "
 		if strings.Contains(rarity, "/") {
-			query += fmt.Sprintf("(a.Rarity = \"%c\" OR a.Rarity = \"%c\")", rarity[0], rarity[2])
+			query += fmt.Sprintf("(a.Rarity = '%c' OR a.Rarity = '%c')", rarity[0], rarity[2])
 		} else if rarity == "S" {
-			query += "a.Rarity = \"special\""
+			query += "a.Rarity = 'special'"
 		} else {
-			query += "a.Rarity = \"" + rarity + "\""
+			query += "a.Rarity = '" + rarity + "'"
 		}
 	}
 
