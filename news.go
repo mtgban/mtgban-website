@@ -1317,6 +1317,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var results [][]string
 	for _, newspage := range pageVars.ToC {
 		if newspage.Option != page {
 			continue
@@ -1333,6 +1334,24 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 		if newspage.PercChanged != "" {
 			pageVars.CanFilterByPercentage = true
+		}
+
+		if newspage.NewNewspaper {
+			if newspage.Results == nil {
+				pageVars.InfoMessage = "This data is not ready yet, please try again in a few minutes"
+				pageVars.LastUpdate = time.Now()
+				render(w, "news.html", pageVars)
+				return
+			}
+
+			results = newspage.Results
+			pageVars.Editions = newspage.AvailableEditions
+			if !pageVars.IsOneDay {
+				results = newspage.Results3Day
+				pageVars.Editions = newspage.AvailableEditions3Day
+			}
+
+			break
 		}
 
 		// Get the total number of rows for the query
@@ -1425,70 +1444,71 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Add any extra filter before sorting
-	// Note that this requires every query to end with an applicable WHERE clause
-	if filter != "" {
-		query += " AND a.Set = '" + filter + "'"
-	}
-	if rarity != "" {
-		query += " AND "
-		if strings.Contains(rarity, "/") {
-			query += fmt.Sprintf("(a.Rarity = '%c' OR a.Rarity = '%c')", rarity[0], rarity[2])
-		} else if rarity == "S" {
-			query += "a.Rarity = 'special'"
-		} else {
-			query += "a.Rarity = '" + rarity + "'"
+	if results == nil {
+		// Add any extra filter before sorting
+		// Note that this requires every query to end with an applicable WHERE clause
+		if filter != "" {
+			query += " AND a.Set = '" + filter + "'"
 		}
-	}
-
-	// Check for price limits
-	if minPrice != 0 || maxPrice != 0 {
-		for _, newspage := range pageVars.ToC {
-			if newspage.Option != page || newspage.Priced == "" {
-				continue
-			}
-			if minPrice != 0 {
-				query += " AND " + newspage.Priced + " > " + fmt.Sprintf("%.2f", minPrice)
-			}
-			if maxPrice != 0 {
-				query += " AND " + newspage.Priced + " < " + fmt.Sprintf("%.2f", maxPrice)
+		if rarity != "" {
+			query += " AND "
+			if strings.Contains(rarity, "/") {
+				query += fmt.Sprintf("(a.Rarity = '%c' OR a.Rarity = '%c')", rarity[0], rarity[2])
+			} else if rarity == "S" {
+				query += "a.Rarity = 'special'"
+			} else {
+				query += "a.Rarity = '" + rarity + "'"
 			}
 		}
-	}
 
-	if minPercChange != 0 || maxPercChange != 0 {
-		for _, newspage := range pageVars.ToC {
-			if newspage.Option != page && newspage.PercChanged == "" {
-				continue
-			}
-			if minPercChange != 0 {
-				query += " AND " + newspage.PercChanged + " > " + fmt.Sprintf("%.2f", minPercChange/100)
-			}
-			if maxPercChange != 0 {
-				query += " AND " + newspage.PercChanged + " < " + fmt.Sprintf("%.2f", maxPercChange/100)
-			}
-		}
-	}
-
-	query += skipEditions
-
-	// Set sorting options
-	if sorting != "" {
-		// Make sure this field is allowed to be sorted
-		canSort := false
-		for i := range pageVars.Headings {
-			if pageVars.Headings[i].Field == sorting {
-				canSort = pageVars.Headings[i].CanSort
-				if pageVars.Headings[i].ConditionalSort && filter != "" {
-					canSort = true
+		// Check for price limits
+		if minPrice != 0 || maxPrice != 0 {
+			for _, newspage := range pageVars.ToC {
+				if newspage.Option != page || newspage.Priced == "" {
+					continue
 				}
-				break
+				if minPrice != 0 {
+					query += " AND " + newspage.Priced + " > " + fmt.Sprintf("%.2f", minPrice)
+				}
+				if maxPrice != 0 {
+					query += " AND " + newspage.Priced + " < " + fmt.Sprintf("%.2f", maxPrice)
+				}
 			}
 		}
-		if canSort {
-			// Define a custom order for our special scale
-			if sorting == "Trending" {
-				sorting = `CASE
+
+		if minPercChange != 0 || maxPercChange != 0 {
+			for _, newspage := range pageVars.ToC {
+				if newspage.Option != page && newspage.PercChanged == "" {
+					continue
+				}
+				if minPercChange != 0 {
+					query += " AND " + newspage.PercChanged + " > " + fmt.Sprintf("%.2f", minPercChange/100)
+				}
+				if maxPercChange != 0 {
+					query += " AND " + newspage.PercChanged + " < " + fmt.Sprintf("%.2f", maxPercChange/100)
+				}
+			}
+		}
+
+		query += skipEditions
+
+		// Set sorting options
+		if sorting != "" {
+			// Make sure this field is allowed to be sorted
+			canSort := false
+			for i := range pageVars.Headings {
+				if pageVars.Headings[i].Field == sorting {
+					canSort = pageVars.Headings[i].CanSort
+					if pageVars.Headings[i].ConditionalSort && filter != "" {
+						canSort = true
+					}
+					break
+				}
+			}
+			if canSort {
+				// Define a custom order for our special scale
+				if sorting == "Trending" {
+					sorting = `CASE
                             WHEN Trending = 'S' THEN '7'
                             WHEN Trending = 'A' THEN '6'
                             WHEN Trending = 'B' THEN '5'
@@ -1498,27 +1518,29 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
                             WHEN Trending = ''  THEN '1'
                             ELSE Trending
                         END`
+				}
+				query += " ORDER BY " + sorting
+				if dir == "asc" {
+					query += " ASC"
+				} else if dir == "desc" {
+					query += " DESC"
+				}
 			}
-			query += " ORDER BY " + sorting
-			if dir == "asc" {
-				query += " ASC"
-			} else if dir == "desc" {
-				query += " DESC"
-			}
+		} else if defSort != "" {
+			query += " ORDER BY " + defSort
 		}
-	} else if defSort != "" {
-		query += " ORDER BY " + defSort
-	}
-	// Keep things limited + pagination
-	query = fmt.Sprintf("%s LIMIT %d OFFSET %d", query, newsPageSize, newsPageSize*(pageIndex-1))
+		// Keep things limited + pagination
+		query = fmt.Sprintf("%s LIMIT %d OFFSET %d", query, newsPageSize, newsPageSize*(pageIndex-1))
 
-	// GO GO GO
-	results, err := getResults(db, query)
-	if err != nil {
-		log.Println(query, err)
+		// GO GO GO
+		output, err := getResults(db, query)
+		if err != nil {
+			log.Println(query, err)
+		}
+		pageVars.Table = output
+	} else {
+		pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, 50, len(results))
 	}
-
-	pageVars.Table = results
 
 	for _, result := range pageVars.Table {
 		c := uuid2card(result[1], true, false, preferFlavor)
