@@ -67,6 +67,10 @@ type NewspaperPage struct {
 	// Cached results of the various queries
 	Results     [][]string
 	Results3Day [][]string
+
+	// Which editions are available in the cache
+	AvailableEditions     []string
+	AvailableEditions3Day []string
 }
 
 func getResults(db *sql.DB, query string) ([][]string, error) {
@@ -144,8 +148,18 @@ func cacheNewspaper() {
 			continue
 		}
 
+		editions := []string{""}
+		for _, result := range results {
+			edition := result[4]
+			if !slices.Contains(editions, edition) {
+				editions = append(editions, edition)
+			}
+		}
+		sort.Strings(editions)
+
 		log.Println(NewspaperPages[i].Option, "has", len(results), "elements")
 		NewspaperPages[i].Results = results
+		NewspaperPages[i].AvailableEditions = editions
 
 		query = strings.Replace(query, "0 DAY", "3 DAY", -1)
 		results3day, err := getResults(NewNewspaperDB, query)
@@ -154,8 +168,18 @@ func cacheNewspaper() {
 			continue
 		}
 
+		editions3day := []string{""}
+		for _, result := range results3day {
+			edition := result[4]
+			if !slices.Contains(editions3day, edition) {
+				editions3day = append(editions3day, edition)
+			}
+		}
+		sort.Strings(editions3day)
+
 		log.Println(NewspaperPages[i].Option, "(3day) has", len(results3day), "elements")
 		NewspaperPages[i].Results3Day = results3day
+		NewspaperPages[i].AvailableEditions3Day = editions3day
 	}
 
 	LastNewspaperUpdate = time.Now()
