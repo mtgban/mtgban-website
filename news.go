@@ -86,7 +86,7 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 		return nil, err
 	}
 
-	if len(cols) < 2 {
+	if len(cols) < 6 {
 		return nil, errors.New("not enough data in rows")
 	}
 
@@ -124,6 +124,21 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 
 		// Next row!
 		count++
+
+		// Override a few fields for better integration with the site
+		if db == NewNewspaperDB {
+			uuid, err := mtgmatcher.MatchId(result[1], result[0] != "Normal")
+			if err != nil {
+				log.Println("match", result[1], result[0], "as", result[3], result[4], result[5], "failed:", err)
+				continue
+			}
+			co, _ := mtgmatcher.GetUUID(uuid)
+			result[0] = co.Rarity
+			result[1] = uuid
+			result[3] = co.Name
+			result[4] = co.Edition
+			result[5] = co.Number
+		}
 	}
 
 	return results, nil
