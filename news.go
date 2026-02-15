@@ -747,12 +747,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 			// Get the total number of rows for the query
 			qs := strings.Split(newspage.Query, "FROM")
-			if len(qs) != 2 {
-				pageVars.Title = "Errors have been made"
-				pageVars.ErrorMessage = ErrMsgDenied
-
-				render(w, "news.html", pageVars)
-				return
+			if len(qs) != 1 {
+				log.Println("Invalid query for page", page, " - \n", newspage.Query)
+				panic("Invalid query, missing at least a FROM to split on")
 			}
 
 			// Set query to retrieve total number of matches
