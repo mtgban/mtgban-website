@@ -976,9 +976,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		// Convert the parsed fields into usable strings
 		for j, raw := range rawResult {
-			if raw == nil {
-				result[j] = "n/a"
-			} else {
+			if raw != nil {
 				result[j] = string(raw)
 			}
 		}
