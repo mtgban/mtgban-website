@@ -335,13 +335,10 @@ nav li.optional {
     border-right: none;
 }
 
-/* push the last items to the right, preserving order */
-nav li:nth-last-child(2) {
-    margin-left: auto;
-}
-
+/* Push theme switch to the right */
 nav li:last-child {
-    padding: 0 16px;
+    margin-left: auto;
+    padding: 0 24px;
     border-right: none;
 }
 
@@ -375,8 +372,160 @@ nav li img {
     display: block;
 }
 
-/*********** END OF TOP NAVBAR ***********/
+/* Hamburger doesn't need margin on desktop since it's hidden */
+.nav-toggle-wrapper {
+    display: none;
+    border-right: none;
+}
 
+@media (max-width: 768px) {
+    /* On mobile, hamburger pushes right */
+    .nav-toggle-wrapper {
+        display: flex !important;
+        align-items: center;
+        margin-left: auto;
+    }
+    
+    /* Theme switch follows hamburger, no auto margin */
+    nav li:last-child {
+        margin-left: 0;
+        padding: 0 0.5rem;
+    }
+}
+
+/*********** END OF TOP NAVBAR ***********/
+/*********** NEW TOP NAVBAR! :D *********/
+.nav-menu {
+    display: none;
+    position: fixed;
+    top: 48px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(34, 34, 34, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 99;
+    overflow-y: auto;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.nav-menu.active {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* For light theme */
+.light-theme .nav-menu {
+    background: rgba(248, 248, 248, 0.8);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.dark-theme .nav-menu {
+    background: rgba(34, 34, 34, 0.85);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Menu items */
+.nav-menu a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    color: var(--activetext);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+    transition: background 0.2s, padding-left 0.2s;
+}
+
+.nav-menu a:hover,
+.nav-menu a.active {
+    background: rgba(128, 128, 128, 0.15);
+    padding-left: 2rem;
+}
+
+.nav-menu a span {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+/* Section labels */
+.nav-menu-section {
+    border-top: 1px solid rgba(128, 128, 128, 0.3);
+    margin-top: 0.5rem;
+}
+
+.nav-menu-label {
+    padding: 1rem 1.5rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--greytext);
+    letter-spacing: 0.1em;
+}
+
+/* Hamburger wrapper */
+.nav-toggle-wrapper {
+    display: none;
+    border-right: none;
+}
+
+.nav-toggle {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    gap: 5px;
+}
+
+.nav-toggle span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--activetext);
+    border-radius: 2px;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.nav-toggle.active span:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+}
+
+.nav-toggle.active span:nth-child(2) {
+    opacity: 0;
+}
+
+.nav-toggle.active span:nth-child(3) {
+    transform: rotate(-45deg) translate(5px, -5px);
+}
+
+@media (max-width: 768px) {
+    .nav-toggle-wrapper {
+        display: flex;
+        align-items: center;
+        margin-left: auto;
+    }
+    
+    .nav-item {
+        display: none;
+    }
+    
+    nav li:first-child,
+    nav li:nth-child(2) {
+        display: flex;
+    }
+    
+    nav li:last-child {
+        padding: 0 0.5rem;
+    }
+}
 
 .index ol {
     padding: 14px 16px;
