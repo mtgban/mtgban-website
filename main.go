@@ -386,6 +386,7 @@ var LogDir string
 
 var LastDatastoreUpdate time.Time
 var LastStashUpdate time.Time
+var LastNewspaperUpdate time.Time
 
 var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
@@ -672,6 +673,7 @@ func loadDatastore() error {
 
 	LastDatastoreUpdate = time.Now()
 	go updateStaticData()
+	go cacheNewspaper()
 	ServerNotify("init", "Datastore installed")
 
 	return nil
@@ -757,6 +759,9 @@ func main() {
 
 		// Update set values with new prices
 		c.AddFunc("30 */12 * * *", runSealedAnalysis)
+
+		// Reload DB Newspaper every 3 hours
+		c.AddFunc("33 */3 * * *", cacheNewspaper)
 
 		c.Start()
 	}
