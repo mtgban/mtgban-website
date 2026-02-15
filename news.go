@@ -1516,6 +1516,35 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.Table = output
 	} else {
+		if skipEditionsOpt != "" || rarity != "" || filter != "" {
+			var output [][]string
+			for _, result := range results {
+				cardRarity := result[0]
+				edition := result[4]
+				if skipEditionsOpt != "" {
+					filters := strings.Split(skipEditionsOpt, ",")
+					if slices.Contains(filters, edition) {
+						continue
+					}
+				}
+				if filter != "" && filter != edition {
+					continue
+				}
+				if rarity != "" {
+					if strings.Contains(rarity, "/") {
+						rarities := strings.Split(rarity, "/")
+						if string(cardRarity[0]) != strings.ToLower(rarities[0]) && string(cardRarity[0]) != strings.ToLower(rarities[1]) {
+							continue
+						}
+					} else if string(cardRarity[0]) != strings.ToLower(rarity) {
+						continue
+					}
+				}
+				output = append(output, result)
+			}
+
+			results = output
+		}
 		pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, 50, len(results))
 	}
 
