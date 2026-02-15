@@ -754,12 +754,16 @@ type Pagination struct {
 func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T, Pagination) {
 	var page Pagination
 
-	page.TotalIndex = len(slice)/maxResults + 1
+	if len(slice) == 0 {
+		return slice, page
+	}
+
+	page.TotalIndex = (len(slice) + maxResults - 1) / maxResults
 	if page.TotalIndex > maxTotalResults/maxResults {
 		page.TotalIndex = maxTotalResults / maxResults
 	}
 
-	// Parse the requested input page
+	// Validate the requested input page
 	if pageIndex <= 1 {
 		pageIndex = 1
 	} else if pageIndex > page.TotalIndex {
@@ -770,7 +774,7 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 	page.CurrentIndex = pageIndex
 
 	// Initialize previous and next pagination links
-	if page.CurrentIndex > 0 {
+	if page.CurrentIndex > 1 {
 		page.PrevIndex = page.CurrentIndex - 1
 	}
 	if page.CurrentIndex < page.TotalIndex {
@@ -779,6 +783,9 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 
 	// Chop results where needed
 	head := maxResults * (pageIndex - 1)
+	if head > len(slice) {
+		head = len(slice)
+	}
 	tail := maxResults * pageIndex
 	if tail > len(slice) {
 		tail = len(slice)
