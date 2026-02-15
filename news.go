@@ -61,6 +61,8 @@ type NewspaperPage struct {
 	Priced string
 	// Which field to use for percentage change comparison
 	PercChanged string
+	// Whether the query applies to the New Newspaper
+	NewNewspaper bool
 }
 
 func getResults(db *sql.DB, query string) ([][]string, error) {
@@ -120,6 +122,445 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 }
 
 var NewspaperPages = []NewspaperPage{
+	{
+		Title:  "Top Singles by Combined Spike Score",
+		Desc:   "Best cards to buy, combining TCGplayer sales data and Card Kingdom pricing changes",
+		Offset: 3,
+		Option: "combined_spike_score",
+		Query: `SELECT calc_date, tcgplayer_id,
+                       ROW_NUMBER() OVER (ORDER BY spike_score DESC) AS ranking,
+                       product_name, set_name, product_number, variant,
+                       bucket_name, bucket_rank,
+                       ck_retail_price, tcg_market_price, ck_buy_price
+                  FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards
+                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
+                                      FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards)
+                   AND game_name = 'Magic: The Gathering'`,
+		Sort: "ranking ASC",
+		Head: []Heading{
+			{
+				IsHidden: true,
+			},
+			{
+				IsHidden: true,
+			},
+			{
+				Title:   "Ranking",
+				CanSort: true,
+				Field:   "ranking",
+			},
+			{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "product_name",
+			},
+			{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "set_name",
+			},
+			{
+				Title: "#",
+				Field: "product_number",
+			},
+			{
+				Title: "Finish",
+				Field: "variant",
+			},
+			{
+				Title:   "Bucket",
+				CanSort: true,
+				Field:   "bucket_name",
+			},
+			{
+				Title:   "Bucket Rank",
+				CanSort: true,
+				Field:   "bucket_rank",
+			},
+			{
+				Title:    "CK Retail",
+				CanSort:  true,
+				Field:    "ck_retail_price",
+				IsDollar: true,
+			},
+			{
+				Title:    "TCG Market",
+				CanSort:  true,
+				Field:    "tcg_market_price",
+				IsDollar: true,
+			},
+			{
+				Title:    "CK Buylist",
+				CanSort:  true,
+				Field:    "ck_buy_price",
+				IsDollar: true,
+			},
+		},
+		NewNewspaper: true,
+	},
+	{
+		Title:  "Top Singles by Spike Score",
+		Desc:   "Best cards to buy, using TCGplayer sales data",
+		Offset: 3,
+		Option: "spike_score",
+		Query: `SELECT calc_date, product_id,
+                       ROW_NUMBER() OVER (ORDER BY spike_score DESC) AS ranking,
+                       product_name, set_name, product_number, variant,
+                       bucket_name, bucket_rank,
+                       current_price
+                  FROM scripts__tcgplayersalesdata_spike_score_cards
+                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
+                                      FROM scripts__tcgplayersalesdata_spike_score_cards)
+                   AND game_name = 'Magic: The Gathering'`,
+		Sort: "ranking ASC",
+		Head: []Heading{
+			{
+				IsHidden: true,
+			},
+			{
+				IsHidden: true,
+			},
+			{
+				Title:   "Ranking",
+				CanSort: true,
+				Field:   "ranking",
+			},
+			{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "product_name",
+			},
+			{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "set_name",
+			},
+			{
+				Title: "#",
+				Field: "product_number",
+			},
+			{
+				Title: "Finish",
+				Field: "variant",
+			},
+			{
+				Title:   "Bucket",
+				CanSort: true,
+				Field:   "bucket_name",
+			},
+			{
+				Title:   "Bucket Rank",
+				CanSort: true,
+				Field:   "bucket_rank",
+			},
+			{
+				Title:    "Current Price",
+				CanSort:  true,
+				Field:    "current_price",
+				IsDollar: true,
+			},
+		},
+		NewNewspaper: true,
+	},
+	{
+		Title:  "Greatest Decrease in Vendor Listings",
+		Desc:   "Cards with relevant stock decrease, indicating that there is not enough supply to meet current demand across the reviewed time period (tl:dr - Seek these out)",
+		Offset: 3,
+		Option: "greastest_decrease_listings",
+		Query: `SELECT calc_date, product_id,
+                       ROW_NUMBER() OVER (ORDER BY raw_score DESC) AS ranking,
+                       product_name, set_name, product_number, variant,
+                       sellers_Today, sellers_d7, sellers_d30, pct_drop_7d
+                  FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
+                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
+                                      FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards)
+                   AND game_name = 'Magic: The Gathering'
+                   AND pct_drop_7d <> 0`,
+		Sort: "ranking ASC",
+		Head: []Heading{
+			{
+				IsHidden: true,
+			},
+			{
+				IsHidden: true,
+			},
+			{
+				Title:   "Ranking",
+				CanSort: true,
+				Field:   "ranking",
+			},
+			{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "product_name",
+			},
+			{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "set_name",
+			},
+			{
+				Title: "#",
+				Field: "product_number",
+			},
+			{
+				Title: "Finish",
+				Field: "variant",
+			},
+			{
+				Title:   "Today's Sellers",
+				CanSort: true,
+				Field:   "sellers_Today",
+			},
+			{
+				Title:   "Last Week Sellers",
+				CanSort: true,
+				Field:   "sellers_d7",
+			},
+			{
+				Title:   "Month Ago Sellers",
+				CanSort: true,
+				Field:   "sellers_d30",
+			},
+			{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "pct_drop_7d",
+				IsPerc:  true,
+			},
+		},
+		NewNewspaper: true,
+	},
+	{
+		Title:  "Greatest Increase in Vendor Listings",
+		Desc:   "Cards with substantial stock increases, indicating that there is more than enough supply to meet current demand across the reviewed time period (tl:dr - Avoid These)",
+		Offset: 3,
+		Option: "greastest_increase_listings",
+		Query: `SELECT calc_date, product_id,
+                       ROW_NUMBER() OVER (ORDER BY raw_score DESC) AS ranking,
+                       product_name, set_name, product_number, variant,
+                       sellers_Today, sellers_d7, sellers_d30, pct_gain_7d
+                  FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
+                 WHERE calc_date <= (SELECT MAX(calc_date) - INTERVAL '0 DAY'
+                                       FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards)
+                   AND game_name = 'Magic: The Gathering'
+                   AND pct_gain_7d <> 0`,
+		Sort: "ranking ASC",
+		Head: []Heading{
+			{
+				IsHidden: true,
+			},
+			{
+				IsHidden: true,
+			},
+			{
+				Title:   "Ranking",
+				CanSort: true,
+				Field:   "ranking",
+			},
+			{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "product_name",
+			},
+			{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "set_name",
+			},
+			{
+				Title: "#",
+				Field: "product_number",
+			},
+			{
+				Title: "Finish",
+				Field: "variant",
+			},
+			{
+				Title:   "Today's Sellers",
+				CanSort: true,
+				Field:   "sellers_Today",
+			},
+			{
+				Title:   "Last Week Sellers",
+				CanSort: true,
+				Field:   "sellers_d7",
+			},
+			{
+				Title:   "Month Ago Sellers",
+				CanSort: true,
+				Field:   "sellers_d30",
+			},
+			{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "pct_gain_7d",
+				IsPerc:  true,
+			},
+		},
+		NewNewspaper: true,
+	},
+	{
+		Title:  "Greatest Increase in Buylist Offer",
+		Desc:   "Buylist increases indicate a higher sales rate (eg. higher demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
+		Offset: 3,
+		Option: "greastest_increase_buylist",
+		Query: `SELECT calc_date, tcgplayer_id,
+                       ROW_NUMBER() OVER (ORDER BY raw_score DESC) AS ranking,
+                       product_name, set_name, product_number, variant,
+                       ck_buy_price, ck_buy_1d, ck_buy_7d, ck_buy_30d, pct_increase_7d
+                  FROM scripts__cardkingdom_buylist_increase_score_cards
+                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
+                                      FROM scripts__cardkingdom_buylist_increase_score_cards)
+                   AND game_name = 'Magic: The Gathering'
+                   AND pct_increase_7d <> 0`,
+		Sort: "ranking ASC",
+		Head: []Heading{
+			{
+				IsHidden: true,
+			},
+			{
+				IsHidden: true,
+			},
+			{
+				Title:   "Ranking",
+				CanSort: true,
+				Field:   "ranking",
+			},
+			{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "product_name",
+			},
+			{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "set_name",
+			},
+			{
+				Title: "#",
+				Field: "product_number",
+			},
+			{
+				Title: "Finish",
+				Field: "variant",
+			},
+			{
+				Title:    "Today's Buylist",
+				CanSort:  true,
+				Field:    "ck_buy_price",
+				IsDollar: true,
+			},
+			{
+				Title:    "Yesterday",
+				CanSort:  true,
+				Field:    "ck_buy_1d",
+				IsDollar: true,
+			},
+			{
+				Title:    "Last Week",
+				CanSort:  true,
+				Field:    "ck_buy_7d",
+				IsDollar: true,
+			},
+			{
+				Title:    "Last Month",
+				CanSort:  true,
+				Field:    "ck_buy_30d",
+				IsDollar: true,
+			},
+			{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "pct_increase_7d",
+				IsPerc:  true,
+			},
+		},
+		NewNewspaper: true,
+	},
+	{
+		Title:  "Greatest Decrease in Buylist Offer",
+		Desc:   "Buylist deecreases indicating a declining sales rate (eg, Less demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
+		Offset: 3,
+		Option: "greastest_decrease_buylist",
+		Query: `SELECT calc_date, tcgplayer_id,
+                       ROW_NUMBER() OVER (ORDER BY raw_score DESC) AS ranking,
+                       product_name, set_name, product_number, variant,
+                       ck_buy_price, ck_buy_1d, ck_buy_7d, ck_buy_30d, pct_decrease_7d
+                  FROM scripts__cardkingdom_buylist_decrease_score_cards
+                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
+                                      FROM scripts__cardkingdom_buylist_decrease_score_cards)
+                   AND game_name = 'Magic: The Gathering'
+                   AND pct_decrease_7d <> 0`,
+		Sort: "ranking ASC",
+		Head: []Heading{
+			{
+				IsHidden: true,
+			},
+			{
+				IsHidden: true,
+			},
+			{
+				Title:   "Ranking",
+				CanSort: true,
+				Field:   "ranking",
+			},
+			{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "product_name",
+			},
+			{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "set_name",
+			},
+			{
+				Title: "#",
+				Field: "product_number",
+			},
+			{
+				Title: "Finish",
+				Field: "variant",
+			},
+			{
+				Title:    "Today's Buylist",
+				CanSort:  true,
+				Field:    "ck_buy_price",
+				IsDollar: true,
+			},
+			{
+				Title:    "Yesterday",
+				CanSort:  true,
+				Field:    "ck_buy_1d",
+				IsDollar: true,
+			},
+			{
+				Title:    "Last Week",
+				CanSort:  true,
+				Field:    "ck_buy_7d",
+				IsDollar: true,
+			},
+			{
+				Title:    "Last Month",
+				CanSort:  true,
+				Field:    "ck_buy_30d",
+				IsDollar: true,
+			},
+			{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "pct_decrease_7d",
+				IsPerc:  true,
+			},
+		},
+		NewNewspaper: true,
+	},
+	NewspaperPage{
+		Title:        "Newspaper Settings",
+		Option:       "options",
+		NewNewspaper: true,
+	},
 	NewspaperPage{
 		Title:  "Top 25 Singles (3 Week Market Review)",
 		Desc:   "Rankings are weighted via prior 21, 15, and 7 days via Retail, Buylist, and several other criteria to arrive at an overall ranking",
@@ -617,7 +1058,12 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pageVars.ToC = NewspaperPages
+	for _, newspage := range NewspaperPages {
+		if newspage.NewNewspaper {
+			continue
+		}
+		pageVars.ToC = append(pageVars.ToC, newspage)
+	}
 
 	r.ParseForm()
 	page := r.FormValue("page")
