@@ -735,111 +735,110 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, newspage := range NewspaperPages {
-		if newspage.Option == page {
-			pageVars.Page = newspage.Option
-			pageVars.Subtitle = newspage.Title
-			pageVars.InfoMessage = newspage.Desc
-			pageVars.Headings = newspage.Head
-			pageVars.LargeTable = newspage.Large
-			pageVars.OffsetCards = newspage.Offset
+		if newspage.Option != page {
+			continue
+		}
+		pageVars.Page = newspage.Option
+		pageVars.Subtitle = newspage.Title
+		pageVars.InfoMessage = newspage.Desc
+		pageVars.Headings = newspage.Head
+		pageVars.LargeTable = newspage.Large
+		pageVars.OffsetCards = newspage.Offset
 
-			// Get the total number of rows for the query
-			qs := strings.Split(newspage.Query, "FROM")
-			if len(qs) < 2 {
-				log.Println("Invalid query for page", page, " - \n", newspage.Query)
-				panic("Invalid query, missing at least a FROM to split on")
-			}
+		// Get the total number of rows for the query
+		qs := strings.Split(newspage.Query, "FROM")
+		if len(qs) < 2 {
+			log.Println("Invalid query for page", page, " - \n", newspage.Query)
+			panic("Invalid query, missing at least a FROM to split on")
+		}
 
-			// Set query to retrieve total number of matches
-			subQuery := "SELECT COUNT(DISTINCT n.uuid) FROM" + strings.Join(qs[1:], "FROM")
+		// Set query to retrieve total number of matches
+		subQuery := "SELECT COUNT(DISTINCT n.uuid) FROM" + strings.Join(qs[1:], "FROM")
 
-			// Add any extra filter that might affect number of results
-			if filter != "" {
-				subQuery += " AND a.Set = \"" + filter + "\""
+		// Add any extra filter that might affect number of results
+		if filter != "" {
+			subQuery += " AND a.Set = \"" + filter + "\""
+		}
+		if rarity != "" {
+			subQuery += " AND "
+			if strings.Contains(rarity, "/") {
+				subQuery += fmt.Sprintf("(a.Rarity = \"%c\" OR a.Rarity = \"%c\")", rarity[0], rarity[2])
+			} else if rarity == "S" {
+				// FIXME: this should be fixed in the DB
+				subQuery += "a.Rarity = \"special\""
+			} else {
+				subQuery += "a.Rarity = \"" + rarity + "\""
 			}
-			if rarity != "" {
-				subQuery += " AND "
-				if strings.Contains(rarity, "/") {
-					subQuery += fmt.Sprintf("(a.Rarity = \"%c\" OR a.Rarity = \"%c\")", rarity[0], rarity[2])
-				} else if rarity == "S" {
-					// FIXME: this should be fixed in the DB
-					subQuery += "a.Rarity = \"special\""
-				} else {
-					subQuery += "a.Rarity = \"" + rarity + "\""
-				}
-			}
-			if newspage.Priced != "" && minPrice != 0 {
-				subQuery += " AND " + newspage.Priced + " > " + fmt.Sprintf("%.2f", minPrice)
-			}
-			if newspage.Priced != "" && maxPrice != 0 {
-				subQuery += " AND " + newspage.Priced + " < " + fmt.Sprintf("%.2f", maxPrice)
-			}
-			if newspage.PercChanged != "" && minPercChange != 0 {
-				subQuery += " AND " + newspage.PercChanged + " > " + fmt.Sprintf("%.2f", minPercChange/100)
-			}
-			if newspage.PercChanged != "" && maxPercChange != 0 {
-				subQuery += " AND " + newspage.PercChanged + " < " + fmt.Sprintf("%.2f", maxPercChange/100)
-			}
+		}
+		if newspage.Priced != "" && minPrice != 0 {
+			subQuery += " AND " + newspage.Priced + " > " + fmt.Sprintf("%.2f", minPrice)
+		}
+		if newspage.Priced != "" && maxPrice != 0 {
+			subQuery += " AND " + newspage.Priced + " < " + fmt.Sprintf("%.2f", maxPrice)
+		}
+		if newspage.PercChanged != "" && minPercChange != 0 {
+			subQuery += " AND " + newspage.PercChanged + " > " + fmt.Sprintf("%.2f", minPercChange/100)
+		}
+		if newspage.PercChanged != "" && maxPercChange != 0 {
+			subQuery += " AND " + newspage.PercChanged + " < " + fmt.Sprintf("%.2f", maxPercChange/100)
+		}
 
-			subQuery += skipEditions
+		subQuery += skipEditions
 
-			if newspage.Priced != "" {
-				pageVars.CanFilterByPrice = true
-			}
-			if newspage.PercChanged != "" {
-				pageVars.CanFilterByPercentage = true
-			}
+		if newspage.Priced != "" {
+			pageVars.CanFilterByPrice = true
+		}
+		if newspage.PercChanged != "" {
+			pageVars.CanFilterByPercentage = true
+		}
 
-			// Sub Go!
-			var elements int
-			err := db.QueryRow(subQuery + ";").Scan(&elements)
-			if err != nil {
-				log.Println(subQuery)
-				log.Println("pagination disabled", err)
-			}
-			// Ceiling division to get number of pages
-			pages := (elements+newsPageSize-1)/newsPageSize - 1
-			if DevMode {
-				log.Println(page, "page has", elements, "elements, for a total of", pages, "pages")
-			}
+		// Sub Go!
+		var elements int
+		err := db.QueryRow(subQuery + ";").Scan(&elements)
+		if err != nil {
+			log.Println(subQuery)
+			log.Println("pagination disabled", err)
+		}
+		// Ceiling division to get number of pages
+		pages := (elements + newsPageSize - 1) / newsPageSize
+		if DevMode {
+			log.Println(page, "page has", elements, "elements, for a total of", pages, "pages")
+		}
+		pageVars.TotalIndex = pages
+		if pageIndex <= 1 {
+			pageIndex = 1
+		} else if pageIndex > pageVars.TotalIndex {
+			pageIndex = pageVars.TotalIndex
+		}
+		pageVars.CurrentIndex = pageIndex
+		if pageVars.CurrentIndex > 1 {
+			pageVars.PrevIndex = pageVars.CurrentIndex - 1
+		}
+		if pageVars.CurrentIndex < pageVars.TotalIndex {
+			pageVars.NextIndex = pageVars.CurrentIndex + 1
+		}
 
-			pageVars.TotalIndex = pages
-			if pageIndex <= 1 {
-				pageIndex = 1
-			} else if pageIndex > pageVars.TotalIndex {
-				pageIndex = pageVars.TotalIndex
-			}
+		query = newspage.Query
+		defSort = newspage.Sort
 
-			pageVars.CurrentIndex = pageIndex
-
-			if pageVars.CurrentIndex > 1 {
-				pageVars.PrevIndex = pageVars.CurrentIndex - 1
-			}
-			if pageVars.CurrentIndex < pageVars.TotalIndex {
-				pageVars.NextIndex = pageVars.CurrentIndex + 1
-			}
-
-			// Repeat as above to retrieve the possible editions
-			subQuery = "SELECT DISTINCT a.Set FROM" + strings.Join(qs[1:], "FROM") + skipEditions + " ORDER BY a.Set ASC"
-			rows, err := db.Query(subQuery + ";")
-			if err != nil {
-				log.Println(subQuery)
-				log.Println("editions disabled", err)
-				break
-			}
-			// First element is always initialized
-			pageVars.Editions = []string{""}
-			// Iterate over subresults
-			for rows.Next() {
-				var tmp string
-				err := rows.Scan(&tmp)
-				if err != nil {
-					continue
-				}
-				pageVars.Editions = append(pageVars.Editions, tmp)
-			}
-
+		// Repeat as above to retrieve the possible editions
+		subQuery = "SELECT DISTINCT a.Set FROM" + strings.Join(qs[1:], "FROM") + skipEditions + " ORDER BY a.Set ASC"
+		rows, err := db.Query(subQuery + ";")
+		if err != nil {
+			log.Println(subQuery)
+			log.Println("editions disabled", err)
 			break
+		}
+		// First element is always initialized
+		pageVars.Editions = []string{""}
+		// Iterate over subresults
+		for rows.Next() {
+			var tmp string
+			err := rows.Scan(&tmp)
+			if err != nil {
+				continue
+			}
+			pageVars.Editions = append(pageVars.Editions, tmp)
 		}
 	}
 
@@ -862,26 +861,28 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	// Check for price limits
 	if minPrice != 0 || maxPrice != 0 {
 		for _, newspage := range NewspaperPages {
-			if newspage.Option == page && newspage.Priced != "" {
-				if minPrice != 0 {
-					query += " AND " + newspage.Priced + " > " + fmt.Sprintf("%.2f", minPrice)
-				}
-				if maxPrice != 0 {
-					query += " AND " + newspage.Priced + " < " + fmt.Sprintf("%.2f", maxPrice)
-				}
+			if newspage.Option != page || newspage.Priced == "" {
+				continue
+			}
+			if minPrice != 0 {
+				query += " AND " + newspage.Priced + " > " + fmt.Sprintf("%.2f", minPrice)
+			}
+			if maxPrice != 0 {
+				query += " AND " + newspage.Priced + " < " + fmt.Sprintf("%.2f", maxPrice)
 			}
 		}
 	}
 
 	if minPercChange != 0 || maxPercChange != 0 {
 		for _, newspage := range NewspaperPages {
-			if newspage.Option == page && newspage.PercChanged != "" {
-				if minPercChange != 0 {
-					query += " AND " + newspage.PercChanged + " > " + fmt.Sprintf("%.2f", minPercChange/100)
-				}
-				if maxPercChange != 0 {
-					query += " AND " + newspage.PercChanged + " < " + fmt.Sprintf("%.2f", maxPercChange/100)
-				}
+			if newspage.Option != page && newspage.PercChanged == "" {
+				continue
+			}
+			if minPercChange != 0 {
+				query += " AND " + newspage.PercChanged + " > " + fmt.Sprintf("%.2f", minPercChange/100)
+			}
+			if maxPercChange != 0 {
+				query += " AND " + newspage.PercChanged + " < " + fmt.Sprintf("%.2f", maxPercChange/100)
 			}
 		}
 	}
