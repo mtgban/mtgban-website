@@ -63,6 +63,10 @@ type NewspaperPage struct {
 	PercChanged string
 	// Whether the query applies to the NewNewspaper
 	NewNewspaper bool
+
+	// Cached results of the various queries
+	Results     [][]string
+	Results3Day [][]string
 }
 
 func getResults(db *sql.DB, query string) ([][]string, error) {
@@ -119,6 +123,43 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 	}
 
 	return results, nil
+}
+
+func cacheNewspaper() {
+	log.Println("Caching Newspaper data")
+
+	for i := range NewspaperPages {
+		if !NewspaperPages[i].NewNewspaper {
+			continue
+		}
+		if NewspaperPages[i].Query == "" {
+			continue
+		}
+
+		query := NewspaperPages[i].Query + " ORDER BY ranking ASC;"
+
+		results, err := getResults(NewNewspaperDB, query)
+		if err != nil {
+			log.Println(query, err)
+			continue
+		}
+
+		log.Println(NewspaperPages[i].Option, "has", len(results), "elements")
+		NewspaperPages[i].Results = results
+
+		query = strings.Replace(query, "0 DAY", "3 DAY", -1)
+		results3day, err := getResults(NewNewspaperDB, query)
+		if err != nil {
+			log.Println(query, err)
+			continue
+		}
+
+		log.Println(NewspaperPages[i].Option, "(3day) has", len(results3day), "elements")
+		NewspaperPages[i].Results3Day = results3day
+	}
+
+	LastNewspaperUpdate = time.Now()
+	log.Println("Newspaper All Ready")
 }
 
 var NewspaperPages = []NewspaperPage{
