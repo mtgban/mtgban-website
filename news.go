@@ -747,13 +747,13 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 			// Get the total number of rows for the query
 			qs := strings.Split(newspage.Query, "FROM")
-			if len(qs) != 1 {
+			if len(qs) < 2 {
 				log.Println("Invalid query for page", page, " - \n", newspage.Query)
 				panic("Invalid query, missing at least a FROM to split on")
 			}
 
 			// Set query to retrieve total number of matches
-			subQuery := "SELECT COUNT(DISTINCT n.uuid) FROM" + qs[1]
+			subQuery := "SELECT COUNT(DISTINCT n.uuid) FROM" + strings.Join(qs[1:], "FROM")
 
 			// Add any extra filter that might affect number of results
 			if filter != "" {
@@ -818,7 +818,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			defSort = newspage.Sort
 
 			// Repeat as above to retrieve the possible editions
-			subQuery = "SELECT DISTINCT a.Set FROM" + qs[1] + skipEditions + " ORDER BY a.Set ASC"
+			subQuery = "SELECT DISTINCT a.Set FROM" + strings.Join(qs[1:], "FROM") + skipEditions + " ORDER BY a.Set ASC"
 			rows, err := db.Query(subQuery)
 			if err != nil {
 				log.Println("editions disabled", err)
