@@ -24,6 +24,8 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
+
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
@@ -344,6 +346,7 @@ type ConfigType struct {
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
 	DBAddress              string             `json:"db_address"`
+	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
 	DiscordHook            string             `json:"discord_hook"`
 	DiscordNotifHook       string             `json:"discord_notif_hook"`
 	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
@@ -386,6 +389,7 @@ var LastStashUpdate time.Time
 
 var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
+var NewNewspaperDB *sql.DB
 
 var GoogleDocsClient *http.Client
 
@@ -593,6 +597,12 @@ func openDBs() (err error) {
 	if err != nil {
 		return err
 	}
+
+	NewNewspaperDB, err = sql.Open("postgres", Config.NewNewspaperConfigLine)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
