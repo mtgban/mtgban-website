@@ -793,8 +793,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Sub Go!
-			err := db.QueryRow(subQuery).Scan(&pages)
+			err := db.QueryRow(subQuery + ";").Scan(&pages)
 			if err != nil {
+				log.Println(subQuery)
 				log.Println("pages disabled", err)
 			}
 			// This integer division is equivalent to math.Floor()
@@ -819,8 +820,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 			// Repeat as above to retrieve the possible editions
 			subQuery = "SELECT DISTINCT a.Set FROM" + strings.Join(qs[1:], "FROM") + skipEditions + " ORDER BY a.Set ASC"
-			rows, err := db.Query(subQuery)
+			rows, err := db.Query(subQuery + ";")
 			if err != nil {
+				log.Println(subQuery)
 				log.Println("editions disabled", err)
 				break
 			}
@@ -926,7 +928,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	query = fmt.Sprintf("%s LIMIT %d OFFSET %d", query, newsPageSize, newsPageSize*pageIndex)
 
 	// GO GO GO
-	rows, err := db.Query(query)
+	rows, err := db.Query(query + ";")
 	if err != nil {
 		log.Println(query, err)
 		pageVars.InfoMessage = "Newspaper is on strike (notify devs!)"
