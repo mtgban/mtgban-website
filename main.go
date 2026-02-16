@@ -115,6 +115,7 @@ type PageVars struct {
 	FilterSet    string
 	Editions     []string
 	FilterRarity string
+	FilterBucket string
 	Rarities     []string
 	CardHashes   []string
 	EditionsMap  map[string]EditionEntry

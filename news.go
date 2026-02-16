@@ -65,6 +65,8 @@ type NewspaperPage struct {
 	PercChanged string
 	// Whether the query applies to the New Newspaper
 	NewNewspaper bool
+	// Whether the page can be filtered by bucket name
+	HasBucket bool
 
 	// Cached results of the various queries
 	Results     [][]string
@@ -281,6 +283,7 @@ var NewspaperPages = []NewspaperPage{
 			},
 		},
 		NewNewspaper: true,
+		HasBucket:    true,
 	},
 	{
 		Title:  "Top Singles by Spike Score",
@@ -347,6 +350,7 @@ var NewspaperPages = []NewspaperPage{
 			},
 		},
 		NewNewspaper: true,
+		HasBucket:    true,
 	},
 	{
 		Title:  "Greatest Decrease in Vendor Listings",
@@ -1106,6 +1110,10 @@ var NewspaperAllRarities = []string{
 	"", "M", "R", "U", "C", "S", "M/R", "U/C",
 }
 
+var BucketNames = []string{
+	"", "$2+", "$5+", "$10+", "$20+", "$35+", "$50+", "$75+",
+}
+
 func getLastDBUpdate(db *sql.DB) (time.Time, error) {
 	var lastUpdate string
 	err := db.QueryRow("SELECT data_value FROM newspaper_updated").Scan(&lastUpdate)
@@ -1159,6 +1167,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	dir := r.FormValue("dir")
 	filter := r.FormValue("filter")
 	rarity := r.FormValue("rarity")
+	bucket := r.FormValue("bucket")
 	minPrice, _ := strconv.ParseFloat(r.FormValue("min_price"), 64)
 	maxPrice, _ := strconv.ParseFloat(r.FormValue("max_price"), 64)
 	minPercChange, _ := strconv.ParseFloat(r.FormValue("min_change"), 64)
@@ -1329,6 +1338,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.SortDir = dir
 	pageVars.FilterSet = filter
 	pageVars.FilterRarity = rarity
+	pageVars.FilterBucket = bucket
 	pageVars.FilterMinPrice = minPrice
 	pageVars.FilterMaxPrice = maxPrice
 	pageVars.FilterMinPercChange = minPercChange
@@ -1374,6 +1384,10 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				pageVars.LastUpdate = time.Now()
 				render(w, "news.html", pageVars)
 				return
+			}
+
+			if newspage.HasBucket {
+				pageVars.Tiers = BucketNames
 			}
 
 			results = newspage.Results
@@ -1571,11 +1585,12 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.Table = output
 	} else {
-		if skipEditionsOpt != "" || rarity != "" || filter != "" {
+		if skipEditionsOpt != "" || rarity != "" || filter != "" || bucket != "" {
 			var output [][]string
 			for _, result := range results {
 				cardRarity := result[0]
 				edition := result[4]
+				bucketName := result[7]
 				if skipEditionsOpt != "" {
 					filters := strings.Split(skipEditionsOpt, ",")
 					if slices.Contains(filters, edition) {
@@ -1583,6 +1598,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				if filter != "" && filter != edition {
+					continue
+				}
+				if bucket != "" && bucket != bucketName {
 					continue
 				}
 				if rarity != "" && cardRarity != "" {
@@ -1659,7 +1677,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(pageVars.Cards) == 0 {
-		if filter == "" && rarity == "" {
+		if filter == "" && rarity == "" && bucket == "" {
 			pageVars.InfoMessage = "Newspaper is on strike (notify devs!)"
 		} else {
 			pageVars.InfoMessage = "No results for the current filter options"

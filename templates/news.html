@@ -190,6 +190,18 @@
                                 <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterRarity)}}selected{{end}}>{{.}}</option>
                             {{end}}
                         </select>
+
+                        {{if .Tiers}}
+                            <select name="bucket" onchange="this.form.submit()" class="select-css" style="width:52px; text-align:center;">
+                                {{if eq "" $.FilterBucket}}
+                                    <option value="" disabled selected hidden>💸</option>
+                                {{end}}
+                                {{range .Tiers}}
+                                    <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterBucket)}}selected{{end}}>{{.}}</option>
+                                {{end}}
+                            </select>
+                        {{end}}
+
                         <input type="submit" style="visibility: hidden" />
                     </form>
                 </div>
@@ -211,8 +223,8 @@
 
                                     {{if or .CanSort (and (not (eq $.FilterSet "")) .ConditionalSort)}}
                                         <nobr>
-                                            <a href="newspaper?page={{$.Page}}&sort={{.Field}}&dir=desc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}"><i class="arrow down"></i></a>
-                                            <a href="newspaper?page={{$.Page}}&sort={{.Field}}&dir=asc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}"><i class="arrow up"></i></a>
+                                            <a href="newspaper?page={{$.Page}}&sort={{.Field}}&dir=desc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}"><i class="arrow down"></i></a>
+                                            <a href="newspaper?page={{$.Page}}&sort={{.Field}}&dir=asc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}"><i class="arrow up"></i></a>
                                         </nobr>
                                     {{end}}
                                 </th>
