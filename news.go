@@ -1138,13 +1138,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for _, newspage := range NewspaperPages {
-		if newspage.NewNewspaper {
-			continue
-		}
-		pageVars.ToC = append(pageVars.ToC, newspage)
-	}
-
 	r.ParseForm()
 	page := r.FormValue("page")
 	sorting := r.FormValue("sort")
@@ -1161,7 +1154,28 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
+	oldMode := page == "old"
+	for _, newspage := range NewspaperPages {
+		if page == newspage.Option {
+			oldMode = !newspage.NewNewspaper
+		}
+	}
+
+	for _, newspage := range NewspaperPages {
+		if (oldMode && newspage.NewNewspaper) || (!oldMode && !newspage.NewNewspaper) {
+			continue
+		}
+		pageVars.ToC = append(pageVars.ToC, newspage)
+	}
+
 	pageVars.Nav = insertNavBar("Newspaper", pageVars.Nav, []NavElem{
+		NavElem{
+			Name:   "Archive",
+			Short:  "📰",
+			Link:   "/newspaper?page=old",
+			Active: oldMode,
+			Class:  "selected",
+		},
 		NavElem{
 			Name:   "TCG Syp List",
 			Short:  "📋",
@@ -1171,10 +1185,13 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	var err error
-	pageVars.LastUpdate, err = getLastDBUpdate(db)
-	if err != nil {
-		log.Println(err)
+	pageVars.LastUpdate = LastNewspaperUpdate
+	if oldMode {
+		var err error
+		pageVars.LastUpdate, err = getLastDBUpdate(db)
+		if err != nil {
+			log.Println(err)
+		}
 	}
 
 	switch page {
