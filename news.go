@@ -34,6 +34,8 @@ type Heading struct {
 	IsDollar bool
 	// This is a percentage
 	IsPerc bool
+	// This is a Number
+	IsNum bool
 	// Do not display this field in HTML
 	IsHidden bool
 	// This field can be sorted when filtered
@@ -228,6 +230,7 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Ranking",
 				CanSort: true,
 				Field:   "ranking",
+				IsNum:   true,
 			},
 			{
 				Title:   "Card Name",
@@ -256,6 +259,7 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Bucket Rank",
 				CanSort: true,
 				Field:   "bucket_rank",
+				IsNum:   true,
 			},
 			{
 				Title:    "CK Retail",
@@ -304,6 +308,7 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Ranking",
 				CanSort: true,
 				Field:   "ranking",
+				IsNum:   true,
 			},
 			{
 				Title:   "Card Name",
@@ -332,6 +337,7 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Bucket Rank",
 				CanSort: true,
 				Field:   "bucket_rank",
+				IsNum:   true,
 			},
 			{
 				Title:    "Current Price",
@@ -391,16 +397,19 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Today's Sellers",
 				CanSort: true,
 				Field:   "sellers_Today",
+				IsNum:   true,
 			},
 			{
 				Title:   "Last Week Sellers",
 				CanSort: true,
 				Field:   "sellers_d7",
+				IsNum:   true,
 			},
 			{
 				Title:   "Month Ago Sellers",
 				CanSort: true,
 				Field:   "sellers_d30",
+				IsNum:   true,
 			},
 			{
 				Title:   "Weekly % Change",
@@ -437,6 +446,7 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Ranking",
 				CanSort: true,
 				Field:   "ranking",
+				IsNum:   true,
 			},
 			{
 				Title:   "Card Name",
@@ -460,16 +470,19 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Today's Sellers",
 				CanSort: true,
 				Field:   "sellers_Today",
+				IsNum:   true,
 			},
 			{
 				Title:   "Last Week Sellers",
 				CanSort: true,
 				Field:   "sellers_d7",
+				IsNum:   true,
 			},
 			{
 				Title:   "Month Ago Sellers",
 				CanSort: true,
 				Field:   "sellers_d30",
+				IsNum:   true,
 			},
 			{
 				Title:   "Weekly % Change",
@@ -506,6 +519,7 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Ranking",
 				CanSort: true,
 				Field:   "ranking",
+				IsNum:   true,
 			},
 			{
 				Title:   "Card Name",
@@ -584,6 +598,7 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Ranking",
 				CanSort: true,
 				Field:   "ranking",
+				IsNum:   true,
 			},
 			{
 				Title:   "Card Name",
@@ -1585,6 +1600,45 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 			results = output
 		}
+
+		if sorting != "" {
+			for _, newspage := range pageVars.ToC {
+				if newspage.Option != page {
+					continue
+				}
+				numberSort := false
+				col := -1
+				for i, heading := range newspage.Head {
+					if heading.Field == sorting {
+						numberSort = heading.IsPerc || heading.IsDollar || heading.IsNum
+						col = i
+						break
+					}
+				}
+				if col < 0 {
+					break
+				}
+
+				sort.SliceStable(results, func(i, j int) bool {
+					var a, b float64
+					if numberSort {
+						a, _ = strconv.ParseFloat(results[i][col], 64)
+						b, _ = strconv.ParseFloat(results[j][col], 64)
+					}
+					if dir == "asc" {
+						if numberSort {
+							return a < b
+						}
+						return results[i][col] < results[j][col]
+					}
+					if numberSort {
+						return a > b
+					}
+					return results[i][col] > results[j][col]
+				})
+			}
+		}
+
 		pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, 50, len(results))
 	}
 
