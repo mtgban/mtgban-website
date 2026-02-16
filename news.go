@@ -791,7 +791,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for _, newspage := range NewspaperPages {
+	for _, newspage := range pageVars.ToC {
 		if newspage.Option != page {
 			continue
 		}
@@ -917,7 +917,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	// Check for price limits
 	if minPrice != 0 || maxPrice != 0 {
-		for _, newspage := range NewspaperPages {
+		for _, newspage := range pageVars.ToC {
 			if newspage.Option != page || newspage.Priced == "" {
 				continue
 			}
@@ -931,7 +931,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if minPercChange != 0 || maxPercChange != 0 {
-		for _, newspage := range NewspaperPages {
+		for _, newspage := range pageVars.ToC {
 			if newspage.Option != page && newspage.PercChanged == "" {
 				continue
 			}
