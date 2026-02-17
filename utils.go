@@ -763,6 +763,11 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 		page.TotalIndex = maxTotalResults / maxResults
 	}
 
+	// Make sure there is at least one page
+	if page.TotalIndex < 1 {
+		page.TotalIndex = 1
+	}
+
 	// Validate the requested input page
 	if pageIndex <= 1 {
 		pageIndex = 1
