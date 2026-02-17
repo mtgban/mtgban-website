@@ -129,12 +129,6 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 			}
 		}
 
-		// Allocate a table row with as many fields as returned by the SELECT
-		results = append(results, result)
-
-		// Next row!
-		count++
-
 		// Override a few fields for better integration with the site
 		if db == NewNewspaperDB {
 			uuid, err := mtgmatcher.MatchId(result[1], result[6] != "Normal")
@@ -149,6 +143,12 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 			result[4] = co.Edition
 			result[5] = co.Number
 		}
+
+		// Allocate a table row with as many fields as returned by the SELECT
+		results = append(results, result)
+
+		// Next row!
+		count++
 	}
 
 	return results, nil
