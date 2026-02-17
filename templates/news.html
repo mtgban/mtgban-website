@@ -159,7 +159,7 @@
                 <div style="float:left;">
                     <h1>{{.Subtitle}}</h1>
                 </div>
-                <div style="float:left; padding:18px 0 0 120px; margin:auto">
+                <div style="float:left; padding:18px 0 0 100px; margin:auto">
                     <form action="newspaper" method="GET">
                         <input type="hidden" name="page" value="{{$.Page}}">
                         <input type="hidden" name="sort" value="{{$.SortOption}}">
@@ -173,6 +173,16 @@
                             <input name="min_change" {{if $.FilterMinPercChange}}value="{{$.FilterMinPercChange}}"{{end}} placeholder="Min %" class="input-css" style="width:48px; padding: .6em .5em .5em .5em">
                             <input name="max_change" {{if $.FilterMaxPercChange}}value="{{$.FilterMaxPercChange}}"{{end}} placeholder="Max %" class="input-css" style="width:48px; padding: .6em .5em .5em .5em">
                         {{end}}
+
+                        <select name="finish" onchange="this.form.submit()" class="select-css" style="width:64px; text-align:center;">
+                            {{if eq "" $.FilterFinish}}
+                                <option value="" disabled selected hidden>✨</option>
+                            {{end}}
+                            {{range .Finishes}}
+                                <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterFinish)}}selected{{end}}>{{.}}</option>
+                            {{end}}
+                        </select>
+
                         <select name="filter" onchange="this.form.submit()" class="select-css" style="width:300px; padding-left:.8em">
                             {{if eq "" $.FilterSet}}
                                 <option value="" disabled selected hidden>Filter by Edition</option>

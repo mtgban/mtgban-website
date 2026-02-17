@@ -116,6 +116,7 @@ type PageVars struct {
 	Editions     []string
 	FilterRarity string
 	FilterBucket string
+	FilterFinish string
 	Rarities     []string
 	CardHashes   []string
 	EditionsMap  map[string]EditionEntry
@@ -142,6 +143,7 @@ type PageVars struct {
 	MemoryStatus string
 	LatestHash   string
 	Tiers        []string
+	Finishes     []string
 
 	SelectableField bool
 	DisableLinks    bool

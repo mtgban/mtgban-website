@@ -75,6 +75,10 @@ type NewspaperPage struct {
 	// Which editions are available in the cache
 	AvailableEditions     []string
 	AvailableEditions3Day []string
+
+	// Which finishes are available in the cache
+	PossibleFinish     []string
+	PossibleFinish3Day []string
 }
 
 func getResults(db *sql.DB, query string) ([][]string, error) {
@@ -168,17 +172,24 @@ func cacheNewspaper() {
 		}
 
 		editions := []string{""}
+		variants := []string{""}
 		for _, result := range results {
 			edition := result[4]
 			if !slices.Contains(editions, edition) {
 				editions = append(editions, edition)
 			}
+			variant := result[6]
+			if !slices.Contains(variants, variant) {
+				variants = append(variants, variant)
+			}
 		}
 		sort.Strings(editions)
+		sort.Strings(variants)
 
 		log.Println(NewspaperPages[i].Option, "has", len(results), "elements")
 		NewspaperPages[i].Results = results
 		NewspaperPages[i].AvailableEditions = editions
+		NewspaperPages[i].PossibleFinish = variants
 
 		query = strings.Replace(query, "0 DAY", "3 DAY", -1)
 		results3day, err := getResults(NewNewspaperDB, query)
@@ -188,17 +199,24 @@ func cacheNewspaper() {
 		}
 
 		editions3day := []string{""}
+		variants3day := []string{""}
 		for _, result := range results3day {
 			edition := result[4]
 			if !slices.Contains(editions3day, edition) {
 				editions3day = append(editions3day, edition)
 			}
+			variant := result[6]
+			if !slices.Contains(variants3day, variant) {
+				variants3day = append(variants3day, edition)
+			}
 		}
 		sort.Strings(editions3day)
+		sort.Strings(variants3day)
 
 		log.Println(NewspaperPages[i].Option, "(3day) has", len(results3day), "elements")
 		NewspaperPages[i].Results3Day = results3day
 		NewspaperPages[i].AvailableEditions3Day = editions3day
+		NewspaperPages[i].PossibleFinish3Day = variants3day
 	}
 
 	LastNewspaperUpdate = time.Now()
@@ -1168,6 +1186,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	filter := r.FormValue("filter")
 	rarity := r.FormValue("rarity")
 	bucket := r.FormValue("bucket")
+	finish := r.FormValue("finish")
 	minPrice, _ := strconv.ParseFloat(r.FormValue("min_price"), 64)
 	maxPrice, _ := strconv.ParseFloat(r.FormValue("max_price"), 64)
 	minPercChange, _ := strconv.ParseFloat(r.FormValue("min_change"), 64)
@@ -1339,6 +1358,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.FilterSet = filter
 	pageVars.FilterRarity = rarity
 	pageVars.FilterBucket = bucket
+	pageVars.FilterFinish = finish
 	pageVars.FilterMinPrice = minPrice
 	pageVars.FilterMaxPrice = maxPrice
 	pageVars.FilterMinPercChange = minPercChange
@@ -1392,9 +1412,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 			results = newspage.Results
 			pageVars.Editions = newspage.AvailableEditions
+			pageVars.Finishes = newspage.PossibleFinish
 			if !pageVars.IsOneDay {
 				results = newspage.Results3Day
 				pageVars.Editions = newspage.AvailableEditions3Day
+				pageVars.Finishes = newspage.PossibleFinish3Day
 			}
 
 			break
@@ -1585,11 +1607,12 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.Table = output
 	} else {
-		if skipEditionsOpt != "" || rarity != "" || filter != "" || bucket != "" {
+		if skipEditionsOpt != "" || rarity != "" || filter != "" || bucket != "" || finish != "" {
 			var output [][]string
 			for _, result := range results {
 				cardRarity := result[0]
 				edition := result[4]
+				finishName := result[6]
 				bucketName := result[7]
 				if skipEditionsOpt != "" {
 					filters := strings.Split(skipEditionsOpt, ",")
@@ -1601,6 +1624,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				if bucket != "" && bucket != bucketName {
+					continue
+				}
+				if finish != "" && finish != finishName {
 					continue
 				}
 				if rarity != "" && cardRarity != "" {
@@ -1677,7 +1703,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(pageVars.Cards) == 0 {
-		if filter == "" && rarity == "" && bucket == "" {
+		if filter == "" && rarity == "" && bucket == "" && finish == "" {
 			pageVars.InfoMessage = "Newspaper is on strike (notify devs!)"
 		} else {
 			pageVars.InfoMessage = "No results for the current filter options"
