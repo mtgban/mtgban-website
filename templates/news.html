@@ -77,36 +77,49 @@
                 </p>
 
                 <h3>Instructions</h3>
-                <ul class="indent">
-                    <li>The Market Review provides an overall market health overview.</li>
-                    <li>Pages 2 and 3 show you how the market is trending.<br>
-                        These are the cards that <a href="https://mtgstocks.com">MTGStocks</a>, <a href="https://echomtg.com">echomtg</a>, and similar pages will pick up in about 5 days (usually - even if they don't, these are the cards that are actively churning on the market given a 3 week review across multiple vendor sites).</li>
-                    <li>Pages 4 and 5 give you an overview of TCG vendor levels, how many vendors have listings of a specific card and how it is trending.</li>
-                    <li>Pages 6 and 7 are the same deal as 4-5, just reviewing CK buylist and the strength and trends of their offers on cards.</li>
-                    <li>On page 8 you may select which sets to exclude and tailor your experience.</li>
-                </ul>
-                <br>
-                <ul class="indent">
-                    <li>Check out a <a href=https://youtu.be/1BILs981-Y4>video introduction</a> from <a href="https://twitter.com/WolfOfTinStreet">WolfOfTinStreet</a>.
-                </ul>
-                <br>
-                <h3>A note on forecasts</h3>
-                <ul class="indent">
-                    <li>This newspaper is not a crystal ball.</li>
-                    <li>More often then not, the trend of the card is what we're aiming to predict and the sharpness of that trend velocity.</li>
-                    <li>These forecasts hereafter attempt to show, based off time series analysis, the potential future values (7 days out) for key metrics.</li>
-                    <li>The values shown demonstrate the value and forecast value from one week prior. We then can compare the forecast value (what the model thought the value would be {{if .IsOneDay}}in present day{{else}}on a 3 day lag{{end}}).</li>
-                    <li>Then it will demonstrate today's value, and the current projection moving forward.</li>
-                    <li>In your own review of how my model performed last week to this week, <b>it is left up to the reader</b> to decide whether or not to believe it will continue to hold true into the future week, or if trends will change. What is being represented is historical patterns and their predicted end result.</li>
+                {{if eq .Page "old"}}
                     <ul class="indent">
-                        <li>Things in the present, oftentimes, do not follow historical trends, and herein lies the risk.</li>
-                        <li>If they should follow historical patterns though...</li>
+                        <li>The Market Review provides an overall market health overview.</li>
+                        <li>Pages 2 and 3 show you how the market is trending.<br>
+                            These are the cards that <a href="https://mtgstocks.com">MTGStocks</a>, <a href="https://echomtg.com">echomtg</a>, and similar pages will pick up in about 5 days (usually - even if they don't, these are the cards that are actively churning on the market given a 3 week review across multiple vendor sites).</li>
+                        <li>Pages 4 and 5 give you an overview of TCG vendor levels, how many vendors have listings of a specific card and how it is trending.</li>
+                        <li>Pages 6 and 7 are the same deal as 4-5, just reviewing CK buylist and the strength and trends of their offers on cards.</li>
+                        <li>On page 8 you may select which sets to exclude and tailor your experience.</li>
                     </ul>
-                    {{if not .IsOneDay}}
-                        <li>Please also remember, this edition is lagged 3 days behind present date. Consider upgrading your pledge to gain access to the <i>early edition</i>.</li>
-                    {{end}}
-                </ul>
-                <br>
+                    <br>
+                    <ul class="indent">
+                        <li>Check out a <a href=https://youtu.be/1BILs981-Y4>video introduction</a> from <a href="https://twitter.com/WolfOfTinStreet">WolfOfTinStreet</a>.
+                    </ul>
+                    <br>
+                    <h3>A note on forecasts</h3>
+                    <ul class="indent">
+                        <li>This newspaper is not a crystal ball.</li>
+                        <li>More often then not, the trend of the card is what we're aiming to predict and the sharpness of that trend velocity.</li>
+                        <li>These forecasts hereafter attempt to show, based off time series analysis, the potential future values (7 days out) for key metrics.</li>
+                        <li>The values shown demonstrate the value and forecast value from one week prior. We then can compare the forecast value (what the model thought the value would be {{if .IsOneDay}}in present day{{else}}on a 3 day lag{{end}}).</li>
+                        <li>Then it will demonstrate today's value, and the current projection moving forward.</li>
+                        <li>In your own review of how my model performed last week to this week, <b>it is left up to the reader</b> to decide whether or not to believe it will continue to hold true into the future week, or if trends will change. What is being represented is historical patterns and their predicted end result.</li>
+                        <ul class="indent">
+                            <li>Things in the present, oftentimes, do not follow historical trends, and herein lies the risk.</li>
+                            <li>If they should follow historical patterns though...</li>
+                        </ul>
+                        {{if not .IsOneDay}}
+                            <li>Please also remember, this edition is lagged 3 days behind present date. Consider upgrading your pledge to gain access to the <i>early edition</i>.</li>
+                        {{end}}
+                    </ul>
+                    <br>
+                {{else}}
+                    <ul class="indent">
+                        <li>The Newspaper is BAN's exclusive market and tren analysis tool! Each page offers different type of data:
+                        <li>We have a <b>Spike Score</b> section that indicates cards with high velocity, using heuristics an price movements over a period of time.<br>
+                            Each card is assigned to a budget bucket that signals different movent across different price ranges.
+                            Depending on the game, we also use buylist movement with a different algorithm to come up with the Spike Score.<br>
+                            These cards usually show up on <a href="https://mtgstocks.com">MTGStocks</a> a few days later.<br>
+                        <li>Then the <b>Increase/Decrese in Vendoer Listing</b> pages give you an overview of TCG vendor levels, how many vendors have listings of a specific card and how it is trending.</li>
+                        <li>Finally the <b>Greatest Increase/Decrease</b> pages use a similar approach to review movements on the buylist (if available).</li>
+                        <li>Of course you can customize your experience, by selecting certain sets or displaying Foil/Nonfoil cards, and pick any rarity you want.</li>
+                    </ul>
+                {{end}}
 
             </div>
         {{else if eq .Subtitle "Options"}}

@@ -1237,10 +1237,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println(err)
 		}
+		pageVars.Page = "old"
 	}
 
 	switch page {
-	case "":
+	case "", "old":
 		render(w, "news.html", pageVars)
 
 		return
