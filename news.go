@@ -1250,7 +1250,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	case "options":
 		pageVars.Subtitle = "Options"
 
-		pageVars.Editions = AllEditionsKeysNoFoilOrPromos
+		pageVars.Editions = AllEditionsKeys
 		pageVars.EditionsMap = AllEditionsMap
 
 		render(w, "news.html", pageVars)
