@@ -398,6 +398,7 @@ var NewspaperPages = []NewspaperPage{
 				Title:   "Ranking",
 				CanSort: true,
 				Field:   "ranking",
+				IsNum:   true,
 			},
 			{
 				Title:   "Card Name",
