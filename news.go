@@ -1621,7 +1621,8 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				bucketName := result[7]
 				if skipEditionsOpt != "" {
 					filters := strings.Split(skipEditionsOpt, ",")
-					if slices.Contains(filters, edition) {
+					set, err := mtgmatcher.GetSetByName(edition)
+					if err == nil && slices.Contains(filters, set.Code) {
 						continue
 					}
 				}
