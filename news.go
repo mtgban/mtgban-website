@@ -1204,6 +1204,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	for _, newspage := range NewspaperPages {
 		if page == newspage.Option {
 			oldMode = !newspage.NewNewspaper
+			break
 		}
 	}
 
