@@ -239,6 +239,7 @@ var OptionalFields = []string{
 	"ArbitEnabled",
 	"ArbitDisabledVendors",
 	"NewsEnabled",
+	"NewsLarge",
 	"UploadBuylistEnabled",
 	"UploadChangeStoresEnabled",
 	"UploadOptimizer",

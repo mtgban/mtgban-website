@@ -19,6 +19,8 @@ import (
 const (
 	newsPageSize = 25
 
+	DefaultPageSize = 25
+
 	MaxSYPResults      = 2500
 	MaxSYPTotalResults = 100000
 )
@@ -1683,7 +1685,14 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, 50, len(results))
+		// Set the page size depending on level
+		pageSize := DefaultPageSize
+		extraSize, _ := strconv.ParseBool(GetParamFromSig(sig, "NewsLarge"))
+		if extraSize {
+			pageSize *= 2
+		}
+
+		pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 	}
 
 	for _, result := range pageVars.Table {
