@@ -455,8 +455,8 @@ var NewspaperPages = []NewspaperPage{
                        product_name, set_name, product_number, variant,
                        sellers_Today, sellers_d7, sellers_d30, pct_gain_7d
                   FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
-                 WHERE calc_date <= (SELECT MAX(calc_date) - INTERVAL '0 DAY'
-                                       FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards)
+                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
+                                      FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards)
                    AND game_name = 'Magic: The Gathering'
                    AND pct_gain_7d <> 0`,
 		Sort: "ranking ASC",
