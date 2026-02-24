@@ -75,6 +75,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	pageVars.LastUpdate = LastDatastoreUpdate
+	pageVars.LastNews = LastNewspaperUpdate
 	pageVars.LastStash = LastStashUpdate
 
 	var gaScrapers []string

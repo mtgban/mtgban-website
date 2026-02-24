@@ -136,6 +136,7 @@ type PageVars struct {
 	Headers      [][]string
 	Tables       [][][]string
 	LastUpdate   time.Time
+	LastNews     time.Time
 	LastStash    time.Time
 	CurrentTime  time.Time
 	Uptime       string
