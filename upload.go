@@ -26,6 +26,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/cardconduit"
+	"github.com/mtgban/mtgban-website/moxfield"
 )
 
 const (
@@ -438,7 +439,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			case "store.tcgplayer.com":
 				uploadedData, err = loadCollection(r.Context(), gdocURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
-				uploadedData, err = loadMoxfieldDeck(r.Context(), u.Path, maxRows)
+				uploadedData, err = loadMoxfield(r.Context(), u.Path, maxRows)
 			case "docs.google.com":
 				uploadedData, err = loadSpreadsheet(u.Path, maxRows)
 			default:
@@ -1381,6 +1382,34 @@ func loadHashes(hashes, qtys, cond, prices []string) ([]UploadEntry, error) {
 			entry.Quantity = 1
 		}
 
+		uploadEntries = append(uploadEntries, entry)
+	}
+
+	return uploadEntries, nil
+}
+
+func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
+	var uploadEntries []UploadEntry
+
+	deckID := path.Base(link)
+	if deckID == "" {
+		return nil, errors.New("invalid Moxfield deck URL")
+	}
+	moxURL := fmt.Sprintf("%s/%s", Config.Uploader.Moxfield, deckID)
+
+	items, err := moxfield.Load(ctx, moxURL, maxRows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Moxfield deck: %w", err)
+	}
+
+	for _, item := range items {
+		cardId, err := mtgmatcher.MatchId(item.ScryfallID, item.IsFoil, item.IsEtched)
+		entry := UploadEntry{
+			HasQuantity:   true,
+			Quantity:      item.Quantity,
+			CardId:        cardId,
+			MismatchError: err,
+		}
 		uploadEntries = append(uploadEntries, entry)
 	}
 
