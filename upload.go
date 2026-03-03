@@ -1395,7 +1395,11 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	if deckID == "" {
 		return nil, errors.New("invalid Moxfield deck URL")
 	}
-	moxURL := fmt.Sprintf("%s/%s", Config.Uploader["moxdeck"], deckID)
+	base := "moxdeck"
+	if strings.Contains(link, "/binders/") {
+		base = "moxcollection"
+	}
+	moxURL := fmt.Sprintf("%s/%s", Config.Uploader[base], deckID)
 
 	items, err := moxfield.Load(ctx, moxURL, maxRows)
 	if err != nil {
@@ -1405,10 +1409,12 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	for _, item := range items {
 		cardId, err := mtgmatcher.MatchId(item.ScryfallID, item.IsFoil, item.IsEtched)
 		entry := UploadEntry{
-			HasQuantity:   true,
-			Quantity:      item.Quantity,
-			CardId:        cardId,
-			MismatchError: err,
+			HasQuantity:       true,
+			Quantity:          item.Quantity,
+			CardId:            cardId,
+			MismatchError:     err,
+			OriginalPrice:     item.Price,
+			OriginalCondition: item.Condition,
 		}
 		uploadEntries = append(uploadEntries, entry)
 	}
