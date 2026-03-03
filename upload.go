@@ -260,7 +260,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	visualPerc := VisualPercSpread
 	customVisual, err := strconv.ParseFloat(r.FormValue("custompercmax"), 64)
-	if err == nil && customMin > 0 {
+	if err == nil && customVisual > 0 {
 		visualPerc = customVisual
 	}
 	pageVars.CanFilterByPrice = visualIndicator
