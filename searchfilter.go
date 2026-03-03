@@ -1406,6 +1406,16 @@ var specialTags = map[string]string{
 	"Sungrass Prairie":     "filterland",
 	"Sunscorched Divide":   "filterland",
 	"Viridescent Bog":      "filterland",
+	"Floodfarm Verge":      "vergeland",
+	"Gloomlake Verge":      "vergeland",
+	"Blazemire Verge":      "vergeland",
+	"Thornspire Verge":     "vergeland",
+	"Hushwood Verge":       "vergeland",
+	"Sunbillow Verge":      "vergeland",
+	"Willowrush Verge":     "vergeland",
+	"Bleachbone Verge":     "vergeland",
+	"Riverpyre Verge":      "vergeland",
+	"Wastewood Verge":      "vergeland",
 }
 
 var specialEditionTags = map[string]string{
