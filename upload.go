@@ -859,6 +859,27 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.CanFilterByPrice = priceSource == ""
 	}
 
+	sortResults(uploadedData, optimizedResults, sorting, preferFlavor)
+
+	pageVars.MissingCounts = missingCounts
+	pageVars.MissingPrices = missingPrices
+	pageVars.ResultPrices = resultPrices
+
+	// Logs
+	user := GetParamFromSig(sig, "UserEmail")
+	msgMode := "retail"
+	if blMode {
+		msgMode = "buylist"
+	}
+	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(cardIds), msgMode, pageVars.SearchQuery, time.Since(start))
+	UserNotify("upload", msg)
+	LogPages["Upload"].Println(msg)
+
+	// Touchdown!
+	render(w, "upload.html", pageVars)
+}
+
+func sortResults(uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string, preferFlavor bool) {
 	switch sorting {
 	case "highprice":
 		sort.Slice(uploadedData, func(i, j int) bool {
@@ -900,48 +921,24 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				return sortSets(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId)
 			})
 		}
-
 	case "highspread":
-		// Leave main results as-is
-
 		for store := range optimizedResults {
 			sort.Slice(optimizedResults[store], func(i, j int) bool {
 				return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
 			})
 		}
 	case "profitability":
-		// Leave main results as-is
-
 		for store := range optimizedResults {
 			sort.Slice(optimizedResults[store], func(i, j int) bool {
 				if optimizedResults[store][i].Spread < 0 || optimizedResults[store][j].Spread < 0 {
 					return optimizedResults[store][i].Spread > optimizedResults[store][j].Spread
 				}
-				// Remember profitability here is computed over the factor to the base price
-				// not from the actual traditional spread, so they are reversed
+				// Profitability is computed over the factor to the base price,
+				// not the traditional spread, so the comparison is reversed.
 				return optimizedResults[store][i].Profitability < optimizedResults[store][j].Profitability
 			})
 		}
-	default:
-		// Leave input order
 	}
-
-	pageVars.MissingCounts = missingCounts
-	pageVars.MissingPrices = missingPrices
-	pageVars.ResultPrices = resultPrices
-
-	// Logs
-	user := GetParamFromSig(sig, "UserEmail")
-	msgMode := "retail"
-	if blMode {
-		msgMode = "buylist"
-	}
-	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(cardIds), msgMode, pageVars.SearchQuery, time.Since(start))
-	UserNotify("upload", msg)
-	LogPages["Upload"].Println(msg)
-
-	// Touchdown!
-	render(w, "upload.html", pageVars)
 }
 
 func getPrice(banPrice *BanPrice, conds string) float64 {
