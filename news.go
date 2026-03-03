@@ -113,7 +113,6 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 	// Allocate the main table scheleton
 	var results [][]string
 
-	count := 0
 	for rows.Next() {
 		result := make([]string, len(cols))
 		err := rows.Scan(dest...)
@@ -146,9 +145,6 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 
 		// Allocate a table row with as many fields as returned by the SELECT
 		results = append(results, result)
-
-		// Next row!
-		count++
 	}
 
 	return results, nil
