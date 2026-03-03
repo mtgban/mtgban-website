@@ -849,12 +849,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		pageVars.Optimized = optimizedResults
-		pageVars.OptimizedTotals = optimizedTotals
-		pageVars.HighestTotal = highestTotal
-		pageVars.Editions = AllEditionsKeys
-		pageVars.EditionsMap = AllEditionsMap
-
 		// Avoid printing the credit conversion if the price source is already in store credit
 		pageVars.CanFilterByPrice = priceSource == ""
 	}
@@ -864,6 +858,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.MissingCounts = missingCounts
 	pageVars.MissingPrices = missingPrices
 	pageVars.ResultPrices = resultPrices
+
+	// Assign the resulting optimized data to the page variables
+	if len(optimizedResults) > 0 {
+		pageVars.Optimized = optimizedResults
+		pageVars.OptimizedTotals = optimizedTotals
+		pageVars.HighestTotal = highestTotal
+		pageVars.Editions = AllEditionsKeys
+		pageVars.EditionsMap = AllEditionsMap
+	}
 
 	// Logs
 	user := GetParamFromSig(sig, "UserEmail")
