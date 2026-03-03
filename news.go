@@ -1162,7 +1162,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	} else if enabled == "3day" {
 		db = Newspaper3dayDB
 	} else if enabled == "0day" || (DevMode && !SigCheck) {
-		force3day := readSetFlag(w, r, "force3day", "MTGBANNewpaperPref")
+		force3day := readSetFlag(w, r, "force3day", "BanNewspaperPref")
 		if force3day {
 			db = Newspaper3dayDB
 		} else {
