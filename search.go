@@ -899,7 +899,7 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			uuids, err = mtgmatcher.SearchSealedContains(query)
 		}
 	case "scryfall":
-		uuids, err = searchScrfyall(query)
+		uuids, err = searchScryfall(query)
 	case "mixed":
 		uuids, err = mtgmatcher.SearchSealedEquals(query)
 		if err != nil {
@@ -933,7 +933,7 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 	return selectedUUIDs, nil
 }
 
-func searchScrfyall(query string) ([]string, error) {
+func searchScryfall(query string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*30))
 	defer cancel()
 
