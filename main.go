@@ -376,9 +376,7 @@ type ConfigType struct {
 
 	ACL map[string]map[string]map[string]string `json:"acl"`
 
-	Uploader struct {
-		Moxfield string `json:"moxfield"`
-	} `json:"uploader"`
+	Uploader map[string]string `json:"uploader"`
 
 	// The location of the configuation file
 	sourcePath string
