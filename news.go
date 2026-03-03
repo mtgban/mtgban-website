@@ -209,7 +209,7 @@ func cacheNewspaper() {
 			}
 			variant := result[6]
 			if !slices.Contains(variants3day, variant) {
-				variants3day = append(variants3day, edition)
+				variants3day = append(variants3day, variant)
 			}
 		}
 		sort.Strings(editions3day)
