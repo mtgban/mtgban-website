@@ -1175,9 +1175,9 @@ func sortSets(uuidI, uuidJ string) bool {
 				bbI := strings.Contains(cI.Name, "Case") || strings.Contains(cI.Name, "Display") || strings.Contains(cI.Name, "Set of")
 				bbJ := strings.Contains(cJ.Name, "Case") || strings.Contains(cJ.Name, "Display") || strings.Contains(cJ.Name, "Set of")
 				if bbI && !bbJ {
-					return !true
+					return false
 				} else if !bbI && bbJ {
-					return !false
+					return true
 				}
 
 				return cI.Name < cJ.Name
