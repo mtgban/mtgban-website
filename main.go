@@ -584,22 +584,25 @@ func loadVars(port, datastorePath string) error {
 
 func openDBs() (err error) {
 	if Config.DBAddress == "" {
-		log.Println("no DB address, skipping")
-		return nil
+		log.Println("no DB address set, Archive won't be loaded")
+	} else {
+		Newspaper3dayDB, err = sql.Open("mysql", Config.DBAddress+"/three_day_newspaper")
+		if err != nil {
+			return err
+		}
+		Newspaper1dayDB, err = sql.Open("mysql", Config.DBAddress+"/newspaper")
+		if err != nil {
+			return err
+		}
 	}
 
-	Newspaper3dayDB, err = sql.Open("mysql", Config.DBAddress+"/three_day_newspaper")
-	if err != nil {
-		return err
-	}
-	Newspaper1dayDB, err = sql.Open("mysql", Config.DBAddress+"/newspaper")
-	if err != nil {
-		return err
-	}
-
-	NewNewspaperDB, err = sql.Open("postgres", Config.NewNewspaperConfigLine)
-	if err != nil {
-		return err
+	if Config.NewNewspaperConfigLine == "" {
+		log.Println("no DB address set, Newspaper won't be loaded")
+	} else {
+		NewNewspaperDB, err = sql.Open("postgres", Config.NewNewspaperConfigLine)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
