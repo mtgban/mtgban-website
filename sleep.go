@@ -229,7 +229,7 @@ func getBulks(skipEditions []string) map[string]int {
 		cardPrices := map[string]float64{}
 		var totalPrices float64
 		for _, card := range set.Cards {
-			uuid := mtgmatcher.Scryfall2UUID(card.Identifiers["scryfallId"])
+			uuid := mtgmatcher.ExternalUUID(card.Identifiers["scryfallId"])
 			co, err := mtgmatcher.GetUUID(uuid)
 			if err != nil {
 				continue

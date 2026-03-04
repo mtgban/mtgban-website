@@ -323,12 +323,7 @@ func fixupIDs(code string) []string {
 			continue
 		}
 		// XXX: id funcs report the first finish available
-		uuid = mtgmatcher.Scryfall2UUID(field)
-		if uuid != "" {
-			fields[i] = uuid
-			continue
-		}
-		uuid = mtgmatcher.Tcg2UUID(field)
+		uuid = mtgmatcher.ExternalUUID(field)
 		if uuid != "" {
 			fields[i] = uuid
 			continue

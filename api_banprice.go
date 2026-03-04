@@ -650,7 +650,7 @@ func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanP
 	for _, id := range sorted {
 		co, err := mtgmatcher.GetUUID(id)
 		if err != nil {
-			co, err = mtgmatcher.GetUUID(mtgmatcher.Scryfall2UUID(id))
+			co, err = mtgmatcher.GetUUID(mtgmatcher.ExternalUUID(id))
 			if err != nil {
 				continue
 			}

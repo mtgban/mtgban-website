@@ -24,13 +24,10 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 		// Look up the hash: mtgjson, scryfall, and tcgproductid in order
 		co, err := mtgmatcher.GetUUID(hash)
 		if err != nil {
-			co, err = mtgmatcher.GetUUID(mtgmatcher.Scryfall2UUID(hash))
+			co, err = mtgmatcher.GetUUID(mtgmatcher.ExternalUUID(hash))
 			if err != nil {
-				co, err = mtgmatcher.GetUUID(mtgmatcher.Tcg2UUID(hash))
-				if err != nil {
-					http.NotFound(w, r)
-					return
-				}
+				http.NotFound(w, r)
+				return
 			}
 		}
 

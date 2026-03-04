@@ -952,7 +952,7 @@ func searchScryfall(query string) ([]string, error) {
 
 		// Sort through the results, add the possible foil and etched variants
 		for _, card := range result.Cards {
-			id := mtgmatcher.Scryfall2UUID(card.ID)
+			id := mtgmatcher.ExternalUUID(card.ID)
 			if id == "" {
 				continue
 			}
