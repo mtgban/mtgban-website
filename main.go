@@ -10,7 +10,6 @@ import (
 	"html/template"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -769,9 +768,6 @@ func main() {
 	if err != nil {
 		log.Println("Error connecting to discord", err)
 	}
-
-	// Set seed in case we need to do random operations
-	rand.Seed(time.Now().UnixNano())
 
 	// Serve everything in known folders as a file
 	http.HandleFunc("/css/", ServeFile)
