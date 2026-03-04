@@ -170,6 +170,11 @@ func cacheNewspaper() {
 		panic("missing game in newspaper map")
 	}
 
+	if NewNewspaperDB == nil {
+		log.Println("NewNewspaper DB connection was established, no cache")
+		return
+	}
+
 	for i := range NewspaperPages {
 		if !NewspaperPages[i].NewNewspaper {
 			continue
