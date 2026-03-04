@@ -1233,6 +1233,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		if newspage.NeedsBuylist && Config.Game != DefaultGame {
 			continue
 		}
+		if !newspage.NewNewspaper && Config.Game != DefaultGame {
+			continue
+		}
 		pageVars.ToC = append(pageVars.ToC, newspage)
 	}
 
