@@ -152,7 +152,15 @@
                     {{if $edition}}
                     <input type="checkbox" id="{{$key}}" name="{{$key}}">
                     <label for="{{$key}}">
-                        <i class="ss ss-{{$edition.Keyrune}} ss-2x ss-fw"></i>
+                        {{if $edition.Keyrune}}
+                            <i class="ss ss-{{$edition.Keyrune}} ss-2x ss-fw"></i>
+                        {{else}}
+                            <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                                <circle r="9" cx="10" cy="10" fill="var(--normal)" stroke="var(--normal)"/>
+                                <text font-size="14" x="50%" y="60%" text-anchor="middle" fill="var(--background)">{{$key}}</text>
+                            </svg>
+                        {{end}}
+
                         {{$edition.Name}}
                     </label>
                     <br>
@@ -267,7 +275,20 @@
                                     </td>
                                 {{else if eq $i (inc $.OffsetCards 1)}}
                                     <td {{if $.LargeTable}}style="min-width: 15%;"{{end}}>
-                                        <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$row}}
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            {{if $card.Keyrune}}
+                                                <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i>
+                                            {{else if $card.RarityColor}}
+                                                <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                                                    <circle r="9" cx="10" cy="10" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
+                                                    <text font-size="14" x="50%" y="60%" text-anchor="middle" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                                </svg>
+                                            {{else}}
+                                                <h3>{{$card.SetCode}}&nbsp;</h3>
+                                            {{end}}
+
+                                            {{$row}}
+                                        </div>
                                     </td>
                                 {{else}}
                                     {{$head := (index $.Headings $i)}}
