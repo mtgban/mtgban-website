@@ -82,7 +82,7 @@ func loadScraper(bucket simplecloud.Reader, path, game, name, kind, shorthand, f
 
 	log.Println("loading", u.String())
 
-	reader, err := simplecloud.InitReader(context.TODO(), bucket, u.String())
+	reader, err := simplecloud.InitReader(context.Background(), bucket, u.String())
 	if err != nil {
 		return err
 	}

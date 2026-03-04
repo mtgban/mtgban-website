@@ -540,7 +540,7 @@ func preloadConfig(configPath string) error {
 }
 
 func loadVars(port, datastorePath string) error {
-	reader, err := simplecloud.InitReader(context.TODO(), ConfigBucket, Config.sourcePath)
+	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
 	if err != nil {
 		return err
 	}
@@ -616,7 +616,7 @@ func loadGoogleCredentials() (*http.Client, error) {
 		return nil, err
 	}
 
-	reader, err := simplecloud.InitReader(context.TODO(), ConfigBucket, u.Path)
+	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, u.Path)
 	if err != nil {
 		return nil, err
 	}
@@ -658,7 +658,7 @@ func loadDatastore() error {
 		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
 	}
 
-	reader, err := simplecloud.InitReader(context.TODO(), bucket, Config.DatastorePath)
+	reader, err := simplecloud.InitReader(context.Background(), bucket, Config.DatastorePath)
 	if err != nil {
 		return err
 	}

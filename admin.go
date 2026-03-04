@@ -248,7 +248,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		duration, _ := strconv.Atoi(dur)
 
-		key, err := generateAPIKey(user, time.Duration(duration)*24*time.Hour)
+		key, err := generateAPIKey(r.Context(), user, time.Duration(duration)*24*time.Hour)
 		msg := key
 		if err != nil {
 			msg = "error: " + err.Error()
@@ -329,7 +329,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Open bucket
-			writer, err := simplecloud.InitWriter(context.TODO(), ConfigBucket, Config.sourcePath)
+			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
 			if err != nil {
 				pageVars.InfoMessage = err.Error()
 				pageVars.CleanSearchQuery = newConfig
@@ -701,7 +701,7 @@ func writeConfigFile(config ConfigType, writer io.Writer) error {
 	return e.Encode(&config)
 }
 
-func generateAPIKey(user string, duration time.Duration) (string, error) {
+func generateAPIKey(ctx context.Context, user string, duration time.Duration) (string, error) {
 	if user == "" {
 		return "", errors.New("missing user")
 	}
@@ -721,7 +721,7 @@ func generateAPIKey(user string, duration time.Duration) (string, error) {
 		Config.ApiUserSecrets[user] = key
 		apiUsersMutex.Unlock()
 
-		writer, err := simplecloud.InitWriter(context.TODO(), ConfigBucket, Config.sourcePath)
+		writer, err := simplecloud.InitWriter(ctx, ConfigBucket, Config.sourcePath)
 		if err != nil {
 			return "", err
 		}
