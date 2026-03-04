@@ -1168,7 +1168,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars := genPageNav("Newspaper", sig)
 
 	// Check if any DB connection was made
-	if Config.DBAddress == "" {
+	if Config.DBAddress == "" && Config.NewNewspaperConfigLine == "" {
 		pageVars.Title = "This feature is not enabled"
 		pageVars.ErrorMessage = ErrMsgDenied
 
