@@ -81,6 +81,9 @@ type NewspaperPage struct {
 	// Which finishes are available in the cache
 	PossibleFinish     []string
 	PossibleFinish3Day []string
+
+	// Whether a relevant buylist is present for the game
+	NeedsBuylist bool
 }
 
 func getResults(db *sql.DB, query string) ([][]string, error) {
@@ -172,6 +175,9 @@ func cacheNewspaper() {
 			continue
 		}
 		if NewspaperPages[i].Query == "" {
+			continue
+		}
+		if NewspaperPages[i].NeedsBuylist && Config.Game != DefaultGame {
 			continue
 		}
 
@@ -313,6 +319,7 @@ var NewspaperPages = []NewspaperPage{
 		},
 		NewNewspaper: true,
 		HasBucket:    true,
+		NeedsBuylist: true,
 	},
 	{
 		Title:  "Top Singles by Spike Score",
@@ -601,6 +608,7 @@ var NewspaperPages = []NewspaperPage{
 			},
 		},
 		NewNewspaper: true,
+		NeedsBuylist: true,
 	},
 	{
 		Title:  "Greatest Decrease in Buylist Offer",
@@ -679,6 +687,7 @@ var NewspaperPages = []NewspaperPage{
 			},
 		},
 		NewNewspaper: true,
+		NeedsBuylist: true,
 	},
 	NewspaperPage{
 		Title:        "Newspaper Settings",
@@ -1214,6 +1223,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	for _, newspage := range NewspaperPages {
 		if (oldMode && newspage.NewNewspaper) || (!oldMode && !newspage.NewNewspaper) {
+			continue
+		}
+		if newspage.NeedsBuylist && Config.Game != DefaultGame {
 			continue
 		}
 		pageVars.ToC = append(pageVars.ToC, newspage)
