@@ -496,7 +496,7 @@ func genPageNav(activeTab, sig string) PageVars {
 			user = "Beta Public Access"
 		}
 	}
-	extra := *&NavElem{
+	extra := NavElem{
 		Active: true,
 		Class:  "beta",
 		Short:  user,
