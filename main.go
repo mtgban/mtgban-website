@@ -638,8 +638,10 @@ func loadGoogleCredentials() (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-func loadDatastore() error {
-	u, err := url.Parse(Config.DatastorePath)
+func loadDatastore(ds string) error {
+	log.Println("Loading datastore from", ds)
+
+	u, err := url.Parse(ds)
 	if err != nil {
 		return err
 	}
@@ -661,7 +663,7 @@ func loadDatastore() error {
 		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
 	}
 
-	reader, err := simplecloud.InitReader(context.Background(), bucket, Config.DatastorePath)
+	reader, err := simplecloud.InitReader(context.Background(), bucket, ds)
 	if err != nil {
 		return err
 	}
@@ -729,8 +731,7 @@ func main() {
 
 	// load website up
 	go func() {
-		log.Println("Loading", Config.DatastorePath)
-		err := loadDatastore()
+		err := loadDatastore(Config.DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}

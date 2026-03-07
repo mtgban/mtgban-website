@@ -155,7 +155,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	var v url.Values
 	switch reboot {
 	case "datastore":
-		loadDatastore()
+		loadDatastore(Config.DatastorePath)
 		pageVars.InfoMessage = "Datastore reloaded..."
 
 	case "update":
