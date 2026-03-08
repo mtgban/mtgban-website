@@ -171,7 +171,7 @@ func cacheNewspaper() {
 	}
 
 	if NewNewspaperDB == nil {
-		log.Println("NewNewspaper DB connection was established, no cache")
+		log.Println("NewNewspaper DB connection was not established, no cache")
 		return
 	}
 
