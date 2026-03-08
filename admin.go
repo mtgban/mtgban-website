@@ -767,7 +767,6 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 
 // 32-126 are the printable characters in ashii, 33 excludes space
 func randomString(l int) string {
-	rand.Seed(time.Now().UnixNano())
 	bytes := make([]byte, l)
 	for i := 0; i < l; i++ {
 		bytes[i] = byte(33 + rand.Intn(126-33))
