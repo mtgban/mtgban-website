@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,7 +25,6 @@ import (
 
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/simplecloud"
-	"golang.org/x/exp/slices"
 
 	"github.com/mackerelio/go-osstat/memory"
 )

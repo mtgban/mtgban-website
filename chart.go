@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
 	"time"
 
 	"github.com/go-redis/redis/v8"
-	"golang.org/x/exp/slices"
 )
 
 type TimeseriesConfig struct {

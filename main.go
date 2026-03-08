@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -27,7 +28,6 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/leemcloughlin/logfile"
-	"golang.org/x/exp/slices"
 	"golang.org/x/oauth2/google"
 	"gopkg.in/Iwark/spreadsheet.v2"
 	"gopkg.in/robfig/cron.v2"
