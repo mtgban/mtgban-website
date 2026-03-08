@@ -23,6 +23,7 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
 
 	"github.com/leemcloughlin/logfile"
@@ -659,6 +660,13 @@ func loadDatastore(ds string) error {
 		b2Bucket.ConcurrentDownloads = 20
 
 		bucket = b2Bucket
+	case "http", "https":
+		httpBucket, err := simplecloud.NewHTTPBucket(cleanhttp.DefaultClient(), ds)
+		if err != nil {
+			return err
+		}
+
+		bucket = httpBucket
 	default:
 		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
 	}
