@@ -1465,7 +1465,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		// Add any extra filter that might affect number of results
 		if filter != "" {
-			subQuery += " AND a.Set = '" + filter + "'"
+			subQuery += " AND a.Set = '" + strings.Replace(filter, "'", "''", -1) + "'"
 		}
 		if rarity != "" {
 			subQuery += " AND "
@@ -1547,7 +1547,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		// Add any extra filter before sorting
 		// Note that this requires every query to end with an applicable WHERE clause
 		if filter != "" {
-			query += " AND a.Set = '" + filter + "'"
+			query += " AND a.Set = '" + strings.Replace(filter, "'", "''", -1) + "'"
 		}
 		if rarity != "" {
 			query += " AND "
