@@ -193,6 +193,14 @@ func cacheNewspaper() {
 			log.Println(query, err)
 			continue
 		}
+		if len(results) == 0 {
+			ServerNotify("newspaper", NewspaperPages[i].Option+" results are empty", true)
+			continue
+		}
+		if NewspaperPages[i].Results != nil && len(results) < len(NewspaperPages[i].Results)/2 {
+			ServerNotify("newspaper", NewspaperPages[i].Option+" too few results "+fmt.Sprint(len(results)), true)
+			continue
+		}
 
 		editions := []string{""}
 		variants := []string{""}
