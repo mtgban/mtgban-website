@@ -343,6 +343,7 @@ type ConfigType struct {
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
 	Datastore     struct {
+		BackupPath      string `json:"backup_path"`
 		BucketAccessKey string `json:"bucket_access_key"`
 		BucketSecretKey string `json:"bucket_access_secret"`
 	} `json:"datastore"`

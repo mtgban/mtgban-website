@@ -154,8 +154,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	doReboot := false
 	var v url.Values
 	switch reboot {
-	case "datastore":
-		loadDatastore(Config.DatastorePath)
+	case "datastore", "datastore-backup":
+		dsPath := Config.DatastorePath
+		if reboot == "datastore-backup" {
+			dsPath = Config.Datastore.BackupPath
+			if dsPath == "" {
+				v = url.Values{}
+				v.Set("msg", "No BackupPath set in config")
+				doReboot = true
+			}
+		}
+		loadDatastore(dsPath)
 		pageVars.InfoMessage = "Datastore reloaded..."
 
 	case "update":
