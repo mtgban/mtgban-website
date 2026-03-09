@@ -573,8 +573,7 @@
                             data-qtys="{{.Quantity}}"
                             data-cond="{{.OriginalCondition}}"
                             data-price="{{.OriginalPrice}}">
-                            <td class="fullAnchor" rowspan=2>
-                                <center>
+                            <td class="upload-card-cell" rowspan=2>
                                     {{if .MismatchError}}
                                         <a href="/search?q={{.Card.Name}}" target="_blank">
                                             <img src="https://cards.scryfall.io/back.png" width="87" height="122">
@@ -584,11 +583,10 @@
                                             <img loading="lazy" src="{{$card.ImageURL}}" width="87" height="122">
                                         </a>
                                     {{end}}
-                                </center>
                             </td>
                             <td>
-                                <table style="margin:0 0 0 0; width:100%; height:100%;">
-                                    <tr style="background-color:rgba(0, 0, 0, 0);">
+                                <table class="upload-info-table">
+                                    <tr>
                                     {{if .MismatchError}}
                                         <td class=fullAnchor>
                                             <a class="btn default" href="/search?q={{.Card.Name}}" target="_blank">
@@ -664,7 +662,7 @@
                                     </tr>
                                 </table>
                             </td>
-                            <td rowspan=2>
+                            <td class="upload-index-cell" rowspan=2>
                                 {{$cardId := .CardId}}
                                 {{$ogCardId := .CardId}}
                                 {{$conds := ""}}
@@ -705,25 +703,25 @@
                         </tr>
                         <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}>
                             <td>
-                                <table style="margin:0 0 0 0; width:100%; height:100%">
-                                    <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--antialiasing)"{{else}}style="background-color:rgba(0, 0, 0, 0);"{{end}}>
+                                <table class="upload-price-grid">
+                                    <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--antialiasing)"{{end}}>
                                         {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
                                         {{$cardId := .CardId}}
                                         {{$oPrice := .OriginalPrice}}
                                         {{range $.ScraperKeys}}
                                             {{$price := (index $scraperEntries .)}}
-                                            <td class="fullAnchor" style="border:1px solid black;min-width:50px">
+                                            <td class="fullAnchor">
                                                 <a class="btn {{if $price}}{{if and $.IsBuylist (and (ne $oPrice 0.0) (lt $oPrice $price))}}success{{else}}normal{{end}}{{else}}default{{end}}" {{if $price}}href="https://mtgban.com/go/{{if $.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}"{{end}} target="_blank">
                                                     {{scraper_name .}}
                                                 </a>
                                             </td>
                                         {{end}}
                                     </tr>
-                                    <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--antialiasing)"{{else}}style="background-color:rgba(0, 0, 0, 0);"{{end}}>
+                                    <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--antialiasing)"{{end}}>
                                         {{range $.ScraperKeys}}
                                             {{$price := (index $scraperEntries .)}}
-                                            <td style="border:1px solid black">
-                                                <h4 style="text-align:center">
+                                            <td>
+                                                <h4>
                                                     {{if not $price}}
                                                         -
                                                     {{else}}
@@ -737,11 +735,9 @@
                             </td>
                         </tr>
                     {{end}}
-                    <tr class="no-hover" style="background-color: var(--tralternatebase);">
-                        <td>
-                            <center>
+                    <tr class="no-hover upload-totals-row">
+                        <td class="upload-totals-cell">
                                 <h3>Totals</h3>
-                                <div style="height: 2px">&nbsp;</div>
                                 <h6>Matches: {{len .ResultPrices}}/{{len .UploadEntries}}</h6>
                                 <h6>
                                     {{if ne .TotalQuantity 0}}
@@ -750,30 +746,29 @@
                                         &nbsp;
                                     {{end}}
                                 </h6>
-                                <div style="height: 10px">&nbsp;</div>
+                                <br>
                                 <h6>
                                     No {{if $.IsBuylist}}buylist{{else}}retail{{end}} /<br>Alt. Estimate
                                 </h6>
-                            </center>
                         </td>
                         <td>
                             <br>
-                            <table style="margin:0 0 0 0; width:100%; height:100%">
-                                <tr class="no-hover" style="background-color:rgba(0, 0, 0, 0);">
+                            <table class="upload-totals-table">
+                                <tr class="no-hover">
                                     {{range $.ScraperKeys}}
                                         {{$entry := (index $.TotalEntries .)}}
-                                        <td class="fullAnchor" style="border:1px solid black;min-width:50px">
+                                        <td class="fullAnchor">
                                             <a class="btn default">
                                                 {{scraper_name .}}
                                             </a>
                                         </td>
                                     {{end}}
                                 </tr>
-                                <tr class="no-hover"  style="background-color:rgba(0, 0, 0, 0);">
+                                <tr class="no-hover">
                                     {{range $.ScraperKeys}}
                                         {{$price := (index $.TotalEntries .)}}
-                                        <td style="border:1px solid black">
-                                            <h4 style="text-align:center">
+                                        <td>
+                                            <h4>
                                                 {{if eq $price 0.0}}
                                                     -
                                                 {{else}}
@@ -783,12 +778,12 @@
                                         </td>
                                     {{end}}
                                 </tr>
-                                <tr class="no-hover"  style="background-color:rgba(0, 0, 0, 0);">
+                                <tr class="no-hover">
                                     {{range $.ScraperKeys}}
                                         {{$price := (index $.MissingPrices .)}}
                                         {{$count := (index $.MissingCounts .)}}
-                                        <td style="border:1px solid black">
-                                            <h6 style="text-align:center">
+                                        <td>
+                                            <h6>
                                                 {{if $count}}
                                                     {{$count}} / $ {{printf "%.2f" $price}}
                                                 {{else}}
