@@ -1267,3 +1267,78 @@ img.hoverImage {
         padding: 0.15rem 0.4rem !important;
     }
 }
+
+/* Upload results table */
+.upload-card-cell {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.upload-card-cell img {
+    border-radius: 6px;
+}
+
+.upload-info-table {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.upload-info-table tr {
+    background-color: transparent;
+}
+
+.upload-price-grid {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.upload-price-grid tr {
+    background-color: transparent;
+}
+
+.upload-price-grid td {
+    border: 1px solid var(--line);
+    min-width: 50px;
+}
+
+.upload-price-grid h4 {
+    text-align: center;
+}
+
+.upload-price-grid h6 {
+    text-align: center;
+}
+
+.upload-alias-row td {
+    border: 1px solid var(--line);
+    min-width: 50px;
+}
+
+.upload-index-cell {
+    vertical-align: top;
+}
+
+.upload-totals-row {
+    background-color: var(--tralternatebase);
+}
+
+.upload-totals-cell {
+    text-align: center;
+}
+
+.upload-totals-table {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.upload-totals-table tr {
+    background-color: transparent;
+}
+
+.upload-totals-table td {
+    border: 1px solid var(--line);
+    min-width: 50px;
+}
