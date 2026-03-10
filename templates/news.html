@@ -239,11 +239,11 @@
             </div>
 
             <div class="indent" style="max-width: {{if $.LargeTable}}90%{{else}}1080px{{end}};">
-                <table onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';" width=100%>
+                <table data-sortable onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';" width=100%>
                     <tr>
                         {{range .Headings}}
                             {{if not .IsHidden}}
-                                <th class="stickyHeaderShort">
+                                <th class="stickyHeaderShort" data-sort-type="{{if .IsDollar}}dollar{{else if .IsPerc}}percent{{else}}text{{end}}">
                                     {{if .ConditionalSort}}
                                         <center>
                                     {{end}}
@@ -359,5 +359,6 @@
         {{end}}
     {{end}}
 </div>
+<script type="text/javascript" src="/js/tablesort.js?hash={{.Hash}}"></script>
 </body>
 </html>

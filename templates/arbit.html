@@ -208,6 +208,7 @@
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/tablesort.js?hash={{.Hash}}"></script>
 
         <h1>{{.Title}}</h1>
 
@@ -428,16 +429,16 @@
                     <hr width=20%>
                 </div>
 
-                <table class="filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                <table class="filterable" data-sortable onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
                     <tr>
-                        <th class="stickyHeaderTiny">
+                        <th class="stickyHeaderTiny" data-sort-type="text">
                             <a href="javascript:sortBy('alpha', '{{.Name}}')">Card Name</a>
                         </th>
-                        <th class="stickyHeaderTiny">
+                        <th class="stickyHeaderTiny" data-sort-type="text">
                             <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a>
                         </th>
                         {{if not $.IsSealed}}
-                            <th class="stickyHeaderTiny"><center>#</center></th>
+                            <th class="stickyHeaderTiny" data-sort-type="number"><center>#</center></th>
                         {{end}}
                         <th class="stickyHeaderTiny">
                             {{if $.IsSealed}}Decklist{{else}}Finish{{end}}
@@ -446,11 +447,11 @@
                             <th class="stickyHeaderTiny">Condition</th>
                         {{end}}
                         {{if not .HasNoQty}}
-                            <th class="stickyHeaderTiny">
+                            <th class="stickyHeaderTiny" data-sort-type="number">
                                 <a href="javascript:sortBy('available', '{{.Name}}')">Quantity</a>
                             </th>
                         {{end}}
-                        <th class="stickyHeaderTiny">
+                        <th class="stickyHeaderTiny" data-sort-type="dollar">
                             <a href="javascript:sortBy('sell_price', '{{.Name}}')">
                                 {{if and $.GlobalMode}}
                                     {{if $.IsSealed}}
@@ -464,7 +465,7 @@
                             </a>
                         </th>
                         {{if not .HasNoPrice}}
-                            <th class="stickyHeaderTiny">
+                            <th class="stickyHeaderTiny" data-sort-type="dollar">
                                 <a href="javascript:sortBy('buy_price', '{{.Name}}')">
                                     {{if and $.GlobalMode}}
                                         {{if $.IsSealed}}
@@ -480,22 +481,22 @@
                         {{end}}
                         {{$save := .}}
                         {{if not .HasNoCredit}}
-                            <th class="stickyHeaderTiny">
+                            <th class="stickyHeaderTiny" data-sort-type="dollar">
                                 <a href="javascript:sortBy('buy_price', '{{.Name}}')">Trade Price</a>
                             </th>
                         {{end}}
                         {{if not .HasNoArbit}}
-                            <th class="stickyHeaderTiny">
+                            <th class="stickyHeaderTiny" data-sort-type="dollar">
                                 <a href="javascript:sortBy('profitability', '{{.Name}}')">Profitability</a>
                             </th>
-                            <th class="stickyHeaderTiny">
+                            <th class="stickyHeaderTiny" data-sort-type="dollar">
                                 <a href="javascript:sortBy('diff', '{{.Name}}')">Difference</a>
                             </th>
-                            <th class="stickyHeaderTiny">
+                            <th class="stickyHeaderTiny" data-sort-type="percent">
                                 <a href="javascript:sortBy('spread', '{{.Name}}')">Spread</a>
                             </th>
                             {{if not $.GlobalMode}}
-                                <th class="stickyHeaderTiny">Price Ratio</th>
+                                <th class="stickyHeaderTiny" data-sort-type="percent">Price Ratio</th>
                             {{end}}
                         {{end}}
                         <th class="stickyHeaderTiny"><center>Quicklinks</center></th>

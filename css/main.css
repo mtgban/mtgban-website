@@ -858,6 +858,20 @@ div.stores-select {
     overflow: auto;
 }
 
+th[data-sort-type] {
+    cursor: pointer;
+    user-select: none;
+}
+
+th[data-sort-type]:hover {
+    background-color: var(--hover);
+}
+
+.sort-arrow {
+    font-size: 0.8em;
+    opacity: 0.7;
+}
+
 img.hoverImage {
     position: absolute;
     z-index: 99;
