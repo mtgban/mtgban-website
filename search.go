@@ -36,7 +36,7 @@ const (
 
 var (
 	defaultSellerPriorityOpt = []string{"TCGMarket", "TCGLow", "TCGSealed"}
-	defaultVendorPriorityOpt = []string{"CK", "SS"}
+	defaultVendorPriorityOpt = []string{"CK", "SCG", "SS"}
 )
 
 type SearchEntry struct {
@@ -1252,20 +1252,20 @@ func sortSetsAlphabeticalSet(uuidI, uuidJ string, preferFlavor bool) bool {
 	return cI.Edition < cJ.Edition
 }
 
-// Sort cards by their prices according to the passed in sellers,
+// Sort cards using the highest price among to the sellers in the input slice
 // If same price is found, sort as normal
 func sortSetsByRetail(uuidI, uuidJ string, retSellers []string) bool {
 	var priceI, priceJ float64
 	for _, retSeller := range retSellers {
-		priceI = price4seller(uuidI, retSeller)
-		if priceI != 0 {
-			break
+		price := price4seller(uuidI, retSeller)
+		if price > priceI {
+			priceI = price
 		}
 	}
 	for _, retSeller := range retSellers {
-		priceJ = price4seller(uuidJ, retSeller)
-		if priceJ != 0 {
-			break
+		price := price4seller(uuidJ, retSeller)
+		if price > priceJ {
+			priceJ = price
 		}
 	}
 
@@ -1276,20 +1276,20 @@ func sortSetsByRetail(uuidI, uuidJ string, retSellers []string) bool {
 	return priceI > priceJ
 }
 
-// Sort cards by their prices according to the passed in vendors
-// If same price is found, sort by the default retail price
+// Sort cards using the highest price among to the vendors in the input slice
+// If same price is found, sort by the highest retail price
 func sortSetsByBuylist(uuidI, uuidJ string, blVendors []string) bool {
 	var priceI, priceJ float64
 	for _, blVendor := range blVendors {
-		priceI = price4vendor(uuidI, blVendor)
-		if priceI != 0 {
-			break
+		price := price4vendor(uuidI, blVendor)
+		if price > priceI {
+			priceI = price
 		}
 	}
 	for _, blVendor := range blVendors {
-		priceJ = price4vendor(uuidJ, blVendor)
-		if priceJ != 0 {
-			break
+		price := price4vendor(uuidJ, blVendor)
+		if price > priceJ {
+			priceJ = price
 		}
 	}
 
