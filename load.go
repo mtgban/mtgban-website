@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"path/filepath"
+	"path"
 	"slices"
 	"strings"
 
@@ -72,13 +72,13 @@ func loadScrapersNG(config ScraperConfig) error {
 	return nil
 }
 
-func loadScraper(bucket simplecloud.Reader, path, game, name, kind, shorthand, format string) error {
-	u, err := url.Parse(path)
+func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, format string) error {
+	u, err := url.Parse(base)
 	if err != nil {
 		return err
 	}
 
-	u.Path = filepath.Join(game, name, kind, shorthand) + "." + format
+	u.Path = path.Join(game, name, kind, shorthand) + "." + format
 
 	log.Println("loading", u.String())
 
