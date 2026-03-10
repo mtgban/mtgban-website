@@ -866,6 +866,34 @@ img.hoverImage {
     max-height: 360px;
 }
 
+/* Foil card image overlay */
+.card-image-wrapper {
+    position: relative;
+    display: inline-block;
+}
+.card-image-wrapper[data-foil="true"]::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 12px;
+    background: linear-gradient(
+        105deg,
+        rgba(255, 0, 0, 0.22) 0%,
+        rgba(255, 154, 0, 0.22) 15%,
+        rgba(208, 222, 33, 0.25) 30%,
+        rgba(79, 220, 74, 0.25) 45%,
+        rgba(63, 218, 216, 0.25) 55%,
+        rgba(47, 107, 236, 0.22) 70%,
+        rgba(166, 68, 253, 0.22) 85%,
+        rgba(235, 66, 137, 0.20) 100%
+    );
+    mix-blend-mode: screen;
+    pointer-events: none;
+}
+
 @font-face {
     font-family: 'phyrexian';
     src: url('phyrexian.woff2') format('woff2');

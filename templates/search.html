@@ -548,9 +548,13 @@ Sims are not required for pre-constructed decks and other products where the sam
             <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
 
             <script type="text/javascript">
-                function updateSidebar(src, printings, products) {
+                function updateSidebar(src, printings, products, isFoil) {
                     {{if not .IsSealed}}
                         document.getElementById('cardImage').src=src;
+                        var wrapper = document.getElementById('cardImageWrapper');
+                        if (wrapper) {
+                            wrapper.setAttribute('data-foil', isFoil ? 'true' : 'false');
+                        }
                     {{else}}
                         document.getElementById('hoverImage').src=src;
                     {{end}}
@@ -639,7 +643,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{else}}
                         <tr class="no-hover" style="background-color: var(--background)" >
                             <td>
-                                <img id="cardImage" src="" width="360" height="502" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
+                                <div id="cardImageWrapper" class="card-image-wrapper">
+                                    <img id="cardImage" src="" width="360" height="502" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
+                                </div>
                             </td>
                         </tr>
                         <tr>
@@ -767,6 +773,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                 {{$firstImg := ""}}
                 {{$firstPrint := ""}}
                 {{$firstProduct := ""}}
+                {{$firstFoil := false}}
 
                 {{if .ChartID}}
                     <div style="margin-left: 10px; float: left; background-color: var(--background);">
@@ -955,9 +962,10 @@ Sims are not required for pre-constructed decks and other products where the sam
                             {{$firstImg = $card.ImageURL}}
                             {{$firstPrint = $card.Printings}}
                             {{$firstProduct = $card.Products}}
+                            {{$firstFoil = $card.Foil}}
                         {{end}}
 
-                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" title="[{{$card.SetCode}}] {{$card.Title}}">
+                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});" title="[{{$card.SetCode}}] {{$card.Title}}">
                             <th colspan="3" class="wrap stickyHeader" style="text-align: left; vertical-align: middle; z-index: {{inc $i 1}}">
                                 <table style="margin:0 0 0 18">
                                     <tr style="background-color:rgba(0, 0, 0, 0);">
@@ -1092,12 +1100,12 @@ Sims are not required for pre-constructed decks and other products where the sam
                             </th>
                         </tr>
 
-                        <tr class="no-hover" style="background-color: var(--background); position: relative; z-index: {{$i}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});">
+                        <tr class="no-hover" style="background-color: var(--background); position: relative; z-index: {{$i}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
                             {{$condsEntry := (index $.FoundSellers $cardId)}}
                             <td style="vertical-align: {{if not $condsEntry}}middle{{else}}top{{end}}; padding: 0; margin: 0;">
                                 <table class="searchResults" style="margin: 0 6px 0 12px;">
                                     {{if not $condsEntry}}
-                                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" style="background-color:rgba(0, 0, 0, 0);">
+                                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});" style="background-color:rgba(0, 0, 0, 0);">
                                             <td colspan="4">
                                                 <center>
                                                     <i>No offers</i>
@@ -1109,20 +1117,20 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if $entries}}
                                             {{if and (eq $conditions "INDEX") $.IsSealed}}
-                                                <tr onmocuseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
+                                                <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, '', {{$card.Foil}});">
                                                     <td></td>
                                                     <th style="min-width: 60px; text-align: center;">EV</td>
                                                     <th style="min-width: 60px; text-align: center;">Sim (Median)</td>
                                                     <th style="min-width: 60px; text-align: center;">Sim (StdDev)</td>
                                                 </tr>
                                             {{else if not (eq $conditions "INDEX")}}
-                                                <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
+                                                <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, '', {{$card.Foil}});">
                                                     <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</i></td>
                                                 </tr>
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}});">
+                                            <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, '', {{$card.Foil}});">
                                                 <td {{if $.IsSealed}}style="min-width: 140px;"{{end}}>
                                                     {{if eq .URL ""}}
                                                         <a class="btn default">
@@ -1209,7 +1217,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                             <td style="vertical-align: {{if not $condsEntry}}middle{{else}}top{{end}}; padding: 0; margin: 0; position: relative;  z-index: {{$i}}">
                                 <table class="searchResults" style="margin: 0 6px 0 12px;">
                                     {{if not $condsEntry}}
-                                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" style="background-color:rgba(0, 0, 0, 0);">
+                                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});" style="background-color:rgba(0, 0, 0, 0);">
                                             <td colspan="4">
                                                 <center>
                                                     <i>No offers</i>
@@ -1221,13 +1229,13 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if ne $conditions "INDEX"}}
                                             {{if $entries }}
-                                                <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});">
+                                                <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
                                                     <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Sell to{{else}}Condition: {{$conditions}}{{end}}</i></td>
                                                 </tr>
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}});" title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'>
+                                            <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});" title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'>
                                                 <td>
                                                     {{if eq .URL ""}}
                                                         <a class="btn default">
@@ -1310,7 +1318,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{$firstImg = $emptyImg}}
                 {{end}}
                 <script type="text/javascript">
-                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}});
+                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}});
                 </script>
             </div>
         {{end}}
