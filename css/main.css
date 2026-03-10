@@ -881,27 +881,17 @@ img.hoverImage {
     border-radius: 12px;
     background: linear-gradient(
         105deg,
-        transparent 35%,
-        rgba(255, 255, 255, 0.15) 45%,
-        rgba(255, 255, 255, 0.25) 50%,
-        rgba(255, 255, 255, 0.15) 55%,
-        transparent 65%
+        rgba(255, 0, 0, 0.22) 0%,
+        rgba(255, 154, 0, 0.22) 15%,
+        rgba(208, 222, 33, 0.25) 30%,
+        rgba(79, 220, 74, 0.25) 45%,
+        rgba(63, 218, 216, 0.25) 55%,
+        rgba(47, 107, 236, 0.22) 70%,
+        rgba(166, 68, 253, 0.22) 85%,
+        rgba(235, 66, 137, 0.20) 100%
     );
-    background-size: 475% 200%;
-    background-position: 100% 0;
+    mix-blend-mode: screen;
     pointer-events: none;
-    animation: foil-sheen 5s ease-in-out infinite;
-}
-@keyframes foil-sheen {
-    0% { background-position: 100% 0; }
-    40% { background-position: -100% 0; }
-    100% { background-position: -100% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-    .card-image-wrapper[data-foil="true"]::after {
-        animation: none;
-        background-position: 50% 0;
-    }
 }
 
 @font-face {
