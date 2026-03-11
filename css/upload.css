@@ -1,13 +1,13 @@
 /* ── Two-Column Layout ── */
 .upload-layout {
     display: grid;
-    grid-template-columns: 1fr 360px;
+    grid-template-columns: 1fr 440px;
     gap: 0;
     min-height: calc(100vh - 75px);
 }
 
 .upload-form-panel {
-    padding: 36px 40px 64px;
+    padding: 36px 28px 64px 40px;
 }
 
 .upload-form-panel h1 {
@@ -105,9 +105,9 @@
 }
 
 .upload-mode-toggle input[type="radio"]:checked + label {
-    background: var(--ainfo);
-    color: #fff;
-    box-shadow: 0 1px 4px rgba(91,141,239,0.3);
+    background: var(--dodgerblue);
+    color: #ffffff;
+    box-shadow: 0 1px 4px rgba(30,144,255,0.3);
 }
 
 .upload-mode-toggle label.disabled {
@@ -305,8 +305,8 @@
 }
 
 .upload-btn-primary {
-    background: var(--ainfo);
-    color: #fff;
+    background: var(--dodgerblue);
+    color: #ffffff;
 }
 
 .upload-btn-primary:hover {
@@ -320,7 +320,7 @@
 
 .upload-btn-secondary {
     background: var(--surface-3);
-    color: var(--activetext);
+    color: var(--normal);
     border: 1px solid var(--border-moderate);
 }
 
@@ -450,7 +450,7 @@
 }
 
 .upload-help-card h3 {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     margin: 0 0 10px 0;
     color: var(--normal);
@@ -460,7 +460,7 @@
 }
 
 .upload-help-card p {
-    font-size: 13px;
+    font-size: 15px;
     color: var(--activetext);
     line-height: 1.65;
     margin: 0 0 8px 0;
@@ -485,7 +485,7 @@
 }
 
 .upload-help-note {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--text-dim);
     border-left: 3px solid var(--accent-border);
     padding: 6px 0 6px 12px;
@@ -497,6 +497,13 @@
     border: none;
     border-top: 1px solid var(--border-subtle);
     margin: 20px 0;
+}
+
+.upload-legend-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
 }
 
 .upload-legend-row {
