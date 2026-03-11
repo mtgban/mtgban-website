@@ -469,13 +469,12 @@
     min-width: 0;
 }
 
-.sleepers-example-card {
-    width: 30px;
-    height: 42px;
+img.sleepers-example-card {
+    width: auto;
+    height: 56px;
     border-radius: 3px;
-    background: var(--surface-3);
-    border: 1px solid var(--border-subtle);
     flex-shrink: 0;
+    object-fit: cover;
 }
 
 
