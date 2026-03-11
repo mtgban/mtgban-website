@@ -176,6 +176,7 @@
             </div>
         </div>
 
+        {{if .CanShowAll}}
         <script>
         function checkSleepersCompare() {
             var r = document.getElementById('ref');
@@ -186,6 +187,7 @@
             }
         }
         </script>
+        {{end}}
 
     {{else if eq .Subtitle "Options"}}
         <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
