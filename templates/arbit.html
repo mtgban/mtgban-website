@@ -208,7 +208,8 @@
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/tablesort.js?hash={{.Hash}}"></script>
+        <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
+        <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
 
         <h1>{{.Title}}</h1>
 
@@ -429,29 +430,30 @@
                     <hr width=20%>
                 </div>
 
-                <table class="filterable" data-sortable onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                <table id="arbitTable" class="filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                    <thead>
                     <tr>
-                        <th class="stickyHeaderTiny" data-sort-type="text">
+                        <th class="stickyHeaderTiny">
                             <a href="javascript:sortBy('alpha', '{{.Name}}')">Card Name</a>
                         </th>
-                        <th class="stickyHeaderTiny" data-sort-type="text">
+                        <th class="stickyHeaderTiny">
                             <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a>
                         </th>
                         {{if not $.IsSealed}}
-                            <th class="stickyHeaderTiny" data-sort-type="number"><center>#</center></th>
+                            <th class="stickyHeaderTiny" style="text-align:center">#</th>
                         {{end}}
-                        <th class="stickyHeaderTiny">
+                        <th class="stickyHeaderTiny" data-sort-method="finish">
                             {{if $.IsSealed}}Decklist{{else}}Finish{{end}}
                         </th>
                         {{if not .HasNoConds}}
-                            <th class="stickyHeaderTiny">Condition</th>
+                            <th class="stickyHeaderTiny" data-sort-method="condition">Condition</th>
                         {{end}}
                         {{if not .HasNoQty}}
-                            <th class="stickyHeaderTiny" data-sort-type="number">
+                            <th class="stickyHeaderTiny">
                                 <a href="javascript:sortBy('available', '{{.Name}}')">Quantity</a>
                             </th>
                         {{end}}
-                        <th class="stickyHeaderTiny" data-sort-type="dollar">
+                        <th class="stickyHeaderTiny">
                             <a href="javascript:sortBy('sell_price', '{{.Name}}')">
                                 {{if and $.GlobalMode}}
                                     {{if $.IsSealed}}
@@ -465,7 +467,7 @@
                             </a>
                         </th>
                         {{if not .HasNoPrice}}
-                            <th class="stickyHeaderTiny" data-sort-type="dollar">
+                            <th class="stickyHeaderTiny">
                                 <a href="javascript:sortBy('buy_price', '{{.Name}}')">
                                     {{if and $.GlobalMode}}
                                         {{if $.IsSealed}}
@@ -481,26 +483,28 @@
                         {{end}}
                         {{$save := .}}
                         {{if not .HasNoCredit}}
-                            <th class="stickyHeaderTiny" data-sort-type="dollar">
+                            <th class="stickyHeaderTiny">
                                 <a href="javascript:sortBy('buy_price', '{{.Name}}')">Trade Price</a>
                             </th>
                         {{end}}
                         {{if not .HasNoArbit}}
-                            <th class="stickyHeaderTiny" data-sort-type="dollar">
+                            <th class="stickyHeaderTiny">
                                 <a href="javascript:sortBy('profitability', '{{.Name}}')">Profitability</a>
                             </th>
-                            <th class="stickyHeaderTiny" data-sort-type="dollar">
+                            <th class="stickyHeaderTiny">
                                 <a href="javascript:sortBy('diff', '{{.Name}}')">Difference</a>
                             </th>
-                            <th class="stickyHeaderTiny" data-sort-type="percent">
+                            <th class="stickyHeaderTiny">
                                 <a href="javascript:sortBy('spread', '{{.Name}}')">Spread</a>
                             </th>
                             {{if not $.GlobalMode}}
-                                <th class="stickyHeaderTiny" data-sort-type="percent">Price Ratio</th>
+                                <th class="stickyHeaderTiny">Price Ratio</th>
                             {{end}}
                         {{end}}
-                        <th class="stickyHeaderTiny"><center>Quicklinks</center></th>
+                        <th class="stickyHeaderTiny" data-sort-method="none"><center>Quicklinks</center></th>
                     </tr>
+                    </thead>
+                    <tbody>
                     {{$arbitContainer := .}}
                     {{range .Arbit}}
                         {{$card := (index $.Metadata .CardId)}}
@@ -645,11 +649,14 @@
                         </tr>
                     {{end}}
 
+                    </tbody>
+                    <tfoot>
                     <tr style="background-color: var(--background);">
                         <td colspan=13>
                             <a class="btn default" style="float: right;" href="#top"><i class="arrow up"></i> back to top</a>
                         </td>
                     </tr>
+                    </tfoot>
                 </table>
             {{end}}
 
@@ -672,5 +679,31 @@
         <br>
     {{end}}
 </div>
+<script>
+    Tablesort.extend('finish', function(item) {
+        return true; // always match on finish columns
+    }, function(a, b) {
+        // 💫 = Etched (0), ✨ = Foil (1), empty = Regular (2)
+        function rank(s) {
+            s = s.trim();
+            if (s.indexOf('\uD83D\uDCAB') !== -1) return 0; // 💫
+            if (s.indexOf('\u2728') !== -1) return 1;        // ✨
+            return 2;
+        }
+        return rank(a) - rank(b);
+    });
+
+    Tablesort.extend('condition', function(item) {
+        return /^(NM|SP|MP|HP|PO)$/i.test(item.trim());
+    }, function(a, b) {
+        var order = {'NM': 0, 'SP': 1, 'MP': 2, 'HP': 3, 'PO': 4};
+        var aVal = order[a.trim()];
+        var bVal = order[b.trim()];
+        return (aVal !== undefined ? aVal : 5) - (bVal !== undefined ? bVal : 5);
+    });
+
+    var arbitTable = document.getElementById('arbitTable');
+    if (arbitTable) new Tablesort(arbitTable);
+</script>
 </body>
 </html>

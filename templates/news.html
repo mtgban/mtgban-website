@@ -239,11 +239,11 @@
             </div>
 
             <div class="indent" style="max-width: {{if $.LargeTable}}90%{{else}}1080px{{end}};">
-                <table data-sortable onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';" width=100%>
+                <table id="newsTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';" width=100%>
                     <tr>
                         {{range .Headings}}
                             {{if not .IsHidden}}
-                                <th class="stickyHeaderShort" data-sort-type="{{if .IsDollar}}dollar{{else if .IsPerc}}percent{{else}}text{{end}}">
+                                <th class="stickyHeaderShort">
                                     {{if .ConditionalSort}}
                                         <center>
                                     {{end}}
@@ -359,6 +359,11 @@
         {{end}}
     {{end}}
 </div>
-<script type="text/javascript" src="/js/tablesort.js?hash={{.Hash}}"></script>
+<script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
+<script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
+<script>
+    var newsTable = document.getElementById('newsTable');
+    if (newsTable) new Tablesort(newsTable);
+</script>
 </body>
 </html>
