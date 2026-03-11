@@ -4,6 +4,7 @@
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/tooltip.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/upload.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
     <title>{{.Title}}</title>
 
@@ -44,62 +45,107 @@
 
 <div class="mainbody">
     {{if ne .ErrorMessage ""}}
-        <h1>{{.ErrorMessage}}</h1>
+        <div class="upload-form-panel">
+            <h1>{{.ErrorMessage}}</h1>
+        </div>
     {{else}}
-        <h1>Welcome to {{.Title}}</h1>
-        <div class="indent">
-            <center>
+        <div class="upload-layout">
+            <div class="upload-form-panel">
+                <h1>Upload &amp; Compare</h1>
+                <p class="upload-subtitle">Upload your collection and compare prices across all available stores.</p>
                 <form {{if not .CardHashes}}enctype="multipart/form-data"{{end}} action="/upload" method="post" id="upload_form">
-                    <input type="radio" id="retail" name="mode" value="false" {{if not .IsBuylist}}checked{{end}} onchange="reloadSelect('retail')">
-                    <label for="retail">Retail</label>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <input type="radio" id="buylist" name="mode" value="true" {{if .IsBuylist}}checked{{end}} onchange="reloadSelect('buylist')" {{if not .CanBuylist}}disabled{{end}}>
-                    <label for="buylist">
-                        {{if .CanBuylist}}
-                            Buylist
-                        {{else}}
-                            <div class="tooltip">
-                                <span class="tooltiptext">Join Legacy and gain access to buylist prices!</span>
-                                <s>Buylist</s>
-                            </div>
-                        {{end}}
-                    </label>
-                    <br>
-                    <br>
-                    <div class="tooltip">
-                        <div class="stores-select" id="storesBox"></div>
-                        {{if not .CanChangeStores}}
-                            <span class="tooltiptext">Increase your tier and customize the list of stores!</span>
+
+                <!-- Card 1: Mode & Stores -->
+                <div class="upload-card">
+                    <div class="upload-card-header">
+                        <span class="upload-step">1</span>
+                        <h2>Select Mode &amp; Stores</h2>
+                    </div>
+
+                    <div class="upload-mode-row">
+                        <div class="upload-mode-toggle">
+                            <input type="radio" id="retail" name="mode" value="false" {{if not .IsBuylist}}checked{{end}} onchange="reloadSelect('retail')">
+                            <label for="retail">Retail</label>
+                            <input type="radio" id="buylist" name="mode" value="true" {{if .IsBuylist}}checked{{end}} onchange="reloadSelect('buylist')" {{if not .CanBuylist}}disabled{{end}}>
+                            <label for="buylist" {{if not .CanBuylist}}class="disabled"{{end}}>
+                                {{if .CanBuylist}}
+                                    Buylist
+                                {{else}}
+                                    <span class="tooltip">
+                                        <span class="tooltiptext">Join Legacy and gain access to buylist prices!</span>
+                                        <s>Buylist</s>
+                                    </span>
+                                {{end}}
+                            </label>
+                        </div>
+                        {{if not .CanBuylist}}
+                            <span class="upload-mode-hint">Buylist access requires Legacy tier</span>
                         {{end}}
                     </div>
-                    <br>
+
+                    <div class="upload-store-grid" id="storesBox">
+                        {{if not .CanChangeStores}}
+                            <span class="tooltip">
+                                <span class="tooltiptext">Increase your tier and customize the list of stores!</span>
+                            </span>
+                        {{end}}
+                    </div>
+                </div>
+                <!-- Card 2: Load Your Data -->
+                <div class="upload-card">
+                    <div class="upload-card-header">
+                        <span class="upload-step">2</span>
+                        <h2>Load Your Data</h2>
+                    </div>
+
                     {{if .CardHashes}}
-                        <br>
                         {{range .CardHashes}}
                             <input type="hidden" name="hashes" value="{{.}}"/>
                         {{end}}
-                        <label for="file" id="fileLabel">Loaded page from BAN</label>
+                        <div class="upload-source-area">
+                            <span class="upload-hashes-label" id="fileLabel">Loaded page from BAN</span>
+                        </div>
                     {{else}}
-                        <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none;" onchange="pressed()">
-                        <input type="hidden" id="gdocURL" name="gdocURL" value="{{.RemoteLinkURL}}">
-                        <br>
-                        <a class="btn default">
-                            <label for="file" id="fileLabel">Select local csv/xls</label>
-                        </a>
-                        or
-                        <a class="btn default" href="javascript:askForURL()" id="urlLabel" title="{{.RemoteLinkURL}}">
-                            {{if .RemoteLinkURL}}
-                                Remote URL ready
-                            {{else}}
-                                Load remote URL
-                            {{end}}
-                        </a>
-                        or
-                        <a class="btn default" href="javascript:displayTextArea()">
-                            Paste freeform text
-                        </a>
-                        <textarea style="display:none" id="textArea" name="textArea" rows="4" cols="40"></textarea>
+                        <div class="upload-source-options">
+                            <div class="upload-source-btn active" id="src-btn-file" onclick="selectSource('file')">
+                                <span class="upload-source-icon">&#128196;</span>
+                                Local CSV / XLS
+                            </div>
+                            <div class="upload-source-btn" id="src-btn-url" onclick="selectSource('url')">
+                                <span class="upload-source-icon">&#128279;</span>
+                                Remote URL
+                            </div>
+                            <div class="upload-source-btn" id="src-btn-text" onclick="selectSource('text')">
+                                <span class="upload-source-icon">&#9998;</span>
+                                Paste Text
+                            </div>
+                        </div>
+
+                        <div class="upload-source-area" id="source-file">
+                            <label>
+                                <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="pressed()">
+                                <span id="fileLabel">Drop file here or <span class="upload-browse-link">browse</span>
+                                <span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span></span>
+                            </label>
+                        </div>
+
+                        <div class="upload-source-area upload-source-hidden" id="source-url">
+                            <input type="text" id="gdocURL" name="gdocURL" value="{{.RemoteLinkURL}}" placeholder="Paste Google Sheets, TCGplayer, or Moxfield URL...">
+                        </div>
+
+                        <div class="upload-source-area upload-source-hidden" id="source-text">
+                            <textarea id="textArea" name="textArea" rows="4" placeholder="Paste card list or decklist here..."></textarea>
+                        </div>
                     {{end}}
-                    <br><br>
+                </div>
+
+                <!-- Card 3: Process -->
+                <div class="upload-card">
+                    <div class="upload-card-header">
+                        <span class="upload-step">3</span>
+                        <h2>Process</h2>
+                        <span class="upload-badge">Ready</span>
+                    </div>
 
                     <script type="text/javascript">
                         const hiddenBools = [
@@ -129,112 +175,196 @@
                     <input type="hidden" id="download" name="download" value="false"/>
                     <input type="hidden" id="estimate" name="estimate" value="false"/>
                     <input type="hidden" id="deckbox" name="deckbox" value="false"/>
-                    <input type="submit" id="submit_default" value="&nbsp;&nbsp;Upload&nbsp;&nbsp;" onclick="javascript:submitForm('upload', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:inline">
-                    {{if .CanBuylist}}
-                        <input type="submit" id="submit_download" value="&nbsp;&nbsp;Get CSV&nbsp;&nbsp;" onclick="javascript:submitForm('download', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
-                        <input type="submit" id="submit_estimate" value="&nbsp;CardConduit&nbsp;" onclick="javascript:submitForm('estimate', true);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
-                        <input type="submit" id="submit_deckbox" value="&nbsp;Deckbox&nbsp;" onclick="javascript:submitForm('deckbox', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
-                    {{end}}
-                    {{if .Optimized}}
-                        <input type="button" value="&nbsp;&nbsp;Optimizer&nbsp;&nbsp;" onclick="window.location.href = '#top';" style="display:inline">
-                    {{end}}
-                    <br>
-                    <div id="opts">
-                        <a id="advOptsButton" class="info h6inline" style="cursor: pointer;" onClick="javascript:document.getElementById('advOpts').style.display = 'inline'; document.getElementById('advOptsButton').style.display = 'none'">Show optimizer options</a>
-                        <div id="advOpts" style="display:none">
-                            <label for="lowval">
-                                <input type="checkbox" id="lowval" name="lowval" checked onClick="javascript:saveCheckbox('lowval')">
-                                <p class="h6inline">Hide low spread offers (below</p>
-                                <input type="text" class="w3-border w3-round-small" id="percspread" name="percspread" value=60 size=1 style="text-align:center;" onchange="javascript:saveText('percspread')">
-                                <p class="h6inline">% wrt loaded price)</p>
+
+                    <div class="upload-actions">
+                        <input type="submit" id="submit_default" class="upload-btn upload-btn-primary" value="Upload" onclick="javascript:submitForm('upload', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}}>
+                        {{if .CanBuylist}}
+                            <input type="submit" id="submit_download" class="upload-btn upload-btn-secondary" value="Get CSV" onclick="javascript:submitForm('download', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_estimate" class="upload-btn upload-btn-secondary" value="CardConduit" onclick="javascript:submitForm('estimate', true);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_deckbox" class="upload-btn upload-btn-secondary" value="Deckbox" onclick="javascript:submitForm('deckbox', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                        {{end}}
+                        {{if .Optimized}}
+                            <input type="button" class="upload-btn upload-btn-secondary" value="Optimizer" onclick="window.location.href = '#top';">
+                        {{end}}
+                    </div>
+
+                    <!-- Optimizer Options (collapsible) -->
+                    <div class="upload-opts-toggle" onclick="toggleOpts(this)">
+                        <span class="upload-chevron">&#9654;</span>
+                        Optimizer Options
+                    </div>
+                    <div class="upload-opts-panel" id="optsPanel">
+                        <div class="upload-opts-grid">
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="lowval" name="lowval" checked onclick="javascript:saveCheckbox('lowval')">
+                                Hide low spread offers (below
+                                <input type="text" id="percspread" name="percspread" value="60" size="1" onchange="javascript:saveText('percspread')">
+                                %)
                             </label>
-                            <br>
-                            <label for="highval">
-                                <input type="checkbox" id="highval" name="highval" onClick="javascript:saveCheckbox('highval')">
-                                <p class="h6inline">Hide high spread offers (above</p>
-                                <input type="text" class="w3-border w3-round-small" id="percspreadmax" name="percspreadmax" value=0 size=1 style="text-align:center;" onchange="javascript:saveText('percspreadmax')">
-                                <p class="h6inline">% wrt loaded price)</p>
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="highval" name="highval" onclick="javascript:saveCheckbox('highval')">
+                                Hide high spread offers (above
+                                <input type="text" id="percspreadmax" name="percspreadmax" value="0" size="1" onchange="javascript:saveText('percspreadmax')">
+                                %)
                             </label>
-                            <br>
-                            <label for="lowvalabs">
-                                <input type="checkbox" id="lowvalabs" name="lowvalabs" checked onClick="javascript:saveCheckbox('lowvalabs')">
-                                <p class="h6inline">Hide low value offers (buylist below $</p>
-                                <input type="text" class="w3-border w3-round-small" id="minval" name="minval" value=1 size=1 style="text-align:center;" onchange="javascript:saveText('minval')">
-                                <p class="h6inline">)</p>
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="lowvalabs" name="lowvalabs" checked onclick="javascript:saveCheckbox('lowvalabs')">
+                                Hide low value offers (below $
+                                <input type="text" id="minval" name="minval" value="1" size="1" onchange="javascript:saveText('minval')">
+                                )
                             </label>
-                            <br>
-                            <label for="highvalabs">
-                                <input type="checkbox" id="highvalabs" name="highvalabs" onClick="javascript:saveCheckbox('highvalabs')">
-                                <p class="h6inline">Hide high value offers (buylist above $</p>
-                                <input type="text" class="w3-border w3-round-small" id="maxval" name="maxval" value=0 size=1 style="text-align:center;" onchange="javascript:saveText('maxval')">
-                                <p class="h6inline">)</p>
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="highvalabs" name="highvalabs" onclick="javascript:saveCheckbox('highvalabs')">
+                                Hide high value offers (above $
+                                <input type="text" id="maxval" name="maxval" value="0" size="1" onchange="javascript:saveText('maxval')">
+                                )
                             </label>
-                            <br>
-                            <label for="margin">
-                                <input type="checkbox" id="minmargin" name="minmargin" checked onClick="javascript:saveCheckbox('minmargin')">
-                                <p class="h6inline">Allow</p>
-                                <input type="text" class="w3-border w3-round-small" id="margin" name="margin" value=10 size=1 style="text-align:center;" onchange="javascript:saveText('margin')">
-                                <p class="h6inline">% difference in offers for multiple selections</p>
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="minmargin" name="minmargin" checked onclick="javascript:saveCheckbox('minmargin')">
+                                Allow
+                                <input type="text" id="margin" name="margin" value="10" size="1" onchange="javascript:saveText('margin')">
+                                % difference for multi-select
                             </label>
-                            <br>
-                            <label for="nocond">
-                                <input type="checkbox" id="nocond" name="nocond" onClick="javascript:saveCheckbox('nocond')">
-                                <p class="h6inline">Ignore conditions when loading data</p>
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="nocond" name="nocond" onclick="javascript:saveCheckbox('nocond')">
+                                Ignore conditions when loading
                             </label>
-                            <br>
-                            <label for="noprice">
-                                <input type="checkbox" id="noprice" name="noprice" onClick="javascript:saveCheckbox('noprice')">
-                                <p class="h6inline">Ignore prices when loading data (<i>use
-                                    <select id="altPrice" name="altPrice" onChange="javascript:saveText('altPrice')" style="text-align-last=center;">
-                                        {{range $.AltKeys}}
-                                            <option value="{{.}}" selected>&nbsp;{{scraper_name .}}</option>
-                                        {{end}}
-                                    </select>
-                                    instead</i>)</p>
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="noprice" name="noprice" onclick="javascript:saveCheckbox('noprice')">
+                                Ignore prices (use
+                                <select id="altPrice" name="altPrice" onchange="javascript:saveText('altPrice')">
+                                    {{range $.AltKeys}}
+                                        <option value="{{.}}" selected>&nbsp;{{scraper_name .}}</option>
+                                    {{end}}
+                                </select>
+                                instead)
                             </label>
-                            <br>
-                            <label for="customperc">
-                                <input type="checkbox" id="customperc" name="customperc" checked onClick="javascript:saveCheckbox('customperc')">
-                                <p class="h6inline">Show a visual indicator when spread is above</p>
-                                <input type="text" class="w3-border w3-round-small" id="custompercmax" name="custompercmax" value=100 size=1 style="text-align:center;" onchange="javascript:saveText('custompercmax')">
-                                <p class="h6inline">% wrt loaded price</p>
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="customperc" name="customperc" checked onclick="javascript:saveCheckbox('customperc')">
+                                Visual indicator above
+                                <input type="text" id="custompercmax" name="custompercmax" value="100" size="1" onchange="javascript:saveText('custompercmax')">
+                                % spread
                             </label>
-                            <br>
-                            <label for="noresults">
-                                <input type="checkbox" id="noresults" name="noresults" onClick="javascript:saveCheckbox('noresults')">
-                                <p class="h6inline">Skip main results, only show Optimizer</p>
+                            <label class="upload-opt-item">
+                                <input type="checkbox" id="noresults" name="noresults" onclick="javascript:saveCheckbox('noresults')">
+                                Skip main results, only Optimizer
                             </label>
-                            <br>
-                            <label for="sorting">
-                                <p class="h6inline">Sort results by</p>
-                                <select id="sorting" name="sorting" onChange="javascript:saveText('sorting')" style="text-align-last=center;">
+                            <label class="upload-opt-item upload-opt-wide">
+                                Sort by
+                                <select id="sorting" name="sorting" onchange="javascript:saveText('sorting')">
                                     <option value="" selected>&nbsp;keep as uploaded</option>
                                     <option value="setchrono">&nbsp;set(chrono)/name/number</option>
                                     <option value="setalpha">&nbsp;set(alpha)/name/number</option>
                                     <option value="alphabetical">&nbsp;alphabetical</option>
                                     <option value="highprice">&nbsp;highest offer</option>
-                                    <option value="highspread">&nbsp;highest spread (optimizer only)</option>
-                                    <option value="profitability">&nbsp;profitability (optimizer only)</option>
+                                    <option value="highspread">&nbsp;highest spread</option>
+                                    <option value="profitability">&nbsp;profitability</option>
                                 </select>
-                            </label>
-                            <br>
-                            <label for="multiplier">
-                                <p class="h6inline">Set a quantity multiplier for operations on loaded data:</p>
-                                <input type="text" class="w3-border w3-round-small" id="multiplier" name="multiplier" value=1 size=1 style="text-align:center;" onchange="javascript:saveText('multiplier')">
-                            </label>
-                            <br>
-                            <label for="pricesource">
-                                <p class="h6inline">Optimize buylists by</p>
-                                <select id="pricesource" name="pricesource" onChange="javascript:saveText('pricesource')" style="text-align-last=center;">
+                                &nbsp;&nbsp;
+                                Qty multiplier:
+                                <input type="text" id="multiplier" name="multiplier" value="1" size="1" onchange="javascript:saveText('multiplier')">
+                                &nbsp;&nbsp;
+                                Optimize by:
+                                <select id="pricesource" name="pricesource" onchange="javascript:saveText('pricesource')">
                                     <option value="" selected>&nbsp;cash prices</option>
                                     <option value="credit">&nbsp;store credit</option>
                                     <option value="marketCredit">&nbsp;market store credit</option>
                                 </select>
+                            </label>
                         </div>
                     </div>
+                </div>
+
                 </form>
-            </center>
-        </div>
+
+                {{if .WarningMessage}}
+                    <div class="upload-warning">
+                        <h4>There was a problem uploading your file: <i>{{.WarningMessage}}</i></h4>
+                    </div>
+                {{end}}
+
+            </div><!-- /.upload-form-panel -->
+
+            <!-- RIGHT: Contextual Help -->
+            <div class="upload-help-panel">
+                <h2>Reference</h2>
+
+                <div class="upload-help-card">
+                    <h3>Supported Formats</h3>
+                    <p><strong>CSV</strong>, <strong>Excel</strong> (.xls/.xlsx), <strong>Google Sheets</strong> (public), <strong>TCG Collection</strong> URLs, <strong>Moxfield</strong> URLs, or pasted decklists.</p>
+                    <p>Popular exports like TCG, Deckbox, BinderPOS, and Cardsphere are auto-detected. Plain card name lists also work &mdash; the most recent printing will be used.</p>
+                    <div class="upload-help-note">Excel sheets should contain <code>mtgban</code> in the sheet name. Google Sheets must be publicly accessible. The saved URL will persist as a preference.</div>
+                </div>
+
+                <div class="upload-help-card">
+                    <h3>Data Requirements</h3>
+                    <p>Data in any format with a comma or tab separated header. Needs sensible column names like <em>card name</em> and <em>edition</em> at minimum.</p>
+                    <p>Card recognition follows <strong>Scryfall</strong> notation. If a card has multiple printings (same name, different art), include the collector number or variant.</p>
+                    <div class="upload-help-note">Max 5MB, up to 350 entries (1000 for Optimizer). Rows with qty 0 are skipped. Identical entries with same condition are merged.</div>
+                </div>
+
+                <div class="upload-help-card">
+                    <h3>Reading Results</h3>
+                    <p>Each card shows prices from all selected stores. A per-store <strong>total</strong> row appears at the bottom with quantity-adjusted sums.</p>
+                    <p>Below totals: count of cards not found per store, plus an estimated missing value via TCG Low.</p>
+                    <p>The <strong>Index Overview</strong> shows popular aggregate prices. TCG Direct is condition-adjusted, falling back to TCG Direct Low.</p>
+                    <div class="upload-help-note">If price or quantity data exists in your upload, it displays above results. Condition data adjusts reported prices and can determine foiling status.</div>
+                </div>
+
+                <div class="upload-help-card">
+                    <h3>Optimizer</h3>
+                    <p>Groups results by <strong>store</strong> and <strong>edition</strong> with a theoretical maximum split per store. Similar offers within the margin threshold are all listed.</p>
+                    <p>Each store section shows its offer next to loaded/TCG Low price. The percentage indicates offer strength. Use <strong>Load at</strong> buttons to push directly to partner storefronts.</p>
+                    <div class="upload-help-note">The qty multiplier applies only to optimizer operations &mdash; loaded data stays untouched. You can download per-store CSVs or remove cards from TCGplayer inventory.</div>
+                </div>
+
+                <hr class="upload-help-divider">
+
+                <div class="upload-help-card">
+                    <h3>Result Legend</h3>
+                    <div class="upload-legend-list">
+                        <div class="upload-legend-row">
+                            <span class="upload-legend-swatch" style="background:var(--aliasing);"></span>
+                            Tinted background &mdash; alias was guessed, verify printing via dropdown
+                        </div>
+                        <div class="upload-legend-row">
+                            <span class="upload-legend-swatch" style="background:var(--asuccess);"></span>
+                            Buylist price exceeds your loaded price
+                        </div>
+                        <div class="upload-legend-row">
+                            <span class="upload-legend-sym">*</span> <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a> card
+                        </div>
+                        <div class="upload-legend-row">
+                            <span class="upload-legend-sym">&bull;</span> On <a href="https://mtgstocks.com/interests">MTGStocks Interests</a> page
+                        </div>
+                        <div class="upload-legend-row">
+                            <span class="upload-legend-sym">&dagger;</span> On <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">TCGplayer SYP Pull Sheet</a>
+                        </div>
+                        <div class="upload-legend-row">
+                            <span class="upload-legend-sym">&#127775;</span> Highest buylist price in 3 months
+                        </div>
+                        <div class="upload-legend-row">
+                            <span class="upload-legend-sym">&#9888;&#65039;</span> Offer above custom spread threshold
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="upload-help-divider">
+
+                <div class="upload-help-card">
+                    <h3>Privacy &amp; Access</h3>
+                    <p>No data is stored on the website. Your exports are private to you only.</p>
+                    <p><strong>Buylist</strong> prices require Legacy tier. Store customization requires a higher tier. CSV download and CardConduit/Deckbox export are buylist-tier features.</p>
+                </div>
+
+                <div class="upload-help-card">
+                    <h3>Need Help?</h3>
+                    <p>If anything doesn't work, post your file in the <strong>#feedback</strong> channel on the BAN Discord with a URL or screenshot.</p>
+                </div>
+            </div>
+
+        </div><!-- /.upload-layout -->
+
         <script type="text/javascript">
             function saveCheckbox(box) {
                 var checkbox = document.getElementById(box);
@@ -305,8 +435,8 @@
                     if (mode == "buylist") {
                         selectBox.innerHTML = " \
                             {{range .VendorKeys}} \
-                                <label for='{{.}}'> \
-                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledVendors .}}checked{{end}}>&nbsp;{{scraper_name .}}</label><br> \
+                                <label class='upload-store-item'> \
+                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledVendors .}}checked{{end}}> {{scraper_name .}}</label> \
                             {{end}} \
                         ";
 
@@ -319,8 +449,8 @@
                     } else if (mode == "retail") {
                         selectBox.innerHTML = " \
                             {{range .SellerKeys}} \
-                                <label for='{{.}}'> \
-                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledSellers .}}checked{{end}}>&nbsp;{{scraper_name .}}</label><br> \
+                                <label class='upload-store-item'> \
+                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledSellers .}}checked{{end}}> {{scraper_name .}}</label> \
                             {{end}} \
                         ";
 
@@ -333,74 +463,44 @@
                     }
                 }
             };
-            window.pressed = function(){
+
+            window.selectSource = function(type) {
+                document.querySelectorAll('.upload-source-btn').forEach(b => b.classList.remove('active'));
+                document.getElementById('src-btn-' + type).classList.add('active');
+                ['file', 'url', 'text'].forEach(t => {
+                    var area = document.getElementById('source-' + t);
+                    if (area) {
+                        if (t === type) {
+                            area.classList.remove('upload-source-hidden');
+                        } else {
+                            area.classList.add('upload-source-hidden');
+                        }
+                    }
+                });
+                if (type === 'text') {
+                    enabledButtons();
+                }
+            };
+
+            window.toggleOpts = function(el) {
+                el.classList.toggle('open');
+                document.getElementById('optsPanel').classList.toggle('open');
+            };
+
+            window.pressed = function() {
                 var label = document.getElementById('file');
                 if (label.value != "") {
                     var theSplit = label.value.split('\\');
-                    fileLabel.innerHTML = theSplit[theSplit.length-1];
-
-                    // Reset URL prompt
-                    var input = document.getElementById('gdocURL');
-                    input.value = "";
-
-                    // Reset text area
+                    document.getElementById('fileLabel').innerHTML = theSplit[theSplit.length - 1];
+                    document.getElementById('gdocURL').value = "";
                     var textArea = document.getElementById('textArea');
-                    if (textArea) {
-                        textArea.value = "";
-                    }
-
-                    // Reset hashes
+                    if (textArea) { textArea.value = ""; }
                     const form = document.getElementById("upload_form");
                     form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
-
-                    var url = document.getElementById('urlLabel');
-                    url.innerHTML = "Select spreadsheet";
-
-                    // Enable buttons
+                    selectSource('file');
                     enabledButtons();
                 }
             };
-            window.askForURL = function(){
-                let url = prompt("Please enter your URL here", "{{.RemoteLinkURL}}");
-                if (url != null && (url.includes("docs.google.com") || url.includes("store.tcgplayer.com") || url.includes("moxfield.com") || url == "")) {
-                    if (url == "") {
-                        urlLabel.innerHTML = "Load remote URL";
-                    } else {
-                        urlLabel.innerHTML = "Remote URL ready";
-
-                        // Reset text area
-                        var textArea = document.getElementById('textArea');
-                        if (textArea) {
-                            textArea.value = "";
-                        }
-
-                        // Reset hashes
-                        const form = document.getElementById("upload_form");
-                        form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
-                    }
-                    urlLabel.title = url
-                    fileLabel.innerHTML = "Select local csv/xls";
-
-                    var input = document.getElementById('gdocURL');
-                    input.value = url;
-
-                    // Enable buttons
-                    enabledButtons();
-                } else if (url != null) {
-                    alert("Invalid URL");
-                }
-            };
-            window.displayTextArea = function(){
-                var textArea = document.getElementById('textArea');
-                textArea.style.display = "block";
-
-                // Reset hashes
-                const form = document.getElementById("upload_form");
-                form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
-
-                // Enable buttons
-                enabledButtons();
-            }
 
             window.onload = (event) => {
                 var textArea = document.getElementById('textArea');
@@ -408,75 +508,36 @@
                     textArea.value = "";
                 }
                 reloadSelect({{if $.IsBuylist}}"buylist"{{else}}"retail"{{end}});
-            }
+
+                var gdocInput = document.getElementById('gdocURL');
+                if (gdocInput) {
+                    gdocInput.addEventListener('input', function() {
+                        var url = this.value.trim();
+                        if (url && (url.includes("docs.google.com") || url.includes("store.tcgplayer.com") || url.includes("moxfield.com"))) {
+                            var fileInput = document.getElementById('file');
+                            if (fileInput) fileInput.value = "";
+                            document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                            var ta = document.getElementById('textArea');
+                            if (ta) ta.value = "";
+                            const form = document.getElementById("upload_form");
+                            form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
+                            enabledButtons();
+                        }
+                    });
+                }
+
+                var textAreaEl = document.getElementById('textArea');
+                if (textAreaEl) {
+                    textAreaEl.addEventListener('input', function() {
+                        if (this.value.trim()) {
+                            enabledButtons();
+                        }
+                    });
+                }
+            };
         </script>
 
-        <br><hr width=30% style="border: 1px dotted; margin: auto;"><br>
-
-        {{if eq .SearchQuery ""}}
-            {{if .WarningMessage}}
-                <div class="indent">
-                    <h4>There was a problem uploading your file: <i>{{.WarningMessage}}</i></h4>
-                </div>
-            {{end}}
-
-            <br>
-            <div class="indent" style="max-width:85%">
-                <h2>Instructions</h2>
-                <br>
-                <ul class="indent">
-                    <li>Upload a file and let the <i>Magic</i> begin!</li>
-                    <ul class="indent">
-                        <li>This tool can read data from <b>CSV</b>, <b>Excel</b> files, from a remote <b>TCG Collection</b>, or a <b>Google Spreadsheet</b>, or by <b>pasting text</b> directly on the page.</li>
-                        <ul class="indent">
-                            <li>The Excel sheet can be in any location as long as it contains the <pre>mtgban</pre> indication. Otherwise the system will use the first sheet found.</li>
-                            <li>The Google Spreadsheet needs to be publicly accessible from the internet, and there needs to be a sheet named with <pre>mtgban</pre>, or the first sheet found will be used.</li>
-                            <li>The URL used will be saved as a preference and you'll be able to use it later.</li>
-                            <li>The text area may support a number of decklist formats used in the industry.</li>
-                        </ul>
-                        <li>Data may be in any format, as long as the file contains a comma or tab separated header in the first row, with sensible indication on what the column contains (eg. <i>card name</i> and <i>edition</i> as a minimum).</li>
-                        <li>For this reason, the most popular CSV files are supported out of the box, <b>TCG</b>, <b>Deckbox</b>, <b>BinderPOS</b>, and <b>Cardsphere</b> among others.</li>
-                        <li>You can also upload a list of cards or a decklist, with just the card name only. In this case the most recent printing of the card will be used to populate prices.</li>
-                        <li>In case of missing data identifying a card (such as a card with the same name with multiple art in the same set) the system will try to pick one for you, and warn you by using a different background.</li>
-                        <li>No data is stored on the website, your exports are private to you only.</li>
-                        <li>The file cannot be larger than 5MB, and it may contain up to 350 entries (or 1000 in case of Optimizer).</li>
-                        <li>If a condition field is present, it will be used to adjust the reported prices and totals. It can also used to determine the foiling status of the card.</li>
-                        <li>Rows with a Quantity field set to 0 are skipped.</li>
-                        <li>Identical card entries with the same condition are merged.</li>
-                    </ul>
-                    <li>The result will be a page containing Retail or Buylist prices from all the available stores on BAN for each recognised card entry.</li>
-                    <ul class="indent">
-                        <li>Note that buylist prices are available for our <b>Legacy</b> patrons only.</li>
-                        <li>You can filter out unwanted store prices by selecting/deselecting them from the list, pressing CTRL or CMD when clicking on them.</li>
-                        <li>Card recognition works best when data strictly follows <b>Scryfall</b> notation. If it fails, try finding your card there and tweaking your entry accordingly.</li>
-                        <li>If a card is missing in BAN Search it will be missing here too. In particular tokens and art series cards are not supported.</li>
-                        <li>The <pre>aliasing error</pre> happens when a parsed card has multiple variations (such as basic land or a modern promo). To fix this make sure to include the card number or a description of the variant in your file.</li>
-                        <li>A final per-store total row will be added at the end, taking into account the quantity information if present.</li>
-                        <li>Below that row, you will find a summary of how many cards were not found in any given store, and an estimation (using TCG Low) of the value missing.</li>
-                        <li>If price or quantity data is found in your entries, it will be displayed above the results.</li>
-                        <li>The Index Overview contains a section of the most popular index prices available. The TCG Direct one is condition-adjusted, and it fallbacks to the TCG Direct Low variant if not available.</li>
-                    </ul>
-                    <li>If you prefer to download a CSV of your results, instead of browsing them on BAN, you may hit the "Get CSV" button.</li>
-                    <li>The CSV will contain all parsed data and pricing available, including the loaded price and condition, but also a custom <b>Notes</b> field: this field will be passed through from your uploaded to the CSV, and can be used, for example, to pass your custom identifier or custom pricing.</li>
-                    <li>If anything doesn't work, post your file on Discord and we'll take a look.</li>
-                </ul>
-
-                <br>
-                <h2>Optimizer</h2>
-                <br>
-                <ul class="indent">
-                    <li>The optimizer allows you to sort through the results, and group them together by <b>store</b> and by <b>edition</b>.</li>
-                    <li>A theoretical maximmum amount, split by store will be provided.</li>
-                    <li>If multiple store have a similar price offer, they will all appear in their own section - this might slightly skew highest total results.</li>
-                    <li>In the stores breakdown, the store offering will be listed, next to the loaded price, or TCG Low in its absence. The percentage next to it represents the strength of the offer.</li>
-                    <li>It is possible to skip low value offerings (less than 60% spread or less than $ 1) by selecting the checkboxes at the top.</li>
-                    <li>A visual indicator will appear next to entries above a certain customizable threshold.</li>
-                    <li>By default, when multiple stores offer a similar price within a certain range (10% by default) they will be all selected, and found in the list result.</li>
-                    <li>It is possible to set a custom quantity multiplier for operations on optimized results, meaning loaded data will stay untouched, but loading external tools (ie buylist or CSV download) will take this value in consideration.</li>
-                    <li>The above options can be modified by selecting "Show optimizer options".</li>
-                </ul>
-             </div>
-        {{else}}
+        {{if ne .SearchQuery ""}}
             <script>
                 function getCardHashes() {
                     return Array.from(document.querySelectorAll('.searchResults tr[data-hash]')).map(row => row.dataset.hash);
@@ -1048,20 +1109,6 @@
             {{end}}
         {{end}}
     {{end}}
-
-    <div style="clear:both;"></div>
-
-    <div class="indent">
-        {{if .HasReserved}}
-            <h4>* = Part of the <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a></h4>
-        {{end}}
-        {{if .HasStocks}}
-            <h4>• = On <a href="https://mtgstocks.com/interests">MTGStocks Interests</a> page</h4>
-        {{end}}
-        {{if .HasSypList}}
-            <h4>† = Found in the <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a></h4>
-        {{end}}
-    </div>
 
     {{if ne .InfoMessage ""}}
         <br>
