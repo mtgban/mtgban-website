@@ -1,0 +1,589 @@
+/* ── Two-Column Layout ── */
+.upload-layout {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 0;
+    min-height: calc(100vh - 75px);
+}
+
+.upload-form-panel {
+    padding: 36px 40px 64px;
+}
+
+.upload-form-panel h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 0 0 4px 0;
+}
+
+.upload-subtitle {
+    color: var(--activetext);
+    font-size: 15px;
+    margin: 0 0 32px 0;
+}
+
+/* ── Card Surfaces ── */
+.upload-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    margin-bottom: 20px;
+}
+
+.upload-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.upload-step {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent-muted);
+    border: 1px solid var(--accent-border);
+    color: var(--ainfo);
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.upload-card-header h2 {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+
+.upload-badge {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--accent-muted);
+    color: var(--ainfo);
+}
+
+/* ── Mode Toggle ── */
+.upload-mode-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.upload-mode-toggle {
+    display: inline-flex;
+    background: var(--surface-3);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 2px;
+}
+
+.upload-mode-toggle label {
+    padding: 8px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--activetext);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+    margin: 0;
+}
+
+.upload-mode-toggle input[type="radio"] {
+    display: none;
+}
+
+.upload-mode-toggle input[type="radio"]:checked + label {
+    background: var(--ainfo);
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(91,141,239,0.3);
+}
+
+.upload-mode-toggle label.disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    text-decoration: line-through;
+}
+
+.upload-mode-hint {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+/* ── Store Selector Grid ── */
+.upload-store-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.upload-store-grid::-webkit-scrollbar {
+    width: 6px;
+}
+
+.upload-store-grid::-webkit-scrollbar-thumb {
+    background: var(--surface-4);
+    border-radius: 3px;
+}
+
+.upload-store-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13px;
+    margin: 0;
+}
+
+.upload-store-item:hover {
+    border-color: var(--accent-border);
+}
+
+.upload-store-item input[type="checkbox"] {
+    accent-color: var(--ainfo);
+    width: 15px;
+    height: 15px;
+}
+
+/* ── Source Selector ── */
+.upload-source-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.upload-source-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 20px 16px;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    border: 2px solid var(--border-subtle);
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--activetext);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.upload-source-btn:hover {
+    border-color: var(--accent-border);
+    color: var(--normal);
+    background: var(--surface-3);
+}
+
+.upload-source-btn.active {
+    border-color: var(--ainfo);
+    background: var(--accent-muted);
+    color: var(--ainfo);
+}
+
+.upload-source-icon {
+    font-size: 24px;
+    line-height: 1;
+}
+
+.upload-source-area {
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed var(--border-moderate);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    color: var(--text-dim);
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.upload-source-area:hover {
+    border-color: var(--accent-border);
+    color: var(--activetext);
+}
+
+.upload-source-area label {
+    cursor: pointer;
+    text-align: center;
+    margin: 0;
+}
+
+.upload-browse-link {
+    color: var(--ainfo);
+    text-decoration: underline;
+}
+
+.upload-file-hint {
+    font-size: 12px;
+    display: block;
+    margin-top: 4px;
+}
+
+.upload-source-area input[type="file"] {
+    display: none;
+}
+
+.upload-source-area textarea {
+    width: 100%;
+    min-height: 80px;
+    background: transparent;
+    border: none;
+    color: var(--normal);
+    font-family: monospace;
+    font-size: 13px;
+    resize: vertical;
+    outline: none;
+}
+
+.upload-source-area input[type="text"] {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--normal);
+    font-family: monospace;
+    font-size: 14px;
+    outline: none;
+}
+
+.upload-source-area input[type="text"]::placeholder,
+.upload-source-area textarea::placeholder {
+    color: var(--text-dim);
+}
+
+.upload-source-hidden {
+    display: none;
+}
+
+.upload-hashes-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--activetext);
+    text-align: center;
+}
+
+/* ── Action Buttons ── */
+.upload-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.upload-btn {
+    padding: 10px 22px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.upload-btn-primary {
+    background: var(--ainfo);
+    color: #fff;
+}
+
+.upload-btn-primary:hover {
+    filter: brightness(1.1);
+}
+
+.upload-btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.upload-btn-secondary {
+    background: var(--surface-3);
+    color: var(--activetext);
+    border: 1px solid var(--border-moderate);
+}
+
+.upload-btn-secondary:hover {
+    color: var(--normal);
+    background: var(--surface-4);
+}
+
+.upload-btn-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Optimizer Options (Collapsible) ── */
+.upload-opts-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: var(--activetext);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 10px 0 0;
+    user-select: none;
+}
+
+.upload-opts-toggle .upload-chevron {
+    transition: transform 0.2s;
+    font-size: 11px;
+}
+
+.upload-opts-toggle.open .upload-chevron {
+    transform: rotate(90deg);
+}
+
+.upload-opts-panel {
+    display: none;
+    padding-top: 16px;
+}
+
+.upload-opts-panel.open {
+    display: block;
+}
+
+.upload-opts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.upload-opt-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    font-size: 13px;
+    color: var(--activetext);
+    line-height: 1.4;
+    margin: 0;
+}
+
+.upload-opt-item input[type="checkbox"] {
+    accent-color: var(--ainfo);
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.upload-opt-item input[type="text"],
+.upload-opt-item select {
+    background: var(--surface-3);
+    border: 1px solid var(--border-moderate);
+    border-radius: 4px;
+    color: var(--normal);
+    font-family: monospace;
+    font-size: 12px;
+    padding: 2px 6px;
+    width: 50px;
+    text-align: center;
+}
+
+.upload-opt-item select {
+    width: auto;
+}
+
+.upload-opt-wide {
+    grid-column: span 2;
+}
+
+/* ── Help Panel (Right Column) ── */
+.upload-help-panel {
+    background: var(--surface-1);
+    border-left: 1px solid var(--border-subtle);
+    padding: 36px 24px 64px;
+    position: sticky;
+    top: 75px;
+    height: calc(100vh - 75px);
+    overflow-y: auto;
+}
+
+.upload-help-panel::-webkit-scrollbar {
+    width: 6px;
+}
+
+.upload-help-panel::-webkit-scrollbar-thumb {
+    background: var(--surface-4);
+    border-radius: 3px;
+}
+
+.upload-help-panel h2 {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0 0 20px 0;
+}
+
+.upload-help-card {
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 16px 18px;
+    margin-bottom: 12px;
+}
+
+.upload-help-card h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 10px 0;
+    color: var(--normal);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.upload-help-card p {
+    font-size: 13px;
+    color: var(--activetext);
+    line-height: 1.65;
+    margin: 0 0 8px 0;
+}
+
+.upload-help-card p:last-child {
+    margin-bottom: 0;
+}
+
+.upload-help-card code {
+    font-family: monospace;
+    font-size: 11px;
+    background: var(--surface-3);
+    padding: 2px 6px;
+    border-radius: 3px;
+    color: var(--ainfo);
+}
+
+.upload-help-card strong {
+    color: var(--normal);
+    font-weight: 600;
+}
+
+.upload-help-note {
+    font-size: 12px;
+    color: var(--text-dim);
+    border-left: 3px solid var(--accent-border);
+    padding: 6px 0 6px 12px;
+    margin-top: 10px;
+    line-height: 1.5;
+}
+
+.upload-help-divider {
+    border: none;
+    border-top: 1px solid var(--border-subtle);
+    margin: 20px 0;
+}
+
+.upload-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--activetext);
+    margin-bottom: 8px;
+    line-height: 1.3;
+}
+
+.upload-legend-row:last-child {
+    margin-bottom: 0;
+}
+
+.upload-legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    border: 1px solid var(--border-moderate);
+}
+
+.upload-legend-sym {
+    width: 14px;
+    text-align: center;
+    flex-shrink: 0;
+    font-size: 13px;
+}
+
+/* ── Warning Message ── */
+.upload-warning {
+    padding: 12px 20px;
+    background: var(--surface-2);
+    border: 1px solid var(--awarning);
+    border-radius: var(--radius-sm);
+    margin-bottom: 20px;
+    color: var(--normal);
+}
+
+/* ── Results Section (full-width, below layout) ── */
+.upload-results-section {
+    padding: 20px 40px;
+    clear: both;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1000px) {
+    .upload-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .upload-help-panel {
+        position: static;
+        height: auto;
+        border-left: none;
+        border-top: 1px solid var(--border-subtle);
+    }
+}
+
+@media (max-width: 640px) {
+    .upload-form-panel {
+        padding: 24px 16px 40px;
+    }
+
+    .upload-help-panel {
+        padding: 24px 16px 40px;
+    }
+
+    .upload-source-options {
+        grid-template-columns: 1fr;
+    }
+
+    .upload-opts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .upload-opt-wide {
+        grid-column: span 1;
+    }
+
+    .upload-results-section {
+        padding: 20px 16px;
+    }
+
+    .upload-store-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    }
+}
