@@ -3,13 +3,11 @@
    ═══════════════════════════════════════ */
 
 .sleepers-page {
-    max-width: 1100px;
-    margin: 0 auto;
     padding: 20px 32px 80px;
 }
 
 .sleepers-page h1 {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 0 0 4px 0;
@@ -17,8 +15,28 @@
 
 .sleepers-page-subtitle {
     color: var(--activetext);
-    font-size: 15px;
-    margin: 0 0 36px 0;
+    font-size: 16px;
+    margin: 0 0 28px 0;
+}
+
+/* ── Two-column body: main + sidebar ── */
+.sleepers-page-body {
+    display: grid;
+    grid-template-columns: 1fr 500px;
+    gap: 12px;
+    align-items: start;
+}
+
+.sleepers-page-main {
+    min-width: 0;
+}
+
+.sleepers-page-sidebar {
+    position: sticky;
+    top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
 /* ── Tool strip: horizontal row of cards ── */
@@ -81,14 +99,14 @@
 }
 
 .sleepers-tool h3 {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
     margin: 0;
     color: var(--headingtext);
 }
 
 .sleepers-tool p {
-    font-size: 12px;
+    font-size: 13px;
     color: var(--activetext);
     line-height: 1.5;
     margin: 0;
@@ -112,7 +130,7 @@
 }
 
 .sleepers-comparator-left h2 {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 600;
     margin: 0 0 4px 0;
     display: flex;
@@ -133,7 +151,7 @@
 }
 
 .sleepers-comparator-left .comp-desc {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--activetext);
     margin: 0 0 18px 0;
     line-height: 1.55;
@@ -154,7 +172,7 @@
     background: var(--surface-2);
     border: 1px solid var(--border-subtle);
     color: var(--activetext);
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 500;
     text-decoration: none;
     transition: all 0.15s;
@@ -304,14 +322,8 @@
 
 
 /* ═══════════════════════════════════════
-   Bottom Row: Info + Options Link
+   Sidebar: Info Card + Example Tiers
    ═══════════════════════════════════════ */
-
-.sleepers-bottom-row {
-    display: flex;
-    gap: 16px;
-    align-items: stretch;
-}
 
 .sleepers-info-card {
     flex: 1;
@@ -322,7 +334,7 @@
 }
 
 .sleepers-info-card h3 {
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     margin: 0 0 10px 0;
     display: flex;
@@ -332,10 +344,10 @@
 }
 
 .sleepers-info-card p {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--activetext);
     line-height: 1.65;
-    margin: 0 0 6px 0;
+    margin: 0 0 8px 0;
 }
 
 .sleepers-info-card p:last-child {
@@ -346,21 +358,55 @@
     color: var(--normal);
 }
 
-.sleepers-opts-link {
+/* ── Tier upgrade perks ── */
+.sleepers-tier-perks {
     display: flex;
     flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.sleepers-tier-perk {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: var(--activetext);
+}
+
+.tier-perk-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}
+
+.tier-perk-legacy {
+    background: rgba(127,191,255,0.15);
+    color: #4da6ff;
+}
+
+.tier-perk-vintage {
+    background: rgba(255,191,64,0.15);
+    color: #e6a817;
+}
+
+.sleepers-opts-link {
+    display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    width: 160px;
-    flex-shrink: 0;
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
-    padding: 22px;
+    padding: 14px 22px;
     text-decoration: none;
     color: var(--activetext);
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 500;
     transition: all 0.2s;
 }
@@ -371,7 +417,65 @@
 }
 
 .sleepers-opts-link .opts-icon {
-    font-size: 24px;
+    font-size: 18px;
+}
+
+/* ── Example tier display ── */
+.sleepers-example {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 18px;
+}
+
+.sleepers-example-label {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+}
+
+.sleepers-example-tiers {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sleepers-example-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sleepers-example-letter {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1a1a1a;
+    flex-shrink: 0;
+}
+
+.sleepers-example-cards {
+    display: flex;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+
+.sleepers-example-card {
+    width: 30px;
+    height: 42px;
+    border-radius: 3px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-subtle);
+    flex-shrink: 0;
 }
 
 
@@ -380,8 +484,6 @@
    ═══════════════════════════════════════ */
 
 .sleepers-results {
-    max-width: 1100px;
-    margin: 0 auto;
     padding: 0 32px 40px;
 }
 
@@ -545,18 +647,17 @@
    ═══════════════════════════════════════ */
 
 @media (max-width: 900px) {
+    .sleepers-page-body {
+        grid-template-columns: 1fr;
+    }
+    .sleepers-page-sidebar {
+        position: static;
+    }
     .sleepers-tools-strip {
         grid-template-columns: repeat(2, 1fr);
     }
     .sleepers-comparator {
         grid-template-columns: 1fr;
-    }
-    .sleepers-bottom-row {
-        flex-direction: column;
-    }
-    .sleepers-opts-link {
-        width: 100%;
-        flex-direction: row;
     }
 }
 
