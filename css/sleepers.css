@@ -3,7 +3,16 @@
    ═══════════════════════════════════════ */
 
 .sleepers-page {
-    padding: 20px 32px 80px;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 20px 48px 80px;
+}
+
+.sleepers-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 24px;
 }
 
 .sleepers-page h1 {
@@ -16,27 +25,31 @@
 .sleepers-page-subtitle {
     color: var(--activetext);
     font-size: 16px;
-    margin: 0 0 28px 0;
+    margin: 0;
 }
 
-/* ── Two-column body: main + sidebar ── */
-.sleepers-page-body {
-    display: grid;
-    grid-template-columns: 1fr 500px;
-    gap: 12px;
-    align-items: start;
-}
-
-.sleepers-page-main {
-    min-width: 0;
-}
-
-.sleepers-page-sidebar {
-    position: sticky;
-    top: 20px;
+.sleepers-filters-btn {
     display: flex;
-    flex-direction: column;
-    gap: 16px;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    text-decoration: none;
+    color: var(--activetext);
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    margin-top: 4px;
+}
+
+.sleepers-filters-btn:hover {
+    border-color: var(--accent-border);
+    color: var(--normal);
+    background: var(--surface-2);
 }
 
 /* ── Tool strip: horizontal row of cards ── */
@@ -322,15 +335,15 @@
 
 
 /* ═══════════════════════════════════════
-   Sidebar: Info Card + Example Tiers
+   Info Card
    ═══════════════════════════════════════ */
 
 .sleepers-info-card {
-    flex: 1;
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     padding: 22px 24px;
+    margin-bottom: 20px;
 }
 
 .sleepers-info-card h3 {
@@ -394,89 +407,6 @@
     background: rgba(255,191,64,0.15);
     color: #e6a817;
 }
-
-.sleepers-opts-link {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 14px 22px;
-    text-decoration: none;
-    color: var(--activetext);
-    font-size: 15px;
-    font-weight: 500;
-    transition: all 0.2s;
-}
-
-.sleepers-opts-link:hover {
-    border-color: var(--accent-border);
-    color: var(--normal);
-}
-
-.sleepers-opts-link .opts-icon {
-    font-size: 18px;
-}
-
-/* ── Example tier display ── */
-.sleepers-example {
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 18px;
-}
-
-.sleepers-example-label {
-    font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-dim);
-    margin-bottom: 12px;
-}
-
-.sleepers-example-tiers {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.sleepers-example-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.sleepers-example-letter {
-    width: 28px;
-    height: 28px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: 700;
-    color: #1a1a1a;
-    flex-shrink: 0;
-}
-
-.sleepers-example-cards {
-    display: flex;
-    gap: 3px;
-    flex: 1;
-    min-width: 0;
-}
-
-img.sleepers-example-card {
-    width: auto;
-    height: 56px;
-    border-radius: 3px;
-    flex-shrink: 0;
-    object-fit: cover;
-}
-
 
 /* ═══════════════════════════════════════
    Results View (tier rows)
@@ -646,12 +576,6 @@ img.sleepers-example-card {
    ═══════════════════════════════════════ */
 
 @media (max-width: 900px) {
-    .sleepers-page-body {
-        grid-template-columns: 1fr;
-    }
-    .sleepers-page-sidebar {
-        position: static;
-    }
     .sleepers-tools-strip {
         grid-template-columns: repeat(2, 1fr);
     }
