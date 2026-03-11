@@ -174,66 +174,34 @@
                     <div class="sleepers-info-card">
                         <h3>&#128161; About Sleepers</h3>
                         <p>Results are tiered <strong>S through F</strong>. Higher tiers = stronger signals. These tools identify cards where market pricing hasn't kept pace with demand, scarcity, or cross-market pricing differences.</p>
-                        <p><strong>Legacy</strong> tier gets Ocean Gap preset comparisons. <strong>Vintage</strong> tier unlocks custom seller pairing.</p>
+                        <div class="sleepers-tier-perks">
+                            <div class="sleepers-tier-perk">
+                                <span class="tier-perk-badge tier-perk-legacy">Legacy</span>
+                                <span>Ocean Gap preset comparisons</span>
+                            </div>
+                            <div class="sleepers-tier-perk">
+                                <span class="tier-perk-badge tier-perk-vintage">Vintage</span>
+                                <span>Custom seller pairing</span>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="sleepers-example">
                         <div class="sleepers-example-label">Example Results</div>
                         <div class="sleepers-example-tiers">
-                            <div class="sleepers-example-row">
-                                <span class="sleepers-example-letter" style="background-color: var(--tier-s);">S</span>
-                                <div class="sleepers-example-cards">
-                                    <div class="sleepers-example-card"></div>
+                            {{range $i, $letter := .SleepersKeys}}
+                                {{$bgColor := index $.SleepersColors $i}}
+                                {{$cardIds := index $.Sleepers $letter}}
+                                <div class="sleepers-example-row">
+                                    <span class="sleepers-example-letter" style="background-color: {{$bgColor}};">{{$letter}}</span>
+                                    <div class="sleepers-example-cards">
+                                        {{range $cardIds}}
+                                            {{$card := index $.Metadata .}}
+                                            <img class="sleepers-example-card" loading="lazy" src="{{$card.ImageURL}}" title="{{$card.Name}}" alt="{{$card.Name}}">
+                                        {{end}}
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="sleepers-example-row">
-                                <span class="sleepers-example-letter" style="background-color: var(--tier-a);">A</span>
-                                <div class="sleepers-example-cards">
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                </div>
-                            </div>
-                            <div class="sleepers-example-row">
-                                <span class="sleepers-example-letter" style="background-color: var(--tier-b);">B</span>
-                                <div class="sleepers-example-cards">
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                </div>
-                            </div>
-                            <div class="sleepers-example-row">
-                                <span class="sleepers-example-letter" style="background-color: var(--tier-c);">C</span>
-                                <div class="sleepers-example-cards">
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                </div>
-                            </div>
-                            <div class="sleepers-example-row">
-                                <span class="sleepers-example-letter" style="background-color: var(--tier-d);">D</span>
-                                <div class="sleepers-example-cards">
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                </div>
-                            </div>
-                            <div class="sleepers-example-row">
-                                <span class="sleepers-example-letter" style="background-color: var(--tier-e);">E</span>
-                                <div class="sleepers-example-cards">
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                </div>
-                            </div>
-                            <div class="sleepers-example-row">
-                                <span class="sleepers-example-letter" style="background-color: var(--tier-f);">F</span>
-                                <div class="sleepers-example-cards">
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                    <div class="sleepers-example-card"></div>
-                                </div>
-                            </div>
+                            {{end}}
                         </div>
                     </div>
                 </div>
