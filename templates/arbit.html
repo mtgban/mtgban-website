@@ -430,7 +430,7 @@
                     <hr width=20%>
                 </div>
 
-                <table id="arbitTable" class="filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                <table class="filterable sortable-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
                     <thead>
                     <tr>
                         <th class="stickyHeaderTiny">
@@ -702,8 +702,9 @@
         return (aVal !== undefined ? aVal : 5) - (bVal !== undefined ? bVal : 5);
     });
 
-    var arbitTable = document.getElementById('arbitTable');
-    if (arbitTable) new Tablesort(arbitTable);
+    document.querySelectorAll('.sortable-table').forEach(function(table) {
+        new Tablesort(table);
+    });
 </script>
 </body>
 </html>
