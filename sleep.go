@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"net/http"
 	"slices"
 	"sort"
@@ -88,9 +89,38 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	default:
 		pageVars.Subtitle = "Index"
 
+		exampleCards := pickExampleCards()
+		pageVars.Sleepers = exampleCards
+		pageVars.SleepersKeys = SleeperLetters
+		pageVars.SleepersColors = SleeperColors
+		pageVars.Metadata = map[string]GenericCard{}
+		for _, cardIds := range exampleCards {
+			for _, cardId := range cardIds {
+				pageVars.Metadata[cardId] = uuid2card(cardId, true, false, false)
+			}
+		}
+
 		render(w, "sleep.html", pageVars)
 
 		return
+	case "example":
+		// Internal endpoint for fetching fresh example cards
+		pageVars.Subtitle = "Example"
+
+		exampleCards := pickExampleCards()
+		pageVars.Sleepers = exampleCards
+		pageVars.SleepersKeys = SleeperLetters
+		pageVars.SleepersColors = SleeperColors
+		pageVars.Metadata = map[string]GenericCard{}
+		for _, cardIds := range exampleCards {
+			for _, cardId := range cardIds {
+				pageVars.Metadata[cardId] = uuid2card(cardId, true, false, false)
+			}
+		}
+
+		render(w, "sleep.html", pageVars)
+		return
+
 	case "options":
 		pageVars.Subtitle = "Options"
 
@@ -504,6 +534,75 @@ func noOversize(co *mtgmatcher.CardObject) (float64, bool) {
 		return 0, true
 	}
 	return 1, false
+}
+
+// Pick random card UUIDs for the example tier display on the Index page.
+// Returns a map of tier letter to card IDs with increasing counts per tier.
+func pickExampleCards() map[string][]string {
+	// Cards per tier: S=1, A=1, B=2, C=2, D=3, E=3, F=3
+	counts := []int{1, 1, 2, 2, 3, 3, 3}
+	total := 0
+	for _, c := range counts {
+		total += c
+	}
+
+	uuids := mtgmatcher.GetUUIDs()
+	if len(uuids) == 0 {
+		return nil
+	}
+
+	// Pick valid random cards
+	var picked []string
+	attempts := 0
+	for len(picked) < total && attempts < total*20 {
+		attempts++
+		uuid := uuids[rand.Intn(len(uuids))]
+
+		co, err := mtgmatcher.GetUUID(uuid)
+		if err != nil {
+			continue
+		}
+
+		// Skip foils, promos, tokens, oversized, and cards without images
+		if co.Foil || co.Etched || co.IsPromo || co.Rarity == "oversize" {
+			continue
+		}
+		if co.Layout == "token" || co.Layout == "emblem" || co.Layout == "art_series" {
+			continue
+		}
+		if co.Images["thumbnail"] == "" {
+			continue
+		}
+
+		// Avoid duplicates
+		dup := false
+		for _, p := range picked {
+			if p == uuid {
+				dup = true
+				break
+			}
+		}
+		if dup {
+			continue
+		}
+
+		picked = append(picked, uuid)
+	}
+
+	// Distribute across tiers
+	result := map[string][]string{}
+	idx := 0
+	for i, letter := range SleeperLetters {
+		if i >= len(counts) {
+			break
+		}
+		for j := 0; j < counts[i] && idx < len(picked); j++ {
+			result[letter] = append(result[letter], picked[idx])
+			idx++
+		}
+	}
+
+	return result
 }
 
 // Return a map of letter : []cardId from a map of cardId : amount
