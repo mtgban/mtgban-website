@@ -81,6 +81,14 @@ nearly black #292929
     --chartjs-dark-grid: rgba(140,140,140,0.2);
     --chartjs-default-text: #666666;
     --chartjs-dark-text: var(--darkgrey);
+
+    --tier-s: #ff7f7f;
+    --tier-a: #ffbf7f;
+    --tier-b: #ffff7f;
+    --tier-c: #7fff7f;
+    --tier-d: #7fbfff;
+    --tier-e: #7f7fff;
+    --tier-f: #ff7fff;
 }
 
 .light-theme {
@@ -1324,6 +1332,14 @@ img.hoverImage {
         font-size: 0.7rem !important;
         padding: 0.15rem 0.4rem !important;
     }
+}
+
+/* Override table.tiers for better card wrapping */
+table.tiers td div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 4px;
 }
 
 /* Upload results table */
