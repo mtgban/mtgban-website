@@ -123,6 +123,21 @@ nearly black #292929
 
     --syntax-text: var(--ainfo);
     --syntax-border-color: var(--navbackground);
+
+    /* Layered surfaces for card-based layouts */
+    --surface-0: var(--background);
+    --surface-1: #ffffff;
+    --surface-2: #f0f0f2;
+    --surface-3: #e2e4e6;
+    --surface-4: #d4d6d8;
+    --border-subtle: rgba(0,0,0,0.06);
+    --border-moderate: rgba(0,0,0,0.12);
+    --text-dim: #6b7280;
+    --accent-muted: rgba(85,158,255,0.08);
+    --accent-border: rgba(85,158,255,0.2);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
 }
 
 .dark-theme {
@@ -165,6 +180,21 @@ nearly black #292929
 
     --syntax-text: var(--awarning);
     --syntax-border-color: var(--navbackground);
+
+    /* Layered surfaces for card-based layouts */
+    --surface-0: var(--background);
+    --surface-1: #181b20;
+    --surface-2: #1f2328;
+    --surface-3: #282d35;
+    --surface-4: #323840;
+    --border-subtle: rgba(255,255,255,0.06);
+    --border-moderate: rgba(255,255,255,0.12);
+    --text-dim: #5f6672;
+    --accent-muted: rgba(91,141,239,0.12);
+    --accent-border: rgba(91,141,239,0.25);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
 }
 
 /* reset all margins and padding*/
