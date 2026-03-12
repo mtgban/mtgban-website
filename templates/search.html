@@ -404,7 +404,8 @@
         {{if and (eq .SearchQuery "") (not .IsSealed)}}
             {{template "syntax" .}}
         {{else if and (eq .SearchQuery "") (.IsSealed)}}
-        </div>{{/* Close .mainbody to go full-width for the sealed layout */}}
+        </div>{{/* Close .indent sticky div */}}
+        </div>{{/* Close .mainbody */}}
 
         <div class="sealed-layout">
             <div class="sealed-toc" id="sealed-toc">
@@ -559,7 +560,7 @@ Sims are not required for pre-constructed decks and other products where the sam
             </div>
         </div>
 
-        <div class="mainbody" style="display:none">{{/* Reopen .mainbody to match the closing tag */}}
+        <div class="mainbody" style="display:none"><div>{{/* Reopen .mainbody + inner div to match closing tags */}}
         {{else}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
             <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
