@@ -1668,10 +1668,8 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 	csvReader.ReuseRecord = true
 	csvReader.Comma = comma
 
-	// In case we are not using a sane csv
-	if comma != ',' {
-		csvReader.LazyQuotes = true
-	}
+	// Enabled for maximum compatibility
+	csvReader.LazyQuotes = true
 
 	// Load header
 	first, err := csvReader.Read()
