@@ -303,6 +303,7 @@
         </div>
 
     {{else}}
+        {{if not (and (eq .SearchQuery "") .IsSealed)}}
         <h1>
             {{if .ChartID}}
                 {{$card := (index $.Metadata .ChartID)}}
@@ -332,13 +333,14 @@
                 {{end}}
             {{end}}
         </h1>
+        {{end}}
 
         {{if .IsSealed}}
             <img id="hoverImage" class="hoverImage" src=""/>
             <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         {{end}}
 
-        <div class="indent sticky" style="top: 48px; background-color: var(--background); float:left">
+        <div class="indent sticky" style="top: 48px; background-color: var(--background); float:left; {{if and (eq .SearchQuery "") .IsSealed}}display:none{{end}}">
             <form class="search autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
                 <label style="clear: both; float: left; width: 115%" for="searchbox">
                     {{if not .SearchQuery}}
