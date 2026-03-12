@@ -4,6 +4,9 @@
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    {{if .IsSealed}}
+    <link rel="stylesheet" type="text/css" href="/css/sealed.css?hash={{.Hash}}">
+    {{end}}
 
     <link rel="search" type="application/opensearchdescription+xml" title="MTGBAN Price Search" href="/api/opensearch.xml" />
 
@@ -53,6 +56,9 @@
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
     <meta name="theme-color" content="#ff0000">
+    {{if .IsSealed}}
+    <script type="text/javascript" src="/js/sealed.js?hash={{.Hash}}" defer></script>
+    {{end}}
 </head>
 
 <body class="light-theme">
