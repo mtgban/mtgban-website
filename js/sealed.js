@@ -4,15 +4,33 @@
     var tocItems = document.querySelectorAll('.sealed-toc-item');
 
     if (sections.length && tocItems.length) {
+        // Track which sections are currently intersecting
+        var visibleSections = new Set();
+
         var observer = new IntersectionObserver(function(entries) {
             entries.forEach(function(entry) {
                 if (entry.isIntersecting) {
-                    tocItems.forEach(function(item) { item.classList.remove('active'); });
-                    var target = document.querySelector('.sealed-toc-item[href="#' + entry.target.id + '"]');
-                    if (target) target.classList.add('active');
+                    visibleSections.add(entry.target.id);
+                } else {
+                    visibleSections.delete(entry.target.id);
                 }
             });
-        }, { rootMargin: '-80px 0px -60% 0px', threshold: 0 });
+
+            // Find the topmost visible section (by DOM order)
+            var activeId = null;
+            for (var i = 0; i < sections.length; i++) {
+                if (visibleSections.has(sections[i].id)) {
+                    activeId = sections[i].id;
+                    break;
+                }
+            }
+
+            if (activeId) {
+                tocItems.forEach(function(item) { item.classList.remove('active'); });
+                var target = document.querySelector('.sealed-toc-item[href="#' + activeId + '"]');
+                if (target) target.classList.add('active');
+            }
+        }, { rootMargin: '-150px 0px -60% 0px', threshold: 0 });
 
         sections.forEach(function(section) { observer.observe(section); });
 
@@ -74,7 +92,7 @@
     if (surpriseBtn) {
         surpriseBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            var editions = document.querySelectorAll('.sealed-edition');
+            var editions = document.querySelectorAll('.sealed-edition:not(.hidden-by-filter)');
             if (editions.length) {
                 var randomEdition = editions[Math.floor(Math.random() * editions.length)];
                 window.location.href = randomEdition.href;
