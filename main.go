@@ -903,6 +903,12 @@ var funcMap = template.FuncMap{
 	"scraper_name": func(s string) string {
 		return scraperName(s)
 	},
+	"slug": func(s string) string {
+		s = strings.ToLower(s)
+		s = strings.ReplaceAll(s, " ", "-")
+		s = strings.ReplaceAll(s, "'", "")
+		return s
+	},
 	"slice_has": func(s []string, p string) bool {
 		return slices.Contains(s, p)
 	},
