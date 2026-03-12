@@ -906,8 +906,13 @@ var funcMap = template.FuncMap{
 	"slug": func(s string) string {
 		s = strings.ToLower(s)
 		s = strings.ReplaceAll(s, " ", "-")
-		s = strings.ReplaceAll(s, "'", "")
-		return s
+		var b strings.Builder
+		for _, r := range s {
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+				b.WriteRune(r)
+			}
+		}
+		return b.String()
 	},
 	"slice_has": func(s []string, p string) bool {
 		return slices.Contains(s, p)
