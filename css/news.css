@@ -1,0 +1,650 @@
+/* ═══════════════════════════════════════════════════
+   news.css — Newspaper page styles
+   ═══════════════════════════════════════════════════ */
+
+/* Theme Variables */
+.light-theme {
+    --news-surface: #f0f0f5;
+    --news-surface-raised: #e5e5ea;
+    --news-surface-hover: #d8d8de;
+    --news-text-dim: #888;
+    --news-border-subtle: rgba(0, 0, 0, 0.08);
+    --news-border-moderate: rgba(0, 0, 0, 0.15);
+    --news-accent-muted: rgba(91, 141, 239, 0.08);
+    --news-accent-border: rgba(91, 141, 239, 0.2);
+    --news-row-even: #f5f5f8;
+    --news-row-odd: #fafafa;
+    --news-row-hover: #ededf2;
+}
+
+.dark-theme {
+    --news-surface: #181b20;
+    --news-surface-raised: #1f2328;
+    --news-surface-hover: #282d35;
+    --news-text-dim: #5f6672;
+    --news-border-subtle: rgba(255, 255, 255, 0.06);
+    --news-border-moderate: rgba(255, 255, 255, 0.12);
+    --news-accent-muted: rgba(91, 141, 239, 0.12);
+    --news-accent-border: rgba(91, 141, 239, 0.25);
+    --news-row-even: #14161a;
+    --news-row-odd: #181b20;
+    --news-row-hover: #282d35;
+}
+
+/* Override mainbody padding when newspaper content is present */
+.mainbody:has(.news-wrap) {
+    padding-top: 0;
+    margin-left: 0;
+}
+
+
+/* ═══════════════════════════════════
+   SHARED: Page section nav
+   Renders as tabs but each is an <a>
+   to newspaper?page=X — full reload.
+   The template sets .active based on
+   the current $.Page value.
+   ═══════════════════════════════════ */
+.news-page-nav {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border-bottom: 1px solid var(--news-border-subtle);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--background);
+    position: sticky;
+    top: 48px;
+    z-index: 50;
+}
+.news-page-nav::-webkit-scrollbar { height: 0; }
+
+.news-page-nav a {
+    padding: 11px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--activetext);
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.12s;
+}
+.news-page-nav a:hover { color: var(--normal); }
+.news-page-nav a.active {
+    color: var(--ainfo);
+    border-bottom-color: var(--ainfo);
+}
+.news-page-nav .nav-spacer { flex: 1; }
+.news-page-nav .nav-opts {
+    padding: 11px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--news-text-dim);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.news-page-nav .nav-opts:hover { color: var(--activetext); }
+
+
+/* ═══════════════════════════════════
+   INDEX VIEW (page="" or page="old")
+   Uses: .ToC, .LastUpdate, .IsOneDay
+   ═══════════════════════════════════ */
+.news-index {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: calc(48px + 28px) 32px 20px;
+}
+.news-index-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+}
+.news-index-header h1 {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 0;
+}
+.news-badge {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--news-accent-muted);
+    color: var(--ainfo);
+}
+.news-date {
+    font-size: 13px;
+    color: var(--news-text-dim);
+    margin-left: auto;
+}
+
+.news-index-desc {
+    color: var(--activetext);
+    font-size: 14px;
+    margin: 0 0 28px;
+    max-width: 700px;
+}
+
+/* TOC cards: from .ToC range */
+.news-toc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+    margin-bottom: 28px;
+}
+.news-toc-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 18px 20px;
+    background: var(--news-surface);
+    border: 1px solid var(--news-border-subtle);
+    border-radius: 14px;
+    text-decoration: none;
+    color: var(--normal);
+    transition: all 0.2s;
+    position: relative;
+}
+.news-toc-card:hover {
+    border-color: var(--news-accent-border);
+    background: var(--news-surface-raised);
+}
+.news-toc-num {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--news-accent-muted);
+    border: 1px solid var(--news-accent-border);
+    color: var(--ainfo);
+    font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.news-toc-card .toc-text h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 4px;
+}
+.news-toc-card .toc-text p {
+    font-size: 12px;
+    color: var(--activetext);
+    margin: 0;
+    line-height: 1.45;
+}
+.news-toc-arrow {
+    position: absolute;
+    right: 16px; top: 20px;
+    color: var(--news-text-dim);
+    font-size: 14px;
+    transition: all 0.2s;
+    opacity: 0;
+}
+.news-toc-card:hover .news-toc-arrow {
+    opacity: 1;
+    color: var(--ainfo);
+    transform: translateX(2px);
+}
+
+/* Collapsible instructions */
+.news-instructions-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    background: var(--news-surface);
+    border: 1px solid var(--news-border-subtle);
+    color: var(--activetext);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-bottom: 12px;
+}
+.news-instructions-toggle:hover {
+    border-color: var(--news-accent-border);
+    color: var(--normal);
+}
+.news-instructions-toggle .toggle-chevron {
+    font-size: 10px;
+    transition: transform 0.2s;
+}
+.news-instructions-toggle.open .toggle-chevron {
+    transform: rotate(90deg);
+}
+
+.news-instructions-panel {
+    display: none;
+    background: var(--news-surface);
+    border: 1px solid var(--news-border-subtle);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    max-width: 800px;
+}
+.news-instructions-panel.open { display: block; }
+.news-instructions-panel h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--normal);
+    margin: 0 0 8px;
+}
+.news-instructions-panel p {
+    font-size: 13px;
+    color: var(--activetext);
+    line-height: 1.65;
+    margin: 0 0 8px;
+}
+.news-instructions-panel p:last-child { margin: 0; }
+.news-instructions-panel strong { color: var(--normal); font-weight: 600; }
+.news-instructions-panel .inst-divider {
+    border: none;
+    border-top: 1px solid var(--news-border-subtle);
+    margin: 14px 0;
+}
+
+
+/* ═══════════════════════════════════
+   DATA TABLE VIEW
+   Uses: .Subtitle, .InfoMessage,
+   .Headings, .Table, .Cards,
+   filter/sort/pagination vars
+   ═══════════════════════════════════ */
+.news-data {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 32px 80px;
+}
+
+/* Page title + description row */
+.news-data-header {
+    margin-bottom: 18px;
+}
+.news-data-header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+}
+.news-data-header p {
+    font-size: 13px;
+    color: var(--activetext);
+    margin: 0;
+    max-width: 700px;
+    line-height: 1.5;
+}
+
+/* Filter bar
+   Maps directly to the template's form fields:
+   min_price, max_price, min_change, max_change,
+   finish, filter (edition), rarity, bucket */
+.news-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 12px 18px;
+    background: var(--news-surface);
+    border: 1px solid var(--news-border-subtle);
+    border-radius: 10px;
+    margin-bottom: 16px;
+}
+.news-fg {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.news-fl {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--news-text-dim);
+}
+.news-filter-bar input[type="text"] {
+    padding: 7px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--news-border-moderate);
+    background: var(--news-surface-raised);
+    color: var(--normal);
+    font-size: 12px;
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    outline: none;
+    width: 54px;
+    text-align: center;
+}
+.news-filter-bar input:focus { border-color: var(--ainfo); }
+.news-filter-bar input::placeholder { color: var(--news-text-dim); }
+.news-filter-bar select {
+    padding: 7px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--news-border-moderate);
+    background: var(--news-surface-raised);
+    color: var(--normal);
+    font-size: 12px;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+}
+.news-filter-bar select:focus { border-color: var(--ainfo); }
+.news-fsep {
+    width: 1px;
+    height: 22px;
+    background: var(--news-border-moderate);
+    flex-shrink: 0;
+}
+
+/* Table container */
+.news-table-wrap {
+    background: var(--news-surface);
+    border: 1px solid var(--news-border-subtle);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+/* Table itself
+   Columns come from range $.Headings
+   Rows from range $.Table + $.Cards */
+.news-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.news-table th {
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--news-text-dim);
+    background: var(--news-surface-raised);
+    border-bottom: 1px solid var(--news-border-subtle);
+    text-align: left;
+    white-space: nowrap;
+}
+/* Sortable headers: the template already renders
+   sort arrows as <a> links with ?sort=field&dir=asc/desc */
+.news-table th.sortable { cursor: pointer; user-select: none; }
+.news-table th.sortable:hover { color: var(--activetext); }
+.news-table th.r { text-align: right; }
+.news-table th.c { text-align: center; }
+
+/* Sort arrow links */
+.news-table th .sort-links {
+    display: inline-flex;
+    gap: 2px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+.news-table th .sort-links a {
+    color: var(--news-text-dim);
+    text-decoration: none;
+    font-size: 10px;
+    padding: 0 1px;
+    transition: color 0.1s;
+}
+.news-table th .sort-links a:hover { color: var(--ainfo); }
+
+.news-table td {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--news-border-subtle);
+    vertical-align: middle;
+}
+.news-table tbody tr:nth-child(even) { background: var(--news-row-even); }
+.news-table tbody tr:nth-child(odd) { background: var(--news-row-odd); }
+.news-table tbody tr:hover { background: var(--news-row-hover); }
+
+/* Card name + edition cell (OffsetCards column)
+   This merges the card name and edition into one richer cell. */
+.news-cc {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.news-cc .set-icon {
+    font-size: 18px;
+    color: var(--activetext);
+    flex-shrink: 0;
+}
+.news-cc .card-detail {
+    display: flex;
+    flex-direction: column;
+}
+.news-cc .card-detail a {
+    font-weight: 600;
+    color: var(--normal);
+    text-decoration: none;
+    font-size: 13px;
+}
+.news-cc .card-detail a:hover { color: var(--ainfo); }
+.news-cc .card-detail .set-sub {
+    font-size: 11px;
+    color: var(--news-text-dim);
+}
+
+/* Numeric cells */
+.news-num {
+    text-align: right;
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+/* Dollar formatting: from print_price template func */
+.news-dollar { color: var(--normal); }
+
+/* Percentage change: from print_perc template func
+   The template already handles sign/color via print_perc,
+   but we add pill styling for stronger visual signal */
+.news-perc {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.news-perc-up { background: rgba(63,185,80,0.1); color: var(--asuccess); }
+.news-perc-down { background: rgba(248,81,73,0.1); color: var(--adanger); }
+.news-perc-zero { color: var(--news-text-dim); }
+
+/* Centered cells (ranking, bucket, etc) */
+.news-center { text-align: center; }
+
+/* Ranking column: subtle badge */
+.news-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    height: 26px;
+    border-radius: 6px;
+    font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--news-surface-hover);
+    color: var(--activetext);
+}
+
+/* Bucket name */
+.news-bucket {
+    font-size: 12px;
+    color: var(--activetext);
+}
+
+/* Pagination bar
+   Maps to: .CurrentIndex, .TotalIndex,
+   .PrevIndex, .NextIndex with link construction */
+.news-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 14px;
+    border-top: 1px solid var(--news-border-subtle);
+}
+.news-pagination a,
+.news-pagination span {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.12s;
+}
+.news-pagination a {
+    background: var(--news-surface-raised);
+    border: 1px solid var(--news-border-subtle);
+    color: var(--activetext);
+}
+.news-pagination a:hover {
+    border-color: var(--news-accent-border);
+    color: var(--normal);
+}
+.news-pagination .cur {
+    background: var(--news-accent-muted);
+    border: 1px solid var(--news-accent-border);
+    color: var(--ainfo);
+    font-weight: 600;
+}
+.news-pagination .pg-info {
+    font-size: 12px;
+    color: var(--news-text-dim);
+}
+
+/* Upload tool link */
+.news-upload-row {
+    display: flex;
+    justify-content: center;
+    padding: 12px;
+    border-top: 1px solid var(--news-border-subtle);
+}
+.news-upload-btn {
+    padding: 8px 20px;
+    border-radius: 6px;
+    background: rgba(63,185,80,0.1);
+    border: 1px solid rgba(63,185,80,0.25);
+    color: var(--asuccess);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+}
+.news-upload-btn:hover { background: rgba(63,185,80,0.18); }
+
+/* Legend row */
+.news-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--news-text-dim);
+}
+
+
+/* ═══════════════════════════════════
+   OPTIONS VIEW
+   Uses: .Editions, .EditionsMap
+   ═══════════════════════════════════ */
+.news-options {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px 32px 80px;
+}
+.news-options h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+}
+.news-options .opts-desc {
+    color: var(--activetext);
+    font-size: 14px;
+    margin: 0 0 24px;
+}
+
+.news-opts-card {
+    background: var(--news-surface);
+    border: 1px solid var(--news-border-subtle);
+    border-radius: 14px;
+    padding: 24px;
+}
+.news-opts-card h2 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 4px;
+}
+.news-opts-card .sd {
+    font-size: 13px;
+    color: var(--activetext);
+    margin: 0 0 14px;
+}
+.news-opts-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--news-border-subtle);
+}
+.news-obtn {
+    padding: 7px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.news-obtn-w { background: rgba(210,153,34,0.15); color: var(--awarning); }
+.news-obtn-w:hover { background: rgba(210,153,34,0.25); }
+.news-obtn-g { background: rgba(63,185,80,0.15); color: var(--asuccess); }
+.news-obtn-g:hover { background: rgba(63,185,80,0.25); }
+
+.news-opts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 4px;
+}
+.news-opts-grid label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--activetext);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+.news-opts-grid label:hover { background: var(--news-surface-raised); }
+.news-opts-grid input[type="checkbox"] {
+    accent-color: var(--ainfo);
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+
+/* ═══════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════ */
+@media (max-width: 768px) {
+    .news-index { padding-left: 16px; padding-right: 16px; }
+    .news-data { padding-left: 16px; padding-right: 16px; }
+    .news-options { padding-left: 16px; padding-right: 16px; }
+    .news-page-nav { padding: 0 16px; }
+    .news-toc-grid { grid-template-columns: 1fr; }
+    .news-filter-bar { padding: 10px 12px; }
+    .news-table th, .news-table td { padding: 7px 10px; }
+    .news-cc .set-icon { display: none; }
+    .news-table { font-size: 12px; }
+}
