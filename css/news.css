@@ -1,7 +1,3 @@
-/* ═══════════════════════════════════════════════════
-   news.css — Newspaper page styles
-   ═══════════════════════════════════════════════════ */
-
 /* Theme Variables */
 .light-theme {
     --news-surface: #f0f0f5;
@@ -12,9 +8,11 @@
     --news-border-moderate: rgba(0, 0, 0, 0.15);
     --news-accent-muted: rgba(91, 141, 239, 0.08);
     --news-accent-border: rgba(91, 141, 239, 0.2);
-    --news-row-even: #f5f5f8;
-    --news-row-odd: #fafafa;
-    --news-row-hover: #ededf2;
+    --news-row-even: #ffffff;
+    --news-row-odd: #f7f7fa;
+    --news-row-hover: #eeeef4;
+    --news-card-border: rgba(0, 0, 0, 0.06);
+    --news-card-glow: rgba(91, 141, 239, 0.06);
 }
 
 .dark-theme {
@@ -26,9 +24,11 @@
     --news-border-moderate: rgba(255, 255, 255, 0.12);
     --news-accent-muted: rgba(91, 141, 239, 0.12);
     --news-accent-border: rgba(91, 141, 239, 0.25);
-    --news-row-even: #14161a;
+    --news-row-even: #13151a;
     --news-row-odd: #181b20;
-    --news-row-hover: #282d35;
+    --news-row-hover: #252930;
+    --news-card-border: rgba(255, 255, 255, 0.05);
+    --news-card-glow: rgba(91, 141, 239, 0.04);
 }
 
 /* Override mainbody padding when newspaper content is present */
@@ -39,77 +39,89 @@
 
 
 /* ═══════════════════════════════════
-   SHARED: Page section nav
-   Renders as tabs but each is an <a>
-   to newspaper?page=X — full reload.
-   The template sets .active based on
-   the current $.Page value.
+   SHARED: Page section nav (pill tabs)
    ═══════════════════════════════════ */
 .news-page-nav {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 32px;
+    padding: 16px 5%;
     display: flex;
     align-items: center;
-    gap: 2px;
-    border-bottom: 1px solid var(--news-border-subtle);
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: wrap;
+    gap: 6px;
     background: var(--background);
+    border-bottom: 1px solid var(--news-border-subtle);
     position: sticky;
     top: 48px;
     z-index: 50;
 }
-.news-page-nav::-webkit-scrollbar { height: 0; }
 
 .news-page-nav a {
-    padding: 11px 16px;
-    font-size: 13px;
+    padding: 7px 16px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--activetext);
     text-decoration: none;
-    border-bottom: 2px solid transparent;
     white-space: nowrap;
+    border-radius: 16px;
+    border: 1px solid var(--news-border-moderate);
+    background: var(--news-surface);
     transition: all 0.12s;
 }
-.news-page-nav a:hover { color: var(--normal); }
+.news-page-nav a:hover {
+    color: var(--normal);
+    border-color: var(--news-accent-border);
+    background: var(--news-surface-raised);
+}
 .news-page-nav a.active {
     color: var(--ainfo);
-    border-bottom-color: var(--ainfo);
+    border-color: var(--news-accent-border);
+    background: var(--news-accent-muted);
 }
 .news-page-nav .nav-spacer { flex: 1; }
 .news-page-nav .nav-opts {
-    padding: 11px 14px;
-    font-size: 13px;
+    padding: 7px 14px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--news-text-dim);
     text-decoration: none;
     white-space: nowrap;
+    border-radius: 16px;
+    border: 1px solid var(--news-border-subtle);
+    background: transparent;
 }
-.news-page-nav .nav-opts:hover { color: var(--activetext); }
+.news-page-nav .nav-opts:hover {
+    color: var(--activetext);
+    border-color: var(--news-border-moderate);
+}
+.news-page-nav .nav-opts.active {
+    color: var(--ainfo);
+    border-color: var(--news-accent-border);
+    background: var(--news-accent-muted);
+}
 
 
 /* ═══════════════════════════════════
-   INDEX VIEW (page="" or page="old")
-   Uses: .ToC, .LastUpdate, .IsOneDay
+   INDEX VIEW
    ═══════════════════════════════════ */
 .news-index {
-    max-width: 1200px;
+    padding: calc(48px + 28px) 5% 40px;
+    max-width: 1100px;
     margin: 0 auto;
-    padding: calc(48px + 28px) 32px 20px;
 }
+
 .news-index-header {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    margin-bottom: 4px;
-    flex-wrap: wrap;
+    margin-bottom: 20px;
 }
 .news-index-header h1 {
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 700;
     letter-spacing: -0.03em;
-    margin: 0;
+    margin: 0 0 8px;
+}
+.news-index-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
 }
 .news-badge {
     padding: 3px 10px;
@@ -122,153 +134,141 @@
 .news-date {
     font-size: 13px;
     color: var(--news-text-dim);
-    margin-left: auto;
 }
 
-.news-index-desc {
-    color: var(--activetext);
-    font-size: 14px;
-    margin: 0 0 28px;
-    max-width: 700px;
-}
-
-/* TOC cards: from .ToC range */
+/* TOC Grid — 2 columns for breathing room */
 .news-toc-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
-    margin-bottom: 28px;
 }
+
+/* Info card — compact banner, spans full width */
+.news-info-card {
+    padding: 14px 20px;
+    background: var(--news-accent-muted);
+    border: 1px solid var(--news-accent-border);
+    border-radius: 10px;
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+.news-info-card .info-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+.news-info-card .info-body h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ainfo);
+    margin: 0 0 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.news-info-card .info-body p {
+    font-size: 12px;
+    color: var(--activetext);
+    line-height: 1.5;
+    margin: 0;
+}
+.news-info-card strong { color: var(--normal); font-weight: 600; }
+.news-info-upgrade {
+    color: var(--awarning);
+    font-weight: 600;
+}
+
+/* TOC cards */
 .news-toc-card {
     display: flex;
     align-items: flex-start;
-    gap: 14px;
-    padding: 18px 20px;
+    gap: 16px;
+    padding: 20px 22px;
     background: var(--news-surface);
-    border: 1px solid var(--news-border-subtle);
-    border-radius: 14px;
+    border: 1px solid var(--news-card-border);
+    border-radius: 12px;
     text-decoration: none;
     color: var(--normal);
     transition: all 0.2s;
     position: relative;
+    overflow: hidden;
+}
+/* Subtle left accent bar */
+.news-toc-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--ainfo);
+    opacity: 0;
+    transition: opacity 0.2s;
 }
 .news-toc-card:hover {
     border-color: var(--news-accent-border);
     background: var(--news-surface-raised);
+    box-shadow: 0 2px 12px var(--news-card-glow);
 }
+.news-toc-card:hover::before {
+    opacity: 1;
+}
+
 .news-toc-num {
-    width: 30px; height: 30px;
-    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     background: var(--news-accent-muted);
     border: 1px solid var(--news-accent-border);
     color: var(--ainfo);
-    font-size: 13px; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
-    margin-top: 2px;
 }
 .news-toc-card .toc-text h3 {
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
-    margin: 0 0 4px;
+    margin: 0 0 6px;
+    line-height: 1.3;
 }
 .news-toc-card .toc-text p {
     font-size: 12px;
     color: var(--activetext);
     margin: 0;
-    line-height: 1.45;
+    line-height: 1.5;
 }
 .news-toc-arrow {
     position: absolute;
-    right: 16px; top: 20px;
+    right: 18px;
+    top: 22px;
     color: var(--news-text-dim);
-    font-size: 14px;
+    font-size: 16px;
     transition: all 0.2s;
     opacity: 0;
 }
 .news-toc-card:hover .news-toc-arrow {
     opacity: 1;
     color: var(--ainfo);
-    transform: translateX(2px);
-}
-
-/* Collapsible instructions */
-.news-instructions-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 14px;
-    border-radius: 6px;
-    background: var(--news-surface);
-    border: 1px solid var(--news-border-subtle);
-    color: var(--activetext);
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.15s;
-    margin-bottom: 12px;
-}
-.news-instructions-toggle:hover {
-    border-color: var(--news-accent-border);
-    color: var(--normal);
-}
-.news-instructions-toggle .toggle-chevron {
-    font-size: 10px;
-    transition: transform 0.2s;
-}
-.news-instructions-toggle.open .toggle-chevron {
-    transform: rotate(90deg);
-}
-
-.news-instructions-panel {
-    display: none;
-    background: var(--news-surface);
-    border: 1px solid var(--news-border-subtle);
-    border-radius: 14px;
-    padding: 20px 24px;
-    margin-bottom: 20px;
-    max-width: 800px;
-}
-.news-instructions-panel.open { display: block; }
-.news-instructions-panel h3 {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--normal);
-    margin: 0 0 8px;
-}
-.news-instructions-panel p {
-    font-size: 13px;
-    color: var(--activetext);
-    line-height: 1.65;
-    margin: 0 0 8px;
-}
-.news-instructions-panel p:last-child { margin: 0; }
-.news-instructions-panel strong { color: var(--normal); font-weight: 600; }
-.news-instructions-panel .inst-divider {
-    border: none;
-    border-top: 1px solid var(--news-border-subtle);
-    margin: 14px 0;
+    transform: translateX(3px);
 }
 
 
 /* ═══════════════════════════════════
    DATA TABLE VIEW
-   Uses: .Subtitle, .InfoMessage,
-   .Headings, .Table, .Cards,
-   filter/sort/pagination vars
    ═══════════════════════════════════ */
 .news-data {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 20px 32px 80px;
+    padding: 65px 5% 80px;
 }
 
-/* Page title + description row */
 .news-data-header {
-    margin-bottom: 18px;
+    margin-bottom: 20px;
 }
 .news-data-header h1 {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.02em;
     margin: 0 0 4px;
@@ -277,29 +277,25 @@
     font-size: 13px;
     color: var(--activetext);
     margin: 0;
-    max-width: 700px;
     line-height: 1.5;
 }
 
-/* Filter bar
-   Maps directly to the template's form fields:
-   min_price, max_price, min_change, max_change,
-   finish, filter (edition), rarity, bucket */
+/* Filter bar — tighter grouping, more cohesive */
 .news-filter-bar {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
-    padding: 12px 18px;
+    padding: 10px 14px;
     background: var(--news-surface);
     border: 1px solid var(--news-border-subtle);
-    border-radius: 10px;
-    margin-bottom: 16px;
+    border-radius: 12px 12px 0 0;
+    border-bottom: none;
 }
 .news-fg {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
 }
 .news-fl {
     font-size: 10px;
@@ -307,24 +303,26 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--news-text-dim);
+    padding-right: 2px;
 }
 .news-filter-bar input[type="text"] {
-    padding: 7px 8px;
-    border-radius: 4px;
+    padding: 6px 8px;
+    border-radius: 5px;
     border: 1px solid var(--news-border-moderate);
     background: var(--news-surface-raised);
     color: var(--normal);
     font-size: 12px;
     font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
     outline: none;
-    width: 54px;
+    width: 58px;
     text-align: center;
+    transition: border-color 0.12s;
 }
 .news-filter-bar input:focus { border-color: var(--ainfo); }
 .news-filter-bar input::placeholder { color: var(--news-text-dim); }
 .news-filter-bar select {
-    padding: 7px 8px;
-    border-radius: 4px;
+    padding: 6px 10px;
+    border-radius: 5px;
     border: 1px solid var(--news-border-moderate);
     background: var(--news-surface-raised);
     color: var(--normal);
@@ -332,6 +330,7 @@
     outline: none;
     appearance: none;
     cursor: pointer;
+    transition: border-color 0.12s;
 }
 .news-filter-bar select:focus { border-color: var(--ainfo); }
 .news-fsep {
@@ -339,133 +338,142 @@
     height: 22px;
     background: var(--news-border-moderate);
     flex-shrink: 0;
+    margin: 0 2px;
 }
 
-/* Table container */
+/* Table container — flush with filter bar above */
 .news-table-wrap {
     background: var(--news-surface);
     border: 1px solid var(--news-border-subtle);
-    border-radius: 14px;
+    border-radius: 0 0 12px 12px;
     overflow: hidden;
 }
 
-/* Table itself
-   Columns come from range $.Headings
-   Rows from range $.Table + $.Cards */
+/* Table */
 .news-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
+    table-layout: auto;
 }
 .news-table th {
-    padding: 10px 14px;
-    font-size: 11px;
+    padding: 10px 12px;
+    font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     color: var(--news-text-dim);
     background: var(--news-surface-raised);
-    border-bottom: 1px solid var(--news-border-subtle);
-    text-align: left;
+    border-bottom: 2px solid var(--news-border-subtle);
+    text-align: center;
     white-space: nowrap;
 }
-/* Sortable headers: the template already renders
-   sort arrows as <a> links with ?sort=field&dir=asc/desc */
-.news-table th.sortable { cursor: pointer; user-select: none; }
-.news-table th.sortable:hover { color: var(--activetext); }
-.news-table th.r { text-align: right; }
-.news-table th.c { text-align: center; }
+.news-table th:first-child { text-align: left; padding-left: 6px; }
 
 /* Sort arrow links */
 .news-table th .sort-links {
     display: inline-flex;
-    gap: 2px;
-    margin-left: 4px;
+    gap: 1px;
+    margin-left: 3px;
     vertical-align: middle;
 }
 .news-table th .sort-links a {
     color: var(--news-text-dim);
     text-decoration: none;
-    font-size: 10px;
-    padding: 0 1px;
-    transition: color 0.1s;
+    font-size: 9px;
+    padding: 1px 2px;
+    border-radius: 3px;
+    transition: all 0.1s;
+    line-height: 1;
 }
-.news-table th .sort-links a:hover { color: var(--ainfo); }
+.news-table th .sort-links a:hover {
+    color: var(--ainfo);
+    background: var(--news-accent-muted);
+}
 
 .news-table td {
-    padding: 9px 14px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--news-border-subtle);
     vertical-align: middle;
+    text-align: center;
 }
+.news-table td:first-child { text-align: left; padding-left: 6px; }
 .news-table tbody tr:nth-child(even) { background: var(--news-row-even); }
 .news-table tbody tr:nth-child(odd) { background: var(--news-row-odd); }
 .news-table tbody tr:hover { background: var(--news-row-hover); }
 
-/* Card name + edition cell (OffsetCards column)
-   This merges the card name and edition into one richer cell. */
+/* Card cell — tighter layout */
 .news-cc {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    min-width: 200px;
 }
 .news-cc .set-icon {
-    font-size: 18px;
+    font-size: 16px;
     color: var(--activetext);
     flex-shrink: 0;
 }
 .news-cc .card-detail {
     display: flex;
     flex-direction: column;
+    gap: 1px;
+    min-width: 0;
 }
 .news-cc .card-detail a {
     font-weight: 600;
     color: var(--normal);
     text-decoration: none;
     font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .news-cc .card-detail a:hover { color: var(--ainfo); }
 .news-cc .card-detail .set-sub {
     font-size: 11px;
     color: var(--news-text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Numeric cells */
 .news-num {
-    text-align: right;
     font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
     font-size: 12px;
     white-space: nowrap;
+    letter-spacing: -0.02em;
 }
 
-/* Dollar formatting: from print_price template func */
-.news-dollar { color: var(--normal); }
-
-/* Percentage change: from print_perc template func
-   The template already handles sign/color via print_perc,
-   but we add pill styling for stronger visual signal */
+/* Percentage pills — more visible */
 .news-perc {
     display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
+    padding: 3px 10px;
+    border-radius: 12px;
     font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     white-space: nowrap;
+    letter-spacing: -0.01em;
 }
-.news-perc-up { background: rgba(63,185,80,0.1); color: var(--asuccess); }
-.news-perc-down { background: rgba(248,81,73,0.1); color: var(--adanger); }
+.news-perc-up {
+    background: rgba(63, 185, 80, 0.15);
+    color: var(--asuccess);
+}
+.news-perc-down {
+    background: rgba(248, 81, 73, 0.15);
+    color: var(--adanger);
+}
 .news-perc-zero { color: var(--news-text-dim); }
 
-/* Centered cells (ranking, bucket, etc) */
-.news-center { text-align: center; }
-
-/* Ranking column: subtle badge */
+/* Ranking badge */
 .news-rank {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 32px;
-    height: 26px;
+    min-width: 30px;
+    height: 24px;
     border-radius: 6px;
     font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
     font-size: 12px;
@@ -474,15 +482,13 @@
     color: var(--activetext);
 }
 
-/* Bucket name */
+/* Bucket label */
 .news-bucket {
     font-size: 12px;
     color: var(--activetext);
 }
 
-/* Pagination bar
-   Maps to: .CurrentIndex, .TotalIndex,
-   .PrevIndex, .NextIndex with link construction */
+/* Pagination */
 .news-pagination {
     display: flex;
     align-items: center;
@@ -494,7 +500,7 @@
 .news-pagination a,
 .news-pagination span {
     padding: 5px 10px;
-    border-radius: 4px;
+    border-radius: 5px;
     font-size: 12px;
     font-weight: 500;
     text-decoration: none;
@@ -520,7 +526,7 @@
     color: var(--news-text-dim);
 }
 
-/* Upload tool link */
+/* Upload link */
 .news-upload-row {
     display: flex;
     justify-content: center;
@@ -530,8 +536,8 @@
 .news-upload-btn {
     padding: 8px 20px;
     border-radius: 6px;
-    background: rgba(63,185,80,0.1);
-    border: 1px solid rgba(63,185,80,0.25);
+    background: rgba(63, 185, 80, 0.1);
+    border: 1px solid rgba(63, 185, 80, 0.25);
     color: var(--asuccess);
     font-size: 13px;
     font-weight: 600;
@@ -539,9 +545,9 @@
     transition: all 0.15s;
     text-decoration: none;
 }
-.news-upload-btn:hover { background: rgba(63,185,80,0.18); }
+.news-upload-btn:hover { background: rgba(63, 185, 80, 0.18); }
 
-/* Legend row */
+/* Legend */
 .news-legend {
     display: flex;
     gap: 16px;
@@ -549,16 +555,17 @@
     font-size: 11px;
     color: var(--news-text-dim);
 }
+.news-legend a { color: var(--news-text-dim); }
+.news-legend a:hover { color: var(--activetext); }
 
 
 /* ═══════════════════════════════════
    OPTIONS VIEW
-   Uses: .Editions, .EditionsMap
    ═══════════════════════════════════ */
 .news-options {
+    padding: 20px 5% 80px;
     max-width: 1000px;
     margin: 0 auto;
-    padding: 20px 32px 80px;
 }
 .news-options h1 {
     font-size: 22px;
@@ -575,7 +582,7 @@
 .news-opts-card {
     background: var(--news-surface);
     border: 1px solid var(--news-border-subtle);
-    border-radius: 14px;
+    border-radius: 12px;
     padding: 24px;
 }
 .news-opts-card h2 {
@@ -604,10 +611,10 @@
     cursor: pointer;
     transition: all 0.15s;
 }
-.news-obtn-w { background: rgba(210,153,34,0.15); color: var(--awarning); }
-.news-obtn-w:hover { background: rgba(210,153,34,0.25); }
-.news-obtn-g { background: rgba(63,185,80,0.15); color: var(--asuccess); }
-.news-obtn-g:hover { background: rgba(63,185,80,0.25); }
+.news-obtn-w { background: rgba(210, 153, 34, 0.15); color: var(--awarning); }
+.news-obtn-w:hover { background: rgba(210, 153, 34, 0.25); }
+.news-obtn-g { background: rgba(63, 185, 80, 0.15); color: var(--asuccess); }
+.news-obtn-g:hover { background: rgba(63, 185, 80, 0.25); }
 
 .news-opts-grid {
     display: grid;
@@ -637,14 +644,19 @@
 /* ═══════════════════════════════════
    RESPONSIVE
    ═══════════════════════════════════ */
+@media (max-width: 900px) {
+    .news-toc-grid {
+        grid-template-columns: 1fr;
+    }
+}
 @media (max-width: 768px) {
-    .news-index { padding-left: 16px; padding-right: 16px; }
-    .news-data { padding-left: 16px; padding-right: 16px; }
-    .news-options { padding-left: 16px; padding-right: 16px; }
-    .news-page-nav { padding: 0 16px; }
-    .news-toc-grid { grid-template-columns: 1fr; }
-    .news-filter-bar { padding: 10px 12px; }
-    .news-table th, .news-table td { padding: 7px 10px; }
+    .news-index { padding-left: 3%; padding-right: 3%; }
+    .news-data { padding-left: 3%; padding-right: 3%; }
+    .news-options { padding-left: 3%; padding-right: 3%; }
+    .news-page-nav { padding: 8px 3%; }
+    .news-filter-bar { padding: 8px 10px; }
+    .news-table th, .news-table td { padding: 6px 8px; }
     .news-cc .set-icon { display: none; }
+    .news-cc { min-width: 140px; }
     .news-table { font-size: 12px; }
 }

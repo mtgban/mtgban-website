@@ -53,51 +53,28 @@
         <div class="news-index">
             <div class="news-index-header">
                 <h1>Welcome to {{.Title}}{{if .IsOneDay}}, <i>early edition</i>{{end}}</h1>
-                {{if .IsOneDay}}<span class="news-badge">Early Edition</span>{{end}}
-                <span class="news-date">Published {{.LastUpdate.Format "Jan 02, 2006"}}</span>
-            </div>
-            <p class="news-index-desc">
-                Market analysis and trend detection. Cards appearing here typically show up on MTGStocks ~5 days later.
-            </p>
-        </div>
-
-        <div style="max-width:1200px; margin:0 auto; padding:20px 32px 40px;">
-            <!-- Collapsible instructions -->
-            <button class="news-instructions-toggle" onclick="this.classList.toggle('open'); document.getElementById('instrPanel').classList.toggle('open');">
-                <span class="toggle-chevron">&#9654;</span>
-                How this works &amp; forecast notes
-            </button>
-            <div class="news-instructions-panel" id="instrPanel">
-                <h3>Data Sources</h3>
-                {{if eq .Page "old"}}
-                    <p>The Market Review provides an overall market health overview.</p>
-                    <p>Pages 2 and 3 show you how the market is trending. These are the cards that <a href="https://mtgstocks.com">MTGStocks</a> and similar pages will pick up in about 5 days.</p>
-                    <p>Pages 4 and 5 give you an overview of TCG vendor levels and how they are trending.</p>
-                    <p>Pages 6 and 7 review CK buylist strength and trends.</p>
-                    <p>On the last page you may select which sets to exclude and tailor your experience.</p>
-                {{else}}
-                    <p><strong>Spike Score</strong> identifies high-velocity cards using heuristics and price movements, assigned to budget buckets. The combined version also incorporates Card Kingdom pricing changes and buylist movement.</p>
-                    <p><strong>Vendor Listings</strong> tracks TCG seller counts. Decreasing vendor counts often signal rising demand before price moves. Increasing counts suggest oversupply.</p>
-                    <p><strong>Buylist Movement</strong> reviews CK offer strength and trends. Rising buylist offers indicate strong dealer demand and typically precede retail increases.</p>
-                {{end}}
-                <hr class="inst-divider">
-                <h3>About Forecasts</h3>
-                <p>This is not a crystal ball. We predict trend <strong>direction and velocity</strong> using time-series analysis across a 3-week review window from multiple vendor sites.</p>
-                <p>Values shown compare last week's forecast against this week's actual. Whether the pattern continues is left to the reader &mdash; present conditions don't always follow historical trends, and therein lies the risk.</p>
-                {{if not .IsOneDay}}
-                    <p style="margin-top:8px; color:var(--awarning); font-size:12px;">This edition is lagged 3 days. Consider upgrading to access the early edition.</p>
-                {{end}}
+                <div class="news-index-meta">
+                    {{if .IsOneDay}}<span class="news-badge">Early Edition</span>{{end}}
+                    <span class="news-date">Published {{.LastUpdate.Format "Jan 02, 2006"}}</span>
+                </div>
             </div>
 
             {{if .CanSwitchDay}}
-                <p style="font-size:13px; color:var(--activetext); margin-bottom:12px;">
+                <p style="font-size:13px; color:var(--activetext); margin:0 0 16px;">
                     As <b>Admin</b> you can check on the
                     <a href="newspaper?force3day={{.IsOneDay}}">{{if .IsOneDay}}3-day{{else}}early edition{{end}} newspaper</a>.
                 </p>
             {{end}}
 
-            <!-- TOC card grid -->
             <div class="news-toc-grid">
+                <div class="news-info-card">
+                    <span class="info-icon">&#9432;</span>
+                    <div class="info-body">
+                        <h3>About Forecasts</h3>
+                        <p>Trend <strong>direction and velocity</strong> predictions via time-series analysis across a 3-week window from multiple vendor sites. Values compare last week's forecast against this week's actual &mdash; present conditions don't always follow historical trends.{{if not .IsOneDay}} <span class="news-info-upgrade">This edition is lagged 3 days.</span>{{end}}</p>
+                    </div>
+                </div>
+
                 {{range $i, $page := .ToC}}
                     {{if ne $page.Option "options"}}
                     <a class="news-toc-card" href="newspaper?page={{$page.Option}}">
