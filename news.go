@@ -69,6 +69,8 @@ type NewspaperPage struct {
 	NewNewspaper bool
 	// Whether the page can be filtered by bucket name
 	HasBucket bool
+	// Short label for tab navigation
+	Short string
 
 	// Cached results of the various queries
 	Results     [][]string
@@ -333,6 +335,7 @@ var NewspaperPages = []NewspaperPage{
 		NewNewspaper: true,
 		HasBucket:    true,
 		NeedsBuylist: true,
+		Short:        "Combined Spike",
 	},
 	{
 		Title:  "Top Singles by Spike Score",
@@ -399,6 +402,7 @@ var NewspaperPages = []NewspaperPage{
 		},
 		NewNewspaper: true,
 		HasBucket:    true,
+		Short:        "Spike Score",
 	},
 	{
 		Title:  "Greatest Decrease in Vendor Listings",
@@ -471,6 +475,7 @@ var NewspaperPages = []NewspaperPage{
 			},
 		},
 		NewNewspaper: true,
+		Short:        "Vendors \u2193",
 	},
 	{
 		Title:  "Greatest Increase in Vendor Listings",
@@ -543,6 +548,7 @@ var NewspaperPages = []NewspaperPage{
 			},
 		},
 		NewNewspaper: true,
+		Short:        "Vendors \u2191",
 	},
 	{
 		Title:  "Greatest Increase in Buylist Offer",
@@ -622,6 +628,7 @@ var NewspaperPages = []NewspaperPage{
 		},
 		NewNewspaper: true,
 		NeedsBuylist: true,
+		Short:        "Buylist \u2191",
 	},
 	{
 		Title:  "Greatest Decrease in Buylist Offer",
@@ -701,6 +708,7 @@ var NewspaperPages = []NewspaperPage{
 		},
 		NewNewspaper: true,
 		NeedsBuylist: true,
+		Short:        "Buylist \u2193",
 	},
 	NewspaperPage{
 		Title:        "Newspaper Settings",
@@ -1221,6 +1229,45 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	minPercChange, _ := strconv.ParseFloat(r.FormValue("min_change"), 64)
 	maxPercChange, _ := strconv.ParseFloat(r.FormValue("max_change"), 64)
 	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
+
+	// Apply saved filter preferences from cookies on fresh visits
+	// (when no explicit filter params are in the URL)
+	filterParamKeys := []string{"filter", "rarity", "bucket", "finish", "min_price", "max_price", "min_change", "max_change"}
+	urlQuery := r.URL.Query()
+	hasExplicitFilters := false
+	for _, key := range filterParamKeys {
+		if urlQuery.Has(key) {
+			hasExplicitFilters = true
+			break
+		}
+	}
+	if !hasExplicitFilters && page != "" && page != "old" && page != "options" {
+		if v := readCookie(r, "news_filter"); v != "" && filter == "" {
+			filter = v
+		}
+		if v := readCookie(r, "news_rarity"); v != "" && rarity == "" {
+			rarity = v
+		}
+		if v := readCookie(r, "news_bucket"); v != "" && bucket == "" {
+			bucket = v
+		}
+		if v := readCookie(r, "news_finish"); v != "" && finish == "" {
+			finish = v
+		}
+		if v := readCookie(r, "news_min_price"); v != "" && minPrice == 0 {
+			minPrice, _ = strconv.ParseFloat(v, 64)
+		}
+		if v := readCookie(r, "news_max_price"); v != "" && maxPrice == 0 {
+			maxPrice, _ = strconv.ParseFloat(v, 64)
+		}
+		if v := readCookie(r, "news_min_change"); v != "" && minPercChange == 0 {
+			minPercChange, _ = strconv.ParseFloat(v, 64)
+		}
+		if v := readCookie(r, "news_max_change"); v != "" && maxPercChange == 0 {
+			maxPercChange, _ = strconv.ParseFloat(v, 64)
+		}
+	}
+
 	var query, defSort string
 
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
