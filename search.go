@@ -227,13 +227,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		} else if isSetsPage {
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Editions", 1)
 
-			pageVars.EditionSort = TreeEditionsKeys
-			pageVars.EditionList = TreeEditionsMap
 			pageVars.TotalSets = TotalSets
 			pageVars.TotalCards = TotalCards
 			pageVars.TotalUnique = TotalUnique
 
 			sortOpt := r.FormValue("sort")
+			sortedKeys := TreeEditionsKeys
 
 			if sortOpt == "name" {
 				namedSort := make([]string, len(TreeEditionsKeys))
@@ -241,7 +240,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				sort.Slice(namedSort, func(i, j int) bool {
 					return TreeEditionsMap[namedSort[i]][0].Name < TreeEditionsMap[namedSort[j]][0].Name
 				})
-				pageVars.EditionSort = namedSort
+				sortedKeys = namedSort
 			} else if sortOpt == "size" {
 				sizeSort := make([]string, len(TreeEditionsKeys))
 				copy(sizeSort, TreeEditionsKeys)
@@ -251,10 +250,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					}
 					return TreeEditionsMap[sizeSort[i]][0].Size > TreeEditionsMap[sizeSort[j]][0].Size
 				})
-				pageVars.EditionSort = sizeSort
+				sortedKeys = sizeSort
 			}
 
-			render(w, "editions.html", pageVars)
+			pageVars.FlatEditions = flattenEditions(sortedKeys, TreeEditionsMap)
+			pageVars.SortOption = sortOpt
+
+			render(w, "sets.html", pageVars)
 			return
 		}
 
