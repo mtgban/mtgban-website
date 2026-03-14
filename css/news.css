@@ -255,8 +255,6 @@
    DATA TABLE VIEW
    ═══════════════════════════════════ */
 .news-data {
-    max-width: 1400px;
-    margin: 0 auto;
     padding: 65px 5% 80px;
 }
 
@@ -342,7 +340,6 @@
     background: var(--surface-2);
     border: 1px solid var(--border-subtle);
     border-radius: 0 0 12px 12px;
-    overflow: hidden;
 }
 
 /* Table */
