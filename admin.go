@@ -57,22 +57,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	page := r.FormValue("page")
 	pageVars := genPageNav("Admin", sig)
-	pageVars.Nav = insertNavBar("Admin", pageVars.Nav, []NavElem{
-		NavElem{
-			Name:   "People",
-			Short:  "👥",
-			Link:   "/admin?page=people",
-			Active: page == "people",
-			Class:  "selected",
-		},
-		NavElem{
-			Name:   "Config",
-			Short:  "🗒️",
-			Link:   "/admin?page=config",
-			Active: page == "config",
-			Class:  "selected",
-		},
-	})
 
 	pageVars.LastUpdate = LastDatastoreUpdate
 	pageVars.LastNews = LastNewspaperUpdate
