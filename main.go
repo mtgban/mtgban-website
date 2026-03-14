@@ -896,6 +896,16 @@ var funcMap = template.FuncMap{
 		n, _ := strconv.ParseFloat(s, 64)
 		return fmt.Sprintf("%0.2f %%", n*100)
 	},
+	"perc_class": func(s string) string {
+		n, _ := strconv.ParseFloat(s, 64)
+		if n > 0 {
+			return "news-perc-up"
+		}
+		if n < 0 {
+			return "news-perc-down"
+		}
+		return "news-perc-zero"
+	},
 	"print_price": func(s string) string {
 		n, _ := strconv.ParseFloat(s, 64)
 		return fmt.Sprintf("$ %0.2f", n)

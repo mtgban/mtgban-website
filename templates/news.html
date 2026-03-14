@@ -4,6 +4,7 @@
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/news.css?hash={{.Hash}}">
     <title>{{.Title}} - {{.Subtitle}}</title>
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
@@ -15,6 +16,7 @@
     <meta name="msapplication-TileColor" content="#da532c">
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
     <meta name="theme-color" content="#ff0000">
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
 </head>
 
 <body class="light-theme">
@@ -45,319 +47,295 @@
     {{if ne .ErrorMessage ""}}
         <h1>{{.ErrorMessage}}</h1>
     {{else}}
-        <h1>Welcome to {{.Title}}{{if .IsOneDay}}, <i>early edition</i>{{end}}</h1>
-        <p class=indent>Published on {{.LastUpdate.Format "Jan 02, 2006"}}</p>
-        <div class="indent" style="max-width: 1000px;">
-            <h2>Table of contents</h2>
-            <ol class="indent index">
-                {{range .ToC}}
-                <li>
-                    <a href="newspaper?page={{.Option}}">{{.Title}}</a>
-                </li>
+    <div class="news-wrap">
+        {{if eq .Subtitle ""}}
+
+        <div class="news-index">
+            <div class="news-index-header">
+                <h1>Welcome to {{.Title}}</h1>
+                <div class="news-index-meta">
+                    {{if .IsOneDay}}<span class="news-badge">Early Edition</span>{{end}}
+                    <span class="news-date">Published {{.LastUpdate.Format "Jan 02, 2006"}}</span>
+                    <a class="news-settings-chip" href="newspaper?page=options">&#9881; Settings</a>
+                </div>
+            </div>
+
+            {{if .CanSwitchDay}}
+                <p style="font-size:13px; color:var(--activetext); margin:0 0 16px;">
+                    As <b>Admin</b> you can check on the
+                    <a href="newspaper?force3day={{.IsOneDay}}">{{if .IsOneDay}}3-day{{else}}early edition{{end}} newspaper</a>.
+                </p>
+            {{end}}
+
+            <div class="news-toc-grid">
+                {{range $i, $page := .ToC}}
+                    {{if ne $page.Option "options"}}
+                    <a class="news-toc-card" href="newspaper?page={{$page.Option}}">
+                        <span class="news-toc-icon">{{if $page.Icon}}{{$page.Icon}}{{else}}{{inc $i 1}}{{end}}</span>
+                        <div class="toc-text">
+                            <h3>{{$page.Title}}</h3>
+                            <p>{{$page.Desc}}</p>
+                        </div>
+                        <span class="news-toc-arrow">&rarr;</span>
+                    </a>
+                    {{end}}
                 {{end}}
-            </ol>
+            </div>
+
+            {{if eq .Page "old"}}
+            <div class="news-info-card">
+                <span class="info-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="dodgerblue" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/></svg></span>
+                <div class="info-body">
+                    <h3>About Forecasts</h3>
+                    <p>Trend <strong>direction and velocity</strong> predictions via time-series analysis across a 3-week window from multiple vendor sites. Values compare last week's forecast against this week's actual &mdash; present conditions don't always follow historical trends.{{if not .IsOneDay}} <span class="news-info-upgrade">This edition is lagged 3 days.</span>{{end}}</p>
+                </div>
+            </div>
+            {{end}}
         </div>
 
-        <div style="clear:both;"></div>
-
-        {{if eq .Subtitle ""}}
-            <div class="indent" style="max-width: 900px;">
-                <br>
-                <p class="indent">
-                    Your patronage gives you access to the
-                    {{if .IsOneDay}}
-                        <i>early edition</i>, aka the 1-day newspaper.
-                    {{else}}
-                        3-day newspaper.
-                    {{end}}
-                    {{if .CanSwitchDay}}
-                        <br>As <b>Admin</b> you can check on the
-                        <a href="newspaper?force3day={{.IsOneDay}}">{{if .IsOneDay}}3-day{{else}}early edition{{end}} newspaper</a>.
-                    {{end}}
-                </p>
-
-                <h3>Instructions</h3>
-                {{if eq .Page "old"}}
-                    <ul class="indent">
-                        <li>The Market Review provides an overall market health overview.</li>
-                        <li>Pages 2 and 3 show you how the market is trending.<br>
-                            These are the cards that <a href="https://mtgstocks.com">MTGStocks</a>, <a href="https://echomtg.com">echomtg</a>, and similar pages will pick up in about 5 days (usually - even if they don't, these are the cards that are actively churning on the market given a 3 week review across multiple vendor sites).</li>
-                        <li>Pages 4 and 5 give you an overview of TCG vendor levels, how many vendors have listings of a specific card and how it is trending.</li>
-                        <li>Pages 6 and 7 are the same deal as 4-5, just reviewing CK buylist and the strength and trends of their offers on cards.</li>
-                        <li>On page 8 you may select which sets to exclude and tailor your experience.</li>
-                    </ul>
-                    <br>
-                    <ul class="indent">
-                        <li>Check out a <a href=https://youtu.be/1BILs981-Y4>video introduction</a> from <a href="https://twitter.com/WolfOfTinStreet">WolfOfTinStreet</a>.
-                    </ul>
-                    <br>
-                    <h3>A note on forecasts</h3>
-                    <ul class="indent">
-                        <li>This newspaper is not a crystal ball.</li>
-                        <li>More often then not, the trend of the card is what we're aiming to predict and the sharpness of that trend velocity.</li>
-                        <li>These forecasts hereafter attempt to show, based off time series analysis, the potential future values (7 days out) for key metrics.</li>
-                        <li>The values shown demonstrate the value and forecast value from one week prior. We then can compare the forecast value (what the model thought the value would be {{if .IsOneDay}}in present day{{else}}on a 3 day lag{{end}}).</li>
-                        <li>Then it will demonstrate today's value, and the current projection moving forward.</li>
-                        <li>In your own review of how my model performed last week to this week, <b>it is left up to the reader</b> to decide whether or not to believe it will continue to hold true into the future week, or if trends will change. What is being represented is historical patterns and their predicted end result.</li>
-                        <ul class="indent">
-                            <li>Things in the present, oftentimes, do not follow historical trends, and herein lies the risk.</li>
-                            <li>If they should follow historical patterns though...</li>
-                        </ul>
-                        {{if not .IsOneDay}}
-                            <li>Please also remember, this edition is lagged 3 days behind present date. Consider upgrading your pledge to gain access to the <i>early edition</i>.</li>
-                        {{end}}
-                    </ul>
-                    <br>
-                {{else}}
-                    <ul class="indent">
-                        <li>The Newspaper is BAN's exclusive market and trend analysis tool! Each page offers different type of data:
-                        <li>We have a <b>Spike Score</b> section that indicates cards with high velocity, using heuristics an price movements over a period of time.<br>
-                            Each card is assigned to a budget bucket that signals different movement across different price ranges.
-                            Depending on the game, we also use buylist movement with a different algorithm to come up with the Spike Score.<br>
-                            These cards usually show up on <a href="https://mtgstocks.com">MTGStocks</a> a few days later.<br>
-                        <li>Then the <b>Increase/Decrease in Vendor Listing</b> pages give you an overview of TCG vendor levels, how many vendors have listings of a specific card and how it is trending.</li>
-                        <li>Finally the <b>Greatest Increase/Decrease</b> pages use a similar approach to review movements on the buylist (if available).</li>
-                        <li>Of course you can customize your experience, by selecting certain sets or displaying Foil/Nonfoil cards, and pick any rarity you want.</li>
-                    </ul>
-                {{end}}
-
-            </div>
-        {{else if eq .Subtitle "Options"}}
-            <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
-            <br>
-
-            <div class="indent">
-                <h2>Edition list</h2>
-                Select which editions you <b>don't</b> want to display in your newspaper.
-                <br>
-
-                <script type="text/javascript">
-                    window.onload = function(e) {
-                        loadForm("NewspaperList", "editions");
-                    }
-                </script>
-
-                <a class="btn warning" onclick="javascript:clearForm('editions');"><b>CLEAR</b></a>
-                <a class="btn success" onclick="javascript:selectAll('editions');"><b>SELECT ALL</b></a>
-                <a class="btn success" onclick="javascript:saveForm('NewspaperList', 'editions'); window.location.href = '/newspaper'"><b>SAVE</b></a>
-            </div>
-
-            <div class="indent row" id="editions">
-                {{range $i, $key := .Editions}}
-                    {{if triple_column_start $i (len $.Editions)}}
-                        <div class="column">
-                    {{end}}
-
-                    {{$edition := index $.EditionsMap $key}}
-                    {{if $edition}}
-                    <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                    <label for="{{$key}}">
-                        {{if $edition.Keyrune}}
-                            <i class="ss ss-{{$edition.Keyrune}} ss-2x ss-fw"></i>
-                        {{else}}
-                            <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-                                <circle r="9" cx="10" cy="10" fill="var(--normal)" stroke="var(--normal)"/>
-                                <text font-size="14" x="50%" y="60%" text-anchor="middle" fill="var(--background)">{{$key}}</text>
-                            </svg>
-                        {{end}}
-
-                        {{$edition.Name}}
-                    </label>
-                    <br>
-                    {{end}}
-
-                    {{if triple_column_end $i (len $.Editions)}}
-                        </div>
-                    {{end}}
-                {{end}}
-            </div>
-
         {{else}}
-            <img id="hoverImage" class="hoverImage" src=""/>
-            <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
 
-            <div style="clear:both;">
-                <div style="float:left;">
-                    <h1>{{.Subtitle}}</h1>
-                </div>
-                <div style="float:left; padding:18px 0 0 100px; margin:auto">
-                    <form action="newspaper" method="GET">
-                        <input type="hidden" name="page" value="{{$.Page}}">
-                        <input type="hidden" name="sort" value="{{$.SortOption}}">
-                        <input type="hidden" name="dir" value="{{$.SortDir}}">
-                        <input type="hidden" name="index" value="{{$.CurrentIndex}}">
-                        {{if $.CanFilterByPrice}}
-                            <input name="min_price" {{if $.FilterMinPrice}}value="{{$.FilterMinPrice}}"{{end}} placeholder="Min $" class="input-css" style="width:42px; padding: .6em .5em .5em .5em">
-                            <input name="max_price" {{if $.FilterMaxPrice}}value="{{$.FilterMaxPrice}}"{{end}} placeholder="Max $" class="input-css" style="width:42px; padding: .6em .5em .5em .5em">
-                        {{end}}
-                        {{if $.CanFilterByPercentage}}
-                            <input name="min_change" {{if $.FilterMinPercChange}}value="{{$.FilterMinPercChange}}"{{end}} placeholder="Min %" class="input-css" style="width:48px; padding: .6em .5em .5em .5em">
-                            <input name="max_change" {{if $.FilterMaxPercChange}}value="{{$.FilterMaxPercChange}}"{{end}} placeholder="Max %" class="input-css" style="width:48px; padding: .6em .5em .5em .5em">
-                        {{end}}
+        <div class="news-page-nav">
+            {{range .ToC}}
+                {{if ne .Option "options"}}
+                    <a href="newspaper?page={{.Option}}" {{if eq .Option $.Page}}class="active"{{end}}>{{if .Short}}{{.Short}}{{else}}{{.Title}}{{end}}</a>
+                {{end}}
+            {{end}}
+            <span class="nav-spacer"></span>
+            <a class="nav-opts {{if eq .Subtitle "Options"}}active{{end}}" href="newspaper?page=options">&#9881; Settings</a>
+        </div>
 
-                        <select name="finish" onchange="this.form.submit()" class="select-css" style="width:64px; text-align:center;">
-                            {{if eq "" $.FilterFinish}}
-                                <option value="" disabled selected hidden>✨</option>
-                            {{end}}
-                            {{range .Finishes}}
-                                <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterFinish)}}selected{{end}}>{{.}}</option>
-                            {{end}}
-                        </select>
+            {{if ne .Subtitle "Options"}}
 
-                        <select name="filter" onchange="this.form.submit()" class="select-css" style="width:300px; padding-left:.8em">
-                            {{if eq "" $.FilterSet}}
-                                <option value="" disabled selected hidden>Filter by Edition</option>
-                            {{end}}
-                            {{range .Editions}}
-                                <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterSet)}}selected{{end}}>{{.}}</option>
-                            {{end}}
-                        </select>
+        <img id="hoverImage" class="hoverImage" src=""/>
+        <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
 
-                        <select name="rarity" onchange="this.form.submit()" class="select-css" style="width:52px; text-align:center;">
-                            {{if eq "" $.FilterRarity}}
-                                <option value="" disabled selected hidden>🍀</option>
-                            {{end}}
-                            {{range .Rarities}}
-                                <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterRarity)}}selected{{end}}>{{.}}</option>
-                            {{end}}
-                        </select>
-
-                        {{if .Tiers}}
-                            <select name="bucket" onchange="this.form.submit()" class="select-css" style="width:52px; text-align:center;">
-                                {{if eq "" $.FilterBucket}}
-                                    <option value="" disabled selected hidden>💸</option>
-                                {{end}}
-                                {{range .Tiers}}
-                                    <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterBucket)}}selected{{end}}>{{.}}</option>
-                                {{end}}
-                            </select>
-                        {{end}}
-
-                        <input type="submit" style="visibility: hidden" />
-                    </form>
+        <div class="news-data">
+            <div class="news-data-header">
+                <h1>{{.Subtitle}}</h1>
+                <p>{{.InfoMessage}}</p>
+                <div class="news-legend">
+                    {{if .HasReserved}}<span>* = <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a></span>{{end}}
+                    {{if .HasStocks}}<span>&bull; = <a href="https://mtgstocks.com/interests">MTGStocks Interests</a></span>{{end}}
+                    {{if .HasSypList}}<span>&dagger; = <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a></span>{{end}}
                 </div>
             </div>
 
-            <div class="indent" style="max-width: {{if $.LargeTable}}90%{{else}}1080px{{end}};">
-                <table onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';" width=100%>
-                    <tr>
-                        {{range .Headings}}
-                            {{if not .IsHidden}}
-                                <th class="stickyHeaderShort">
-                                    {{if .ConditionalSort}}
-                                        <center>
-                                    {{end}}
-                                    {{.Title}}
-                                    {{if .ConditionalSort}}
-                                        </center>
-                                    {{end}}
+            <form action="newspaper" method="GET">
+                <input type="hidden" name="page" value="{{$.Page}}">
+                <input type="hidden" name="sort" value="{{$.SortOption}}">
+                <input type="hidden" name="dir" value="{{$.SortDir}}">
+                <div class="news-filter-bar">
+                    {{if $.CanFilterByPrice}}
+                    <div class="news-fg">
+                        <span class="news-fl">Price</span>
+                        <input type="text" name="min_price" {{if $.FilterMinPrice}}value="{{$.FilterMinPrice}}"{{end}} placeholder="Min $">
+                        <input type="text" name="max_price" {{if $.FilterMaxPrice}}value="{{$.FilterMaxPrice}}"{{end}} placeholder="Max $">
+                    </div>
+                    <span class="news-fsep"></span>
+                    {{end}}
 
-                                    {{if or .CanSort (and (not (eq $.FilterSet "")) .ConditionalSort)}}
-                                        <nobr>
-                                            <a href="newspaper?page={{$.Page}}&sort={{.Field}}&dir=desc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}"><i class="arrow down"></i></a>
-                                            <a href="newspaper?page={{$.Page}}&sort={{.Field}}&dir=asc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}"><i class="arrow up"></i></a>
-                                        </nobr>
-                                    {{end}}
-                                </th>
-                            {{end}}
+                    {{if $.CanFilterByPercentage}}
+                    <div class="news-fg">
+                        <span class="news-fl">Change</span>
+                        <input type="text" name="min_change" {{if $.FilterMinPercChange}}value="{{$.FilterMinPercChange}}"{{end}} placeholder="Min %">
+                        <input type="text" name="max_change" {{if $.FilterMaxPercChange}}value="{{$.FilterMaxPercChange}}"{{end}} placeholder="Max %">
+                    </div>
+                    <span class="news-fsep"></span>
+                    {{end}}
+
+                    <select name="finish" onchange="this.form.submit()" style="width:58px; text-align:center;">
+                        {{if eq "" $.FilterFinish}}
+                            <option value="" disabled selected hidden>&#10024;</option>
                         {{end}}
-                    </tr>
-                    {{range $j, $card := .Cards}}
-                        {{$table := (index $.Table $j)}}
-                        <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
-                            {{range $i, $row := $table}}
-                                {{if eq $i $.OffsetCards}}
-                                    <td {{if $.LargeTable}}style="min-width: 15%;"{{end}}>
-                                        <a href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}" lang="{{$card.LangTag}}">{{$row}}</a>
-                                        {{if $card.Reserved}} *{{end}}
-                                        {{if $card.Stocks}} •{{end}}
-                                        {{if $card.SypList}} †{{end}}
-                                    </td>
-                                {{else if eq $i (inc $.OffsetCards 1)}}
-                                    <td {{if $.LargeTable}}style="min-width: 15%;"{{end}}>
-                                        <div style="display: flex; align-items: center; gap: 6px;">
-                                            {{if $card.Keyrune}}
-                                                <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i>
-                                            {{else if $card.RarityColor}}
-                                                <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-                                                    <circle r="9" cx="10" cy="10" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
-                                                    <text font-size="14" x="50%" y="60%" text-anchor="middle" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
-                                                </svg>
-                                            {{else}}
-                                                <h3>{{$card.SetCode}}&nbsp;</h3>
-                                            {{end}}
+                        {{range .Finishes}}
+                            <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterFinish)}}selected{{end}}>{{.}}</option>
+                        {{end}}
+                    </select>
 
-                                            {{$row}}
-                                        </div>
-                                    </td>
-                                {{else}}
-                                    {{$head := (index $.Headings $i)}}
-                                    {{if not $head.IsHidden}}
-                                        <td>
-                                            <center>
-                                                <nobr>
-                                                {{if $head.IsDollar}}
-                                                    {{print_price $row}}
-                                                {{else if $head.IsPerc}}
-                                                    {{print_perc $row}}
-                                                {{else}}
-                                                    {{$row}}
-                                                {{end}}
-                                                </nobr>
-                                            </center>
-                                        </td>
+                    <select name="filter" onchange="this.form.submit()" style="min-width:180px;">
+                        {{if eq "" $.FilterSet}}
+                            <option value="" disabled selected hidden>Edition...</option>
+                        {{end}}
+                        {{range .Editions}}
+                            <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterSet)}}selected{{end}}>{{.}}</option>
+                        {{end}}
+                    </select>
+
+                    <select name="rarity" onchange="this.form.submit()" style="width:52px; text-align:center;">
+                        {{if eq "" $.FilterRarity}}
+                            <option value="" disabled selected hidden>&#127808;</option>
+                        {{end}}
+                        {{range .Rarities}}
+                            <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterRarity)}}selected{{end}}>{{.}}</option>
+                        {{end}}
+                    </select>
+
+                    {{if .Tiers}}
+                    <select name="bucket" onchange="this.form.submit()" style="width:58px; text-align:center;">
+                        {{if eq "" $.FilterBucket}}
+                            <option value="" disabled selected hidden>&#128184;</option>
+                        {{end}}
+                        {{range .Tiers}}
+                            <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterBucket)}}selected{{end}}>{{.}}</option>
+                        {{end}}
+                    </select>
+                    {{end}}
+
+                    <input type="submit" style="visibility:hidden; width:0; padding:0; border:0;" />
+                </div>
+            </form>
+
+            <div class="news-table-wrap">
+                <table class="news-table" id="newsTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                    <thead>
+                        <tr>
+                            {{range $i, $head := .Headings}}
+                                {{if not $head.IsHidden}}
+                                    {{if or (eq $i (inc $.OffsetCards 1)) (eq $i (inc $.OffsetCards 2))}}
+                                        {{/* Skip Edition and # headers — merged into Card column */}}
+                                    {{else}}
+                                        <th class="{{if eq $i $.OffsetCards}}news-th-card{{end}} {{if $head.IsDollar}}r{{end}} {{if $head.IsNum}}c{{end}} {{if eq $head.Title "Ranking"}}news-rank-col{{end}}">
+                                            {{if eq $i $.OffsetCards}}Card{{else}}{{$head.Title}}{{end}}
+                                            {{if or $head.CanSort (and (not (eq $.FilterSet "")) $head.ConditionalSort)}}
+                                                <span class="sort-links">
+                                                    <a href="newspaper?page={{$.Page}}&sort={{$head.Field}}&dir=desc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&#9660;</a>
+                                                    <a href="newspaper?page={{$.Page}}&sort={{$head.Field}}&dir=asc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&#9650;</a>
+                                                </span>
+                                            {{end}}
+                                        </th>
                                     {{end}}
                                 {{end}}
                             {{end}}
                         </tr>
-                    {{end}}
-                    <tr>
-                        <td colspan="{{len .Headings}}">
-                            <p style="text-align: center; vertical-align: middle;">
-                            {{if ne .CurrentIndex 1}}
-                                <a class="pagination" href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index=&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&lt;</a>
-                                <a class="pagination" href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}"><i class="arrow left"></i></a>
-                            {{end}}
-                            {{.CurrentIndex}} / {{.TotalIndex}}
-                            {{if ne .CurrentIndex .TotalIndex}}
-                                <a class="pagination" href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}"><i class="arrow right"></i></a>
-                                <a class="pagination" href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.TotalIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&gt;</a>
-                            {{end}}
-                            </p>
-
-                            <center>
-                                <form action="/upload" method="post">
-                                    <input type="hidden" name="mode" value="false"/>
-                                    {{range .CardHashes}}
-                                        <input type="hidden" name="hashes" value="{{.}}"/>
+                    </thead>
+                    <tbody>
+                        {{range $j, $card := .Cards}}
+                            {{$table := (index $.Table $j)}}
+                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
+                                {{range $i, $row := $table}}
+                                    {{if eq $i $.OffsetCards}}
+                                        <td class="news-td-card">
+                                            <div class="news-cc">
+                                                {{if $card.Keyrune}}
+                                                    <i class="ss {{$card.Keyrune}} ss-1x ss-fw set-icon"></i>
+                                                {{else if $card.RarityColor}}
+                                                    <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                                                        <circle r="9" cx="10" cy="10" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
+                                                        <text font-size="14" x="50%" y="60%" text-anchor="middle" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                                    </svg>
+                                                {{end}}
+                                                <div class="card-detail">
+                                                    <span class="card-name"><a href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}" lang="{{$card.LangTag}}">{{$row}}</a>{{if $card.Reserved}} *{{end}}{{if $card.Stocks}} &bull;{{end}}{{if $card.SypList}} &dagger;{{end}}</span>
+                                                    <span class="set-sub">{{index $table (inc $.OffsetCards 1)}} &bull; #{{index $table (inc $.OffsetCards 2)}}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    {{else if or (eq $i (inc $.OffsetCards 1)) (eq $i (inc $.OffsetCards 2))}}
+                                        {{/* Skip edition and # columns — merged into Card cell */}}
+                                    {{else}}
+                                        {{$head := (index $.Headings $i)}}
+                                        {{if not $head.IsHidden}}
+                                            <td class="{{if or $head.IsDollar $head.IsPerc $head.IsNum}}news-num{{end}} {{if eq $head.Title "Ranking"}}news-rank-col{{end}}">
+                                                {{if and $head.IsNum (eq $head.Title "Ranking")}}
+                                                    <span class="news-rank">{{$row}}</span>
+                                                {{else if $head.IsDollar}}
+                                                    {{print_price $row}}
+                                                {{else if $head.IsPerc}}
+                                                    <span class="news-perc {{perc_class $row}}">{{print_perc $row}}</span>
+                                                {{else if $head.IsNum}}
+                                                    {{$row}}
+                                                {{else}}
+                                                    <span class="news-bucket">{{$row}}</span>
+                                                {{end}}
+                                            </td>
+                                        {{end}}
                                     {{end}}
-                                    <a class="btn success" style="text-align: center;" href='#' onclick='this.parentNode.submit(); return false;'>Load this page in the Uploader tool</a>
-                                    <noscript>
-                                        <input type="submit" value="Check Uploader!" />
-                                    </noscript>
-                                </form>
-                            </center>
-                        </td>
-                    </tr>
+                                {{end}}
+                            </tr>
+                        {{end}}
+                    </tbody>
                 </table>
-                <br>
-                <h4>
-                    <p>{{.InfoMessage}}</p>
-                    {{if .HasReserved}}
-                        <p>* = Part of the <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a></p>
+
+                <div class="news-pagination">
+                    {{if ne .CurrentIndex 1}}
+                        <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index=&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&lt;&lt;</a>
+                        <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&lt;</a>
                     {{end}}
-                    {{if .HasStocks}}
-                        <p>• = On <a href="https://mtgstocks.com/interests">MTGStocks Interests</a> page</p>
+                    <span class="cur">{{.CurrentIndex}}</span>
+                    <span class="pg-info">/ {{.TotalIndex}}</span>
+                    {{if ne .CurrentIndex .TotalIndex}}
+                        <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&gt;</a>
+                        <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.TotalIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&gt;&gt;</a>
                     {{end}}
-                    {{if .HasSypList}}
-                        <p>† = Found in the <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a></p>
-                    {{end}}
-                </h4>
-                <br><br><br>
+                </div>
+
+                <div class="news-upload-row">
+                    <form action="/upload" method="post">
+                        <input type="hidden" name="mode" value="false"/>
+                        {{range .CardHashes}}
+                            <input type="hidden" name="hashes" value="{{.}}"/>
+                        {{end}}
+                        <button type="submit" class="news-upload-btn">Load this page in the Uploader</button>
+                    </form>
+                </div>
             </div>
-            <br>
+
+        </div>
+
+            {{else}}
+
+        <div class="news-options">
+            <h1>Newspaper Options</h1>
+            <p class="opts-desc">Select editions to <strong>exclude</strong> from your newspaper.</p>
+
+            <div class="news-opts-card">
+                <h2>Edition List</h2>
+                <p class="sd">Checked editions will be <strong>hidden</strong> from all newspaper pages.</p>
+                <div class="news-opts-bar">
+                    <button class="news-obtn news-obtn-w" onclick="clearForm('editions')">Clear</button>
+                    <button class="news-obtn news-obtn-g" onclick="selectAll('editions')">Select All</button>
+                    <button class="news-obtn news-obtn-g" onclick="saveForm('NewspaperList','editions'); location.href='/newspaper'">Save</button>
+                </div>
+                <div class="news-opts-grid" id="editions">
+                    {{range $i, $key := .Editions}}
+                        {{$edition := index $.EditionsMap $key}}
+                        {{if $edition}}
+                        <label>
+                            <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                            {{if $edition.Keyrune}}
+                                <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
+                            {{else}}
+                                <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                                    <circle r="9" cx="10" cy="10" fill="var(--normal)" stroke="var(--normal)"/>
+                                    <text font-size="14" x="50%" y="60%" text-anchor="middle" fill="var(--background)">{{$key}}</text>
+                                </svg>
+                            {{end}}
+                            {{$edition.Name}}
+                        </label>
+                        {{end}}
+                    {{end}}
+                </div>
+            </div>
+
+            <script>
+                window.onload = function() {
+                    loadForm("NewspaperList", "editions");
+                }
+            </script>
+        </div>
+
+            {{end}}
         {{end}}
+    </div>
     {{end}}
 </div>
+
+<script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
+<script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
+<script>
+    var t = document.getElementById('newsTable');
+    if (t) new Tablesort(t);
+</script>
 </body>
 </html>
