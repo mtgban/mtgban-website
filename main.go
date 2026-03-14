@@ -114,6 +114,7 @@ type PageVars struct {
 	OffsetCards  int
 	FilterSet    string
 	Editions     []string
+	FlatEditions []FlatEditionEntry
 	FilterRarity string
 	FilterBucket string
 	FilterFinish string

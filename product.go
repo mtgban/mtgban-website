@@ -29,6 +29,26 @@ type EditionEntry struct {
 	Colors   []string
 }
 
+// FinishOption represents a finish variant link for a set
+type FinishOption struct {
+	Query string // e.g. "nonfoil", "foil", "etched"
+	Label string // display label
+}
+
+// ColorEntry represents a color with its precomputed hex value
+type ColorEntry struct {
+	Name string
+	Hex  string
+}
+
+// FlatEditionEntry extends EditionEntry with fields needed by sets.html
+type FlatEditionEntry struct {
+	EditionEntry
+	IsChild  bool
+	Finishes []FinishOption
+	ColorHex []ColorEntry
+}
+
 // Contains all the set value computations shown on sealed products
 var Infos map[string]mtgban.InventoryRecord
 
@@ -249,6 +269,55 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 	}
 
 	return sortedEditions, listEditions
+}
+
+// flattenEditions converts the tree structure into a flat slice for sets.html
+func flattenEditions(keys []string, tree map[string][]EditionEntry) []FlatEditionEntry {
+	var flat []FlatEditionEntry
+	for _, key := range keys {
+		entries := tree[key]
+		for i, entry := range entries {
+			fe := FlatEditionEntry{
+				EditionEntry: entry,
+				IsChild:      i > 0,
+			}
+
+			// Build finish options
+			if entry.Special {
+				switch entry.Code {
+				case "H1R":
+					fe.Finishes = []FinishOption{
+						{Query: "foil", Label: "foil"},
+						{Query: "etched", Label: "etched"},
+					}
+				case "SCD":
+					fe.Finishes = []FinishOption{
+						{Query: "nonfoil", Label: "nonfoil"},
+						{Query: "etched", Label: "etched"},
+					}
+				}
+			} else if entry.ShowFin {
+				if entry.HasReg {
+					fe.Finishes = append(fe.Finishes, FinishOption{Query: "nonfoil", Label: "nonfoil"})
+				}
+				if entry.HasFoil {
+					fe.Finishes = append(fe.Finishes, FinishOption{Query: "foil", Label: "foil"})
+				}
+			}
+
+			// Build color entries with hex values
+			for _, color := range entry.Colors {
+				hex, found := colorValues[color]
+				if !found {
+					hex = "#111111"
+				}
+				fe.ColorHex = append(fe.ColorHex, ColorEntry{Name: color, Hex: hex})
+			}
+
+			flat = append(flat, fe)
+		}
+	}
+	return flat
 }
 
 func getSealedEditions() ([]string, map[string][]EditionEntry) {
