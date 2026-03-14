@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"slices"
@@ -71,6 +72,8 @@ type NewspaperPage struct {
 	HasBucket bool
 	// Short label for tab navigation
 	Short string
+	// SVG icon for TOC card display
+	Icon template.HTML
 
 	// Cached results of the various queries
 	Results     [][]string
@@ -336,6 +339,7 @@ var NewspaperPages = []NewspaperPage{
 		HasBucket:    true,
 		NeedsBuylist: true,
 		Short:        "Combined Spike",
+		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg>`,
 	},
 	{
 		Title:  "Top Singles by Spike Score",
@@ -403,79 +407,7 @@ var NewspaperPages = []NewspaperPage{
 		NewNewspaper: true,
 		HasBucket:    true,
 		Short:        "Spike Score",
-	},
-	{
-		Title:  "Greatest Decrease in Vendor Listings",
-		Desc:   "Cards with relevant stock decrease, indicating that there is not enough supply to meet current demand across the reviewed time period (tl:dr - Seek these out)",
-		Offset: 3,
-		Option: "greatest_decrease_listings",
-		Query: `SELECT calc_date, product_id,
-                       ROW_NUMBER() OVER (ORDER BY raw_score DESC) AS ranking,
-                       product_name, set_name, product_number, variant,
-                       sellers_Today, sellers_d7, sellers_d30, pct_drop_7d
-                  FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
-                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
-                                      FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards)
-                   AND pct_drop_7d <> 0`,
-		Sort: "ranking ASC",
-		Head: []Heading{
-			{
-				IsHidden: true,
-			},
-			{
-				IsHidden: true,
-			},
-			{
-				Title:   "Ranking",
-				CanSort: true,
-				Field:   "ranking",
-				IsNum:   true,
-			},
-			{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "product_name",
-			},
-			{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "set_name",
-			},
-			{
-				Title: "#",
-				Field: "product_number",
-			},
-			{
-				Title: "Finish",
-				Field: "variant",
-			},
-			{
-				Title:   "Today's Sellers",
-				CanSort: true,
-				Field:   "sellers_Today",
-				IsNum:   true,
-			},
-			{
-				Title:   "Last Week Sellers",
-				CanSort: true,
-				Field:   "sellers_d7",
-				IsNum:   true,
-			},
-			{
-				Title:   "Month Ago Sellers",
-				CanSort: true,
-				Field:   "sellers_d30",
-				IsNum:   true,
-			},
-			{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "pct_drop_7d",
-				IsPerc:  true,
-			},
-		},
-		NewNewspaper: true,
-		Short:        "Vendors \u2193",
+		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg>`,
 	},
 	{
 		Title:  "Greatest Increase in Vendor Listings",
@@ -549,6 +481,81 @@ var NewspaperPages = []NewspaperPage{
 		},
 		NewNewspaper: true,
 		Short:        "Vendors \u2191",
+		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>`,
+	},
+	{
+		Title:  "Greatest Decrease in Vendor Listings",
+		Desc:   "Cards with relevant stock decrease, indicating that there is not enough supply to meet current demand across the reviewed time period (tl:dr - Seek these out)",
+		Offset: 3,
+		Option: "greatest_decrease_listings",
+		Query: `SELECT calc_date, product_id,
+                       ROW_NUMBER() OVER (ORDER BY raw_score DESC) AS ranking,
+                       product_name, set_name, product_number, variant,
+                       sellers_Today, sellers_d7, sellers_d30, pct_drop_7d
+                  FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
+                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
+                                      FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards)
+                   AND pct_drop_7d <> 0`,
+		Sort: "ranking ASC",
+		Head: []Heading{
+			{
+				IsHidden: true,
+			},
+			{
+				IsHidden: true,
+			},
+			{
+				Title:   "Ranking",
+				CanSort: true,
+				Field:   "ranking",
+				IsNum:   true,
+			},
+			{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "product_name",
+			},
+			{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "set_name",
+			},
+			{
+				Title: "#",
+				Field: "product_number",
+			},
+			{
+				Title: "Finish",
+				Field: "variant",
+			},
+			{
+				Title:   "Today's Sellers",
+				CanSort: true,
+				Field:   "sellers_Today",
+				IsNum:   true,
+			},
+			{
+				Title:   "Last Week Sellers",
+				CanSort: true,
+				Field:   "sellers_d7",
+				IsNum:   true,
+			},
+			{
+				Title:   "Month Ago Sellers",
+				CanSort: true,
+				Field:   "sellers_d30",
+				IsNum:   true,
+			},
+			{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "pct_drop_7d",
+				IsPerc:  true,
+			},
+		},
+		NewNewspaper: true,
+		Short:        "Vendors \u2193",
+		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>`,
 	},
 	{
 		Title:  "Greatest Increase in Buylist Offer",
@@ -629,6 +636,7 @@ var NewspaperPages = []NewspaperPage{
 		NewNewspaper: true,
 		NeedsBuylist: true,
 		Short:        "Buylist \u2191",
+		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"/><path d="M18 12h.01"/><path d="M19 22v-6"/><path d="m22 19-3-3-3 3"/><path d="M6 12h.01"/><circle cx="12" cy="12" r="2"/></svg>`,
 	},
 	{
 		Title:  "Greatest Decrease in Buylist Offer",
@@ -709,6 +717,7 @@ var NewspaperPages = []NewspaperPage{
 		NewNewspaper: true,
 		NeedsBuylist: true,
 		Short:        "Buylist \u2193",
+		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"/><path d="m16 19 3 3 3-3"/><path d="M18 12h.01"/><path d="M19 16v6"/><path d="M6 12h.01"/><circle cx="12" cy="12" r="2"/></svg>`,
 	},
 	NewspaperPage{
 		Title:        "Newspaper Settings",
@@ -721,6 +730,7 @@ var NewspaperPages = []NewspaperPage{
 		Offset: 3,
 		Priced: "n.Buylist",
 		Option: "review",
+		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg>`,
 		Query: `SELECT DISTINCT n.row_names, n.uuid,
                        n.Ranking,
                        a.Name, a.Set, a.Number, a.Rarity,
@@ -779,293 +789,12 @@ var NewspaperPages = []NewspaperPage{
 		},
 	},
 	NewspaperPage{
-		Title:  "Greatest Decrease in Vendor Listings",
-		Desc:   "Information Sourced from TCG: Stock decreases indicate that there is not enough supply to meet current demand across the reviewed time period (tl:dr - Seek these out)",
-		Offset: 2,
-		Option: "stock_dec",
-
-		PercChanged: "n.Week_Ago_Sellers_Chg",
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_Sellers, n.Week_Ago_Sellers, n.Month_Ago_Sellers, n.Week_Ago_Sellers_Chg,
-                       CASE
-                           WHEN n.Week_Ago_Sellers < n.Month_Ago_Sellers
-                           THEN CASE
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers / 3     THEN 'S'
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers / 2     THEN 'A'
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 2 / 3 THEN 'B'
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 3 / 4 THEN 'C'
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 4 / 5 THEN 'D'
-                               WHEN n.Todays_Sellers <  n.Week_Ago_Sellers         THEN 'E'
-                               ELSE ''
-                           END
-                           ELSE ''
-                       END AS 'Trending'
-                FROM vendor_levels n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.Week_Ago_Sellers_Chg is not NULL and n.Week_Ago_Sellers_Chg != 0`,
-		Sort: "n.Week_Ago_Sellers_Chg DESC",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Today's Sellers",
-				CanSort: true,
-				Field:   "Todays_Sellers",
-			},
-			Heading{
-				Title:   "Last Week Sellers",
-				CanSort: true,
-				Field:   "Week_Ago_Sellers",
-			},
-			Heading{
-				Title:   "Month Ago Sellers",
-				CanSort: true,
-				Field:   "Month_Ago_Sellers",
-			},
-			Heading{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "Week_Ago_Sellers_Chg",
-				IsPerc:  true,
-			},
-			Heading{
-				Title:   "Tier",
-				CanSort: true,
-				Field:   "Trending",
-			},
-		},
-	},
-	NewspaperPage{
-		Title:  "Greatest Increase in Vendor Listings",
-		Desc:   "Information Sourced from TCG: Stock Increases indicate that there is more than enough supply to meet current demand across the reviewed time period (tl:dr - Avoid These)",
-		Offset: 2,
-		Option: "stock_inc",
-
-		PercChanged: "n.Week_Ago_Sellers_Chg",
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_Sellers, n.Week_Ago_Sellers, n.Month_Ago_Sellers, n.Week_Ago_Sellers_Chg
-                FROM vendor_levels n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.Week_Ago_Sellers_Chg is not NULL and n.Week_Ago_Sellers_Chg != 0 AND a.rdate <= CURRENT_DATE()`,
-		Sort: "n.Week_Ago_Sellers_Chg ASC",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Today's Seller",
-				CanSort: true,
-				Field:   "Todays_Sellers",
-			},
-			Heading{
-				Title:   "Last Week",
-				CanSort: true,
-				Field:   "Week_Ago_Sellers",
-			},
-			Heading{
-				Title:   "Month Ago",
-				CanSort: true,
-				Field:   "Month_Ago_Sellers",
-			},
-			Heading{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "Week_Ago_Sellers_Chg",
-				IsPerc:  true,
-			},
-		},
-	},
-	NewspaperPage{
-		Title:  "Greatest Increase in Buylist Offer",
-		Desc:   "Information Sourced from CK: buylist increases indicate a higher sales rate (eg. higher demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
-		Offset: 2,
-		Priced: "n.Todays_BL",
-		Option: "buylist_inc",
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg
-                FROM buylist_levels n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.Week_Ago_BL_Chg is not NULL and n.Week_Ago_BL_Chg != 0 and n.Yesterday_BL >= 1.25 and n.Todays_BL >= 1.25`,
-		Sort: "n.Week_Ago_BL_Chg DESC",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:    "Today's Buylist",
-				CanSort:  true,
-				Field:    "Todays_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Yesterday",
-				CanSort:  true,
-				Field:    "Yesterday_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Last Week",
-				CanSort:  true,
-				Field:    "Week_Ago_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Last Month",
-				CanSort:  true,
-				Field:    "Month_Ago_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "Week_Ago_BL_Chg",
-				IsPerc:  true,
-			},
-		},
-	},
-	NewspaperPage{
-		Title:  "Greatest Decrease in Buylist Offer",
-		Desc:   "Information Sourced from CK: Buylist Decreases indicate a declining sales rate (eg, Less demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
-		Offset: 2,
-		Priced: "n.Todays_BL",
-		Option: "buylist_dec",
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg
-                FROM buylist_levels n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.Week_Ago_BL_Chg is not NULL and n.Week_Ago_BL_Chg != 0 and n.Yesterday_BL >= 1.25 and n.Todays_BL >= 1.25`,
-		Sort: "n.Week_Ago_BL_Chg ASC",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:    "Today's Buylist",
-				CanSort:  true,
-				Field:    "Todays_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Yesterday",
-				CanSort:  true,
-				Field:    "Yesterday_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Last Week",
-				CanSort:  true,
-				Field:    "Week_Ago_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Last Month",
-				CanSort:  true,
-				Field:    "Month_Ago_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "Week_Ago_BL_Chg",
-				IsPerc:  true,
-			},
-		},
-	},
-	NewspaperPage{
 		Title:  "Buylist Growth Forecast",
 		Desc:   "Forecasting Card Kingdom's Buylist Offers on Cards",
 		Offset: 2,
 		Priced: "n.Recent_BL",
 		Option: "ensemble_forecast",
+		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fae500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.828 14.828 21 21"/><path d="M21 16v5h-5"/><path d="m21 3-9 9-4-4-6 6"/><path d="M21 8V3h-5"/></svg>`,
 		Query: `SELECT DISTINCT n.row_names, n.uuid,
                        a.Name, a.Set, a.Number, a.Rarity,
                        n.Recent_BL, n.Historical_plus_minus, n.Historical_Median, n.Historical_Max, n.Forecasted_BL, n.Forecast_plus_minus, n.Target_Date, n.Tier, n.Behavior, n.custom_sort
@@ -1156,6 +885,292 @@ var NewspaperPages = []NewspaperPage{
 		},
 	},
 	NewspaperPage{
+		Title:  "Greatest Increase in Vendor Listings",
+		Desc:   "Information Sourced from TCG: Stock Increases indicate that there is more than enough supply to meet current demand across the reviewed time period (tl:dr - Avoid These)",
+		Offset: 2,
+		Option: "stock_inc",
+		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>`,
+
+		PercChanged: "n.Week_Ago_Sellers_Chg",
+		Query: `SELECT DISTINCT n.row_names, n.uuid,
+                       a.Name, a.Set, a.Number, a.Rarity,
+                       n.Todays_Sellers, n.Week_Ago_Sellers, n.Month_Ago_Sellers, n.Week_Ago_Sellers_Chg
+                FROM vendor_levels n
+                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
+                WHERE n.Week_Ago_Sellers_Chg is not NULL and n.Week_Ago_Sellers_Chg != 0 AND a.rdate <= CURRENT_DATE()`,
+		Sort: "n.Week_Ago_Sellers_Chg ASC",
+		Head: []Heading{
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "Name",
+			},
+			Heading{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "a.Set",
+			},
+			Heading{
+				Title:           "#",
+				ConditionalSort: true,
+				Field:           "a.Number",
+			},
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				Title:   "Today's Seller",
+				CanSort: true,
+				Field:   "Todays_Sellers",
+			},
+			Heading{
+				Title:   "Last Week",
+				CanSort: true,
+				Field:   "Week_Ago_Sellers",
+			},
+			Heading{
+				Title:   "Month Ago",
+				CanSort: true,
+				Field:   "Month_Ago_Sellers",
+			},
+			Heading{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "Week_Ago_Sellers_Chg",
+				IsPerc:  true,
+			},
+		},
+	},
+	NewspaperPage{
+		Title:  "Greatest Decrease in Vendor Listings",
+		Desc:   "Information Sourced from TCG: Stock decreases indicate that there is not enough supply to meet current demand across the reviewed time period (tl:dr - Seek these out)",
+		Offset: 2,
+		Option: "stock_dec",
+		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>`,
+
+		PercChanged: "n.Week_Ago_Sellers_Chg",
+		Query: `SELECT DISTINCT n.row_names, n.uuid,
+                       a.Name, a.Set, a.Number, a.Rarity,
+                       n.Todays_Sellers, n.Week_Ago_Sellers, n.Month_Ago_Sellers, n.Week_Ago_Sellers_Chg,
+                       CASE
+                           WHEN n.Week_Ago_Sellers < n.Month_Ago_Sellers
+                           THEN CASE
+                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers / 3     THEN 'S'
+                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers / 2     THEN 'A'
+                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 2 / 3 THEN 'B'
+                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 3 / 4 THEN 'C'
+                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 4 / 5 THEN 'D'
+                               WHEN n.Todays_Sellers <  n.Week_Ago_Sellers         THEN 'E'
+                               ELSE ''
+                           END
+                           ELSE ''
+                       END AS 'Trending'
+                FROM vendor_levels n
+                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
+                WHERE n.Week_Ago_Sellers_Chg is not NULL and n.Week_Ago_Sellers_Chg != 0`,
+		Sort: "n.Week_Ago_Sellers_Chg DESC",
+		Head: []Heading{
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "Name",
+			},
+			Heading{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "a.Set",
+			},
+			Heading{
+				Title:           "#",
+				ConditionalSort: true,
+				Field:           "a.Number",
+			},
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				Title:   "Today's Sellers",
+				CanSort: true,
+				Field:   "Todays_Sellers",
+			},
+			Heading{
+				Title:   "Last Week Sellers",
+				CanSort: true,
+				Field:   "Week_Ago_Sellers",
+			},
+			Heading{
+				Title:   "Month Ago Sellers",
+				CanSort: true,
+				Field:   "Month_Ago_Sellers",
+			},
+			Heading{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "Week_Ago_Sellers_Chg",
+				IsPerc:  true,
+			},
+			Heading{
+				Title:   "Tier",
+				CanSort: true,
+				Field:   "Trending",
+			},
+		},
+	},
+	NewspaperPage{
+		Title:  "Greatest Increase in Buylist Offer",
+		Desc:   "Information Sourced from CK: buylist increases indicate a higher sales rate (eg. higher demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
+		Offset: 2,
+		Priced: "n.Todays_BL",
+		Option: "buylist_inc",
+		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"/><path d="M18 12h.01"/><path d="M19 22v-6"/><path d="m22 19-3-3-3 3"/><path d="M6 12h.01"/><circle cx="12" cy="12" r="2"/></svg>`,
+		Query: `SELECT DISTINCT n.row_names, n.uuid,
+                       a.Name, a.Set, a.Number, a.Rarity,
+                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg
+                FROM buylist_levels n
+                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
+                WHERE n.Week_Ago_BL_Chg is not NULL and n.Week_Ago_BL_Chg != 0 and n.Yesterday_BL >= 1.25 and n.Todays_BL >= 1.25`,
+		Sort: "n.Week_Ago_BL_Chg DESC",
+		Head: []Heading{
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "Name",
+			},
+			Heading{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "a.Set",
+			},
+			Heading{
+				Title:           "#",
+				ConditionalSort: true,
+				Field:           "a.Number",
+			},
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				Title:    "Today's Buylist",
+				CanSort:  true,
+				Field:    "Todays_BL",
+				IsDollar: true,
+			},
+			Heading{
+				Title:    "Yesterday",
+				CanSort:  true,
+				Field:    "Yesterday_BL",
+				IsDollar: true,
+			},
+			Heading{
+				Title:    "Last Week",
+				CanSort:  true,
+				Field:    "Week_Ago_BL",
+				IsDollar: true,
+			},
+			Heading{
+				Title:    "Last Month",
+				CanSort:  true,
+				Field:    "Month_Ago_BL",
+				IsDollar: true,
+			},
+			Heading{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "Week_Ago_BL_Chg",
+				IsPerc:  true,
+			},
+		},
+	},
+	NewspaperPage{
+		Title:  "Greatest Decrease in Buylist Offer",
+		Desc:   "Information Sourced from CK: Buylist Decreases indicate a declining sales rate (eg, Less demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
+		Offset: 2,
+		Priced: "n.Todays_BL",
+		Option: "buylist_dec",
+		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"/><path d="m16 19 3 3 3-3"/><path d="M18 12h.01"/><path d="M19 16v6"/><path d="M6 12h.01"/><circle cx="12" cy="12" r="2"/></svg>`,
+		Query: `SELECT DISTINCT n.row_names, n.uuid,
+                       a.Name, a.Set, a.Number, a.Rarity,
+                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg
+                FROM buylist_levels n
+                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
+                WHERE n.Week_Ago_BL_Chg is not NULL and n.Week_Ago_BL_Chg != 0 and n.Yesterday_BL >= 1.25 and n.Todays_BL >= 1.25`,
+		Sort: "n.Week_Ago_BL_Chg ASC",
+		Head: []Heading{
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				Title:   "Card Name",
+				CanSort: true,
+				Field:   "Name",
+			},
+			Heading{
+				Title:   "Edition",
+				CanSort: true,
+				Field:   "a.Set",
+			},
+			Heading{
+				Title:           "#",
+				ConditionalSort: true,
+				Field:           "a.Number",
+			},
+			Heading{
+				IsHidden: true,
+			},
+			Heading{
+				Title:    "Today's Buylist",
+				CanSort:  true,
+				Field:    "Todays_BL",
+				IsDollar: true,
+			},
+			Heading{
+				Title:    "Yesterday",
+				CanSort:  true,
+				Field:    "Yesterday_BL",
+				IsDollar: true,
+			},
+			Heading{
+				Title:    "Last Week",
+				CanSort:  true,
+				Field:    "Week_Ago_BL",
+				IsDollar: true,
+			},
+			Heading{
+				Title:    "Last Month",
+				CanSort:  true,
+				Field:    "Month_Ago_BL",
+				IsDollar: true,
+			},
+			Heading{
+				Title:   "Weekly % Change",
+				CanSort: true,
+				Field:   "Week_Ago_BL_Chg",
+				IsPerc:  true,
+			},
+		},
+	},
+	NewspaperPage{
 		Title:  "Newspaper Settings",
 		Option: "options",
 	},
@@ -1229,44 +1244,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	minPercChange, _ := strconv.ParseFloat(r.FormValue("min_change"), 64)
 	maxPercChange, _ := strconv.ParseFloat(r.FormValue("max_change"), 64)
 	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
-
-	// Apply saved filter preferences from cookies on fresh visits
-	// (when no explicit filter params are in the URL)
-	filterParamKeys := []string{"filter", "rarity", "bucket", "finish", "min_price", "max_price", "min_change", "max_change"}
-	urlQuery := r.URL.Query()
-	hasExplicitFilters := false
-	for _, key := range filterParamKeys {
-		if urlQuery.Has(key) {
-			hasExplicitFilters = true
-			break
-		}
-	}
-	if !hasExplicitFilters && page != "" && page != "old" && page != "options" {
-		if v := readCookie(r, "news_filter"); v != "" && filter == "" {
-			filter = v
-		}
-		if v := readCookie(r, "news_rarity"); v != "" && rarity == "" {
-			rarity = v
-		}
-		if v := readCookie(r, "news_bucket"); v != "" && bucket == "" {
-			bucket = v
-		}
-		if v := readCookie(r, "news_finish"); v != "" && finish == "" {
-			finish = v
-		}
-		if v := readCookie(r, "news_min_price"); v != "" && minPrice == 0 {
-			minPrice, _ = strconv.ParseFloat(v, 64)
-		}
-		if v := readCookie(r, "news_max_price"); v != "" && maxPrice == 0 {
-			maxPrice, _ = strconv.ParseFloat(v, 64)
-		}
-		if v := readCookie(r, "news_min_change"); v != "" && minPercChange == 0 {
-			minPercChange, _ = strconv.ParseFloat(v, 64)
-		}
-		if v := readCookie(r, "news_max_change"); v != "" && maxPercChange == 0 {
-			maxPercChange, _ = strconv.ParseFloat(v, 64)
-		}
-	}
 
 	var query, defSort string
 
