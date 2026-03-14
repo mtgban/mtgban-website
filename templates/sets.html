@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/sets.css?hash={{.Hash}}">
+    <title>{{.Title}}</title>
+
+    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/img/favicon/site.webmanifest">
+    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
+    <meta name="theme-color" content="#ff0000">
+</head>
+
+<body class="light-theme">
+<script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
+<nav>
+    <ul>
+        <li><a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" width=48></a></li>
+        <li {{if .PatreonLogin}}style="display:none"{{end}}><a href="/discord"><img src="/img/misc/discord.png" width=48></a></li>
+        {{range .Nav}}
+            <li>
+                <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+                    <span>{{.Short}} {{.Name}}</span>
+                </a>
+            </li>
+        {{end}}
+        <li>
+            <label class="switch">
+                <div>
+                    <input id="theme-toggle" type="checkbox"/>
+                    <span class="slider"></span>
+                </div>
+                <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+            </label>
+        </li>
+    </ul>
+</nav>
+
+<div class="mainbody">
+    {{if ne .ErrorMessage ""}}
+        <h1>{{.ErrorMessage}}</h1>
+    {{else}}
+    <div class="sets-page">
+        <h1>Editions</h1>
+        <p class="sets-stats">
+            Tracking <strong>{{.TotalSets}}</strong> editions, for
+            <strong>{{.TotalCards}}</strong> cards over
+            <strong>{{.TotalUnique}}</strong> printings.
+        </p>
+
+        <div class="sets-table-wrap">
+            <div class="sets-toolbar">
+                <input class="sets-filter-input" type="text" id="filterInput"
+                       onkeyup="filterTableByName()" placeholder="Filter editions...">
+
+                <span class="sets-toolbar-sep"></span>
+
+                <button class="sets-toolbar-btn" id="expandBtn" onclick="toggleExpanded()">
+                    Show Colors &amp; Rarities
+                </button>
+
+                <span class="sets-toolbar-spacer"></span>
+
+                <div class="sets-sort-group">
+                    <span class="sets-sort-label">Sort</span>
+                    <a class="sets-sort-link {{if not .SortOption}}active{{end}}" href="/sets">Date</a>
+                    <a class="sets-sort-link {{if eq .SortOption "name"}}active{{end}}" href="/sets?sort=name">Name</a>
+                    <a class="sets-sort-link {{if eq .SortOption "size"}}active{{end}}" href="/sets?sort=size">Size</a>
+                </div>
+            </div>
+
+            <table class="sets-table filterable" id="table">
+                <thead>
+                    <tr>
+                        <th>Edition</th>
+                        <th>Finish</th>
+                        <th class="col-extra c">Colors</th>
+                        <th class="col-extra c">Rarity</th>
+                        <th class="c">Size</th>
+                        <th class="r">Released</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .FlatEditions}}
+                        {{$edition := .}}
+                        <tr {{if .IsChild}}class="child-row"{{end}}>
+                            <td>
+                                <div class="sets-name-cell">
+                                    {{if .Keyrune}}
+                                        <i class="ss ss-{{.Keyrune}} ss-1x ss-fw set-icon"></i>
+                                    {{else}}
+                                        <span class="set-icon">&middot;</span>
+                                    {{end}}
+                                    <a href="/search?q=s:{{.Code}}">{{.Name}}</a>
+                                    <span class="set-code">{{.Code}}</span>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="sets-finish">
+                                    {{range .Finishes}}
+                                        <a class="sets-finish-tag" href="/search?q=s:{{$edition.Code}}%20f:{{.Query}}">{{.Label}}</a>
+                                    {{end}}
+                                </div>
+                            </td>
+
+                            <td class="col-extra">
+                                <div class="sets-colors">
+                                    {{range .ColorHex}}
+                                        <a class="sets-color-orb" href="/search?q=s:{{$edition.Code}}%20c:{{.Name}}" title="{{.Name}}">
+                                            <svg height="18" width="18" xmlns="http://www.w3.org/2000/svg">
+                                                <defs>
+                                                    <linearGradient id="gradient-{{$edition.Code}}-{{.Name}}" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                        <stop offset="0%" stop-color="#708090" />
+                                                        <stop offset="50%" stop-color="{{.Hex}}" />
+                                                    </linearGradient>
+                                                </defs>
+                                                <circle r="9" cx="9" cy="9" fill="url(#gradient-{{$edition.Code}}-{{.Name}})" />
+                                            </svg>
+                                        </a>
+                                    {{end}}
+                                </div>
+                            </td>
+
+                            <td class="col-extra">
+                                <div class="sets-rarities">
+                                    {{range .Rarities}}
+                                        <a class="sets-rarity-tag" href="/search?q=s:{{$edition.Code}}%20r:{{.}}">{{.}}</a>
+                                    {{end}}
+                                </div>
+                            </td>
+
+                            <td class="sets-size">{{.Size}}</td>
+
+                            <td class="sets-date">{{.FmtDate}}</td>
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {{end}}
+</div>
+
+<script>
+function toggleExpanded() {
+    const table = document.getElementById('table');
+    const btn = document.getElementById('expandBtn');
+    table.classList.toggle('expanded');
+    if (table.classList.contains('expanded')) {
+        btn.textContent = 'Hide Colors & Rarities';
+        btn.classList.add('active');
+    } else {
+        btn.textContent = 'Show Colors & Rarities';
+        btn.classList.remove('active');
+    }
+}
+</script>
+</body>
+</html>
