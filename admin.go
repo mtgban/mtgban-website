@@ -266,218 +266,197 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch page {
-	case "people":
-		pageVars.DisableLinks = true
+	// -- Config: handle POST if submitted --
+	newConfig := r.FormValue("textArea")
+	if newConfig != "" {
+		var config ConfigType
+		configSourcePath := Config.sourcePath
 
-		pageVars.Headers = [][]string{
-			[]string{"", "#", "Category", "Email", "Name", "Tier"},
-			[]string{"", "#", "API User"},
-		}
-
-		var userTable [][]string
-		for i, person := range Config.Patreon.Grants {
-			row := []string{
-				fmt.Sprintf("%d", i+1),
-				person.Category,
-				person.Email,
-				person.Name,
-				person.Tier,
-			}
-
-			userTable = append(userTable, row)
-		}
-		pageVars.Tables = append(pageVars.Tables, userTable)
-
-		// Sort before show
-		var emails []string
-		for person := range Config.ApiUserSecrets {
-			emails = append(emails, person)
-		}
-		sort.Strings(emails)
-
-		var apiTable [][]string
-		for i, email := range emails {
-			row := []string{
-				fmt.Sprintf("%d", i+1),
-				email,
-			}
-
-			apiTable = append(apiTable, row)
-		}
-		pageVars.Tables = append(pageVars.Tables, apiTable)
-
-	case "config":
-		newConfig := r.FormValue("textArea")
-		if newConfig != "" {
-			var config ConfigType
-			configSourcePath := Config.sourcePath
-
-			// Test if data can be unmarshaled
-			err := json.Unmarshal([]byte(newConfig), &config)
-			if err != nil {
-				pageVars.InfoMessage = err.Error()
-				pageVars.CleanSearchQuery = newConfig
-				break
-			}
-
-			// Open bucket
+		err := json.Unmarshal([]byte(newConfig), &config)
+		if err != nil {
+			pageVars.InfoMessage = err.Error()
+		} else {
 			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
 			if err != nil {
 				pageVars.InfoMessage = err.Error()
-				pageVars.CleanSearchQuery = newConfig
-				break
+			} else {
+				defer writer.Close()
+				err = writeConfigFile(config, writer)
+				if err != nil {
+					log.Println(err)
+					pageVars.InfoMessage = err.Error()
+				} else {
+					Config = config
+					Config.sourcePath = configSourcePath
+					pageVars.InfoMessage = "Config updated"
+				}
 			}
-			defer writer.Close()
-
-			// Test if writing the permanent config is ok
-			err = writeConfigFile(config, writer)
-			if err != nil {
-				log.Println(err)
-				pageVars.InfoMessage = err.Error()
-				pageVars.CleanSearchQuery = newConfig
-				break
-			}
-
-			// Only then update the running configuration
-			Config = config
-
-			// Preserve the current filepath
-			Config.sourcePath = configSourcePath
-
-			pageVars.InfoMessage = "Config updated"
 		}
+	}
 
-		// Load the current configuration and save it in text
-		var out bytes.Buffer
-		err := writeConfigFile(Config, &out)
-		if err != nil {
+	// -- Config: always load current config text --
+	var configOut bytes.Buffer
+	err := writeConfigFile(Config, &configOut)
+	if err != nil {
+		if pageVars.InfoMessage == "" {
 			pageVars.InfoMessage = err.Error()
 		}
-		pageVars.CleanSearchQuery = out.String()
-
-	default:
-		var sellerTable [][]string
-		for _, seller := range Sellers {
-			key := "UNKNOWN"
-			for name, scrapersConfig := range Config.ScraperConfig.Config {
-				if slices.Contains(scrapersConfig["retail"], seller.Info().Shorthand) {
-					key = name
-					break
-				}
-			}
-
-			lastUpdate := seller.Info().InventoryTimestamp.Format(time.Stamp)
-
-			inv := seller.Inventory()
-
-			status := "✅"
-			if slices.Contains(gaScrapers, key) {
-				status = "🔶"
-			} else if len(inv) == 0 {
-				status = "🔴"
-			}
-
-			name := seller.Info().Name
-			if seller.Info().SealedMode {
-				name += " 📦"
-			}
-			if seller.Info().MetadataOnly {
-				name += " 🎯"
-			}
-
-			ref := ""
-			if slices.Contains(Config.AffiliatesList, seller.Info().Shorthand) ||
-				slices.Contains(Config.AffiliatesList, key) {
-				ref = "👍"
-			}
-
-			row := []string{
-				name,
-				seller.Info().Shorthand,
-				key,
-				lastUpdate,
-				fmt.Sprint(len(inv)),
-				ref,
-				status,
-			}
-
-			sellerTable = append(sellerTable, row)
-		}
-		pageVars.Headers = append(pageVars.Headers, []string{
-			"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status",
-		})
-		pageVars.Tables = append(pageVars.Tables, sellerTable)
-
-		var vendorTable [][]string
-		for _, vendor := range Vendors {
-			key := "UNKNOWN"
-			for name, scrapersConfig := range Config.ScraperConfig.Config {
-				if slices.Contains(scrapersConfig["buylist"], vendor.Info().Shorthand) {
-					key = name
-					break
-				}
-			}
-
-			lastUpdate := vendor.Info().BuylistTimestamp.Format(time.Stamp)
-
-			bl := vendor.Buylist()
-
-			status := "✅"
-			if slices.Contains(gaScrapers, key) {
-				status = "🔶"
-			} else if len(bl) == 0 {
-				status = "🔴"
-			}
-
-			name := vendor.Info().Name
-			if vendor.Info().SealedMode {
-				name += " 📦"
-			}
-			if vendor.Info().MetadataOnly {
-				name += " 🎯"
-			}
-
-			ref := ""
-			if slices.Contains(Config.AffiliatesBuylistList, vendor.Info().Shorthand) ||
-				slices.Contains(Config.AffiliatesBuylistList, key) {
-				ref = "👍"
-			}
-
-			row := []string{
-				name,
-				vendor.Info().Shorthand,
-				key,
-				lastUpdate,
-				fmt.Sprint(len(bl)),
-				ref,
-				status,
-			}
-
-			vendorTable = append(vendorTable, row)
-		}
-		pageVars.Headers = append(pageVars.Headers, []string{
-			"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status",
-		})
-		pageVars.Tables = append(pageVars.Tables, vendorTable)
-
-		var pageTable [][]string
-		for _, navName := range OrderNav {
-			nav := ExtraNavs[navName]
-
-			row := []string{
-				nav.Short,
-				nav.Name,
-				nav.Link,
-				nav.Page,
-			}
-			pageTable = append(pageTable, row)
-		}
-		pageVars.Headers = append(pageVars.Headers, []string{
-			"", "Icon", "Logs", "Link", "Template",
-		})
-		pageVars.Tables = append(pageVars.Tables, pageTable)
+	} else {
+		pageVars.CleanSearchQuery = configOut.String()
 	}
+
+	// -- Dashboard: Retail Scrapers --
+	var sellerTable [][]string
+	for _, seller := range Sellers {
+		key := "UNKNOWN"
+		for name, scrapersConfig := range Config.ScraperConfig.Config {
+			if slices.Contains(scrapersConfig["retail"], seller.Info().Shorthand) {
+				key = name
+				break
+			}
+		}
+
+		lastUpdate := seller.Info().InventoryTimestamp.Format(time.Stamp)
+		inv := seller.Inventory()
+
+		status := "✅"
+		if slices.Contains(gaScrapers, key) {
+			status = "🔶"
+		} else if len(inv) == 0 {
+			status = "🔴"
+		}
+
+		name := seller.Info().Name
+		if seller.Info().SealedMode {
+			name += " 📦"
+		}
+		if seller.Info().MetadataOnly {
+			name += " 🎯"
+		}
+
+		ref := ""
+		if slices.Contains(Config.AffiliatesList, seller.Info().Shorthand) ||
+			slices.Contains(Config.AffiliatesList, key) {
+			ref = "👍"
+		}
+
+		row := []string{
+			name,
+			seller.Info().Shorthand,
+			key,
+			lastUpdate,
+			fmt.Sprint(len(inv)),
+			ref,
+			status,
+		}
+		sellerTable = append(sellerTable, row)
+	}
+	pageVars.Headers = append(pageVars.Headers, []string{
+		"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status",
+	})
+	pageVars.Tables = append(pageVars.Tables, sellerTable)
+
+	// -- Dashboard: Buylist Scrapers --
+	var vendorTable [][]string
+	for _, vendor := range Vendors {
+		key := "UNKNOWN"
+		for name, scrapersConfig := range Config.ScraperConfig.Config {
+			if slices.Contains(scrapersConfig["buylist"], vendor.Info().Shorthand) {
+				key = name
+				break
+			}
+		}
+
+		lastUpdate := vendor.Info().BuylistTimestamp.Format(time.Stamp)
+		bl := vendor.Buylist()
+
+		status := "✅"
+		if slices.Contains(gaScrapers, key) {
+			status = "🔶"
+		} else if len(bl) == 0 {
+			status = "🔴"
+		}
+
+		name := vendor.Info().Name
+		if vendor.Info().SealedMode {
+			name += " 📦"
+		}
+		if vendor.Info().MetadataOnly {
+			name += " 🎯"
+		}
+
+		ref := ""
+		if slices.Contains(Config.AffiliatesBuylistList, vendor.Info().Shorthand) ||
+			slices.Contains(Config.AffiliatesBuylistList, key) {
+			ref = "👍"
+		}
+
+		row := []string{
+			name,
+			vendor.Info().Shorthand,
+			key,
+			lastUpdate,
+			fmt.Sprint(len(bl)),
+			ref,
+			status,
+		}
+		vendorTable = append(vendorTable, row)
+	}
+	pageVars.Headers = append(pageVars.Headers, []string{
+		"", "Name", "Id", "Tag", "Last Update", "Entries", "Ref", "Status",
+	})
+	pageVars.Tables = append(pageVars.Tables, vendorTable)
+
+	// -- Dashboard: Registered Pages --
+	var pageTable [][]string
+	for _, navName := range OrderNav {
+		nav := ExtraNavs[navName]
+		row := []string{
+			nav.Short,
+			nav.Name,
+			nav.Link,
+			nav.Page,
+		}
+		pageTable = append(pageTable, row)
+	}
+	pageVars.Headers = append(pageVars.Headers, []string{
+		"", "Icon", "Logs", "Link", "Template",
+	})
+	pageVars.Tables = append(pageVars.Tables, pageTable)
+
+	// -- People: Patreon Grants --
+	var userTable [][]string
+	for i, person := range Config.Patreon.Grants {
+		row := []string{
+			fmt.Sprintf("%d", i+1),
+			person.Category,
+			person.Email,
+			person.Name,
+			person.Tier,
+		}
+		userTable = append(userTable, row)
+	}
+	pageVars.Tables = append(pageVars.Tables, userTable)
+
+	// -- People: API Users --
+	var emails []string
+	for person := range Config.ApiUserSecrets {
+		emails = append(emails, person)
+	}
+	sort.Strings(emails)
+
+	var apiTable [][]string
+	for i, email := range emails {
+		row := []string{
+			fmt.Sprintf("%d", i+1),
+			email,
+		}
+		apiTable = append(apiTable, row)
+	}
+	pageVars.Tables = append(pageVars.Tables, apiTable)
+
+	// Pass current page to template for active tab
+	pageVars.Page = page
 
 	var tiers []string
 	for tierName := range Config.ACL {
