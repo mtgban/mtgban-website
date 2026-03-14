@@ -375,6 +375,11 @@
     min-height: 500px;
     border: none;
     border-radius: 0;
+}
+.admin-config-wrap .CodeMirror-gutters {
+    padding-right: 8px;
+}
+.admin-config-wrap .CodeMirror-lines {
     padding-left: 8px;
 }
 
