@@ -210,12 +210,6 @@ func FormatEmbedSearchResult(searchRes *EmbedSearchResult) (fields []EmbedField)
 					continue
 				}
 			} else if EmbedFieldsNames[i] == "Buylist" {
-				if entry.Shorthand == "CK" {
-					_, found := Infos["hotlist"][searchRes.CardId]
-					if found {
-						value.SuffixEmoji += "🌟"
-					}
-				}
 				for _, subres := range searchRes.ResultsSellers {
 					// 90% of sell price is the minimum for arbit
 					if subres.Price < entry.Price*0.9 {
