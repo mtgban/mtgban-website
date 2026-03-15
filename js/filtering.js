@@ -1,5 +1,5 @@
 function filterTableByEdition() {
-    var input, filter, tables, tr, td, i, j, txtValue;
+    var input, filter, tables, tr, i, j, txtValue, el;
     input = document.getElementById("filterInput");
     filter = input.value.toUpperCase();
     tables = document.getElementsByClassName("filterable");
@@ -7,9 +7,12 @@ function filterTableByEdition() {
     for (j = 0; j < tables.length; j++) {
         tr = tables[j].getElementsByTagName("tr");
         for (i = 1; i < tr.length; i++) {
-            td = tr[i].getElementsByTagName("td")[1]; // filtering on edition
-            if (td) {
-                txtValue = td.textContent || td.innerText;
+            el = tr[i].querySelector('.card-edition');
+            if (!el) {
+                el = tr[i].getElementsByTagName("td")[1];
+            }
+            if (el) {
+                txtValue = el.textContent || el.innerText;
                 if (txtValue.toUpperCase().indexOf(filter) > -1) {
                     tr[i].style.display = "";
                 } else {
