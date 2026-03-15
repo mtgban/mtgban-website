@@ -6,6 +6,8 @@ on:
       - 'lorcana-*' # deploy only when a new tag is created
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
