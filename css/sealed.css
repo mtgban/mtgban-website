@@ -13,7 +13,7 @@
 
 /* ── Sidebar TOC ── */
 .sealed-toc {
-    background: var(--surface-2);
+    background: var(--surface-1);
     border-right: 1px solid var(--border-subtle);
     padding: 20px 0 20px;
     position: sticky;
@@ -27,7 +27,7 @@
 .sealed-toc::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
 
 .sealed-toc-title {
-    font-size: 15px;
+    font-size: var(--text-md);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -38,7 +38,7 @@
 .sealed-toc-item {
     display: block;
     padding: 7px 16px;
-    font-size: 16px;
+    font-size: var(--text-lg);
     font-weight: 500;
     color: var(--activetext);
     text-decoration: none;
@@ -47,7 +47,7 @@
 }
 .sealed-toc-item:hover {
     color: var(--normal);
-    background: var(--surface-2);
+    background: var(--surface-1);
 }
 .sealed-toc-item.active {
     color: var(--ainfo);
@@ -56,7 +56,7 @@
 }
 .sealed-toc-item .toc-count {
     float: right;
-    font-size: 14px;
+    font-size: var(--text-base);
     color: var(--text-dim);
 }
 
@@ -65,7 +65,7 @@
     padding: 28px 36px 80px;
 }
 .sealed-main h1 {
-    font-size: 26px;
+    font-size: var(--text-8xl);
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 0 0 16px;
@@ -91,11 +91,11 @@
     min-width: 240px;
     max-width: 420px;
     padding: 10px 16px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     border: 1px solid var(--border-moderate);
-    background: var(--surface-2);
+    background: var(--surface-1);
     color: var(--normal);
-    font-size: 17px;
+    font-size: var(--text-xl);
     font-family: inherit;
     outline: none;
 }
@@ -105,11 +105,11 @@
 .sealed-toolbar a,
 .sealed-toolbar .sealed-toolbar-btn {
     padding: 7px 14px;
-    border-radius: 6px;
-    background: var(--surface-2);
+    border-radius: var(--radius-sm);
+    background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     color: var(--activetext);
-    font-size: 17px;
+    font-size: var(--text-xl);
     font-weight: 500;
     text-decoration: none;
     transition: all 0.15s;
@@ -135,12 +135,12 @@
     border-bottom: 1px solid var(--border-subtle);
 }
 .sealed-section-header h2 {
-    font-size: 21px;
+    font-size: var(--text-5xl);
     font-weight: 600;
     margin: 0;
 }
 .sealed-section-header .section-count {
-    font-size: 16px;
+    font-size: var(--text-lg);
     color: var(--text-dim);
     margin-left: auto;
 }
@@ -156,21 +156,21 @@
     align-items: center;
     gap: 9px;
     padding: 10px 14px;
-    background: var(--surface-2);
+    background: var(--surface-1);
     border: 1px solid var(--border-subtle);
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     text-decoration: none;
     color: var(--normal);
-    font-size: 17px;
+    font-size: var(--text-xl);
     font-weight: 500;
     transition: all 0.15s;
 }
 .sealed-edition:hover {
     border-color: var(--border-moderate);
-    background: var(--surface-3);
+    background: var(--surface-2);
 }
 .sealed-edition .ss {
-    font-size: 20px;
+    font-size: var(--text-4xl);
     flex-shrink: 0;
     color: var(--activetext);
 }
@@ -181,7 +181,7 @@
     scroll-margin-top: 120px;
 }
 .sealed-faq h3 {
-    font-size: 22px;
+    font-size: var(--text-6xl);
     font-weight: 700;
     margin-bottom: 16px;
 }
@@ -216,7 +216,7 @@
     .sealed-toc-title { display: none; }
     .sealed-toc-item {
         border-left: none;
-        border-radius: 6px;
+        border-radius: var(--radius-sm);
         padding: 6px 10px;
     }
     .sealed-toc-item .toc-count { display: none; }

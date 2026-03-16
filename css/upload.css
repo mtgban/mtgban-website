@@ -11,7 +11,7 @@
 }
 
 .upload-form-panel h1 {
-    font-size: var(--fs-page-title);
+    font-size: var(--text-9xl);
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 0 0 4px 0;
@@ -19,7 +19,7 @@
 
 .upload-subtitle {
     color: var(--activetext);
-    font-size: 15px;
+    font-size: var(--text-xl);
     margin: 0 0 32px 0;
 }
 
@@ -46,7 +46,7 @@
     background: var(--accent-muted);
     border: 1px solid var(--accent-border);
     color: var(--ainfo);
-    font-size: 13px;
+    font-size: var(--text-md);
     font-weight: 600;
     display: flex;
     align-items: center;
@@ -55,7 +55,7 @@
 }
 
 .upload-card-header h2 {
-    font-size: 17px;
+    font-size: var(--text-3xl);
     font-weight: 600;
     letter-spacing: -0.01em;
     margin: 0;
@@ -63,7 +63,7 @@
 
 .upload-badge {
     margin-left: auto;
-    font-size: 12px;
+    font-size: var(--text-base);
     font-weight: 500;
     padding: 3px 10px;
     border-radius: 20px;
@@ -91,7 +91,7 @@
 .upload-mode-toggle label {
     padding: 8px 20px;
     border-radius: 4px;
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: 500;
     color: var(--activetext);
     cursor: pointer;
@@ -117,7 +117,7 @@
 }
 
 .upload-mode-hint {
-    font-size: 12px;
+    font-size: var(--text-base);
     color: var(--text-dim);
 }
 
@@ -150,7 +150,7 @@
     border: 1px solid var(--border-subtle);
     cursor: pointer;
     transition: all 0.15s;
-    font-size: 13px;
+    font-size: var(--text-md);
     margin: 0;
 }
 
@@ -184,7 +184,7 @@
     cursor: pointer;
     transition: all 0.2s;
     color: var(--activetext);
-    font-size: 13px;
+    font-size: var(--text-md);
     font-weight: 500;
     text-align: center;
 }
@@ -202,7 +202,7 @@
 }
 
 .upload-source-icon {
-    font-size: 24px;
+    font-size: var(--text-8xl);
     line-height: 1;
 }
 
@@ -215,7 +215,7 @@
     border-radius: var(--radius-md);
     padding: 20px;
     color: var(--text-dim);
-    font-size: 14px;
+    font-size: var(--text-lg);
     transition: all 0.2s;
 }
 
@@ -236,7 +236,7 @@
 }
 
 .upload-file-hint {
-    font-size: 12px;
+    font-size: var(--text-base);
     display: block;
     margin-top: 4px;
 }
@@ -252,7 +252,7 @@
     border: none;
     color: var(--normal);
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: var(--text-md);
     resize: vertical;
     outline: none;
 }
@@ -263,7 +263,7 @@
     border: none;
     color: var(--normal);
     font-family: var(--font-mono);
-    font-size: 14px;
+    font-size: var(--text-lg);
     outline: none;
 }
 
@@ -277,7 +277,7 @@
 }
 
 .upload-hashes-label {
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: 500;
     color: var(--activetext);
     text-align: center;
@@ -294,7 +294,7 @@
 .upload-btn {
     padding: 10px 22px;
     border-radius: var(--radius-sm);
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: 600;
     border: none;
     cursor: pointer;
@@ -341,7 +341,7 @@
     gap: 8px;
     cursor: pointer;
     color: var(--activetext);
-    font-size: 13px;
+    font-size: var(--text-md);
     font-weight: 500;
     padding: 10px 0 0;
     user-select: none;
@@ -349,7 +349,7 @@
 
 .upload-opts-toggle .upload-chevron {
     transition: transform 0.2s;
-    font-size: 11px;
+    font-size: var(--text-sm);
 }
 
 .upload-opts-toggle.open .upload-chevron {
@@ -379,7 +379,7 @@
     background: var(--surface-2);
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-subtle);
-    font-size: 13px;
+    font-size: var(--text-md);
     color: var(--activetext);
     line-height: 1.4;
     margin: 0;
@@ -398,7 +398,7 @@
     border-radius: 4px;
     color: var(--normal);
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: var(--text-base);
     padding: 2px 6px;
     width: 50px;
     text-align: center;
@@ -433,7 +433,7 @@
 }
 
 .upload-help-panel h2 {
-    font-size: 12px;
+    font-size: var(--text-base);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
@@ -450,7 +450,7 @@
 }
 
 .upload-help-card h3 {
-    font-size: 16px;
+    font-size: var(--text-2xl);
     font-weight: 600;
     margin: 0 0 10px 0;
     color: var(--normal);
@@ -460,7 +460,7 @@
 }
 
 .upload-help-card p {
-    font-size: 15px;
+    font-size: var(--text-xl);
     color: var(--activetext);
     line-height: 1.65;
     margin: 0 0 8px 0;
@@ -472,7 +472,7 @@
 
 .upload-help-card code {
     font-family: var(--font-mono);
-    font-size: 11px;
+    font-size: var(--text-sm);
     background: var(--surface-3);
     padding: 2px 6px;
     border-radius: 3px;
@@ -485,7 +485,7 @@
 }
 
 .upload-help-note {
-    font-size: 13px;
+    font-size: var(--text-md);
     color: var(--text-dim);
     border-left: 3px solid var(--accent-border);
     padding: 6px 0 6px 12px;
@@ -510,7 +510,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 12px;
+    font-size: var(--text-base);
     color: var(--activetext);
     margin-bottom: 8px;
     line-height: 1.3;
@@ -532,7 +532,7 @@
     width: 14px;
     text-align: center;
     flex-shrink: 0;
-    font-size: 13px;
+    font-size: var(--text-md);
 }
 
 /* ── Warning Message ── */

@@ -50,7 +50,7 @@
     {{if ne .InfoMessage ""}}
         {{if .SelectableField}}
             <div class="admin-msg">
-                New key: <input value="{{.InfoMessage}}" onFocus="this.setSelectionRange(0, this.value.length)" style="width:70%; padding:4px 8px; background:var(--surface-2); border:1px solid var(--border-moderate); border-radius:4px; color:var(--normal); font-family:monospace; font-size:11px; outline:none;">
+                New key: <input value="{{.InfoMessage}}" onFocus="this.setSelectionRange(0, this.value.length)" style="width:70%; padding:4px 8px; background:var(--surface-2); border:1px solid var(--border-moderate); border-radius:4px; color:var(--normal); font-family:var(--font-mono); font-size:var(--text-sm); outline:none;">
             </div>
         {{else}}
             <div class="admin-msg">{{.InfoMessage}}</div>
@@ -116,6 +116,66 @@
             </table>
             </div>
         </div>
+        <br>
+
+        {{if .CleanSearchQuery}}
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/dracula.min.css">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/lint/lint.min.css">
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+            <div class="indent">
+                <h2>⚠️caution when editing this file⚠️</h2>
+                <form id="configForm" action="/admin?page=config" method="post">
+                    <textarea id="textArea" name="textArea" style="display:none;">{{.CleanSearchQuery}}</textarea>
+                    <div id="configEditor"></div>
+                    <br>
+                    <input type="button" value="&nbsp;&nbsp;Format JSON&nbsp;&nbsp;" onclick="formatJSON()" style="display:inline">
+                    <input type="submit" value="&nbsp;&nbsp;Update&nbsp;&nbsp;"/>
+                    <input type="button" value="&nbsp;&nbsp;Reset&nbsp;&nbsp;" onclick="window.location.replace(window.location)" style="display:inline">
+                </form>
+            </div>
+            <script>
+            (function() {
+                var textarea = document.getElementById("textArea");
+                var isDark = document.body.classList.contains("dark-theme");
+                var editor = CodeMirror(document.getElementById("configEditor"), {
+                    value: textarea.value,
+                    mode: "application/json",
+                    theme: isDark ? "dracula" : "default",
+                    lineNumbers: true,
+                    matchBrackets: true,
+                    autoCloseBrackets: true,
+                    tabSize: 4,
+                    indentWithTabs: false,
+                    viewportMargin: Infinity
+                });
+                editor.setSize("100%", "600px");
+
+                // Sync editor content to textarea on form submit
+                document.getElementById("configForm").addEventListener("submit", function() {
+                    textarea.value = editor.getValue();
+                });
+
+                // Toggle theme with nightmode
+                new MutationObserver(function() {
+                    var dark = document.body.classList.contains("dark-theme");
+                    editor.setOption("theme", dark ? "dracula" : "default");
+                }).observe(document.body, {attributes: true, attributeFilter: ["class"]});
+
+                // Format JSON button
+                window.formatJSON = function() {
+                    try {
+                        var obj = JSON.parse(editor.getValue());
+                        editor.setValue(JSON.stringify(obj, null, 4));
+                    } catch(e) {
+                        alert("Invalid JSON: " + e.message);
+                    }
+                };
+            })();
+            </script>
         {{end}}
 
         {{if gt (len .Tables) 1}}
