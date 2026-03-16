@@ -37,7 +37,7 @@ nearly black #292929
  */
 
 /* Global font scaling: adjust html { font-size } to scale all text sizes together. */
-html { font-size: 19px; }
+html { font-size: 17px; }
 
 :root {
     --white: #f8f8f8;
@@ -53,7 +53,7 @@ html { font-size: 19px; }
     --black: black;
 
     --verywhite: #d4d4d4;
-    --lightblack: #1a1a1a;
+    --lightblack: #121212;
 
     --paleblue: #96b1cf;
     --darkpaleblue: #768190;
