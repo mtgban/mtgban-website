@@ -216,47 +216,17 @@
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
-        <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
-        <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
 
         <a name="top"></a>
 
-        <div class="indent">
-            <div class="indent" style="max-width: 85%;">
-                {{if .LargeTable}}
-                    <br>
-                    {{if eq $.ScraperShort "SYP"}}
-                        <a class="btn success" href="/newspaper?page=syp&sort={{$.SortOption}}&format=csv">Download CSV</a>
-                    {{end}}
-                    {{else}}
-                    <p>
-                        Jump to
-                        {{if .Arb}}
-                            {{range .Arb}}
-                                <a class="btn normal" href="#{{.Name}}">{{.Name}} ({{len .Arbit}})</a>
-                            {{end}}
-                        {{else}}
-                            <a class="btn normal" href="javascript:history.back()">¯\_(ツ)_/¯</a>
-                        {{end}}
-                    </p>
-                    <p>
-                        Show
-                        {{range $.ArbitOptKeys}}
-                            {{$key := .}}
-                            {{$skipIfTesting := and (index $.ArbitOptConfig .).BetaFlag (not $.CanShowAll)}}
-                            {{$skipIfGlobal := and (index $.ArbitOptConfig .).ArbitOnly $.GlobalMode}}
-                            {{$skipIfArbit := and (index $.ArbitOptConfig .).GlobalOnly (not $.GlobalMode)}}
-                            {{$skipIfSealed := and (index $.ArbitOptConfig .).NoSealed $.IsSealed}}
-                            {{$skipIfNotSealed := and (index $.ArbitOptConfig .).SealedOnly (not $.IsSealed)}}
-                            {{if and (and (not $skipIfTesting) (not $skipIfGlobal)) (and (and (not $skipIfNotSealed) (not $skipIfSealed)) (not $skipIfArbit))}}
-                                {{$cfg := index $.ArbitOptConfig .}}
-                                {{if $cfg}}
-                                    {{$name := $cfg.Title}}
-                                    <a class="btn {{if index $.ArbitFilters .}}success{{else}}normal{{end}}" href="?source={{$.ScraperShort}}&sort={{$.SortOption}}&{{range $.ArbitOptKeys}}{{$val := index $.ArbitFilters .}}{{.}}={{if eq . $key}}{{not $val}}{{else}}{{$val}}{{end}}&{{end}}">{{$name}}</a>
-                                {{end}}
-                            {{end}}
-                        {{end}}
-                    </p>
+        <!-- Selector bar -->
+        <div class="arb-selector-bar">
+            {{range .ExtraNav}}
+                {{if .Active}}
+                    <div class="arb-current-store">
+                        <span class="store-type">{{if $.GlobalMode}}Index{{else if $.ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
+                        {{.Name}}
+                    </div>
                 {{end}}
             {{end}}
 
@@ -494,111 +464,64 @@
                     {{end}}
                     -->
                 </div>
-                <hr style="width: 100%; border: none; border-top: 1px solid var(--border-subtle); margin: 0;">
+                <hr style="width: 100%; border: none; border-top: 1px solid var(--arb-border-subtle); margin: 0;">
             </div>
 
-                <table class="filterable sortable-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
-                    <thead>
-                    <tr>
-                        <th class="stickyHeaderTiny">
-                            <a href="javascript:sortBy('alpha', '{{.Name}}')">Card Name</a>
-                        </th>
-                        <th class="stickyHeaderTiny">
-                            <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a>
-                        </th>
-                        {{if not $.IsSealed}}
-                            <th class="stickyHeaderTiny" style="text-align:center">#</th>
-                        {{end}}
-                        <th class="stickyHeaderTiny" data-sort-method="finish">
-                            {{if $.IsSealed}}Decklist{{else}}Finish{{end}}
-                        </th>
-                        {{if not .HasNoConds}}
-                            <th class="stickyHeaderTiny" data-sort-method="condition">Condition</th>
-                        {{end}}
-                        {{if not .HasNoQty}}
-                            <th class="stickyHeaderTiny">
-                                <a href="javascript:sortBy('available', '{{.Name}}')">Quantity</a>
-                            </th>
-                        {{end}}
-                        <th class="stickyHeaderTiny">
-                            <a href="javascript:sortBy('sell_price', '{{.Name}}')">
-                                {{if and $.GlobalMode}}
-                                    {{if $.IsSealed}}
-                                        {{.Name}}
-                                    {{else}}
-                                        {{$.ScraperShort}}
-                                    {{end}}
+            <div class="arb-table-wrap">
+            <table class="arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                <thead>
+                <tr>
+                    <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
+                    <th class="c">{{if $.IsSealed}}Decklist{{else}}Finish{{end}}</th>
+                    {{if not .HasNoConds}}
+                        <th class="c">Cond</th>
+                    {{end}}
+                    {{if not .HasNoQty}}
+                        <th class="c"><a href="javascript:sortBy('available', '{{.Name}}')">Qty</a></th>
+                    {{end}}
+                    <th class="c">
+                        <a href="javascript:sortBy('sell_price', '{{.Name}}')">
+                            {{if $.GlobalMode}}
+                                {{if $.IsSealed}}{{.Name}}{{else}}{{$.ScraperShort}}{{end}}
+                            {{else}}
+                                Sell Price
+                            {{end}}
+                        </a>
+                    </th>
+                    {{if not .HasNoPrice}}
+                        <th class="c">
+                            <a href="javascript:sortBy('buy_price', '{{.Name}}')">
+                                {{if $.GlobalMode}}
+                                    {{if $.IsSealed}}{{$.ScraperShort}}{{else}}{{.Name}}{{end}}
                                 {{else}}
                                     Buy Price
                                 {{end}}
                             </a>
                         </th>
-                        {{if not .HasNoPrice}}
-                            <th class="stickyHeaderTiny">
-                                <a href="javascript:sortBy('buy_price', '{{.Name}}')">
-                                    {{if and $.GlobalMode}}
-                                        {{if $.IsSealed}}
-                                            {{$.ScraperShort}}
-                                        {{else}}
-                                            {{.Name}}
-                                        {{end}}
-                                    {{else}}
-                                        Buy Price
-                                    {{end}}
-                                </a>
-                            </th>
+                    {{end}}
+                    {{$save := .}}
+                    {{if not .HasNoCredit}}
+                        <th class="c"><a href="javascript:sortBy('buy_price', '{{.Name}}')">Trade Price</a></th>
+                    {{end}}
+                    {{if not .HasNoArbit}}
+                        <th class="c"><a href="javascript:sortBy('profitability', '{{.Name}}')">Profit</a></th>
+                        <th class="c"><a href="javascript:sortBy('diff', '{{.Name}}')">Diff</a></th>
+                        <th class="c"><a href="javascript:sortBy('spread', '{{.Name}}')">Spread</a></th>
+                        {{if not $.GlobalMode}}
+                            <th class="c">Ratio</th>
                         {{end}}
-                        {{$save := .}}
-                        {{if not .HasNoCredit}}
-                            <th class="stickyHeaderTiny">
-                                <a href="javascript:sortBy('buy_price', '{{.Name}}')">Trade Price</a>
-                            </th>
-                        {{end}}
-                        {{if not .HasNoArbit}}
-                            <th class="stickyHeaderTiny">
-                                <a href="javascript:sortBy('profitability', '{{.Name}}')">Profitability</a>
-                            </th>
-                            <th class="stickyHeaderTiny">
-                                <a href="javascript:sortBy('diff', '{{.Name}}')">Difference</a>
-                            </th>
-                            <th class="stickyHeaderTiny">
-                                <a href="javascript:sortBy('spread', '{{.Name}}')">Spread</a>
-                            </th>
-                            {{if not $.GlobalMode}}
-                                <th class="stickyHeaderTiny">Price Ratio</th>
-                            {{end}}
-                        {{end}}
-                        <th class="stickyHeaderTiny" data-sort-method="none"><center>Quicklinks</center></th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {{$arbitContainer := .}}
-                    {{range .Arbit}}
-                        {{$card := (index $.Metadata .CardId)}}
-                        <tr onmouseover="document.getElementById('hoverImage').src='{{(index $.Metadata .CardId).ImageURL}}';">
-                            <td>
-                                {{if $card.Sealed}}
-                                <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product">
-                                    <span class="emoji">🔎</span>
-                                </a>&nbsp;
-                                {{else}}
-                                    <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{(index $.Metadata .CardId).Name}}')" title="Copy to clipboard">📝</span>&nbsp;
-                                    <!--
-                                    {{if eq $sourceKey "TCGDirect"}}
-                                        <span class="emoji" style="cursor: pointer;" onclick="getDirectQty(this, '{{.CardId}}')" title="Update quantities for TCG Direct" id="directqty-{{.CardId}}">⚡️</span>
-                                    {{end}}
-                                    -->
-                                {{end}}
-                                <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
-                                {{if (index $.Metadata .CardId).Reserved}} *{{end}}
-                                {{if (index $.Metadata .CardId).Stocks}} •{{end}}
-                                {{if (index $.Metadata .CardId).SypList}} †{{end}}
-                                {{if eq $.ScraperShort $card.HotlistStore}}
-                                    <span class=emoji title="Highest price in 3 months">🌟</span>
-                                {{end}}
-                            </td>
-                            <td>
-                                {{$keyrune := (index $.Metadata .CardId).Keyrune}}
+                    {{end}}
+                    <th class="c">Links</th>
+                </tr>
+                </thead>
+                <tbody>
+                {{$arbitContainer := .}}
+                {{range .Arbit}}
+                    {{$card := (index $.Metadata .CardId)}}
+                    <tr onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';">
+                        <td>
+                            <div class="arb-card-cell">
+                                {{$keyrune := $card.Keyrune}}
                                 {{if $keyrune}}
                                     <i class="ss {{$keyrune}} ss-1x ss-fw set-icon"></i>
                                 {{else}}
@@ -649,19 +572,65 @@
                                     / {{.BuylistEntry.Quantity}}
                                 {{end}}
                             </td>
-                        </tr>
-                    {{end}}
-
-                    </tbody>
-                    <tfoot>
-                    <tr style="background-color: var(--background);">
-                        <td colspan=13>
-                            <a class="btn default" style="float: right;" href="#top"><i class="arrow up"></i> back to top</a>
+                        {{end}}
+                        <td class="m">
+                            $ {{printf "%.2f" .InventoryEntry.Price}}
+                        </td>
+                        {{if not $save.HasNoPrice}}
+                            <td class="m">
+                                {{if eq .BuylistEntry.BuyPrice 0.0}}
+                                    $ {{printf "%.2f" .ReferenceEntry.Price}}
+                                    {{if (isSussy $arbitContainer.SussyList .CardId)}}
+                                        {{$susPrice := (index $arbitContainer.SussyList .CardId)}}
+                                        <span class=emoji title="CAUTION - This price looks a bit off, {{if $.IsSealed}}the contents of this product have a very uneven distribution, and simulation or data may be wrong (IQR: {{printf "%.2f" $susPrice}}){{else}}TCG Market is {{if $susPrice}}${{printf "%.2f" $susPrice}}{{else}}missing{{end}}{{end}}">‼️ </span>
+                                    {{end}}
+                                {{else}}
+                                    $ {{printf "%.2f" .BuylistEntry.BuyPrice}}
+                                {{end}}
+                            </td>
+                        {{end}}
+                        {{if not $save.HasNoCredit}}
+                            <td class="m">
+                                $ {{printf "%.2f" (mulf .BuylistEntry.BuyPrice $save.CreditMultiplier)}}
+                            </td>
+                        {{end}}
+                        {{if not $save.HasNoArbit}}
+                            <td class="m">
+                                {{if gt .Spread 0.0}}
+                                    {{printf "%.2f" .Profitability}}
+                                {{else}}
+                                    n/a
+                                {{end}}
+                            </td>
+                            <td class="m">
+                                $ {{printf "%.2f" .Difference}}
+                            </td>
+                            <td class="m {{if gt .Spread 0.0}}arb-spread-up{{else}}arb-spread-down{{end}}">
+                                {{printf "%.2f" .Spread}} %
+                            </td>
+                            {{if not $.GlobalMode}}
+                                <td class="m">
+                                    {{printf "%.2f" .BuylistEntry.PriceRatio}} %
+                                </td>
+                            {{end}}
+                        {{end}}
+                        <td>
+                            <div class="arb-quick-links">
+                                {{if ne .InventoryEntry.URL ""}}
+                                    <a class="arb-qlink buy" href="{{.InventoryEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
+                                {{end}}
+                                {{if ne .BuylistEntry.URL ""}}
+                                    <a class="arb-qlink sell" href="{{.BuylistEntry.URL}}" target="_blank" rel="nofollow">Sell</a>
+                                {{end}}
+                                {{if not (and $.GlobalMode $card.Sealed)}}
+                                    {{if ne .ReferenceEntry.URL ""}}
+                                        <a class="arb-qlink buy" href="{{.ReferenceEntry.URL}}" target="_blank" rel="nofollow">Buy</a>
+                                    {{end}}
+                                {{end}}
+                            </div>
                         </td>
                     </tr>
-                    </tfoot>
-                </table>
-            {{end}}
+                {{end}}
 
                 {{if $.CurrentIndex}}
                     <tr style="background-color: var(--headerbackground);">
@@ -712,32 +681,6 @@
         <br>
     {{end}}
 </div>
-<script>
-    Tablesort.extend('finish', function(item) {
-        return true; // always match on finish columns
-    }, function(a, b) {
-        // 💫 = Etched (0), ✨ = Foil (1), empty = Regular (2)
-        function rank(s) {
-            s = s.trim();
-            if (s.indexOf('\uD83D\uDCAB') !== -1) return 0; // 💫
-            if (s.indexOf('\u2728') !== -1) return 1;        // ✨
-            return 2;
-        }
-        return rank(a) - rank(b);
-    });
-
-    Tablesort.extend('condition', function(item) {
-        return /^(NM|SP|MP|HP|PO)$/i.test(item.trim());
-    }, function(a, b) {
-        var order = {'NM': 0, 'SP': 1, 'MP': 2, 'HP': 3, 'PO': 4};
-        var aVal = order[a.trim()];
-        var bVal = order[b.trim()];
-        return (aVal !== undefined ? aVal : 5) - (bVal !== undefined ? bVal : 5);
-    });
-
-    document.querySelectorAll('.sortable-table').forEach(function(table) {
-        new Tablesort(table);
-    });
-</script>
+</div>
 </body>
 </html>
