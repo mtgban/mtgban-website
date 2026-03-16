@@ -1,23 +1,11 @@
-/* ── Row colors ── */
-.light-theme {
-    --admin-row-even: #ffffff;
-    --admin-row-odd: #f7f7fa;
-    --admin-row-hover: #eeeef4;
-}
-.dark-theme {
-    --admin-row-even: #13151a;
-    --admin-row-odd: #181b20;
-    --admin-row-hover: #252930;
-}
-
 /* ── Page Layout ── */
 .admin-page {
-    max-width: 1300px;
+    max-width: 80vw;
     margin: 0 auto;
     padding: calc(48px + 24px) 28px 80px;
 }
 .admin-page > h1 {
-    font-size: 24px;
+    font-size: var(--text-8xl);
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 0 0 14px;
@@ -30,7 +18,7 @@
     background: var(--accent-muted);
     border: 1px solid var(--accent-border);
     color: var(--ainfo);
-    font-size: 13px;
+    font-size: var(--text-md);
     font-weight: 500;
     margin-bottom: 14px;
 }
@@ -51,26 +39,26 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: var(--text-base);
     color: var(--activetext);
 }
 .admin-stat .sl {
     color: var(--text-dim);
     font-weight: 600;
-    font-size: 10px;
+    font-size: var(--text-xs);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
 .admin-stat .sv {
-    font-family: monospace;
-    font-size: 11px;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
     color: var(--normal);
 }
 .admin-stat a {
     color: var(--ainfo);
     text-decoration: none;
-    font-family: monospace;
-    font-size: 11px;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
 }
 .admin-stat a:hover { text-decoration: underline; }
 .admin-sep {
@@ -89,7 +77,7 @@
 }
 .admin-tab {
     padding: 10px 18px;
-    font-size: 13px;
+    font-size: var(--text-md);
     font-weight: 600;
     color: var(--activetext);
     background: none;
@@ -118,12 +106,12 @@
     margin-bottom: 8px;
 }
 .admin-section-header h2 {
-    font-size: 15px;
+    font-size: var(--text-xl);
     font-weight: 600;
     margin: 0;
 }
 .admin-section-header .count {
-    font-size: 12px;
+    font-size: var(--text-base);
     color: var(--text-dim);
 }
 
@@ -136,11 +124,11 @@
 .admin-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12px;
+    font-size: var(--text-base);
 }
 .admin-table th {
     padding: 8px 12px;
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -157,9 +145,9 @@
     vertical-align: middle;
     white-space: nowrap;
 }
-.admin-table tbody tr:nth-child(even) { background: var(--admin-row-even); }
-.admin-table tbody tr:nth-child(odd) { background: var(--admin-row-odd); }
-.admin-table tbody tr:hover { background: var(--admin-row-hover); }
+.admin-table tbody tr:nth-child(even) { background: var(--row-even); }
+.admin-table tbody tr:nth-child(odd) { background: var(--row-odd); }
+.admin-table tbody tr:hover { background: var(--row-hover); }
 .admin-table a {
     color: var(--ainfo);
     text-decoration: none;
@@ -167,14 +155,14 @@
 }
 .admin-table a:hover { text-decoration: underline; }
 .admin-mono {
-    font-family: monospace;
-    font-size: 11px;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
 }
 .status-ok { color: var(--asuccess); }
 .status-busy { color: var(--awarning); }
 .status-err { color: var(--adanger); }
 .badge-sealed {
-    font-size: 10px;
+    font-size: var(--text-xs);
     padding: 1px 5px;
     border-radius: 8px;
     background: rgba(91,141,239,0.1);
@@ -182,7 +170,7 @@
     margin-left: 4px;
 }
 .badge-meta {
-    font-size: 10px;
+    font-size: var(--text-xs);
     padding: 1px 5px;
     border-radius: 8px;
     background: rgba(210,153,34,0.1);
@@ -203,7 +191,7 @@
     padding: 22px;
 }
 .tools-card h3 {
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: 600;
     margin: 0 0 16px;
     padding-bottom: 12px;
@@ -228,7 +216,7 @@
     background: var(--surface-2);
     border: 1px solid var(--border-subtle);
     color: var(--activetext);
-    font-size: 13px;
+    font-size: var(--text-md);
     font-weight: 500;
     text-decoration: none;
     transition: all 0.12s;
@@ -246,13 +234,13 @@
     background: rgba(248,81,73,0.05);
 }
 .admin-action .act-icon {
-    font-size: 16px;
+    font-size: var(--text-2xl);
     width: 20px;
     text-align: center;
     flex-shrink: 0;
 }
 .admin-action .act-desc {
-    font-size: 11px;
+    font-size: var(--text-sm);
     color: var(--text-dim);
     font-weight: 400;
     margin-left: auto;
@@ -263,7 +251,7 @@
 .admin-tool:last-child { margin-bottom: 0; }
 .admin-tool label {
     display: block;
-    font-size: 11px;
+    font-size: var(--text-sm);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -279,7 +267,7 @@
     border: 1px solid var(--border-moderate);
     background: var(--surface-2);
     color: var(--normal);
-    font-size: 13px;
+    font-size: var(--text-md);
     outline: none;
     font-family: inherit;
     transition: border-color 0.12s;
@@ -305,7 +293,7 @@
     background: var(--accent-muted);
     border: 1px solid var(--accent-border);
     color: var(--ainfo);
-    font-size: 13px;
+    font-size: var(--text-md);
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
@@ -329,14 +317,14 @@
     gap: 10px;
 }
 .admin-config-header h2 {
-    font-size: 14px;
+    font-size: var(--text-lg);
     font-weight: 600;
     margin: 0;
 }
 .admin-config-header .warn-tag {
     padding: 2px 8px;
     border-radius: 8px;
-    font-size: 10px;
+    font-size: var(--text-xs);
     font-weight: 700;
     background: rgba(248,81,73,0.12);
     color: var(--adanger);
@@ -349,14 +337,14 @@
 .cfg-btn {
     padding: 6px 14px;
     border-radius: var(--radius-sm);
-    font-size: 12px;
+    font-size: var(--text-base);
     font-weight: 600;
     border: none;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.12s;
 }
-.cfg-primary { background: var(--ainfo); color: #fff; }
+.cfg-primary { background: var(--dodgerblue); color: #fff; }
 .cfg-primary:hover { filter: brightness(1.1); }
 .cfg-secondary {
     background: var(--surface-3);
@@ -367,20 +355,20 @@
 .cfg-format { background: rgba(210,153,34,0.15); color: var(--awarning); }
 .cfg-format:hover { background: rgba(210,153,34,0.25); }
 
-/* CodeMirror wrapper — override to match card */
+/* CodeMirror wrapper */
 .admin-config-wrap .CodeMirror {
     background: var(--surface-0, var(--background));
-    font-family: monospace;
-    font-size: 12px;
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
     min-height: 500px;
     border: none;
     border-radius: 0;
 }
 .admin-config-wrap .CodeMirror-gutters {
-    padding-right: 8px;
+    padding-right: 14px;
 }
 .admin-config-wrap .CodeMirror-lines {
-    padding-left: 8px;
+    padding-left: 12px;
 }
 
 /* ── People Tab ── */
@@ -397,6 +385,6 @@
 }
 @media (max-width: 640px) {
     .admin-page { padding-left: 16px; padding-right: 16px; }
-    .admin-table { font-size: 11px; }
+    .admin-table { font-size: var(--text-sm); }
     .admin-table th, .admin-table td { padding: 5px 8px; }
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"errors"
+	"encoding/csv"
 	"fmt"
 	"html/template"
 	"log"
@@ -1398,6 +1398,37 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		if len(arbit) > MaxSYPResults {
 			pageIndex, _ := strconv.Atoi(r.FormValue("p"))
 			arbit, pageVars.Pagination = Paginate(arbit, pageIndex, MaxSYPResults, MaxSYPTotalResults)
+		}
+
+		// Handle CSV download
+		if r.FormValue("format") == "csv" {
+			w.Header().Set("Content-Type", "text/csv")
+			w.Header().Set("Content-Disposition", `attachment; filename="syp-buylist.csv"`)
+			writer := csv.NewWriter(w)
+			writer.Write([]string{"Card Name", "Edition", "Number", "Finish", "Condition", "Buy Price", "Quantity"})
+			for _, entry := range arbit {
+				co, err := mtgmatcher.GetUUID(entry.CardId)
+				if err != nil {
+					continue
+				}
+				finish := "Regular"
+				if co.Foil {
+					finish = "Foil"
+				} else if co.Etched {
+					finish = "Etched"
+				}
+				writer.Write([]string{
+					co.Card.Name,
+					co.Edition,
+					co.Card.Number,
+					finish,
+					entry.InventoryEntry.Conditions,
+					fmt.Sprintf("%.2f", entry.InventoryEntry.Price),
+					fmt.Sprintf("%d", entry.Quantity),
+				})
+			}
+			writer.Flush()
+			return
 		}
 
 		entry := Arbitrage{
