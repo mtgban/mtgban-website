@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -158,6 +159,14 @@ func stashInTimeseries() {
 			for uuid, entries := range seller.Inventory() {
 				// Adjust price through defaultGradeMap in case NM is not available
 				price := entries[0].Price * defaultGradeMap[entries[0].Conditions]
+
+				// Check if there is a specific price entry
+				realRetail, found := entries[0].CustomFields["RetailPrice"]
+				if entries[0].Conditions != "NM" && found {
+					price, _ = strconv.ParseFloat(realRetail, 64)
+				}
+
+				// Skip empty
 				if price == 0 {
 					continue
 				}
