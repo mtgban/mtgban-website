@@ -991,7 +991,10 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Prefix the name passed in with templates/
 	templates := []string{fmt.Sprintf("templates/%s", tmpl)}
 
-	// Add partials if needed
+	// Always include the navbar partial
+	templates = append(templates, "templates/partials/navbar.html")
+
+	// Add other partials as needed
 	if name == "search.html" {
 		templates = append(templates, "templates/partials/syntax.html")
 	}
