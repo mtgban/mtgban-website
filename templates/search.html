@@ -3,6 +3,7 @@
 <head>
     <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/search.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
     {{if .IsSealed}}
     <link rel="stylesheet" type="text/css" href="/css/sealed.css?hash={{.Hash}}">
@@ -69,217 +70,7 @@
     {{if ne .ErrorMessage ""}}
         <h1>{{.ErrorMessage}}</h1>
     {{else if eq .Title "Options"}}
-        <br>
-
-        <script type="text/javascript">
-            window.onload = function(e) {
-                loadForm("SearchSellersList", "sellers");
-                loadForm("SearchVendorsList", "vendors");
-                loadForm("SearchMiscOpts", "miscOpts");
-                loadRadio("SearchDefaultSort", "defaultSort");
-                loadRadio("SearchListingPriority", "listingPriority");
-                loadRadio("SearchBuylistSecondary", "buylistSecondary");
-                loadDropdown("SearchSellersPriority", "sellersPriority");
-                loadDropdown("SearchVendorsPriority", "vendorsPriority");
-            }
-        </script>
-
-        <div class="indent">
-            <h2>Stores</h2>
-            Select which sellers or vendors you <b>don't</b> want to display in your searches.
-            <br>
-
-            <a class="btn warning" onclick="javascript:clearForm('sellers'); clearForm('vendors');"><b>CLEAR</b></a>
-            <a class="btn success" onclick="javascript:selectAll('sellers');"><b>Select ALL Sellers</b></a>
-            <a class="btn success" onclick="javascript:selectAll('vendors');"><b>Select ALL Vendors</b></a>
-            <a class="btn success" onclick="javascript:saveForm('SearchSellersList', 'sellers'); saveForm('SearchVendorsList', 'vendors'); window.location.href = '/search'"><b>SAVE</b></a>
-        </div>
-
-        <br>
-        <div class="indent row">
-            <div class="column" id="sellers">
-                <h3>Retail</h3>
-                {{range $i, $key := .SellerKeys}}
-                    <input type="checkbox" id="s{{$key}}" name="{{$key}}">
-                    <label for="s{{$key}}">
-                        {{scraper_name $key}}
-                        {{if (contains $key "Sealed")}}
-                            <i>(Sealed)</i>
-                        {{end}}
-                    </label>
-                    <br>
-                {{end}}
-            </div>
-            <div class="column" id="vendors">
-                <h3>Buylist</h3>
-                {{range $i, $key := .VendorKeys}}
-                    <input type="checkbox" id="v{{$key}}" name="{{$key}}">
-                    <label for="v{{$key}}">
-                        {{scraper_name $key}}
-                        {{if (contains $key "Sealed")}}
-                            <i>(Sealed)</i>
-                        {{end}}
-                    </label>
-                    <br>
-                {{end}}
-            </div>
-        </div>
-
-        <br>
-        <div class="indent">
-            <h2>Result sorting</h2>
-            Select how card results should be sorted by.
-            <br>
-
-            <a class="btn success" onclick="javascript:saveRadio('SearchDefaultSort', 'defaultSort'); window.location.href = '/search'"><b>SAVE</b></a>
-        </div>
-
-        <br>
-        <div class="indent row">
-            <div class="column" id="defaultSort">
-                <input type="radio" id="chrono" name="sort" value="chrono" checked>
-                <label for="chrono">By chronological order</label>
-                <br>
-                <input type="radio" id="hybrid" name="sort" value="hybrid" checked>
-                <label for="hybrid">By alphabetical order, grouping sets by chronological order</label>
-                <br>
-                <input type="radio" id="alpha" name="sort" value="alpha">
-                <label for="alpha">By alphabetical order</label>
-                <br>
-                <input type="radio" id="number" name="sort" value="#">
-                <label for="number">By collector number</label>
-                <br>
-                <input type="radio" id="retail" name="sort" value="retail">
-                <label for="retail">By best retail price (off TCGplayer)</label>
-                <br>
-                <input type="radio" id="buylist" name="sort" value="buylist">
-                <label for="buylist">By best buylist price (off Card Kingdom)</label>
-                <br>
-            </div>
-        </div>
-
-        <br>
-        <div class="indent">
-            <h2>Preferred retail/buylist sort option</h2>
-            Select which retail and buylist stores should sort  by.
-            <br>
-
-            <a class="btn success" onclick="javascript:saveDropdown('SearchSellersPriority', 'sellersPriority'); saveDropdown('SearchVendorsPriority', 'vendorsPriority'); window.location.href = '/search'"><b>SAVE</b></a>
-        </div>
-
-        <br>
-        <div class="indent row">
-            <div class="column" id="sortPriority">
-                <label for="sellersPriority">Retail priority</label>
-                <select id="sellersPriority" class="select-css">
-                    <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick a store</option>
-                    <option value="">&nbsp;&nbsp;&nbsp;Reset to Default</option>
-                    {{range $i, $key := .SellerKeys}}
-                        <option value="{{$key}}">&nbsp;&nbsp;&nbsp;{{scraper_name $key}}</option>
-                    {{end}}
-                </select>
-
-                <label for="vendorsPriority">Buylist priority</label>
-                <select id="vendorsPriority" class="select-css">
-                    <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick a store</option>
-                    <option value="">&nbsp;&nbsp;&nbsp;Reset to Default</option>
-                    {{range $i, $key := .VendorKeys}}
-                        <option value="{{$key}}">&nbsp;&nbsp;&nbsp;{{scraper_name $key}}</option>
-                    {{end}}
-                </select>
-            </div>
-        </div>
-
-        <br>
-        <div class="indent">
-            <h2>Listing priority</h2>
-            Select how price results should be sorted by.
-            <br>
-
-            <a class="btn success" onclick="javascript:saveRadio('SearchListingPriority', 'listingPriority'); window.location.href = '/search'"><b>SAVE</b></a>
-        </div>
-
-        <br>
-        <div class="indent row">
-            <div class="column" id="listingPriority">
-                <input type="radio" id="stores" name="priority" value="stores" checked>
-                <label for="stores">Alphabetical, by store name</label>
-                <br>
-                <input type="radio" id="prices" name="priority" value="prices">
-                <label for="prices">Asc for Retail, Desc for Buylist, by prices</label>
-                <br>
-                <input type="radio" id="credit" name="priority" value="credit">
-                <label for="credit">Asc for Retail, Desc for Buylist, by credit prices</label>
-                <br>
-                <input type="radio" id="market" name="priority" value="market">
-                <label for="market">Asc for Retail, Desc for Buylist, by credit market prices</label>
-                <br>
-            </div>
-        </div>
-
-        <br>
-        <div class="indent">
-            <h2>Buylist secondary entry</h2>
-            Choose which information you'd like to display next to the buylist price (if available).
-            <br>
-
-            <a class="btn success" onclick="javascript:saveRadio('SearchBuylistSecondary', 'buylistSecondary'); window.location.href = '/search'"><b>SAVE</b></a>
-        </div>
-
-        <br>
-        <div class="indent row">
-            <div class="column" id="buylistSecondary">
-                <input type="radio" id="priceRatio" name="blSecondary" value="priceRatio" checked>
-                <label for="priceRatio">Price ratio, the indication how much a vendor is seeking a card</label>
-                <br>
-                <input type="radio" id="creditPrice" name="blSecondary" value="creditPrice">
-                <label for="creditPrice">Credit price, how much the prices would be in store credit</label>
-                <br>
-                <input type="radio" id="marketCredit" name="blSecondary" value="marketCredit">
-                <label for="marketCredit">Credit price converted to market value, as in, how much the credit is worth by reselling it. <i>Note: this is a completely arbitrary metric, and should not be used for financially sensitive operations.</i></label>
-                <br>
-            </div>
-        </div>
-
-        <br>
-        <div class="indent">
-            <h2>Other preferences</h2>
-            Miscellaneous life hacks for Search.
-            <br>
-
-            <a class="btn warning" onclick="javascript:clearForm('miscOpts');"><b>CLEAR</b></a>
-            <a class="btn success" onclick="javascript:saveForm('SearchMiscOpts', 'miscOpts'); window.location.href = '/search'"><b>SAVE</b></a>
-        </div>
-
-        <br>
-        <div class="indent row">
-            <div class="column" id="miscOpts">
-                <input type="checkbox" id="noSussy" name="noSussy">
-                <label for="noSussy">Skip invalid TCGplayer Direct prices (2x Market, or no Market)</label>
-                <br>
-                <input type="checkbox" id="hidePrelPack" name="hidePrelPack">
-                <label for="hidePrelPack">Hide classic Promotional entries (<i>promopack, prerelease, etc</i>)</label>
-                <br>
-                <input type="checkbox" id="hidePromos" name="hidePromos">
-                <label for="hidePromos">Hide ALL Promotional entries (<i>judge, buyabox, bundle, some sets, etc</i>)</label>
-                <br>
-                <input type="checkbox" id="preferFlavor" name="preferFlavor">
-                <label for="preferFlavor">Prefer <i>flavor name</i> when available (global setting)</label>
-                <br>
-                <input type="checkbox" id="hideBLconds" name="hideBLconds">
-                <label for="hideBLconds">Hide non-NM Buylist entries</label>
-                <br>
-                <input type="checkbox" id="skipEmpty" name="skipEmpty">
-                <label for="skipEmpty">Skip results with no prices</label>
-                <br>
-                <input type="checkbox" id="noSyp" name="noSyp">
-                <label for="noSyp">Don't show the SYP indication (†)</label>
-                <br>
-                <input type="checkbox" id="noUpsell" name="noUpsell">
-                <label for="noUpsell">Hide the upsell reminder to download CSVs</label>
-                <br>
-            </div>
-        </div>
+        {{template "search_options" .}}
 
     {{else}}
         {{if not (and (eq .SearchQuery "") .IsSealed)}}
@@ -296,20 +87,6 @@
                 </h1>
             {{else}}
                 Welcome to {{$.Title}}
-
-                {{if .TotalUnique}}
-                    -
-                    <small><small><small>
-                        {{.TotalUnique}}
-                        {{if .TotalCards}}
-                            / {{.TotalCards}}
-                        {{end}}
-                        {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
-                        {{if gt .TotalUnique (len .AllKeys)}}
-                            ({{len .AllKeys}} shown)
-                        {{end}}
-                    </small></small></small>
-                {{end}}
             {{end}}
         </h1>
         {{end}}
@@ -319,71 +96,31 @@
             <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         {{end}}
 
-        <div class="indent sticky" style="top: 48px; background-color: var(--background); float:left; {{if and (eq .SearchQuery "") .IsSealed}}display:none{{end}}">
-            <form class="search autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
-                <label style="clear: both; float: left; width: 115%" for="searchbox">
-                    {{if not .SearchQuery}}
-                        Search for a {{if .IsSealed}}product{{else}}card{{end}}, or... <a class="btn info" href="/random{{if .IsSealed}}sealed{{end}}">surprise me</a>
-                    {{else}}
-                        Sort
-                        {{if .NoSort}}
-                            from syntax
-                        {{else}}
-                            <a class="btn info" href="?q={{.SearchQuery}}&sort=" title="Sort by chronological order">
-                                {{if or (eq .SearchSort "chrono") (not .SearchSort)}}<b>{{end}}chrono{{if or (eq .SearchSort "chrono") (not .SearchSort)}}</b>{{end}}
-                            </a>
-                            {{if or (eq .SearchSort "chrono") (not .SearchSort)}}
-                                <a href="?q={{.SearchQuery}}&sort=&reverse={{not .ReverseMode}}" title="Sort by reverse chronological order">🔄</a>
-                            {{end}}
-
-                            {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
-                            <a class="btn info" href="?q={{.SearchQuery}}&sort=alpha" title="Sort by alphabetical order{{if eq .SearchSort "hybrid"}} (keeping sets grouped){{end}}">
-                                {{if $isAlphaSorted}}<b>{{end}}alpha{{if $isAlphaSorted}}</b>{{end}}
-                            </a>
-                            {{if $isAlphaSorted}}
-                                <a href="?q={{.SearchQuery}}&sort=alpha&reverse={{not .ReverseMode}}" title="Sort by reverse alphabetical order{{if eq .SearchSort "hybrid"}} (keeping sets grouped){{end}}">🔄</a>
-                            {{end}}
-
-                            <a class="btn info" href="?q={{.SearchQuery}}&sort=number" title="Sort by collector number">
-                                {{if eq .SearchSort "number"}}<b>{{end}}#{{if eq .SearchSort "number"}}</b>{{end}}
-                            </a>
-                            {{if eq .SearchSort "number"}}
-                                <a href="?q={{.SearchQuery}}&sort=number&reverse={{not .ReverseMode}}" title="Sort by collector number">🔄</a>
-                            {{end}}
-
-                            <a class="btn info" href="?q={{.SearchQuery}}&sort=retail" title="Sort by best retail price (off TCGplayer)">
-                                {{if eq .SearchSort "retail"}}<b>{{end}}retail{{if eq .SearchSort "retail"}}</b>{{end}}
-                            </a>
-                            {{if eq .SearchSort "retail"}}
-                                <a href="?q={{.SearchQuery}}&sort=retail&reverse={{not .ReverseMode}}" title="Sort by lowest retail price (off TCGplayer)">🔄</a>
-                            {{end}}
-
-                            <a class="btn info" href="?q={{.SearchQuery}}&sort=buylist" title="Sort by best buylits price (off Card Kingdom)">
-                                {{if eq .SearchSort "buylist"}}<b>{{end}}buylist{{if eq .SearchSort "buylist"}}</b>{{end}}
-                            </a>
-                            {{if eq .SearchSort "buylist"}}
-                                <a href="?q={{.SearchQuery}}&sort=buylist&reverse={{not .ReverseMode}}" title="Sort by lowest buylits price (off Card Kingdom)">🔄</a>
-                            {{end}}
-                        {{end}}
-                        <span class=emoji>
-                            <a class="btn info" title="...more surpises" href="/random{{if .IsSealed}}sealed{{end}}">🎰</a>
-                        </span>
-                    {{end}}
-                    <span class=emoji>
-                        <a href="?page=options" title="Search settings">⚙️</a>
-                    </span>
-                </label>
-                <input id="searchbox" class="w3-input w3-border w3-round-small search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
-            </form>
-
+        {{if and (eq .SearchQuery "") (not .IsSealed)}}
+            <div class="search-bar-wrap">
+                <div class="search-input-row">
+                    <form class="search autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+                        <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
+                    </form>
+                    <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Surprise me</a>
+                </div>
+            </div>
             <script type="text/javascript">
                 autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
             </script>
-
-        {{if and (eq .SearchQuery "") (not .IsSealed)}}
             {{template "syntax" .}}
         {{else if and (eq .SearchQuery "") (.IsSealed)}}
-        </div>{{/* Close .indent sticky div */}}
+            <div class="search-bar-wrap" style="display:none">
+                <div class="search-input-row">
+                    <form class="search autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+                        <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
+                    </form>
+                    <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Surprise me</a>
+                </div>
+            </div>
+            <script type="text/javascript">
+                autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+            </script>
         </div>{{/* Close .mainbody */}}
 
         <div class="sealed-layout">
@@ -619,326 +356,320 @@ Sims are not required for pre-constructed decks and other products where the sam
             </script>
 
             {{$emptyImg := "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}}
-            <div>
-                <table style="float: left; background-color: var(--background); width: 360px">
+
+            <div class="search-layout" {{if .IsSealed}}onmouseout="document.getElementById('hoverImage').src='{{$emptyImg}}';"{{end}}>
+
+            <div class="search-bar-wrap">
+                <div class="search-input-row">
+                    <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+                        <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
+                    </form>
+                    <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Surprise me</a>
+                </div>
+                {{if .SearchQuery}}
+                <div class="search-sort-row">
+                    {{if .NoSort}}
+                        <span class="search-sort-label">Sort from syntax</span>
+                    {{else}}
+                        <span class="search-sort-label">Sort</span>
+                        <a class="search-sort-pill{{if or (eq .SearchSort "chrono") (not .SearchSort)}} active{{end}}" href="?q={{.SearchQuery}}&sort=">chrono</a>
+                        {{if or (eq .SearchSort "chrono") (not .SearchSort)}}
+                            <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
+                        {{end}}
+                        {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
+                        <a class="search-sort-pill{{if $isAlphaSorted}} active{{end}}" href="?q={{.SearchQuery}}&sort=alpha">alpha</a>
+                        {{if $isAlphaSorted}}
+                            <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=alpha&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
+                        {{end}}
+                        <a class="search-sort-pill{{if eq .SearchSort "number"}} active{{end}}" href="?q={{.SearchQuery}}&sort=number">#</a>
+                        {{if eq .SearchSort "number"}}
+                            <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=number&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
+                        {{end}}
+                        <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{end}}" href="?q={{.SearchQuery}}&sort=retail">retail</a>
+                        {{if eq .SearchSort "retail"}}
+                            <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=retail&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
+                        {{end}}
+                        <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{end}}" href="?q={{.SearchQuery}}&sort=buylist">buylist</a>
+                        {{if eq .SearchSort "buylist"}}
+                            <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=buylist&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
+                        {{end}}
+                    {{end}}
+                    {{if .TotalUnique}}
+                        <span class="search-result-count">
+                            {{.TotalUnique}}
+                            {{if .TotalCards}}/ {{.TotalCards}}{{end}}
+                            {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
+                            {{if gt .TotalUnique (len .AllKeys)}}({{len .AllKeys}} shown){{end}}
+                        </span>
+                    {{end}}
+                    <a class="search-opts-link" href="?page=options">&#9881; Settings</a>
+                </div>
+                {{end}}
+            </div>
+            <script type="text/javascript">
+                autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+            </script>
+
+                <div class="search-sidebar">
                     {{if .IsSealed}}
-                        <tr class="no-hover" style="background-color: var(--background)">
-                            <td>
-                                <div id="printings" style="text-align: center; max-width: 360px; display: block;"></div>
-                            </td>
-                        </tr>
+                        <div class="sidebar-printings" id="printings"></div>
                         {{if .HasAvailable}}
-                            <tr>
-                                <td>
-                                    <center>
-                                        <h4>Available in</h4>
-                                    </center>
-                                    <div id="products" style="text-align: center; max-width: 360px; display: block;"></div>
-                                </td>
-                            </tr>
+                            <div class="sidebar-products-card">
+                                <div class="sidebar-products-title">Available In</div>
+                                <div class="sidebar-products-list" id="products"></div>
+                            </div>
                         {{end}}
                     {{else}}
-                        <tr class="no-hover" style="background-color: var(--background)" >
-                            <td>
-                                <div id="cardImageWrapper" class="card-image-wrapper">
-                                    <img id="cardImage" src="" width="360" height="502" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <div id="printings" style="text-align: center; max-width: 360px; display: block;"></div>
-                                {{if .CanShowAll}}
-                                    <center>
-                                        <a class="btn info" href="search?q={{.CleanSearchQuery}}">Show all versions</a>
-                                    </center>
-                                {{end}}
-                            </td>
-                        </tr>
+                        <div class="sidebar-img-wrap" id="cardImageWrapper">
+                            <img class="sidebar-card-img" id="cardImage" src="" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
+                        </div>
+                        <div class="sidebar-printings" id="printings"></div>
+                        {{if .CanShowAll}}
+                            <a class="sidebar-action primary" href="search?q={{.CleanSearchQuery}}">Show all versions</a>
+                        {{end}}
                         {{if .HasAvailable}}
-                            <tr>
-                                <td>
-                                    <center>
-                                        <h4>Available in</h4>
-                                    </center>
-                                    <div id="products" style="text-align: center; max-width: 360px; display: block;"></div>
-                                </td>
-                            </tr>
+                            <div class="sidebar-products-card">
+                                <div class="sidebar-products-title">Available In</div>
+                                <div class="sidebar-products-list" id="products"></div>
+                            </div>
                         {{end}}
                         {{if not (eq .Alternative "")}}
-                            <tr>
-                                <td>
-                                    <center>
-                                        <a class="btn warning" href="/search?chart={{.Alternative}}">Switch Foil/Non-Foil</a>
-                                    </center>
-                                </td>
-                            </tr>
+                            <a class="sidebar-action warning" href="/search?chart={{.Alternative}}">Switch Foil/Non-Foil</a>
                         {{end}}
                         {{if not (eq .AltEtchedId "")}}
-                            <tr>
-                                <td>
-                                    <center>
-                                        <a class="btn warning" href="/search?chart={{.AltEtchedId}}">Switch Etched/Non-Etched</a>
-                                    </center>
-                                </td>
-                            </tr>
+                            <a class="sidebar-action warning" href="/search?chart={{.AltEtchedId}}">Switch Etched/Non-Etched</a>
                         {{end}}
                         {{if not (eq .StocksURL "")}}
-                            <tr>
-                                <td>
-                                    <center>
-                                        <a class="btn success" href="{{.StocksURL}}" target="_blank">Check MTGStocks charts</a>
-                                    </center>
-                                </td>
-                            </tr>
+                            <a class="sidebar-action success" href="{{.StocksURL}}" target="_blank">Check MTGStocks charts</a>
                         {{end}}
                     {{end}}
                     {{if .CanDownloadCSV}}
-                        <tr>
-                            <td>
-                                <center>
-                                    Download prices as CSV<br>
-                                    <a class="btn success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
-                                    <a class="btn warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
-                                    <br>
-                                    Get {{if .IsSealed}}sealed{{else}}card{{end}} list<br>
-                                    <a class="btn normal" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">Download</a>
-                                </center>
-                            </td>
-                        </tr>
+                        <hr class="sidebar-divider">
+                        <div class="sidebar-actions">
+                            <span class="sidebar-section-label">Download CSV</span>
+                            <div class="sidebar-action-row">
+                                <a class="sidebar-action success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
+                                <a class="sidebar-action warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
+                            </div>
+                            <a class="sidebar-action default" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">&#128203; Card List</a>
+                        </div>
                         {{if not .IsSealed}}
-                            <tr>
-                                <td>
-                                    <center>
-                                        Load search in Uploader<br>
-                                        <form action="/upload" method="post">
-                                            <input id="mode" type="hidden" name="mode" value="false"/>
-                                            {{range .CardHashes}}
-                                                <input type="hidden" name="hashes" value="{{.}}"/>
-                                            {{end}}
-                                            <a class="btn success" style="text-align: center;" onclick='document.getElementById("mode").value=false; this.parentNode.submit(); return false;'>Retail</a>
-                                            <a class="btn warning" style="text-align: center;" onclick='document.getElementById("mode").value=true; this.parentNode.submit(); return false;'>Buylist</a>
-                                            <noscript>
-                                                <input type="submit" value="Check Uploader!" />
-                                            </noscript>
-                                        </form>
-                                    </center>
-                                </td>
-                            </tr>
+                            <hr class="sidebar-divider">
+                            <div class="sidebar-actions">
+                                <span class="sidebar-section-label">Load in Uploader</span>
+                                <form action="/upload" method="post">
+                                    <input id="mode" type="hidden" name="mode" value="false"/>
+                                    {{range .CardHashes}}
+                                        <input type="hidden" name="hashes" value="{{.}}"/>
+                                    {{end}}
+                                    <div class="sidebar-action-row">
+                                        <a class="sidebar-action success" onclick='document.getElementById("mode").value=false; this.closest("form").submit(); return false;'>Retail</a>
+                                        <a class="sidebar-action warning" onclick='document.getElementById("mode").value=true; this.closest("form").submit(); return false;'>Buylist</a>
+                                    </div>
+                                    <noscript>
+                                        <input type="submit" value="Check Uploader!" />
+                                    </noscript>
+                                </form>
+                            </div>
                         {{end}}
                     {{else if $.ShowUpsell}}
-                        <tr>
-                            <td>
-                                <center>
-                                    <i>
-                                        Increase your tier to be able to download any search results as CSVs{{if not .IsSealed}} or to transfer them to the Upload optimizer!{{end}}
-                                    </i>
-                                </center>
-                            </td>
-                        </tr>
-                    {{end}}
-                    <tr>
-                        <td style="background-color: var(--background);">
-                            {{if .HasReserved}}
-                                <h4>
-                                    {{if .ChartID}}<center>{{else}}* ={{end}}
-                                    Part of the <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a>
-                                    {{if .ChartID}}</center>{{end}}
-                                </h4>
-                            {{end}}
-                            {{if .HasStocks}}
-                                <h4>
-                                    {{if .ChartID}}<center>{{else}}• ={{end}}
-                                    On <a href="https://mtgstocks.com/interests">MTGStocks Interests</a> page
-                                    {{if .ChartID}}</center>{{end}}
-                                </h4>
-                            {{end}}
-                            {{if .HasSypList}}
-                                <h4>
-                                    {{if .ChartID}}<center>{{else}}† ={{end}}
-                                    Found in the <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a>
-                                    {{if .ChartID}}</center>{{end}}
-                                </h4>
-                            {{end}}
-                        </td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-
-            <div class="indent sticky">
-                {{$firstImg := ""}}
-                {{$firstPrint := ""}}
-                {{$firstProduct := ""}}
-                {{$firstFoil := false}}
-
-                {{if .ChartID}}
-                    <div style="margin-left: 10px; float: left; background-color: var(--background);">
-                        <canvas id="cardChart" width="760" height="480"></canvas>
-                        <br>
-                        <hr>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <p style="margin: 0;">
-                                {{if $.CanDeleteChart}}
-                                    <form action="/{{if .IsSealed}}sealed{{else}}search{{end}}" id=deletechart method="get" style="width: 800px; display: none;">
-                                        <select name="dataset" id="dataset" style="width: 110px">
-                                            <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick dataset</option>
-                                            {{range .Datasets}}
-                                                <option value="{{.Name}}">&nbsp;&nbsp;&nbsp;{{.Name}}</option>
-                                            {{end}}
-                                        </select>
-                                        <select name="datekey" id="datekey" style="width: 105px">
-                                            <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick a date</option>
-                                            {{range .AxisLabels}}
-                                                <option value="{{.}}">&nbsp;&nbsp;&nbsp;{{.}}</option>
-                                            {{end}}
-                                        </select>
-                                        <input id="chart" type="hidden" name="chart" value="{{.ChartID}}"/>
-                                        <a class="btn danger" style="text-align: center;" onclick='this.parentNode.submit(); return false;'>Delete</a>
-                                    </form>
-                                {{end}}
-                            </p>
-                            <p style="margin: 0;">
-                                {{if $.CanDeleteChart}}
-                                    <a class="btn warning" onclick="document.getElementById('deletechart').style='inline'">Show delete options</a>
-                                {{end}}
-                                <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
-                                <a class="btn success" href="javascript:downloadAsImg()">Download</a>
-                            </p>
+                        <hr class="sidebar-divider">
+                        <div class="sidebar-actions">
+                            <i style="font-size: var(--text-sm); color: var(--greytext);">
+                                Increase your tier to be able to download any search results as CSVs{{if not .IsSealed}} or to transfer them to the Upload optimizer!{{end}}
+                            </i>
                         </div>
+                    {{end}}
+                    <hr class="sidebar-divider">
+                    <div class="sidebar-legend">
+                        {{if .HasReserved}}
+                            <h4>
+                                {{if .ChartID}}<center>{{else}}* ={{end}}
+                                Part of the <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a>
+                                {{if .ChartID}}</center>{{end}}
+                            </h4>
+                        {{end}}
+                        {{if .HasStocks}}
+                            <h4>
+                                {{if .ChartID}}<center>{{else}}• ={{end}}
+                                On <a href="https://mtgstocks.com/interests">MTGStocks Interests</a> page
+                                {{if .ChartID}}</center>{{end}}
+                            </h4>
+                        {{end}}
+                        {{if .HasSypList}}
+                            <h4>
+                                {{if .ChartID}}<center>{{else}}† ={{end}}
+                                Found in the <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a>
+                                {{if .ChartID}}</center>{{end}}
+                            </h4>
+                        {{end}}
                     </div>
-                    <script>
-                        var productKeyrunes = {
-                            {{range $key := .EditionSort}}
-                                {{$editionList := index $.EditionList $key }}
-                                    {{range $editionList}}
-                                        {{if sixMonthsAgo .Date}}
-                                            {{continue}}
+                </div>
+
+                <div class="search-results">
+                    {{$firstImg := ""}}
+                    {{$firstPrint := ""}}
+                    {{$firstProduct := ""}}
+                    {{$firstFoil := false}}
+
+                    {{if .ChartID}}
+                        <div class="chart-container">
+                            <canvas id="cardChart" width="760" height="480"></canvas>
+                            <br>
+                            <hr>
+                            <div class="chart-controls">
+                                <p style="margin: 0;">
+                                    {{if $.CanDeleteChart}}
+                                        <form action="/{{if .IsSealed}}sealed{{else}}search{{end}}" id=deletechart method="get" style="width: 800px; display: none;">
+                                            <select name="dataset" id="dataset" style="width: 110px">
+                                                <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick dataset</option>
+                                                {{range .Datasets}}
+                                                    <option value="{{.Name}}">&nbsp;&nbsp;&nbsp;{{.Name}}</option>
+                                                {{end}}
+                                            </select>
+                                            <select name="datekey" id="datekey" style="width: 105px">
+                                                <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick a date</option>
+                                                {{range .AxisLabels}}
+                                                    <option value="{{.}}">&nbsp;&nbsp;&nbsp;{{.}}</option>
+                                                {{end}}
+                                            </select>
+                                            <input id="chart" type="hidden" name="chart" value="{{.ChartID}}"/>
+                                            <a class="btn danger" style="text-align: center;" onclick='this.parentNode.submit(); return false;'>Delete</a>
+                                        </form>
+                                    {{end}}
+                                </p>
+                                <p style="margin: 0;">
+                                    {{if $.CanDeleteChart}}
+                                        <a class="btn warning" onclick="document.getElementById('deletechart').style='inline'">Show delete options</a>
+                                    {{end}}
+                                    <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
+                                    <a class="btn success" href="javascript:downloadAsImg()">Download</a>
+                                </p>
+                            </div>
+                        </div>
+                        <script>
+                            var productKeyrunes = {
+                                {{range $key := .EditionSort}}
+                                    {{$editionList := index $.EditionList $key }}
+                                        {{range $editionList}}
+                                            {{if sixMonthsAgo .Date}}
+                                                {{continue}}
+                                            {{end}}
+                                            "{{.FmtDate}}": "{{.Keyrune}}",
                                         {{end}}
-                                        "{{.FmtDate}}": "{{.Keyrune}}",
-                                    {{end}}
-                            {{end}}
-                        }
+                                {{end}}
+                            }
 
-                        // Set a per-chart-style key
-                        var legendStorageKey = 'BANChart{{if $.IsSealed}}Sealed{{end}}';
+                            // Set a per-chart-style key
+                            var legendStorageKey = 'BANChart{{if $.IsSealed}}Sealed{{end}}';
 
-                        // Prepare options
-                        var opts = getChartOpts({{.AxisLabels}}, localStorage.getItem("chartSpanGaps"));
-                        
-                        // Override legend click function
-                        opts = withLegendPersistence(legendStorageKey, opts);
+                            // Prepare options
+                            var opts = getChartOpts({{.AxisLabels}}, localStorage.getItem("chartSpanGaps"));
 
-                        // Create the chart
-                        var ctx = document.getElementById('cardChart').getContext('2d');
-                        var cardChart = new Chart(ctx, {
-                            type: 'banWithLine',
-                            data: {
-                                labels: {{.AxisLabels}},
-                                datasets: [
-                                    {{range .Datasets}}
-                                        {
-                                            label: {{.Name}},
-                                            data: {{.Data}},
-                                            backgroundColor: {{.Color}},
-                                            borderColor: {{.Color}},
-                                            fill: false,
-                                            pointRadius: 0,
-                                        },
-                                    {{end}}
-                                ]
-                            },
-                            options: opts,
-                            plugins: [{
-                                afterDraw: chart => {
-                                    var ctx = chart.chart.ctx;
+                            // Override legend click function
+                            opts = withLegendPersistence(legendStorageKey, opts);
 
-                                    ctx.textAlign = 'center';
-                                    ctx.textBaseline = 'bottom';
-                                    ctx.font = '32px Keyrune';
-                                    ctx.fillStyle = readVar('--chartjs-text');
+                            // Create the chart
+                            var ctx = document.getElementById('cardChart').getContext('2d');
+                            var cardChart = new Chart(ctx, {
+                                type: 'banWithLine',
+                                data: {
+                                    labels: {{.AxisLabels}},
+                                    datasets: [
+                                        {{range .Datasets}}
+                                            {
+                                                label: {{.Name}},
+                                                data: {{.Data}},
+                                                backgroundColor: {{.Color}},
+                                                borderColor: {{.Color}},
+                                                fill: false,
+                                                pointRadius: 0,
+                                            },
+                                        {{end}}
+                                    ]
+                                },
+                                options: opts,
+                                plugins: [{
+                                    afterDraw: chart => {
+                                        var ctx = chart.chart.ctx;
 
-                                    var xBottomAxis = chart.scales['x-time'];
-                                    var xTopAxis = chart.scales['x-top'];
-                                    xTopAxis.ticks.forEach((value, index) => {
-                                        if (value in productKeyrunes) {
-                                            const padding = 32;
+                                        ctx.textAlign = 'center';
+                                        ctx.textBaseline = 'bottom';
+                                        ctx.font = '32px Keyrune';
+                                        ctx.fillStyle = readVar('--chartjs-text');
 
-                                            var x = xTopAxis.getPixelForTick(index);
-                                            if (x + padding/2 > chart.width) {
-                                                x = chart.width - padding / 2;
+                                        var xBottomAxis = chart.scales['x-time'];
+                                        var xTopAxis = chart.scales['x-top'];
+                                        xTopAxis.ticks.forEach((value, index) => {
+                                            if (value in productKeyrunes) {
+                                                const padding = 32;
+
+                                                var x = xTopAxis.getPixelForTick(index);
+                                                if (x + padding/2 > chart.width) {
+                                                    x = chart.width - padding / 2;
+                                                }
+
+                                                let el = document.createElement('i');
+                                                el.className = 'ss-' + productKeyrunes[value];
+
+                                                document.body.appendChild(el);
+                                                let content = window.getComputedStyle(el, '::before').content;
+                                                content = content.replace(/^"(.*)"$/, '$1');
+                                                document.body.removeChild(el);
+
+                                                ctx.fillText(content, x, xTopAxis.top + 24);
                                             }
+                                        });
+                                    }
+                                }],
+                            });
 
-                                            let el = document.createElement('i');
-                                            el.className = 'ss-' + productKeyrunes[value];
+                            // Load state from local storage
+                            applySavedLegendState(cardChart);
 
-                                            document.body.appendChild(el);
-                                            let content = window.getComputedStyle(el, '::before').content;
-                                            content = content.replace(/^"(.*)"$/, '$1');
-                                            document.body.removeChild(el);
+                            // Apply theme (light/dark)
+                            rethemeFirstAxes(cardChart);
 
-                                            ctx.fillText(content, x, xTopAxis.top + 24);
-                                        }
-                                    });
-                                }
-                            }],
-                        });
-
-                        // Load state from local storage
-                        applySavedLegendState(cardChart);
-
-                        // Apply theme (light/dark)
-                        rethemeFirstAxes(cardChart);
-
-                        // Re-run on theme flips (class changes on <body>/<html>)
-                        const rerun = () => cardChart && rethemeFirstAxes(cardChart);
-                        const mo = new MutationObserver(rerun);
-                        if (document.body) {
-                            mo.observe(document.body, {
+                            // Re-run on theme flips (class changes on <body>/<html>)
+                            const rerun = () => cardChart && rethemeFirstAxes(cardChart);
+                            const mo = new MutationObserver(rerun);
+                            if (document.body) {
+                                mo.observe(document.body, {
+                                    attributes: true,
+                                    attributeFilter: ['class'],
+                                });
+                            }
+                            mo.observe(document.documentElement, {
                                 attributes: true,
                                 attributeFilter: ['class'],
                             });
-                        }
-                        mo.observe(document.documentElement, {
-                            attributes: true,
-                            attributeFilter: ['class'],
-                        });
 
-                        function toggleGaps() {
-                            cardChart.options.spanGaps = !cardChart.options.spanGaps;
-                            cardChart.update();
-                            localStorage.setItem("chartSpanGaps", cardChart.options.spanGaps);
-                        }
-                        function downloadAsImg() {
-                            var chartImg = document.createElement('a');
-                            {{$card := (index $.Metadata .ChartID)}}
-                            chartImg.download = '{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png';
+                            function toggleGaps() {
+                                cardChart.options.spanGaps = !cardChart.options.spanGaps;
+                                cardChart.update();
+                                localStorage.setItem("chartSpanGaps", cardChart.options.spanGaps);
+                            }
+                            function downloadAsImg() {
+                                var chartImg = document.createElement('a');
+                                {{$card := (index $.Metadata .ChartID)}}
+                                chartImg.download = '{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png';
 
-                            var scaleFactor = 2;
-                            var border = 10;
+                                var scaleFactor = 2;
+                                var border = 10;
 
-                            var exportCanvas = document.createElement('canvas');
-                            exportCanvas.width = cardChart.width * scaleFactor;
-                            exportCanvas.height = cardChart.height * scaleFactor;
+                                var exportCanvas = document.createElement('canvas');
+                                exportCanvas.width = cardChart.width * scaleFactor;
+                                exportCanvas.height = cardChart.height * scaleFactor;
 
-                            var exportCtx = exportCanvas.getContext('2d');
-                            exportCtx.fillStyle = readVar('--background');
-                            exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-                            exportCtx.drawImage(cardChart.canvas, border, border, exportCanvas.width - border * 3, exportCanvas.height - border * 2);
+                                var exportCtx = exportCanvas.getContext('2d');
+                                exportCtx.fillStyle = readVar('--background');
+                                exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+                                exportCtx.drawImage(cardChart.canvas, border, border, exportCanvas.width - border * 3, exportCanvas.height - border * 2);
 
-                            chartImg.href = exportCanvas.toDataURL("image/png");
-                            chartImg.click();
-                        }
-                    </script>
-                {{end}}
-
-                <table style="background-color: var(--background); float:left;" {{if .IsSealed}}onmouseout="document.getElementById('hoverImage').src='{{$emptyImg}}';"{{end}}>
-                    {{if .AllKeys}}
-                        <tr>
-                            <th class="stickyCategory" style="z-index: {{len .AllKeys}}"><h2 align=center>Sellers</h2></th>
-                            <th class="stickyCategory" style="z-index: {{len .AllKeys}}"><h2 align=center>Buyers</h2></th>
-                            <th class="stickyCategory" style="z-index: {{len .AllKeys}}"><h2 align=center style="display:none" id="lastsalesth">Last Sales</h2></th>
-                        </tr>
+                                chartImg.href = exportCanvas.toDataURL("image/png");
+                                chartImg.click();
+                            }
+                        </script>
                     {{end}}
 
                     <svg height="0" width="0" xmlns="http://www.w3.org/2000/svg">
@@ -962,216 +693,118 @@ Sims are not required for pre-constructed decks and other products where the sam
                             {{$firstFoil = $card.Foil}}
                         {{end}}
 
-                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});" title="[{{$card.SetCode}}] {{$card.Title}}">
-                            <th colspan="3" class="wrap stickyHeader" style="text-align: left; vertical-align: middle; z-index: {{inc $i 1}}">
-                                <table style="margin:0 0 0 18">
-                                    <tr style="background-color:rgba(0, 0, 0, 0);">
-                                        <td rowspan=2>
-                                            <a href="?q=s:{{$card.SetCode}}">
-                                                <span class="small-hidden-text" aria-hidden="true">{{$card.SetCode}}</span>
-                                                {{if $card.Keyrune}}
-                                                    <i class="ss {{$card.Keyrune}} ss-2x ss-fw"></i>
-                                                {{else if $card.RarityColor}}
-                                                    <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" style="margin: 4px 0 0 0">
-                                                        <circle r="15" cx="16" cy="16" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
-                                                        <text font-size="20" x="50%" y="60%" text-anchor="middle" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
-                                                    </svg>
-                                                {{else}}
-                                                    <h3>{{$card.SetCode}}&nbsp;</h3>
-                                                {{end}}
-                                            </a>
-                                        </td>
-                                        <td width=100%>
-                                            <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">
-                                                {{$card.Name}}
-                                            </a>
-                                            {{if ne $card.Variant ""}}
-                                                <i>({{$card.Variant}})</i>
-                                            {{end}}
-                                            {{if $card.Flag}}
-                                                &nbsp;<span class="emoji" style="line-height:0">{{$card.Flag}}</span>
-                                            {{end}}
-                                            {{if $card.Reserved}}
-                                                *
-                                            {{end}}
-                                            {{if $card.Stocks}}
-                                                •
-                                            {{end}}
-                                            {{if and $.ShowSYP $card.SypList}}
-                                                †
-                                            {{end}}
-                                        </td>
-                                        {{if $card.Sealed}}
-                                            {{if $card.Booster}}
-                                                <td rowspan=2>
-                                                    <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">🎁</span></a>
-                                                </td>
-                                            {{end}}
-                                            {{if $card.HasDeck}}
-                                                <td rowspan=2>
-                                                    <a href='/api/tcgplayer/decklist/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist">
-                                                        <img width=28 src="/img/misc/decklist.png">
-                                                    </a>
-                                                </td>
-                                                <td rowspan=2>
-                                                    <a href='/api/cardmarket/decklist/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist">
-                                                        <img width=28 src="/img/misc/decklist-mkm.png">
-                                                    </a>
-                                                </td>
-                                            {{end}}
-                                            <td rowspan=2>
-                                                <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>
-                                            </td>
-                                        {{else if $.HasAvailable}}
-                                            <td rowspan=2>
-                                                <a href='/sealed?q=container:"{{$card.Name}}"' title="Search which products can contain a reprint"><span class="emoji">📖</span></a>
-                                            </td>
+                        <div class="result-block">
+                            <div class="result-header" style="z-index: {{inc $i 1}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
+                                <a href="?q=s:{{$card.SetCode}}">
+                                    {{if $card.Keyrune}}
+                                        <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
+                                    {{else if $card.RarityColor}}
+                                        <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" style="margin: 4px 0 0 0">
+                                            <circle r="15" cx="16" cy="16" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
+                                            <text font-size="20" x="50%" y="60%" text-anchor="middle" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                        </svg>
+                                    {{else}}
+                                        <span>{{$card.SetCode}}</span>
+                                    {{end}}
+                                </a>
+                                <a class="result-card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                {{if ne $card.Variant ""}}
+                                    <span class="result-variant">({{$card.Variant}})</span>
+                                {{end}}
+                                {{if $card.Flag}}
+                                    <span class="result-variant">{{$card.Flag}}</span>
+                                {{end}}
+                                <div class="result-badges">
+                                    {{if $card.Reserved}}<span class="result-badge rl">* RL</span>{{end}}
+                                    {{if $card.Stocks}}<span class="result-badge stocks">&bull; Stocks</span>{{end}}
+                                    {{if and $.ShowSYP $card.SypList}}<span class="result-badge syp">&dagger; SYP</span>{{end}}
+                                </div>
+                                <span class="result-set-title">
+                                    <a href="?q=s:{{$card.SetCode}}{{if $card.Date}} date:{{$card.Date}}{{end}}">{{$card.Title}}</a>
+                                    {{if $card.SourceSealed}}
+                                        - <a href="/sealed?q=container:{{$card.UUID}}">Found in {{len $card.SourceSealed}} product{{if gt (len $card.SourceSealed) 1}}s{{end}}</a>
+                                    {{end}}
+                                </span>
+                                <div class="result-quick-icons">
+                                    {{if $card.Sealed}}
+                                        {{if $card.Booster}}
+                                            <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">&#127873;</span></a>
                                         {{end}}
-                                        <td rowspan=2>
-                                            <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">📝</span>
-                                        </td>
-
-                                        {{if not $card.Sealed}}
-                                            <td rowspan=2>
-                                                <a href="{{$card.DeckboxURL}}" title="Open the Dropbox page for this card" target=_blank><img width=22 src="/img/logo/deckbox.webp"></a>
-                                            </td>
+                                        {{if $card.HasDeck}}
+                                            <a href='/api/tcgplayer/decklist/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist"><img width=28 src="/img/misc/decklist.png"></a>
+                                            <a href='/api/cardmarket/decklist/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist"><img width=28 src="/img/misc/decklist-mkm.png"></a>
                                         {{end}}
-
-                                        {{if $card.CKRestockURL}}
-                                            <td rowspan=2>
-                                                <a href="{{$card.CKRestockURL}}" title="Set a Restock Notice at CardKingdom" target=_blank>
-                                                    <span class="emoji">🏰</span>
-                                                </a>
-                                            </td>
-                                        {{end}}
-
-                                        {{if $card.ScryfallURL}}
-                                            <td rowspan=2>
-                                                <a href="{{$card.ScryfallURL}}" title="Check this card on Scryfall.com" target=_blank><img width=28 src="/img/logo/scryfall.svg"></a>
-                                            </td>
-                                        {{end}}
-
-                                        {{if $card.TCGId}}
-                                            <td rowspan=2>
-                                                    <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 src="/img/logo/tcgapp.png"></a>
-                                            </td>
-                                            <!--
-                                            <td rowspan=2>
-                                                <a href="javascript:getLastSold('{{$cardId}}')" title="Retrieve last sales on TCG" id="lastsolda{{$cardId}}"><span class="emoji">💸</span></a>
-                                            </td>
-                                            {{$done := false}}
-                                            {{$condsEntry := (index $.FoundSellers $cardId)}}
-                                            {{range $conditions := $.CondKeys}}
-                                                {{$entries := (index $condsEntry $conditions)}}
-                                                {{range $entries}}
-                                                    {{if and (not $done) (eq .ScraperName "TCGplayer Direct")}}
-                                                        <td rowspan=2>
-                                                            <span class="emoji" style="cursor: pointer;" onclick="getDirectQty(this,'{{$cardId}}')" title="Update quantities for TCG Direct" id="directqty-{{$cardId}}">⚡️</span>
-                                                        </td>
-                                                        {{$done = true}}
-                                                    {{end}}
-                                                {{end}}
-                                            {{end}}
-                                            -->
-                                        {{end}}
-                                        {{if and (not $.DisableChart) (eq $.ChartID "")}}
-                                            <td rowspan=2>
-                                                <span class="emoji">
-                                                    <a href="?chart={{$cardId}}" title="See historical data">📊</a>
-                                                </span>
-                                            </td>
-                                        {{end}}
-                                    </tr>
-                                    <tr style="background-color:rgba(0, 0, 0, 0); margin-bottom: 0px;">
-                                        <td>
-                                            <h6>
-                                                <a href="?q=s:{{$card.SetCode}}{{if $card.Date}} date:{{$card.Date}}{{end}}">{{$card.Title}}</a>
-                                                {{if $card.SourceSealed}}
-                                                    - <a href="/sealed?q=container:{{$card.UUID}}">Found in {{len $card.SourceSealed}} product{{if gt (len $card.SourceSealed) 1}}s{{end}}</a>
-                                                {{end}}
-                                            </h6>
-                                        </td>
-
-                                    </tr>
-                                </table>
-                            </th>
-                        </tr>
-
-                        <tr class="no-hover" style="background-color: var(--background); position: relative; z-index: {{$i}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
-                            {{$condsEntry := (index $.FoundSellers $cardId)}}
-                            <td style="vertical-align: {{if not $condsEntry}}middle{{else}}top{{end}}; padding: 0; margin: 0;">
-                                <table class="searchResults" style="margin: 0 6px 0 12px;">
+                                        <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">&#128270;</span></a>
+                                    {{else if $.HasAvailable}}
+                                        <a href='/sealed?q=container:"{{$card.Name}}"' title="Search which products can contain a reprint"><span class="emoji">&#128214;</span></a>
+                                    {{end}}
+                                    <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>
+                                    {{if not $card.Sealed}}
+                                        <a href="{{$card.DeckboxURL}}" title="Open the Deckbox page for this card" target=_blank><img width=22 src="/img/logo/deckbox.webp"></a>
+                                    {{end}}
+                                    {{if $card.CKRestockURL}}
+                                        <a href="{{$card.CKRestockURL}}" title="Set a Restock Notice at CardKingdom" target=_blank><span class="emoji">&#127984;</span></a>
+                                    {{end}}
+                                    {{if $card.ScryfallURL}}
+                                        <a href="{{$card.ScryfallURL}}" title="Check this card on Scryfall.com" target=_blank><img width=28 src="/img/logo/scryfall.svg"></a>
+                                    {{end}}
+                                    {{if $card.TCGId}}
+                                        <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 src="/img/logo/tcgapp.png"></a>
+                                    {{end}}
+                                    {{if and (not $.DisableChart) (eq $.ChartID "")}}
+                                        <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
+                                    {{end}}
+                                </div>
+                            </div>
+                            <div class="result-body" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
+                                <!-- Sellers column -->
+                                <div class="result-col">
+                                    <div class="result-col-header">{{if $.IsSealed}}Purchase from{{else}}Sellers{{end}}</div>
+                                    {{$condsEntry := (index $.FoundSellers $cardId)}}
                                     {{if not $condsEntry}}
-                                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});" style="background-color:rgba(0, 0, 0, 0);">
-                                            <td colspan="4">
-                                                <center>
-                                                    <i>No offers</i>
-                                                </center>
-                                            </td>
-                                        </tr>
+                                        <div class="no-offers"><i>No offers</i></div>
                                     {{end}}
                                     {{range $conditions := $.CondKeys}}
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if $entries}}
                                             {{if and (eq $conditions "INDEX") $.IsSealed}}
-                                                <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, '', {{$card.Foil}});">
-                                                    <td></td>
-                                                    <th style="min-width: 60px; text-align: center;">EV</td>
-                                                    <th style="min-width: 60px; text-align: center;">Sim (Median)</td>
-                                                    <th style="min-width: 60px; text-align: center;">Sim (StdDev)</td>
-                                                </tr>
+                                                <div class="price-index-header">
+                                                    <span></span>
+                                                    <span>EV</span>
+                                                    <span>Sim (Median)</span>
+                                                    <span>Sim (StdDev)</span>
+                                                </div>
                                             {{else if not (eq $conditions "INDEX")}}
-                                                <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, '', {{$card.Foil}});">
-                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</i></td>
-                                                </tr>
+                                                <div class="price-cond-header">{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, '', {{$card.Foil}});">
-                                                <td {{if $.IsSealed}}style="min-width: 140px;"{{end}}>
-                                                    {{if eq .URL ""}}
-                                                        <a class="btn default">
-                                                    {{else}}
-                                                        <a class="btn normal" href="{{.URL}}" target="_blank" rel="nofollow">
-                                                    {{end}}
-                                                        {{.ScraperName}}
-                                                        {{if ne $conditions "INDEX"}}
-                                                            {{.Country}}
-                                                        {{end}}
-                                                    </a>
-                                                </td>
+                                            <div class="price-row">
+                                                {{if eq .URL ""}}
+                                                    <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                {{else}}
+                                                    <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                {{end}}
                                                 {{if and (eq $conditions "INDEX") $.IsSealed}}
-                                                    <td style="text-align: center; vertical-align: middle;">
-                                                        $ {{printf "%.2f" .Price}}
-                                                    </td>
-                                                    <td style="text-align: center; vertical-align: middle;">
+                                                    <span class="price">$ {{printf "%.2f" .Price}}</span>
+                                                    <span class="price">
                                                         {{if .Secondary}}
                                                             $ {{printf "%.2f" .Secondary}}
                                                             {{$iqr := index .ExtraValues "iqr"}}
                                                             {{if gt $iqr 150.0}}
-                                                                <span title="High Simulation IQR: {{printf "%.2f" $iqr}}">‼️</span>
+                                                                <span title="High Simulation IQR: {{printf "%.2f" $iqr}}">&#8252;&#65039;</span>
                                                             {{end}}
-                                                        {{else}}
-                                                            n/a
-                                                        {{end}}
-                                                    </td>
-                                                    <td style="text-align: center; vertical-align: middle;">
+                                                        {{else}}n/a{{end}}
+                                                    </span>
+                                                    <span class="price">
                                                         {{if .Secondary}}
                                                             {{$stdDev := index .ExtraValues "stdDev"}}
-                                                            {{if $stdDev}}
-                                                                $ {{printf "%.2f" $stdDev}}
-                                                            {{else}}
-                                                                n/a
-                                                            {{end}}
-                                                        {{else}}
-                                                            n/a
-                                                        {{end}}
-                                                    </td>
+                                                            {{if $stdDev}}$ {{printf "%.2f" $stdDev}}{{else}}n/a{{end}}
+                                                        {{else}}n/a{{end}}
+                                                    </span>
                                                 {{else}}
-                                                    {{if $.IsSealed}}
-                                                        <td></td>
-                                                    {{end}}
-                                                    <td style="text-align: center; vertical-align: middle;" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}}>
+                                                    {{if $.IsSealed}}<span class="secondary"></span>{{end}}
+                                                    <span class="price" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}}>
                                                         {{if .Price}}
                                                             $ {{printf "%.2f" .Price}}
                                                         {{else}}
@@ -1180,134 +813,104 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         {{if eq .Shorthand "TCGDirect"}}
                                                             {{$marketPrice := tcg_market_price $cardId}}
                                                             {{if gt .Price (mul $marketPrice 2)}}
-                                                                <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if $marketPrice}}${{printf "%.2f" $marketPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                                <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if $marketPrice}}${{printf "%.2f" $marketPrice}}{{else}}missing{{end}}">&#8252;&#65039; </span>
                                                             {{end}}
                                                         {{end}}
-                                                    </td>
+                                                    </span>
                                                     {{if .Secondary}}
-                                                        <td style="text-align: center; vertical-align: middle;">
-                                                            /
-                                                        </td>
-                                                        <td style="text-align: center; vertical-align: middle;">
-                                                            $ {{printf "%.2f" .Secondary}}
-                                                        </td>
+                                                        <span class="secondary">/</span>
+                                                        <span class="secondary">$ {{printf "%.2f" .Secondary}}</span>
                                                     {{else}}
-                                                        {{if not $.IsSealed}}
-                                                            <td></td>
-                                                        {{end}}
-                                                        <td style="text-align: center; vertical-align: middle;" {{if eq .Shorthand "TCGDirect"}}id="qty-{{.Shorthand}}-{{$conditions}}-{{$cardId}}"{{end}}>
+                                                        <span class="qty" {{if eq .Shorthand "TCGDirect"}}id="qty-{{.Shorthand}}-{{$conditions}}-{{$cardId}}"{{end}}>
                                                             {{if .BundleIcon}}
                                                                 <img style="padding-top:4px;" src="{{.BundleIcon}}">
                                                             {{else if not .NoQuantity}}
                                                                 {{.Quantity}}
                                                             {{end}}
-                                                        </td>
+                                                        </span>
                                                     {{end}}
                                                 {{end}}
-                                            </tr>
+                                            </div>
                                         {{end}}
                                     {{end}}
-                                </table>
-                            </td>
-
-                            {{$condsEntry := (index $.FoundVendors $cardId)}}
-                            <td style="vertical-align: {{if not $condsEntry}}middle{{else}}top{{end}}; padding: 0; margin: 0; position: relative;  z-index: {{$i}}">
-                                <table class="searchResults" style="margin: 0 6px 0 12px;">
+                                </div>
+                                <!-- Buyers column -->
+                                <div class="result-col">
+                                    <div class="result-col-header">{{if $.IsSealed}}Sell to{{else}}Buyers{{end}}</div>
+                                    {{$condsEntry := (index $.FoundVendors $cardId)}}
                                     {{if not $condsEntry}}
-                                        <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});" style="background-color:rgba(0, 0, 0, 0);">
-                                            <td colspan="4">
-                                                <center>
-                                                    <i>No offers</i>
-                                                </center>
-                                            </td>
-                                        </tr>
+                                        <div class="no-offers"><i>No offers</i></div>
                                     {{end}}
                                     {{range $conditions := $.CondKeys}}
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if ne $conditions "INDEX"}}
-                                            {{if $entries }}
-                                                <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
-                                                    <td colspan="4" style="padding-top: 8px; padding-bottom: 8px"><i>{{if $.IsSealed}}Sell to{{else}}Condition: {{$conditions}}{{end}}</i></td>
-                                                </tr>
+                                            {{if $entries}}
+                                                <div class="price-cond-header">{{if $.IsSealed}}Sell to{{else}}Condition: {{$conditions}}{{end}}</div>
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <tr onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});" title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'>
-                                                <td>
-                                                    {{if eq .URL ""}}
-                                                        <a class="btn default">
-                                                    {{else}}
-                                                        <a class="btn normal" href="{{.URL}}" target="_blank" rel="nofollow">
-                                                    {{end}}
-                                                        {{.ScraperName}} {{.Country}}
-                                                        {{if eq .Shorthand $card.HotlistStore}}
-                                                            <span class=emoji title="Highest price in 3 months">🌟</span>
-                                                        {{end}}
-                                                    </a>
-                                                </td>
-                                                <td style="text-align: center; vertical-align: middle;">
+                                            <div class="price-row" title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'>
+                                                {{if eq .URL ""}}
+                                                    <a class="store-name dim">{{.ScraperName}} {{.Country}}{{if eq .Shorthand $card.HotlistStore}} <span class=emoji title="Highest price in 3 months">&#127775;</span>{{end}}</a>
+                                                {{else}}
+                                                    <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}{{if eq .Shorthand $card.HotlistStore}} <span class=emoji title="Highest price in 3 months">&#127775;</span>{{end}}</a>
+                                                {{end}}
+                                                <span class="price">
                                                     {{if ne .Shorthand "SYP"}}
                                                         $ {{printf "%.2f" .Price}}
                                                         {{if eq .Shorthand "TCGDirectNet"}}
                                                             {{$marketPrice := tcg_market_price $cardId}}
                                                             {{if gt .Price (mul $marketPrice 2)}}
-                                                                <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if $marketPrice}}${{printf "%.2f" $marketPrice}}{{else}}missing{{end}}">‼️ </span>
+                                                                <span class=emoji title="CAUTION - This price looks a bit off, TCG Market is {{if $marketPrice}}${{printf "%.2f" $marketPrice}}{{else}}missing{{end}}">&#8252;&#65039; </span>
                                                             {{end}}
                                                         {{end}}
                                                     {{else}}
                                                         # {{.Quantity}}
                                                     {{end}}
-                                                </td>
-                                                <td class="secondaryBuylistEntry"
-                                                    style="text-align: center; vertical-align: middle;"
+                                                </span>
+                                                <span class="secondary secondaryBuylistEntry"
                                                     data-ratio='{{if and .Ratio (eq $conditions "NM")}}{{printf "%.02f" .Ratio}}{{end}}'
                                                     data-credit='{{if .Credit}}{{printf "%.02f" .Credit}}{{end}}'
                                                     data-marketcredit='{{if .MarketCredit}}{{printf "%.02f" .MarketCredit}}{{end}}'>
-                                                    hi
-                                                </td>
-                                                <td style="text-align: center; vertical-align: middle;">
+                                                </span>
+                                                <span class="qty">
                                                     {{if and .Quantity (eq $conditions "NM")}}
                                                         {{.Quantity}}
                                                     {{end}}
-                                                </td>
-                                            </tr>
+                                                </span>
+                                            </div>
                                         {{end}}
                                     {{end}}
-                                </table>
-                            </td>
+                                </div>
+                            </div>
+                            <!-- Last sold placeholder (feature currently disabled) -->
+                            <div id="{{$cardId}}" style="display:none"></div>
+                        </div>
+                    {{end}}
 
-                            <td style="vertical-align: top; padding: 0; margin: 0;">
-                                <table class="searchResults" style="margin: 0 12px 0 6px; display:none" id="{{$cardId}}">
-                                </table>
-                            </td>
-                        </tr>
-                    {{end}}
                     {{if .CurrentIndex}}
-                        <tr style="background-color: var(--headerbackground);">
-                            <td colspan="3" style="text-align: center; vertical-align: middle;">
-                                <p style="display: inline;">
-                                    {{if ne .CurrentIndex 1}}
-                                        <a class="pagination" href="?q={{.SearchQuery}}&p=1&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&lt;</a>
-                                        <a class="pagination" href="?q={{.SearchQuery}}&p={{.PrevIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}"><i class="arrow left"></i></a>
-                                    {{end}}
-                                    {{.CurrentIndex}} / {{.TotalIndex}}
-                                    {{if ne .CurrentIndex .TotalIndex}}
-                                        <a class="pagination" href="?q={{.SearchQuery}}&p={{.NextIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}"><i class="arrow right"></i></a>
-                                        <a class="pagination" href="?q={{.SearchQuery}}&p={{.TotalIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&gt;</a>
-                                    {{end}}
-                                </p>
-                            </td>
-                        </tr>
+                        <div class="search-pagination">
+                            {{if ne .CurrentIndex 1}}
+                                <a href="?q={{.SearchQuery}}&p=1&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&laquo;</a>
+                                <a href="?q={{.SearchQuery}}&p={{.PrevIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&lsaquo;</a>
+                            {{end}}
+                            <span class="cur">{{.CurrentIndex}}</span>
+                            <span class="pg-info">/ {{.TotalIndex}}</span>
+                            {{if ne .CurrentIndex .TotalIndex}}
+                                <a href="?q={{.SearchQuery}}&p={{.NextIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&rsaquo;</a>
+                                <a href="?q={{.SearchQuery}}&p={{.TotalIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&raquo;</a>
+                            {{end}}
+                        </div>
                     {{end}}
+
                     {{if ne .InfoMessage ""}}
-                        <tr>
-                            <td colspan="2" style="text-align: center; vertical-align: middle;">
-                                <br>
-                                <h4 class="indent"><i>{{.InfoMessage}}</i></h4>
-                            </td>
-                        </tr>
+                        <div class="search-info-message">
+                            <br>
+                            <h4 class="indent"><i>{{.InfoMessage}}</i></h4>
+                        </div>
                     {{end}}
-                </table>
+                </div>{{/* Close .search-results */}}
+
                 {{if eq $firstImg ""}}
                     {{$firstImg = $.CardBackURL}}
                 {{end}}
@@ -1317,9 +920,8 @@ Sims are not required for pre-constructed decks and other products where the sam
                 <script type="text/javascript">
                     updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}});
                 </script>
-            </div>
+            </div>{{/* Close .search-layout */}}
         {{end}}
-        <div style="clear:both;"></div>
     {{end}}
     <br>
 </div>
@@ -1350,7 +952,7 @@ Sims are not required for pre-constructed decks and other products where the sam
             }
         }
 
-        document.querySelectorAll("td.secondaryBuylistEntry").forEach(renderCell);
+        document.querySelectorAll(".secondaryBuylistEntry").forEach(renderCell);
     })();
 </script>
 
