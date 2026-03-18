@@ -314,6 +314,15 @@
 }
 
 
+/* ═══ Landing page (no query) ═══ */
+.search-landing {
+    padding: 0 20% 80px 10%;
+}
+.search-landing h1 {
+    margin-bottom: 8px;
+}
+
+
 /* ═══ Results main area ═══ */
 .search-results {
     padding: 20px 24px 80px;
@@ -346,7 +355,7 @@
 }
 
 .result-card-name {
-    font-size: var(--text-xl);
+    font-size: var(--text-2xl);
     font-weight: 700;
     color: var(--normal);
     text-decoration: none;
@@ -382,7 +391,8 @@
 .result-set-title {
     font-size: var(--text-sm);
     color: var(--search-text-dim);
-    margin-left: auto;
+    width: 100%;
+    order: 10;
 }
 .result-set-title a {
     color: inherit;
@@ -394,6 +404,7 @@
     display: flex;
     gap: 6px;
     align-items: center;
+    margin-left: auto;
 }
 .result-quick-icons a,
 .result-quick-icons span {
@@ -449,7 +460,7 @@
     gap: 8px;
     padding: 12px 12px;
     border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
     transition: background 0.1s;
 }
 .price-row:last-child { border-bottom: none; }
@@ -459,32 +470,61 @@
     color: var(--search-link);
     text-decoration: none;
     font-weight: 500;
-    min-width: 100px;
+    width: 55%;
+    flex-shrink: 0;
 }
 .price-row .store-name:hover { text-decoration: underline; }
 .price-row .store-name.dim { color: var(--search-text-dim); }
 
 .price-row .price {
-    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
+    color: var(--normal);
+    white-space: nowrap;
+}
+
+.price-row .price-warn {
+    color: var(--adanger);
+    font-weight: 700;
+    position: relative;
+    cursor: help;
+}
+.price-row .price-warn[data-tooltip]:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 12px;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--search-surface-1);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    color: var(--normal);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.price-row .secondary {
     font-family: var(--font-mono);
     font-size: var(--text-base);
     color: var(--normal);
     white-space: nowrap;
 }
-
-.price-row .secondary {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--search-text-dim);
-    white-space: nowrap;
+.price-row .secondaryBuylistEntry {
+    padding-left: 6px;
 }
 
 .price-row .qty {
     font-family: var(--font-mono);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     color: var(--search-text-dim);
-    min-width: 28px;
+    min-width: 36px;
     text-align: center;
+    margin-left: auto;
 }
 
 .price-cond-header {
