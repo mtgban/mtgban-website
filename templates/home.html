@@ -2,7 +2,8 @@
 <html>
 <head>
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="/css/landing.css?hash={{.Hash}}">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
     <meta name='impact-site-verification' value='77b54a05-53ed-42d4-b087-cb40fa950018' />
     <title>{{.Title}}</title>
 
@@ -16,70 +17,90 @@
     <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
     <meta name="theme-color" content="#ff0000">
 
-    {{if .PatreonLogin}}
-        <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
-    {{end}}
+    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
 </head>
 
 <body class="light-theme">
-    {{template "navbar" .}}
+<script>
+(function() {
+    var stored = localStorage.getItem('theme');
+    var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.body.className = theme === 'dark' ? 'dark-theme' : 'light-theme';
+})();
+</script>
 
-    <div class="bg">
-        <div class="mainbody">
-            {{if .PatreonLogin}}
-                <div class="indent">
-                    <form class="search autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
-                        <input id="searchbox" class="w3-input w3-border w3-round-small search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Quick price check" maxlength="1000" autofocus autocapitalize="none">
-                    </form>
-                </div>
+<div class="landing">
+    <div class="landing-main">
+        <div class="landing-brand">
+            <img src="/img/logo/ban-round.png" alt="BAN">
+            <span class="landing-brand-text">MTG<span class="ban">BAN</span></span>
+        </div>
+        <div class="landing-tagline">Price comparison for the discerning trader</div>
 
-                <script type="text/javascript">
-                    autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
-                </script>
+        <div class="landing-search-wrap">
+            <span class="landing-search-icon">&#128269;</span>
+            <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+                <input id="searchbox" class="landing-search" type="text" name="q"
+                       placeholder="Search for a card or product..."
+                       maxlength="1000" autofocus autocapitalize="none"
+                       onFocus="this.setSelectionRange(0, this.value.length)">
+            </form>
+            <a class="landing-lucky" href="/random">Surprise me</a>
+        </div>
+        <script type="text/javascript">
+            autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
+        </script>
+
+        <div class="landing-tools">
+            {{range .Nav}}
+                {{if and (ne .Name "Home") (ne .Class "beta")}}
+                    <a class="landing-tool" href="{{.Link}}">
+                        <span class="t-icon">{{.Short}}</span> {{.Name}}
+                    </a>
+                {{end}}
             {{end}}
         </div>
     </div>
 
     {{if ne .ErrorMessage ""}}
-        <h1>{{.ErrorMessage}}</h1>
+        <div class="landing-error">{{.ErrorMessage}}</div>
     {{end}}
 
-    <div class="indent">
-        {{if .PatreonLogin}}
-            <script type="text/javascript">
-                function getPatreonURL(patreonId, client) {
-                    return "http://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href + ";" + client);
-                }
-            </script>
+    <div class="landing-footer">
+        <div class="landing-divider"></div>
 
-            {{range $ref, $id := .PatreonIds}}
-                <a href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">
-                    <img src="/img/misc/login-{{$ref}}.png" width=360 height=60>
-                </a>
+        <div class="landing-game-links">
+            <a href="https://mtgban.com">Magic: the Gathering</a>
+            <span>|</span>
+            <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
+        </div>
 
-                <noscript>
-                    <a href="http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=;{{$ref}}">
-                        Login without JavaScript enabled
-                    </a>
-                </noscript>
-                <br>
+        <div class="landing-login-row">
+            {{if .PatreonLogin}}
+                <script type="text/javascript">
+                    function getPatreonURL(patreonId, client) {
+                        return "http://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href + ";" + client);
+                    }
+                </script>
+                {{range $ref, $id := .PatreonIds}}
+                    <a class="landing-login-btn patreon" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">&#9829; Patreon</a>
+                    <noscript>
+                        <a class="landing-login-btn patreon" href="http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=;{{$ref}}">
+                            Patreon (no JS)
+                        </a>
+                    </noscript>
+                {{end}}
+                <a class="landing-login-btn discord" href="/discord">Discord</a>
+            {{else}}
+                <a class="landing-login-btn discord" href="/discord">Discord</a>
+                <a class="landing-login-btn patreon" href="/?errmsg=logout">Logout</a>
             {{end}}
-        {{else}}
-            <a href="/?errmsg=logout"><img src="/img/misc/logout.png" width=236 height=60></a>
-        {{end}}
-    </div>
+        </div>
 
-    <br>
-    <div class="indent">
-    Jump to &nbsp;<a href="https://mtgban.com">Magic: the Gathering</a> &nbsp;|&nbsp; <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
+        <div class="landing-copyright">&copy; 2019&ndash;2026 MTGBAN Inc</div>
     </div>
+</div>
 
-    <br>
-    <div class="footer">&copy; 2019-2026 MTGBAN Inc<br>
-        <br><hr width=30% style="border: 1px dotted;">
-        Cookies may be in use to ensure correct functionality of the platform.<br>
-        Content is provided for informational purpose only.<br>
-    </div>
 </body>
 </html>
