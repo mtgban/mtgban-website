@@ -1,0 +1,81 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/arbit.css?hash={{.Hash}}">
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+{{end}}
+
+{{define "content"}}
+<div class="arb-page">
+    <div class="arb-landing">
+        <div class="page-header">
+            <div>
+                <h1>{{.Title}}<a name="top">&nbsp;</a></h1>
+                <p class="page-subtitle">
+                    {{if .GlobalMode}}
+                        Choose the index to compare from.
+                    {{else if .ReverseMode}}
+                        Choose the vendor to sell to.
+                    {{else}}
+                        Select a store to compare prices and find arbitrage opportunities.
+                    {{end}}
+                </p>
+            </div>
+            <a class="page-action" href="?page=options">&#9881; Options</a>
+        </div>
+
+        <div class="arb-store-group">
+            <div class="arb-store-group-label">Select Store</div>
+            <div class="arb-store-grid">
+                {{range .ExtraNav}}
+                    {{if not (contains .Name "Sealed")}}
+                        <a class="arb-store-card" href="{{.Link}}">
+                            <span class="store-name">{{.Name}}</span>
+                            <span class="arb-store-arrow">&rarr;</span>
+                        </a>
+                    {{end}}
+                {{end}}
+            </div>
+        </div>
+
+        {{$showSealed := false}}
+        {{range .ExtraNav}}
+            {{if contains .Name "Sealed"}}
+                {{$showSealed = true}}
+            {{end}}
+        {{end}}
+        {{if $showSealed}}
+            <div class="arb-store-group">
+                <div class="arb-store-group-label">Sealed Products</div>
+                <div class="arb-store-grid">
+                    {{range .ExtraNav}}
+                        {{if contains .Name "Sealed"}}
+                            <a class="arb-store-card" href="{{.Link}}">
+                                <span class="store-name">{{.Name}}</span>
+                                <span class="arb-store-arrow">&rarr;</span>
+                            </a>
+                        {{end}}
+                    {{end}}
+                </div>
+            </div>
+        {{end}}
+
+        <div class="arb-instructions-panel open">
+            <p>Data is refreshed periodically. There is a minimum spread and difference for a card to be included.</p>
+            <p>Always verify prices before committing &mdash; prices or quantities may have changed since the last refresh.</p>
+            <p>Arbitrage is computed on cash value, taking into account condition whenever possible.</p>
+            {{if .GlobalMode}}
+                <p>Each page provides a list of cards that can be arbitraged from, according to value reported from other markets.</p>
+            {{else}}
+                <p>Buylist prices are displayed NM for easier lookup, but actual spread uses the card's condition.</p>
+                <p>Each {{if .ReverseMode}}vendor{{else}}seller{{end}} page contains a list of {{if .ReverseMode}}sellers{{else}}vendors{{end}} with a summary of arbitrage opportunities.</p>
+            {{end}}
+            <p>In case of mistakes, please notify the devs in the BAN Discord.</p>
+            <p>Should you find this content useful, consider clicking on one of the provided links to support BAN.</p>
+        </div>
+
+        {{if ne .InfoMessage ""}}
+            <br>
+            <h2><p>{{.InfoMessage}}</p></h2>
+        {{end}}
+    </div>
+</div>
+{{end}}
