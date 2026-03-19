@@ -88,6 +88,12 @@ html { font-size: 17px; }
 
     --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
 
+    /* ── Layout tokens ── */
+    --nav-height: 48px;
+    --page-gutter: 3vw;
+    --page-max-width: 80vw;
+    --content-padding-top: calc(var(--nav-height) + 2vh);
+
     /* ── Font Size Scale ── */
     --text-2xs:  0.5625rem; /* 9px  */
     --text-xs:   0.625rem;  /* 10px */
@@ -655,6 +661,64 @@ a.selected:hover{
 }
 .mainbody{
     padding-top: 75px;
+}
+
+/* ═══ Base template layout ═══ */
+.page-content {
+    padding-top: 75px;
+    min-height: 100vh;
+}
+
+.page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1em;
+    margin-bottom: 1.5em;
+}
+.page-header h1 {
+    font-size: var(--text-10xl);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin: 0;
+}
+.page-header .page-subtitle {
+    color: var(--activetext);
+    font-size: var(--text-2xl);
+    margin: 0.25em 0 0;
+}
+.page-header .page-action {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: var(--surface-3);
+    border: 1px solid var(--border-subtle);
+    color: var(--activetext);
+    font-size: var(--text-base);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+.page-header .page-action:hover {
+    color: var(--ainfo);
+    border-color: var(--accent-border);
+}
+
+.page-error {
+    padding: 2em var(--page-gutter);
+    font-size: var(--text-4xl);
+    color: var(--adanger);
+}
+
+.page-sticky-toolbar {
+    position: sticky;
+    top: var(--nav-height);
+    z-index: 50;
+    background: var(--background);
 }
 
 .indent{
