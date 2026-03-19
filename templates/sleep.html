@@ -1,37 +1,19 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+{{define "extra-css"}}
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" type="text/css" href="/css/sleepers.css?hash={{.Hash}}">
-    <title>{{.Title}} - {{.Subtitle}}</title>
+{{end}}
 
-    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
-    <link rel="manifest" href="/img/favicon/site.webmanifest">
-    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
-    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
-    <meta name="msapplication-TileColor" content="#da532c">
-    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
-    <meta name="theme-color" content="#ff0000">
-</head>
+{{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
 
-<body class="light-theme">
-{{template "navbar" .}}
-
-<div class="mainbody">
-    {{if ne .ErrorMessage ""}}
-        <h1>{{.ErrorMessage}}</h1>
-    {{else if eq .Subtitle "Index"}}
+{{define "content"}}
+    {{if eq .Subtitle "Index"}}
         <div class="sleepers-page">
-            <div class="sleepers-page-header">
+            <div class="page-header">
                 <div>
                     <h1>Sleepers</h1>
-                    <p class="sleepers-page-subtitle">Cards the market hasn't caught up on yet.</p>
+                    <p class="page-subtitle">Cards the market hasn't caught up on yet.</p>
                 </div>
-                <a class="sleepers-filters-btn" href="?page=options">
+                <a class="page-action" href="?page=options">
                     <span>&#9881;</span> Filters
                 </a>
             </div>
@@ -273,6 +255,4 @@
     {{if ne .InfoMessage ""}}
         <h2><p class=indent>{{.InfoMessage}}</p></h2>
     {{end}}
-</div>
-</body>
-</html>
+{{end}}

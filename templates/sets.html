@@ -1,32 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+{{define "extra-css"}}
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" type="text/css" href="/css/sets.css?hash={{.Hash}}">
-    <title>{{.Title}}</title>
+{{end}}
 
-    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
-    <link rel="manifest" href="/img/favicon/site.webmanifest">
-    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
-    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="msapplication-TileColor" content="#da532c">
-    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
-    <meta name="theme-color" content="#ff0000">
-</head>
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
+{{end}}
 
-<body class="light-theme">
-<script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
-{{template "navbar" .}}
-
-<div class="mainbody">
-    {{if ne .ErrorMessage ""}}
-        <h1>{{.ErrorMessage}}</h1>
-    {{else}}
+{{define "content"}}
     <div class="sets-page">
         <h1>Editions</h1>
         <p class="sets-stats">
@@ -126,9 +107,9 @@
             </table>
         </div>
     </div>
-    {{end}}
-</div>
+{{end}}
 
+{{define "extra-scripts"}}
 <script>
 function toggleExpanded() {
     const table = document.getElementById('table');
@@ -143,5 +124,4 @@ function toggleExpanded() {
     }
 }
 </script>
-</body>
-</html>
+{{end}}
