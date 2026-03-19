@@ -1,0 +1,68 @@
+{{define "extra-css"}}
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/news.css?hash={{.Hash}}">
+{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+{{end}}
+
+{{define "title"}}{{.Title}} - Options{{end}}
+
+{{define "content"}}
+<div class="news-wrap">
+    <div class="news-page-nav">
+        {{range .ToC}}
+            {{if ne .Option "options"}}
+                <a href="newspaper?page={{.Option}}" {{if eq .Option $.Page}}class="active"{{end}}>{{if .Short}}{{.Short}}{{else}}{{.Title}}{{end}}</a>
+            {{end}}
+        {{end}}
+        <span class="nav-spacer"></span>
+        <a class="nav-opts active" href="newspaper?page=options">&#9881; Settings</a>
+    </div>
+
+    <div class="opts-page-wrap">
+        <div class="page-header">
+            <div>
+                <h1>Newspaper Options</h1>
+                <p class="page-subtitle">Select editions to <strong>exclude</strong> from your newspaper.</p>
+            </div>
+        </div>
+
+        <div class="opts-section">
+            <h2>Edition List</h2>
+            <p class="section-desc">Checked editions will be <strong>hidden</strong> from all newspaper pages.</p>
+            <div class="opts-bar">
+                <button class="opts-btn opts-btn-warn" onclick="clearForm('editions')">Clear</button>
+                <button class="opts-btn opts-btn-ok" onclick="selectAll('editions')">Select All</button>
+                <button class="opts-btn opts-btn-ok" onclick="saveForm('NewspaperList','editions'); location.href='/newspaper'">Save</button>
+            </div>
+            <div class="opts-checkbox-grid opts-grid-wide" id="editions">
+                {{range $i, $key := .Editions}}
+                    {{$edition := index $.EditionsMap $key}}
+                    {{if $edition}}
+                    <label>
+                        <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                        {{if $edition.Keyrune}}
+                            <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
+                        {{else}}
+                            <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                                <circle r="9" cx="10" cy="10" fill="var(--normal)" stroke="var(--normal)"/>
+                                <text font-size="14" x="50%" y="60%" text-anchor="middle" fill="var(--background)">{{$key}}</text>
+                            </svg>
+                        {{end}}
+                        {{$edition.Name}}
+                    </label>
+                    {{end}}
+                {{end}}
+            </div>
+        </div>
+
+        <script>
+            window.onload = function() {
+                loadForm("NewspaperList", "editions");
+            }
+        </script>
+    </div>
+</div>
+{{end}}

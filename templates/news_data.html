@@ -1,0 +1,209 @@
+{{define "extra-css"}}
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/news.css?hash={{.Hash}}">
+{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+{{end}}
+
+{{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
+
+{{define "content"}}
+<div class="news-wrap">
+    <div class="news-page-nav">
+        {{range .ToC}}
+            {{if ne .Option "options"}}
+                <a href="newspaper?page={{.Option}}" {{if eq .Option $.Page}}class="active"{{end}}>{{if .Short}}{{.Short}}{{else}}{{.Title}}{{end}}</a>
+            {{end}}
+        {{end}}
+        <span class="nav-spacer"></span>
+        <a class="nav-opts" href="newspaper?page=options">&#9881; Settings</a>
+    </div>
+
+    <img id="hoverImage" class="hoverImage" src=""/>
+    <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
+
+    <div class="news-data">
+        <div class="news-data-header">
+            <h1>{{.Subtitle}}</h1>
+            <p>{{.InfoMessage}}</p>
+            <div class="news-legend">
+                {{if .HasReserved}}<span>* = <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a></span>{{end}}
+                {{if .HasStocks}}<span>&bull; = <a href="https://mtgstocks.com/interests">MTGStocks Interests</a></span>{{end}}
+                {{if .HasSypList}}<span>&dagger; = <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a></span>{{end}}
+            </div>
+        </div>
+
+        <form action="newspaper" method="GET">
+            <input type="hidden" name="page" value="{{$.Page}}">
+            <input type="hidden" name="sort" value="{{$.SortOption}}">
+            <input type="hidden" name="dir" value="{{$.SortDir}}">
+            <div class="news-filter-bar">
+                {{if $.CanFilterByPrice}}
+                <div class="news-fg">
+                    <span class="news-fl">Price</span>
+                    <input type="text" name="min_price" {{if $.FilterMinPrice}}value="{{$.FilterMinPrice}}"{{end}} placeholder="Min $">
+                    <input type="text" name="max_price" {{if $.FilterMaxPrice}}value="{{$.FilterMaxPrice}}"{{end}} placeholder="Max $">
+                </div>
+                <span class="news-fsep"></span>
+                {{end}}
+
+                {{if $.CanFilterByPercentage}}
+                <div class="news-fg">
+                    <span class="news-fl">Change</span>
+                    <input type="text" name="min_change" {{if $.FilterMinPercChange}}value="{{$.FilterMinPercChange}}"{{end}} placeholder="Min %">
+                    <input type="text" name="max_change" {{if $.FilterMaxPercChange}}value="{{$.FilterMaxPercChange}}"{{end}} placeholder="Max %">
+                </div>
+                <span class="news-fsep"></span>
+                {{end}}
+
+                <select name="finish" onchange="this.form.submit()" style="width:58px; text-align:center;">
+                    {{if eq "" $.FilterFinish}}
+                        <option value="" disabled selected hidden>&#10024;</option>
+                    {{end}}
+                    {{range .Finishes}}
+                        <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterFinish)}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+
+                <select name="filter" onchange="this.form.submit()" style="min-width:180px;">
+                    {{if eq "" $.FilterSet}}
+                        <option value="" disabled selected hidden>Edition...</option>
+                    {{end}}
+                    {{range .Editions}}
+                        <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterSet)}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+
+                <select name="rarity" onchange="this.form.submit()" style="width:52px; text-align:center;">
+                    {{if eq "" $.FilterRarity}}
+                        <option value="" disabled selected hidden>&#127808;</option>
+                    {{end}}
+                    {{range .Rarities}}
+                        <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterRarity)}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+
+                {{if .Tiers}}
+                <select name="bucket" onchange="this.form.submit()" style="width:58px; text-align:center;">
+                    {{if eq "" $.FilterBucket}}
+                        <option value="" disabled selected hidden>&#128184;</option>
+                    {{end}}
+                    {{range .Tiers}}
+                        <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterBucket)}}selected{{end}}>{{.}}</option>
+                    {{end}}
+                </select>
+                {{end}}
+
+                <input type="submit" style="visibility:hidden; width:0; padding:0; border:0;" />
+            </div>
+        </form>
+
+        <div class="news-table-wrap">
+            <table class="news-table" id="newsTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                <thead>
+                    <tr>
+                        {{range $i, $head := .Headings}}
+                            {{if not $head.IsHidden}}
+                                {{if or (eq $i (inc $.OffsetCards 1)) (eq $i (inc $.OffsetCards 2))}}
+                                    {{/* Skip Edition and # headers — merged into Card column */}}
+                                {{else}}
+                                    <th class="{{if eq $i $.OffsetCards}}news-th-card{{end}} {{if $head.IsDollar}}r{{end}} {{if $head.IsNum}}c{{end}} {{if eq $head.Title "Ranking"}}news-rank-col{{end}}">
+                                        {{if eq $i $.OffsetCards}}Card{{else}}{{$head.Title}}{{end}}
+                                        {{if or $head.CanSort (and (not (eq $.FilterSet "")) $head.ConditionalSort)}}
+                                            <span class="sort-links">
+                                                <a href="newspaper?page={{$.Page}}&sort={{$head.Field}}&dir=desc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&#9660;</a>
+                                                <a href="newspaper?page={{$.Page}}&sort={{$head.Field}}&dir=asc&filter={{$.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&#9650;</a>
+                                            </span>
+                                        {{end}}
+                                    </th>
+                                {{end}}
+                            {{end}}
+                        {{end}}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range $j, $card := .Cards}}
+                        {{$table := (index $.Table $j)}}
+                        <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
+                            {{range $i, $row := $table}}
+                                {{if eq $i $.OffsetCards}}
+                                    <td class="news-td-card">
+                                        <div class="news-cc">
+                                            {{if $card.Keyrune}}
+                                                <i class="ss {{$card.Keyrune}} ss-1x ss-fw set-icon"></i>
+                                            {{else if $card.RarityColor}}
+                                                <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                                                    <circle r="9" cx="10" cy="10" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
+                                                    <text font-size="14" x="50%" y="60%" text-anchor="middle" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                                </svg>
+                                            {{end}}
+                                            <div class="card-detail">
+                                                <span class="card-name"><a href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}" lang="{{$card.LangTag}}">{{$row}}</a>{{if $card.Reserved}} *{{end}}{{if $card.Stocks}} &bull;{{end}}{{if $card.SypList}} &dagger;{{end}}</span>
+                                                <span class="set-sub">{{index $table (inc $.OffsetCards 1)}} &bull; #{{index $table (inc $.OffsetCards 2)}}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                {{else if or (eq $i (inc $.OffsetCards 1)) (eq $i (inc $.OffsetCards 2))}}
+                                    {{/* Skip edition and # columns — merged into Card cell */}}
+                                {{else}}
+                                    {{$head := (index $.Headings $i)}}
+                                    {{if not $head.IsHidden}}
+                                        <td class="{{if or $head.IsDollar $head.IsPerc $head.IsNum}}news-num{{end}} {{if eq $head.Title "Ranking"}}news-rank-col{{end}}">
+                                            {{if and $head.IsNum (eq $head.Title "Ranking")}}
+                                                <span class="news-rank">{{$row}}</span>
+                                            {{else if $head.IsDollar}}
+                                                {{print_price $row}}
+                                            {{else if $head.IsPerc}}
+                                                <span class="news-perc {{perc_class $row}}">{{print_perc $row}}</span>
+                                            {{else if $head.IsNum}}
+                                                {{$row}}
+                                            {{else}}
+                                                <span class="news-bucket">{{$row}}</span>
+                                            {{end}}
+                                        </td>
+                                    {{end}}
+                                {{end}}
+                            {{end}}
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+
+            <div class="news-pagination">
+                {{if ne .CurrentIndex 1}}
+                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index=&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&lt;&lt;</a>
+                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&lt;</a>
+                {{end}}
+                <span class="cur">{{.CurrentIndex}}</span>
+                <span class="pg-info">/ {{.TotalIndex}}</span>
+                {{if ne .CurrentIndex .TotalIndex}}
+                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&gt;</a>
+                    <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.TotalIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&gt;&gt;</a>
+                {{end}}
+            </div>
+
+            <div class="news-upload-row">
+                <form action="/upload" method="post">
+                    <input type="hidden" name="mode" value="false"/>
+                    {{range .CardHashes}}
+                        <input type="hidden" name="hashes" value="{{.}}"/>
+                    {{end}}
+                    <button type="submit" class="news-upload-btn">Load this page in the Uploader</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
+<script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
+<script>
+    var t = document.getElementById('newsTable');
+    if (t) new Tablesort(t);
+</script>
+{{end}}
