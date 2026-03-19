@@ -1,0 +1,197 @@
+{{define "search_options"}}
+<script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+<script type="text/javascript">
+    window.onload = function(e) {
+        loadForm("SearchSellersList", "sellers");
+        loadForm("SearchVendorsList", "vendors");
+        loadForm("SearchMiscOpts", "miscOpts");
+        loadRadio("SearchDefaultSort", "defaultSort");
+        loadRadio("SearchListingPriority", "listingPriority");
+        loadRadio("SearchBuylistSecondary", "buylistSecondary");
+        loadDropdown("SearchSellersPriority", "sellersPriority");
+        loadDropdown("SearchVendorsPriority", "vendorsPriority");
+    }
+</script>
+
+<div class="opts-page">
+    <div class="opts-page-header">
+        <h1>Search Settings</h1>
+        <p class="opts-desc">Customize which stores, sorting, and display options apply to your searches.</p>
+        <a class="opts-back" href="/search">&larr; Back to Search</a>
+    </div>
+
+    <!-- Stores -->
+    <div class="opts-card opts-card">
+        <div class="opts-card-header">
+            <div class="opts-card-header-text">
+                <h2>Stores</h2>
+                <p>Select which sellers or vendors you <strong>don't</strong> want to display in your searches.</p>
+            </div>
+            <div class="opts-card-actions">
+                <button class="opts-btn opts-btn-clear" onclick="clearForm('sellers'); clearForm('vendors');">Clear</button>
+                <button class="opts-btn opts-btn-select" onclick="selectAll('sellers');">All Sellers</button>
+                <button class="opts-btn opts-btn-select" onclick="selectAll('vendors');">All Vendors</button>
+                <button class="opts-btn opts-btn-save" onclick="saveForm('SearchSellersList','sellers'); saveForm('SearchVendorsList','vendors'); location.href='/search'">Save</button>
+            </div>
+        </div>
+        <div class="opts-card-body">
+            <div class="opts-two-col">
+                <div>
+                    <div class="opts-col-label">Retail</div>
+                    <div class="opts-check-grid" id="sellers" style="grid-template-columns:1fr;">
+                        {{range $i, $key := .SellerKeys}}
+                        <label>
+                            <input type="checkbox" id="s{{$key}}" name="{{$key}}">
+                            {{scraper_name $key}}
+                            {{if (contains $key "Sealed")}}<span class="sealed-tag">(Sealed)</span>{{end}}
+                        </label>
+                        {{end}}
+                    </div>
+                </div>
+                <div>
+                    <div class="opts-col-label">Buylist</div>
+                    <div class="opts-check-grid" id="vendors" style="grid-template-columns:1fr;">
+                        {{range $i, $key := .VendorKeys}}
+                        <label>
+                            <input type="checkbox" id="v{{$key}}" name="{{$key}}">
+                            {{scraper_name $key}}
+                            {{if (contains $key "Sealed")}}<span class="sealed-tag">(Sealed)</span>{{end}}
+                        </label>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Sorting -->
+    <div class="opts-card">
+        <div class="opts-card-header">
+            <div class="opts-card-header-text">
+                <h2>Result Sorting</h2>
+                <p>Select how card results should be sorted by default.</p>
+            </div>
+            <div class="opts-card-actions">
+                <button class="opts-btn opts-btn-save" onclick="saveRadio('SearchDefaultSort','defaultSort'); location.href='/search'">Save</button>
+            </div>
+        </div>
+        <div class="opts-card-body">
+            <div class="opts-radio-list" id="defaultSort">
+                <label><input type="radio" id="chrono" name="sort" value="chrono"> By chronological order</label>
+                <label><input type="radio" id="hybrid" name="sort" value="hybrid" checked> By alphabetical order, grouping sets chronologically</label>
+                <label><input type="radio" id="alpha" name="sort" value="alpha"> By alphabetical order</label>
+                <label><input type="radio" id="number" name="sort" value="#"> By collector number</label>
+                <label><input type="radio" id="retail" name="sort" value="retail"> By best retail price (off TCGplayer)</label>
+                <label><input type="radio" id="buylist" name="sort" value="buylist"> By best buylist price (off Card Kingdom)</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preferred Sort Stores -->
+    <div class="opts-card">
+        <div class="opts-card-header">
+            <div class="opts-card-header-text">
+                <h2>Preferred Retail/Buylist Sort</h2>
+                <p>Select which stores should be used for price-based sorting.</p>
+            </div>
+            <div class="opts-card-actions">
+                <button class="opts-btn opts-btn-save" onclick="saveDropdown('SearchSellersPriority','sellersPriority'); saveDropdown('SearchVendorsPriority','vendorsPriority'); location.href='/search'">Save</button>
+            </div>
+        </div>
+        <div class="opts-card-body">
+            <div class="opts-dropdown-group">
+                <div class="opts-dropdown-item">
+                    <label for="sellersPriority">Retail Priority</label>
+                    <select id="sellersPriority">
+                        <option selected disabled hidden>Pick a store</option>
+                        <option value="">Reset to Default</option>
+                        {{range $i, $key := .SellerKeys}}
+                        <option value="{{$key}}">{{scraper_name $key}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div class="opts-dropdown-item">
+                    <label for="vendorsPriority">Buylist Priority</label>
+                    <select id="vendorsPriority">
+                        <option selected disabled hidden>Pick a store</option>
+                        <option value="">Reset to Default</option>
+                        {{range $i, $key := .VendorKeys}}
+                        <option value="{{$key}}">{{scraper_name $key}}</option>
+                        {{end}}
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Listing Priority -->
+    <div class="opts-card">
+        <div class="opts-card-header">
+            <div class="opts-card-header-text">
+                <h2>Listing Priority</h2>
+                <p>Select how price results should be sorted within each card.</p>
+            </div>
+            <div class="opts-card-actions">
+                <button class="opts-btn opts-btn-save" onclick="saveRadio('SearchListingPriority','listingPriority'); location.href='/search'">Save</button>
+            </div>
+        </div>
+        <div class="opts-card-body">
+            <div class="opts-radio-list" id="listingPriority">
+                <label><input type="radio" id="stores" name="priority" value="stores" checked> Alphabetical, by store name</label>
+                <label><input type="radio" id="prices" name="priority" value="prices"> Asc for Retail, Desc for Buylist, by prices</label>
+                <label><input type="radio" id="credit" name="priority" value="credit"> Asc for Retail, Desc for Buylist, by credit prices</label>
+                <label><input type="radio" id="market" name="priority" value="market"> Asc for Retail, Desc for Buylist, by credit market prices</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buylist Secondary -->
+    <div class="opts-card">
+        <div class="opts-card-header">
+            <div class="opts-card-header-text">
+                <h2>Buylist Secondary Entry</h2>
+                <p>Choose what to display next to the buylist price (if available).</p>
+            </div>
+            <div class="opts-card-actions">
+                <button class="opts-btn opts-btn-save" onclick="saveRadio('SearchBuylistSecondary','buylistSecondary'); location.href='/search'">Save</button>
+            </div>
+        </div>
+        <div class="opts-card-body">
+            <div class="opts-radio-list" id="buylistSecondary">
+                <label><input type="radio" id="priceRatio" name="blSecondary" value="priceRatio" checked> Price ratio</label>
+                <div class="radio-note">Indicates how much a vendor is seeking a card</div>
+                <label><input type="radio" id="creditPrice" name="blSecondary" value="creditPrice"> Credit price</label>
+                <div class="radio-note">How much the prices would be in store credit</div>
+                <label><input type="radio" id="marketCredit" name="blSecondary" value="marketCredit"> Credit market value</label>
+                <div class="radio-note">Credit converted to market value by reselling. <em>Note: arbitrary metric, not for financial decisions.</em></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Other Preferences -->
+    <div class="opts-card opts-card">
+        <div class="opts-card-header">
+            <div class="opts-card-header-text">
+                <h2>Other Preferences</h2>
+                <p>Miscellaneous display and filtering options.</p>
+            </div>
+            <div class="opts-card-actions">
+                <button class="opts-btn opts-btn-clear" onclick="clearForm('miscOpts');">Clear</button>
+                <button class="opts-btn opts-btn-save" onclick="saveForm('SearchMiscOpts','miscOpts'); location.href='/search'">Save</button>
+            </div>
+        </div>
+        <div class="opts-card-body">
+            <div class="opts-check-grid" id="miscOpts" style="grid-template-columns:1fr;">
+                <label><input type="checkbox" id="noSussy" name="noSussy"> Skip invalid TCGplayer Direct prices (2x Market, or no Market)</label>
+                <label><input type="checkbox" id="hidePrelPack" name="hidePrelPack"> Hide classic Promotional entries (<em>promopack, prerelease, etc</em>)</label>
+                <label><input type="checkbox" id="hidePromos" name="hidePromos"> Hide ALL Promotional entries (<em>judge, buyabox, bundle, some sets, etc</em>)</label>
+                <label><input type="checkbox" id="preferFlavor" name="preferFlavor"> Prefer <em>flavor name</em> when available (global setting)</label>
+                <label><input type="checkbox" id="hideBLconds" name="hideBLconds"> Hide non-NM Buylist entries</label>
+                <label><input type="checkbox" id="skipEmpty" name="skipEmpty"> Skip results with no prices</label>
+                <label><input type="checkbox" id="noSyp" name="noSyp"> Don't show the SYP indication (&dagger;)</label>
+                <label><input type="checkbox" id="noUpsell" name="noUpsell"> Hide the upsell reminder to download CSVs</label>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}

@@ -1,0 +1,53 @@
+{{define "navbar"}}
+<nav class="ban-nav">
+    <ul class="ban-nav-links">
+        {{range .Nav}}
+        <li>
+            <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+                <span class="nav-icon">{{.Short}}</span>
+                <span class="nav-full">{{.Name}}</span>
+                <span class="nav-short">{{.Name}}</span>
+            </a>
+        </li>
+        {{end}}
+    </ul>
+
+    <div class="ban-nav-spacer"></div>
+
+    <div class="ban-nav-right">
+        <a class="ban-nav-ext" href="https://www.patreon.com/mtgban" title="Patreon">
+            <img src="/img/misc/patreon.png" alt="Patreon">
+        </a>
+        <a class="ban-nav-ext" {{if .PatreonLogin}}style="display:none"{{end}} href="/discord" title="Discord">
+            <img src="/img/misc/discord.png" alt="Discord">
+        </a>
+
+        <button class="ban-theme-toggle" id="theme-toggle" type="button" title="Toggle theme">
+            <svg class="theme-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffdd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+            <svg class="theme-icon theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00b3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+        </button>
+        <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
+
+        <button class="ban-nav-hamburger" onclick="document.getElementById('mobile-menu').classList.add('open'); document.getElementById('mobile-overlay').classList.add('open');">&#9776;</button>
+    </div>
+</nav>
+
+<div class="ban-nav-mobile-overlay" id="mobile-overlay" onclick="this.classList.remove('open'); document.getElementById('mobile-menu').classList.remove('open');"></div>
+<div class="ban-nav-mobile-menu" id="mobile-menu">
+    <button class="ban-nav-mobile-close" onclick="this.parentElement.classList.remove('open'); document.getElementById('mobile-overlay').classList.remove('open');">&#10005;</button>
+    <ul class="ban-nav-mobile-links">
+        {{range .Nav}}
+        <li>
+            <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+                <span class="nav-icon">{{.Short}}</span> {{.Name}}
+            </a>
+        </li>
+        {{end}}
+    </ul>
+    <hr class="ban-nav-mobile-divider">
+    <div class="ban-nav-mobile-ext">
+        <a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" alt="Patreon"></a>
+        <a {{if .PatreonLogin}}style="display:none"{{end}} href="/discord"><img src="/img/misc/discord.png" alt="Discord"></a>
+    </div>
+</div>
+{{end}}
