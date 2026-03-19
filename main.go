@@ -1050,7 +1050,10 @@ var baseTemplatePages = map[string]string{
 	"arbit_options.html": "templates/base.html",
 	"arbit_results.html": "templates/base.html",
 	"upload.html":   "templates/base.html",
-	"search.html":   "templates/base.html",
+	"search_landing.html": "templates/base.html",
+	"search_sealed.html":  "templates/base.html",
+	"search_results.html": "templates/base.html",
+	"search_options.html": "templates/base.html",
 	"home.html":     "templates/base-landing.html",
 }
 
@@ -1073,9 +1076,8 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	templates = append(templates, "templates/partials/navbar.html")
 
 	// Add other partials as needed
-	if name == "search.html" {
+	if name == "search_landing.html" {
 		templates = append(templates, "templates/partials/syntax.html")
-		templates = append(templates, "templates/partials/search_options.html")
 	}
 
 	// Parse and execute
