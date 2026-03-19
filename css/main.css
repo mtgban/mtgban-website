@@ -1613,12 +1613,30 @@ table.tiers td div {
     flex-shrink: 0;
 }
 
+/* ═══ Shared options page wrapper ═══ */
+.opts-page-wrap {
+    max-width: 80vw;
+    margin: 0 auto;
+    padding: 6vh 3vw 5vh;
+}
+.opts-page-wrap h1 {
+    font-size: var(--text-7xl);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.25em;
+}
+.opts-page-wrap .opts-desc {
+    color: var(--activetext);
+    font-size: var(--text-lg);
+    margin: 0 0 1.5em;
+}
+
 .opts-section {
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
-    padding: 24px;
-    margin-bottom: 20px;
+    padding: 1.5em;
+    margin-bottom: 1.25em;
 }
 
 .opts-section h2 {
@@ -1674,6 +1692,9 @@ table.tiers td div {
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 4px;
 }
+.opts-checkbox-grid.opts-grid-wide {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
 
 .opts-checkbox-grid label {
     display: flex;
@@ -1696,6 +1717,26 @@ table.tiers td div {
     width: 15px;
     height: 15px;
     flex-shrink: 0;
+}
+.opts-nowrap label { white-space: nowrap; }
+
+/* ═══ Two-column layout (sellers/vendors) ═══ */
+.opts-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5em;
+}
+.opts-two-col h3 {
+    font-size: var(--text-md);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    margin: 0 0 0.625em;
+}
+@media (max-width: 640px) {
+    .opts-page-wrap { padding: 2vh 4vw 3vh; }
+    .opts-two-col { grid-template-columns: 1fr; }
 }
 
 .hover-arrow {
