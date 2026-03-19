@@ -1034,12 +1034,34 @@ var funcMap = template.FuncMap{
 	},
 }
 
+// Templates that have been migrated to use base template inheritance.
+// Unmigrated templates are rendered with the legacy standalone approach.
+var baseTemplatePages = map[string]string{
+	"sleep.html":    "templates/base.html",
+	"sets.html":     "templates/base.html",
+	"editions.html": "templates/base.html",
+	"news.html":     "templates/base.html",
+	"admin.html":    "templates/base.html",
+	"arbit.html":    "templates/base.html",
+	"upload.html":   "templates/base.html",
+	"search.html":   "templates/base.html",
+	"home.html":     "templates/base-landing.html",
+}
+
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// Give each template a name
 	name := path.Base(tmpl)
 
-	// Prefix the name passed in with templates/
-	templates := []string{fmt.Sprintf("templates/%s", tmpl)}
+	var templates []string
+	baseTmpl, usesBase := baseTemplatePages[name]
+
+	if usesBase {
+		// New approach: base template first, then child template
+		templates = []string{baseTmpl, fmt.Sprintf("templates/%s", tmpl)}
+	} else {
+		// Legacy approach: standalone template
+		templates = []string{fmt.Sprintf("templates/%s", tmpl)}
+	}
 
 	// Always include the navbar partial
 	templates = append(templates, "templates/partials/navbar.html")
@@ -1050,14 +1072,18 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		templates = append(templates, "templates/partials/search_options.html")
 	}
 
-	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New(name).Funcs(funcMap).ParseFiles(templates...)
+	// Parse and execute
+	execName := name
+	if usesBase {
+		execName = path.Base(baseTmpl)
+	}
+
+	t, err := template.New(execName).Funcs(funcMap).ParseFiles(templates...)
 	if err != nil {
 		log.Print("template parsing error: ", err)
 		return
 	}
-	// Execute the template and pass in the variables to fill the gaps
-	err = t.ExecuteTemplate(w, name, pageVars)
+	err = t.ExecuteTemplate(w, execName, pageVars)
 	if err != nil {
 		log.Print("template executing error: ", err)
 	}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+    {{block "extra-css" .}}{{end}}
+
+    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/img/favicon/site.webmanifest">
+    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
+    <meta name="theme-color" content="#ff0000">
+
+    {{block "extra-meta" .}}{{end}}
+
+    <title>{{block "title" .}}{{.Title}}{{end}}</title>
+
+    {{block "extra-head" .}}{{end}}
+</head>
+
+<body class="light-theme">
+<script>
+(function() {
+    var stored = localStorage.getItem('theme');
+    var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.body.className = theme === 'dark' ? 'dark-theme' : 'light-theme';
+})();
+</script>
+
+{{block "content" .}}{{end}}
+
+{{block "extra-scripts" .}}{{end}}
+</body>
+</html>
