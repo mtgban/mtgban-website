@@ -106,28 +106,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.PromoTags = mtgmatcher.AllPromoTypes()
 	}
 
-	pageVars.Nav = insertNavBar("Search", pageVars.Nav, []NavElem{
-		NavElem{
-			Name:   "Sets",
-			Short:  "📦",
-			Link:   "/sets",
-			Active: isSetsPage,
-			Class:  "selected",
-		},
-	})
-
-	if len(mtgmatcher.GetSealedUUIDs()) > 0 {
-		pageVars.Nav = insertNavBar("Sets", pageVars.Nav, []NavElem{
-			NavElem{
-				Name:   "Sealed",
-				Short:  "🧱",
-				Link:   "/sealed",
-				Active: pageVars.IsSealed,
-				Class:  "selected",
-			},
-		})
-		pageVars.HasAvailable = true
-	}
+	pageVars.HasAvailable = len(mtgmatcher.GetSealedUUIDs()) > 0
 
 	page := r.FormValue("page")
 	if page == "options" {

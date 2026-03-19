@@ -216,7 +216,10 @@ type NavElem struct {
 	CanPOST bool
 
 	// Alternative endpoints connected to this handler
-	SubPages []string
+	SubPages []NavElem
+
+	// Condition upon which the page should not be made visible
+	ShouldHide func() bool
 }
 
 var DefaultNav = []NavElem{
@@ -275,12 +278,26 @@ var ExtraNavs map[string]*NavElem
 func init() {
 	ExtraNavs = map[string]*NavElem{
 		"Search": {
-			Name:     "Search",
-			Short:    "🔍",
-			Link:     "/search",
-			Handle:   Search,
-			Page:     "search.html",
-			SubPages: []string{"/sets", "/sealed"},
+			Name:   "Search",
+			Short:  "🔍",
+			Link:   "/search",
+			Handle: Search,
+			Page:   "search.html",
+			SubPages: []NavElem{
+				{
+					Name:  "Sets",
+					Short: "📦",
+					Link:  "/sets",
+				},
+				{
+					Name:  "Sealed",
+					Short: "🧱",
+					Link:  "/sealed",
+					ShouldHide: func() bool {
+						return len(mtgmatcher.GetSealedUUIDs()) == 0
+					},
+				},
+			},
 		},
 		"Newspaper": {
 			Name:   "Newspaper",
@@ -288,6 +305,25 @@ func init() {
 			Link:   "/newspaper",
 			Handle: Newspaper,
 			Page:   "news.html",
+			SubPages: []NavElem{
+				{
+					Name:  "Archive",
+					Short: "📰",
+					Link:  "/newspaper?page=old",
+					ShouldHide: func() bool {
+						return Config.Game != DefaultGame
+					},
+				},
+				{
+					Name:  "TCG Syp List",
+					Short: "📋",
+					Link:  "/newspaper?page=syp",
+					ShouldHide: func() bool {
+						_, err := findVendorBuylist("SYP")
+						return err != nil
+					},
+				},
+			},
 		},
 		"Sleepers": {
 			Name:   "Sleepers",
@@ -483,6 +519,12 @@ func genPageNav(activeTab, sig string) PageVars {
 		}
 
 		pageVars.Nav = append(pageVars.Nav, *ExtraNavs[feat])
+		for _, subPage := range ExtraNavs[feat].SubPages {
+			if subPage.ShouldHide != nil && subPage.ShouldHide() {
+				continue
+			}
+			pageVars.Nav = append(pageVars.Nav, subPage)
+		}
 	}
 
 	mainNavIndex := 0
@@ -829,7 +871,7 @@ func main() {
 
 		// Add any additional endpoints to it
 		for _, subPage := range nav.SubPages {
-			http.Handle(subPage, handler)
+			http.Handle(subPage.Link, handler)
 		}
 	}
 

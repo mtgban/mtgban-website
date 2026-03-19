@@ -1272,25 +1272,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.ToC = append(pageVars.ToC, newspage)
 	}
 
-	if Config.Game == DefaultGame {
-		pageVars.Nav = insertNavBar("Newspaper", pageVars.Nav, []NavElem{
-			NavElem{
-				Name:   "Archive",
-				Short:  "📰",
-				Link:   "/newspaper?page=old",
-				Active: oldMode,
-				Class:  "selected",
-			},
-			NavElem{
-				Name:   "TCG Syp List",
-				Short:  "📋",
-				Link:   "/newspaper?page=syp",
-				Active: page == "syp",
-				Class:  "selected",
-			},
-		})
-	}
-
 	pageVars.LastUpdate = LastNewspaperUpdate
 	if oldMode {
 		var err error

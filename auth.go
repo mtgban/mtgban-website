@@ -377,7 +377,10 @@ func enforceSigning(next http.Handler) http.Handler {
 		_, checkNoAuth := Config.ACL["Any"]
 		if checkNoAuth {
 			for _, nav := range ExtraNavs {
-				if nav.Link == r.URL.Path || slices.Contains(nav.SubPages, r.URL.Path) {
+				if nav.Link == r.URL.Path || slices.ContainsFunc(nav.SubPages, func(p NavElem) bool {
+					// Check prefix because Link may contain query params
+					return strings.HasPrefix(p.Link, r.URL.Path)
+				}) {
 					_, noAuth := Config.ACL["Any"][nav.Name]
 					if noAuth {
 						noSigning(next).ServeHTTP(w, r)
@@ -507,6 +510,17 @@ func enforceSigning(next http.Handler) http.Handler {
 					render(w, nav.Page, pageVars)
 					return
 				}
+
+				// Check if link is a subpage, and validate if viewing conditions are met
+				for _, subPage := range nav.SubPages {
+					if strings.HasPrefix(subPage.Link, r.URL.Path) &&
+						subPage.ShouldHide != nil && subPage.ShouldHide() {
+						pageVars.Title = "Unauthorized"
+						render(w, "home.html", pageVars)
+						break
+					}
+				}
+
 				break
 			}
 		}

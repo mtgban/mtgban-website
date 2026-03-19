@@ -178,22 +178,6 @@ func editionTitle(cardId string) string {
 	return fmt.Sprintf("%s -%s %s%s", edition, finish, mtgmatcher.Title(co.Card.Rarity), extra)
 }
 
-func insertNavBar(page string, nav []NavElem, extra []NavElem) []NavElem {
-	out := make([]NavElem, len(nav)+len(extra))
-	var j int
-	for i := range nav {
-		out[j] = nav[i]
-		if out[j].Name == page {
-			for e := range extra {
-				j++
-				out[j] = extra[e]
-			}
-		}
-		j++
-	}
-	return out
-}
-
 const (
 	// 9 per line for default size, otherwise 19-21 depending on size
 	MaxBeforeShrink = 18
