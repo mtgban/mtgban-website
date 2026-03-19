@@ -27,14 +27,14 @@
 .sleepers-filters-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 20px;
-    border-radius: var(--radius-md);
-    background: var(--surface-1);
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: var(--surface-3);
     border: 1px solid var(--border-subtle);
     text-decoration: none;
     color: var(--activetext);
-    font-size: var(--text-xl);
+    font-size: var(--text-base);
     font-weight: 600;
     white-space: nowrap;
     transition: all 0.15s;
@@ -441,130 +441,7 @@
 }
 
 
-/* ═══════════════════════════════════════
-   Options View
-   ═══════════════════════════════════════ */
-
-.sleepers-options {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 0 32px 80px;
-}
-
-.sleepers-options h1 {
-    font-size: var(--text-8xl);
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    margin: 0 0 4px 0;
-    color: var(--headingtext);
-}
-
-.sleepers-options .opts-desc {
-    color: var(--activetext);
-    font-size: var(--text-lg);
-    margin: 0 0 28px 0;
-}
-
-.sleepers-opts-section {
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    padding: 24px;
-    margin-bottom: 20px;
-}
-
-.sleepers-opts-section h2 {
-    font-size: var(--text-3xl);
-    font-weight: 600;
-    margin: 0 0 4px 0;
-    color: var(--headingtext);
-}
-
-.sleepers-opts-section .section-desc {
-    font-size: var(--text-md);
-    color: var(--activetext);
-    margin: 0 0 14px 0;
-}
-
-.sleepers-opts-bar {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 14px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border-subtle);
-}
-
-.sleepers-obtn {
-    padding: 7px 16px;
-    border-radius: var(--radius-sm);
-    font-size: var(--text-md);
-    font-weight: 600;
-    border: none;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-
-.sleepers-obtn-warn {
-    background: rgba(210,153,34,0.15);
-    color: var(--awarning);
-}
-
-.sleepers-obtn-warn:hover {
-    background: rgba(210,153,34,0.25);
-}
-
-.sleepers-obtn-ok {
-    background: rgba(63,185,80,0.15);
-    color: var(--asuccess);
-}
-
-.sleepers-obtn-ok:hover {
-    background: rgba(63,185,80,0.25);
-}
-
-.sleepers-opts-cols {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-}
-
-.sleepers-opts-cols h3 {
-    font-size: var(--text-md);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-dim);
-    margin: 0 0 10px 0;
-}
-
-.sleepers-opts-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-    gap: 4px;
-}
-
-.sleepers-opts-list label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 10px;
-    border-radius: var(--radius-sm);
-    font-size: var(--text-md);
-    color: var(--activetext);
-    cursor: pointer;
-    transition: background 0.1s;
-}
-
-.sleepers-opts-list label:hover {
-    background: var(--surface-2);
-}
-
-.sleepers-opts-list input[type="checkbox"] {
-    accent-color: var(--ainfo);
-    width: 15px;
-    height: 15px;
-    flex-shrink: 0;
-}
+/* Options view uses shared .opts-page-wrap, .opts-two-col from main.css */
 
 
 /* ═══════════════════════════════════════
@@ -589,10 +466,6 @@
         padding-left: 16px;
         padding-right: 16px;
     }
-    .sleepers-options {
-        padding-left: 16px;
-        padding-right: 16px;
-    }
     .sleepers-tools-strip {
         grid-template-columns: 1fr;
     }
@@ -601,8 +474,5 @@
     }
     .sleepers-comp-presets {
         gap: 4px;
-    }
-    .sleepers-opts-cols {
-        grid-template-columns: 1fr;
     }
 }

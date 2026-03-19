@@ -37,7 +37,7 @@
 /* ═══ Search bar (spans full width above grid) ═══ */
 .search-bar-wrap {
     grid-column: 1 / -1;
-    padding: 16px 24px 0;
+    padding: 0 24px;
     background: var(--background);
     position: sticky;
     top: var(--nav-height, 40px);
@@ -141,17 +141,24 @@
 }
 
 .search-opts-link {
-    padding: 4px 12px;
-    border-radius: 14px;
-    font-size: var(--text-base);
-    color: var(--search-text-dim);
-    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    background: var(--surface-3);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
-    transition: all 0.12s;
+    color: var(--activetext);
+    font-size: var(--text-base);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.15s;
 }
 .search-opts-link:hover {
-    color: var(--activetext);
-    border-color: var(--border-moderate, rgba(255,255,255,0.12));
+    color: var(--normal);
+    border-color: var(--accent-border, rgba(91,141,239,0.25));
+    background: var(--surface-2);
 }
 
 
@@ -316,10 +323,12 @@
 
 /* ═══ Landing page (no query) ═══ */
 .search-landing {
-    padding: 0 20% 80px 10%;
+    padding: 0 24px 80px;
 }
-.search-landing h1 {
-    margin-bottom: 8px;
+.search-landing h1,
+.search-page-title {
+    margin: 0 0 8px;
+    padding-left: 24px;
 }
 
 

@@ -28,7 +28,6 @@
         <h1>{{.ErrorMessage}}</h1>
     {{else if eq .Title "Options"}}
         <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
-        <br>
 
         {{$cookieName := "ArbitVendorsList"}}
         {{if .ReverseMode}}
@@ -44,62 +43,53 @@
             }
         </script>
 
-        <div class="indent">
-            <h2>Vendors list</h2>
-            Select which vendors you <b>don't</b> want to display in your global tool.
-            <br>
+        <div class="opts-page-wrap">
+            <h1>{{if .ReverseMode}}Reverse{{else if .GlobalMode}}Global{{else}}Arbitrage{{end}} Options</h1>
+            <p class="opts-desc">Select vendors and editions to <strong>exclude</strong> from results.</p>
 
-            <a class="btn warning" onclick="javascript:clearForm('vendors');"><b>CLEAR</b></a>
-            <a class="btn success" onclick="javascript:saveForm('{{$cookieName}}', 'vendors'); window.location.href = '?'"><b>SAVE</b></a>
-        </div>
-
-        <br>
-        <div class="indent row">
-            <div class="column" id="vendors">
-                {{range $i, $key := .VendorKeys}}
-                    <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                    <label for="{{$key}}">
-                        {{scraper_name $key}}
-                        {{if (contains $key "Sealed")}}
-                            <i>(Sealed)</i>
-                        {{end}}
-                    </label>
-                    <br>
-                {{end}}
+            <div class="opts-section">
+                <h2>Vendors List</h2>
+                <p class="section-desc">Checked vendors will be <strong>hidden</strong> from results.</p>
+                <div class="opts-bar">
+                    <button class="opts-btn opts-btn-warn" onclick="clearForm('vendors')">Clear</button>
+                    <button class="opts-btn opts-btn-ok" onclick="saveForm('{{$cookieName}}', 'vendors'); location.href='?'">Save</button>
+                </div>
+                <div class="opts-checkbox-grid opts-nowrap" id="vendors">
+                    {{range $i, $key := .VendorKeys}}
+                        <label>
+                            <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                            {{scraper_name $key}}
+                            {{if (contains $key "Sealed")}}
+                                <i>(Sealed)</i>
+                            {{end}}
+                        </label>
+                    {{end}}
+                </div>
             </div>
-        </div>
 
-        <br>
-        <div class="indent">
-            <h2>Edition list</h2>
-            Select which editions you <b>don't</b> want to display in your global tool.
-            <br>
-
-            <a class="btn warning" onclick="javascript:clearForm('editions');"><b>CLEAR</b></a>
-            <a class="btn success" onclick="javascript:selectAll('editions');"><b>SELECT ALL</b></a>
-            <a class="btn success" onclick="javascript:saveForm('GlobalEditionList', 'editions'); window.location.href = '/global'"><b>SAVE</b></a>
-        </div>
-
-        <div class="indent row" id="editions">
-            {{range $i, $key := .Editions}}
-                {{if triple_column_start $i (len $.Editions)}}
-                    <div class="column">
-                {{end}}
-
-                {{$edition := index $.EditionsMap $key}}
-                {{if $edition}}
-                <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                <label for="{{$key}}">
-                    <i class="ss ss-{{$edition.Keyrune}} ss-2x ss-fw"></i>
-                    {{$edition.Name}}
-                </label>
-                <br>
-                {{end}}
-
-                {{if triple_column_end $i (len $.Editions)}}
-                    </div>
-                {{end}}
-            {{end}}
+            <div class="opts-section">
+                <h2>Edition List</h2>
+                <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
+                <div class="opts-bar">
+                    <button class="opts-btn opts-btn-warn" onclick="clearForm('editions')">Clear</button>
+                    <button class="opts-btn opts-btn-ok" onclick="selectAll('editions')">Select All</button>
+                    <button class="opts-btn opts-btn-ok" onclick="saveForm('GlobalEditionList', 'editions'); location.href='/global'">Save</button>
+                </div>
+                <div class="opts-checkbox-grid opts-grid-wide" id="editions">
+                    {{range $i, $key := .Editions}}
+                        {{$edition := index $.EditionsMap $key}}
+                        {{if $edition}}
+                        <label>
+                            <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                            {{if $edition.Keyrune}}
+                                <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
+                            {{end}}
+                            {{$edition.Name}}
+                        </label>
+                        {{end}}
+                    {{end}}
+                </div>
+            </div>
         </div>
 
     {{else if eq .ScraperShort ""}}
@@ -180,7 +170,8 @@
 
         <a name="top"></a>
 
-        <!-- Selector bar -->
+        <!-- Selector bar (hidden for SYP) -->
+        {{if ne .ScraperShort "SYP"}}
         <div class="arb-selector-bar">
             {{range .ExtraNav}}
                 {{if .Active}}
@@ -218,6 +209,7 @@
 
             <a class="arb-opts-link" href="?page=options">&#9881; Options</a>
         </div>
+        {{end}}
 
         <!-- Filter chips -->
         {{if not .LargeTable}}
@@ -425,6 +417,9 @@
                     {{end}}
                     -->
                 </div>
+                {{if and (eq $i 0) (eq $.ScraperShort "SYP")}}
+                    <a class="arb-opts-link" href="?page=options">&#9881; Options</a>
+                {{end}}
                 <hr style="width: 100%; border: none; border-top: 1px solid var(--arb-border-subtle); margin: 0;">
             </div>
 

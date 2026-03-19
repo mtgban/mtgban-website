@@ -80,8 +80,8 @@
 
         {{if and (eq .SearchQuery "") (not .IsSealed)}}
             <div class="search-landing">
-                <h1 style="margin: 0 0 12px;">Welcome to {{$.Title}}</h1>
-                <div class="search-bar-wrap" style="position:static; padding:0 0 16px;">
+                <h1>Welcome to {{$.Title}}</h1>
+                <div class="search-bar-wrap" style="position:static; padding:0 24px 16px;">
                     <div class="search-input-row">
                         <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
                             <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a card name" value="" maxlength="1000" autofocus autocapitalize="none">
@@ -265,7 +265,7 @@ Sims are not required for pre-constructed decks and other products where the sam
         {{else}}
             {{if .ChartID}}
                 {{$card := (index $.Metadata .ChartID)}}
-                <h1 lang="{{$card.LangTag}}" class=indent style="width: fit-content; margin-bottom: 8px;">
+                <h1 lang="{{$card.LangTag}}" class="search-page-title" style="width: fit-content;">
                     {{$card.Name}}
                     <hr>
                     {{if not $.IsSealed}}
@@ -274,7 +274,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                     <h5 lang="en" class=indent>{{$card.Title}}</h5>
                 </h1>
             {{else}}
-                <h1 style="margin: 0 0 8px;">Welcome to {{$.Title}}</h1>
+                <h1 class="search-page-title">Welcome to {{$.Title}}</h1>
             {{end}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
             <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
