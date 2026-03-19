@@ -1,0 +1,59 @@
+{{define "extra-css"}}
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/news.css?hash={{.Hash}}">
+{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "content"}}
+<div class="news-wrap">
+    <div class="news-index">
+        <div class="page-header">
+            <div>
+                <h1>Welcome to {{.Title}}</h1>
+                <div class="news-index-meta">
+                    {{if .IsOneDay}}<span class="news-badge">Early Edition</span>{{end}}
+                    <span class="news-date">Published {{.LastUpdate.Format "Jan 02, 2006"}}</span>
+                </div>
+            </div>
+            <a class="page-action" href="newspaper?page=options">&#9881; Settings</a>
+        </div>
+
+        {{if .CanSwitchDay}}
+            <p style="font-size:var(--text-md); color:var(--activetext); margin:0 0 16px;">
+                As <b>Admin</b> you can check on the
+                <a href="newspaper?force3day={{.IsOneDay}}">{{if .IsOneDay}}3-day{{else}}early edition{{end}} newspaper</a>.
+            </p>
+        {{end}}
+
+        <div class="news-toc-grid">
+            {{range $i, $page := .ToC}}
+                {{if ne $page.Option "options"}}
+                <a class="news-toc-card" href="newspaper?page={{$page.Option}}">
+                    <span class="news-toc-icon">{{if $page.Icon}}{{$page.Icon}}{{else}}{{inc $i 1}}{{end}}</span>
+                    <div class="toc-text">
+                        <h3>{{$page.Title}}</h3>
+                        <p>{{$page.Desc}}</p>
+                    </div>
+                    <span class="news-toc-arrow">&rarr;</span>
+                </a>
+                {{end}}
+            {{end}}
+        </div>
+
+        {{if eq .Page "old"}}
+        <div class="news-info-card">
+            <span class="info-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="dodgerblue" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/></svg></span>
+            <div class="info-body">
+                <h3>About Forecasts</h3>
+                <p>Trend <strong>direction and velocity</strong> predictions via time-series analysis across a 3-week window from multiple vendor sites. Values compare last week's forecast against this week's actual &mdash; present conditions don't always follow historical trends.{{if not .IsOneDay}} <span class="news-info-upgrade">This edition is lagged 3 days.</span>{{end}}</p>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}
