@@ -1,165 +1,144 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+{{define "extra-css"}}
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
-    <title>{{.Title}}</title>
+{{end}}
 
-    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
-    <link rel="manifest" href="/img/favicon/site.webmanifest">
-    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
-    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
-    <meta name="msapplication-TileColor" content="#da532c">
-    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
-    <meta name="theme-color" content="#ff0000">
-</head>
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
+{{end}}
 
-<body class="light-theme">
-<script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
-{{template "navbar" .}}
+{{define "content"}}
+    <h1>Welcome to {{.Title}}</h1>
+    <div class="indent" style="max-width: 90%">
+        <script>
+            function showAll() {
+                const table = document.getElementById("table");
+                table.style.width = "90%"
 
-<div class="mainbody">
-    {{if ne .ErrorMessage ""}}
-        <h1>{{.ErrorMessage}}</h1>
-    {{else}}
-        <h1>Welcome to {{.Title}}</h1>
-        <div class="indent" style="max-width: 90%">
-            <script>
-                function showAll() {
-                    const table = document.getElementById("table");
-                    table.style.width = "90%"
+                const link = document.getElementById("hideme");
+                link.style.display = 'none'
 
-                    const link = document.getElementById("hideme");
-                    link.style.display = 'none'
+                const heads = document.getElementsByTagName("th");
+                let inputList = Array.prototype.slice.call(heads);
+                inputList.forEach(element =>
+                    element.style.display = ''
+                );
 
-                    const heads = document.getElementsByTagName("th");
-                    let inputList = Array.prototype.slice.call(heads);
-                    inputList.forEach(element =>
-                        element.style.display = ''
-                    );
-
-                    const cells = document.getElementsByTagName("td");
-                    inputList = Array.prototype.slice.call(cells);
-                    inputList.forEach(element =>
-                        element.style.display = ''
-                    );
-                }
-            </script>
-            <div class="indent" style="max-width: 85%">
-                Tracking {{.TotalSets}} editions, for {{.TotalCards}} cards over {{.TotalUnique}} printings. <a href="javascript:showAll()" id="hideme">Show additional search options.</a>
-            </div>
-            <br>
-
-            <table class="filterable" style="float: left; background-color: var(--background); width:60%" id="table">
-                <tr>
-                    <th><a class="btn default" style="padding: 0 0 0 0;" href="/sets?sort=name" title="Sort by edition name">Name</a>&nbsp;&nbsp;&nbsp;<input type="text" id="filterInput" onkeyup="filterTableByName()" placeholder="Filter.."></th>
-                    <th>Finish</th>
-                    <th style="display:none;">Color</th>
-                    <th style="display:none;">Rarity</th>
-                    <th><a class="btn default" style="padding: 0 0 0 0" href="/sets?sort=size" title="Sort by number of cards">Size</a></th>
-                    <th><a class="btn default" style="padding: 0 0 0 0" href="/sets" title="Sort by date">Release Date</a></th>
-                </tr>
-                {{range $key := .EditionSort}}
-                    {{$editionList := index $.EditionList $key }}
-                    {{range $i, $edition := $editionList}}
-                        <tr>
-                            <td>
-                                <nobr>
-                                    {{if gt $i 0}}
-                                    <h4 style="display:inline; padding: 0px 10px 0px 10px">&nbsp;</h6>
-                                    {{end}}
-
-                                    {{if $edition.Keyrune}}
-                                        <i class="ss ss-{{$edition.Keyrune}} ss-1x ss-fw"></i>
-                                    {{end}}
-                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}">
-                                        {{.Name}}
-                                    </a>
-                                    <h6 style="display:inline">{{$edition.Code}}</h6>
-                                </nobr>
-                            </td>
-                            <td>
-                                {{if $edition.Special}}
-                                    {{if eq $edition.Code "H1R"}}
-                                        <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:foil">
-                                            <h6>foil</h6>
-                                        </a>
-                                        <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:etched">
-                                            <h6>etched</h6>
-                                        </a>
-                                    {{else if eq $edition.Code "SCD"}}
-                                        <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:nonfoil">
-                                            <h6>nonfoil</h6>
-                                        </a>
-                                        <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:etched">
-                                            <h6>etched</h6>
-                                        </a>
-                                    {{end}}
-                                {{else if $edition.ShowFin}}
-                                    {{if $edition.HasReg}}
-                                        <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:nonfoil">
-                                            <h6>nonfoil</h6>
-                                        </a>
-                                    {{end}}
-                                    {{if $edition.HasFoil}}
-                                        <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:foil,etched">
-                                            <h6>foil</h6>
-                                        </a>
-                                    {{end}}
-                                {{end}}
-                            </td>
-                            <td style="display:none;">
-                                <table>
-                                    <tr style="background-color:rgba(0, 0, 0, 0);">
-                                        {{range $edition.Colors}}
-                                            <td>
-                                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:{{.}}" title="{{.}}">
-                                                    <svg height="18" width="18" xmlns="http://www.w3.org/2000/svg">
-                                                        <defs>
-                                                            <linearGradient id="gradient-{{.}}" x1="0%" y1="0%" x2="0%" y2="100%">
-                                                                <stop offset="0%" stop-color="#708090" />
-                                                                <stop offset="50%" stop-color="{{color2hex .}}" />
-                                                            </linearGradient>
-                                                        </defs>
-                                                        <circle r="9" cx="9" cy="9" fill="url(#gradient-{{.}})" />
-                                                    </svg>
-                                                </a>
-                                            </td>
-                                        {{end}}
-                                    </tr>
-                                </table>
-                            </td>
-                            <td style="display:none;">
-                                <table>
-                                    <tr style="background-color:rgba(0, 0, 0, 0);">
-                                        {{range $edition.Rarities}}
-                                            <td>
-                                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20r:{{.}}">
-                                                    <h6>{{.}}</h6>
-                                                </a>
-                                            </td>
-                                        {{end}}
-                                    </tr>
-                                </table>
-                            </td>
-                            <td>
-                                {{$edition.Size}}
-                            </td>
-                            <td>
-                                {{$edition.FmtDate}}
-                            </td>
-                        </tr>
-                    {{end}}
-                {{end}}
-            </table>
+                const cells = document.getElementsByTagName("td");
+                inputList = Array.prototype.slice.call(cells);
+                inputList.forEach(element =>
+                    element.style.display = ''
+                );
+            }
+        </script>
+        <div class="indent" style="max-width: 85%">
+            Tracking {{.TotalSets}} editions, for {{.TotalCards}} cards over {{.TotalUnique}} printings. <a href="javascript:showAll()" id="hideme">Show additional search options.</a>
         </div>
-        <div style="clear:both;"></div>
-        <br><br>
-    {{end}}
+        <br>
+
+        <table class="filterable" style="float: left; background-color: var(--background); width:60%" id="table">
+            <tr>
+                <th><a class="btn default" style="padding: 0 0 0 0;" href="/sets?sort=name" title="Sort by edition name">Name</a>&nbsp;&nbsp;&nbsp;<input type="text" id="filterInput" onkeyup="filterTableByName()" placeholder="Filter.."></th>
+                <th>Finish</th>
+                <th style="display:none;">Color</th>
+                <th style="display:none;">Rarity</th>
+                <th><a class="btn default" style="padding: 0 0 0 0" href="/sets?sort=size" title="Sort by number of cards">Size</a></th>
+                <th><a class="btn default" style="padding: 0 0 0 0" href="/sets" title="Sort by date">Release Date</a></th>
+            </tr>
+            {{range $key := .EditionSort}}
+                {{$editionList := index $.EditionList $key }}
+                {{range $i, $edition := $editionList}}
+                    <tr>
+                        <td>
+                            <nobr>
+                                {{if gt $i 0}}
+                                <h4 style="display:inline; padding: 0px 10px 0px 10px">&nbsp;</h6>
+                                {{end}}
+
+                                {{if $edition.Keyrune}}
+                                    <i class="ss ss-{{$edition.Keyrune}} ss-1x ss-fw"></i>
+                                {{end}}
+                                <a class="btn normal" href="/search?q=s:{{$edition.Code}}">
+                                    {{.Name}}
+                                </a>
+                                <h6 style="display:inline">{{$edition.Code}}</h6>
+                            </nobr>
+                        </td>
+                        <td>
+                            {{if $edition.Special}}
+                                {{if eq $edition.Code "H1R"}}
+                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:foil">
+                                        <h6>foil</h6>
+                                    </a>
+                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:etched">
+                                        <h6>etched</h6>
+                                    </a>
+                                {{else if eq $edition.Code "SCD"}}
+                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:nonfoil">
+                                        <h6>nonfoil</h6>
+                                    </a>
+                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:etched">
+                                        <h6>etched</h6>
+                                    </a>
+                                {{end}}
+                            {{else if $edition.ShowFin}}
+                                {{if $edition.HasReg}}
+                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:nonfoil">
+                                        <h6>nonfoil</h6>
+                                    </a>
+                                {{end}}
+                                {{if $edition.HasFoil}}
+                                    <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20f:foil,etched">
+                                        <h6>foil</h6>
+                                    </a>
+                                {{end}}
+                            {{end}}
+                        </td>
+                        <td style="display:none;">
+                            <table>
+                                <tr style="background-color:rgba(0, 0, 0, 0);">
+                                    {{range $edition.Colors}}
+                                        <td>
+                                            <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20c:{{.}}" title="{{.}}">
+                                                <svg height="18" width="18" xmlns="http://www.w3.org/2000/svg">
+                                                    <defs>
+                                                        <linearGradient id="gradient-{{.}}" x1="0%" y1="0%" x2="0%" y2="100%">
+                                                            <stop offset="0%" stop-color="#708090" />
+                                                            <stop offset="50%" stop-color="{{color2hex .}}" />
+                                                        </linearGradient>
+                                                    </defs>
+                                                    <circle r="9" cx="9" cy="9" fill="url(#gradient-{{.}})" />
+                                                </svg>
+                                            </a>
+                                        </td>
+                                    {{end}}
+                                </tr>
+                            </table>
+                        </td>
+                        <td style="display:none;">
+                            <table>
+                                <tr style="background-color:rgba(0, 0, 0, 0);">
+                                    {{range $edition.Rarities}}
+                                        <td>
+                                            <a class="btn normal" href="/search?q=s:{{$edition.Code}}%20r:{{.}}">
+                                                <h6>{{.}}</h6>
+                                            </a>
+                                        </td>
+                                    {{end}}
+                                </tr>
+                            </table>
+                        </td>
+                        <td>
+                            {{$edition.Size}}
+                        </td>
+                        <td>
+                            {{$edition.FmtDate}}
+                        </td>
+                    </tr>
+                {{end}}
+            {{end}}
+        </table>
+    </div>
+    <div style="clear:both;"></div>
+    <br><br>
     <br>
-</div>
-</body>
-</html>
+{{end}}
