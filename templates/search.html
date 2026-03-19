@@ -1,16 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <link href='https://fonts.googleapis.com/css?family=Rosario:400' rel='stylesheet' type='text/css'>
-    <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+{{define "extra-css"}}
     <link rel="stylesheet" type="text/css" href="/css/search.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
     {{if .IsSealed}}
     <link rel="stylesheet" type="text/css" href="/css/sealed.css?hash={{.Hash}}">
     {{end}}
+{{end}}
 
+{{define "extra-meta"}}
     <link rel="search" type="application/opensearchdescription+xml" title="MTGBAN Price Search" href="/api/opensearch.xml" />
-
     {{if .Embed.OEmbedURL}}
         <link rel="alternate" type="application/json+oembed" href="{{.Embed.OEmbedURL}}" title="MTGBAN Price Search"/>
         <meta property="og:site_name" content="MTGBAN Price Search" />
@@ -19,7 +16,6 @@
         <meta property="og:description" content="{{.Embed.Contents}}" />
         <meta property="og:url" content="{{.Embed.PageURL}}" />
         <meta property="og:image" content="{{.Embed.ImageURL}}" />
-
         <meta name="twitter:creator" content="@MTG_BAN" />
         <meta name="twitter:site" content="@MTG_BAN" />
         <meta name="twitter:domain" content="https://mtgban.com/" />
@@ -32,13 +28,14 @@
         <meta name="twitter:label2" content="Card Kingdom Buylist" />
         <meta name="twitter:data2" content="{{if .Embed.BuylistPrice}}{{printf "$ %.2f" .Embed.BuylistPrice}}{{else}}N/A{{end}}" />
     {{end}}
+{{end}}
 
-    <title>
-        {{.Title}}{{if .CleanSearchQuery}}: {{.CleanSearchQuery}}{{end}}
-    </title>
-        <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+{{define "title"}}{{.Title}}{{if .CleanSearchQuery}}: {{.CleanSearchQuery}}{{end}}{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     {{if .ChartID}}
         <script type="text/javascript"
                  src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.bundle.js"
@@ -46,32 +43,15 @@
          crossorigin="anonymous"></script>
         <script type="text/javascript" src="/js/chartopts.js?hash={{.Hash}}"></script>
     {{end}}
-
-    <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon/favicon-16x16.png">
-    <link rel="manifest" href="/img/favicon/site.webmanifest">
-    <link rel="mask-icon" href="/img/favicon/safari-pinned-tab.svg" color="#5bbad5">
-    <link rel="shortcut icon" href="/img/favicon/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="msapplication-TileColor" content="#da532c">
-    <meta name="msapplication-config" content="/img/favicon/browserconfig.xml">
-    <meta name="theme-color" content="#ff0000">
     {{if .IsSealed}}
     <script type="text/javascript" src="/js/sealed.js?hash={{.Hash}}" defer></script>
     {{end}}
-</head>
+    <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
+{{end}}
 
-<body class="light-theme">
-<script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
-{{template "navbar" .}}
-
-<div class="mainbody">
-    {{if ne .ErrorMessage ""}}
-        <h1>{{.ErrorMessage}}</h1>
-    {{else if eq .Title "Options"}}
+{{define "content"}}
+    {{if eq .Title "Options"}}
         {{template "search_options" .}}
-
     {{else}}
         {{if .IsSealed}}
             <img id="hoverImage" class="hoverImage" src=""/>
@@ -106,7 +86,6 @@
             <script type="text/javascript">
                 autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
             </script>
-        </div>{{/* Close .mainbody */}}
 
         <div class="sealed-layout">
             <div class="sealed-toc" id="sealed-toc">
@@ -261,7 +240,6 @@ Sims are not required for pre-constructed decks and other products where the sam
             </div>
         </div>
 
-        <div class="mainbody" style="display:none"><div>{{/* Reopen .mainbody + inner div to match closing tags */}}
         {{else}}
             {{if .ChartID}}
                 {{$card := (index $.Metadata .ChartID)}}
@@ -955,6 +933,4 @@ Sims are not required for pre-constructed decks and other products where the sam
         document.querySelectorAll(".secondaryBuylistEntry").forEach(renderCell);
     })();
 </script>
-
-</body>
-</html>
+{{end}}
