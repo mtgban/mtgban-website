@@ -1037,8 +1037,10 @@ var funcMap = template.FuncMap{
 // Templates that have been migrated to use base template inheritance.
 // Unmigrated templates are rendered with the legacy standalone approach.
 var baseTemplatePages = map[string]string{
-	"sleep.html":    "templates/base.html",
-	"sets.html":     "templates/base.html",
+	"sleep_index.html":   "templates/base.html",
+	"sleep_options.html": "templates/base.html",
+	"sleep_results.html": "templates/base.html",
+	"sets.html":          "templates/base.html",
 	"editions.html": "templates/base.html",
 	"news.html":     "templates/base.html",
 	"admin.html":    "templates/base.html",

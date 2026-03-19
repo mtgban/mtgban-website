@@ -88,7 +88,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	default:
 		pageVars.Subtitle = "Index"
 
-		render(w, "sleep.html", pageVars)
+		render(w, "sleep_index.html", pageVars)
 
 		return
 	case "options":
@@ -122,7 +122,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		pageVars.SellerKeys = sellerKeys
 		pageVars.VendorKeys = vendorKeys
 
-		render(w, "sleep.html", pageVars)
+		render(w, "sleep_options.html", pageVars)
 
 		return
 	case "bulk":
@@ -156,7 +156,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		pageVars.Title = "Errors have been made"
 		pageVars.InfoMessage = ErrNoSleepers
 
-		render(w, "sleep.html", pageVars)
+		render(w, "sleep_results.html", pageVars)
 		return
 	}
 
@@ -187,7 +187,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		start = time.Now()
 	}
-	render(w, "sleep.html", pageVars)
+	render(w, "sleep_results.html", pageVars)
 	if DevMode {
 		log.Println("Sleepers render took", time.Since(start))
 	}
