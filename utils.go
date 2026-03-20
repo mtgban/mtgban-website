@@ -189,7 +189,7 @@ const (
 // Return the CreditMultiplier for any given vendor
 func findCredit(shorthand string) float64 {
 	for _, vendor := range Vendors {
-		if strings.ToLower(vendor.Info().Shorthand) == strings.ToLower(shorthand) {
+		if strings.EqualFold(vendor.Info().Shorthand, shorthand) {
 			return vendor.Info().CreditMultiplier
 		}
 	}
@@ -199,7 +199,7 @@ func findCredit(shorthand string) float64 {
 // Look up a seller and return its inventory
 func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
 	for _, seller := range Sellers {
-		if strings.ToLower(seller.Info().Shorthand) == strings.ToLower(shorthand) {
+		if strings.EqualFold(seller.Info().Shorthand, shorthand) {
 			return seller.Inventory(), nil
 		}
 	}
@@ -209,7 +209,7 @@ func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
 // Look up a vendor and return its buylist
 func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 	for _, vendor := range Vendors {
-		if strings.ToLower(vendor.Info().Shorthand) == strings.ToLower(shorthand) {
+		if strings.EqualFold(vendor.Info().Shorthand, shorthand) {
 			return vendor.Buylist(), nil
 		}
 	}
@@ -219,7 +219,7 @@ func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 // Look up a seller with its name and return its inventory
 func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord, error) {
 	for _, seller := range Sellers {
-		if seller.Info().SealedMode == sealed && strings.ToLower(seller.Info().Name) == strings.ToLower(name) {
+		if seller.Info().SealedMode == sealed && strings.EqualFold(seller.Info().Name, name) {
 			return seller.Inventory(), nil
 		}
 	}
@@ -229,7 +229,7 @@ func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord
 // Look up a vendor with its name and return its inventory
 func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, error) {
 	for _, vendor := range Vendors {
-		if vendor.Info().SealedMode == sealed && strings.ToLower(vendor.Info().Name) == strings.ToLower(name) {
+		if vendor.Info().SealedMode == sealed && strings.EqualFold(vendor.Info().Name, name) {
 			return vendor.Buylist(), nil
 		}
 	}
