@@ -832,8 +832,13 @@ func scraperName(shorthand string) string {
 
 // Special function to detect if the input price is bigger than
 // twice as much the market price on TCGplayer - used to detect
-// invalid Direct prices
+// invalid Direct prices. Ignored for anything lower than $1
+// since Direct minimum is $0.40.
 func invalidDirect(id string, price float64) bool {
+	if price < 1 {
+		return false
+	}
+
 	marketPrice := getTCGMarketPrice(id)
 	return price > marketPrice*2
 }

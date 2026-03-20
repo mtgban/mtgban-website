@@ -1889,8 +1889,11 @@ var FilterPriceFuncs = map[string]func(filters []float64, refPrice float64) bool
 	"rev_price_less_than":    priceLessThan,
 
 	// Special function that doubles the check price, filtering out
-	// anything that is twice as much the market price
+	// anything (above 1usd) that is at least twice as much the market price
 	"invalid_direct": func(filters []float64, refPrice float64) bool {
+		if filters[0] < 1 {
+			return false
+		}
 		return priceLessThan(filters, refPrice/2)
 	},
 }
