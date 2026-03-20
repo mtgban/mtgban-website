@@ -785,9 +785,12 @@ a.selected:hover{
     align-items: center;
     gap: 4px;
     font-size: var(--text-md);
-    color: var(--ainfo);
+    color: #3b6fd4;
     text-decoration: none;
     margin-bottom: 0.5em;
+}
+.dark-theme .back-link {
+    color: #5b8def;
 }
 .back-link:hover { text-decoration: underline; }
 

@@ -1033,6 +1033,24 @@ var funcMap = template.FuncMap{
 	"uuid2edition": func(s string) string {
 		return editionTitle(s)
 	},
+	"is_best_price": func(prices map[string]float64, store string, isBuylist bool) bool {
+		target := prices[store]
+		if target == 0 {
+			return false
+		}
+		for _, price := range prices {
+			if price == 0 {
+				continue
+			}
+			if !isBuylist && price > target {
+				return false
+			}
+			if isBuylist && price < target {
+				return false
+			}
+		}
+		return true
+	},
 }
 
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
