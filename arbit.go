@@ -332,6 +332,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 		pageName = "Reverse"
 	}
 	pageVars := genPageNav(pageName, sig)
+	pageVars.ReverseMode = reverse
 
 	var anyOptionEnabled bool
 
@@ -388,21 +389,18 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 
 		render(w, "arbit.html", pageVars)
 		return
-	} else {
-		cookieName := "ArbitVendorsList"
-		if reverse {
-			cookieName = "ReverseVendorsList"
-		}
-
-		filters := strings.Split(readCookie(r, cookieName), ",")
-		for _, code := range filters {
-			if !slices.Contains(blocklistVendors, code) {
-				blocklistVendors = append(blocklistVendors, code)
-			}
-		}
+	}
+	cookieName := "ArbitVendorsList"
+	if reverse {
+		cookieName = "ReverseVendorsList"
 	}
 
-	pageVars.ReverseMode = reverse
+	filters := strings.Split(readCookie(r, cookieName), ",")
+	for _, code := range filters {
+		if !slices.Contains(blocklistVendors, code) {
+			blocklistVendors = append(blocklistVendors, code)
+		}
+	}
 
 	start := time.Now()
 
@@ -418,6 +416,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav("Global", sig)
+	pageVars.GlobalMode = true
 
 	anyEnabledOpt := GetParamFromSig(sig, "AnyEnabled")
 	anyEnabled, _ := strconv.ParseBool(anyEnabledOpt)
@@ -479,19 +478,16 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 		render(w, "arbit.html", pageVars)
 		return
-	} else {
-		cookieName := "GlobalVendorsList"
-
-		filters := strings.Split(readCookie(r, cookieName), ",")
-		for _, code := range filters {
-			if !slices.Contains(blocklistVendors, code) {
-				blocklistVendors = append(blocklistVendors, code)
-			}
-		}
 	}
 
-	// Inform the render this is Global
-	pageVars.GlobalMode = true
+	cookieName := "GlobalVendorsList"
+
+	filters := strings.Split(readCookie(r, cookieName), ",")
+	for _, code := range filters {
+		if !slices.Contains(blocklistVendors, code) {
+			blocklistVendors = append(blocklistVendors, code)
+		}
+	}
 
 	start := time.Now()
 
