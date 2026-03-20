@@ -756,7 +756,7 @@
                             <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                                 <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}||{{end}}"/>
-                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load at {{$sourceKey}}"/>
                                 </noscript>
@@ -766,7 +766,7 @@
                             <form action="https://www.coolstuffinc.com/main_deckBuilder.php" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                                 <input type="hidden" name="sList" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}|{{end}}"/>
-                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load at {{$sourceKey}}"/>
                                 </noscript>
@@ -776,7 +776,7 @@
                             <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
                                 <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{uuid2tcgid .CardId}}||{{end}}"/>
-                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at TCG</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at TCG</a>
                                 <noscript>
                                     <input type="submit" value="Load at TCG"/>
                                 </noscript>
@@ -796,7 +796,7 @@
                             <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
                                 <input type="hidden" name="deck" value="{{base64enc $deck}}"/>
-                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at Manapool</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at Manapool</a>
                                 <noscript>
                                     <input type="submit" value="Load at Manapool"/>
                                 </noscript>
@@ -811,7 +811,7 @@
                                     <input type="hidden" name="{{$sourceKey}}RetailhashesQtys" value="{{.Quantity}}"/>
                                     <input type="hidden" name="{{$sourceKey}}RetailhashesCond" value="{{.Condition}}"/>
                                 {{end}}
-                                <a class="btn warning" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load at {{$sourceKey}}"/>
                                 </noscript>
@@ -831,7 +831,7 @@
                                         {}
                                     ]}'/>
                                 <input type="hidden" name="partner" value="{{load_partner $scraperKey}}"/>
-                                <a class="btn warning" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}blhashes").submit();'>Load buylist at {{$scraperKey}}</a>
+                                <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}blhashes").submit();'>Load buylist at {{$scraperKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load buylist at {{$scraperKey}}"/>
                                 </noscript>
@@ -846,7 +846,7 @@
                                     <input type="hidden" name="{{$scraperKey}}hashes" value="{{.CardId}}"/>
                                     <input type="hidden" name="{{$scraperKey}}hashesQtys" value="{{.Quantity}}"/>
                                 {{end}}
-                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}hashes").submit();'>Download {{$scraperKey}} CSV</a>
+                                <a class="opt-btn csv" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}hashes").submit();'>Download {{$scraperKey}} CSV</a>
                                 <noscript>
                                     <input type="submit" value="Download {{$scraperKey}} CSV"/>
                                 </noscript>
@@ -860,7 +860,7 @@
                                 <input type="hidden" name="TCGhashesQtys" value="-{{.Quantity}}"/>
                                 <input type="hidden" name="TCGhashesCond" value="{{.Condition}}"/>
                             {{end}}
-                            Remove from:<a class="btn danger" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();'>TCGplayer CSV</a>
+                            <a class="opt-btn remove" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();'>Remove from TCG CSV</a>
                             <noscript>
                                 <input type="submit" value="TCGplayer CSV"/>
                             </noscript>
