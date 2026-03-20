@@ -383,7 +383,11 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 
 	printings := ""
 	if genPrints {
-		printings = genPrintings(co)
+		if co.Sealed {
+			printings = genSealedPrintings(co)
+		} else {
+			printings = genCardPrintings(co)
+		}
 	}
 
 	var canBoosterGen bool
@@ -505,7 +509,7 @@ func genQuery(co *mtgmatcher.CardObject) string {
 	return query
 }
 
-func genPrintings(co *mtgmatcher.CardObject) string {
+func genCardPrintings(co *mtgmatcher.CardObject) string {
 	printings := ""
 	// Hack to generate HTML in the template
 	for i, setCode := range co.Printings {
@@ -537,32 +541,33 @@ func genPrintings(co *mtgmatcher.CardObject) string {
 		// Make sure not to capture the 2X2 set code
 		printings = strings.Replace(printings, "ss-2x\"", "ss-1x\"", -1)
 	}
+	return printings
+}
 
-	if co.Sealed {
-		// The first chunk is always present, even for foil-only sets
-		printings = "<h6>Set Value</h6><table class='setValue'>"
+func genSealedPrintings(co *mtgmatcher.CardObject) string {
+	// The first chunk is always present, even for foil-only sets
+	printings := "<h6>Set Value</h6><table class='setValue'>"
+
+	for i, title := range ProductTitles {
+		entries, found := Infos[ProductKeys[i]][co.SetCode]
+		if found {
+			printings += fmt.Sprintf("<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
+		}
+	}
+	printings += "</table>"
+
+	// The second chunk is optional, check for the first key
+	if len(Infos[ProductFoilKeys[0]][co.SetCode]) > 0 {
+		printings += "<br>"
+		printings += "<h6>Foil Set Value</h6><table class='setValue'>"
 
 		for i, title := range ProductTitles {
-			entries, found := Infos[ProductKeys[i]][co.SetCode]
+			entries, found := Infos[ProductFoilKeys[i]][co.SetCode]
 			if found {
 				printings += fmt.Sprintf("<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
 			}
 		}
 		printings += "</table>"
-
-		// The second chunk is optional, check for the first key
-		if len(Infos[ProductFoilKeys[0]][co.SetCode]) > 0 {
-			printings += "<br>"
-			printings += "<h6>Foil Set Value</h6><table class='setValue'>"
-
-			for i, title := range ProductTitles {
-				entries, found := Infos[ProductFoilKeys[i]][co.SetCode]
-				if found {
-					printings += fmt.Sprintf("<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
-				}
-			}
-			printings += "</table>"
-		}
 	}
 	return printings
 }
