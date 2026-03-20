@@ -651,6 +651,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if pageVars.Metadata[data.CardId].SypList {
 			pageVars.HasSypList = true
 		}
+
+		// Load metadata for alternative printings (used by pick-printing picker)
+		for _, alias := range data.PossibleAliases {
+			if _, exists := pageVars.Metadata[alias]; !exists {
+				pageVars.Metadata[alias] = uuid2card(alias, true, false, preferFlavor)
+			}
+		}
 	}
 
 	var highestTotal float64
