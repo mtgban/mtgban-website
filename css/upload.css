@@ -867,6 +867,43 @@
 .sum-card .s-total.idx { color: var(--ainfo); }
 .sum-card .s-detail { font-size: var(--text-sm); color: var(--text-dim); }
 
+/* ── Error and alias picker ── */
+.ures-error-row { opacity: 0.5; }
+.ures-not-found { color: var(--adanger); font-style: italic; }
+.ures-reload-bar {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--surface-1);
+    border: 1px solid rgba(63,185,80,0.3);
+    border-radius: var(--radius-md);
+    font-size: var(--text-md);
+    color: var(--activetext);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.ures-reload-bar span { font-weight: 700; color: var(--asuccess); }
+
+.ures-fixed-row { background: rgba(63,185,80,0.08) !important; }
+
+.ures-alias-picker {
+    display: block;
+    margin-top: 2px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--surface-3);
+    border: 1px solid var(--border-moderate);
+    color: var(--activetext);
+    font-size: var(--text-sm);
+    font-family: inherit;
+    max-width: 200px;
+    cursor: pointer;
+}
+
 /* ── Upload results responsive ── */
 @media (max-width: 900px) {
     .ures-wrap { overflow-x: auto; }

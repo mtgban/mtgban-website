@@ -676,15 +676,45 @@
                 <tbody>
                     {{range .UploadEntries}}
                         {{$cardId := .CardId}}
+                        {{if .MismatchError}}
+                        <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}">
+                            <td>
+                                <div class="ures-card-cell">
+                                    <img src="https://cards.scryfall.io/back.png" loading="lazy">
+                                    <div class="ures-card-info">
+                                        <span class="ures-card-name"><a href="/search?q={{.Card.Name}}" target="_blank">{{.Card.Name}}</a></span>
+                                        <span class="ures-card-set ures-not-found">Not found</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
+                            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
+                            <td style="text-align:center">{{.Quantity}}</td>
+                            {{range $.ScraperKeys}}<td class="ures-price no-data">&mdash;</td>{{end}}
+                            <td></td>
+                        </tr>
+                        {{else}}
                         {{$card := (index $.Metadata .CardId)}}
                         {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
-                        <tr {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}>
+                        <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
+                            {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}>
                             <td>
                                 <div class="ures-card-cell">
                                     <img src="{{$card.ImageURL}}" loading="lazy">
                                     <div class="ures-card-info">
                                         <span class="ures-card-name"><a href="{{$card.SearchURL}}">{{$card.Name}}</a></span>
                                         <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
+                                        {{if .MismatchAlias}}
+                                        <select class="ures-alias-picker" data-hash="{{.CardId}}" onchange="updateRowHash(this)">
+                                            <option value="{{.CardId}}" selected>{{$card.Edition}} #{{$card.Number}}</option>
+                                            {{range .PossibleAliases}}
+                                                {{if ne . $cardId}}
+                                                    {{$alt := (index $.Metadata .)}}
+                                                    <option value="{{.}}">{{$alt.Edition}} #{{$alt.Number}}</option>
+                                                {{end}}
+                                            {{end}}
+                                        </select>
+                                        {{end}}
                                     </div>
                                 </div>
                             </td>
@@ -710,6 +740,7 @@
                                 </div>
                             </td>
                         </tr>
+                        {{end}}{{/* closes {{else}} for MismatchError */}}
                     {{end}}
                 </tbody>
             </table>
@@ -923,6 +954,59 @@
         document.getElementById('panel-' + panel).classList.add('active');
         document.querySelectorAll('.res-tab').forEach(function(t) { t.classList.remove('on'); });
         btn.classList.add('on');
+    }
+    </script>
+
+    <!-- Hidden form for pick-printing re-submission -->
+    <form id="upload_form" action="/upload" method="post" style="display:none">
+        <input type="hidden" name="mode" value="{{if .IsBuylist}}true{{else}}false{{end}}">
+    </form>
+
+    <!-- Reload button (hidden until a pick is made) -->
+    <div id="reload-bar" class="ures-reload-bar" style="display:none">
+        <span id="reload-count">0</span> printing(s) updated
+        <button class="opt-btn load" onclick="document.getElementById('upload_form').submit()">Reload with fixes</button>
+    </div>
+
+    <script>
+    var pendingFixes = 0;
+
+    function updateRowHash(select) {
+        var form = document.getElementById("upload_form");
+        var newHash = select.value;
+        var oldHash = select.dataset.hash;
+
+        // On first pick, load all card data into hidden form
+        if (form.querySelectorAll('input[name="hashes"]').length === 0) {
+            form.removeAttribute("enctype");
+            document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
+                var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
+                pairs.forEach(function(pair) {
+                    var input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = pair[1];
+                    if (pair[0] === 'hash') input.id = "row-" + row.dataset[pair[0]];
+                    input.value = row.dataset[pair[0]];
+                    form.appendChild(input);
+                });
+            });
+        }
+
+        // Swap the hash
+        var input = document.getElementById("row-" + oldHash);
+        if (input) {
+            input.value = newHash;
+            select.dataset.hash = newHash;
+        }
+
+        // Mark the row as fixed
+        select.closest('tr').classList.add('ures-fixed-row');
+        select.closest('tr').style.backgroundColor = '';
+
+        // Track the fix and show reload bar
+        pendingFixes++;
+        document.getElementById('reload-count').textContent = pendingFixes;
+        document.getElementById('reload-bar').style.display = 'flex';
     }
     </script>
 
