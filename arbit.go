@@ -386,7 +386,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 		}
 		pageVars.VendorKeys = vendorKeys
 
-		render(w, "arbit_options.html", pageVars)
+		render(w, "arbit.html", pageVars)
 		return
 	} else {
 		cookieName := "ArbitVendorsList"
@@ -477,7 +477,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.VendorKeys = vendorKeys
 
-		render(w, "arbit_options.html", pageVars)
+		render(w, "arbit.html", pageVars)
 		return
 	} else {
 		cookieName := "GlobalVendorsList"
@@ -587,7 +587,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		pageVars.Title = "Errors have been made"
 		pageVars.ErrorMessage = message
 
-		render(w, "arbit_landing.html", pageVars)
+		render(w, "arbit.html", pageVars)
 		return
 	}
 
@@ -652,7 +652,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			pageVars.InfoMessage = "Increase your tier to discover more cards and more markets!"
 		}
 
-		render(w, "arbit_landing.html", pageVars)
+		render(w, "arbit.html", pageVars)
 		return
 	}
 
@@ -940,5 +940,5 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		pageVars.Title += source.Info().Name
 	}
 
-	render(w, "arbit_results.html", pageVars)
+	render(w, "arbit.html", pageVars)
 }

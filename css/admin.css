@@ -1,8 +1,6 @@
 /* ── Page Layout ── */
 .admin-page {
-    max-width: 80vw;
-    margin: 0 auto;
-    padding: calc(48px + 24px) 28px 80px;
+    padding: calc(48px + 24px) 0 80px;
 }
 .admin-page > h1 {
     font-size: var(--text-8xl);
@@ -145,9 +143,7 @@
     vertical-align: middle;
     white-space: nowrap;
 }
-.admin-table tbody tr:nth-child(even) { background: var(--row-even); }
-.admin-table tbody tr:nth-child(odd) { background: var(--row-odd); }
-.admin-table tbody tr:hover { background: var(--row-hover); }
+/* Row stripes provided by .table-data in main.css */
 .admin-table a {
     color: var(--ainfo);
     text-decoration: none;
@@ -185,9 +181,6 @@
     gap: 16px;
 }
 .tools-card {
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
     padding: 22px;
 }
 .tools-card h3 {

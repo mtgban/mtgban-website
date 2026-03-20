@@ -3,8 +3,10 @@
 {{end}}
 
 {{define "content"}}
-<div class="admin-page">
-    <h1>Admin</h1>
+<div class="page-standard admin-page">
+    <div class="page-header">
+        <h1>Admin</h1>
+    </div>
 
     {{if ne .InfoMessage ""}}
         {{if .SelectableField}}
@@ -53,7 +55,7 @@
                 <span class="count">{{len (index .Tables 0)}} providers</span>
             </div>
             <div class="admin-table-wrap">
-            <table class="admin-table">
+            <table class="table-data admin-table">
                 <thead><tr>
                     <th>Name</th><th>Id</th><th>Tag</th>
                     <th>Last Update</th><th>Entries</th>
@@ -84,7 +86,7 @@
                 <span class="count">{{len (index .Tables 1)}} providers</span>
             </div>
             <div class="admin-table-wrap">
-            <table class="admin-table">
+            <table class="table-data admin-table">
                 <thead><tr>
                     <th>Name</th><th>Id</th><th>Tag</th>
                     <th>Last Update</th><th>Entries</th>
@@ -112,7 +114,7 @@
         <div class="admin-section">
             <div class="admin-section-header"><h2>Registered Pages</h2></div>
             <div class="admin-table-wrap">
-            <table class="admin-table">
+            <table class="table-data admin-table">
                 <thead><tr><th>Icon</th><th>Name</th><th>Logs</th><th>Link</th><th>Template</th></tr></thead>
                 <tbody>
                 {{range $row := index .Tables 2}}
@@ -144,7 +146,7 @@
                     <span class="count">{{len (index .Tables 3)}} users</span>
                 </div>
                 <div class="admin-table-wrap">
-                <table class="admin-table">
+                <table class="table-data admin-table">
                     <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th></tr></thead>
                     <tbody>
                     {{range $row := index .Tables 3}}
@@ -169,7 +171,7 @@
                     <span class="count">{{len (index .Tables 4)}} keys</span>
                 </div>
                 <div class="admin-table-wrap">
-                <table class="admin-table">
+                <table class="table-data admin-table">
                     <thead><tr><th>#</th><th>Email</th></tr></thead>
                     <tbody>
                     {{range $row := index .Tables 4}}
@@ -222,7 +224,7 @@
     <div class="admin-panel{{if eq .Page "tools"}} active{{end}}" id="panel-tools">
         <div class="tools-grid">
             <!-- Server Actions -->
-            <div class="tools-card">
+            <div class="card tools-card">
                 <h3>Server Actions</h3>
                 <div class="admin-action-list">
                     <a class="admin-action" href="?reboot=datastore" onclick="return confirm('Reload datastore?')">
@@ -258,7 +260,7 @@
             </div>
 
             <!-- Admin Tools -->
-            <div class="tools-card">
+            <div class="card tools-card">
                 <h3>Admin Tools</h3>
 
                 <div class="admin-tool">
