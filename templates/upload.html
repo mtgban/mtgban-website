@@ -4,6 +4,19 @@
 {{end}}
 
 {{define "content"}}
+    {{if .UploadEntries}}
+        <div class="page-standard">
+            <a class="back-link" href="/upload">&larr; Back to Uploader</a>
+            <div class="page-header">
+                <div>
+                    <h1>Results{{if and .SearchQuery (not (eq .SearchQuery "hashes"))}} from {{.SearchQuery}}{{end}}</h1>
+                    <p class="page-subtitle">{{len .UploadEntries}} cards matched &middot; {{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode</p>
+                </div>
+            </div>
+
+            {{template "upload-results" .}}
+        </div>
+    {{else}}
         <div class="upload-layout">
             <div class="upload-form-panel">
                 <div class="page-header">
@@ -578,495 +591,340 @@
                 }
             </script>
 
-            <div class="indent sticky">
-                {{if and .SearchQuery (not (eq .SearchQuery "hashes"))}}
-                    <h2 >Results from {{.SearchQuery}}</h2>
-                    <br>
+        {{end}}
+
+    <br>
+    <br>
+    {{end}}
+{{end}}
+
+{{define "upload-results"}}
+    <!-- Summary banner -->
+    <div class="res-summary">
+        <div class="res-summary-stat">
+            <span class="label">Cards</span>
+            <span class="val">{{.TotalQuantity}}</span>
+        </div>
+        {{range .ScraperKeys}}
+            <div class="res-summary-stat">
+                <span class="label">{{scraper_name .}}</span>
+                <span class="val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+                {{$missing := (index $.MissingCounts .)}}
+                {{if ne $missing 0}}
+                    <span class="label">{{$missing}} missing</span>
                 {{end}}
-                <table class="searchResults" >
-                    {{range $.UploadEntries}}
-                        {{$qty := .Quantity}}
-                        {{$card := (index $.Metadata .CardId)}}
-                        <tr class="no-hover"
-                            {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}
-                            data-hash="{{.CardId}}"
-                            data-qtys="{{.Quantity}}"
-                            data-cond="{{.OriginalCondition}}"
-                            data-price="{{.OriginalPrice}}">
-                            <td class="upload-card-cell" rowspan=2>
-                                    {{if .MismatchError}}
-                                        <a href="/search?q={{.Card.Name}}" target="_blank">
-                                            <img src="https://cards.scryfall.io/back.png" width="87" height="122">
-                                        </a>
-                                    {{else}}
-                                        <a href="{{$card.SearchURL}}" target="_blank">
-                                            <img loading="lazy" src="{{$card.ImageURL}}" width="87" height="122">
-                                        </a>
-                                    {{end}}
-                            </td>
-                            <td>
-                                <table class="upload-info-table">
-                                    <tr>
-                                    {{if .MismatchError}}
-                                        <td class=fullAnchor>
-                                            <a class="btn default" href="/search?q={{.Card.Name}}" target="_blank">
-                                                <i class="ss ss-1x"></i>
-                                                {{if .Card.Name}}
-                                                    <b>Unable to find</b> {{.Card.Name}} {{if .Card.Variation}}({{.Card.Variation}}){{end}} <b>in</b> {{.Card.Edition}}
-                                                {{else}}
-                                                    <b>Unable to parse one entry from your list</b>
-                                                {{end}}
-                                                <h6>{{.MismatchError}}</h6>
-                                            </a>
-                                        </td>
-                                    {{else}}
-                                        <td class="fullAnchor" width="{{if .OriginalPrice}}80%{{else}}100%{{end}}">
-                                            <a class="btn default" href="{{$card.SearchURL}}" target="_blank">
-                                                <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i>
-                                                <b lang="{{$card.LangTag}}">{{$card.Name}}</b>
-                                                {{if ne $card.Variant ""}}
-                                                    <i>({{$card.Variant}})</i>
-                                                {{end}}
-                                                {{if $card.Reserved}}
-                                                    *
-                                                {{end}}
-                                                {{if $card.Stocks}}
-                                                    •
-                                                {{end}}
-                                                {{if $card.SypList}}
-                                                    †
-                                                {{end}}
-                                                <h6>
-                                                    {{$card.Title}}
-                                                    {{if .MismatchAlias}}
-                                                        (?)
-                                                    {{end}}
-                                                </h6>
-                                            </a>
-                                        </td>
-                                        {{if .MismatchAlias}}
-                                            <td>
-                                                <form>
-                                                    <select data-hash="{{.CardId}}" class="select-css" style="width: auto; line-height: inherit;" onchange="javascript:updateRowHash(event); return false;">
-                                                        <option selected disabled>&nbsp;Pick printing</option>
-                                                        {{range .PossibleAliases}}
-                                                            <option value={{.}}>&nbsp;{{uuid2edition .}}&nbsp;</option>
-                                                        {{end}}
-                                                    </select>
-                                                </form>
-                                            </td>
-                                        {{end}}
-                                        <td width=100%>
-                                        {{if .OriginalPrice}}
-                                            <h6>
-                                                <nobr>Your price: $ {{printf "%.2f" .OriginalPrice}}</nobr>
-                                            </h6>
-                                        {{end}}
-                                        {{if .OriginalCondition}}
-                                            <h6>
-                                                <nobr>Condition: {{.OriginalCondition}}</nobr>
-                                            </h6>
-                                        {{end}}
-                                        {{if .HasQuantity}}
-                                             <h6>
-                                                 <nobr>Quantity: {{.Quantity}}</nobr>
-                                            </h6>
-                                        {{end}}
-                                        </td>
-                                        <td width=100%>
-                                            <span class="emoji">
-                                                <a href="/search?chart={{.CardId}}" title="See historical data" target="_blank">📊</a>
-                                            </span>
-                                        </td>
-                                    {{end}}
-                                    </tr>
-                                </table>
-                            </td>
-                            <td class="upload-index-cell" rowspan=2>
-                                {{$cardId := .CardId}}
-                                {{$ogCardId := .CardId}}
-                                {{$conds := ""}}
-                                {{$ogConds := .OriginalCondition}}
-                                <b>Index overview</b>
-                                <br>
-                                {{range $.IndexKeys}}
-                                    {{$indexName := .}}
-                                    {{if eq $indexName "TCGDirect"}}
-                                        {{$cardId = (print $cardId $ogConds)}}
-                                    {{end}}
-                                    {{$indexEntries := (index $.ResultPrices $cardId)}}
+            </div>
+        {{end}}
+        {{range .IndexKeys}}
+            <div class="res-summary-stat">
+                <span class="label">{{scraper_name .}}</span>
+                <span class="val blue">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+            </div>
+        {{end}}
+        {{if .Optimized}}
+        <div class="res-summary-stat">
+            <span class="label">Optimizer Max</span>
+            <span class="val green">$ {{printf "%.2f" .HighestTotal}}</span>
+        </div>
+        {{end}}
+    </div>
 
-                                    {{$price := (index $indexEntries $indexName)}}
-                                    {{if and (not $price) (eq $indexName "TCGDirect")}}
-                                        {{$indexName = "TCGDirectLow"}}
-                                        {{$indexEntries = (index $.ResultPrices $ogCardId)}}
-                                        {{$price = (index $indexEntries $indexName)}}
-                                    {{end}}
+    <!-- Tabs -->
+    <div class="res-tabs">
+        <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
+        {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
+    </div>
 
-                                    <nobr>
-                                        <a class="btn normal" {{if $price}}href="https://mtgban.com/go/{{.}}/{{$ogCardId}}"{{end}} target="_blank">
-                                            {{$indexName}}:
-                                        </a>
-                                        {{if not $price}}
-                                            n/a
-                                        {{else}}
-                                            $ {{printf "%.2f" $price}}
-                                            {{if gt $qty 1}}
-                                                (⇨ $ {{printf "%.2f" (mul $price $qty)}})
-                                            {{end}}
-                                        {{end}}
-                                    </nobr>
-                                    <br>
+    <!-- Tab: Results -->
+    <div class="res-panel active" id="panel-results">
+        <div class="ures-wrap">
+            <table class="ures-table">
+                <thead>
+                    <tr>
+                        <th style="width:280px;">Card</th>
+                        <th class="r">Your Price</th>
+                        <th class="c">Cond</th>
+                        <th class="c">Qty</th>
+                        {{range .ScraperKeys}}
+                            <th class="r">{{scraper_name .}}</th>
+                        {{end}}
+                        <th>Index</th>
+                    </tr>
+                    <tr class="ures-totals-row">
+                        <td><span class="ures-totals-label">Totals ({{.TotalQuantity}} cards)</span></td>
+                        <td></td>
+                        <td></td>
+                        <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.TotalQuantity}}</td>
+                        {{range .ScraperKeys}}
+                            <td class="ures-price" style="font-weight:700">
+                                $ {{printf "%.2f" (index $.TotalEntries .)}}
+                                {{$missing := (index $.MissingCounts .)}}
+                                {{if ne $missing 0}}
+                                    <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $.MissingPrices .)}}</div>
                                 {{end}}
-                                <hr>
                             </td>
-                        </tr>
-                        <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}>
+                        {{end}}
+                        <td>
+                            <div class="ures-index" style="font-weight:600">
+                                {{range .IndexKeys}}
+                                    <span><span class="idx-label">{{scraper_name .}}</span> $ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+                                {{end}}
+                            </div>
+                        </td>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .UploadEntries}}
+                        {{$cardId := .CardId}}
+                        {{$card := (index $.Metadata .CardId)}}
+                        {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
+                        <tr {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}>
                             <td>
-                                <table class="upload-price-grid">
-                                    <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--antialiasing)"{{end}}>
-                                        {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
-                                        {{$cardId := .CardId}}
-                                        {{$oPrice := .OriginalPrice}}
-                                        {{range $.ScraperKeys}}
-                                            {{$price := (index $scraperEntries .)}}
-                                            <td class="fullAnchor">
-                                                <a class="btn {{if $price}}{{if and $.IsBuylist (and (ne $oPrice 0.0) (lt $oPrice $price))}}success{{else}}normal{{end}}{{else}}default{{end}}" {{if $price}}href="https://mtgban.com/go/{{if $.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}"{{end}} target="_blank">
-                                                    {{scraper_name .}}
-                                                </a>
-                                            </td>
-                                        {{end}}
-                                    </tr>
-                                    <tr class="no-hover" {{if .MismatchAlias}}style="background-color:var(--antialiasing)"{{end}}>
-                                        {{range $.ScraperKeys}}
-                                            {{$price := (index $scraperEntries .)}}
-                                            <td>
-                                                <h4>
-                                                    {{if not $price}}
-                                                        -
-                                                    {{else}}
-                                                        <nobr>$ {{printf "%.2f" $price}}</nobr>
-                                                    {{end}}
-                                                </h4>
-                                            </td>
-                                        {{end}}
-                                    </tr>
-                                </table>
+                                <div class="ures-card-cell">
+                                    <img src="{{$card.ImageURL}}" loading="lazy">
+                                    <div class="ures-card-info">
+                                        <span class="ures-card-name"><a href="{{$card.SearchURL}}">{{$card.Name}}</a></span>
+                                        <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
+                            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
+                            <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
+                            {{range $.ScraperKeys}}
+                                {{$price := (index $scraperEntries .)}}
+                                <td class="ures-price {{if and (ne $price 0.0) (is_best_price $scraperEntries . $.ScraperKeys $.IsBuylist)}}best{{end}}">
+                                    {{if ne $price 0.0}}
+                                        <a href="https://mtgban.com/go/{{if $.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
+                                    {{else}}
+                                        &mdash;
+                                    {{end}}
+                                </td>
+                            {{end}}
+                            <td>
+                                <div class="ures-index">
+                                    {{range $.IndexKeys}}
+                                        {{$idxPrice := (index $scraperEntries .)}}
+                                        <span><span class="idx-label">{{scraper_name .}}</span> {{if ne $idxPrice 0.0}}$ {{printf "%.2f" $idxPrice}}{{else}}&mdash;{{end}}</span>
+                                    {{end}}
+                                </div>
                             </td>
                         </tr>
                     {{end}}
-                    <tr class="no-hover upload-totals-row">
-                        <td class="upload-totals-cell">
-                                <h3>Totals</h3>
-                                <h6>Matches: {{len .ResultPrices}}/{{len .UploadEntries}}</h6>
-                                <h6>
-                                    {{if ne .TotalQuantity 0}}
-                                        Count: {{.TotalQuantity}}
-                                    {{else}}
-                                        &nbsp;
-                                    {{end}}
-                                </h6>
-                                <br>
-                                <h6>
-                                    No {{if $.IsBuylist}}buylist{{else}}retail{{end}} /<br>Alt. Estimate
-                                </h6>
-                        </td>
-                        <td>
-                            <br>
-                            <table class="upload-totals-table">
-                                <tr class="no-hover">
-                                    {{range $.ScraperKeys}}
-                                        {{$entry := (index $.TotalEntries .)}}
-                                        <td class="fullAnchor">
-                                            <a class="btn default">
-                                                {{scraper_name .}}
-                                            </a>
-                                        </td>
-                                    {{end}}
-                                </tr>
-                                <tr class="no-hover">
-                                    {{range $.ScraperKeys}}
-                                        {{$price := (index $.TotalEntries .)}}
-                                        <td>
-                                            <h4>
-                                                {{if eq $price 0.0}}
-                                                    -
-                                                {{else}}
-                                                    <nobr>$ {{printf "%.2f" $price}}</nobr>
-                                                {{end}}
-                                            </h4>
-                                        </td>
-                                    {{end}}
-                                </tr>
-                                <tr class="no-hover">
-                                    {{range $.ScraperKeys}}
-                                        {{$price := (index $.MissingPrices .)}}
-                                        {{$count := (index $.MissingCounts .)}}
-                                        <td>
-                                            <h6>
-                                                {{if $count}}
-                                                    {{$count}} / $ {{printf "%.2f" $price}}
-                                                {{else}}
-                                                -
-                                                {{end}}
-                                            </h6>
-                                        </td>
-                                    {{end}}
-                                </tr>
-                            </table>
-                            <br>
-                        </td>
-                        <td>
-                            <b>Index totals</b>
-                            {{range $.IndexKeys}}
-                                <br>
-                                <a class="btn info">{{scraper_name .}}:</a>
-                                {{$price := (index $.TotalEntries .)}}
-                                {{if $price}}
-                                    <nobr>$ {{printf "%.2f" $price}}</nobr>
-                                    {{else}}
-                                    N/A
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tab: Optimizer -->
+    {{if .Optimized}}
+    <div class="res-panel" id="panel-optimizer">
+        <img id="hoverImage" class="hoverImage" src=""/>
+        <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
+        <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
+
+        <p class="opt-intro">{{len .Optimized}} store splits for a theoretical maximum of <strong>$ {{printf "%.2f" .HighestTotal}}</strong></p>
+
+        <div class="opt-toc">
+            {{range .ScraperKeys}}
+                {{$entries := index $.Optimized .}}
+                {{if $entries}}
+                    {{$total := index $.OptimizedTotals .}}
+                    <a class="opt-toc-item" href="#opt-{{.}}">
+                        <span class="toc-store">{{scraper_name .}}</span>
+                        <span class="toc-stats">{{len $entries}} cards</span>
+                        <span class="toc-total">$ {{printf "%.2f" $total}}</span>
+                    </a>
+                {{end}}
+            {{end}}
+        </div>
+
+        {{range .ScraperKeys}}
+            {{$scraperKey := .}}
+            {{$sourceKey := .}}
+            {{$entries := index $.Optimized .}}
+            {{if $entries}}
+                {{$total := index $.OptimizedTotals .}}
+                <div class="opt-store" id="opt-{{.}}">
+                    <div class="opt-store-header">
+                        <h3>{{scraper_name .}}</h3>
+                        <span class="opt-count">{{len $entries}} cards</span>
+                        <span class="opt-total">$ {{printf "%.2f" $total}}</span>
+                    </div>
+                    <div class="opt-actions">
+                        {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
+                            <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
+                                <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
+                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}||{{end}}"/>
+                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
+                                <noscript>
+                                    <input type="submit" value="Load at {{$sourceKey}}"/>
+                                </noscript>
+                            </form>
+                        {{end}}
+                        {{if and (not $.IsBuylist) (eq $sourceKey "CSI")}}
+                            <form action="https://www.coolstuffinc.com/main_deckBuilder.php" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
+                                <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
+                                <input type="hidden" name="sList" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}|{{end}}"/>
+                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
+                                <noscript>
+                                    <input type="submit" value="Load at {{$sourceKey}}"/>
+                                </noscript>
+                            </form>
+                        {{end}}
+                        {{if and (not $.IsBuylist) (has_prefix $sourceKey "TCG")}}
+                            <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
+                                <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
+                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{uuid2tcgid .CardId}}||{{end}}"/>
+                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at TCG</a>
+                                <noscript>
+                                    <input type="submit" value="Load at TCG"/>
+                                </noscript>
+                            </form>
+                        {{end}}
+                        {{if and (not $.IsBuylist) (eq $sourceKey "MP")}}
+                            {{$deck := ""}}
+                            {{range $entries}}
+                                {{$card := (index $.Metadata .CardId)}}
+                                {{$entry := printf "%d %s [%s] %s" .Quantity $card.Name $card.SetCode $card.Number}}
+                                {{if eq $deck ""}}
+                                    {{$deck = $entry}}
+                                {{else}}
+                                    {{$deck = printf "%s\n%s" $deck $entry}}
                                 {{end}}
                             {{end}}
-                            <hr>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-
-            {{if .Optimized}}
-                <div style="clear:both;"></div>
-
-                <hr style="margin-left:20px;" width=58%> <br>
-
-                <img id="hoverImage" class="hoverImage" src=""/>
-                <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
-                <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
-
-                <div class="indent sticky">
-                    <span class="anchor" id="top"></span>
-                    <h2>Upload Optimizer</h2>
-                    <br>
-                    <p>
-                    {{len .Optimized}} different {{if $.IsBuylist}}buylists{{else}}results{{end}} for a theoretical maximum of $ {{printf "%.2f" .HighestTotal}}
-                    </p>
-                    <p>
-                        {{range .ScraperKeys}}
-                            {{$scraperKey := .}}
-                            {{$entries := index $.Optimized $scraperKey}}
-                            {{$factor := credit_factor $scraperKey}}
-                            {{$total := index $.OptimizedTotals $scraperKey}}
-                            {{if $entries}}
-                                <a class="btn default" href="#{{$scraperKey}}-opt">
-                                    {{len $entries}} cards {{if $.IsBuylist}}to{{else}}at{{end}} <b>{{scraper_name $scraperKey}}</b>: $ {{printf "%.2f" $total}}
-                                    {{if and $.CanFilterByPrice $factor}}
-                                        {{$credit := mulf $total $factor}}
-                                        ($ {{printf "%.2f" $credit}} in credit)
-                                    {{end}}
-                                </a>
-                                <br>
-                            {{end}}
+                            <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
+                                <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
+                                <input type="hidden" name="deck" value="{{base64enc $deck}}"/>
+                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at Manapool</a>
+                                <noscript>
+                                    <input type="submit" value="Load at Manapool"/>
+                                </noscript>
+                            </form>
                         {{end}}
-                    </p>
+                        {{if and (not $.IsBuylist) (eq $sourceKey "SCG")}}
+                            <form action="/upload" method="post" id="{{$scraperKey}}{{$sourceKey}}hashes" style="display: inline;" target="_blank">
+                                <input type="hidden" name="tag" value="{{$sourceKey}}Retail"/>
+                                <input type="hidden" name="mode" value="false"/>
+                                {{range $entries}}
+                                    <input type="hidden" name="{{$sourceKey}}Retailhashes" value="{{.CardId}}"/>
+                                    <input type="hidden" name="{{$sourceKey}}RetailhashesQtys" value="{{.Quantity}}"/>
+                                    <input type="hidden" name="{{$sourceKey}}RetailhashesCond" value="{{.Condition}}"/>
+                                {{end}}
+                                <a class="btn warning" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
+                                <noscript>
+                                    <input type="submit" value="Load at {{$sourceKey}}"/>
+                                </noscript>
+                            </form>
+                        {{end}}
 
-                    <table>
-                        {{range .ScraperKeys}}
-                            {{$scraperKey := .}}
-                            {{$entries := index $.Optimized $scraperKey}}
-                            {{if $entries}}
-                                <tr>
-                                    <span class="anchor" id="{{$scraperKey}}-opt"></span>
-                                    <a class="btn default" href="#top">
-                                        <b>{{scraper_name $scraperKey}}</b> - $ {{printf "%.2f" (index $.OptimizedTotals $scraperKey)}}
-                                    </a>
-
-                                    {{$sourceKey := $scraperKey}}
-                                    {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
-                                        <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
-                                            <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                            <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}||{{end}}"/>
-                                            <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
-                                            <noscript>
-                                                <input type="submit" value="Load at {{$sourceKey}}"/>
-                                            </noscript>
-                                        </form>
-                                    {{end}}
-                                    {{if and (not $.IsBuylist) (eq $sourceKey "CSI")}}
-                                        <form action="https://www.coolstuffinc.com/main_deckBuilder.php" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
-                                            <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                            <input type="hidden" name="sList" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}|{{end}}"/>
-                                            <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
-                                            <noscript>
-                                                <input type="submit" value="Load at {{$sourceKey}}"/>
-                                            </noscript>
-                                        </form>
-                                    {{end}}
-                                    {{if and (not $.IsBuylist) (has_prefix $sourceKey "TCG")}}
-                                        <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
-                                            <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
-                                            <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{uuid2tcgid .CardId}}||{{end}}"/>
-                                            <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at TCG</a>
-                                            <noscript>
-                                                <input type="submit" value="Load at TCG"/>
-                                            </noscript>
-                                        </form>
-                                    {{end}}
-                                    {{if and (not $.IsBuylist) (eq $sourceKey "MP")}}
-                                        {{$deck := ""}}
+                        {{if and $.IsBuylist (eq $scraperKey "CK")}}
+                            <form action="https://www.cardkingdom.com/sellcart/partner_import" method="post" id="{{$scraperKey}}blhashes" style="display: inline;" target="_blank">
+                                <input type="hidden" name="json" value='
+                                    {"contents": [
                                         {{range $entries}}
-                                            {{$card := (index $.Metadata .CardId)}}
-                                            {{$entry := printf "%d %s [%s] %s" .Quantity $card.Name $card.SetCode $card.Number}}
-                                            {{if eq $deck ""}}
-                                                {{$deck = $entry}}
-                                            {{else}}
-                                                {{$deck = printf "%s\n%s" $deck $entry}}
-                                            {{end}}
+                                        {
+                                           "id": {{uuid2ckid .CardId}},
+                                            "qty": {{.Quantity}}
+                                        },
                                         {{end}}
-                                        <form action="https://manapool.com/add-deck" method="get" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
-                                            <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                            <input type="hidden" name="deck" value="{{base64enc $deck}}"/>
-                                            <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at Manapool</a>
-                                            <noscript>
-                                                <input type="submit" value="Load at Manapool"/>
-                                            </noscript>
-                                        </form>
-                                    {{end}}
-                                    {{if and (not $.IsBuylist) (eq $sourceKey "SCG")}}
-                                        <form action="/upload" method="post" id="{{$scraperKey}}{{$sourceKey}}hashes" style="display: inline;" target="_blank">
-                                            <input type="hidden" name="tag" value="{{$sourceKey}}Retail"/>
-                                            <input type="hidden" name="mode" value="false"/>
-                                            {{range $entries}}
-                                                <input type="hidden" name="{{$sourceKey}}Retailhashes" value="{{.CardId}}"/>
-                                                <input type="hidden" name="{{$sourceKey}}RetailhashesQtys" value="{{.Quantity}}"/>
-                                                <input type="hidden" name="{{$sourceKey}}RetailhashesCond" value="{{.Condition}}"/>
-                                            {{end}}
-                                            <a class="btn warning" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}{{$sourceKey}}hashes").submit();'>Load at {{$sourceKey}}</a>
-                                            <noscript>
-                                                <input type="submit" value="Load at {{$sourceKey}}"/>
-                                            </noscript>
-                                        </form>
-                                    {{end}}
+                                        {}
+                                    ]}'/>
+                                <input type="hidden" name="partner" value="{{load_partner $scraperKey}}"/>
+                                <a class="btn warning" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}blhashes").submit();'>Load buylist at {{$scraperKey}}</a>
+                                <noscript>
+                                    <input type="submit" value="Load buylist at {{$scraperKey}}"/>
+                                </noscript>
+                            </form>
+                        {{end}}
 
-                                    |
+                        {{if and $.IsBuylist (or (eq $scraperKey "CK") (eq $scraperKey "SCG"))}}
+                            <form action="/upload" method="post" id="{{$scraperKey}}hashes" style="display: inline;">
+                                <input type="hidden" name="tag" value="{{$scraperKey}}"/>
+                                <input type="hidden" name="mode" value="false"/>
+                                {{range $entries}}
+                                    <input type="hidden" name="{{$scraperKey}}hashes" value="{{.CardId}}"/>
+                                    <input type="hidden" name="{{$scraperKey}}hashesQtys" value="{{.Quantity}}"/>
+                                {{end}}
+                                <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}hashes").submit();'>Download {{$scraperKey}} CSV</a>
+                                <noscript>
+                                    <input type="submit" value="Download {{$scraperKey}} CSV"/>
+                                </noscript>
+                            </form>
+                        {{end}}
 
-                                    {{if and $.IsBuylist (eq $scraperKey "CK")}}
-                                        <form action="https://www.cardkingdom.com/sellcart/partner_import" method="post" id="{{$scraperKey}}blhashes" style="display: inline;" target="_blank">
-                                            <input type="hidden" name="json" value='
-                                                {"contents": [
-                                                    {{range $entries}}
-                                                    {
-                                                       "id": {{uuid2ckid .CardId}},
-                                                        "qty": {{.Quantity}}
-                                                    },
-                                                    {{end}}
-                                                    {}
-                                                ]}'/>
-                                            <input type="hidden" name="partner" value="{{load_partner $scraperKey}}"/>
-                                            <a class="btn warning" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}blhashes").submit();'>Load buylist at {{$scraperKey}}</a>
-                                            <noscript>
-                                                <input type="submit" value="Load buylist at {{$scraperKey}}"/>
-                                            </noscript>
-                                        </form>
-                                    {{end}}
-
-                                    {{if and $.IsBuylist (or (eq $scraperKey "CK") (eq $scraperKey "SCG"))}}
-                                        <form action="/upload" method="post" id="{{$scraperKey}}hashes" style="display: inline;">
-                                            <input type="hidden" name="tag" value="{{$scraperKey}}"/>
-                                            <input type="hidden" name="mode" value="false"/>
-                                            {{range $entries}}
-                                                <input type="hidden" name="{{$scraperKey}}hashes" value="{{.CardId}}"/>
-                                                <input type="hidden" name="{{$scraperKey}}hashesQtys" value="{{.Quantity}}"/>
-                                            {{end}}
-                                            <a class="btn success" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}hashes").submit();'>Download {{$scraperKey}} CSV</a>
-                                            <noscript>
-                                                <input type="submit" value="Download {{$scraperKey}} CSV"/>
-                                            </noscript>
-                                        </form>
-                                    {{end}}
-
-                                    |&nbsp;&nbsp;
-
-                                    <form action="/upload" method="post" id="TCG{{$scraperKey}}hashes" style="display: inline;">
-                                        <input type="hidden" name="tag" value="TCG"/>
-                                        {{range $entries}}
-                                            <input type="hidden" name="TCGhashes" value="{{.CardId}}"/>
-                                            <input type="hidden" name="TCGhashesQtys" value="-{{.Quantity}}"/>
-                                            <input type="hidden" name="TCGhashesCond" value="{{.Condition}}"/>
-                                        {{end}}
-                                        Remove from:<a class="btn danger" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();'>TCGplayer CSV</a>
-                                        <noscript>
-                                            <input type="submit" value="TCGplayer CSV"/>
-                                        </noscript>
-                                    </form>
-
-                                    <br>
-                                    <table onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
-                                        {{range $entries}}
-                                            {{$card := (index $.Metadata .CardId)}}
-                                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
-                                                <td>
-                                                    <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">📝</span>&nbsp;
-                                                    <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>
-                                                    {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
-                                                    {{if $card.Reserved}} *{{end}}
-                                                    {{if $card.Stocks}} •{{end}}
-                                                    {{if $card.SypList}} †{{end}}
-                                                </td>
-                                                <td>
-                                                    <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.Edition}}
-                                                </td>
-                                                <td>
-                                                    {{$card.Number}}
-                                                </td>
-                                                <td>
-                                                    {{if $card.Etched}}
-                                                        <span title="Etched">💫</span>
-                                                    {{else if $card.Foil}}
-                                                        <span title="Foil">✨</span>
-                                                    {{end}}
-                                                </td>
-                                                <td>
-                                                    {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
-                                                    {{$price := (index $scraperEntries $scraperKey)}}
-
-                                                    $
-                                                    <a href="/go/b/{{$scraperKey}}/{{.CardId}}" target="_blank">
-                                                        {{printf "%.2f" $price}}
-                                                    </a>
-                                                    {{if .Price}}
-                                                        / $
-                                                        <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">
-                                                            {{printf "%.2f" .Price}}
-                                                        </a>
-                                                        {{if and $.CanFilterByPrice (lt .VisualPrice $price)}}⚠️{{end}}
-                                                    {{end}}
-
-                                                    {{if eq $scraperKey $card.HotlistStore}}
-                                                        <span class=emoji title="Highest price in 3 months">🌟</span>
-                                                    {{end}}
-                                                </td>
-                                                <td>
-                                                    {{if .Price}}
-                                                        <h{{if gt .Spread 80.0}}3{{else}}4{{end}} style="text-align: right; display:inline">
-                                                            {{printf "%.2f%%" .Spread}}
-                                                        </h{{if gt .Spread 80.0}}3{{else}}4{{end}}>
-                                                    {{end}}
-                                                    {{if .Profitability}}
-                                                        ({{printf "%.2f" .Profitability}})
-                                                        {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}❗{{end}}
-                                                    {{end}}
-                                                </td>
-                                            </tr>
-                                        {{end}}
-                                    </table>
-                                    <br>
-                                </tr>
+                        <form action="/upload" method="post" id="TCG{{$scraperKey}}hashes" style="display: inline;">
+                            <input type="hidden" name="tag" value="TCG"/>
+                            {{range $entries}}
+                                <input type="hidden" name="TCGhashes" value="{{.CardId}}"/>
+                                <input type="hidden" name="TCGhashesQtys" value="-{{.Quantity}}"/>
+                                <input type="hidden" name="TCGhashesCond" value="{{.Condition}}"/>
                             {{end}}
+                            Remove from:<a class="btn danger" style="text-align: center;" href='javascript:void(0)' onclick='document.getElementById("TCG{{$scraperKey}}hashes").submit();'>TCGplayer CSV</a>
+                            <noscript>
+                                <input type="submit" value="TCGplayer CSV"/>
+                            </noscript>
+                        </form>
+                    </div>
+                    <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                        {{range $entries}}
+                            {{$card := (index $.Metadata .CardId)}}
+                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
+                                <td class="opt-name">
+                                    <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
+                                    <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                    {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
+                                    {{if $card.Reserved}} *{{end}}
+                                    {{if $card.Stocks}} &bull;{{end}}
+                                    {{if $card.SypList}} &dagger;{{end}}
+                                </td>
+                                <td class="opt-set">
+                                    <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.SetCode}} #{{$card.Number}}
+                                    {{if $card.Etched}}
+                                        <span title="Etched">&#128171;</span>
+                                    {{else if $card.Foil}}
+                                        <span title="Foil">&#10024;</span>
+                                    {{end}}
+                                </td>
+                                <td class="opt-prices">
+                                    {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
+                                    {{$price := (index $scraperEntries $scraperKey)}}
+                                    <span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardId}}" target="_blank">{{printf "%.2f" $price}}</a></span>
+                                    {{if .Price}}
+                                        / <span class="loaded">$ <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a></span>
+                                        {{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}
+                                    {{end}}
+                                    {{if eq $scraperKey $card.HotlistStore}}
+                                        <span class="emoji" title="Highest price in 3 months">&#127775;</span>
+                                    {{end}}
+                                </td>
+                                <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}">
+                                    {{if .Price}}
+                                        {{printf "%.2f" .Spread}}%
+                                    {{end}}
+                                    {{if .Profitability}}
+                                        ({{printf "%.2f" .Profitability}})
+                                        {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}&#10071;{{end}}
+                                    {{end}}
+                                </td>
+                            </tr>
                         {{end}}
                     </table>
                 </div>
             {{end}}
         {{end}}
+    </div>
+    {{end}}
+
+    <!-- Tab switching script -->
+    <script>
+    function showResTab(panel, btn) {
+        document.querySelectorAll('.res-panel').forEach(function(p) { p.classList.remove('active'); });
+        document.getElementById('panel-' + panel).classList.add('active');
+        document.querySelectorAll('.res-tab').forEach(function(t) { t.classList.remove('on'); });
+        btn.classList.add('on');
+    }
+    </script>
 
     {{if ne .InfoMessage ""}}
         <br>
@@ -1074,6 +932,4 @@
             <h4><i>{{.InfoMessage}}</i></h4>
         </div>
     {{end}}
-    <br>
-    <br>
 {{end}}
