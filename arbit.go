@@ -254,11 +254,8 @@ var FilterOptConfig = map[string]FilterOpt{
 					if getTCGSimulationIQR(cardId) > IQRThreshold {
 						return 0, true
 					}
-				} else {
-					marketPrice := getTCGMarketPrice(cardId)
-					if invEntry.Price/2 > marketPrice {
-						return 0, true
-					}
+				} else if invalidDirect(cardId, invEntry.Price) {
+					return 0, true
 				}
 				if oldFunc != nil {
 					return oldFunc(cardId, invEntry)
@@ -800,9 +797,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			sussy = map[string]float64{}
 
 			for _, res := range arbit {
-				marketPrice := getTCGMarketPrice(res.CardId)
-				if res.ReferenceEntry.Price/2 > marketPrice {
-					sussy[res.CardId] = marketPrice
+				isSussy := invalidDirect(res.CardId, res.ReferenceEntry.Price)
+				if isSussy {
+					sussy[res.CardId] = getTCGMarketPrice(res.CardId)
 				}
 			}
 		}

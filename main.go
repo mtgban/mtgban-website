@@ -1011,10 +1011,7 @@ var funcMap = template.FuncMap{
 		_, found := m[s]
 		return found
 	},
-	"invalid_direct": func(s string, price float64) bool {
-		marketPrice := getTCGMarketPrice(s)
-		return price > marketPrice*2
-	},
+	"invalid_direct": invalidDirect,
 	"color2hex": func(s string) string {
 		color, found := colorValues[s]
 		if !found {

@@ -829,3 +829,11 @@ func scraperName(shorthand string) string {
 	}
 	return ""
 }
+
+// Special function to detect if the input price is bigger than
+// twice as much the market price on TCGplayer - used to detect
+// invalid Direct prices
+func invalidDirect(id string, price float64) bool {
+	marketPrice := getTCGMarketPrice(id)
+	return price > marketPrice*2
+}
