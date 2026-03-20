@@ -1,5 +1,4 @@
 {{define "extra-css"}}
-    <link rel="stylesheet" type="text/css" href="/css/tooltip.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/upload.css?hash={{.Hash}}">
     <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
 {{end}}
@@ -7,12 +6,16 @@
 {{define "content"}}
         <div class="upload-layout">
             <div class="upload-form-panel">
-                <h1>Upload &amp; Compare</h1>
-                <p class="upload-subtitle">Upload your collection and compare prices across all available stores.</p>
+                <div class="page-header">
+                    <div>
+                        <h1>Upload &amp; Compare</h1>
+                        <p class="page-subtitle">Upload your collection and compare prices across all available stores.</p>
+                    </div>
+                </div>
                 <form {{if not .CardHashes}}enctype="multipart/form-data"{{end}} action="/upload" method="post" id="upload_form">
 
                 <!-- Card 1: Mode & Stores -->
-                <div class="upload-card">
+                <div class="card upload-card">
                     <div class="upload-card-header">
                         <span class="upload-step">1</span>
                         <h2>Select Mode &amp; Stores</h2>
@@ -48,7 +51,7 @@
                     </div>
                 </div>
                 <!-- Card 2: Load Your Data -->
-                <div class="upload-card">
+                <div class="card upload-card">
                     <div class="upload-card-header">
                         <span class="upload-step">2</span>
                         <h2>Load Your Data</h2>
@@ -96,7 +99,7 @@
                 </div>
 
                 <!-- Card 3: Process -->
-                <div class="upload-card">
+                <div class="card upload-card">
                     <div class="upload-card-header">
                         <span class="upload-step">3</span>
                         <h2>Process</h2>

@@ -27,7 +27,7 @@
     background: var(--background);
     border-bottom: 1px solid var(--border-subtle);
     position: sticky;
-    top: 48px;
+    top: var(--nav-height);
     z-index: 50;
 }
 
@@ -85,16 +85,14 @@
    INDEX VIEW
    ═══════════════════════════════════ */
 .news-index {
-    padding: calc(48px + 28px) 5% 40px;
-    max-width: 1100px;
-    margin: 0 auto;
+    padding: calc(48px + 28px) 0 40px;
 }
 
 .news-index-header {
     margin-bottom: 20px;
 }
 .news-index-header h1 {
-    font-size: var(--text-10xl);
+    font-size: var(--text-8xl);
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 0 0 8px;
@@ -188,9 +186,6 @@
     align-items: flex-start;
     gap: 16px;
     padding: 20px 22px;
-    background: var(--surface-1);
-    border: 1px solid var(--news-card-border);
-    border-radius: 12px;
     text-decoration: none;
     color: var(--normal);
     transition: all 0.2s;
@@ -263,9 +258,7 @@
    DATA TABLE VIEW
    ═══════════════════════════════════ */
 .news-data {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 65px 5% 80px;
+    padding: 65px 0 80px;
 }
 
 .news-data-header {
@@ -337,13 +330,6 @@
     transition: border-color 0.12s;
 }
 .news-filter-bar select:focus { border-color: var(--ainfo); }
-.news-fsep {
-    width: 1px;
-    height: 22px;
-    background: var(--border-moderate);
-    flex-shrink: 0;
-    margin: 0 2px;
-}
 
 /* Table container */
 .news-table-wrap {
@@ -400,9 +386,7 @@
     vertical-align: middle;
     text-align: center;
 }
-.news-table tbody tr:nth-child(even) { background: var(--row-even); }
-.news-table tbody tr:nth-child(odd) { background: var(--row-odd); }
-.news-table tbody tr:hover { background: var(--row-hover); }
+/* Row stripes provided by .table-data in main.css */
 
 /* Card column */
 .news-th-card { text-align: left !important; }

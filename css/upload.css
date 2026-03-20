@@ -11,7 +11,7 @@
 }
 
 .upload-form-panel h1 {
-    font-size: var(--text-9xl);
+    font-size: var(--text-8xl);
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 0 0 4px 0;
@@ -25,9 +25,6 @@
 
 /* ── Card Surfaces ── */
 .upload-card {
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
     padding: 28px;
     margin-bottom: 20px;
 }
@@ -418,7 +415,7 @@
     border-left: 1px solid var(--border-subtle);
     padding: 36px 24px 64px;
     position: sticky;
-    top: 75px;
+    top: 75px; /* Matches mainbody padding-top — panel is outside page-content flow */
     height: calc(100vh - 75px);
     overflow-y: auto;
 }

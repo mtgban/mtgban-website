@@ -3,256 +3,280 @@
     <link rel="stylesheet" type="text/css" href="/css/sleepers.css?hash={{.Hash}}">
 {{end}}
 
+{{define "extra-head"}}
+    {{if eq .Subtitle "Options"}}
+        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+    {{end}}
+{{end}}
+
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
 
 {{define "content"}}
     {{if eq .Subtitle "Index"}}
-        <div class="sleepers-page">
-            <div class="page-header">
-                <div>
-                    <h1>Sleepers</h1>
-                    <p class="page-subtitle">Cards the market hasn't caught up on yet.</p>
-                </div>
-                <a class="page-action" href="?page=options">
-                    <span>&#9881;</span> Filters
-                </a>
+        {{template "sleep-index" .}}
+    {{else if eq .Subtitle "Options"}}
+        {{template "sleep-options" .}}
+    {{else}}
+        {{template "sleep-results" .}}
+    {{end}}
+{{end}}
+
+
+{{define "sleep-index"}}
+<div class="page-standard sleepers-page">
+    <div class="page-header">
+        <div>
+            <h1>Sleepers</h1>
+            <p class="page-subtitle">Cards the market hasn't caught up on yet.</p>
+        </div>
+        <a class="page-action" href="?page=options">
+            <span>&#9881;</span> Filters
+        </a>
+    </div>
+
+    <div class="card sleepers-info-card">
+        <h3>&#128161; About Sleepers</h3>
+        <p>Results are tiered <strong>S through F</strong>. Higher tiers = stronger signals. These tools identify cards where market pricing hasn't kept pace with demand, scarcity, or cross-market pricing differences.</p>
+        <div class="sleepers-tier-perks">
+            <div class="sleepers-tier-perk">
+                <span class="tier-perk-badge tier-perk-legacy">Legacy</span>
+                <span>Unlocks Ocean Gap preset comparisons</span>
             </div>
-
-            <div class="sleepers-info-card">
-                <h3>&#128161; About Sleepers</h3>
-                <p>Results are tiered <strong>S through F</strong>. Higher tiers = stronger signals. These tools identify cards where market pricing hasn't kept pace with demand, scarcity, or cross-market pricing differences.</p>
-                <div class="sleepers-tier-perks">
-                    <div class="sleepers-tier-perk">
-                        <span class="tier-perk-badge tier-perk-legacy">Legacy</span>
-                        <span>Unlocks Ocean Gap preset comparisons</span>
-                    </div>
-                    <div class="sleepers-tier-perk">
-                        <span class="tier-perk-badge tier-perk-vintage">Vintage</span>
-                        <span>Unlocks custom seller pairing</span>
-                    </div>
-                </div>
+            <div class="sleepers-tier-perk">
+                <span class="tier-perk-badge tier-perk-vintage">Vintage</span>
+                <span>Unlocks custom seller pairing</span>
             </div>
+        </div>
+    </div>
 
-            <!-- Tool strip -->
-            <div class="sleepers-tools-strip">
-                <a class="sleepers-tool" href="?page=bulk">
-                    <div class="tool-top">
-                        <span class="tool-icon" style="background:rgba(255,127,127,0.15); color:var(--tier-s);">&#128142;</span>
-                        <span class="tool-arrow">&rarr;</span>
-                    </div>
-                    <h3>Bulk Me Up</h3>
-                    <p>Cards deviating from their set average over the last 5 years. Unexpected gems in bulk.</p>
-                </a>
-                <a class="sleepers-tool" href="?page=reprint">
-                    <div class="tool-top">
-                        <span class="tool-icon" style="background:rgba(255,191,127,0.15); color:var(--tier-a);">&#128197;</span>
-                        <span class="tool-arrow">&rarr;</span>
-                    </div>
-                    <h3>Long Time No Reprint</h3>
-                    <p>No reprint in 2+ years. Excludes bulk, Reserved List, and non-tournament cards.</p>
-                </a>
-                <a class="sleepers-tool" href="?page=mismatch">
-                    <div class="tool-top">
-                        <span class="tool-icon" style="background:rgba(127,255,127,0.15); color:var(--tier-c);">&#128200;</span>
-                        <span class="tool-arrow">&rarr;</span>
-                    </div>
-                    <h3>Market Mismatch</h3>
-                    <p>Buylist exceeds market price, or priced below TCG Low. Arbitrage signals.</p>
-                </a>
-                <a class="sleepers-tool" href="?page=hotlist">
-                    <div class="tool-top">
-                        <span class="tool-icon" style="background:rgba(255,255,127,0.15); color:var(--tier-b);">&#128293;</span>
-                        <span class="tool-arrow">&rarr;</span>
-                    </div>
-                    <h3>Hotlist</h3>
-                    <p>Most buylist growth over the past 3 months. Spot emerging trends early.</p>
-                </a>
+    <!-- Tool strip -->
+    <div class="sleepers-tools-strip">
+        <a class="card sleepers-tool" href="?page=bulk">
+            <div class="tool-top">
+                <span class="tool-icon" style="background:rgba(255,127,127,0.15); color:var(--tier-s);">&#128142;</span>
+                <span class="tool-arrow">&rarr;</span>
             </div>
+            <h3>Bulk Me Up</h3>
+            <p>Cards deviating from their set average over the last 5 years. Unexpected gems in bulk.</p>
+        </a>
+        <a class="card sleepers-tool" href="?page=reprint">
+            <div class="tool-top">
+                <span class="tool-icon" style="background:rgba(255,191,127,0.15); color:var(--tier-a);">&#128197;</span>
+                <span class="tool-arrow">&rarr;</span>
+            </div>
+            <h3>Long Time No Reprint</h3>
+            <p>No reprint in 2+ years. Excludes bulk, Reserved List, and non-tournament cards.</p>
+        </a>
+        <a class="card sleepers-tool" href="?page=mismatch">
+            <div class="tool-top">
+                <span class="tool-icon" style="background:rgba(127,255,127,0.15); color:var(--tier-c);">&#128200;</span>
+                <span class="tool-arrow">&rarr;</span>
+            </div>
+            <h3>Market Mismatch</h3>
+            <p>Buylist exceeds market price, or priced below TCG Low. Arbitrage signals.</p>
+        </a>
+        <a class="card sleepers-tool" href="?page=hotlist">
+            <div class="tool-top">
+                <span class="tool-icon" style="background:rgba(255,255,127,0.15); color:var(--tier-b);">&#128293;</span>
+                <span class="tool-arrow">&rarr;</span>
+            </div>
+            <h3>Hotlist</h3>
+            <p>Most buylist growth over the past 3 months. Spot emerging trends early.</p>
+        </a>
+    </div>
 
-            <!-- Ocean Gap: presets + custom builder -->
-            <div class="sleepers-comparator">
-                <div class="sleepers-comparator-left">
-                    <h2>
-                        &#127754; Ocean Gap
-                        <span class="beta-tag">Beta</span>
-                    </h2>
-                    <p class="comp-desc">Compare two sellers. Find where one has cheaper cards than the other.</p>
+    <!-- Ocean Gap: presets + custom builder -->
+    <div class="sleepers-comparator">
+        <div class="sleepers-comparator-left">
+            <h2>
+                &#127754; Ocean Gap
+                <span class="beta-tag">Beta</span>
+            </h2>
+            <p class="comp-desc">Compare two sellers. Find where one has cheaper cards than the other.</p>
 
-                    <div class="sleepers-comp-presets">
-                        <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMLow">
-                            <span class="ref-name">TCGLow</span>
-                            <span class="vs">vs</span>
-                            <span class="target-name">MKMLow</span>
-                            <span class="preset-arrow">&rarr;</span>
-                        </a>
-                        <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMTrend">
-                            <span class="ref-name">TCGLow</span>
-                            <span class="vs">vs</span>
-                            <span class="target-name">MKMTrend</span>
-                            <span class="preset-arrow">&rarr;</span>
-                        </a>
-                        <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=CK">
-                            <span class="ref-name">MKMTrend</span>
-                            <span class="vs">vs</span>
-                            <span class="target-name">Card Kingdom</span>
-                            <span class="preset-arrow">&rarr;</span>
-                        </a>
-                        <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=SCG">
-                            <span class="ref-name">MKMTrend</span>
-                            <span class="vs">vs</span>
-                            <span class="target-name">SCG</span>
-                            <span class="preset-arrow">&rarr;</span>
-                        </a>
-                        <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=MP">
-                            <span class="ref-name">MKMTrend</span>
-                            <span class="vs">vs</span>
-                            <span class="target-name">Manapool</span>
-                            <span class="preset-arrow">&rarr;</span>
-                        </a>
-                    </div>
-                </div>
-
-                {{if .CanShowAll}}
-                <div class="sleepers-comparator-right">
-                    <div class="sleepers-comp-custom-title">Custom Comparison</div>
-                    <form class="sleepers-comp-builder" action="sleepers" method="GET">
-                        <input type="hidden" name="page" value="gap">
-                        <label>Reference Seller</label>
-                        <select name="ref" id="ref" onchange="checkSleepersCompare()">
-                            <option value="" disabled selected>Pick a reference...</option>
-                            {{range .SellerKeys}}
-                                <option value="{{.}}">{{scraper_name .}}</option>
-                            {{end}}
-                        </select>
-                        <div class="sleepers-comp-vs-divider">VS</div>
-                        <label>Target Seller</label>
-                        <select name="target" id="target" onchange="checkSleepersCompare()">
-                            <option value="" disabled selected>Pick where to buy...</option>
-                            {{range .SellerKeys}}
-                                <option value="{{.}}">{{scraper_name .}}</option>
-                            {{end}}
-                        </select>
-                        <button type="submit" class="sleepers-comp-go" id="sleepers-comp-go" disabled>Compare</button>
-                    </form>
-                </div>
-                {{else if $.ShowUpsell}}
-                <div class="sleepers-comparator-right">
-                    <div class="sleepers-comp-custom-title">Custom Comparison</div>
-                    <div class="sleepers-upsell">
-                        <em>Increase your tier to compare any seller on Sleepers!</em>
-                    </div>
-                </div>
-                {{end}}
+            <div class="sleepers-comp-presets">
+                <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMLow">
+                    <span class="ref-name">TCGLow</span>
+                    <span class="vs">vs</span>
+                    <span class="target-name">MKMLow</span>
+                    <span class="preset-arrow">&rarr;</span>
+                </a>
+                <a class="sleepers-comp-preset" href="?page=gap&ref=TCGLow&target=MKMTrend">
+                    <span class="ref-name">TCGLow</span>
+                    <span class="vs">vs</span>
+                    <span class="target-name">MKMTrend</span>
+                    <span class="preset-arrow">&rarr;</span>
+                </a>
+                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=CK">
+                    <span class="ref-name">MKMTrend</span>
+                    <span class="vs">vs</span>
+                    <span class="target-name">Card Kingdom</span>
+                    <span class="preset-arrow">&rarr;</span>
+                </a>
+                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=SCG">
+                    <span class="ref-name">MKMTrend</span>
+                    <span class="vs">vs</span>
+                    <span class="target-name">SCG</span>
+                    <span class="preset-arrow">&rarr;</span>
+                </a>
+                <a class="sleepers-comp-preset" href="?page=gap&ref=MKMTrend&target=MP">
+                    <span class="ref-name">MKMTrend</span>
+                    <span class="vs">vs</span>
+                    <span class="target-name">Manapool</span>
+                    <span class="preset-arrow">&rarr;</span>
+                </a>
             </div>
         </div>
 
         {{if .CanShowAll}}
-        <script>
-        function checkSleepersCompare() {
-            var r = document.getElementById('ref');
-            var t = document.getElementById('target');
-            var btn = document.getElementById('sleepers-comp-go');
-            if (r && t && btn) {
-                btn.disabled = !(r.value && t.value && r.value !== t.value);
-            }
-        }
-        </script>
+        <div class="sleepers-comparator-right">
+            <div class="sleepers-comp-custom-title">Custom Comparison</div>
+            <form class="sleepers-comp-builder" action="sleepers" method="GET">
+                <input type="hidden" name="page" value="gap">
+                <label>Reference Seller</label>
+                <select name="ref" id="ref" onchange="checkSleepersCompare()">
+                    <option value="" disabled selected>Pick a reference...</option>
+                    {{range .SellerKeys}}
+                        <option value="{{.}}">{{scraper_name .}}</option>
+                    {{end}}
+                </select>
+                <div class="sleepers-comp-vs-divider">VS</div>
+                <label>Target Seller</label>
+                <select name="target" id="target" onchange="checkSleepersCompare()">
+                    <option value="" disabled selected>Pick where to buy...</option>
+                    {{range .SellerKeys}}
+                        <option value="{{.}}">{{scraper_name .}}</option>
+                    {{end}}
+                </select>
+                <button type="submit" class="sleepers-comp-go" id="sleepers-comp-go" disabled>Compare</button>
+            </form>
+        </div>
+        {{else if $.ShowUpsell}}
+        <div class="sleepers-comparator-right">
+            <div class="sleepers-comp-custom-title">Custom Comparison</div>
+            <div class="sleepers-upsell">
+                <em>Increase your tier to compare any seller on Sleepers!</em>
+            </div>
+        </div>
         {{end}}
+    </div>
+</div>
 
-    {{else if eq .Subtitle "Options"}}
-        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
-        <script type="text/javascript">
-            window.onload = function(e) {
-                loadForm("SleepersSellersList", "sellers");
-                loadForm("SleepersVendorsList", "vendors");
-                loadForm("SleepersEditionList", "editions");
-            }
-        </script>
+{{if .CanShowAll}}
+<script>
+function checkSleepersCompare() {
+    var r = document.getElementById('ref');
+    var t = document.getElementById('target');
+    var btn = document.getElementById('sleepers-comp-go');
+    if (r && t && btn) {
+        btn.disabled = !(r.value && t.value && r.value !== t.value);
+    }
+}
+</script>
+{{end}}
+{{end}}
 
-        <div class="opts-page-wrap">
+
+{{define "sleep-options"}}
+<script type="text/javascript">
+    window.onload = function(e) {
+        loadForm("SleepersSellersList", "sellers");
+        loadForm("SleepersVendorsList", "vendors");
+        loadForm("SleepersEditionList", "editions");
+    }
+</script>
+
+<div class="page-standard opts-page-wrap">
+    <div class="page-header">
+        <div>
             <h1>Sleepers Options</h1>
-            <p class="opts-desc">Select sellers, vendors, and editions to <strong>exclude</strong> from results.</p>
+            <p class="page-subtitle">Select sellers, vendors, and editions to <strong>exclude</strong> from results.</p>
+        </div>
+    </div>
 
-            <div class="opts-section">
-                <h2>Vendors &amp; Sellers</h2>
-                <p class="section-desc">Checked stores will be <strong>hidden</strong> from your Sleepers.</p>
-                <div class="opts-bar">
-                    <button class="opts-btn opts-btn-warn" onclick="clearForm('sellers'); clearForm('vendors');">Clear</button>
-                    <button class="opts-btn opts-btn-ok" onclick="selectAll('sellers');">Select All</button>
-                    <button class="opts-btn opts-btn-ok" onclick="saveForm('SleepersSellersList', 'sellers'); saveForm('SleepersVendorsList', 'vendors'); window.location.href = '/sleepers'">Save</button>
-                </div>
-                <div class="opts-two-col">
-                    <div id="sellers">
-                        <h3>Retail</h3>
-                        <div class="opts-checkbox-grid">
-                            {{range $i, $key := .SellerKeys}}
-                                <label><input type="checkbox" id="s{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
-                            {{end}}
-                        </div>
-                    </div>
-                    <div id="vendors">
-                        <h3>Buylist</h3>
-                        <div class="opts-checkbox-grid">
-                            {{range $i, $key := .VendorKeys}}
-                                <label><input type="checkbox" id="v{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
-                            {{end}}
-                        </div>
-                    </div>
+    <div class="card opts-section">
+        <h2>Vendors &amp; Sellers</h2>
+        <p class="section-desc">Checked stores will be <strong>hidden</strong> from your Sleepers.</p>
+        <div class="opts-bar">
+            <button class="opts-btn opts-btn-warn" onclick="clearForm('sellers'); clearForm('vendors');">Clear</button>
+            <button class="opts-btn opts-btn-ok" onclick="selectAll('sellers');">Select All</button>
+            <button class="opts-btn opts-btn-ok" onclick="saveForm('SleepersSellersList', 'sellers'); saveForm('SleepersVendorsList', 'vendors'); window.location.href = '/sleepers'">Save</button>
+        </div>
+        <div class="opts-two-col">
+            <div id="sellers">
+                <h3>Retail</h3>
+                <div class="opts-checkbox-grid">
+                    {{range $i, $key := .SellerKeys}}
+                        <label><input type="checkbox" id="s{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
+                    {{end}}
                 </div>
             </div>
-
-            <div class="opts-section">
-                <h2>Editions</h2>
-                <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
-                <div class="opts-bar">
-                    <button class="opts-btn opts-btn-warn" onclick="clearForm('editions');">Clear</button>
-                    <button class="opts-btn opts-btn-ok" onclick="selectAll('editions');">Select All</button>
-                    <button class="opts-btn opts-btn-ok" onclick="saveForm('SleepersEditionList', 'editions'); window.location.href = '/sleepers'">Save</button>
-                </div>
-                <div class="opts-checkbox-grid opts-grid-wide" id="editions">
-                    {{range $i, $key := .Editions}}
-                        {{$edition := index $.EditionsMap $key}}
-                        {{if $edition}}
-                            <label><input type="checkbox" id="{{$key}}" name="{{$key}}"> <i class="ss ss-{{$edition.Keyrune}} ss-2x ss-fw"></i> {{$edition.Name}}</label>
-                        {{end}}
+            <div id="vendors">
+                <h3>Buylist</h3>
+                <div class="opts-checkbox-grid">
+                    {{range $i, $key := .VendorKeys}}
+                        <label><input type="checkbox" id="v{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
                     {{end}}
                 </div>
             </div>
         </div>
-    {{else}}
-        <div class="sleepers-results">
-            <div class="sleepers-results-header">
-                <a class="sleepers-back-link" href="/sleepers">&larr; Sleepers</a>
-                <h1>{{.Subtitle}}</h1>
-            </div>
-            <table class="tiers">
-                {{range $i, $letter := .SleepersKeys}}
-                    {{$bgColor := index $.SleepersColors $i}}
-                    {{$cardIds := index $.Sleepers $letter}}
-                    <tr class="tiers">
-                        <td class="tiers" style="background-color: {{$bgColor}};">
-                            {{$letter}}
-                        </td>
-                        <td>
-                            <div style="min-height: 50px;">
-                                {{range $cardIds}}
-                                    {{$card := index $.Metadata .}}
-                                    <a href="{{$card.SearchURL}}">
-                                        <nobr>
-                                            <span class="small-hidden-text" aria-hidden="true">{{$card.Name}}</span>
-                                            <img loading="lazy" style="margin: 5px;" src="{{$card.ImageURL}}" width=146 height=204 title="{{$card.Name}} [{{$card.Title}}]">
-                                        </nobr>
-                                    </a>
-                                {{end}}
-                            </div>
-                        </td>
-                    </tr>
-                {{end}}
-            </table>
+    </div>
+
+    <div class="card opts-section">
+        <h2>Editions</h2>
+        <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
+        <div class="opts-bar">
+            <button class="opts-btn opts-btn-warn" onclick="clearForm('editions');">Clear</button>
+            <button class="opts-btn opts-btn-ok" onclick="selectAll('editions');">Select All</button>
+            <button class="opts-btn opts-btn-ok" onclick="saveForm('SleepersEditionList', 'editions'); window.location.href = '/sleepers'">Save</button>
         </div>
-        <br>
-    {{end}}
-    {{if ne .InfoMessage ""}}
-        <h2><p class=indent>{{.InfoMessage}}</p></h2>
-    {{end}}
+        <div class="opts-checkbox-grid opts-grid-wide" id="editions">
+            {{range $i, $key := .Editions}}
+                {{$edition := index $.EditionsMap $key}}
+                {{if $edition}}
+                    <label><input type="checkbox" id="{{$key}}" name="{{$key}}"> <i class="ss ss-{{$edition.Keyrune}} ss-2x ss-fw"></i> {{$edition.Name}}</label>
+                {{end}}
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
+
+
+{{define "sleep-results"}}
+<div class="page-standard sleepers-results">
+    <div class="page-header">
+        <div>
+            <a class="sleepers-back-link" href="/sleepers">&larr; Sleepers</a>
+            <h1>{{.Subtitle}}</h1>
+        </div>
+    </div>
+    <table class="tiers">
+        {{range $i, $letter := .SleepersKeys}}
+            {{$bgColor := index $.SleepersColors $i}}
+            {{$cardIds := index $.Sleepers $letter}}
+            <tr class="tiers">
+                <td class="tiers" style="background-color: {{$bgColor}};">
+                    {{$letter}}
+                </td>
+                <td>
+                    <div style="min-height: 50px;">
+                        {{range $cardIds}}
+                            {{$card := index $.Metadata .}}
+                            <a href="{{$card.SearchURL}}">
+                                <nobr>
+                                    <span class="small-hidden-text" aria-hidden="true">{{$card.Name}}</span>
+                                    <img loading="lazy" style="margin: 5px;" src="{{$card.ImageURL}}" width=146 height=204 title="{{$card.Name}} [{{$card.Title}}]">
+                                </nobr>
+                            </a>
+                        {{end}}
+                    </div>
+                </td>
+            </tr>
+        {{end}}
+    </table>
+</div>
+{{if ne .InfoMessage ""}}
+    <h2><p class=indent>{{.InfoMessage}}</p></h2>
+{{end}}
 {{end}}

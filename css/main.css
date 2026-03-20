@@ -677,7 +677,7 @@ a.selected:hover{
     margin-bottom: 1.5em;
 }
 .page-header h1 {
-    font-size: var(--text-10xl);
+    font-size: var(--text-8xl);
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 0;
@@ -687,7 +687,7 @@ a.selected:hover{
     font-size: var(--text-2xl);
     margin: 0.25em 0 0;
 }
-.page-header .page-action {
+.page-action {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -703,9 +703,15 @@ a.selected:hover{
     transition: all 0.15s;
     flex-shrink: 0;
 }
-.page-header .page-action:hover {
+.page-action:hover {
+    color: var(--normal);
+    border-color: var(--accent-border);
+    background: var(--surface-2);
+}
+.page-action.active {
     color: var(--ainfo);
     border-color: var(--accent-border);
+    background: var(--accent-muted);
 }
 
 .page-error {
@@ -719,6 +725,101 @@ a.selected:hover{
     top: var(--nav-height);
     z-index: 50;
     background: var(--background);
+}
+
+/* ═══ Page width tiers ═══ */
+.page-standard {
+    max-width: 80vw;
+    margin: 0 auto;
+    margin-right: 11%;
+    /*padding: 0 var(--page-gutter);*/
+}
+.page-wide {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 var(--page-gutter);
+}
+.page-compact {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 var(--page-gutter);
+}
+
+/* ═══ Card base (surface + border + radius, no padding) ═══ */
+.card {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+}
+
+/* ═══ Data table base + row stripes ═══ */
+.table-data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-md);
+}
+.table-data th {
+    padding: 8px 12px;
+    font-size: var(--text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    background: var(--surface-2);
+    border-bottom: 2px solid var(--border-subtle);
+    text-align: left;
+    white-space: nowrap;
+}
+.table-data td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+}
+.table-data tbody tr:nth-child(even) { background: var(--row-even); }
+.table-data tbody tr:nth-child(odd) { background: var(--row-odd); }
+.table-data tbody tr:hover { background: var(--row-hover); }
+
+/* ═══ Back link ═══ */
+.back-link {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--text-md);
+    color: var(--ainfo);
+    text-decoration: none;
+    margin-bottom: 0.5em;
+}
+.back-link:hover { text-decoration: underline; }
+
+/* ═══ Pagination ═══ */
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 1em 0;
+}
+.pagination a {
+    padding: 5px 10px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--activetext);
+    text-decoration: none;
+    font-size: var(--text-base);
+    font-weight: 600;
+    transition: all 0.12s;
+}
+.pagination a:hover {
+    background: var(--surface-3);
+    color: var(--normal);
+}
+.pagination .cur {
+    font-weight: 700;
+    color: var(--ainfo);
+}
+.pagination .pg-info {
+    color: var(--text-dim);
+    font-size: var(--text-sm);
 }
 
 .indent{
@@ -792,7 +893,7 @@ a.selected:hover{
 th.stickyCategory {
     position: -webkit-sticky;
     position: sticky;
-    top: 48px;
+    top: var(--nav-height);
     background-color: var(--background);
 }
 
@@ -816,7 +917,7 @@ th.stickyHeaderTiny {
 th.stickyHeaderShort {
     position: -webkit-sticky;
     position: sticky;
-    top: 48px;
+    top: var(--nav-height);
     background-color: var(--headerbackground);
     z-index: 1;
 }
@@ -1145,13 +1246,13 @@ img.hoverImage {
     display: flex;
     flex-direction: column;
     position: relative;
-    width: 75vw;
+    width: 80vw;
     background: var(--background);
     border: 0.1rem solid var(--syntax-border-color);
     border-radius: 8px;
     overflow: hidden;
-    margin-top: 1rem;
-    margin-left: 0.4rem;
+    margin-top: 2rem;
+    margin-left: 8%;
 }
 
 .syntax-header {
@@ -1679,9 +1780,7 @@ table.tiers td div {
 
 /* ═══ Shared options page wrapper ═══ */
 .opts-page-wrap {
-    max-width: 80vw;
-    margin: 0 auto;
-    padding: 6vh 3vw 5vh;
+    padding: 6vh 0 5vh;
 }
 .opts-page-wrap h1 {
     font-size: var(--text-7xl);
@@ -1696,9 +1795,6 @@ table.tiers td div {
 }
 
 .opts-section {
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
     padding: 1.5em;
     margin-bottom: 1.25em;
 }
@@ -1754,7 +1850,7 @@ table.tiers td div {
 .opts-checkbox-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-    gap: 4px;
+    gap: 6px 12px;
 }
 .opts-checkbox-grid.opts-grid-wide {
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1836,4 +1932,27 @@ table.tiers td div {
 
 .card-accent-bar:hover::before {
     opacity: 1;
+}
+
+/* ═══ Tooltip (merged from tooltip.css) ═══ */
+.tooltip {
+    position: relative;
+    display: inline-block;
+}
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: var(--navbackground);
+    color: var(--almostwhite);
+    text-align: center;
+    vertical-align: center;
+    border-radius: 6px;
+    padding: 5px 0;
+    position: absolute;
+    z-index: 1;
+    top: 0px;
+    left: 105%;
+}
+.tooltip:hover .tooltiptext {
+    visibility: visible;
 }

@@ -1,12 +1,10 @@
 /* ── Page Layout ── */
 .sets-page {
-    max-width: 80vw;
-    margin: 0 auto;
-    padding: 28px 5% 80px;
+    padding: 28px 0 80px;
 }
 
 .sets-page h1 {
-    font-size: var(--text-9xl);
+    font-size: var(--text-8xl);
     font-weight: 700;
     letter-spacing: -0.03em;
     margin: 0 0 6px;
@@ -55,12 +53,6 @@
     color: var(--text-dim);
 }
 
-.sets-toolbar-sep {
-    width: 1px;
-    height: 22px;
-    background: var(--border-moderate);
-    flex-shrink: 0;
-}
 
 .sets-toolbar-btn {
     padding: 6px 14px;
@@ -155,7 +147,7 @@
     text-align: left;
     white-space: nowrap;
     position: sticky;
-    top: 48px;
+    top: var(--nav-height);
     z-index: 10;
 }
 
@@ -171,9 +163,7 @@
     vertical-align: middle;
 }
 
-.sets-table tbody tr:nth-child(even) { background: var(--row-even); }
-.sets-table tbody tr:nth-child(odd) { background: var(--row-odd); }
-.sets-table tbody tr:hover { background: var(--row-hover); }
+/* Row stripes provided by .table-data in main.css */
 
 /* ── Name Cell ── */
 

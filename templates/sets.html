@@ -8,20 +8,24 @@
 {{end}}
 
 {{define "content"}}
-    <div class="sets-page">
-        <h1>Editions</h1>
-        <p class="sets-stats">
-            Tracking <strong>{{.TotalSets}}</strong> editions, for
-            <strong>{{.TotalCards}}</strong> cards over
-            <strong>{{.TotalUnique}}</strong> printings.
-        </p>
+    <div class="page-standard sets-page">
+        <div class="page-header">
+            <div>
+                <h1>Editions</h1>
+                <p class="page-subtitle">
+                    Tracking <strong>{{.TotalSets}}</strong> editions, for
+                    <strong>{{.TotalCards}}</strong> cards over
+                    <strong>{{.TotalUnique}}</strong> printings.
+                </p>
+            </div>
+        </div>
 
         <div class="sets-table-wrap">
             <div class="sets-toolbar">
                 <input class="sets-filter-input" type="text" id="filterInput"
                        onkeyup="filterTableByName()" placeholder="Filter editions...">
 
-                <span class="sets-toolbar-sep"></span>
+                <span class="toolbar-sep"></span>
 
                 <button class="sets-toolbar-btn" id="expandBtn" onclick="toggleExpanded()">
                     Show Colors &amp; Rarities
@@ -37,7 +41,7 @@
                 </div>
             </div>
 
-            <table class="sets-table filterable" id="table">
+            <table class="table-data sets-table filterable" id="table">
                 <thead>
                     <tr>
                         <th>Edition</th>

@@ -1037,23 +1037,14 @@ var funcMap = template.FuncMap{
 // Templates that have been migrated to use base template inheritance.
 // Unmigrated templates are rendered with the legacy standalone approach.
 var baseTemplatePages = map[string]string{
-	"sleep_index.html":   "templates/base.html",
-	"sleep_options.html": "templates/base.html",
-	"sleep_results.html": "templates/base.html",
+	"sleep.html": "templates/base.html",
 	"sets.html":          "templates/base.html",
 	"editions.html": "templates/base.html",
-	"news_index.html":   "templates/base.html",
-	"news_options.html": "templates/base.html",
-	"news_data.html":    "templates/base.html",
+	"news.html": "templates/base.html",
 	"admin.html":    "templates/base.html",
-	"arbit_landing.html": "templates/base.html",
-	"arbit_options.html": "templates/base.html",
-	"arbit_results.html": "templates/base.html",
+	"arbit.html": "templates/base.html",
 	"upload.html":   "templates/base.html",
-	"search_landing.html": "templates/base.html",
-	"search_sealed.html":  "templates/base.html",
-	"search_results.html": "templates/base.html",
-	"search_options.html": "templates/base.html",
+	"search.html": "templates/base.html",
 	"home.html":     "templates/base-landing.html",
 }
 
@@ -1076,7 +1067,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	templates = append(templates, "templates/partials/navbar.html")
 
 	// Add other partials as needed
-	if name == "search_landing.html" {
+	if name == "search.html" {
 		templates = append(templates, "templates/partials/syntax.html")
 	}
 

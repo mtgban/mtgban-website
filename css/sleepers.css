@@ -1,6 +1,4 @@
 .sleepers-page {
-    max-width: 80vw;
-    margin: 0 auto;
     padding: 20px 48px 80px;
 }
 
@@ -57,9 +55,6 @@
 }
 
 .sleepers-tool {
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
     padding: 20px;
     text-decoration: none;
     color: var(--normal);
@@ -335,9 +330,6 @@
    ═══════════════════════════════════════ */
 
 .sleepers-info-card {
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
     padding: 22px 24px;
     margin-bottom: 20px;
 }

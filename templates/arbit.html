@@ -4,97 +4,68 @@
 {{end}}
 
 {{define "extra-head"}}
+    {{if eq .Title "Options"}}
+        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+    {{end}}
     <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
 {{end}}
 
 {{define "content"}}
-<div class="arb-page">
     {{if eq .Title "Options"}}
-        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+        {{template "arbit-options" .}}
+    {{else if eq .ScraperShort ""}}
+        {{template "arbit-landing" .}}
+    {{else}}
+        {{template "arbit-results" .}}
+    {{end}}
+{{end}}
 
-        {{$cookieName := "ArbitVendorsList"}}
-        {{if .ReverseMode}}
-            {{$cookieName = "ReverseVendorsList"}}
-        {{else if .GlobalMode}}
-            {{$cookieName = "GlobalVendorsList"}}
-        {{end}}
-
-        <script type="text/javascript">
-            window.onload = function(e) {
-                loadForm("GlobalEditionList", "editions");
-                loadForm("{{$cookieName}}", "vendors");
-            }
-        </script>
-
-        <div class="opts-page-wrap">
-            <h1>{{if .ReverseMode}}Reverse{{else if .GlobalMode}}Global{{else}}Arbitrage{{end}} Options</h1>
-            <p class="opts-desc">Select vendors and editions to <strong>exclude</strong> from results.</p>
-
-            <div class="opts-section">
-                <h2>Vendors List</h2>
-                <p class="section-desc">Checked vendors will be <strong>hidden</strong> from results.</p>
-                <div class="opts-bar">
-                    <button class="opts-btn opts-btn-warn" onclick="clearForm('vendors')">Clear</button>
-                    <button class="opts-btn opts-btn-ok" onclick="saveForm('{{$cookieName}}', 'vendors'); location.href='?'">Save</button>
-                </div>
-                <div class="opts-checkbox-grid opts-nowrap" id="vendors">
-                    {{range $i, $key := .VendorKeys}}
-                        <label>
-                            <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                            {{scraper_name $key}}
-                            {{if (contains $key "Sealed")}}
-                                <i>(Sealed)</i>
-                            {{end}}
-                        </label>
+{{define "arbit-landing"}}
+<div class="page-standard arb-page">
+    <div class="arb-landing">
+        <div class="page-header">
+            <div>
+                <h1>{{.Title}}<a name="top">&nbsp;</a></h1>
+                <p class="page-subtitle">
+                    {{if .GlobalMode}}
+                        Choose the index to compare from.
+                    {{else if .ReverseMode}}
+                        Choose the vendor to sell to.
+                    {{else}}
+                        Select a store to compare prices and find arbitrage opportunities.
                     {{end}}
-                </div>
+                </p>
             </div>
+            <a class="page-action" href="?page=options">&#9881; Options</a>
+        </div>
 
-            <div class="opts-section">
-                <h2>Edition List</h2>
-                <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
-                <div class="opts-bar">
-                    <button class="opts-btn opts-btn-warn" onclick="clearForm('editions')">Clear</button>
-                    <button class="opts-btn opts-btn-ok" onclick="selectAll('editions')">Select All</button>
-                    <button class="opts-btn opts-btn-ok" onclick="saveForm('GlobalEditionList', 'editions'); location.href='/global'">Save</button>
-                </div>
-                <div class="opts-checkbox-grid opts-grid-wide" id="editions">
-                    {{range $i, $key := .Editions}}
-                        {{$edition := index $.EditionsMap $key}}
-                        {{if $edition}}
-                        <label>
-                            <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                            {{if $edition.Keyrune}}
-                                <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
-                            {{end}}
-                            {{$edition.Name}}
-                        </label>
-                        {{end}}
+        <div class="arb-store-group">
+            <div class="arb-store-group-label">Select Store</div>
+            <div class="arb-store-grid">
+                {{range .ExtraNav}}
+                    {{if not (contains .Name "Sealed")}}
+                        <a class="card arb-store-card" href="{{.Link}}">
+                            <span class="store-name">{{.Name}}</span>
+                            <span class="arb-store-arrow">&rarr;</span>
+                        </a>
                     {{end}}
-                </div>
+                {{end}}
             </div>
         </div>
 
-    {{else if eq .ScraperShort ""}}
-        <div class="arb-landing">
-            <h1>{{.Title}}<a name="top">&nbsp;</a></h1>
-            <p class="arb-landing-desc">
-                {{if .GlobalMode}}
-                    Choose the index to compare from.
-                {{else if .ReverseMode}}
-                    Choose the vendor to sell to.
-                {{else}}
-                    Select a store to compare prices and find arbitrage opportunities.
-                {{end}}
-            </p>
-            <a class="arb-opts-link" href="?page=options">&#9881; Options</a>
-
+        {{$showSealed := false}}
+        {{range .ExtraNav}}
+            {{if contains .Name "Sealed"}}
+                {{$showSealed = true}}
+            {{end}}
+        {{end}}
+        {{if $showSealed}}
             <div class="arb-store-group">
-                <div class="arb-store-group-label">Select Store</div>
+                <div class="arb-store-group-label">Sealed Products</div>
                 <div class="arb-store-grid">
                     {{range .ExtraNav}}
-                        {{if not (contains .Name "Sealed")}}
-                            <a class="arb-store-card" href="{{.Link}}">
+                        {{if contains .Name "Sealed"}}
+                            <a class="card arb-store-card" href="{{.Link}}">
                                 <span class="store-name">{{.Name}}</span>
                                 <span class="arb-store-arrow">&rarr;</span>
                             </a>
@@ -102,50 +73,101 @@
                     {{end}}
                 </div>
             </div>
+        {{end}}
 
-            {{$showSealed := false}}
-            {{range .ExtraNav}}
-                {{if contains .Name "Sealed"}}
-                    {{$showSealed = true}}
-                {{end}}
+        <div class="arb-instructions-panel open">
+            <p>Data is refreshed periodically. There is a minimum spread and difference for a card to be included.</p>
+            <p>Always verify prices before committing &mdash; prices or quantities may have changed since the last refresh.</p>
+            <p>Arbitrage is computed on cash value, taking into account condition whenever possible.</p>
+            {{if .GlobalMode}}
+                <p>Each page provides a list of cards that can be arbitraged from, according to value reported from other markets.</p>
+            {{else}}
+                <p>Buylist prices are displayed NM for easier lookup, but actual spread uses the card's condition.</p>
+                <p>Each {{if .ReverseMode}}vendor{{else}}seller{{end}} page contains a list of {{if .ReverseMode}}sellers{{else}}vendors{{end}} with a summary of arbitrage opportunities.</p>
             {{end}}
-            {{if $showSealed}}
-                <div class="arb-store-group">
-                    <div class="arb-store-group-label">Sealed Products</div>
-                    <div class="arb-store-grid">
-                        {{range .ExtraNav}}
-                            {{if contains .Name "Sealed"}}
-                                <a class="arb-store-card" href="{{.Link}}">
-                                    <span class="store-name">{{.Name}}</span>
-                                    <span class="arb-store-arrow">&rarr;</span>
-                                </a>
-                            {{end}}
-                        {{end}}
-                    </div>
-                </div>
-            {{end}}
-
-            <div class="arb-instructions-panel open">
-                <p>Data is refreshed periodically. There is a minimum spread and difference for a card to be included.</p>
-                <p>Always verify prices before committing &mdash; prices or quantities may have changed since the last refresh.</p>
-                <p>Arbitrage is computed on cash value, taking into account condition whenever possible.</p>
-                {{if .GlobalMode}}
-                    <p>Each page provides a list of cards that can be arbitraged from, according to value reported from other markets.</p>
-                {{else}}
-                    <p>Buylist prices are displayed NM for easier lookup, but actual spread uses the card's condition.</p>
-                    <p>Each {{if .ReverseMode}}vendor{{else}}seller{{end}} page contains a list of {{if .ReverseMode}}sellers{{else}}vendors{{end}} with a summary of arbitrage opportunities.</p>
-                {{end}}
-                <p>In case of mistakes, please notify the devs in the BAN Discord.</p>
-                <p>Should you find this content useful, consider clicking on one of the provided links to support BAN.</p>
-            </div>
-
-            {{if ne .InfoMessage ""}}
-                <br>
-                <h2><p>{{.InfoMessage}}</p></h2>
-            {{end}}
+            <p>In case of mistakes, please notify the devs in the BAN Discord.</p>
+            <p>Should you find this content useful, consider clicking on one of the provided links to support BAN.</p>
         </div>
 
-    {{else}}
+        {{if ne .InfoMessage ""}}
+            <br>
+            <h2><p>{{.InfoMessage}}</p></h2>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{define "arbit-options"}}
+{{$cookieName := "ArbitVendorsList"}}
+{{if .ReverseMode}}
+    {{$cookieName = "ReverseVendorsList"}}
+{{else if .GlobalMode}}
+    {{$cookieName = "GlobalVendorsList"}}
+{{end}}
+
+<script type="text/javascript">
+    window.onload = function(e) {
+        loadForm("GlobalEditionList", "editions");
+        loadForm("{{$cookieName}}", "vendors");
+    }
+</script>
+
+<div class="page-standard opts-page-wrap">
+    <div class="page-header">
+        <div>
+            <h1>{{if .ReverseMode}}Reverse{{else if .GlobalMode}}Global{{else}}Arbitrage{{end}} Options</h1>
+            <p class="page-subtitle">Select vendors and editions to <strong>exclude</strong> from results.</p>
+        </div>
+    </div>
+
+    <div class="card opts-section">
+        <h2>Vendors List</h2>
+        <p class="section-desc">Checked vendors will be <strong>hidden</strong> from results.</p>
+        <div class="opts-bar">
+            <button class="opts-btn opts-btn-warn" onclick="clearForm('vendors')">Clear</button>
+            <button class="opts-btn opts-btn-ok" onclick="saveForm('{{$cookieName}}', 'vendors'); location.href='?'">Save</button>
+        </div>
+        <div class="opts-checkbox-grid opts-nowrap" id="vendors">
+            {{range $i, $key := .VendorKeys}}
+                <label>
+                    <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                    {{scraper_name $key}}
+                    {{if (contains $key "Sealed")}}
+                        <i>(Sealed)</i>
+                    {{end}}
+                </label>
+            {{end}}
+        </div>
+    </div>
+
+    <div class="card opts-section">
+        <h2>Edition List</h2>
+        <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
+        <div class="opts-bar">
+            <button class="opts-btn opts-btn-warn" onclick="clearForm('editions')">Clear</button>
+            <button class="opts-btn opts-btn-ok" onclick="selectAll('editions')">Select All</button>
+            <button class="opts-btn opts-btn-ok" onclick="saveForm('GlobalEditionList', 'editions'); location.href='/global'">Save</button>
+        </div>
+        <div class="opts-checkbox-grid opts-grid-wide" id="editions">
+            {{range $i, $key := .Editions}}
+                {{$edition := index $.EditionsMap $key}}
+                {{if $edition}}
+                <label>
+                    <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                    {{if $edition.Keyrune}}
+                        <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
+                    {{end}}
+                    {{$edition.Name}}
+                </label>
+                {{end}}
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "arbit-results"}}
+<div class="page-standard arb-page">
         <img id="hoverImage" class="hoverImage" src=""/>
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
@@ -180,7 +202,7 @@
                 {{end}}
             {{end}}
             {{if $hasSealed}}
-                <span class="arb-selector-sep"></span>
+                <span class="toolbar-sep"></span>
                 <div class="arb-alt-stores">
                     {{range .ExtraNav}}
                         {{if and (not .Active) (contains .Name "Sealed")}}
@@ -190,7 +212,7 @@
                 </div>
             {{end}}
 
-            <a class="arb-opts-link" href="?page=options">&#9881; Options</a>
+            <a class="page-action" href="?page=options">&#9881; Options</a>
         </div>
         {{end}}
 
@@ -401,13 +423,13 @@
                     -->
                 </div>
                 {{if and (eq $i 0) (eq $.ScraperShort "SYP")}}
-                    <a class="arb-opts-link" href="?page=options">&#9881; Options</a>
+                    <a class="page-action" href="?page=options">&#9881; Options</a>
                 {{end}}
                 <hr style="width: 100%; border: none; border-top: 1px solid var(--arb-border-subtle); margin: 0;">
             </div>
 
             <div class="arb-table-wrap">
-            <table class="arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+            <table class="table-data arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
@@ -618,6 +640,5 @@
             {{end}}
         </p>
         <br>
-    {{end}}
 </div>
 {{end}}

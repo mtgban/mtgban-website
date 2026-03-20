@@ -1,6 +1,4 @@
 .arb-page {
-    max-width: 80vw;
-    margin: 0 auto;
     padding: 28px 28px 80px;
 }
 
@@ -43,9 +41,6 @@
     align-items: center;
     gap: 14px;
     padding: 16px 20px;
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
     text-decoration: none;
     color: var(--normal);
     transition: all 0.2s;
@@ -165,8 +160,6 @@
     background: var(--accent-muted);
 }
 
-.arb-selector-sep { width: 1px; height: 22px; background: var(--border-moderate); flex-shrink: 0; }
-
 .arb-opts-link {
     margin-left: auto;
     display: flex;
@@ -245,7 +238,7 @@
     margin-bottom: 0;
     border-bottom: 1px solid var(--border-subtle);
     position: sticky;
-    top: 48px;
+    top: var(--nav-height);
     z-index: 20;
     background: var(--background);
 }
@@ -367,9 +360,7 @@
 }
 .arb-table td:first-child { text-align: left; }
 
-.arb-table tbody tr:nth-child(even) { background: var(--row-even); }
-.arb-table tbody tr:nth-child(odd) { background: var(--row-odd); }
-.arb-table tbody tr:hover { background: var(--row-hover); }
+/* Row stripes provided by .table-data in main.css */
 .arb-table a { color: var(--ainfo); text-decoration: none; font-weight: 500; }
 .arb-table a:hover { text-decoration: underline; }
 
