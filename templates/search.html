@@ -795,10 +795,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                     {{if $.IsSealed}}<span class="secondary"></span>{{end}}
                                                     {{$priceWarn := false}}
                                                     {{if eq .Shorthand "TCGDirect"}}
-                                                        {{$marketPrice := tcg_market_price $cardId}}
-                                                        {{if gt .Price (mul $marketPrice 2)}}
-                                                            {{$priceWarn = true}}
-                                                        {{end}}
+                                                        {{$priceWarn = invalid_direct $cardId .Price}}
                                                     {{end}}
                                                     <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
                                                         {{if .Price}}
@@ -847,10 +844,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 {{end}}
                                                 {{$blPriceWarn := false}}
                                                 {{if eq .Shorthand "TCGDirectNet"}}
-                                                    {{$marketPrice := tcg_market_price $cardId}}
-                                                    {{if gt .Price (mul $marketPrice 2)}}
-                                                        {{$blPriceWarn = true}}
-                                                    {{end}}
+                                                    {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
                                                 <span class="price{{if $blPriceWarn}} price-warn{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
                                                     {{if ne .Shorthand "SYP"}}
