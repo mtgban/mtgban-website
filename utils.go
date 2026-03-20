@@ -662,12 +662,11 @@ func readSetFlag(w http.ResponseWriter, r *http.Request, queryParam, cookieName 
 
 // Read a cookie from the request
 func readCookie(r *http.Request, cookieName string) string {
-	for _, cookie := range r.Cookies() {
-		if cookie.Name == cookieName {
-			return cookie.Value
-		}
+	cookie, err := r.Cookie(cookieName)
+	if err != nil {
+		return ""
 	}
-	return ""
+	return cookie.Value
 }
 
 // There is no forever in cookies, so pick a really large interval
