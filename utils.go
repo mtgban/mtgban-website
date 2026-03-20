@@ -463,7 +463,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		Variant:   variant,
 		Foil:      co.Foil,
 		Etched:    co.Etched,
-		Keyrune:   keyruneForCardSet(cardId),
+		Keyrune:   keyrune,
 		ImageURL:  imgURL,
 		Title:     editionTitle(cardId),
 		Reserved:  co.Card.IsReserved,
