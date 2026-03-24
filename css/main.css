@@ -390,8 +390,14 @@ a.pagination {
     display: flex; align-items: center; gap: 2px;
     list-style: none;
     flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-4) transparent;
     margin: 0; padding: 0;
 }
+.ban-nav-links::-webkit-scrollbar { height: 3px; }
+.ban-nav-links::-webkit-scrollbar-track { background: transparent; }
+.ban-nav-links::-webkit-scrollbar-thumb { background: var(--surface-4); border-radius: 2px; }
 
 .ban-nav-links a {
     display: flex; align-items: center; gap: 5px;
@@ -553,7 +559,7 @@ a.pagination {
     .ban-nav-links .nav-full { display: none; }
     .ban-nav-links .nav-short { display: inline; }
 }
-@media (max-width: 768px) {
+@media (max-width: 1000px) {
     .ban-nav-links { display: none; }
     .ban-nav-hamburger { display: flex; }
 }
