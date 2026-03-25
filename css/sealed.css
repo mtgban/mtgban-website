@@ -231,4 +231,27 @@
     .sealed-grid {
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     }
+    /* TOC horizontal scroll instead of wrapping many items */
+    .sealed-toc {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .sealed-toc-item { flex-shrink: 0; }
+}
+
+@media (max-width: 640px) {
+    .sealed-main { padding: 16px 12px 60px; }
+    .sealed-main h1 { font-size: var(--text-6xl); }
+    .sealed-toolbar {
+        margin-left: -12px;
+        margin-right: -12px;
+        padding-left: 12px;
+        padding-right: 12px;
+        gap: 8px;
+    }
+    .sealed-search { min-width: 0; width: 100%; max-width: none; }
+    .sealed-grid { grid-template-columns: 1fr; }
+    .sealed-edition { font-size: var(--text-lg); }
+    .sealed-section-header h2 { font-size: var(--text-3xl); }
 }
