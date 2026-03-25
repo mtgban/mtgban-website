@@ -573,4 +573,32 @@
     .news-cc .set-icon { display: none; }
     .news-cc { min-width: 140px; }
     .news-table { font-size: var(--text-base); }
+
+    /* Horizontal scroll for data table */
+    .news-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Touch-friendly nav pills */
+    .news-page-nav a { padding: 10px 16px; }
+
+    /* Touch-friendly pagination */
+    .news-pagination a,
+    .news-pagination span { padding: 10px 14px; font-size: var(--text-md); }
+}
+
+@media (max-width: 640px) {
+    .news-index { padding-left: 16px; padding-right: 16px; }
+    .news-data { padding-left: 16px; padding-right: 16px; }
+    .news-page-nav { padding: 8px 16px; gap: 4px; }
+    .news-page-nav a { padding: 8px 12px; font-size: var(--text-sm); }
+
+    /* Filter bar: wrap groups vertically */
+    .news-filter-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+    .news-fg { justify-content: space-between; }
+
+    /* Card cell tighter */
+    .news-cc { min-width: 120px; gap: 4px; }
+    .news-cc .card-detail .card-name { font-size: var(--text-base); }
+
+    /* Upload button full width */
+    .news-upload-btn { width: 100%; text-align: center; }
 }
