@@ -1959,3 +1959,48 @@ table.tiers td div {
 .tooltip:hover .tooltiptext {
     visibility: visible;
 }
+
+/* ═══════════════════════════════════════════════════
+   Mobile Foundation
+   ═══════════════════════════════════════════════════ */
+
+/* Horizontal scroll wrapper for data tables on mobile */
+.table-scroll-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+@media (min-width: 769px) {
+    .table-scroll-wrap { overflow-x: visible; }
+}
+
+/* ── Mobile layout token overrides ── */
+@media (max-width: 768px) {
+    :root {
+        --page-gutter: 16px;
+        --page-max-width: 100%;
+        --content-padding-top: calc(var(--nav-height) + 8px);
+    }
+
+    .page-content { padding-top: 56px; }
+    .mainbody { padding-top: 56px; }
+
+    /* Legacy table overflow fixes */
+    table.searchResults { float: none; min-width: 0; width: 100%; }
+    th.wrap { max-width: none; }
+
+    /* Touch-friendly tap targets (excludes nav which has its own sizing) */
+    .page-content button,
+    .page-content select,
+    .page-content .btn,
+    .page-content [role="button"] {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Responsive search input */
+    .search { width: 100%; box-sizing: border-box; }
+
+    /* Tighter table cells on small screens */
+    th, td { padding: 4px 6px; font-size: var(--text-sm); }
+}
