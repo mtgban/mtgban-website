@@ -898,6 +898,13 @@
                         </form>
                     </div>
                     <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                        <thead><tr>
+                            <th>Card</th>
+                            <th>Set</th>
+                            <th>Prices</th>
+                            <th>Spread</th>
+                        </tr></thead>
+                        <tbody>
                         {{range $entries}}
                             {{$card := (index $.Metadata .CardId)}}
                             <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
@@ -940,6 +947,7 @@
                                 </td>
                             </tr>
                         {{end}}
+                        </tbody>
                     </table>
                 </div>
             {{end}}
@@ -956,6 +964,14 @@
         btn.classList.add('on');
     }
     </script>
+
+    {{if .Optimized}}
+    <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
+    <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
+    <script>
+        document.querySelectorAll('.opt-table').forEach(function(t) { new Tablesort(t); });
+    </script>
+    {{end}}
 
     <!-- Hidden form for pick-printing re-submission -->
     <form id="upload_form" action="/upload" method="post" style="display:none">
