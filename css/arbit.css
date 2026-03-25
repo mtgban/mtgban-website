@@ -446,4 +446,30 @@
     .arb-table th, .arb-table td { padding: 5px 8px; }
     .arb-card-cell .set-icon { display: none; }
     .arb-selector-bar { gap: 6px; }
+
+    /* Touch-friendly filter chips */
+    .arb-filter-chip { padding: 8px 14px; }
+    .arb-jump-chip { padding: 8px 14px; }
+    .arb-alt-pill { padding: 8px 14px; }
+}
+
+@media (max-width: 640px) {
+    .arb-page { padding: 16px 12px 60px; }
+
+    /* Selector bar: stack vertically */
+    .arb-selector-bar { flex-direction: column; align-items: stretch; }
+    .arb-current-store { justify-content: center; }
+    .arb-opts-link { margin-left: 0; justify-content: center; }
+    .arb-alt-stores { flex-wrap: wrap; margin-left: 0; justify-content: center; }
+
+    /* Card cell tighter */
+    .arb-card-cell { min-width: 140px; gap: 4px; }
+    .arb-card-cell .card-name-line a { font-size: var(--text-sm); }
+
+    /* Section header tighter */
+    .arb-section-name { font-size: var(--text-lg); }
+    .arb-load-btns { width: 100%; justify-content: flex-start; }
+
+    /* Edition filter full width */
+    .arb-edition-filter { width: 100%; margin-left: 0; }
 }
