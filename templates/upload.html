@@ -992,10 +992,11 @@
         var newHash = select.value;
         var oldHash = select.dataset.hash;
 
-        // On first pick, load all card data into hidden form
+        // On first pick, load all card data into hidden form (skip error rows with empty hash)
         if (form.querySelectorAll('input[name="hashes"]').length === 0) {
             form.removeAttribute("enctype");
             document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
+                if (!row.dataset.hash) return; // skip not-found cards
                 var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
                 pairs.forEach(function(pair) {
                     var input = document.createElement("input");
