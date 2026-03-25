@@ -812,19 +812,19 @@
 .opt-store-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
     padding: 12px 16px;
     background: var(--surface-2);
     border-bottom: 1px solid var(--border-subtle);
     position: sticky;
-    top: 0;
+    top: var(--nav-height);
     z-index: 5;
 }
-.opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; flex: 1; }
+.opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; white-space: nowrap; }
+.opt-header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; flex: 1; }
 .opt-store-header .opt-total { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 600; color: var(--asuccess); }
 .opt-store-header .opt-count { font-size: var(--text-sm); color: var(--text-dim); padding: 2px 8px; background: var(--surface-3); border-radius: 10px; }
-
-.opt-actions { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--border-subtle); }
 .opt-btn {
     padding: 6px 14px;
     border-radius: var(--radius-sm);
