@@ -779,10 +779,7 @@
                 <div class="opt-store" id="opt-{{.}}">
                     <div class="opt-store-header">
                         <h3>{{scraper_name .}}</h3>
-                        <span class="opt-count">{{len $entries}} cards</span>
-                        <span class="opt-total">$ {{printf "%.2f" $total}}</span>
-                    </div>
-                    <div class="opt-actions">
+                        <div class="opt-header-actions">
                         {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
                             <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
@@ -896,6 +893,9 @@
                                 <input type="submit" value="TCGplayer CSV"/>
                             </noscript>
                         </form>
+                        </div>
+                        <span class="opt-count">{{len $entries}} cards</span>
+                        <span class="opt-total">$ {{printf "%.2f" $total}}</span>
                     </div>
                     <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
                         <thead><tr>
