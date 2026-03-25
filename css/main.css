@@ -954,36 +954,46 @@ th a {
 }
 .autocomplete-items {
     position: absolute;
-    border: 1px solid var(--verywhite);
-    border-bottom: none;
-    border-top: none;
     z-index: 99;
-
-    /* Position the autocomplete items to be the same width as the container */
     top: 100%;
     left: 0;
     right: 0;
-
-    /* Adjust the offsets brought by the container element */
-    margin-left: 8px;
-    margin-top: -8px;
-    margin-right: -10px;
+    margin-top: 4px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-moderate);
+    overflow: hidden;
+    max-height: 320px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-4) transparent;
+}
+.light-theme .autocomplete-items {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+.dark-theme .autocomplete-items {
+    background: rgba(20, 24, 30, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 .autocomplete-items div {
-    padding: 10px;
+    padding: 10px 14px;
     cursor: pointer;
-    background-color: var(--almostwhite);
-    border-bottom: 1px solid var(--verywhite);
-    color: black;
+    color: var(--normal);
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: var(--text-lg);
+    transition: background 0.1s;
 }
-/* when hovering an item */
+.autocomplete-items div:last-child { border-bottom: none; }
 .autocomplete-items div:hover {
-    background-color: var(--hover);
+    background: var(--accent-muted);
 }
-/* when navigating through the items using the arrow keys */
 .autocomplete-active {
-    background-color: var(--navbackground) !important;
-    color: #ffffff;
+    background: var(--accent-muted) !important;
+    color: var(--ainfo) !important;
 }
 
 pre {
