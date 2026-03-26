@@ -424,8 +424,9 @@ a.pagination {
 }
 .light-theme .ban-nav-links a.active,
 .light-theme .ban-nav-links a.selected {
-    background: rgba(30,144,255,0.10);
-    border: 1px solid rgba(30,144,255,0.25);
+    color: var(--activetext);
+    background: rgba(30,144,255,0.12);
+    border: 1px solid rgba(30,144,255,0.30);
 }
 
 /* Emoji/icon in nav items */
