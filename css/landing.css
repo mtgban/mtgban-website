@@ -1,5 +1,4 @@
 :root {
-    --font-display: 'Instrument Serif', Georgia, serif;
     --ban-red: #e53935;
 }
 
@@ -9,7 +8,6 @@
     align-items: center;
     min-height: 100vh;
     position: relative;
-    font-family: 'DM Sans', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
 }
 

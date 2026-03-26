@@ -397,7 +397,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                             </div>
                         {{end}}
                     {{else}}
-                        <div class="sidebar-img-wrap" id="cardImageWrapper">
+                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper">
                             <img class="sidebar-card-img" id="cardImage" src="" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
                         </div>
                         <div class="sidebar-printings" id="printings"></div>
@@ -749,7 +749,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <div class="price-row">
+                                            <div class="price-row{{if and (eq $conditions "INDEX") $.IsSealed}} index-row{{end}}">
                                                 {{if eq .URL ""}}
                                                     <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                 {{else}}

@@ -651,7 +651,7 @@ a.active:hover{
     color: var(--activetext);
 }
 a.beta {
-    color: var(--background);
+    color: #ffffff;
     font-weight: bold;
     pointer-events: none;
 }
@@ -1048,6 +1048,7 @@ td.tiers {
     text-align: center;
     font-size: var(--text-8xl);
     margin: auto;
+    color: #000000;
 }
 
 .input-css {
@@ -1217,20 +1218,22 @@ img.hoverImage {
     width: auto;
     max-width: 640px;
     max-height: 360px;
+    border-radius: 8px;
 }
 
 /* Foil card image overlay */
-.card-image-wrapper {
+.foil-wrap {
     position: relative;
     display: inline-block;
+    line-height: 0;
 }
-.card-image-wrapper[data-foil="true"]::after {
+.foil-wrap > img {
+    display: block;
+}
+.foil-wrap[data-foil="true"]::after {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     border-radius: 12px;
     background: linear-gradient(
         105deg,
