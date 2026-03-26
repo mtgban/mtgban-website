@@ -422,6 +422,11 @@ a.pagination {
     color: var(--ainfo);
     background: var(--accent-muted, rgba(91,141,239,0.12));
 }
+.light-theme .ban-nav-links a.active,
+.light-theme .ban-nav-links a.selected {
+    background: rgba(30,144,255,0.10);
+    border: 1px solid rgba(30,144,255,0.25);
+}
 
 /* Emoji/icon in nav items */
 .ban-nav-links .nav-icon {
