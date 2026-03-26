@@ -449,6 +449,12 @@
     }
 }
 
+@media (max-width: 768px) {
+    /* Touch-friendly preset buttons */
+    .sleepers-comp-preset { padding: 12px 16px; }
+    .sleepers-comp-go { padding: 14px 20px; }
+}
+
 @media (max-width: 640px) {
     .sleepers-page {
         padding-left: 16px;
@@ -467,4 +473,10 @@
     .sleepers-comp-presets {
         gap: 4px;
     }
+
+    /* Tier table horizontal scroll */
+    table.tiers { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Results header */
+    .sleepers-results-header h1 { font-size: var(--text-6xl); }
 }

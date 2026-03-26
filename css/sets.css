@@ -323,4 +323,27 @@ tr.child-row td:first-child {
     .sets-name-cell .set-icon { display: none; }
     tr.child-row .sets-name-cell { padding-left: 18px; }
     tr.child-row .sets-name-cell::before { left: 8px; }
+
+    /* Horizontal scroll for wide tables */
+    .sets-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Touch-friendly toolbar */
+    .sets-toolbar-btn { padding: 10px 14px; }
+    .sets-sort-link { padding: 8px 12px; }
+}
+
+@media (max-width: 640px) {
+    .sets-page { padding-left: 16px; padding-right: 16px; }
+    .sets-page h1 { font-size: var(--text-6xl); }
+
+    /* Filter input full width */
+    .sets-filter-input { width: 100%; }
+    .sets-toolbar { flex-direction: column; align-items: stretch; }
+    .sets-toolbar-spacer { display: none; }
+    .sets-sort-group { justify-content: flex-start; }
+
+    /* Tighter table cells */
+    .sets-table th, .sets-table td { padding: 5px 8px; }
+    .sets-name-cell a { font-size: var(--text-base); }
+    .sets-name-cell .set-code { display: none; }
 }

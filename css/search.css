@@ -895,6 +895,43 @@
     .opts-dropdown-group { grid-template-columns: 1fr; }
     .opts-check-grid { grid-template-columns: 1fr; }
 }
+@media (max-width: 768px) {
+    /* Symmetric padding on tablet/mobile */
+    .search-layout { padding-left: 0; padding-right: 0; }
+
+    /* Sort pills: touch-friendly sizing */
+    .search-sort-pill { padding: 8px 14px; font-size: var(--text-md); }
+    .search-sort-label { padding: 8px 0; }
+
+    /* Pagination: bigger touch targets */
+    .search-pagination a,
+    .search-pagination span { padding: 10px 16px; font-size: var(--text-lg); }
+
+    /* Chart canvas responsive */
+    .chart-container canvas { width: 100% !important; height: auto !important; }
+    .chart-container { padding: 10px; }
+    .chart-controls { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 640px) {
+    /* Price rows: tighter layout */
+    .price-row { padding: 8px 8px; gap: 4px; font-size: var(--text-md); }
+    .price-row .store-name { width: 50%; font-size: var(--text-md); }
+    .price-row .price { font-size: var(--text-md); }
+    .price-row .qty { font-size: var(--text-sm); min-width: 28px; }
+    .price-row .secondary { font-size: var(--text-sm); }
+
+    /* Result headers: tighter */
+    .result-card-name { font-size: var(--text-lg); }
+    .result-header { padding: 8px 8px; gap: 4px; }
+
+    /* Options page: full-width padding */
+    .opts-page { padding-left: 16px; padding-right: 16px; }
+
+    /* Sealed index columns tighter */
+    .price-index-header { font-size: var(--text-xs); gap: 4px; padding: 4px 8px; }
+}
+
 @media (max-width: 600px) {
     .search-input-row { flex-wrap: wrap; }
     .search-surprise { width: 100%; text-align: center; }

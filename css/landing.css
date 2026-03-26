@@ -182,8 +182,17 @@
 /* ═══ Responsive ═══ */
 @media (max-width: 640px) {
     .landing-brand-text { font-size: 22px; }
+    .landing-search-wrap { display: flex; flex-direction: column; gap: 8px; }
     .landing-search { font-size: 15px; padding: 14px 18px 14px 42px; }
+    .landing-lucky {
+        position: static;
+        transform: none;
+        align-self: center;
+        padding: 10px 24px;
+        font-size: 13px;
+    }
     .landing-tools { gap: 4px; }
-    .landing-tool { font-size: 12px; padding: 6px 12px; }
+    .landing-tool { font-size: 12px; padding: 8px 14px; }
+    .landing-login-btn { padding: 12px 24px; }
     .landing-footer { padding-bottom: 24px; }
 }
