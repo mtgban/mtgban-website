@@ -604,18 +604,20 @@
 }
 
 
-/* ═══ Chart container (glass effect) ═══ */
+/* ═══ Chart container ═══ */
 .chart-container {
-    background: rgba(24, 27, 32, 0.7);
+    position: relative;
+    background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: var(--radius-lg);
     padding: 16px;
-    margin-bottom: 20px;
+    margin-top: 20px;
+    margin-bottom: 10px;
 }
-.light-theme .chart-container {
-    background: rgba(255, 255, 255, 0.7);
+.dark-theme .chart-container {
+    background: rgba(24, 27, 32, 0.7);
 }
 
 .chart-controls {
@@ -625,6 +627,55 @@
     flex-wrap: wrap;
     gap: 8px;
     margin-top: 12px;
+}
+
+/* ═══ Chart tooltip (glass) ═══ */
+.chart-tooltip {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 11px;
+    color: rgba(0,0,0,0.85);
+    transition: opacity 0.15s ease;
+    z-index: 10;
+    min-width: 140px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+    white-space: nowrap;
+}
+.dark-theme .chart-tooltip {
+    background: rgba(12, 14, 20, 0.82);
+    border-color: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.9);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+.chart-tooltip-title {
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+}
+.dark-theme .chart-tooltip-title {
+    border-bottom-color: rgba(255,255,255,0.08);
+}
+.chart-tooltip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 0;
+}
+.chart-tooltip-swatch {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
 }
 
 
