@@ -343,7 +343,7 @@
 .news-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: var(--text-md);
+    font-size: var(--text-xl);
     table-layout: auto;
 }
 .news-table th {
