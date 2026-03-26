@@ -297,6 +297,12 @@
     filter: brightness(1.1);
 }
 
+/* Dark theme: brighten faint text */
+.dark-theme .sleepers-page-subtitle,
+.dark-theme .sleepers-filters-btn {
+    color: var(--normal);
+}
+
 .sleepers-comp-go:disabled {
     opacity: 0.35;
     cursor: not-allowed;
