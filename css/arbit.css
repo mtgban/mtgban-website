@@ -286,8 +286,8 @@
     display: inline-block;
 }
 
-.arb-load-btn.buy { background: rgba(63,185,80,0.12); color: var(--asuccess); }
-.arb-load-btn.buy:hover { background: rgba(63,185,80,0.22); }
+.arb-load-btn.buy { background: rgba(30,144,255,0.12); color: var(--ainfo); }
+.arb-load-btn.buy:hover { background: rgba(30,144,255,0.22); }
 .arb-load-btn.sell { background: rgba(210,153,34,0.12); color: var(--awarning); }
 .arb-load-btn.sell:hover { background: rgba(210,153,34,0.22); }
 .arb-load-btn.csv { background: var(--surface-2); color: var(--activetext); border: 1px solid var(--border-subtle); }
@@ -415,8 +415,8 @@
     transition: all 0.1s;
 }
 
-.arb-qlink.buy { background: rgba(63,185,80,0.08); color: var(--asuccess); border: 1px solid rgba(63,185,80,0.15); }
-.arb-qlink.buy:hover { background: rgba(63,185,80,0.18); text-decoration: none; }
+.arb-qlink.buy { background: rgba(30,144,255,0.08); color: var(--ainfo); border: 1px solid rgba(30,144,255,0.15); }
+.arb-qlink.buy:hover { background: rgba(30,144,255,0.18); text-decoration: none; }
 .arb-qlink.sell { background: rgba(210,153,34,0.08); color: var(--awarning); border: 1px solid rgba(210,153,34,0.15); }
 .arb-qlink.sell:hover { background: rgba(210,153,34,0.18); text-decoration: none; }
 
