@@ -75,7 +75,7 @@
 
 {{define "search-bar"}}
 <div class="page-standard">
-    <div class="search-bar-wrap" style="position:static; padding:0 0 0px;">
+    <div class="search-bar-wrap">
         <div class="search-input-row">
             <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
                 <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
@@ -459,24 +459,10 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{end}}
                     <hr class="sidebar-divider">
                     <div class="sidebar-legend">
-                        {{if .HasReserved}}
-                            <h4>
-                                {{if .ChartID}}<center>{{else}}* ={{end}}
-                                Part of the <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a>
-                                {{if .ChartID}}</center>{{end}}
-                            </h4>
-                        {{end}}
                         {{if .HasStocks}}
                             <h4>
                                 {{if .ChartID}}<center>{{else}}• ={{end}}
                                 On <a href="https://mtgstocks.com/interests">MTGStocks Interests</a> page
-                                {{if .ChartID}}</center>{{end}}
-                            </h4>
-                        {{end}}
-                        {{if .HasSypList}}
-                            <h4>
-                                {{if .ChartID}}<center>{{else}}† ={{end}}
-                                Found in the <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a>
                                 {{if .ChartID}}</center>{{end}}
                             </h4>
                         {{end}}
