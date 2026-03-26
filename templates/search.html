@@ -37,10 +37,8 @@
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     {{if .ChartID}}
-        <script type="text/javascript"
-                 src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.bundle.js"
-           integrity="sha512-zO8oeHCxetPn1Hd9PdDleg5Tw1bAaP0YmNvPY8CwcRyUk7d7/+nyElmFrB6f7vg4f7Fv4sui1mcep8RIEShczg=="
-         crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
         <script type="text/javascript" src="/js/chartopts.js?hash={{.Hash}}"></script>
     {{end}}
     {{if .IsSealed}}
@@ -68,17 +66,7 @@
 {{define "search-header"}}
 <div class="page-standard">
     <div class="page-header">
-        {{if .ChartID}}
-            {{$card := (index $.Metadata .ChartID)}}
-            <h1 lang="{{$card.LangTag}}" style="width: fit-content;">
-                {{$card.Name}}
-                <hr>
-                {{if not $.IsSealed}}
-                    <h3 lang="en" class=indent>{{$card.Variant}}</h3>
-                {{end}}
-                <h5 lang="en" class=indent>{{$card.Title}}</h5>
-            </h1>
-        {{else}}
+        {{if not .ChartID}}
             <h1>Welcome to {{.Title}}</h1>
         {{end}}
     </div>
@@ -504,8 +492,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{if .ChartID}}
                         <div class="chart-container">
                             <canvas id="cardChart" width="760" height="480"></canvas>
-                            <br>
-                            <hr>
                             <div class="chart-controls">
                                 <p style="margin: 0;">
                                     {{if $.CanDeleteChart}}
@@ -533,6 +519,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     {{end}}
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
+                                    <a class="btn" href="javascript:closeChart()">Close chart</a>
                                 </p>
                             </div>
                         </div>
@@ -561,7 +548,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                             // Create the chart
                             var ctx = document.getElementById('cardChart').getContext('2d');
                             var cardChart = new Chart(ctx, {
-                                type: 'banWithLine',
+                                type: 'line',
                                 data: {
                                     labels: {{.AxisLabels}},
                                     datasets: [
@@ -569,52 +556,51 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {
                                                 label: {{.Name}},
                                                 data: {{.Data}},
-                                                backgroundColor: {{.Color}},
                                                 borderColor: {{.Color}},
-                                                fill: false,
-                                                pointRadius: 0,
+                                                fill: 'origin',
                                             },
                                         {{end}}
                                     ]
                                 },
                                 options: opts,
                                 plugins: [{
-                                    afterDraw: chart => {
-                                        var ctx = chart.chart.ctx;
-
-                                        ctx.textAlign = 'center';
-                                        ctx.textBaseline = 'bottom';
-                                        ctx.font = '32px Keyrune';
-                                        ctx.fillStyle = readVar('--chartjs-text');
-
-                                        var xBottomAxis = chart.scales['x-time'];
+                                    afterDraw: function (chart) {
+                                        var drawCtx = chart.ctx;
                                         var xTopAxis = chart.scales['x-top'];
-                                        xTopAxis.ticks.forEach((value, index) => {
-                                            if (value in productKeyrunes) {
-                                                const padding = 32;
+                                        if (!xTopAxis) return;
 
+                                        drawCtx.save();
+                                        drawCtx.textAlign = 'center';
+                                        drawCtx.textBaseline = 'bottom';
+                                        drawCtx.font = '32px Keyrune';
+                                        drawCtx.fillStyle = readVar('--chartjs-text');
+
+                                        xTopAxis.ticks.forEach(function (tick, index) {
+                                            var value = tick.label;
+                                            if (value in productKeyrunes) {
+                                                var padding = 32;
                                                 var x = xTopAxis.getPixelForTick(index);
-                                                if (x + padding/2 > chart.width) {
+                                                if (x + padding / 2 > chart.width) {
                                                     x = chart.width - padding / 2;
                                                 }
 
-                                                let el = document.createElement('i');
+                                                var el = document.createElement('i');
                                                 el.className = 'ss-' + productKeyrunes[value];
-
                                                 document.body.appendChild(el);
-                                                let content = window.getComputedStyle(el, '::before').content;
+                                                var content = window.getComputedStyle(el, '::before').content;
                                                 content = content.replace(/^"(.*)"$/, '$1');
                                                 document.body.removeChild(el);
 
-                                                ctx.fillText(content, x, xTopAxis.top + 24);
+                                                drawCtx.fillText(content, x, xTopAxis.top + 24);
                                             }
                                         });
+                                        drawCtx.restore();
                                     }
                                 }],
                             });
 
                             // Load state from local storage
-                            applySavedLegendState(cardChart);
+                            applySavedLegendState(cardChart, legendStorageKey);
 
                             // Apply theme (light/dark)
                             rethemeFirstAxes(cardChart);
@@ -637,6 +623,15 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 cardChart.options.spanGaps = !cardChart.options.spanGaps;
                                 cardChart.update();
                                 localStorage.setItem("chartSpanGaps", cardChart.options.spanGaps);
+                            }
+                            function closeChart() {
+                                if (window.history.length > 1) {
+                                    window.history.back();
+                                } else {
+                                    var url = new URL(window.location);
+                                    url.searchParams.delete('chart');
+                                    window.location = url;
+                                }
                             }
                             function downloadAsImg() {
                                 var chartImg = document.createElement('a');

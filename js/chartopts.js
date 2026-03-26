@@ -1,213 +1,297 @@
-// Custom chart type which copies the "line" one and draws
-// an extra vertical line on hover
-Chart.defaults.banWithLine = Chart.defaults.line;
-Chart.controllers.banWithLine = Chart.controllers.line.extend({
-    draw: function(ease) {
-        Chart.controllers.line.prototype.draw.call(this, ease);
+/* ── Plugins ── */
 
-        if (this.chart.tooltip._active && this.chart.tooltip._active.length) {
-            var activePoint = this.chart.tooltip._active[0];
-            var ctx = this.chart.ctx;
-            var x = activePoint.tooltipPosition().x;
-            var topY = this.chart.legend.bottom;
-            var bottomY = this.chart.chartArea.bottom;
+// Dashed vertical crosshair on hover
+const crosshairPlugin = {
+    id: 'crosshair',
+    afterDatasetsDraw(chart) {
+        const active = chart.tooltip?.getActiveElements();
+        if (!active?.length) return;
 
-            // Draw vertical line
-            ctx.save();
-            ctx.beginPath();
-            ctx.moveTo(x, topY);
-            ctx.lineTo(x, bottomY);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = '#92929242';
-            ctx.stroke();
-            ctx.restore();
-        }
-    }
-});
+        const x = active[0].element.x;
+        const { top, bottom } = chart.chartArea;
+        const ctx = chart.ctx;
 
-// Custom positioner to draw the tooltip on the bottom or top if it covers anything
-Chart.Tooltip.positioners.bottom = function(elements, position) {
-    if (!elements.length) {
-        return false;
-    }
-    var pos = this._chart.chartArea.bottom;
-    var topPos = this._chart.chartArea.top;
-
-    // The very first hover event might not have drawn the tooltip yet so make up
-    // some height value using the default font size plus some margin
-    var tooltipHeight = elements.length * 12 + 26;
-    if (this._chart.tooltip._view) {
-        tooltipHeight = this._chart.tooltip._view.height + this._chart.tooltip._view.footerMarginTop;
-    }
-
-    elements.forEach(function(element) {
-        if (element._view.y > pos - tooltipHeight) {
-            pos = topPos + tooltipHeight * 2 / 3;
-        }
-    });
-
-    return {
-        x: elements[0]._view.x,
-        y: pos,
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([4, 3]);
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = readVar('--chartjs-crosshair');
+        ctx.stroke();
+        ctx.restore();
     }
 };
+
+// Build per-dataset gradient fills once layout dimensions are known
+const gradientFillPlugin = {
+    id: 'gradientFill',
+    afterLayout(chart) {
+        const area = chart.chartArea;
+        if (!area) return;
+
+        chart.data.datasets.forEach(function (ds) {
+            var color = ds.borderColor;
+            if (!color || typeof color !== 'string') return;
+
+            var match = color.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+            if (!match) return;
+            var r = match[1], g = match[2], b = match[3];
+
+            var grad = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+            grad.addColorStop(0,   'rgba(' + r + ',' + g + ',' + b + ',0.10)');
+            grad.addColorStop(0.5, 'rgba(' + r + ',' + g + ',' + b + ',0.03)');
+            grad.addColorStop(1,   'rgba(' + r + ',' + g + ',' + b + ',0)');
+            ds.backgroundColor = grad;
+        });
+    }
+};
+
+Chart.register(crosshairPlugin, gradientFillPlugin);
+
+
+/* ── External HTML tooltip ── */
+
+function externalTooltipHandler(context) {
+    var chart   = context.chart;
+    var tooltip = context.tooltip;
+    var container = chart.canvas.parentNode;
+
+    var el = container.querySelector('.chart-tooltip');
+    if (!el) {
+        el = document.createElement('div');
+        el.className = 'chart-tooltip';
+        container.appendChild(el);
+    }
+
+    if (tooltip.opacity === 0) {
+        el.style.opacity = '0';
+        return;
+    }
+
+    // Build HTML
+    var html = '';
+    if (tooltip.title && tooltip.title.length) {
+        html += '<div class="chart-tooltip-title">' + tooltip.title[0] + '</div>';
+    }
+
+    var body = tooltip.body || [];
+    body.forEach(function (bodyItem, i) {
+        var line = bodyItem.lines[0];
+        if (!line) return;
+        var colors = tooltip.labelColors[i];
+        html += '<div class="chart-tooltip-row">' +
+            '<span class="chart-tooltip-swatch" style="background:' + colors.borderColor + '"></span>' +
+            '<span>' + line + '</span>' +
+            '</div>';
+    });
+
+    el.innerHTML = html;
+    el.style.opacity = '1';
+
+    // Position to whichever side of the crosshair has more room
+    var cx = chart.canvas.offsetLeft + tooltip.caretX;
+    var cy = chart.canvas.offsetTop  + tooltip.caretY;
+
+    el.style.top = cy + 'px';
+    el.style.transform = 'translateY(-50%)';
+
+    if (tooltip.caretX > chart.width / 2) {
+        el.style.right = (container.clientWidth - cx + 14) + 'px';
+        el.style.left  = 'auto';
+    } else {
+        el.style.left  = (cx + 14) + 'px';
+        el.style.right = 'auto';
+    }
+}
+
+
+/* ── Chart options ── */
 
 function getChartOpts(xAxisLabels, gaps) {
     if (gaps === null) {
         gaps = true;
     } else {
-        gaps = (gaps === "true");
+        gaps = (gaps === 'true');
     }
+
+    var textColor = readVar('--chartjs-text') || '#000000';
+    var gridColor = readVar('--chartjs-grid') || 'rgba(150,150,150,0.06)';
+
     return {
         responsive: true,
-        // Controls the gaps in the graph when data is missing
+        maintainAspectRatio: true,
         spanGaps: gaps,
-        legend: {
-            position: "top",
-            align: "center",
-            onHover: function(e) { this.chart.canvas.style.cursor = 'pointer'; },
-            onLeave: function(e) { this.chart.canvas.style.cursor = 'default'; },
-        },
-        // Speed up initial animation
-        animation: {
-            duration: 1000,
-        },
-        // The labels appearing on top of points
-        tooltips: {
-            mode: "index",
-            position: "bottom",
-            backgroundColor: 'rgba(10, 10, 10, 220)',
+
+        interaction: {
+            mode: 'index',
             intersect: false,
-            callbacks: {
-                // Make sure there is a $ and floating point looks sane
-                label: function(tooltipItems, data) {
-                    return data.datasets[tooltipItems.datasetIndex].label + ': $' + parseFloat(data.datasets[tooltipItems.datasetIndex].data[tooltipItems.index]).toFixed(2);
+        },
+
+        animation: {
+            duration: 800,
+            easing: 'easeOutQuart',
+        },
+
+        elements: {
+            line: {
+                tension: 0.15,
+                borderWidth: 2,
+            },
+            point: {
+                radius: 0,
+                hoverRadius: 5,
+                hoverBorderWidth: 2,
+                hoverBorderColor: 'rgba(255,255,255,0.9)',
+                hitRadius: 6,
+            },
+        },
+
+        plugins: {
+            legend: {
+                position: 'top',
+                align: 'center',
+                labels: {
+                    color: textColor,
+                    usePointStyle: true,
+                    pointStyle: 'circle',
+                    padding: 16,
+                    font: { size: 11 },
+                },
+                onHover: function (e) { e.native.target.style.cursor = 'pointer'; },
+                onLeave: function (e) { e.native.target.style.cursor = 'default'; },
+            },
+            tooltip: {
+                enabled: false,
+                external: externalTooltipHandler,
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                    title: function (items) {
+                        if (!items.length) return '';
+                        var d = new Date(items[0].parsed.x);
+                        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+                    },
+                    label: function (ctx) {
+                        var val = parseFloat(ctx.raw);
+                        if (isNaN(val)) return null;
+                        return ctx.dataset.label + ': $' + val.toFixed(2);
+                    },
                 },
             },
         },
-        // The animation when hovering on an axis
-        hover: {
-            mode: "x-axis",
-            intersect: true,
-            animationDuration: 0,
-        },
+
         scales: {
-            xAxes: [
-                {
-                    id: 'x-time',
-                    display: true,
-                    type: "time",
-                    distribution: "linear",
-                    time: {
-                        unit: "day",
-                        stepSize: 7,
+            x: {
+                type: 'time',
+                time: {
+                    unit: 'day',
+                    stepSize: 7,
+                    displayFormats: { day: 'MMM d' },
+                },
+                grid: {
+                    color: gridColor,
+                    drawTicks: false,
+                },
+                ticks: {
+                    color: textColor,
+                    padding: 8,
+                    maxRotation: 45,
+                    font: { size: 10 },
+                },
+                border: { display: false },
+            },
+            'x-top': {
+                type: 'category',
+                position: 'top',
+                display: true,
+                labels: xAxisLabels,
+                reverse: true,
+                grid: { display: false },
+                ticks: {
+                    color: 'transparent',
+                    font: { size: 4 },
+                },
+                border: { display: false },
+            },
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: gridColor,
+                    drawTicks: false,
+                },
+                ticks: {
+                    color: textColor,
+                    padding: 8,
+                    font: { size: 10 },
+                    callback: function (value) {
+                        return '$' + value.toFixed(2);
                     },
                 },
-                // This is an invisible axis so that we have better sizing
-                // and positioning for our set symbols
-                {
-                    id: 'x-top',
-                    type: 'category',
-                    position: 'top',
-                    display: true,
-                    // These labels are not going to be visible but will serve
-                    // as input ticks to check for where to put symbols
-                    labels: xAxisLabels,
-                    gridLines: {
-                        display: false,
-                    },
-                    ticks: {
-                        fontColor: 'transparent',
-                        fontSize: 4,
-                        reverse: true,
-                    },
+                border: { display: false },
+                afterDataLimits: function (axis) {
+                    axis.max *= 1.1;
                 },
-            ],
-            yAxes: [
-                {
-                    id: 'y-data',
-                    display: true,
-                    ticks: {
-                        beginAtZero: true,
-                        callback: function(value, index, values) {
-                            return '$' + value.toFixed(2);
-                        },
-                    },
-                    afterDataLimits: function(axis) {
-                        // Keep a 10% buffer
-                        axis.max *= 1.1;
-                    },
-                },
-            ],
+            },
         },
-    }
+    };
 }
 
-// Read a CSS variable from the current document
+
+/* ── Theme helpers ── */
+
 function readVar(name) {
-    let el = document.documentElement;
+    var el = document.documentElement;
     if (document.body.classList.contains('light-theme') || document.body.classList.contains('dark-theme')) {
         el = document.body;
     }
-    // Trim to remove possible whitespaces
     return window.getComputedStyle(el).getPropertyValue(name).trim();
 }
 
-// Read chart options and set the appropriate theme color for grid and text
-// Only the first two axis are set to let invisible ones alone
 function rethemeFirstAxes(chart) {
-    if (!chart || !chart.options) {
-        return;
+    if (!chart || !chart.options) return;
+
+    var grid = readVar('--chartjs-grid');
+    var text = readVar('--chartjs-text') || '#000000';
+
+    // Legend text
+    var legend = chart.options.plugins && chart.options.plugins.legend;
+    if (legend && legend.labels) {
+        legend.labels.color = text;
     }
 
-    const grid = readVar('--chartjs-grid');
-    const text = readVar('--chartjs-text');
-
-    // Legend + title text
-    chart.options.legend = chart.options.legend || {};
-    chart.options.legend.labels = chart.options.legend.labels || {};
-    chart.options.legend.labels.fontColor = text;
-    if (chart.options.title) {
-        chart.options.title.fontColor = text;
+    // X axis
+    var xScale = chart.options.scales && chart.options.scales.x;
+    if (xScale) {
+        xScale.ticks = xScale.ticks || {};
+        xScale.ticks.color = text;
+        xScale.grid  = xScale.grid  || {};
+        xScale.grid.color = grid;
     }
 
-    // Only first x axis and first y axis
-    const scales = chart.options.scales || (chart.options.scales = {});
-    const x0 = (scales.xAxes && scales.xAxes[0]) || null;
-    const y0 = (scales.yAxes && scales.yAxes[0]) || null;
-
-    if (x0) {
-        x0.ticks = x0.ticks || {};
-        x0.ticks.fontColor = text;
-        x0.gridLines = x0.gridLines || {};
-        x0.gridLines.color = grid;
-        x0.gridLines.zeroLineColor = grid;
+    // Y axis
+    var yScale = chart.options.scales && chart.options.scales.y;
+    if (yScale) {
+        yScale.ticks = yScale.ticks || {};
+        yScale.ticks.color = text;
+        yScale.grid  = yScale.grid  || {};
+        yScale.grid.color = grid;
     }
 
-    if (y0) {
-        y0.ticks = y0.ticks || {};
-        y0.ticks.fontColor = text;
-        y0.gridLines = y0.gridLines || {};
-        y0.gridLines.color = grid;
-        y0.gridLines.zeroLineColor = grid;
-    }
-
-    // Redraw
-    chart.update();
+    chart.update('none');
 }
 
-// Extend chart options to capture clicks and save state in local storage
+
+/* ── Legend persistence ── */
+
 function withLegendPersistence(legendStorageKey, opts) {
-    var orig = (Chart.defaults.global.legend && Chart.defaults.global.legend.onClick) || function(){};
+    var defaultClick = Chart.defaults.plugins.legend.onClick;
 
-    opts.legend = opts.legend || {};
-    opts.legend.onClick = function(e, legendItem) {
-        // Run the default toggle
-        orig.call(this, e, legendItem);
+    opts.plugins.legend.onClick = function (e, legendItem, legend) {
+        defaultClick.call(this, e, legendItem, legend);
 
-        // Save hidden flags using computed visibility
-        var chart = this.chart;
-        var hidden = chart.data.datasets.map(function(ds, i) {
+        var chart = legend.chart;
+        var hidden = chart.data.datasets.map(function (_, i) {
             return !chart.isDatasetVisible(i);
         });
         localStorage.setItem(legendStorageKey, JSON.stringify(hidden));
@@ -216,35 +300,19 @@ function withLegendPersistence(legendStorageKey, opts) {
     return opts;
 }
 
-// Load legend state from local storage and apply it
-function applySavedLegendState(chart) {
-    var raw = localStorage.getItem(legendStorageKey);
-    if (!raw) {
-        return;
-    }
+function applySavedLegendState(chart, storageKey) {
+    var raw = localStorage.getItem(storageKey);
+    if (!raw) return;
 
     try {
         var hidden = JSON.parse(raw);
-
-        hidden.forEach(function(isHidden, i) {
-            // Guard for dataset count changes
-            if (!chart.data.datasets[i]) {
-                return;
-            }
-
-            // Source of truth: dataset.hidden
+        hidden.forEach(function (isHidden, i) {
+            if (!chart.data.datasets[i]) return;
             chart.data.datasets[i].hidden = !!isHidden;
-
-            // Let the default legend logic control visibility going forward
-            chart.getDatasetMeta(i).hidden = null;
         });
-
-        // Redraw chart
         chart.update();
     } catch (e) {
         console.error('Failed to parse legend state:', e);
-
-        // Delete bad state
-        localStorage.removeItem(legendStorageKey);
+        localStorage.removeItem(storageKey);
     }
 }

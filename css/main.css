@@ -83,8 +83,10 @@ html { font-size: 17px; }
 
     --chartjs-default-grid: rgba(0,0,0,0.1);
     --chartjs-dark-grid: rgba(140,140,140,0.2);
-    --chartjs-default-text: #666666;
+    --chartjs-default-text: #000000;
     --chartjs-dark-text: var(--darkgrey);
+    --chartjs-default-crosshair: rgba(0,0,0,0.12);
+    --chartjs-dark-crosshair: rgba(255,255,255,0.15);
 
     --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
 
@@ -149,6 +151,7 @@ html { font-size: 17px; }
     --backgroundImage: var(--mainImage);
     --chartjs-grid: var(--chartjs-default-grid);
     --chartjs-text: var(--chartjs-default-text);
+    --chartjs-crosshair: var(--chartjs-default-crosshair);
 
     --bg-active: var(--headerbackground);
     --bg-example: var(--headerbackground);
@@ -209,6 +212,7 @@ html { font-size: 17px; }
     --backgroundImage: var(--darkImage);
     --chartjs-grid: var(--chartjs-dark-grid);
     --chartjs-text: var(--chartjs-dark-text);
+    --chartjs-crosshair: var(--chartjs-dark-crosshair);
 
     --bg-active: var(--headerbackground);
     --bg-example: var(--headerbackground);
