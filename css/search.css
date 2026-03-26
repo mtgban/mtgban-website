@@ -628,6 +628,36 @@
     gap: 8px;
     margin-top: 12px;
 }
+.chart-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 14px;
+    font-size: var(--text-base);
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    color: var(--activetext);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    transition: all 0.12s;
+}
+.chart-pill:hover {
+    border-color: var(--accent-border, rgba(91,141,239,0.25));
+    color: var(--search-link, var(--normal));
+}
+.chart-pill-warning {
+    border-color: var(--awarning);
+    color: var(--awarning);
+}
+.chart-pill-warning:hover {
+    background: rgba(255,165,0,0.1);
+}
+.chart-pill-danger {
+    border-color: var(--adanger);
+    color: var(--adanger);
+}
+.chart-pill-danger:hover {
+    background: rgba(255,0,0,0.1);
+}
 
 /* ═══ Chart tooltip (glass) ═══ */
 .chart-tooltip {

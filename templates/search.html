@@ -509,17 +509,17 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 {{end}}
                                             </select>
                                             <input id="chart" type="hidden" name="chart" value="{{.ChartID}}"/>
-                                            <a class="btn danger" style="text-align: center;" onclick='this.parentNode.submit(); return false;'>Delete</a>
+                                            <a class="chart-pill chart-pill-danger" onclick='this.parentNode.submit(); return false;'>Delete</a>
                                         </form>
                                     {{end}}
                                 </p>
                                 <p style="margin: 0;">
                                     {{if $.CanDeleteChart}}
-                                        <a class="btn warning" onclick="document.getElementById('deletechart').style='inline'">Show delete options</a>
+                                        <a class="chart-pill chart-pill-warning" onclick="document.getElementById('deletechart').style='inline'">Show delete options</a>
                                     {{end}}
-                                    <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
-                                    <a class="btn success" href="javascript:downloadAsImg()">Download</a>
-                                    <a class="btn" href="javascript:closeChart()">Close chart</a>
+                                    <a class="chart-pill" href="javascript:toggleGaps()">Toggle gaps</a>
+                                    <a class="chart-pill" href="javascript:downloadAsImg()">Download</a>
+                                    <a class="chart-pill" href="javascript:closeChart()">Close chart</a>
                                 </p>
                             </div>
                         </div>
