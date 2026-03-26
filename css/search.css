@@ -35,13 +35,14 @@
 
 
 /* ═══ Search bar (spans full width above grid) ═══ */
-.search-bar-wrap {
-    grid-column: 1 / -1;
-    padding: 0 24px;
-    background: var(--background);
+/* --search-bar-h is used by the sidebar to clear the sticky bar */
+.search-bar-sticky {
     position: sticky;
-    top: var(--nav-height, 40px);
+    top: var(--nav-height, 48px);
     z-index: 50;
+    background: var(--background);
+    padding-top: 6px;
+    padding-bottom: 4px;
 }
 
 .search-input-row {
@@ -167,9 +168,9 @@
 .search-sidebar {
     padding: 20px;
     position: sticky;
-    top: var(--nav-height, 48px);
+    top: calc(var(--nav-height, 48px) + 90px);
     height: fit-content;
-    max-height: calc(100vh - var(--nav-height, 48px) - 20px);
+    max-height: calc(100vh - var(--nav-height, 48px) - 90px - 20px);
     overflow-y: auto;
 }
 .search-sidebar::-webkit-scrollbar { width: 4px; }
@@ -514,7 +515,7 @@
 
 .price-row .secondary {
     font-family: var(--font-mono);
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
     color: var(--normal);
     white-space: nowrap;
 }
@@ -1000,7 +1001,7 @@
     .price-row .store-name { width: 50%; font-size: var(--text-md); }
     .price-row .price { font-size: var(--text-md); }
     .price-row .qty { font-size: var(--text-sm); min-width: 28px; }
-    .price-row .secondary { font-size: var(--text-sm); }
+    .price-row .secondary { font-size: var(--text-md); }
 
     /* Result headers: tighter */
     .result-card-name { font-size: var(--text-lg); }
