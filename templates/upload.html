@@ -4,13 +4,17 @@
 {{end}}
 
 {{define "content"}}
-    {{if .UploadEntries}}
+    {{if or .UploadEntries .Optimized}}
         <div class="page-standard">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
             <div class="page-header">
                 <div>
                     <h1>Results{{if and .SearchQuery (not (eq .SearchQuery "hashes"))}} from {{.SearchQuery}}{{end}}</h1>
-                    <p class="page-subtitle">{{len .UploadEntries}} cards matched &middot; {{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode</p>
+                    {{if .UploadEntries}}
+                        <p class="page-subtitle">{{len .UploadEntries}} cards matched &middot; {{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode</p>
+                    {{else}}
+                        <p class="page-subtitle">{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode &middot; Optimizer only</p>
+                    {{end}}
                 </div>
             </div>
 
@@ -957,11 +961,11 @@
         document.querySelectorAll('.res-tab').forEach(function(t) { t.classList.remove('on'); });
         btn.classList.add('on');
     }
-    // Auto-activate optimizer tab when results are empty (skip results was checked)
+    // Auto-activate optimizer tab when "skip results" was checked
     (function() {
+        var skipResults = JSON.parse(localStorage.getItem('noresults'));
         var optBtn = document.querySelector('.res-tab:nth-child(2)');
-        var resultsTable = document.querySelector('#panel-results .ures-table tbody');
-        if (optBtn && resultsTable && resultsTable.children.length === 0) {
+        if (skipResults && optBtn) {
             showResTab('optimizer', optBtn);
         }
     })();
