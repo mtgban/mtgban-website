@@ -381,15 +381,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		pageVars.Metadata[cardId] = uuid2card(cardId, false, true, preferFlavor)
-		if pageVars.Metadata[cardId].Reserved {
-			pageVars.HasReserved = true
-		}
-		if pageVars.Metadata[cardId].Stocks {
-			pageVars.HasStocks = true
-		}
-		if pageVars.Metadata[cardId].SypList {
-			pageVars.HasSypList = true
-		}
 	}
 
 	// Optionally sort according to price

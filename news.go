@@ -1334,20 +1334,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			if found {
 				continue
 			}
-
-			meta := uuid2card(cardId, true, false, preferFlavor)
-
-			// This is the SYP-specific page, turn off the small reminder
-			// character that says whether a card is on SYP or not
-			meta.SypList = false
-
-			pageVars.Metadata[cardId] = meta
-			if pageVars.Metadata[cardId].Reserved {
-				pageVars.HasReserved = true
-			}
-			if pageVars.Metadata[cardId].Stocks {
-				pageVars.HasStocks = true
-			}
+			pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
 		}
 
 		switch sorting {
@@ -1774,16 +1761,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		c := uuid2card(result[1], true, false, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
 		pageVars.CardHashes = append(pageVars.CardHashes, result[1])
-
-		if c.Reserved {
-			pageVars.HasReserved = true
-		}
-		if c.Stocks {
-			pageVars.HasStocks = true
-		}
-		if c.SypList {
-			pageVars.HasSypList = true
-		}
 	}
 
 	if len(pageVars.Cards) == 0 {

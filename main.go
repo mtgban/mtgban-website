@@ -104,9 +104,6 @@ type PageVars struct {
 	Headings     []Heading
 	Cards        []GenericCard
 	Table        [][]string
-	HasReserved  bool
-	HasStocks    bool
-	HasSypList   bool
 	IsOneDay     bool
 	CanSwitchDay bool
 	SortDir      string

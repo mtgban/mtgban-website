@@ -905,15 +905,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 				continue
 			}
 			pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
-			if pageVars.Metadata[cardId].Reserved {
-				pageVars.HasReserved = true
-			}
-			if pageVars.Metadata[cardId].Stocks {
-				pageVars.HasStocks = true
-			}
-			if pageVars.Metadata[cardId].SypList {
-				pageVars.HasSypList = true
-			}
 		}
 	}
 

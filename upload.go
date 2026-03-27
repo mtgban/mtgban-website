@@ -642,15 +642,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		pageVars.Metadata[data.CardId] = uuid2card(data.CardId, true, false, preferFlavor)
-		if pageVars.Metadata[data.CardId].Reserved {
-			pageVars.HasReserved = true
-		}
-		if pageVars.Metadata[data.CardId].Stocks {
-			pageVars.HasStocks = true
-		}
-		if pageVars.Metadata[data.CardId].SypList {
-			pageVars.HasSypList = true
-		}
 
 		// Load metadata for alternative printings (used by pick-printing picker)
 		for _, alias := range data.PossibleAliases {
