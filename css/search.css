@@ -513,6 +513,8 @@
 }
 .price-row .secondaryBuylistEntry {
     padding-left: 6px;
+    min-width: 70px;
+    text-align: right;
 }
 
 .price-row .qty {
