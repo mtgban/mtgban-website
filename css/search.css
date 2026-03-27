@@ -9,7 +9,7 @@
     --search-surface-1: #f0f0f4;
     --search-surface-2: #e4e4ea;
     --search-link: #3b6fd4;
-    --search-text-dim: #777;
+    --search-text-dim: #454545;
 }
 .dark-theme {
     --search-row-even: #13151a;
@@ -18,7 +18,7 @@
     --search-surface-1: #181b20;
     --search-surface-2: #1f2328;
     --search-link: #5b8def;
-    --search-text-dim: #5f6672;
+    --search-text-dim: #b5b5b5;
 }
 
 
