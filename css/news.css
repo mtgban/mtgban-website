@@ -1,3 +1,8 @@
+/* Page-wide 2px font bump */
+.news-data {
+    font-size: calc(1em + 2px);
+}
+
 /* Page-specific variables */
 .light-theme {
     --news-card-border: rgba(0, 0, 0, 0.06);
