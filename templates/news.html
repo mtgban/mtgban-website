@@ -159,11 +159,6 @@
                 <p class="page-subtitle">{{.InfoMessage}}</p>
             </div>
         </div>
-        <div class="news-legend">
-            {{if .HasReserved}}<span>* = <a href="https://mtg.wiki/page/Reserved_List">Reserved List</a></span>{{end}}
-            {{if .HasStocks}}<span>&bull; = <a href="https://mtgstocks.com/interests">MTGStocks Interests</a></span>{{end}}
-            {{if .HasSypList}}<span>&dagger; = <a href="https://help.tcgplayer.com/hc/en-us/articles/360054178934-Store-Your-Products-SYP-Pull-Sheet">SYP Pull Sheet</a></span>{{end}}
-        </div>
 
         <form action="newspaper" method="GET">
             <input type="hidden" name="page" value="{{$.Page}}">
