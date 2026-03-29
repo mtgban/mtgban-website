@@ -728,7 +728,7 @@ func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanP
 
 							qty := entry.Quantities[subtag]
 							if qty != 0 {
-								subQtyStr = fmt.Sprintf("%d", qtys[i])
+								subQtyStr = fmt.Sprintf("%d", qty)
 							}
 
 							record = append(record, subQtyStr)
