@@ -221,7 +221,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Filter by user preference, as long as it's listed in the enebled stores
+	// Filter by user preference, as long as it's listed in the enabled stores
 	filterByVendors := r.FormValue("vendor")
 	if filterByVendors != "" {
 		var newEnabledStores []string
@@ -559,7 +559,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
 	for _, vendor := range Vendors {
-		// Only keep the right proudct type
+		// Only keep the right product type
 		if (!sealed && vendor.Info().SealedMode) ||
 			(sealed && !vendor.Info().SealedMode) {
 			continue
@@ -767,7 +767,7 @@ func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanP
 }
 
 // Convert uploadedData to CSV, using the associated map of uuid->keys->prices
-func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedDada []UploadEntry, preferFlavor bool) error {
+func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, preferFlavor bool) error {
 	var allScraperNames []string
 	var allScrapers []string
 	var isIndex []string
@@ -814,12 +814,12 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 		return err
 	}
 
-	for j := range uploadedDada {
-		if uploadedDada[j].MismatchError != nil {
+	for j := range uploadedData {
+		if uploadedData[j].MismatchError != nil {
 			continue
 		}
 
-		id := uploadedDada[j].CardId
+		id := uploadedData[j].CardId
 		_, found := pm[id]
 		if !found {
 			continue
@@ -844,7 +844,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			if !found {
 				continue
 			}
-			condition := uploadedDada[j].OriginalCondition
+			condition := uploadedData[j].OriginalCondition
 			if slices.Contains(isIndex, scraper) {
 				condition = ""
 			}
@@ -852,20 +852,20 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			prices[i] = fmt.Sprintf("%0.2f", price)
 		}
 		ogPrice := ""
-		if uploadedDada[j].OriginalPrice != 0 {
-			ogPrice = fmt.Sprintf("%0.2f", uploadedDada[j].OriginalPrice)
+		if uploadedData[j].OriginalPrice != 0 {
+			ogPrice = fmt.Sprintf("%0.2f", uploadedData[j].OriginalPrice)
 		}
 		prices = append(prices, ogPrice)
 
-		prices = append(prices, uploadedDada[j].OriginalCondition)
+		prices = append(prices, uploadedData[j].OriginalCondition)
 
 		qty := ""
-		if uploadedDada[j].HasQuantity {
-			qty = fmt.Sprint(uploadedDada[j].Quantity)
+		if uploadedData[j].HasQuantity {
+			qty = fmt.Sprint(uploadedData[j].Quantity)
 		}
 		prices = append(prices, qty)
 
-		prices = append(prices, uploadedDada[j].Notes)
+		prices = append(prices, uploadedData[j].Notes)
 
 		scryfallID, found := co.Identifiers["scryfallId"]
 		if found {
