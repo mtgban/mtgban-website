@@ -768,7 +768,6 @@ func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanP
 
 // Convert uploadedData to CSV, using the associated map of uuid->keys->prices
 func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, preferFlavor bool) error {
-	var allScraperNames []string
 	var allScrapers []string
 	var isIndex []string
 	for id := range pm {
@@ -798,13 +797,17 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 
 			// Add to the arrays
 			allScrapers = append(allScrapers, scraperKey)
-			allScraperNames = append(allScraperNames, scraperName(scraperKey))
 		}
 	}
 
 	// Keep alphabetical order
 	sort.Strings(allScrapers)
-	sort.Strings(allScraperNames)
+
+	// Derive names in the same order as the sorted scrapers
+	allScraperNames := make([]string, len(allScrapers))
+	for i, key := range allScrapers {
+		allScraperNames[i] = scraperName(key)
+	}
 
 	header := []string{"Scryfall ID", "Card Name", "Set Code", "Number", "Finish"}
 	header = append(header, allScraperNames...)
