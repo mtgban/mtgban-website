@@ -19,6 +19,7 @@ import (
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/mtgban/mtgban-website/patreon"
+	"github.com/mtgban/mtgban-website/ratelimit"
 )
 
 const (
@@ -28,7 +29,14 @@ const (
 	ErrMsgExpired = "You've been logged out"
 	ErrMsgRestart = "Website is restarting, please try again in a few minutes"
 	ErrMsgUseAPI  = "Slow down, you're making too many requests! For heavy data use consider the BAN API"
+
+	APIRequestsPerSec  = 10
+	UserRequestsPerSec = 3
 )
+
+var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
+
+var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
 
 type PatreonConfig struct {
 	Source string            `json:"source"`
@@ -274,14 +282,14 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		w.Header().Add("RateLimit-Limit", fmt.Sprint(APIRequestsPerSec))
 
-		ip, err := IpAddress(r)
+		ip, err := ratelimit.IPAddress(r)
 		if err != nil {
 			log.Println(err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
-		if !APIRateLimiter.allow(string(ip)) {
+		if !APIRateLimiter.Allow(string(ip)) {
 			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
 			return
 		}
@@ -414,7 +422,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		pageVars := genPageNav("Error", sig)
 
-		if !UserRateLimiter.allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
+		if !UserRateLimiter.Allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
 			pageVars.Title = "Too Many Requests"
 			pageVars.ErrorMessage = ErrMsgUseAPI
 

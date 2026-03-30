@@ -1,4 +1,4 @@
-package main
+package ratelimit
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ type visitor struct {
 	*rate.Limiter
 }
 
-type rateLimiter struct {
+type Limiter struct {
 	sync.RWMutex
 
 	burst    int
@@ -22,25 +22,16 @@ type rateLimiter struct {
 	visitors map[string]*visitor
 }
 
-const (
-	APIRequestsPerSec  = 10
-	UserRequestsPerSec = 3
-)
-
-var APIRateLimiter = &rateLimiter{
-	rate:     APIRequestsPerSec,
-	burst:    2,
-	visitors: map[string]*visitor{},
-}
-
-var UserRateLimiter = &rateLimiter{
-	rate:     UserRequestsPerSec,
-	burst:    1,
-	visitors: map[string]*visitor{},
+func NewLimiter(r rate.Limit, burst int) *Limiter {
+	return &Limiter{
+		rate:     r,
+		burst:    burst,
+		visitors: map[string]*visitor{},
+	}
 }
 
 // Allow checks if given ip has not exceeded rate limit
-func (l *rateLimiter) allow(ip string) bool {
+func (l *Limiter) Allow(ip string) bool {
 	l.RLock()
 	v, exists := l.visitors[ip]
 	l.RUnlock()
@@ -54,10 +45,10 @@ func (l *rateLimiter) allow(ip string) bool {
 		l.Unlock()
 	}
 
-	return v.Allow()
+	return v.Limiter.Allow()
 }
 
-func IpAddress(r *http.Request) (net.IP, error) {
+func IPAddress(r *http.Request) (net.IP, error) {
 	// Try headers first
 	xff := r.Header.Get("X-Forwarded-For")
 	if xff != "" {
