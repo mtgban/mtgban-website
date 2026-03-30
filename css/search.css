@@ -570,13 +570,22 @@
 .result-body {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
-    border-top: none;
+    border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-right: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: 0;
     overflow: hidden;
 }
 
-.result-col { min-width: 0; }
+.result-col {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+}
+.result-col::after {
+    content: "";
+    flex: 1;
+}
 .result-col + .result-col {
     border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
 }
