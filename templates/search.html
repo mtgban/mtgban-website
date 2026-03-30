@@ -70,10 +70,6 @@
     <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
         <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
     </form>
-    <div class="sidebar-search-controls">
-        <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Surprise me</a>
-        <a class="page-action" href="?page=options" title="Settings"><i data-lucide="settings"></i></a>
-    </div>
     <div class="search-sort-row">
         {{if .NoSort}}
             <span class="search-sort-label">Sort from syntax</span>
@@ -87,6 +83,10 @@
             <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i></a>
             <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i></a>
         {{end}}
+        <span class="search-sort-actions">
+            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}" title="Surprise me"><i data-lucide="dice-5"></i></a>
+            <a class="search-sort-settings" href="?page=options" title="Settings"><i data-lucide="settings"></i></a>
+        </span>
     </div>
     {{if .TotalUnique}}
         <span class="search-result-count">
