@@ -517,7 +517,7 @@
 }
 
 .result-col-header {
-    padding: 8px 12px;
+    padding: 4px 12px;
     font-size: var(--text-xs);
     font-weight: 700;
     text-transform: uppercase;
