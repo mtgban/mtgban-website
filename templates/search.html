@@ -712,7 +712,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                             <div class="result-body" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
-                                    <div class="result-col-header">{{if $.IsSealed}}Purchase from{{else}}Sellers{{end}}</div>
+                                    <div class="result-col-header">Sellers</div>
                                     {{$condsEntry := (index $.FoundSellers $cardId)}}
                                     {{if not $condsEntry}}
                                         <div class="no-offers"><i>No offers</i></div>
@@ -784,7 +784,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 </div>
                                 <!-- Buyers column -->
                                 <div class="result-col">
-                                    <div class="result-col-header">{{if $.IsSealed}}Sell to{{else}}Buyers{{end}}</div>
+                                    <div class="result-col-header">Buyers</div>
                                     {{$condsEntry := (index $.FoundVendors $cardId)}}
                                     {{if not $condsEntry}}
                                         <div class="no-offers"><i>No offers</i></div>
