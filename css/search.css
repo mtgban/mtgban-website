@@ -407,10 +407,9 @@
 }
 
 
-/* ── Single card result block ── */
-.result-block {
-    padding-bottom: 20px;
-    position: relative;
+/* ── Card spacing ── */
+.result-body {
+    margin-bottom: 20px;
 }
 
 /* Card header — sticky */
@@ -424,19 +423,18 @@
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     position: sticky;
-    top: calc(var(--nav-height, 48px) + 19px);
-    z-index: 20;
+    top: calc(var(--nav-height, 48px) + 21px);
     box-shadow: calc(-1 * var(--radius-lg, 12px)) 0 0 var(--background), var(--radius-lg, 12px) 0 0 var(--background);
 }
-.result-header::before {
-    content: "";
-    position: absolute;
-    top: -40px;
-    left: -1px;
-    right: -1px;
-    height: 40px;
+.result-header-cover {
+    position: sticky;
+    top: var(--nav-height, 48px);
+    height: 21px;
+    margin-bottom: -21px;
     background: var(--background);
-    z-index: -1;
+    margin-left: -18px;
+    margin-right: -18px;
+    pointer-events: none;
 }
 
 .result-set-link {

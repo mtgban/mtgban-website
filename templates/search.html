@@ -646,8 +646,8 @@ Sims are not required for pre-constructed decks and other products where the sam
                             {{$firstFoil = $card.Foil}}
                         {{end}}
 
-                        <div class="result-block" style="z-index: {{dec (len $.AllKeys) $i}}">
-                            <div class="result-header" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
+                            <div class="result-header-cover" style="z-index: {{$i}}"></div>
+                            <div class="result-header" style="z-index: {{inc $i 100}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -839,7 +839,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                             </div>
                             <!-- Last sold placeholder (feature currently disabled) -->
                             <div id="{{$cardId}}" style="display:none"></div>
-                        </div>
                     {{end}}
 
                     {{if .CurrentIndex}}
