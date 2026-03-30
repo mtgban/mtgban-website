@@ -78,28 +78,14 @@
         {{if .NoSort}}
             <span class="search-sort-label">Sort from syntax</span>
         {{else}}
-            <span class="search-sort-label">Sort</span>
-            <a class="search-sort-pill{{if or (eq .SearchSort "chrono") (not .SearchSort)}} active{{end}}" href="?q={{.SearchQuery}}&sort=" title="Chronological"><i data-lucide="clock"></i></a>
-            {{if or (eq .SearchSort "chrono") (not .SearchSort)}}
-                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
-            {{end}}
+            {{$isChronoSorted := or (eq .SearchSort "chrono") (not .SearchSort)}}
             {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
-            <a class="search-sort-pill{{if $isAlphaSorted}} active{{end}}" href="?q={{.SearchQuery}}&sort=alpha" title="Alphabetical"><i data-lucide="a-large-small"></i></a>
-            {{if $isAlphaSorted}}
-                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=alpha&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
-            {{end}}
-            <a class="search-sort-pill{{if eq .SearchSort "number"}} active{{end}}" href="?q={{.SearchQuery}}&sort=number" title="Collector Number"><i data-lucide="hash"></i></a>
-            {{if eq .SearchSort "number"}}
-                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=number&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
-            {{end}}
-            <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{end}}" href="?q={{.SearchQuery}}&sort=retail" title="Retail Price"><i data-lucide="tag"></i></a>
-            {{if eq .SearchSort "retail"}}
-                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=retail&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
-            {{end}}
-            <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{end}}" href="?q={{.SearchQuery}}&sort=buylist" title="Buylist Price"><i data-lucide="shopping-cart"></i></a>
-            {{if eq .SearchSort "buylist"}}
-                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=buylist&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
-            {{end}}
+            <span class="search-sort-label">Sort</span>
+            <a class="search-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort={{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological"><i data-lucide="clock"></i></a>
+            <a class="search-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=alpha{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical"><i data-lucide="a-large-small"></i></a>
+            <a class="search-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number"><i data-lucide="hash"></i></a>
+            <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i></a>
+            <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i></a>
         {{end}}
     </div>
     {{if .TotalUnique}}
