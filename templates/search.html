@@ -652,7 +652,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     {{else if $card.RarityColor}}
                                         <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" style="margin: 4px 0 0 0">
                                             <circle r="15" cx="16" cy="16" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
-                                            <text font-size="20" x="50%" y="60%" text-anchor="middle" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                            <text font-size="16" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
                                         </svg>
                                     {{else}}
                                         <span>{{$card.SetCode}}</span>
