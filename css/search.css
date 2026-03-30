@@ -179,6 +179,8 @@
     height: fit-content;
     max-height: calc(100vh - var(--nav-height, 48px) - 20px);
     overflow-y: auto;
+    scrollbar-color: transparent transparent;
+    scrollbar-width: none;
 }
 
 /* ── Sidebar search bar ── */

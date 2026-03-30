@@ -396,8 +396,8 @@ a.pagination {
     list-style: none;
     flex-wrap: nowrap;
     overflow-x: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--surface-4) transparent;
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent;
     margin: 0; padding: 0;
 }
 .ban-nav-links::-webkit-scrollbar { height: 3px; }
