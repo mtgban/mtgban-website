@@ -415,10 +415,10 @@
 
 /* Card header — sticky */
 .result-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    gap: 0 10px;
     padding: 10px 14px;
     background: var(--search-surface-1);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
@@ -439,10 +439,30 @@
     z-index: -1;
 }
 
+.result-set-link {
+    grid-column: 1;
+    display: flex;
+    align-items: center;
+}
+
 .result-set-icon {
     font-size: var(--text-7xl);
-    margin-right: 2px;
     color: var(--normal);
+}
+
+.result-card-info {
+    grid-column: 2;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.result-card-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
 }
 
 .result-card-name {
@@ -455,6 +475,29 @@
     white-space: nowrap;
 }
 .result-card-name:hover { color: var(--search-link); }
+
+.result-set-title {
+    font-size: var(--text-sm);
+    color: var(--search-text-dim);
+}
+.result-set-title a {
+    color: inherit;
+    text-decoration: none;
+}
+.result-set-title a:hover { color: var(--activetext); }
+
+.result-card-extra {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 14px 6px;
+    background: var(--search-surface-1);
+    border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-right: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+}
+.result-card-extra:empty {
+    display: none;
+}
 
 .result-variant {
     font-size: var(--text-md);
@@ -482,23 +525,11 @@
     color: var(--asuccess);
 }
 
-.result-set-title {
-    font-size: var(--text-sm);
-    color: var(--search-text-dim);
-    width: 100%;
-    order: 10;
-}
-.result-set-title a {
-    color: inherit;
-    text-decoration: none;
-}
-.result-set-title a:hover { color: var(--activetext); }
-
 .result-quick-icons {
+    grid-column: 3;
     display: flex;
     gap: 6px;
     align-items: center;
-    margin-left: auto;
 }
 .result-quick-icons a,
 .result-quick-icons span {

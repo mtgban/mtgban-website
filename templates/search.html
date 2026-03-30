@@ -648,11 +648,11 @@ Sims are not required for pre-constructed decks and other products where the sam
 
                         <div class="result-block" style="z-index: {{dec (len $.AllKeys) $i}}">
                             <div class="result-header" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
-                                <a href="?q=s:{{$card.SetCode}}">
+                                <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
                                     {{else if $card.RarityColor}}
-                                        <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg" style="margin: 4px 0 0 0">
+                                        <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
                                             <circle r="15" cx="16" cy="16" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
                                             <text font-size="16" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
                                         </svg>
@@ -660,24 +660,22 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         <span>{{$card.SetCode}}</span>
                                     {{end}}
                                 </a>
-                                <a class="result-card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
-                                {{if ne $card.Variant ""}}
-                                    <span class="result-variant">({{$card.Variant}})</span>
-                                {{end}}
-                                {{if $card.Flag}}
-                                    <span class="result-variant">{{$card.Flag}}</span>
-                                {{end}}
-                                <div class="result-badges">
-                                    {{if $card.Reserved}}<span class="result-badge rl">RL</span>{{end}}
-                                    {{if $card.Stocks}}<span class="result-badge stocks">Stocks</span>{{end}}
-                                    {{if and $.ShowSYP $card.SypList}}<span class="result-badge syp">SYP</span>{{end}}
+                                <div class="result-card-info">
+                                    <div class="result-card-name-row">
+                                        <a class="result-card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                        <div class="result-badges">
+                                            {{if $card.Reserved}}<span class="result-badge rl">RL</span>{{end}}
+                                            {{if $card.Stocks}}<span class="result-badge stocks">Stocks</span>{{end}}
+                                            {{if and $.ShowSYP $card.SypList}}<span class="result-badge syp">SYP</span>{{end}}
+                                        </div>
+                                    </div>
+                                    <span class="result-set-title">
+                                        <a href="?q=s:{{$card.SetCode}}{{if $card.Date}} date:{{$card.Date}}{{end}}">{{$card.Title}}</a>
+                                        {{if $card.SourceSealed}}
+                                            - <a href="/sealed?q=container:{{$card.UUID}}">Found in {{len $card.SourceSealed}} product{{if gt (len $card.SourceSealed) 1}}s{{end}}</a>
+                                        {{end}}
+                                    </span>
                                 </div>
-                                <span class="result-set-title">
-                                    <a href="?q=s:{{$card.SetCode}}{{if $card.Date}} date:{{$card.Date}}{{end}}">{{$card.Title}}</a>
-                                    {{if $card.SourceSealed}}
-                                        - <a href="/sealed?q=container:{{$card.UUID}}">Found in {{len $card.SourceSealed}} product{{if gt (len $card.SourceSealed) 1}}s{{end}}</a>
-                                    {{end}}
-                                </span>
                                 <div class="result-quick-icons">
                                     {{if $card.Sealed}}
                                         {{if $card.Booster}}
@@ -709,6 +707,16 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     {{end}}
                                 </div>
                             </div>
+                            {{if or (ne $card.Variant "") $card.Flag}}
+                            <div class="result-card-extra">
+                                {{if ne $card.Variant ""}}
+                                    <span class="result-variant">{{$card.Variant}}</span>
+                                {{end}}
+                                {{if $card.Flag}}
+                                    <span class="result-variant">{{$card.Flag}}</span>
+                                {{end}}
+                            </div>
+                            {{end}}
                             <div class="result-body" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
