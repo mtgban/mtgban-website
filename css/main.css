@@ -748,7 +748,7 @@ a.selected:hover{
 .page-standard {
     max-width: 80vw;
     margin: 0 auto;
-    margin-right: 11%;
+    margin-right: clamp(0px, 5vw, 11%);
     /*padding: 0 var(--page-gutter);*/
 }
 .page-wide {
