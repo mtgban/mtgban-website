@@ -721,11 +721,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if $entries}}
                                             {{if and (eq $conditions "INDEX") $.IsSealed}}
-                                                <div class="price-index-header">
-                                                    <span></span>
-                                                    <span>EV</span>
-                                                    <span>Sim (Median)</span>
-                                                    <span>Sim (StdDev)</span>
+                                                <div class="price-row index-row price-index-header">
+                                                    <span class="store-name" style="visibility:hidden">&nbsp;</span>
+                                                    <span class="price">EV</span>
+                                                    <span class="price">Sim (Median)</span>
+                                                    <span class="price">Sim (StdDev)</span>
                                                 </div>
                                             {{else if not (eq $conditions "INDEX")}}
                                                 <div class="price-cond-header">{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>

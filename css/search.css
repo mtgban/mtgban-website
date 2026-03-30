@@ -549,8 +549,8 @@
     color: var(--search-link);
     text-decoration: none;
     font-weight: 500;
-    width: 55%;
-    flex-shrink: 0;
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -563,6 +563,7 @@
     font-size: var(--text-lg);
     color: var(--normal);
     white-space: nowrap;
+    margin-left: auto;
 }
 
 .price-row .price-warn {
@@ -608,7 +609,6 @@
     color: var(--search-text-dim);
     min-width: 36px;
     text-align: center;
-    margin-left: auto;
 }
 
 .price-cond-header {
@@ -622,21 +622,22 @@
 
 /* Sealed INDEX: 4-column sub-header */
 .price-index-header {
-    display: flex;
-    gap: 8px;
-    padding: 5px 12px;
+    background: var(--search-surface-1);
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+.price-index-header .price {
+    color: var(--search-text-dim);
+    font-family: inherit;
     font-size: var(--text-sm);
     font-weight: 700;
-    color: var(--search-text-dim);
-    background: var(--search-surface-1);
-    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    white-space: normal;
+    text-align: center;
 }
-.price-index-header span { flex: 1; text-align: center; }
-.price-index-header span:first-child { text-align: left; min-width: 100px; }
 
 /* Sealed INDEX: price row with 4 values */
-.price-row.index-row .store-name { width: auto; flex: 1; }
-.price-row.index-row .price { margin-left: 0; flex: 1; text-align: center; }
+.price-row.index-row .store-name { flex: 1 1 0; min-width: 0; }
+.price-row.index-row .price { flex: 1 1 0; text-align: center; margin-left: 0; min-width: 0; }
 
 .no-offers {
     padding: 16px;
@@ -1084,7 +1085,7 @@
 @media (max-width: 640px) {
     /* Price rows: tighter layout */
     .price-row { padding: 8px 8px; gap: 4px; font-size: var(--text-md); }
-    .price-row .store-name { width: 50%; font-size: var(--text-md); }
+    .price-row .store-name { font-size: var(--text-md); }
     .price-row .price { font-size: var(--text-md); }
     .price-row .qty { font-size: var(--text-sm); min-width: 28px; }
     .price-row .secondary { font-size: var(--text-md); }
