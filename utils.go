@@ -524,7 +524,7 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 			fmt.Fprintf(&b, `
                     <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
                         <circle r="15" cx="16" cy="16" fill="var(--normal)"/>
-                        <text font-size="20" x="50%%" y="60%%" text-anchor="middle" fill="var(--background)">%s</text>
+                        <text font-size="16" font-family="monospace" font-weight="bold" x="50%%" y="50%%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">%s</text>
                     </svg>`, setCode)
 		} else {
 			fmt.Fprintf(&b, `<i class="ss ss-%s ss-2x"></i>`, keyruneCode)
