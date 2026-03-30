@@ -28,9 +28,9 @@
     grid-template-columns: 340px 1fr;
     gap: 0;
     min-height: calc(100vh - var(--nav-height, 40px));
-    /*padding-top: var(--nav-height, 40px);*/
-    padding-left: 7%;
-    padding-right: 10%;
+    margin-top: -40px;
+    padding-left: 15%;
+    padding-right: 15%;
 }
 
 
@@ -117,14 +117,21 @@
 }
 
 .search-sort-pill {
-    padding: 4px 12px;
-    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 8px;
     font-size: var(--text-base);
     font-weight: 600;
     text-decoration: none;
     color: var(--activetext);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     transition: all 0.12s;
+}
+.search-sort-pill svg {
+    width: 16px;
+    height: 16px;
 }
 .search-sort-pill:hover {
     border-color: var(--accent-border, rgba(91,141,239,0.25));
@@ -168,10 +175,63 @@
 .search-sidebar {
     padding: 20px;
     position: sticky;
-    top: calc(var(--nav-height, 48px) + 90px);
+    top: var(--nav-height, 48px);
     height: fit-content;
-    max-height: calc(100vh - var(--nav-height, 48px) - 90px - 20px);
+    max-height: calc(100vh - var(--nav-height, 48px) - 20px);
     overflow-y: auto;
+}
+
+/* ── Sidebar search bar ── */
+.sidebar-search {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+}
+.sidebar-search form.autocomplete {
+    position: relative;
+    display: block;
+    width: 100%;
+}
+.sidebar-search .search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border-radius: var(--radius-md, 10px);
+    border: 1px solid var(--border-moderate);
+    background: var(--search-surface-1);
+    font-size: var(--text-lg);
+    color: var(--normal);
+    outline: none;
+    margin-bottom: 8px;
+}
+.sidebar-search .search-input:focus {
+    border-color: var(--accent-border, rgba(91,141,239,0.4));
+    box-shadow: 0 0 0 3px var(--accent-muted, rgba(91,141,239,0.12));
+}
+.sidebar-search-controls {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+.sidebar-search-controls .search-surprise {
+    flex: 1;
+    text-align: center;
+    padding: 6px 10px;
+    font-size: var(--text-sm);
+}
+.sidebar-search-controls .page-action {
+    padding: 6px 10px;
+    font-size: var(--text-sm);
+}
+.sidebar-search .search-sort-row {
+    padding-bottom: 8px;
+    border-bottom: none;
+}
+.sidebar-search .search-result-count {
+    display: block;
+    font-size: var(--text-sm);
+    color: var(--search-text-dim);
+    margin-top: 6px;
 }
 .search-sidebar::-webkit-scrollbar { width: 4px; }
 .search-sidebar::-webkit-scrollbar-thumb {
@@ -342,6 +402,8 @@
     background: var(--search-surface-1);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    position: sticky;
+    top: var(--nav-height, 48px);
     z-index: 20;
 }
 
@@ -356,6 +418,9 @@
     font-weight: 700;
     color: var(--normal);
     text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .result-card-name:hover { color: var(--search-link); }
 
@@ -469,6 +534,9 @@
     font-weight: 500;
     width: 55%;
     flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .price-row .store-name:hover { text-decoration: underline; }
 .price-row .store-name.dim { color: var(--search-text-dim); }
@@ -949,7 +1017,13 @@
 /* ═══ Responsive ═══ */
 @media (max-width: 900px) {
     .search-layout { grid-template-columns: 1fr; }
-    .search-sidebar { display: none; }
+    .search-sidebar {
+        position: static;
+        max-height: none;
+        overflow: visible;
+        padding: 12px 16px 0;
+    }
+    .search-sidebar > *:not(.sidebar-search) { display: none; }
     .result-body { grid-template-columns: 1fr; }
     .result-col + .result-col {
         border-left: none;

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
 
 /* Ubuntu-ish Colour theme
    Dark brown - #332532
@@ -88,7 +89,7 @@ html { font-size: 17px; }
     --chartjs-default-crosshair: rgba(0,0,0,0.12);
     --chartjs-dark-crosshair: rgba(255,255,255,0.15);
 
-    --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+    --font-mono: 'Geist', sans-serif;
 
     /* ── Layout tokens ── */
     --nav-height: 48px;
@@ -247,10 +248,10 @@ html { font-size: 17px; }
 }
 
 /* reset all margins and padding*/
- * {
+* {
     margin: 0;
     padding: 0;
-    font-family: 'Rosario', sans-serif;
+    font-family: 'Geist', sans-serif;
 }
 
 body {

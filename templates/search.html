@@ -45,6 +45,7 @@
     <script type="text/javascript" src="/js/sealed.js?hash={{.Hash}}" defer></script>
     {{end}}
     <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
 {{define "content"}}
@@ -53,9 +54,8 @@
     {{else if and (eq .SearchQuery "") .IsSealed}}
         {{template "search-sealed" .}}
     {{else}}
-        {{template "search-header" .}}
-        {{template "search-bar" .}}
         {{if eq .SearchQuery ""}}
+            {{template "search-bar" .}}
             {{template "syntax" .}}
         {{else}}
             {{template "search-results" .}}
@@ -63,13 +63,56 @@
     {{end}}
 {{end}}
 
-{{define "search-header"}}
-<div class="page-standard">
-    <div class="page-header">
-        {{if not .ChartID}}
-            <h1>Welcome to {{.Title}}</h1>
+{{define "search-header"}}{{end}}
+
+{{define "sidebar-search"}}
+<div class="sidebar-search">
+    <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+        <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
+    </form>
+    <div class="sidebar-search-controls">
+        <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Surprise me</a>
+        <a class="page-action" href="?page=options">&#9881; Settings</a>
+    </div>
+    <div class="search-sort-row">
+        {{if .NoSort}}
+            <span class="search-sort-label">Sort from syntax</span>
+        {{else}}
+            <span class="search-sort-label">Sort</span>
+            <a class="search-sort-pill{{if or (eq .SearchSort "chrono") (not .SearchSort)}} active{{end}}" href="?q={{.SearchQuery}}&sort=" title="Chronological"><i data-lucide="clock"></i></a>
+            {{if or (eq .SearchSort "chrono") (not .SearchSort)}}
+                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
+            {{end}}
+            {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
+            <a class="search-sort-pill{{if $isAlphaSorted}} active{{end}}" href="?q={{.SearchQuery}}&sort=alpha" title="Alphabetical"><i data-lucide="a-large-small"></i></a>
+            {{if $isAlphaSorted}}
+                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=alpha&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
+            {{end}}
+            <a class="search-sort-pill{{if eq .SearchSort "number"}} active{{end}}" href="?q={{.SearchQuery}}&sort=number" title="Collector Number"><i data-lucide="hash"></i></a>
+            {{if eq .SearchSort "number"}}
+                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=number&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
+            {{end}}
+            <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{end}}" href="?q={{.SearchQuery}}&sort=retail" title="Retail Price"><i data-lucide="tag"></i></a>
+            {{if eq .SearchSort "retail"}}
+                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=retail&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
+            {{end}}
+            <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{end}}" href="?q={{.SearchQuery}}&sort=buylist" title="Buylist Price"><i data-lucide="shopping-cart"></i></a>
+            {{if eq .SearchSort "buylist"}}
+                <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=buylist&reverse={{not .ReverseMode}}" title="Reverse"><i data-lucide="arrow-up-down"></i></a>
+            {{end}}
         {{end}}
     </div>
+    {{if .TotalUnique}}
+        <span class="search-result-count">
+            {{.TotalUnique}}
+            {{if .TotalCards}}/ {{.TotalCards}}{{end}}
+            {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
+            {{if gt .TotalUnique (len .AllKeys)}}({{len .AllKeys}} shown){{end}}
+        </span>
+    {{end}}
+    <script type="text/javascript">
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+    </script>
 </div>
 {{end}}
 
@@ -82,45 +125,6 @@
             </form>
             <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Surprise me</a>
         </div>
-        {{if .SearchQuery}}
-        <div class="search-sort-row">
-            {{if .NoSort}}
-                <span class="search-sort-label">Sort from syntax</span>
-            {{else}}
-                <span class="search-sort-label">Sort</span>
-                <a class="search-sort-pill{{if or (eq .SearchSort "chrono") (not .SearchSort)}} active{{end}}" href="?q={{.SearchQuery}}&sort=">chrono</a>
-                {{if or (eq .SearchSort "chrono") (not .SearchSort)}}
-                    <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
-                {{end}}
-                {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
-                <a class="search-sort-pill{{if $isAlphaSorted}} active{{end}}" href="?q={{.SearchQuery}}&sort=alpha">alpha</a>
-                {{if $isAlphaSorted}}
-                    <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=alpha&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
-                {{end}}
-                <a class="search-sort-pill{{if eq .SearchSort "number"}} active{{end}}" href="?q={{.SearchQuery}}&sort=number">#</a>
-                {{if eq .SearchSort "number"}}
-                    <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=number&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
-                {{end}}
-                <a class="search-sort-pill{{if eq .SearchSort "retail"}} active{{end}}" href="?q={{.SearchQuery}}&sort=retail">retail</a>
-                {{if eq .SearchSort "retail"}}
-                    <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=retail&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
-                {{end}}
-                <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{end}}" href="?q={{.SearchQuery}}&sort=buylist">buylist</a>
-                {{if eq .SearchSort "buylist"}}
-                    <a class="search-sort-pill" href="?q={{.SearchQuery}}&sort=buylist&reverse={{not .ReverseMode}}" title="Reverse">&#128260;</a>
-                {{end}}
-            {{end}}
-            {{if .TotalUnique}}
-                <span class="search-result-count">
-                    {{.TotalUnique}}
-                    {{if .TotalCards}}/ {{.TotalCards}}{{end}}
-                    {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
-                    {{if gt .TotalUnique (len .AllKeys)}}({{len .AllKeys}} shown){{end}}
-                </span>
-            {{end}}
-            <a class="page-action" href="?page=options">&#9881; Settings</a>
-        </div>
-        {{end}}
     </div>
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
@@ -388,6 +392,7 @@ Sims are not required for pre-constructed decks and other products where the sam
             <div class="search-layout" {{if .IsSealed}}onmouseout="document.getElementById('hoverImage').src='{{$emptyImg}}';"{{end}}>
 
                 <div class="search-sidebar">
+                    {{template "sidebar-search" .}}
                     {{if .IsSealed}}
                         <div class="sidebar-printings" id="printings"></div>
                         {{if .HasAvailable}}
@@ -1108,4 +1113,8 @@ Sims are not required for pre-constructed decks and other products where the sam
         </div>
     </div>
 </div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script>lucide.createIcons();</script>
 {{end}}
