@@ -740,13 +740,10 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 {{end}}
                                                 {{if and (eq $conditions "INDEX") $.IsSealed}}
                                                     <span class="price">$ {{printf "%.2f" .Price}}</span>
-                                                    <span class="price">
+                                                    {{$iqr := 0.0}}{{if .Secondary}}{{$iqr = index .ExtraValues "iqr"}}{{end}}
+                                                    <span class="price{{if gt $iqr 150.0}} price-warn{{end}}" {{if gt $iqr 150.0}}title="High Simulation IQR: {{printf "%.2f" $iqr}}"{{end}}>
                                                         {{if .Secondary}}
                                                             $ {{printf "%.2f" .Secondary}}
-                                                            {{$iqr := index .ExtraValues "iqr"}}
-                                                            {{if gt $iqr 150.0}}
-                                                                <span title="High Simulation IQR: {{printf "%.2f" $iqr}}">&#8252;&#65039;</span>
-                                                            {{end}}
                                                         {{else}}n/a{{end}}
                                                     </span>
                                                     <span class="price">
