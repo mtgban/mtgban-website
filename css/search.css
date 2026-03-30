@@ -671,19 +671,21 @@
     background: var(--search-surface-1);
     padding-top: 4px;
     padding-bottom: 4px;
+    align-items: center;
 }
 .price-index-header .price {
     color: var(--search-text-dim);
     font-family: inherit;
-    font-size: var(--text-sm);
+    font-size: var(--text-xs);
     font-weight: 700;
-    white-space: normal;
-    text-align: center;
+    white-space: nowrap;
+    line-height: 1.2;
 }
 
 /* Sealed INDEX: price row with 4 values */
+.price-row.index-row { gap: 2px; }
 .price-row.index-row .store-name { flex: 1 1 0; min-width: 0; }
-.price-row.index-row .price { flex: 1 1 0; text-align: center; margin-left: 0; min-width: 0; }
+.price-row.index-row .price { flex: 0 0 72px; text-align: center; margin-left: 0; }
 
 .no-offers {
     padding: 16px;
