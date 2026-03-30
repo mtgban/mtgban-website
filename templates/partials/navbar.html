@@ -3,7 +3,7 @@
     <ul class="ban-nav-links">
         {{range .Nav}}
         <li>
-            <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+            <a class="{{.Class}}" href="{{.Link}}">
                 <span class="nav-icon">{{.Short}}</span>
                 <span class="nav-full">{{.Name}}</span>
                 <span class="nav-short">{{.Name}}</span>
@@ -38,7 +38,7 @@
     <ul class="ban-nav-mobile-links">
         {{range .Nav}}
         <li>
-            <a {{if .Active}}class="{{.Class}}"{{end}} href="{{.Link}}">
+            <a class="{{.Class}}" href="{{.Link}}">
                 <span class="nav-icon">{{.Short}}</span> {{.Name}}
             </a>
         </li>

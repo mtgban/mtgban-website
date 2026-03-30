@@ -635,7 +635,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		if source != nil && source.Info().Shorthand == scraper.Info().Shorthand {
 			nav.Active = true
-			nav.Class = "selected"
 		}
 		pageVars.ExtraNav = append(pageVars.ExtraNav, nav)
 	}
