@@ -646,8 +646,8 @@ Sims are not required for pre-constructed decks and other products where the sam
                             {{$firstFoil = $card.Foil}}
                         {{end}}
 
-                        <div class="result-block">
-                            <div class="result-header" style="z-index: {{inc $i 1}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
+                        <div class="result-block" style="z-index: {{dec (len $.AllKeys) $i}}">
+                            <div class="result-header" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
                                 <a href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>

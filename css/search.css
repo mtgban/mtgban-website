@@ -403,13 +403,14 @@
 
 /* ═══ Results main area ═══ */
 .search-results {
-    padding: 0px 18px 80px;
+    padding: 9px 18px 80px;
 }
 
 
 /* ── Single card result block ── */
 .result-block {
-    margin-bottom: 20px;
+    padding-bottom: 20px;
+    position: relative;
 }
 
 /* Card header — sticky */
@@ -423,8 +424,19 @@
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     position: sticky;
-    top: var(--nav-height, 48px);
+    top: calc(var(--nav-height, 48px) + 19px);
     z-index: 20;
+    box-shadow: calc(-1 * var(--radius-lg, 12px)) 0 0 var(--background), var(--radius-lg, 12px) 0 0 var(--background);
+}
+.result-header::before {
+    content: "";
+    position: absolute;
+    top: -40px;
+    left: -1px;
+    right: -1px;
+    height: 40px;
+    background: var(--background);
+    z-index: -1;
 }
 
 .result-set-icon {
