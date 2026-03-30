@@ -56,6 +56,11 @@
 
                                 {{if $edition.Keyrune}}
                                     <i class="ss ss-{{$edition.Keyrune}} ss-1x ss-fw"></i>
+                                {{else}}
+                                    <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle">
+                                        <circle r="9" cx="10" cy="10" fill="var(--normal)" stroke="var(--normal)"/>
+                                        <text font-size="10" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{$edition.Code}}</text>
+                                    </svg>
                                 {{end}}
                                 <a class="btn normal" href="/search?q=s:{{$edition.Code}}">
                                     {{.Name}}

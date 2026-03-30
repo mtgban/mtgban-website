@@ -61,7 +61,10 @@
                                     {{if .Keyrune}}
                                         <i class="ss ss-{{.Keyrune}} ss-1x ss-fw set-icon"></i>
                                     {{else}}
-                                        <span class="set-icon">&middot;</span>
+                                        <svg class="set-icon" width="24" height="24" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle">
+                                            <circle r="11" cx="12" cy="12" fill="var(--normal)" stroke="var(--normal)"/>
+                                            <text font-size="12" font-family="monospace" font-weight="bold" x="12" y="12" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{.Code}}</text>
+                                        </svg>
                                     {{end}}
                                     <a href="/search?q=s:{{.Code}}">{{.Name}}</a>
                                     <span class="set-code">{{.Code}}</span>
