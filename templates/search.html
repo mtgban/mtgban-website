@@ -647,7 +647,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                         {{end}}
 
                             <div class="result-header-cover" style="z-index: {{$i}}"></div>
-                            <div class="result-header" style="z-index: {{inc $i 100}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
+                            <div class="result-header{{if eq $i 0}} result-first{{end}}" style="z-index: {{inc $i 100}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -717,7 +717,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
