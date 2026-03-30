@@ -15,6 +15,11 @@
     <div class="ban-nav-spacer"></div>
 
     <div class="ban-nav-right">
+        {{if .BetaNav}}
+        <a class="{{.BetaNav.Class}}" href="{{.BetaNav.Link}}">
+            <span class="nav-icon">{{.BetaNav.Short}}</span>
+        </a>
+        {{end}}
         <a class="ban-nav-ext" href="https://www.patreon.com/mtgban" title="Patreon">
             <img src="/img/misc/patreon.png" alt="Patreon">
         </a>

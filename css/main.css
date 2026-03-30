@@ -655,6 +655,7 @@ a.beta {
     color: #ffffff;
     font-weight: bold;
     pointer-events: none;
+    padding-left: 10px;
 }
 
 .selected {
