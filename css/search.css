@@ -409,7 +409,19 @@
 
 /* ── Card spacing ── */
 .result-body {
-    margin-bottom: 20px;
+    margin-bottom: 0;
+}
+.result-body::after {
+    content: "";
+    display: block;
+    grid-column: 1 / -1;
+    height: 20px;
+    border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-right: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    margin: 0 -1px;
+}
+.result-body.result-last-body::after {
+    display: none;
 }
 
 /* Card header — sticky */
@@ -592,7 +604,6 @@
     font-size: var(--text-lg);
     transition: background 0.1s;
 }
-.price-row:last-child { border-bottom: none; }
 .price-row:hover { background: var(--search-row-hover); }
 
 .price-row .store-name {
