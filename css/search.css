@@ -546,8 +546,6 @@
     color: var(--search-link);
     text-decoration: none;
     font-weight: 500;
-    width: 55%;
-    flex-shrink: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -560,6 +558,7 @@
     font-size: var(--text-lg);
     color: var(--normal);
     white-space: nowrap;
+    margin-left: auto;
 }
 
 .price-row .price-warn {
@@ -605,7 +604,6 @@
     color: var(--search-text-dim);
     min-width: 36px;
     text-align: center;
-    margin-left: auto;
 }
 
 .price-cond-header {
@@ -632,8 +630,7 @@
 .price-index-header span:first-child { text-align: left; min-width: 100px; }
 
 /* Sealed INDEX: price row with 4 values */
-.price-row.index-row .store-name { width: auto; flex: 1; }
-.price-row.index-row .price { margin-left: 0; flex: 1; text-align: center; }
+.price-row.index-row .price { text-align: center; }
 
 .no-offers {
     padding: 16px;
@@ -1081,7 +1078,7 @@
 @media (max-width: 640px) {
     /* Price rows: tighter layout */
     .price-row { padding: 8px 8px; gap: 4px; font-size: var(--text-md); }
-    .price-row .store-name { width: 50%; font-size: var(--text-md); }
+    .price-row .store-name { font-size: var(--text-md); }
     .price-row .price { font-size: var(--text-md); }
     .price-row .qty { font-size: var(--text-sm); min-width: 28px; }
     .price-row .secondary { font-size: var(--text-md); }
