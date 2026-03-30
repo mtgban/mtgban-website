@@ -89,12 +89,14 @@
         </span>
     </div>
     {{if .TotalUnique}}
-        <span class="search-result-count">
-            {{.TotalUnique}}
-            {{if .TotalCards}}/ {{.TotalCards}}{{end}}
-            {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
-            {{if gt .TotalUnique (len .AllKeys)}}({{len .AllKeys}} shown){{end}}
-        </span>
+        <div class="search-result-divider">
+            <span class="search-result-count">
+                {{.TotalUnique}}
+                {{if .TotalCards}}/ {{.TotalCards}}{{end}}
+                {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found
+                {{if gt .TotalUnique (len .AllKeys)}}({{len .AllKeys}} shown){{end}}
+            </span>
+        </div>
     {{end}}
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
