@@ -249,11 +249,13 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {{range $j, $card := .Cards}}
-                        {{$table := (index $.Table $j)}}
+                    {{range $j, $row := .Table}}
+                        {{$card := (index $.Cards $j)}}
                         <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
-                            {{range $i, $row := $table}}
-                                {{if eq $i $.OffsetCards}}
+                            {{range $i, $head := $.Headings}}
+                                {{if $head.IsHidden}}
+                                    {{/* skip hidden columns */}}
+                                {{else if eq $head.Title "Card Name"}}
                                     <td class="news-td-card">
                                         <div class="news-cc">
                                             {{if $card.Keyrune}}
@@ -265,27 +267,27 @@
                                                 </svg>
                                             {{end}}
                                             <div class="card-detail">
-                                                <span class="card-name"><a href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}" lang="{{$card.LangTag}}">{{$row}}</a>{{if $card.Reserved}} *{{end}}{{if $card.Stocks}} &bull;{{end}}{{if $card.SypList}} &dagger;{{end}}</span>
-                                                <span class="set-sub">{{index $table (inc $.OffsetCards 1)}} &bull; #{{index $table (inc $.OffsetCards 2)}}</span>
+                                                <span class="card-name"><a href="search?q={{$row.CardName}} s:{{$card.SetCode}} cn:{{$row.Number}}" lang="{{$card.LangTag}}">{{$row.CardName}}</a>{{if $card.Reserved}} *{{end}}{{if $card.Stocks}} &bull;{{end}}{{if $card.SypList}} &dagger;{{end}}</span>
+                                                <span class="set-sub">{{$row.Edition}} &bull; #{{$row.Number}}</span>
                                             </div>
                                         </div>
                                     </td>
-                                {{else if or (eq $i (inc $.OffsetCards 1)) (eq $i (inc $.OffsetCards 2))}}
+                                {{else if or (eq $head.Title "Edition") (eq $head.Title "#")}}
                                     {{/* Skip edition and # columns — merged into Card cell */}}
                                 {{else}}
-                                    {{$head := (index $.Headings $i)}}
+                                    {{$val := $row.FieldValue $head.Field}}
                                     {{if not $head.IsHidden}}
                                         <td class="{{if or $head.IsDollar $head.IsPerc $head.IsNum}}news-num{{end}} {{if eq $head.Title "Ranking"}}news-rank-col{{end}}">
                                             {{if and $head.IsNum (eq $head.Title "Ranking")}}
-                                                <span class="news-rank">{{$row}}</span>
+                                                <span class="news-rank">{{$val}}</span>
                                             {{else if $head.IsDollar}}
-                                                {{print_price $row}}
+                                                {{print_price $val}}
                                             {{else if $head.IsPerc}}
-                                                <span class="news-perc {{perc_class $row}}">{{print_perc $row}}</span>
+                                                <span class="news-perc {{perc_class $val}}">{{print_perc $val}}</span>
                                             {{else if $head.IsNum}}
-                                                {{$row}}
+                                                {{$val}}
                                             {{else}}
-                                                <span class="news-bucket">{{$row}}</span>
+                                                <span class="news-bucket">{{$val}}</span>
                                             {{end}}
                                         </td>
                                     {{end}}

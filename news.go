@@ -46,6 +46,153 @@ type Heading struct {
 	ConditionalSort bool
 }
 
+type NewspaperResult struct {
+	// Common fields (all pages)
+	Date     string // calc_date or row_names (hidden)
+	UUID     string // product_id or uuid (hidden)
+	Ranking  int
+	CardName string
+	Edition  string
+	Number   string
+	Variant  string // variant or rarity
+
+	// Spike score pages
+	BucketName string
+	BucketRank int
+
+	// Price fields
+	CKRetailPrice  float64
+	TCGMarketPrice float64
+	CKBuyPrice     float64
+	CurrentPrice   float64
+	Retail         float64
+	Buylist        float64
+
+	// Seller listing fields
+	SellersToday    int
+	SellersLastWeek int
+	SellersMonthAgo int
+
+	// Buylist level fields
+	TodaysBuylist    float64
+	YesterdayBuylist float64
+	LastWeekBuylist  float64
+	LastMonthBuylist float64
+
+	// Change fields
+	WeeklyPctChange float64
+
+	// Vendor count
+	Vendors int
+
+	// Forecast fields
+	RecentBL            float64
+	HistoricalPlusMinus float64
+	HistoricalMedian    float64
+	HistoricalMax       float64
+	ForecastedBL        float64
+	ForecastPlusMinus   float64
+	TargetDate          string
+	Tier                string
+	Behavior            string
+	CustomSort          string
+}
+
+// FieldValue returns the value of the named field as a string for template rendering.
+// The name parameter corresponds to the SQL column name (Heading.Field).
+func (r NewspaperResult) FieldValue(name string) string {
+	switch name {
+	// Common
+	case "ranking", "Ranking":
+		if r.Ranking == 0 {
+			return ""
+		}
+		return strconv.Itoa(r.Ranking)
+	case "product_name", "Name":
+		return r.CardName
+	case "set_name", "Set":
+		return r.Edition
+	case "product_number", "Number":
+		return r.Number
+	case "variant", "Rarity":
+		return r.Variant
+	// Bucket
+	case "bucket_name":
+		return r.BucketName
+	case "bucket_rank":
+		if r.BucketRank == 0 {
+			return ""
+		}
+		return strconv.Itoa(r.BucketRank)
+	// Prices
+	case "ck_retail_price":
+		return formatFloat(r.CKRetailPrice)
+	case "tcg_market_price":
+		return formatFloat(r.TCGMarketPrice)
+	case "ck_buy_price":
+		return formatFloat(r.CKBuyPrice)
+	case "current_price":
+		return formatFloat(r.CurrentPrice)
+	case "Retail":
+		return formatFloat(r.Retail)
+	case "Buylist":
+		return formatFloat(r.Buylist)
+	// Sellers
+	case "sellers_Today", "Todays_Sellers":
+		return strconv.Itoa(r.SellersToday)
+	case "sellers_d7", "Week_Ago_Sellers":
+		return strconv.Itoa(r.SellersLastWeek)
+	case "sellers_d30", "Month_Ago_Sellers":
+		return strconv.Itoa(r.SellersMonthAgo)
+	// Buylist levels
+	case "ck_buy_price_today", "Todays_BL":
+		return formatFloat(r.TodaysBuylist)
+	case "ck_buy_1d", "Yesterday_BL":
+		return formatFloat(r.YesterdayBuylist)
+	case "ck_buy_7d", "Week_Ago_BL":
+		return formatFloat(r.LastWeekBuylist)
+	case "ck_buy_30d", "Month_Ago_BL":
+		return formatFloat(r.LastMonthBuylist)
+	// Percentage change
+	case "pct_gain_7d", "pct_drop_7d", "pct_increase_7d", "pct_decrease_7d",
+		"Week_Ago_Sellers_Chg", "Week_Ago_BL_Chg":
+		return formatFloat(r.WeeklyPctChange)
+	// Vendors
+	case "Vendors":
+		return strconv.Itoa(r.Vendors)
+	// Forecast
+	case "Recent_BL":
+		return formatFloat(r.RecentBL)
+	case "Historical_plus_minus":
+		return formatFloat(r.HistoricalPlusMinus)
+	case "Historical_Median":
+		return formatFloat(r.HistoricalMedian)
+	case "Historical_Max":
+		return formatFloat(r.HistoricalMax)
+	case "Forecasted_BL":
+		return formatFloat(r.ForecastedBL)
+	case "Forecast_plus_minus":
+		return formatFloat(r.ForecastPlusMinus)
+	case "Target_Date":
+		return r.TargetDate
+	case "Tier":
+		return r.Tier
+	case "Behavior":
+		return r.Behavior
+	case "custom_sort":
+		return r.CustomSort
+	default:
+		return ""
+	}
+}
+
+func formatFloat(f float64) string {
+	if f == 0 {
+		return ""
+	}
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
 type NewspaperPage struct {
 	// Title of the page
 	Title string
@@ -77,8 +224,8 @@ type NewspaperPage struct {
 	Icon template.HTML
 
 	// Cached results of the various queries
-	Results     [][]string
-	Results3Day [][]string
+	Results     []NewspaperResult
+	Results3Day []NewspaperResult
 
 	// Which editions are available in the cache
 	AvailableEditions     []string
@@ -92,7 +239,7 @@ type NewspaperPage struct {
 	NeedsBuylist bool
 }
 
-func getResults(db *sql.DB, query string) ([][]string, error) {
+func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -109,7 +256,7 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 		return nil, errors.New("not enough data in rows")
 	}
 
-	// Result is your slice string
+	// Result is your slice of raw bytes
 	rawResult := make([][]byte, len(cols))
 
 	// A temporary interface{} slice, containing a variable number of fields
@@ -119,11 +266,10 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 		dest[e] = &rawResult[e]
 	}
 
-	// Allocate the main table scheleton
-	var results [][]string
+	// Allocate the main result slice
+	var results []NewspaperResult
 
 	for rows.Next() {
-		result := make([]string, len(cols))
 		err := rows.Scan(dest...)
 		if err != nil {
 			log.Println(err)
@@ -131,28 +277,106 @@ func getResults(db *sql.DB, query string) ([][]string, error) {
 		}
 
 		// Convert the parsed fields into usable strings
-		for j, raw := range rawResult {
-			if raw != nil {
-				result[j] = string(raw)
+		raw := make([]string, len(cols))
+		for j, r := range rawResult {
+			if r != nil {
+				raw[j] = string(r)
 			}
 		}
 
 		// Override a few fields for better integration with the site
 		if db == NewNewspaperDB {
-			uuid, err := mtgmatcher.MatchId(result[1], result[6] != "Normal")
+			uuid, err := mtgmatcher.MatchId(raw[1], raw[6] != "Normal")
 			if err != nil {
-				log.Println("match", result[1], result[6], "as", result[3], result[4], result[5], "failed:", err)
+				log.Println("match", raw[1], raw[6], "as", raw[3], raw[4], raw[5], "failed:", err)
 				continue
 			}
 			co, _ := mtgmatcher.GetUUID(uuid)
-			result[0] = co.Rarity
-			result[1] = uuid
-			result[3] = co.Name
-			result[4] = co.Edition
-			result[5] = co.Number
+			raw[0] = co.Rarity
+			raw[1] = uuid
+			raw[3] = co.Name
+			raw[4] = co.Edition
+			raw[5] = co.Number
 		}
 
-		// Allocate a table row with as many fields as returned by the SELECT
+		// Map common fields (first 7 columns are always the same order)
+		result := NewspaperResult{
+			Date:     raw[0],
+			UUID:     raw[1],
+			CardName: raw[3],
+			Edition:  raw[4],
+			Number:   raw[5],
+			Variant:  raw[6],
+		}
+		if raw[2] != "" {
+			result.Ranking, _ = strconv.Atoi(raw[2])
+		}
+
+		// Map remaining columns by SQL column name
+		for j := 7; j < len(cols); j++ {
+			if raw[j] == "" {
+				continue
+			}
+			switch cols[j] {
+			case "bucket_name":
+				result.BucketName = raw[j]
+			case "bucket_rank":
+				result.BucketRank, _ = strconv.Atoi(raw[j])
+			case "ck_retail_price":
+				result.CKRetailPrice, _ = strconv.ParseFloat(raw[j], 64)
+			case "tcg_market_price":
+				result.TCGMarketPrice, _ = strconv.ParseFloat(raw[j], 64)
+			case "ck_buy_price":
+				result.CKBuyPrice, _ = strconv.ParseFloat(raw[j], 64)
+			case "current_price":
+				result.CurrentPrice, _ = strconv.ParseFloat(raw[j], 64)
+			case "Retail":
+				result.Retail, _ = strconv.ParseFloat(raw[j], 64)
+			case "Buylist":
+				result.Buylist, _ = strconv.ParseFloat(raw[j], 64)
+			case "sellers_Today", "Todays_Sellers":
+				result.SellersToday, _ = strconv.Atoi(raw[j])
+			case "sellers_d7", "Week_Ago_Sellers":
+				result.SellersLastWeek, _ = strconv.Atoi(raw[j])
+			case "sellers_d30", "Month_Ago_Sellers":
+				result.SellersMonthAgo, _ = strconv.Atoi(raw[j])
+			case "Todays_BL":
+				result.TodaysBuylist, _ = strconv.ParseFloat(raw[j], 64)
+			case "Yesterday_BL", "ck_buy_1d":
+				result.YesterdayBuylist, _ = strconv.ParseFloat(raw[j], 64)
+			case "Week_Ago_BL", "ck_buy_7d":
+				result.LastWeekBuylist, _ = strconv.ParseFloat(raw[j], 64)
+			case "Month_Ago_BL", "ck_buy_30d":
+				result.LastMonthBuylist, _ = strconv.ParseFloat(raw[j], 64)
+			case "pct_gain_7d", "pct_drop_7d", "pct_increase_7d", "pct_decrease_7d",
+				"Week_Ago_Sellers_Chg", "Week_Ago_BL_Chg":
+				result.WeeklyPctChange, _ = strconv.ParseFloat(raw[j], 64)
+			case "Vendors":
+				result.Vendors, _ = strconv.Atoi(raw[j])
+			case "Recent_BL":
+				result.RecentBL, _ = strconv.ParseFloat(raw[j], 64)
+			case "Historical_plus_minus":
+				result.HistoricalPlusMinus, _ = strconv.ParseFloat(raw[j], 64)
+			case "Historical_Median":
+				result.HistoricalMedian, _ = strconv.ParseFloat(raw[j], 64)
+			case "Historical_Max":
+				result.HistoricalMax, _ = strconv.ParseFloat(raw[j], 64)
+			case "Forecasted_BL":
+				result.ForecastedBL, _ = strconv.ParseFloat(raw[j], 64)
+			case "Forecast_plus_minus":
+				result.ForecastPlusMinus, _ = strconv.ParseFloat(raw[j], 64)
+			case "Target_Date":
+				result.TargetDate = raw[j]
+			case "Tier", "Trending":
+				result.Tier = raw[j]
+			case "Behavior":
+				result.Behavior = raw[j]
+			case "custom_sort":
+				result.CustomSort = raw[j]
+			}
+		}
+
+		// Allocate a result row with all mapped fields
 		results = append(results, result)
 	}
 
@@ -211,13 +435,11 @@ func cacheNewspaper() {
 		editions := []string{""}
 		variants := []string{""}
 		for _, result := range results {
-			edition := result[4]
-			if !slices.Contains(editions, edition) {
-				editions = append(editions, edition)
+			if !slices.Contains(editions, result.Edition) {
+				editions = append(editions, result.Edition)
 			}
-			variant := result[6]
-			if !slices.Contains(variants, variant) {
-				variants = append(variants, variant)
+			if !slices.Contains(variants, result.Variant) {
+				variants = append(variants, result.Variant)
 			}
 		}
 		sort.Strings(editions)
@@ -238,13 +460,11 @@ func cacheNewspaper() {
 		editions3day := []string{""}
 		variants3day := []string{""}
 		for _, result := range results3day {
-			edition := result[4]
-			if !slices.Contains(editions3day, edition) {
-				editions3day = append(editions3day, edition)
+			if !slices.Contains(editions3day, result.Edition) {
+				editions3day = append(editions3day, result.Edition)
 			}
-			variant := result[6]
-			if !slices.Contains(variants3day, variant) {
-				variants3day = append(variants3day, variant)
+			if !slices.Contains(variants3day, result.Variant) {
+				variants3day = append(variants3day, result.Variant)
 			}
 		}
 		sort.Strings(editions3day)
@@ -1442,7 +1662,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var results [][]string
+	var results []NewspaperResult
 	for _, newspage := range pageVars.ToC {
 		if newspage.Option != page {
 			continue
@@ -1671,29 +1891,26 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.Table = output
 	} else {
 		if skipEditionsOpt != "" || rarity != "" || filter != "" || bucket != "" || finish != "" {
-			var output [][]string
+			var output []NewspaperResult
 			for _, result := range results {
-				cardRarity := result[0]
-				edition := result[4]
-				finishName := result[6]
-				bucketName := result[7]
 				if skipEditionsOpt != "" {
 					filters := strings.Split(skipEditionsOpt, ",")
-					set, err := mtgmatcher.GetSetByName(edition)
+					set, err := mtgmatcher.GetSetByName(result.Edition)
 					if err == nil && slices.Contains(filters, set.Code) {
 						continue
 					}
 				}
-				if filter != "" && filter != edition {
+				if filter != "" && filter != result.Edition {
 					continue
 				}
-				if bucket != "" && bucket != bucketName {
+				if bucket != "" && bucket != result.BucketName {
 					continue
 				}
-				if finish != "" && finish != finishName {
+				if finish != "" && finish != result.Variant {
 					continue
 				}
-				if rarity != "" && cardRarity != "" {
+				if rarity != "" && result.Date != "" {
+					cardRarity := result.Date // Date field holds rarity for overridden rows
 					if strings.Contains(rarity, "/") {
 						rarities := strings.Split(rarity, "/")
 						if string(cardRarity[0]) != strings.ToLower(rarities[0]) && string(cardRarity[0]) != strings.ToLower(rarities[1]) {
@@ -1714,36 +1931,26 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				if newspage.Option != page {
 					continue
 				}
-				numberSort := false
-				col := -1
-				for i, heading := range newspage.Head {
-					if heading.Field == sorting {
-						numberSort = heading.IsPerc || heading.IsDollar || heading.IsNum
-						col = i
-						break
-					}
-				}
-				if col < 0 {
-					break
-				}
 
 				sort.SliceStable(results, func(i, j int) bool {
-					var a, b float64
-					if numberSort {
-						a, _ = strconv.ParseFloat(results[i][col], 64)
-						b, _ = strconv.ParseFloat(results[j][col], 64)
-					}
+					a := results[i].FieldValue(sorting)
+					b := results[j].FieldValue(sorting)
+					var af, bf float64
+					af, _ = strconv.ParseFloat(a, 64)
+					bf, _ = strconv.ParseFloat(b, 64)
+					numberSort := af != 0 || bf != 0
 					if dir == "asc" {
 						if numberSort {
-							return a < b
+							return af < bf
 						}
-						return results[i][col] < results[j][col]
+						return a < b
 					}
 					if numberSort {
-						return a > b
+						return af > bf
 					}
-					return results[i][col] > results[j][col]
+					return a > b
 				})
+				break
 			}
 		}
 
@@ -1758,9 +1965,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, result := range pageVars.Table {
-		c := uuid2card(result[1], true, false, preferFlavor)
+		c := uuid2card(result.UUID, true, false, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
-		pageVars.CardHashes = append(pageVars.CardHashes, result[1])
+		pageVars.CardHashes = append(pageVars.CardHashes, result.UUID)
 	}
 
 	if len(pageVars.Cards) == 0 {

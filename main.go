@@ -104,7 +104,7 @@ type PageVars struct {
 	ToC          []NewspaperPage
 	Headings     []Heading
 	Cards        []GenericCard
-	Table        [][]string
+	Table        []NewspaperResult
 	IsOneDay     bool
 	CanSwitchDay bool
 	SortDir      string
