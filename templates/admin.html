@@ -315,6 +315,9 @@ function switchTab(btn, panelId) {
     btn.classList.add('active');
     document.getElementById('panel-' + panelId).classList.add('active');
     history.replaceState(null, '', '?page=' + panelId);
+    if (panelId === 'config' && window.refreshConfigEditor) {
+        window.refreshConfigEditor();
+    }
 }
 </script>
 
@@ -355,6 +358,10 @@ function switchTab(btn, panelId) {
         } catch(e) {
             alert("Invalid JSON: " + e.message);
         }
+    };
+
+    window.refreshConfigEditor = function() {
+        setTimeout(function() { editor.refresh(); }, 0);
     };
 })();
 </script>
