@@ -324,8 +324,10 @@ function switchTab(btn, panelId) {
     var textarea = document.getElementById("textArea");
     if (!textarea) return;
     var isDark = document.body.classList.contains("dark-theme");
+    var initialValue = textarea.value;
+    try { initialValue = JSON.stringify(JSON.parse(initialValue), null, 4); } catch(e) {}
     var editor = CodeMirror(document.getElementById("configEditor"), {
-        value: textarea.value,
+        value: initialValue,
         mode: "application/json",
         theme: isDark ? "dracula" : "default",
         lineNumbers: true,
