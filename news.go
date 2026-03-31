@@ -162,8 +162,13 @@ var gameMap = map[string]string{
 	"pokemon":   "Pokemon",
 }
 
+// Cache of card UUIDs that appear in the newspaper spike score pages
+var NewspaperUUIDs map[string]struct{}
+
 func cacheNewspaper() {
 	log.Println("Caching Newspaper data")
+
+	newspaperUUIDs := map[string]struct{}{}
 
 	game, found := gameMap[Config.Game]
 	if !found {
@@ -222,6 +227,13 @@ func cacheNewspaper() {
 		NewspaperPages[i].AvailableEditions = editions
 		NewspaperPages[i].PossibleFinish = variants
 
+		// Cache UUIDs from spike score pages for the "on:newspaper" search filter
+		if NewspaperPages[i].Option == "combined_spike_score" || NewspaperPages[i].Option == "spike_score" {
+			for _, result := range results {
+				newspaperUUIDs[result[1]] = struct{}{}
+			}
+		}
+
 		query = strings.Replace(query, "0 DAY", "3 DAY", -1)
 		results3day, err := getResults(NewNewspaperDB, query)
 		if err != nil {
@@ -249,6 +261,9 @@ func cacheNewspaper() {
 		NewspaperPages[i].AvailableEditions3Day = editions3day
 		NewspaperPages[i].PossibleFinish3Day = variants3day
 	}
+
+	NewspaperUUIDs = newspaperUUIDs
+	log.Println("Newspaper UUIDs cached:", len(newspaperUUIDs))
 
 	LastNewspaperUpdate = time.Now()
 	log.Println("Newspaper All Ready")

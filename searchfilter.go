@@ -1601,6 +1601,12 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 				if found {
 					return false
 				}
+			case "newspaper":
+				if NewspaperUUIDs != nil {
+					if _, found := NewspaperUUIDs[co.UUID]; found {
+						return false
+					}
+				}
 			}
 		}
 		return true
