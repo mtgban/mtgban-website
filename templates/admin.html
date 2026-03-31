@@ -207,7 +207,7 @@
                 <div class="config-actions">
                     <button class="cfg-btn cfg-format" onclick="formatJSON()">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
-                    <button class="cfg-btn cfg-primary" onclick="document.getElementById('configForm').submit()">Update</button>
+                    <button class="cfg-btn cfg-primary" onclick="document.getElementById('configForm').requestSubmit()">Update</button>
                 </div>
             </div>
             <form id="configForm" action="/admin?page=config" method="post">
