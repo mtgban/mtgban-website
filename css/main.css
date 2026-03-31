@@ -749,7 +749,6 @@ a.selected:hover{
 .page-standard {
     max-width: 80vw;
     margin: 0 auto;
-    margin-right: clamp(0px, 5vw, 11%);
     /*padding: 0 var(--page-gutter);*/
 }
 .page-wide {
@@ -1216,7 +1215,7 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
 
 img.hoverImage {
     position: absolute;
-    z-index: 99;
+    z-index: 200;
     width: auto;
     max-width: 640px;
     max-height: 360px;
@@ -1280,13 +1279,14 @@ img.hoverImage {
     display: flex;
     flex-direction: column;
     position: relative;
-    width: 80vw;
+    max-width: 80vw;
     background: var(--background);
     border: 0.1rem solid var(--syntax-border-color);
     border-radius: 8px;
     overflow: hidden;
     margin-top: 2rem;
-    margin-left: 8%;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .syntax-header {

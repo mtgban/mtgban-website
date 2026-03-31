@@ -31,7 +31,7 @@
     gap: 0;
     min-height: calc(100vh - var(--nav-height, 40px));
     margin-top: -40px;
-    max-width: 1100px;
+    max-width: 80vw;
     margin-left: auto;
     margin-right: auto;
     padding-left: 16px;
@@ -203,7 +203,7 @@
 /* ── Sidebar search bar ── */
 .sidebar-search {
     margin: -20px -20px 8px;
-    padding: 20px 20px 8px;
+    padding: 40px 20px 8px;
     position: sticky;
     top: -20px;
     background: var(--background);
@@ -403,7 +403,7 @@
 
 /* ═══ Results main area ═══ */
 .search-results {
-    padding: 9px 18px 80px;
+    padding: 20px 18px 80px;
 }
 
 
@@ -436,6 +436,7 @@
     border-radius: 0;
     position: sticky;
     top: calc(var(--nav-height, 48px) + 21px);
+    z-index: 2;
 }
 .result-header.result-first {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
@@ -447,6 +448,7 @@
 .result-header-cover {
     position: sticky;
     top: var(--nav-height, 48px);
+    z-index: 2;
     height: 21px;
     margin-bottom: -21px;
     background: var(--background);
@@ -580,7 +582,6 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
-    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
 }
 .result-col::after {
     content: "";
@@ -619,8 +620,8 @@
     color: var(--search-link);
     text-decoration: none;
     font-weight: 500;
-    flex: 1;
-    min-width: 0;
+    width: 55%;
+    flex-shrink: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -633,7 +634,6 @@
     font-size: var(--text-lg);
     color: var(--normal);
     white-space: nowrap;
-    margin-left: auto;
 }
 
 .price-row .price-warn {
@@ -679,6 +679,12 @@
     color: var(--search-text-dim);
     min-width: 36px;
     text-align: center;
+    margin-left: auto;
+}
+
+/* Collapse empty sealed secondary placeholder so it doesn't add a gap */
+.price-row .secondary:empty {
+    display: none;
 }
 
 .price-cond-header {
@@ -693,8 +699,8 @@
 /* Sealed INDEX: 4-column sub-header */
 .price-index-header {
     background: var(--search-surface-1);
-    padding-top: 4px;
-    padding-bottom: 4px;
+    padding: 5px 12px;
+    font-size: var(--text-sm);
     align-items: center;
 }
 .price-index-header .price {
@@ -708,8 +714,8 @@
 
 /* Sealed INDEX: price row with 4 values */
 .price-row.index-row { gap: 2px; }
-.price-row.index-row .store-name { flex: 1 1 0; min-width: 0; }
-.price-row.index-row .price { flex: 0 0 72px; text-align: center; margin-left: 0; }
+.price-row.index-row .store-name { width: auto; flex: 1; }
+.price-row.index-row .price { flex: 1; text-align: center; }
 
 .no-offers {
     padding: 16px;
@@ -1160,7 +1166,7 @@
 @media (max-width: 640px) {
     /* Price rows: tighter layout */
     .price-row { padding: 8px 8px; gap: 4px; font-size: var(--text-md); }
-    .price-row .store-name { font-size: var(--text-md); }
+    .price-row .store-name { width: 50%; font-size: var(--text-md); }
     .price-row .price { font-size: var(--text-md); }
     .price-row .qty { font-size: var(--text-sm); min-width: 28px; }
     .price-row .secondary { font-size: var(--text-md); }
