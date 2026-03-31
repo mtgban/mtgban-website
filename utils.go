@@ -71,6 +71,7 @@ type GenericCard struct {
 	CKRestockURL string
 	SourceSealed []string
 	HotlistStore string
+	Newspaper    bool
 }
 
 func fileExists(filename string) bool {
@@ -327,6 +328,11 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		stocksURL = entries[0].URL
 	}
 
+	var newspaper bool
+	if NewspaperUUIDs != nil {
+		_, newspaper = NewspaperUUIDs[cardId]
+	}
+
 	variant := ""
 	if showVariant(cardId) {
 		switch {
@@ -491,6 +497,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
 		HotlistStore: hotlistStore,
+		Newspaper:    newspaper,
 	}
 }
 
