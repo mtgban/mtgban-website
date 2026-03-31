@@ -554,6 +554,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Strip " EV" suffix from INDEX scraper names since the column headers already convey this.
+		for i := range tmp {
+			tmp[i].ScraperName = strings.TrimSuffix(tmp[i].ScraperName, " EV")
+		}
+
 		// If the TCG index is missing, but ID is known, we manually add one to get the link
 		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed && pageVars.Metadata[cardId].TCGId != "" {
 			tcgId, _ := strconv.Atoi(pageVars.Metadata[cardId].TCGId)
