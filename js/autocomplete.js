@@ -31,9 +31,6 @@ async function autocomplete(form, inp, sealed) {
         a.setAttribute("id", this.id + "autocomplete-list");
         a.setAttribute("class", "autocomplete-items");
 
-        /* Append the DIV element as a child of the autocomplete container */
-        this.parentNode.appendChild(a);
-
         /* For each item in the array... */
         for (i = 0; i < arr.length; i++) {
             let inputText = val.toUpperCase();
@@ -71,6 +68,11 @@ async function autocomplete(form, inp, sealed) {
                 });
                 a.appendChild(b);
             }
+        }
+
+        /* Only append the dropdown if there are matching items */
+        if (a.hasChildNodes()) {
+            this.parentNode.appendChild(a);
         }
     });
 
