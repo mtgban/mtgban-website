@@ -943,6 +943,10 @@ Sims are not required for pre-constructed decks and other products where the sam
                     break;
                 }
             }
+            // If we're just above the first header (within 20px), treat as at header 0
+            if (current === -1 && targets.length > 0 && targets[0] - scrollY < 20) {
+                current = 0;
+            }
             return current;
         }
 
