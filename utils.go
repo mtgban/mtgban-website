@@ -417,7 +417,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 			if err != nil {
 				continue
 			}
-			products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + "</a><br>"
+			products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + "</a>"
 		}
 		products += "</h4>"
 		if len(sourceSealed) > 5 {
