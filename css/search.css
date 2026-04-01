@@ -83,6 +83,10 @@
 .search-bar-wrap .search-input:focus {
     border-color: var(--search-link);
 }
+.search-bar-wrap .autocomplete:has(.autocomplete-items) .search-input {
+    border-radius: var(--radius-lg, 10px) var(--radius-lg, 10px) 0 0;
+    transition: border-radius 0.15s;
+}
 .search-bar-wrap .search-input::placeholder {
     color: var(--search-text-dim);
 }
