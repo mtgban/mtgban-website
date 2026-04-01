@@ -94,6 +94,10 @@
 .landing-lucky:hover { border-color: var(--accent-border); color: var(--ainfo); text-decoration: none; }
 
 /* Autocomplete dropdown override */
+.landing-search-wrap .autocomplete:has(.autocomplete-items) .landing-search {
+    border-radius: 16px 16px 0 0;
+    transition: border-radius 0.15s;
+}
 .landing-search-wrap .autocomplete-items {
     border-radius: 0 0 16px 16px;
     overflow: hidden;
