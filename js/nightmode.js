@@ -6,12 +6,14 @@ const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 // If there is no local value, follow the system preference
 let theme = stored || (prefersDark ? 'dark' : 'light');
 document.body.classList.toggle('dark-theme', theme === 'dark');
+document.body.classList.toggle('light-theme', theme === 'light');
 toggle.title = theme === 'dark' ? 'Nightbound' : 'Daybound';
 
 toggle.addEventListener('click', () => {
     theme = theme === 'dark' ? 'light' : 'dark';
 
     document.body.classList.toggle('dark-theme', theme === 'dark');
+    document.body.classList.toggle('light-theme', theme === 'light');
 
     toggle.title = theme === 'dark' ? 'Nightbound' : 'Daybound';
     localStorage.setItem("theme", theme);
