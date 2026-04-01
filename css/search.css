@@ -212,6 +212,7 @@
     padding: 20px;
     position: sticky;
     top: var(--nav-height, 48px);
+    align-self: start;
     max-height: calc(100vh - var(--nav-height, 48px));
     overflow-y: auto;
     scrollbar-color: transparent transparent;
@@ -1195,7 +1196,7 @@
         max-height: none;
         overflow: visible;
         padding: 12px 16px 0;
-        z-index: 30;
+        z-index: 150;
         background: var(--background);
     }
     .search-sidebar > *:not(.sidebar-search) { display: none; }
