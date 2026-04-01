@@ -969,7 +969,6 @@ th a {
     top: 100%;
     left: 0;
     right: 0;
-    margin-top: 4px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-moderate);
     overflow: hidden;
