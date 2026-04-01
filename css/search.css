@@ -649,6 +649,43 @@
 }
 .price-row:hover { background: var(--search-row-hover); }
 
+.price-row-locked {
+    background: var(--search-surface-2);
+    opacity: 0.7;
+}
+.price-row-locked:hover {
+    opacity: 1;
+}
+.locked-cta {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+.locked-btn {
+    padding: 2px 10px;
+    border-radius: var(--radius-sm, 6px);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    color: var(--search-link);
+    background: var(--accent-muted, rgba(91,141,239,0.12));
+    white-space: nowrap;
+    transition: all 0.12s;
+}
+.locked-btn:hover {
+    background: rgba(91,141,239,0.2);
+    text-decoration: none;
+}
+.locked-btn-join {
+    background: rgba(63,185,80,0.1);
+    border-color: rgba(63,185,80,0.25);
+    color: var(--asuccess);
+}
+.locked-btn-join:hover {
+    background: rgba(63,185,80,0.2);
+}
+
 .price-row .store-name {
     color: var(--search-link);
     text-decoration: none;

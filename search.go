@@ -56,6 +56,8 @@ type SearchEntry struct {
 	Secondary float64
 
 	ExtraValues map[string]float64
+
+	Locked bool
 }
 
 func isSame(a, b SearchEntry) bool {
@@ -141,15 +143,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if skipVendorsOpt != "" {
 		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
 	}
-	// For buylists, if open mode, filter any store except the ones in the AffiliatesBuylistList
+	// For open mode (Any), disable history charts
 	if sig == "" && SigCheck {
-		for _, vendor := range Vendors {
-			if vendor != nil && !slices.Contains(Config.AffiliatesBuylistList, vendor.Info().Shorthand) {
-				blocklistBuylist = append(blocklistBuylist, vendor.Info().Shorthand)
-			}
-		}
 		pageVars.DisableChart = true
-		pageVars.InfoMessage = "Join BAN to unlock additional buylists and tools!"
 	}
 
 	// Load sort option from preferences, merge the alpha query parameter if needed
@@ -572,6 +568,21 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		foundSellers[cardId]["INDEX"] = tmp
+
+		if sig == "" && SigCheck {
+			for j, foundSet := range []map[string]map[string][]SearchEntry{foundSellers, foundVendors} {
+				for cond := range foundSet[cardId] {
+					entries := foundSet[cardId][cond]
+					for i := range entries {
+						if j == 0 && !slices.Contains(Config.AffiliatesList, entries[i].Shorthand) {
+							entries[i].Locked = true
+						} else if j == 1 && !slices.Contains(Config.AffiliatesBuylistList, entries[i].Shorthand) {
+							entries[i].Locked = true
+						}
+					}
+				}
+			}
+		}
 	}
 
 	pageVars.FoundSellers = foundSellers

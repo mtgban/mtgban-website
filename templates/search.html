@@ -748,12 +748,21 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <div class="price-row{{if and (eq $conditions "INDEX") $.IsSealed}} index-row{{end}}">
-                                                {{if eq .URL ""}}
+                                            <div class="price-row{{if and (eq $conditions "INDEX") $.IsSealed}} index-row{{end}}{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                                {{if .Locked}}
+                                                    <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
+                                                    <span class="locked-cta">
+                                                        <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                                        {{range $ref, $id := $.PatreonIds}}
+                                                            <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                        {{end}}
+                                                    </span>
+                                                {{else if eq .URL ""}}
                                                     <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                 {{else}}
                                                     <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                 {{end}}
+                                                {{if not .Locked}}
                                                 {{if and (eq $conditions "INDEX") $.IsSealed}}
                                                     <span class="price">$ {{printf "%.2f" .Price}}</span>
                                                     {{$iqr := 0.0}}{{if .Secondary}}{{$iqr = index .ExtraValues "iqr"}}{{end}}
@@ -794,6 +803,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         </span>
                                                     {{end}}
                                                 {{end}}
+                                                {{end}}
                                             </div>
                                         {{end}}
                                     {{end}}
@@ -813,12 +823,21 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <div class="price-row" title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'>
-                                                {{if eq .URL ""}}
+                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{else}}title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'{{end}}>
+                                                {{if .Locked}}
+                                                    <span class="store-name dim">{{.ScraperName}} {{.Country}}</span>
+                                                    <span class="locked-cta">
+                                                        <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                                        {{range $ref, $id := $.PatreonIds}}
+                                                            <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                        {{end}}
+                                                    </span>
+                                                {{else if eq .URL ""}}
                                                     <a class="store-name dim">{{.ScraperName}} {{.Country}}{{if eq .Shorthand $card.HotlistStore}} <span class=emoji title="Highest price in 3 months">&#127775;</span>{{end}}</a>
                                                 {{else}}
                                                     <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}{{if eq .Shorthand $card.HotlistStore}} <span class=emoji title="Highest price in 3 months">&#127775;</span>{{end}}</a>
                                                 {{end}}
+                                                {{if not .Locked}}
                                                 {{$blPriceWarn := false}}
                                                 {{if eq .Shorthand "TCGDirectNet"}}
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
@@ -840,6 +859,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         {{.Quantity}}
                                                     {{end}}
                                                 </span>
+                                                {{end}}
                                             </div>
                                         {{end}}
                                     {{end}}
