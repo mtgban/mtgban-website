@@ -103,12 +103,11 @@
 .landing-tools {
     display: flex; flex-wrap: wrap;
     justify-content: center;
-    gap: 6px;
 }
 .landing-tool {
     padding: 7px 16px; border-radius: 20px;
-    border: 1px solid var(--border-subtle);
-    background: rgba(255,255,255,0.02);
+    border: 1px solid transparent;
+    background: transparent;
     color: var(--activetext);
     font-size: 13px; font-weight: 500;
     text-decoration: none; transition: all 0.15s;
