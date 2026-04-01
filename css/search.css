@@ -53,7 +53,7 @@
 .search-input-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    position: relative;
     margin-bottom: 10px;
 }
 
@@ -68,8 +68,8 @@
 .search-bar-wrap .search-input,
 .search-bar-wrap input.search-input {
     flex: 1;
-    padding: 10px 16px;
-    border-radius: var(--radius-md, 10px);
+    padding: 14px 14px 14px 14px;
+    border-radius: var(--radius-lg, 10px);
     border: 1px solid var(--border-moderate, rgba(255,255,255,0.12));
     background: var(--search-surface-1);
     color: var(--normal);
@@ -87,20 +87,34 @@
     color: var(--search-text-dim);
 }
 
-.search-surprise {
-    padding: 10px 18px;
-    border-radius: var(--radius-md, 10px);
-    background: var(--accent-muted, rgba(91,141,239,0.12));
-    border: 1px solid var(--accent-border, rgba(91,141,239,0.25));
-    color: var(--search-link);
-    font-size: var(--text-md);
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-    transition: all 0.12s;
+.search-actions {
+    position: absolute;
+    right: 6px; top: 50%; transform: translateY(-50%);
+    display: flex;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-3);
+    z-index: 1;
 }
-.search-surprise:hover {
-    background: rgba(91,141,239,0.2);
+.search-action-btn {
+    padding: 8px 12px;
+    background: transparent; border: none;
+    color: var(--activetext);
+    cursor: pointer; text-decoration: none;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+}
+.search-action-btn svg {
+    width: 20px; height: 20px;
+}
+.search-action-btn + .search-action-btn {
+    border-left: 1px solid var(--border-subtle);
+}
+.search-action-btn:hover {
+    background: var(--accent-muted);
+    color: var(--ainfo);
+    text-decoration: none;
 }
 
 .search-sort-row {
@@ -1199,7 +1213,7 @@
 
 @media (max-width: 600px) {
     .search-input-row { flex-wrap: wrap; }
-    .search-surprise { width: 100%; text-align: center; }
+    .search-actions { width: 100%; justify-content: center; }
     .result-quick-icons { width: 100%; justify-content: flex-start; }
     .result-set-title { margin-left: 0; width: 100%; }
 }
