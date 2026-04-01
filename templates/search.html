@@ -290,6 +290,7 @@ Sims are not required for pre-constructed decks and other products where the sam
 
 {{define "search-results"}}
     {{if not .AllKeys}}
+        {{template "search-bar" .}}
         <div class="page-standard" style="padding-top: 2em;">
             <p style="color: var(--activetext); font-size: var(--text-3xl);"><em>{{.InfoMessage}}</em></p>
         </div>
