@@ -84,7 +84,7 @@
             <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i></a>
         {{end}}
         <span class="search-sort-actions">
-            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}" title="Surprise me"><i data-lucide="dice-5"></i></a>
+            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
             <a class="search-sort-settings" href="?page=options" title="Settings"><i data-lucide="settings"></i></a>
         </span>
     </div>
@@ -111,7 +111,7 @@
             <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
                 <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
             </form>
-            <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Surprise me</a>
+            <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Random {{if .IsSealed}}Product{{else}}Card{{end}}</a>
         </div>
     </div>
     <script type="text/javascript">
@@ -126,7 +126,7 @@
                     <form class="search autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
                         <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
                     </form>
-                    <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Surprise me</a>
+                    <a class="search-surprise" href="/random{{if .IsSealed}}sealed{{end}}">Random {{if .IsSealed}}Product{{else}}Card{{end}}</a>
                 </div>
             </div>
             <script type="text/javascript">
