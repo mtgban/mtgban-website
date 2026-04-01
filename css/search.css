@@ -642,7 +642,9 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 12px;
+    height: var(--price-row-h, 42px);
+    padding: 0 12px;
+    box-sizing: border-box;
     border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     font-size: var(--text-lg);
     transition: background 0.1s;
@@ -758,7 +760,11 @@
 }
 
 .price-cond-header {
-    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    height: calc(var(--price-row-h, 42px) / 2);
+    padding: 0 12px;
+    box-sizing: border-box;
     font-size: var(--text-sm);
     color: var(--search-text-dim);
     font-style: italic;
@@ -1201,7 +1207,7 @@
     .search-bar-wrap { padding: 12px 16px 0; }
     .search-results { padding: 16px 16px 60px; }
     .result-header { padding: 8px 10px; gap: 6px; }
-    .price-row { padding: 6px 10px; }
+    .price-row { --price-row-h: 34px; padding: 0 10px; }
 }
 
 @media (max-width: 900px) {
@@ -1235,7 +1241,7 @@
 
 @media (max-width: 640px) {
     /* Price rows: tighter layout */
-    .price-row { padding: 8px 8px; gap: 4px; font-size: var(--text-md); }
+    .price-row { --price-row-h: 36px; padding: 0 8px; gap: 4px; font-size: var(--text-md); }
     .price-row .store-name { width: 50%; font-size: var(--text-md); }
     .price-row .price { font-size: var(--text-md); }
     .price-row .qty { font-size: var(--text-sm); min-width: 28px; }
