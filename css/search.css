@@ -308,11 +308,22 @@
     padding: 8px 12px;
     font-size: var(--text-sm);
     text-align: center;
+    max-height: 4.5em;
+    overflow-y: auto;
+}
+.sidebar-products-list h4,
+.sidebar-products-list h5,
+.sidebar-products-list h6 {
+    font-size: inherit;
+    font-weight: normal;
+    margin: 0;
+    padding: 0;
 }
 .sidebar-products-list a {
     color: var(--search-link);
     text-decoration: none;
     display: block;
+    line-height: 1.5;
 }
 .sidebar-products-list a:hover { text-decoration: underline; }
 
