@@ -963,13 +963,17 @@ th a {
     position: relative;
     display: inline-block;
 }
+.autocomplete:has(.autocomplete-items) input {
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    transition: border-radius 0.15s;
+}
 .autocomplete-items {
     position: absolute;
     z-index: 99;
     top: 100%;
     left: 0;
     right: 0;
-    border-radius: var(--radius-md);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
     border: 1px solid var(--border-moderate);
     overflow: hidden;
     max-height: 320px;
