@@ -213,6 +213,7 @@
     position: relative;
     display: block;
     width: 100%;
+    margin-bottom: 8px;
 }
 .sidebar-search .search-input {
     width: 100%;
@@ -224,7 +225,6 @@
     font-size: var(--text-lg);
     color: var(--normal);
     outline: none;
-    margin-bottom: 8px;
 }
 .sidebar-search .search-input:focus {
     border-color: var(--accent-border, rgba(91,141,239,0.4));
