@@ -1673,7 +1673,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			skipEditions += " AND a.Set <> '" + set.Name + "'"
+			skipEditions += " AND a.Set <> '" + strings.Replace(set.Name, "'", "''", -1) + "'"
 		}
 	}
 
