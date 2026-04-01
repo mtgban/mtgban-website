@@ -62,7 +62,7 @@
     width: 100%;
     box-sizing: border-box;
     height: 52px;
-    padding: 0 120px 0 48px;
+    padding: 0 120px 0 20px;
     border-radius: 16px;
     border: 1px solid var(--border-moderate);
     background: var(--surface-1);
@@ -78,20 +78,33 @@
     box-shadow: 0 2px 20px rgba(0,0,0,0.15), 0 0 0 3px var(--accent-muted), inset 0 1px 0 rgba(255,255,255,0.03);
 }
 .landing-search::placeholder { color: var(--text-dim); }
-.landing-search-icon {
-    position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
-    font-size: 18px; color: var(--text-dim); pointer-events: none;
-    z-index: 1;
-}
-.landing-lucky {
+.landing-actions {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-    padding: 8px 16px; border-radius: 10px;
-    background: var(--surface-3); border: 1px solid var(--border-subtle);
-    color: var(--activetext); font-size: 12px; font-weight: 600;
-    cursor: pointer; font-family: 'DM Sans', system-ui, sans-serif;
-    transition: all 0.15s; text-decoration: none;
+    display: flex;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-3);
 }
-.landing-lucky:hover { border-color: var(--accent-border); color: var(--ainfo); text-decoration: none; }
+.landing-action-btn {
+    padding: 8px 12px;
+    background: transparent; border: none;
+    color: var(--activetext);
+    cursor: pointer; text-decoration: none;
+    transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center;
+}
+.landing-action-btn svg {
+    width: 20px; height: 20px;
+}
+.landing-action-btn + .landing-action-btn {
+    border-left: 1px solid var(--border-subtle);
+}
+.landing-action-btn:hover {
+    background: var(--accent-muted);
+    color: var(--ainfo);
+    text-decoration: none;
+}
 
 /* Autocomplete dropdown override */
 .landing-search-wrap .autocomplete:has(.autocomplete-items) .landing-search {

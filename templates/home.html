@@ -10,6 +10,7 @@
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
 {{define "content"}}
@@ -22,14 +23,16 @@
         <div class="landing-tagline"><br></div>
 
         <div class="landing-search-wrap">
-            <span class="landing-search-icon">&#128269;</span>
             <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
                 <input id="searchbox" class="landing-search" type="text" name="q"
                        placeholder="Search for a card or product..."
                        maxlength="1000" autofocus autocapitalize="none"
                        onFocus="this.setSelectionRange(0, this.value.length)">
             </form>
-            <a class="landing-lucky" href="/random">Random Card</a>
+            <div class="landing-actions">
+                <button class="landing-action-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+                <a class="landing-action-btn" href="/random" title="Random Card"><i data-lucide="dice-5"></i></a>
+            </div>
         </div>
         <script type="text/javascript">
             autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
@@ -45,6 +48,7 @@
             {{end}}
         </div>
     </div>
+    <script>lucide.createIcons();</script>
 
     {{if ne .ErrorMessage ""}}
         <div class="landing-error">{{.ErrorMessage}}</div>
