@@ -173,8 +173,8 @@ github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 h1:RWengNIwukTxcDr9
 github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826/go.mod h1:TaXosZuwdSHYgviHp1DAtfrULt5eUgsSMsZf+YrPgl8=
 github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd5E/OeU=
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
-github.com/mtgban/go-mtgban v0.5.53 h1:Tyyb5e5IhSC5/fazIh7oDTz67GhN3rVR/Dpba0FmtQ4=
-github.com/mtgban/go-mtgban v0.5.53/go.mod h1:R/VYGGU8+tJ11yBnQnCpjbxN2GvyNq5xtrXHm/NvTk0=
+github.com/mtgban/go-mtgban v0.6.0 h1:GZfF+A0LJMgsBS9pmq5uWYEL086FtrOHYFchUhhow80=
+github.com/mtgban/go-mtgban v0.6.0/go.mod h1:7x3szLEdcWmzhHDz0b3y2GM8dFCvVeb2MfskIemMkCc=
 github.com/mtgban/go-tcgplayer v0.0.1 h1:0IJvApKMKyDqbMqjRtjFMzCKI3MZQEKuDIkA43zoPdo=
 github.com/mtgban/go-tcgplayer v0.0.1/go.mod h1:l0BmeIiHMkZXkdNSAcAyu9yZLEn6ryOKoOzn8e2xtn0=
 github.com/mtgban/simplecloud v0.0.7 h1:n9+NSP6FPxoGCL/95nYu27clROiJqBrcW3MC5IzTcB0=
