@@ -309,7 +309,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	enabledVendors := readCookie(r, "enabledVendors")
-	if len(enabledVendors) == 0 {
+	if len(enabledVendors) == 0 || !canChangeStores {
 		pageVars.EnabledVendors = allVendors
 	} else {
 		pageVars.EnabledVendors = strings.Split(enabledVendors, "|")
@@ -321,6 +321,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Filter out any unselected store from the full list
 	stores := r.Form["stores"]
 	if blMode {
+		// Override in case not allowed to change list
+		if !canChangeStores {
+			stores = allVendors
+		}
 		for _, store := range stores {
 			if slices.Contains(allVendors, store) {
 				enabledStores = append(enabledStores, store)
