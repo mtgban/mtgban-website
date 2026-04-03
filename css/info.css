@@ -134,9 +134,6 @@
 .info-matrix-wrap {
     border: 1px solid var(--border-moderate);
     border-radius: var(--radius-lg);
-    overflow: hidden;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
 }
 
 /* ── Table ── */
@@ -152,7 +149,7 @@
 
 .info-matrix thead {
     position: sticky;
-    top: 0;
+    top: var(--nav-height);
     z-index: 20;
 }
 
@@ -409,6 +406,8 @@
 
     .info-matrix-wrap {
         border-radius: var(--radius-sm);
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .info-hint-mobile {
