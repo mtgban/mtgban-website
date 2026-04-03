@@ -389,6 +389,7 @@
             }
 
             window.reloadSelect = function(mode) {
+                localStorage.setItem("uploadMode", mode);
                 var selectBox = document.getElementById('storesBox');
                 if (selectBox) {
                     const fields = [
@@ -471,7 +472,18 @@
                 if (textArea) {
                     textArea.value = "";
                 }
-                reloadSelect({{if $.IsBuylist}}"buylist"{{else}}"retail"{{end}});
+                var savedMode = localStorage.getItem("uploadMode");
+                if (savedMode === "buylist" || savedMode === "retail") {
+                    var radio = document.getElementById(savedMode);
+                    if (radio && !radio.disabled) {
+                        radio.checked = true;
+                    } else {
+                        savedMode = "retail";
+                    }
+                } else {
+                    savedMode = {{if $.IsBuylist}}"buylist"{{else}}"retail"{{end}};
+                }
+                reloadSelect(savedMode);
 
                 var gdocInput = document.getElementById('gdocURL');
                 if (gdocInput) {
