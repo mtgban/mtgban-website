@@ -6,42 +6,66 @@
     overflow-x: hidden;
 }
 
-/* Search bar */
+/* Search bar - sticky at top */
+.m-search-bar-sticky {
+    position: sticky;
+    top: 48px; /* below the 48px mobile nav */
+    z-index: 50;
+    background: var(--background);
+    padding: 0.4em 0.5em;
+    margin: 0 -0.5em; /* bleed to page edges */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.light-theme .m-search-bar-sticky {
+    border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
 .m-search-wrap {
     display: flex;
     align-items: center;
     gap: 0.5em;
-    padding: 0.5em 0;
 }
 
 .m-search-input {
     flex: 1;
     font-size: 1rem;
-    padding: 0.75em;
-    border: 1px solid var(--border);
+    padding: 0.6em 0.75em;
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 8px;
-    background: var(--background);
+    background: rgba(255, 255, 255, 0.07);
     color: var(--text);
-    min-height: 48px;
+    min-height: 44px;
     box-sizing: border-box;
+}
+
+.light-theme .m-search-input {
+    border-color: rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.04);
 }
 
 .m-search-input:focus {
     outline: 2px solid var(--dodgerblue);
     outline-offset: -1px;
+    background: var(--background);
 }
 
 .m-search-btn {
-    min-width: 48px;
-    min-height: 48px;
-    border: 1px solid var(--border);
+    min-width: 44px;
+    min-height: 44px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
     border-radius: 8px;
-    background: var(--background);
+    background: rgba(255, 255, 255, 0.07);
     color: var(--text);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.light-theme .m-search-btn {
+    border-color: rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.04);
 }
 
 /* Result metadata */
@@ -379,4 +403,78 @@
 .m-pg-info {
     color: var(--greytext);
     font-size: 0.85rem;
+}
+
+/* Card image bottom drawer */
+.m-drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 400;
+}
+
+.m-drawer-overlay.open {
+    display: block;
+}
+
+.m-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    background: var(--background);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    transition: transform 250ms ease;
+    padding: 0.5em 1em 1.5em;
+    max-height: 70vh;
+}
+
+.m-drawer.open {
+    transform: translateY(0);
+}
+
+.m-drawer-handle {
+    display: flex;
+    justify-content: center;
+    padding: 0.5em 0;
+    cursor: pointer;
+}
+
+.m-drawer-handle span {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.light-theme .m-drawer-handle span {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.m-drawer-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.m-drawer-img {
+    max-width: 250px;
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+}
+
+.m-drawer-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+/* Make card header indicate it's tappable */
+.m-card-header {
+    cursor: pointer;
 }
