@@ -87,9 +87,11 @@
                 </div>
                 <div class="m-card-info">
                     <span class="m-card-name" lang="{{$card.LangTag}}">{{$card.Name}}</span>
-                    <span class="m-card-set">{{$card.Edition}} · #{{$card.Number}}{{if $card.Foil}} · Foil{{end}}{{if $card.Etched}} · Etched{{end}}</span>
+                    <span class="m-card-set">{{$card.Edition}} · #{{$card.Number}}</span>
                 </div>
                 <div class="m-card-badges">
+                    {{if $card.Foil}}<span class="m-badge foil">Foil</span>{{end}}
+                    {{if $card.Etched}}<span class="m-badge etched">Etched</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                 </div>
             </div>
