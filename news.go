@@ -1433,6 +1433,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav("Newspaper", sig)
+	pageVars.IsMobile = isMobileRequest(r)
 
 	// Check if any DB connection was made
 	if Config.DBAddress == "" && Config.NewNewspaperConfigLine == "" {
