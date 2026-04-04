@@ -1,0 +1,136 @@
+/* Mobile nav bar */
+.m-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.75em;
+    height: 48px;
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.m-nav-home {
+    text-decoration: none;
+}
+
+.m-nav-logo {
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--activetext);
+}
+
+.m-nav-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+
+.m-nav-hamburger {
+    font-size: 1.4rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text);
+    padding: 0.5em;
+    min-width: 48px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Mobile slide-out menu */
+.m-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 200;
+}
+
+.m-overlay.open {
+    display: block;
+}
+
+.m-menu {
+    position: fixed;
+    top: 0;
+    right: -280px;
+    width: 280px;
+    height: 100%;
+    background: var(--background);
+    z-index: 300;
+    transition: right 200ms ease;
+    overflow-y: auto;
+    padding: 1em;
+}
+
+.m-menu.open {
+    right: 0;
+}
+
+.m-menu-close {
+    font-size: 1.4rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text);
+    padding: 0.5em;
+    min-width: 48px;
+    min-height: 48px;
+}
+
+.m-menu-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.m-menu-links li a {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.75em 0.5em;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 1rem;
+    min-height: 48px;
+    border-radius: 6px;
+}
+
+.m-menu-links li a:hover,
+.m-menu-links li a.active {
+    background: var(--highlight);
+}
+
+.m-menu-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.75em 0;
+}
+
+.m-menu-ext {
+    display: flex;
+    gap: 1em;
+    padding: 0.5em;
+}
+
+.m-menu-ext img {
+    height: 24px;
+}
+
+/* Mobile body: hide desktop nav */
+body.mobile .ban-nav,
+body.mobile .ban-nav-mobile-overlay,
+body.mobile .ban-nav-mobile-menu {
+    display: none;
+}
+
+/* Global mobile overrides */
+body.mobile .page-content {
+    padding: 0;
+    max-width: 100%;
+}
