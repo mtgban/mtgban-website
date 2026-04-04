@@ -65,10 +65,8 @@
     margin-bottom: 1em;
     overflow: hidden;
     background: var(--background);
-}
-
-.m-card + .m-card {
-    margin-top: 0.25em;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .m-card-header {
@@ -220,12 +218,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 0.75em;
+    padding: 0 1em 0 0.75em;
     min-height: 44px;
     cursor: pointer;
     list-style: none;
     gap: 0.5em;
-    overflow: hidden;
     box-sizing: border-box;
 }
 
@@ -263,6 +260,8 @@
     font-weight: 700;
     font-size: 0.85rem;
     white-space: nowrap;
+    text-align: right;
+    min-width: 5.5em;
 }
 
 .m-vendor-qty {
