@@ -250,10 +250,9 @@
 
 .m-vendor-right {
     display: grid;
-    grid-template-columns: auto 2em;
+    grid-template-columns: 6em 2em;
     align-items: baseline;
     flex-shrink: 0;
-    gap: 0.2em;
 }
 
 .m-vendor-price {
