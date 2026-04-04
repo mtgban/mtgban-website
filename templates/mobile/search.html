@@ -1,0 +1,275 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/search-mobile.css?hash={{.Hash}}">
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+{{end}}
+
+{{define "extra-meta"}}
+    <link rel="search" type="application/opensearchdescription+xml" title="MTGBAN Price Search" href="/api/opensearch.xml" />
+{{end}}
+
+{{define "title"}}{{.Title}}{{if .CleanSearchQuery}}: {{.CleanSearchQuery}}{{end}}{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+{{end}}
+
+{{define "content"}}
+    {{if eq .Title "Options"}}
+        {{/* Options page — reuse desktop for now, future mobile version */}}
+        <div class="m-page">
+            <p style="padding: 1em;">Options are not yet available on mobile. <a href="?page=options">View desktop version</a>.</p>
+        </div>
+    {{else if and (eq .SearchQuery "") .IsSealed}}
+        {{/* Sealed landing — redirect to search for now */}}
+        {{template "m-search-bar" .}}
+    {{else}}
+        {{if eq .SearchQuery ""}}
+            {{template "m-search-bar" .}}
+        {{else}}
+            {{template "m-search-results" .}}
+        {{end}}
+    {{end}}
+{{end}}
+
+{{define "m-search-bar"}}
+<div class="m-page">
+    <div class="m-search-wrap">
+        <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+            <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a {{if .IsSealed}}product{{else}}card{{end}}..." value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
+        </form>
+        <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+    </div>
+    <script type="text/javascript">
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+    </script>
+    <script>lucide.createIcons();</script>
+</div>
+{{end}}
+
+{{define "m-search-results"}}
+<div class="m-page">
+    {{/* Search bar — always visible at top */}}
+    <div class="m-search-wrap">
+        <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+            <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search..." value="{{.SearchQuery}}" maxlength="1000" autocapitalize="none">
+        </form>
+        <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+    </div>
+    <script type="text/javascript">
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+    </script>
+
+    {{/* Result count */}}
+    {{if .TotalUnique}}
+    <div class="m-result-meta">
+        <span>{{.TotalUnique}} {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found</span>
+        {{if gt .TotalUnique (len .AllKeys)}}<span class="m-meta-sub">({{len .AllKeys}} shown)</span>{{end}}
+    </div>
+    {{end}}
+
+    {{/* Results */}}
+    {{range $i, $cardId := .AllKeys}}
+        {{$card := (index $.Metadata $cardId)}}
+        <div class="m-card">
+            {{/* Card header */}}
+            <div class="m-card-header">
+                <div class="m-card-icon">
+                    {{if $card.Keyrune}}
+                        <i class="ss {{$card.Keyrune}} ss-fw"></i>
+                    {{else if $card.RarityColor}}
+                        <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                            <circle r="9" cx="10" cy="10" fill="{{$card.RarityColor}}" stroke="{{$card.RarityColor}}"/>
+                            <text font-size="10" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{$card.SetCode}}</text>
+                        </svg>
+                    {{end}}
+                </div>
+                <div class="m-card-info">
+                    <span class="m-card-name" lang="{{$card.LangTag}}">{{$card.Name}}</span>
+                    <span class="m-card-set">
+                        {{$card.Title}} · #{{$card.Number}}
+                        {{if $card.Foil}} · Foil{{end}}
+                        {{if $card.Etched}} · Etched{{end}}
+                    </span>
+                </div>
+                <div class="m-card-badges">
+                    {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
+                </div>
+            </div>
+
+            {{/* Seller/Buyer tab toggle */}}
+            {{$hasSellers := (index $.FoundSellers $cardId)}}
+            {{$hasBuyers := (index $.FoundVendors $cardId)}}
+            <div class="m-tabs" data-card="{{$cardId}}">
+                {{if $hasSellers}}<button class="m-tab active" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
+                {{if $hasBuyers}}<button class="m-tab" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
+            </div>
+
+            {{/* Condition pills — default to NM */}}
+            <div class="m-cond-pills" data-card="{{$cardId}}">
+                {{range $conditions := $.CondKeys}}
+                    {{if ne $conditions "INDEX"}}
+                        {{/* Only show pill if this card has entries for this condition in either sellers or buyers */}}
+                        {{$sellerConds := (index $.FoundSellers $cardId)}}
+                        {{$vendorConds := (index $.FoundVendors $cardId)}}
+                        {{$hasCond := false}}
+                        {{if $sellerConds}}{{if (index $sellerConds $conditions)}}{{$hasCond = true}}{{end}}{{end}}
+                        {{if $vendorConds}}{{if (index $vendorConds $conditions)}}{{$hasCond = true}}{{end}}{{end}}
+                        {{if $hasCond}}
+                            <button class="m-cond-pill{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">{{$conditions}}</button>
+                        {{end}}
+                    {{end}}
+                {{end}}
+            </div>
+
+            {{/* Sellers panel */}}
+            {{if $hasSellers}}
+            <div class="m-tab-panel active" id="sellers-{{$cardId}}">
+                {{$condsEntry := (index $.FoundSellers $cardId)}}
+                {{range $conditions := $.CondKeys}}
+                    {{$entries := (index $condsEntry $conditions)}}
+                    {{if $entries}}
+                        {{if eq $conditions "INDEX"}}
+                            {{/* Skip INDEX on mobile for now */}}
+                        {{else}}
+                        <div class="m-cond-group{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
+                            {{range $ei, $entry := $entries}}
+                                {{if $entry.Locked}}
+                                <div class="m-vendor-row m-vendor-locked">
+                                    <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
+                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                </div>
+                                {{else}}
+                                <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
+                                    <summary>
+                                        <span class="m-vendor-name">
+                                            {{$entry.ScraperName}} {{$entry.Country}}
+                                            {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
+                                        </span>
+                                        <span class="m-vendor-right">
+                                            <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                            {{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}
+                                                <span class="m-vendor-qty">{{$entry.Quantity}}</span>
+                                            {{end}}
+                                        </span>
+                                    </summary>
+                                    <div class="m-vendor-detail">
+                                        {{if $entry.Credit}}<div class="m-detail-row"><span>Credit</span><span>$ {{printf "%.2f" $entry.Credit}}</span></div>{{end}}
+                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
+                                    </div>
+                                </details>
+                                {{end}}
+                            {{end}}
+                        </div>
+                        {{end}}
+                    {{end}}
+                {{end}}
+            </div>
+            {{end}}
+
+            {{/* Buyers panel */}}
+            {{if $hasBuyers}}
+            <div class="m-tab-panel" id="buyers-{{$cardId}}">
+                {{$condsEntry := (index $.FoundVendors $cardId)}}
+                {{range $conditions := $.CondKeys}}
+                    {{$entries := (index $condsEntry $conditions)}}
+                    {{if and $entries (ne $conditions "INDEX")}}
+                        <div class="m-cond-group{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
+                            {{range $ei, $entry := $entries}}
+                                {{if $entry.Locked}}
+                                <div class="m-vendor-row m-vendor-locked">
+                                    <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
+                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                </div>
+                                {{else}}
+                                <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
+                                    <summary>
+                                        <span class="m-vendor-name">
+                                            {{$entry.ScraperName}} {{$entry.Country}}
+                                            {{if eq $entry.Shorthand $card.HotlistStore}} <span class="m-hot">&#127775;</span>{{end}}
+                                            {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
+                                        </span>
+                                        <span class="m-vendor-right">
+                                            <span class="m-vendor-price">$ {{printf "%.2f" $entry.Price}}</span>
+                                            {{if and $entry.Quantity (eq $conditions "NM")}}
+                                                <span class="m-vendor-qty">{{$entry.Quantity}}</span>
+                                            {{end}}
+                                        </span>
+                                    </summary>
+                                    <div class="m-vendor-detail">
+                                        {{if and $entry.Ratio (eq $conditions "NM")}}<div class="m-detail-row"><span>Ratio</span><span>{{printf "%.02f%%" $entry.Ratio}}</span></div>{{end}}
+                                        {{if $entry.Credit}}<div class="m-detail-row"><span>Credit</span><span>$ {{printf "%.2f" $entry.Credit}}</span></div>{{end}}
+                                        {{if $entry.MarketCredit}}<div class="m-detail-row"><span>Market Credit</span><span>$ {{printf "%.2f" $entry.MarketCredit}}</span></div>{{end}}
+                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
+                                    </div>
+                                </details>
+                                {{end}}
+                            {{end}}
+                        </div>
+                    {{end}}
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+    {{end}}
+
+    {{/* Pagination */}}
+    {{if .CurrentIndex}}
+    <div class="m-pagination">
+        {{if ne .CurrentIndex 1}}
+            <a href="?q={{.SearchQuery}}&p=1&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&laquo;</a>
+            <a href="?q={{.SearchQuery}}&p={{.PrevIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&lsaquo;</a>
+        {{end}}
+        <span class="m-pg-cur">{{.CurrentIndex}}</span>
+        <span class="m-pg-info">/ {{.TotalIndex}}</span>
+        {{if ne .CurrentIndex .TotalIndex}}
+            <a href="?q={{.SearchQuery}}&p={{.NextIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&rsaquo;</a>
+            <a href="?q={{.SearchQuery}}&p={{.TotalIndex}}&sort={{.SearchSort}}&reverse={{.ReverseMode}}">&raquo;</a>
+        {{end}}
+    </div>
+    {{end}}
+
+    <script>lucide.createIcons();</script>
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script>
+(function() {
+    // Tab switching: Sellers / Buyers
+    document.querySelectorAll('.m-tab').forEach(function(tab) {
+        tab.addEventListener('click', function() {
+            var card = this.closest('.m-card');
+            card.querySelectorAll('.m-tab').forEach(function(t) { t.classList.remove('active'); });
+            card.querySelectorAll('.m-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
+            var target = document.getElementById(this.getAttribute('data-target'));
+            if (target) target.classList.add('active');
+        });
+    });
+
+    // Condition pill switching
+    document.querySelectorAll('.m-cond-pill').forEach(function(pill) {
+        pill.addEventListener('click', function() {
+            var cardId = this.getAttribute('data-card');
+            var cond = this.getAttribute('data-cond');
+
+            // Update active pill
+            this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
+
+            // Show matching condition groups across both panels
+            var card = this.closest('.m-card');
+            card.querySelectorAll('.m-cond-group').forEach(function(g) {
+                if (g.getAttribute('data-cond') === cond) {
+                    g.classList.add('active');
+                } else {
+                    g.classList.remove('active');
+                }
+            });
+        });
+    });
+})();
+</script>
+{{end}}
