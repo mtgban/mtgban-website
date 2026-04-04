@@ -1,0 +1,354 @@
+
+.m-page {
+    padding: 0.5em;
+    max-width: 100%;
+}
+
+/* Search bar */
+.m-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0;
+}
+
+.m-search-input {
+    flex: 1;
+    font-size: 1rem;
+    padding: 0.75em;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--background);
+    color: var(--text);
+    min-height: 48px;
+    box-sizing: border-box;
+}
+
+.m-search-input:focus {
+    outline: 2px solid var(--dodgerblue);
+    outline-offset: -1px;
+}
+
+.m-search-btn {
+    min-width: 48px;
+    min-height: 48px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--background);
+    color: var(--text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Result metadata */
+.m-result-meta {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    padding: 0.25em 0 0.5em;
+    font-size: 0.85rem;
+    color: var(--greytext);
+}
+
+.m-meta-sub {
+    font-size: 0.75rem;
+}
+
+/* Card container */
+.m-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 0.75em;
+    overflow: hidden;
+    background: var(--background);
+}
+
+.m-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.625em 0.75em;
+    border-bottom: 1px solid var(--border);
+    min-height: 48px;
+}
+
+.m-card-icon {
+    flex-shrink: 0;
+    width: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.m-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.m-card-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.m-card-set {
+    font-size: 0.75rem;
+    color: var(--greytext);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.m-card-badges {
+    flex-shrink: 0;
+}
+
+.m-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+
+.m-badge.rl {
+    background: var(--orange);
+    color: var(--lightblack);
+}
+
+/* Tab toggle: Sellers / Buyers */
+.m-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+}
+
+.m-tab {
+    flex: 1;
+    padding: 0.6em;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--greytext);
+    cursor: pointer;
+    min-height: 44px;
+}
+
+.m-tab.active {
+    color: var(--activetext);
+    border-bottom-color: var(--dodgerblue);
+}
+
+.m-tab-panel {
+    display: none;
+}
+
+.m-tab-panel.active {
+    display: block;
+}
+
+/* Condition pills */
+.m-cond-pills {
+    display: flex;
+    gap: 0.35em;
+    padding: 0.5em 0.75em;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--border);
+}
+
+.m-cond-pill {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.3em 0.65em;
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    background: none;
+    color: var(--greytext);
+    cursor: pointer;
+    white-space: nowrap;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+}
+
+.m-cond-pill.active {
+    background: var(--dodgerblue);
+    color: white;
+    border-color: var(--dodgerblue);
+}
+
+/* Condition groups (show/hide by active pill) */
+.m-cond-group {
+    display: none;
+}
+
+.m-cond-group.active {
+    display: block;
+}
+
+/* Vendor rows (details/summary) */
+.m-vendor-row {
+    border-bottom: 1px solid var(--border);
+}
+
+.m-vendor-row:last-child {
+    border-bottom: none;
+}
+
+.m-vendor-row summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.75em;
+    min-height: 48px;
+    cursor: pointer;
+    list-style: none;
+    gap: 0.5em;
+}
+
+.m-vendor-row summary::-webkit-details-marker {
+    display: none;
+}
+
+.m-vendor-row summary::marker {
+    display: none;
+    content: "";
+}
+
+.m-vendor-name {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.9rem;
+}
+
+.m-vendor-name.dim {
+    opacity: 0.5;
+}
+
+.m-vendor-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    flex-shrink: 0;
+}
+
+.m-vendor-price {
+    font-family: var(--font-mono, monospace);
+    font-weight: 700;
+    font-size: 0.95rem;
+    white-space: nowrap;
+}
+
+.m-vendor-qty {
+    font-size: 0.7rem;
+    color: var(--greytext);
+    min-width: 1.5em;
+    text-align: right;
+}
+
+/* Best price highlight */
+.m-best-price summary {
+    background: color-mix(in srgb, var(--dodgerblue) 8%, transparent);
+}
+
+.m-best-badge {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--dodgerblue);
+    margin-left: 0.3em;
+}
+
+.m-hot {
+    font-size: 0.8rem;
+}
+
+/* Expanded detail */
+.m-vendor-detail {
+    padding: 0.5em 0.75em 0.75em;
+    background: color-mix(in srgb, var(--text) 3%, var(--background));
+    font-size: 0.8rem;
+}
+
+.m-detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25em 0;
+    color: var(--greytext);
+}
+
+.m-detail-row span:last-child {
+    font-family: var(--font-mono, monospace);
+    font-weight: 600;
+    color: var(--text);
+}
+
+.m-detail-link {
+    display: inline-block;
+    margin-top: 0.4em;
+    color: var(--dodgerblue);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+/* Locked vendor */
+.m-vendor-locked {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.75em;
+    min-height: 48px;
+}
+
+.m-locked-btn {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.3em 0.75em;
+    border-radius: 4px;
+    background: var(--dodgerblue);
+    color: white;
+    text-decoration: none;
+}
+
+/* Pagination */
+.m-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: 1em 0;
+}
+
+.m-pagination a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 1rem;
+}
+
+.m-pg-cur {
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.m-pg-info {
+    color: var(--greytext);
+    font-size: 0.85rem;
+}
