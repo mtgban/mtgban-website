@@ -1,0 +1,328 @@
+/* Header */
+.m-sleep-header {
+    padding: 0.75em 0 0.25em;
+}
+
+.m-sleep-header h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.m-sleep-subtitle {
+    font-size: 0.8rem;
+    color: var(--greytext);
+    margin: 0.15em 0 0;
+}
+
+.m-sleep-back {
+    font-size: 0.8rem;
+    color: var(--dodgerblue);
+    text-decoration: none;
+}
+
+.m-sleep-info {
+    font-size: 0.8rem;
+    padding: 0.6em 0.75em;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    margin-bottom: 0.75em;
+}
+
+.light-theme .m-sleep-info {
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.m-sleep-info p {
+    margin: 0.25em 0 0;
+    color: var(--greytext);
+}
+
+.m-sleep-info-msg {
+    font-size: 0.85rem;
+    color: var(--greytext);
+    padding: 0.5em 0;
+}
+
+/* Tool cards */
+.m-sleep-tools {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+    margin-bottom: 1em;
+}
+
+.m-sleep-tool {
+    display: flex;
+    align-items: center;
+    gap: 0.6em;
+    padding: 0.6em 0.75em;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--text);
+    min-height: 48px;
+}
+
+.light-theme .m-sleep-tool {
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+.m-sleep-tool-icon {
+    font-size: 1.2rem;
+    flex-shrink: 0;
+    width: 24px;
+    text-align: center;
+}
+
+.m-sleep-tool-text {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.m-sleep-tool-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.m-sleep-tool-desc {
+    font-size: 0.7rem;
+    color: var(--greytext);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.m-sleep-tool-arrow {
+    font-size: 1.2rem;
+    color: var(--greytext);
+    flex-shrink: 0;
+}
+
+/* Ocean Gap */
+.m-sleep-gap {
+    margin-bottom: 1em;
+}
+
+.m-sleep-gap h2 {
+    font-size: 1rem;
+    margin: 0 0 0.15em;
+}
+
+.m-sleep-beta {
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    background: var(--dodgerblue);
+    color: white;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.m-sleep-gap-desc {
+    font-size: 0.75rem;
+    color: var(--greytext);
+    margin: 0 0 0.5em;
+}
+
+.m-sleep-gap-presets {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+
+.m-sleep-gap-preset {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.5em 0.75em;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 0.8rem;
+    min-height: 40px;
+}
+
+.light-theme .m-sleep-gap-preset {
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.m-sleep-vs {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--greytext);
+    text-transform: uppercase;
+}
+
+.m-sleep-gap-custom {
+    margin-top: 0.75em;
+    padding: 0.6em 0.75em;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.light-theme .m-sleep-gap-custom {
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.m-sleep-gap-custom-title {
+    font-weight: 600;
+    font-size: 0.85rem;
+    display: block;
+    margin-bottom: 0.5em;
+}
+
+.m-sleep-gap-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4em;
+}
+
+.m-sleep-gap-form select {
+    width: 100%;
+    padding: 0.4em;
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--text);
+    min-height: 36px;
+}
+
+.m-sleep-gap-form .m-sleep-vs {
+    text-align: center;
+    padding: 0.15em 0;
+}
+
+.m-sleep-gap-go {
+    padding: 0.5em;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    background: var(--dodgerblue);
+    color: white;
+    cursor: pointer;
+    min-height: 40px;
+}
+
+.m-sleep-gap-go:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.m-sleep-upsell {
+    font-size: 0.8rem;
+    color: var(--greytext);
+    margin: 0;
+}
+
+.m-sleep-settings-link {
+    display: block;
+    text-align: center;
+    padding: 0.75em;
+    font-size: 0.85rem;
+    color: var(--greytext);
+    text-decoration: none;
+}
+
+/* Options page */
+.m-sleep-opts-section {
+    margin-bottom: 1em;
+}
+
+.m-sleep-opts-section h2 {
+    font-size: 0.95rem;
+    margin: 0 0 0.25em;
+}
+
+.m-sleep-opts-section h3 {
+    font-size: 0.8rem;
+    margin: 0.5em 0 0.2em;
+    color: var(--greytext);
+}
+
+.m-sleep-opts-bar {
+    display: flex;
+    gap: 0.4em;
+    margin-bottom: 0.5em;
+}
+
+.m-sleep-opts-btn {
+    padding: 0.35em 0.65em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: none;
+    color: var(--text);
+    cursor: pointer;
+    min-height: auto !important;
+}
+
+.m-sleep-opts-save {
+    background: var(--dodgerblue);
+    color: white;
+    border-color: var(--dodgerblue);
+}
+
+.m-sleep-opts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.15em;
+}
+
+.m-sleep-opts-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.3em 0.25em;
+    font-size: 0.8rem;
+    min-height: 34px;
+}
+
+.m-sleep-opts-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+/* Tier results */
+.m-sleep-tier {
+    display: flex;
+    gap: 0.5em;
+    margin-bottom: 0.75em;
+    align-items: flex-start;
+}
+
+.m-sleep-tier-label {
+    flex-shrink: 0;
+    width: 2em;
+    height: 2em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1rem;
+    border-radius: 6px;
+    color: #222;
+    margin-top: 0.25em;
+}
+
+.m-sleep-tier-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35em;
+}
+
+.m-sleep-card {
+    display: block;
+}
+
+.m-sleep-card img {
+    transition: transform 100ms ease;
+}
