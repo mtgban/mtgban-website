@@ -50,6 +50,8 @@ type PageVars struct {
 	PatreonLogin bool
 	Hash         string
 
+	IsMobile bool
+
 	Embed struct {
 		OEmbedURL    string
 		PageURL      string
