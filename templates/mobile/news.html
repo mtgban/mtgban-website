@@ -1,0 +1,249 @@
+{{define "extra-css"}}
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/news-mobile.css?hash={{.Hash}}">
+{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+{{end}}
+
+{{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
+
+{{define "content"}}
+    {{if eq .Subtitle ""}}
+        {{template "m-news-index" .}}
+    {{else if eq .Subtitle "Options"}}
+        {{template "m-news-options" .}}
+    {{else}}
+        {{template "m-news-data" .}}
+    {{end}}
+{{end}}
+
+{{/* ==================== INDEX ==================== */}}
+{{define "m-news-index"}}
+<div class="m-page">
+    <div class="m-news-header">
+        <h1>{{.Title}}</h1>
+        <div class="m-news-meta">
+            {{if .IsOneDay}}<span class="m-news-badge">Early Edition</span>{{end}}
+            <span class="m-news-date">{{.LastUpdate.Format "Jan 02, 2006"}}</span>
+        </div>
+    </div>
+
+    <div class="m-news-toc">
+        {{range $i, $page := .ToC}}
+            {{if ne $page.Option "options"}}
+            <a class="m-news-toc-item" href="newspaper?page={{$page.Option}}">
+                <span class="m-news-toc-icon">{{if $page.Icon}}{{$page.Icon}}{{else}}{{inc $i 1}}{{end}}</span>
+                <div class="m-news-toc-text">
+                    <span class="m-news-toc-title">{{$page.Title}}</span>
+                    <span class="m-news-toc-desc">{{$page.Desc}}</span>
+                </div>
+                <span class="m-news-toc-arrow">&rsaquo;</span>
+            </a>
+            {{end}}
+        {{end}}
+    </div>
+
+    <a class="m-news-settings-link" href="newspaper?page=options">&#9881; Settings</a>
+</div>
+{{end}}
+
+{{/* ==================== OPTIONS ==================== */}}
+{{define "m-news-options"}}
+<div class="m-page">
+    <div class="m-news-header">
+        <h1>Settings</h1>
+        <p class="m-news-subtitle">Select editions to <strong>exclude</strong> from your newspaper.</p>
+    </div>
+
+    <div class="m-news-opts">
+        <div class="m-news-opts-bar">
+            <button class="m-news-opts-btn" onclick="clearForm('editions')">Clear</button>
+            <button class="m-news-opts-btn" onclick="selectAll('editions')">Select All</button>
+            <button class="m-news-opts-btn m-news-opts-save" onclick="saveForm('NewspaperList','editions'); location.href='/newspaper'">Save</button>
+        </div>
+        <div class="m-news-opts-grid" id="editions">
+            {{range $i, $key := .Editions}}
+                {{$edition := index $.EditionsMap $key}}
+                {{if $edition}}
+                <label class="m-news-opts-label">
+                    <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                    {{if $edition.Keyrune}}
+                        <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
+                    {{end}}
+                    <span>{{$edition.Name}}</span>
+                </label>
+                {{end}}
+            {{end}}
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            loadForm("NewspaperList", "editions");
+        }
+    </script>
+</div>
+{{end}}
+
+{{/* ==================== DATA ==================== */}}
+{{define "m-news-data"}}
+<div class="m-page">
+    {{/* Section nav - horizontally scrollable */}}
+    <div class="m-news-nav">
+        {{range .ToC}}
+            {{if ne .Option "options"}}
+                <a class="m-news-nav-pill{{if eq .Option $.Page}} active{{end}}" href="newspaper?page={{.Option}}">{{if .Short}}{{.Short}}{{else}}{{.Title}}{{end}}</a>
+            {{end}}
+        {{end}}
+    </div>
+
+    {{/* Page title */}}
+    <div class="m-news-header">
+        <h1>{{.Subtitle}}</h1>
+        {{if .InfoMessage}}<p class="m-news-subtitle">{{.InfoMessage}}</p>{{end}}
+    </div>
+
+    {{/* Filter bar - collapsed behind toggle */}}
+    <div class="m-news-filter-section">
+        <button class="m-news-filter-toggle" onclick="this.closest('.m-news-filter-section').classList.toggle('open')">
+            Filters
+            <span class="m-news-filter-arrow">&#9662;</span>
+        </button>
+        <form action="newspaper" method="GET" class="m-news-filter-form">
+            <input type="hidden" name="page" value="{{$.Page}}">
+            <input type="hidden" name="sort" value="{{$.SortOption}}">
+            <input type="hidden" name="dir" value="{{$.SortDir}}">
+
+            <select name="filter" onchange="this.form.submit()">
+                {{if eq "" $.FilterSet}}
+                    <option value="" disabled selected hidden>Edition...</option>
+                {{end}}
+                {{range .Editions}}
+                    <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterSet)}}selected{{end}}>{{.}}</option>
+                {{end}}
+            </select>
+
+            <select name="rarity" onchange="this.form.submit()">
+                {{if eq "" $.FilterRarity}}
+                    <option value="" disabled selected hidden>Rarity...</option>
+                {{end}}
+                {{range .Rarities}}
+                    <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterRarity)}}selected{{end}}>{{.}}</option>
+                {{end}}
+            </select>
+
+            <select name="finish" onchange="this.form.submit()">
+                {{if eq "" $.FilterFinish}}
+                    <option value="" disabled selected hidden>Finish...</option>
+                {{end}}
+                {{range .Finishes}}
+                    <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterFinish)}}selected{{end}}>{{.}}</option>
+                {{end}}
+            </select>
+
+            {{if .Tiers}}
+            <select name="bucket" onchange="this.form.submit()">
+                {{if eq "" $.FilterBucket}}
+                    <option value="" disabled selected hidden>Tier...</option>
+                {{end}}
+                {{range .Tiers}}
+                    <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterBucket)}}selected{{end}}>{{.}}</option>
+                {{end}}
+            </select>
+            {{end}}
+
+            {{if $.CanFilterByPrice}}
+            <div class="m-news-filter-range">
+                <span>Price</span>
+                <input type="text" name="min_price" {{if $.FilterMinPrice}}value="{{$.FilterMinPrice}}"{{end}} placeholder="Min $" inputmode="decimal">
+                <input type="text" name="max_price" {{if $.FilterMaxPrice}}value="{{$.FilterMaxPrice}}"{{end}} placeholder="Max $" inputmode="decimal">
+            </div>
+            {{end}}
+
+            {{if $.CanFilterByPercentage}}
+            <div class="m-news-filter-range">
+                <span>Change</span>
+                <input type="text" name="min_change" {{if $.FilterMinPercChange}}value="{{$.FilterMinPercChange}}"{{end}} placeholder="Min %" inputmode="decimal">
+                <input type="text" name="max_change" {{if $.FilterMaxPercChange}}value="{{$.FilterMaxPercChange}}"{{end}} placeholder="Max %" inputmode="decimal">
+            </div>
+            {{end}}
+
+            <button type="submit" class="m-news-filter-apply">Apply</button>
+        </form>
+    </div>
+
+    {{/* Data rows - summary + expand */}}
+    <div class="m-news-results">
+        {{range $j, $row := .Table}}
+            {{$card := (index $.Cards $j)}}
+            <details class="m-news-row">
+                <summary>
+                    <div class="m-news-row-left">
+                        {{/* Ranking if present */}}
+                        {{$ranking := $row.FieldValue "ranking"}}
+                        {{if $ranking}}<span class="m-news-rank">#{{$ranking}}</span>{{end}}
+
+                        {{/* Card identity */}}
+                        <div class="m-news-card-info">
+                            <span class="m-news-card-name" lang="{{$card.LangTag}}">{{$row.CardName}}</span>
+                            <span class="m-news-card-set">{{$row.Edition}} · #{{$row.Number}}{{if $card.Foil}} · Foil{{end}}{{if $card.Etched}} · Etched{{end}}</span>
+                        </div>
+                    </div>
+
+                    {{/* Primary metric - find the most important visible numeric column */}}
+                    <div class="m-news-row-right">
+                        {{range $i, $head := $.Headings}}
+                            {{if and (not $head.IsHidden) $head.IsPerc}}
+                                {{$val := $row.FieldValue $head.Field}}
+                                {{if $val}}
+                                <span class="m-news-perc {{perc_class $val}}">{{print_perc $val}}</span>
+                                {{end}}
+                            {{end}}
+                        {{end}}
+                    </div>
+                </summary>
+
+                {{/* Expanded detail - all visible columns as label:value */}}
+                <div class="m-news-detail">
+                    {{range $i, $head := $.Headings}}
+                        {{if and (not $head.IsHidden) (ne $head.Title "Card Name") (ne $head.Title "Edition") (ne $head.Title "#") (ne $head.Title "Ranking")}}
+                            {{$val := $row.FieldValue $head.Field}}
+                            {{if $val}}
+                            <div class="m-news-detail-row">
+                                <span class="m-news-detail-label">{{$head.Title}}</span>
+                                <span class="m-news-detail-value{{if $head.IsDollar}} m-news-dollar{{end}}{{if $head.IsPerc}} {{perc_class $val}}{{end}}">
+                                    {{if $head.IsDollar}}{{print_price $val}}{{else if $head.IsPerc}}{{print_perc $val}}{{else}}{{$val}}{{end}}
+                                </span>
+                            </div>
+                            {{end}}
+                        {{end}}
+                    {{end}}
+                    <a class="m-news-detail-search" href="search?q={{$row.CardName}} s:{{$card.SetCode}} cn:{{$row.Number}}">View prices &rarr;</a>
+                </div>
+            </details>
+        {{end}}
+    </div>
+
+    {{/* Pagination */}}
+    {{if .CurrentIndex}}
+    <div class="m-pagination">
+        {{if ne .CurrentIndex 1}}
+            <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index=&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&laquo;</a>
+            <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&lsaquo;</a>
+        {{end}}
+        <span class="m-pg-cur">{{.CurrentIndex}}</span>
+        <span class="m-pg-info">/ {{.TotalIndex}}</span>
+        {{if ne .CurrentIndex .TotalIndex}}
+            <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&rsaquo;</a>
+            <a href="/newspaper?page={{.Page}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.TotalIndex}}&filter={{.FilterSet}}&rarity={{$.FilterRarity}}&min_price={{$.FilterMinPrice}}&max_price={{$.FilterMaxPrice}}&min_change={{$.FilterMinPercChange}}&max_change={{$.FilterMaxPercChange}}&bucket={{$.FilterBucket}}&finish={{$.FilterFinish}}">&raquo;</a>
+        {{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+{{/* No tablesort on mobile - sorting is server-side via nav links */}}
+{{end}}
