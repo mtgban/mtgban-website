@@ -111,6 +111,8 @@
 
 .m-card-badges {
     flex-shrink: 0;
+    display: flex;
+    gap: 0.2em;
 }
 
 .m-badge {
@@ -124,6 +126,16 @@
 .m-badge.rl {
     background: var(--orange);
     color: var(--lightblack);
+}
+
+.m-badge.foil {
+    background: linear-gradient(135deg, #ea8d66, #fdef8a, #8bcc93, #a6dced);
+    color: #222;
+}
+
+.m-badge.etched {
+    background: linear-gradient(135deg, #a6dced, #c9b1ff);
+    color: #222;
 }
 
 /* Tab toggle: Sellers / Buyers */
