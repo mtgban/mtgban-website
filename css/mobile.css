@@ -58,18 +58,19 @@
 .m-menu {
     position: fixed;
     top: 0;
-    right: -280px;
+    right: 0;
     width: 280px;
+    transform: translateX(100%);
     height: 100%;
     background: var(--background);
     z-index: 300;
-    transition: right 200ms ease;
+    transition: transform 200ms ease;
     overflow-y: auto;
     padding: 1em;
 }
 
 .m-menu.open {
-    right: 0;
+    transform: translateX(0);
 }
 
 .m-menu-close {
