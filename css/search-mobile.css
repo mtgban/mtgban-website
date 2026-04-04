@@ -250,8 +250,7 @@
 
 .m-vendor-right {
     display: flex;
-    align-items: center;
-    gap: 0.5em;
+    align-items: baseline;
     flex-shrink: 0;
 }
 
@@ -261,14 +260,26 @@
     font-size: 0.85rem;
     white-space: nowrap;
     text-align: right;
-    min-width: 5.5em;
+    width: 5.5em;
 }
 
 .m-vendor-qty {
     font-size: 0.7rem;
     color: var(--greytext);
-    min-width: 1.5em;
+    width: 2em;
     text-align: right;
+    flex-shrink: 0;
+}
+
+/* Always reserve qty space so prices stay aligned */
+.m-vendor-right::after {
+    content: "\00a0";
+    width: 2em;
+    flex-shrink: 0;
+    font-size: 0.7rem;
+}
+.m-vendor-right:has(.m-vendor-qty)::after {
+    display: none;
 }
 
 /* Best price highlight */
