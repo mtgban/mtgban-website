@@ -75,9 +75,9 @@
     display: flex;
     align-items: center;
     gap: 0.5em;
-    padding: 0.625em 0.75em;
+    padding: 0.5em 0.75em;
     border-bottom: 1px solid var(--border);
-    min-height: 48px;
+    min-height: 40px;
 }
 
 .m-card-icon {
@@ -170,19 +170,26 @@
     border-bottom: 1px solid var(--border);
 }
 
+/* Override main.css @media (max-width: 768px) min-height: 44px on buttons */
+.m-cond-pill,
+.m-tab {
+    min-height: auto !important;
+}
+
 .m-cond-pill {
     font-size: 0.7rem;
     font-weight: 600;
-    padding: 0.2em 0.55em;
+    padding: 0.15em 0.5em;
     border: 1px solid var(--border);
     border-radius: 4px;
     background: none;
     color: var(--greytext);
     cursor: pointer;
     white-space: nowrap;
-    min-height: 28px;
-    display: flex;
+    height: 20px;
+    display: inline-flex;
     align-items: center;
+    line-height: 1;
 }
 
 .m-cond-pill.active {
@@ -214,11 +221,12 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 0.75em;
-    min-height: 48px;
+    min-height: 44px;
     cursor: pointer;
     list-style: none;
     gap: 0.5em;
     overflow: hidden;
+    box-sizing: border-box;
 }
 
 .m-vendor-row summary::-webkit-details-marker {
