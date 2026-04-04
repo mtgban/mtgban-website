@@ -72,7 +72,7 @@
 .m-card-header {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.4em;
     padding: 0.5em 0.75em;
     border-bottom: 1px solid var(--border);
     min-height: 40px;
