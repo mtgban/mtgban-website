@@ -122,26 +122,30 @@
     height: 24px;
 }
 
-/* Mobile body: hide desktop elements */
+/* Mobile body: hide ALL desktop chrome */
 body.mobile .ban-nav,
 body.mobile .ban-nav-mobile-overlay,
-body.mobile .ban-nav-mobile-menu {
-    display: none;
-}
-
-/* Prevent desktop layouts from bleeding through */
+body.mobile .ban-nav-mobile-menu,
 body.mobile .search-layout,
 body.mobile .search-sidebar {
-    display: none;
+    display: none !important;
 }
 
 /* Global mobile overrides */
+html:has(body.mobile) {
+    overflow-x: hidden;
+}
+
 body.mobile {
     overflow-x: hidden;
+    width: 100vw;
+    max-width: 100vw;
 }
 
 body.mobile .page-content {
     padding: 0;
+    width: 100%;
     max-width: 100%;
     overflow-x: hidden;
+    box-sizing: border-box;
 }
