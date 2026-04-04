@@ -1,0 +1,233 @@
+{{define "extra-css"}}
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/sleepers-mobile.css?hash={{.Hash}}">
+{{end}}
+
+{{define "extra-head"}}
+    {{if eq .Subtitle "Options"}}
+        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+    {{end}}
+{{end}}
+
+{{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
+
+{{define "content"}}
+    {{if eq .Subtitle "Index"}}
+        {{template "m-sleep-index" .}}
+    {{else if eq .Subtitle "Options"}}
+        {{template "m-sleep-options" .}}
+    {{else}}
+        {{template "m-sleep-results" .}}
+    {{end}}
+{{end}}
+
+{{/* ==================== INDEX ==================== */}}
+{{define "m-sleep-index"}}
+<div class="m-page">
+    <div class="m-sleep-header">
+        <h1>Sleepers</h1>
+        <p class="m-sleep-subtitle">Cards the market hasn't caught up on yet.</p>
+    </div>
+
+    <div class="m-sleep-info">
+        <strong>&#128161; About Sleepers</strong>
+        <p>Results are tiered <strong>S through F</strong>. Higher tiers = stronger signals.</p>
+    </div>
+
+    {{/* Tool cards */}}
+    <div class="m-sleep-tools">
+        <a class="m-sleep-tool" href="?page=bulk">
+            <span class="m-sleep-tool-icon" style="color:var(--tier-s, #ff7f7f);">&#128142;</span>
+            <div class="m-sleep-tool-text">
+                <span class="m-sleep-tool-title">Bulk Me Up</span>
+                <span class="m-sleep-tool-desc">Cards deviating from set average over 5 years.</span>
+            </div>
+            <span class="m-sleep-tool-arrow">&rsaquo;</span>
+        </a>
+        <a class="m-sleep-tool" href="?page=reprint">
+            <span class="m-sleep-tool-icon" style="color:var(--tier-a, #ffbf7f);">&#128197;</span>
+            <div class="m-sleep-tool-text">
+                <span class="m-sleep-tool-title">Long Time No Reprint</span>
+                <span class="m-sleep-tool-desc">No reprint in 2+ years.</span>
+            </div>
+            <span class="m-sleep-tool-arrow">&rsaquo;</span>
+        </a>
+        <a class="m-sleep-tool" href="?page=mismatch">
+            <span class="m-sleep-tool-icon" style="color:var(--tier-c, #7fff7f);">&#128200;</span>
+            <div class="m-sleep-tool-text">
+                <span class="m-sleep-tool-title">Market Mismatch</span>
+                <span class="m-sleep-tool-desc">Buylist exceeds market or below TCG Low.</span>
+            </div>
+            <span class="m-sleep-tool-arrow">&rsaquo;</span>
+        </a>
+        <a class="m-sleep-tool" href="?page=hotlist">
+            <span class="m-sleep-tool-icon" style="color:var(--tier-b, #ffff7f);">&#128293;</span>
+            <div class="m-sleep-tool-text">
+                <span class="m-sleep-tool-title">Hotlist</span>
+                <span class="m-sleep-tool-desc">Most buylist growth over 3 months.</span>
+            </div>
+            <span class="m-sleep-tool-arrow">&rsaquo;</span>
+        </a>
+    </div>
+
+    {{/* Ocean Gap */}}
+    <div class="m-sleep-gap">
+        <h2>&#127754; Ocean Gap <span class="m-sleep-beta">Beta</span></h2>
+        <p class="m-sleep-gap-desc">Compare two sellers. Find where one has cheaper cards.</p>
+
+        <div class="m-sleep-gap-presets">
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=TCGLow&target=MKMLow">
+                <span>TCGLow</span><span class="m-sleep-vs">vs</span><span>MKMLow</span>
+            </a>
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=TCGLow&target=MKMTrend">
+                <span>TCGLow</span><span class="m-sleep-vs">vs</span><span>MKMTrend</span>
+            </a>
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=CK">
+                <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>Card Kingdom</span>
+            </a>
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=SCG">
+                <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>SCG</span>
+            </a>
+            <a class="m-sleep-gap-preset" href="?page=gap&ref=MKMTrend&target=MP">
+                <span>MKMTrend</span><span class="m-sleep-vs">vs</span><span>Manapool</span>
+            </a>
+        </div>
+
+        {{if .CanShowAll}}
+        <div class="m-sleep-gap-custom">
+            <span class="m-sleep-gap-custom-title">Custom Comparison</span>
+            <form class="m-sleep-gap-form" action="sleepers" method="GET">
+                <input type="hidden" name="page" value="gap">
+                <select name="ref" id="ref" onchange="checkSleepersCompare()">
+                    <option value="" disabled selected>Reference seller...</option>
+                    {{range .SellerKeys}}
+                        <option value="{{.}}">{{scraper_name .}}</option>
+                    {{end}}
+                </select>
+                <span class="m-sleep-vs">VS</span>
+                <select name="target" id="target" onchange="checkSleepersCompare()">
+                    <option value="" disabled selected>Target seller...</option>
+                    {{range .SellerKeys}}
+                        <option value="{{.}}">{{scraper_name .}}</option>
+                    {{end}}
+                </select>
+                <button type="submit" class="m-sleep-gap-go" id="sleepers-comp-go" disabled>Compare</button>
+            </form>
+        </div>
+        <script>
+        function checkSleepersCompare() {
+            var r = document.getElementById('ref');
+            var t = document.getElementById('target');
+            var btn = document.getElementById('sleepers-comp-go');
+            if (r && t && btn) {
+                btn.disabled = !(r.value && t.value && r.value !== t.value);
+            }
+        }
+        </script>
+        {{else if $.ShowUpsell}}
+        <div class="m-sleep-gap-custom">
+            <span class="m-sleep-gap-custom-title">Custom Comparison</span>
+            <p class="m-sleep-upsell"><em>Increase your tier to compare any seller!</em></p>
+        </div>
+        {{end}}
+    </div>
+
+    <a class="m-sleep-settings-link" href="?page=options">&#9881; Filters</a>
+</div>
+{{end}}
+
+{{/* ==================== OPTIONS ==================== */}}
+{{define "m-sleep-options"}}
+<script type="text/javascript">
+    window.onload = function(e) {
+        loadForm("SleepersSellersList", "sellers");
+        loadForm("SleepersVendorsList", "vendors");
+        loadForm("SleepersEditionList", "editions");
+    }
+</script>
+
+<div class="m-page">
+    <div class="m-sleep-header">
+        <h1>Sleepers Options</h1>
+        <p class="m-sleep-subtitle">Select stores and editions to <strong>exclude</strong> from results.</p>
+    </div>
+
+    <div class="m-sleep-opts-section">
+        <h2>Vendors &amp; Sellers</h2>
+        <div class="m-sleep-opts-bar">
+            <button class="m-sleep-opts-btn" onclick="clearForm('sellers'); clearForm('vendors');">Clear</button>
+            <button class="m-sleep-opts-btn" onclick="selectAll('sellers');">Select All</button>
+            <button class="m-sleep-opts-btn m-sleep-opts-save" onclick="saveForm('SleepersSellersList', 'sellers'); saveForm('SleepersVendorsList', 'vendors'); window.location.href = '/sleepers'">Save</button>
+        </div>
+
+        <h3>Retail</h3>
+        <div class="m-sleep-opts-grid" id="sellers">
+            {{range $i, $key := .SellerKeys}}
+                <label class="m-sleep-opts-label"><input type="checkbox" id="s{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
+            {{end}}
+        </div>
+
+        <h3>Buylist</h3>
+        <div class="m-sleep-opts-grid" id="vendors">
+            {{range $i, $key := .VendorKeys}}
+                <label class="m-sleep-opts-label"><input type="checkbox" id="v{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
+            {{end}}
+        </div>
+    </div>
+
+    <div class="m-sleep-opts-section">
+        <h2>Editions</h2>
+        <div class="m-sleep-opts-bar">
+            <button class="m-sleep-opts-btn" onclick="clearForm('editions');">Clear</button>
+            <button class="m-sleep-opts-btn" onclick="selectAll('editions');">Select All</button>
+            <button class="m-sleep-opts-btn m-sleep-opts-save" onclick="saveForm('SleepersEditionList', 'editions'); window.location.href = '/sleepers'">Save</button>
+        </div>
+        <div class="m-sleep-opts-grid" id="editions">
+            {{range $i, $key := .Editions}}
+                {{$edition := index $.EditionsMap $key}}
+                {{if $edition}}
+                    <label class="m-sleep-opts-label">
+                        <input type="checkbox" id="{{$key}}" name="{{$key}}">
+                        {{if $edition.Keyrune}}<i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>{{end}}
+                        {{$edition.Name}}
+                    </label>
+                {{end}}
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{/* ==================== RESULTS ==================== */}}
+{{define "m-sleep-results"}}
+<div class="m-page">
+    <div class="m-sleep-header">
+        <a class="m-sleep-back" href="/sleepers">&larr; Sleepers</a>
+        <h1>{{.Subtitle}}</h1>
+    </div>
+
+    {{if ne .InfoMessage ""}}
+        <p class="m-sleep-info-msg">{{.InfoMessage}}</p>
+    {{end}}
+
+    {{range $i, $letter := .SleepersKeys}}
+        {{$bgColor := index $.SleepersColors $i}}
+        {{$cardIds := index $.Sleepers $letter}}
+        <div class="m-sleep-tier">
+            <div class="m-sleep-tier-label" style="background-color: {{$bgColor}};">{{$letter}}</div>
+            <div class="m-sleep-tier-cards">
+                {{range $cardIds}}
+                    {{$card := index $.Metadata .}}
+                    <a class="m-sleep-card" href="{{$card.SearchURL}}">
+                        <div class="foil-wrap" data-foil="{{$card.Foil}}">
+                            <img loading="lazy" src="{{$card.ImageURL}}" width="110" height="154" alt="{{$card.Name}}" title="{{$card.Name}}" style="border-radius: 8px; display: block;">
+                        </div>
+                    </a>
+                {{end}}
+            </div>
+        </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "extra-scripts"}}{{end}}
