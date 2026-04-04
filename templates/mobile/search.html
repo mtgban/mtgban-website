@@ -57,10 +57,16 @@
                 <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search..." value="{{.SearchQuery}}" maxlength="1000" autocapitalize="none">
             </form>
             <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+            <button class="m-search-btn m-filter-btn" type="button" title="Filters" onclick="document.getElementById('m-filter-overlay').classList.add('open'); document.getElementById('m-filter-sheet').classList.add('open');"><i data-lucide="sliders-horizontal"></i></button>
         </div>
     </div>
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+    </script>
+
+    {{/* Set data for filter dropdown - populated in extra-scripts after DOM ready */}}
+    <script>
+    var mFilterSets = [{{range .AllKeys}}{{$card := index $.Metadata .}}{code:"{{$card.SetCode}}",name:"{{$card.Edition}}"},{{end}}];
     </script>
 
     {{/* Result count */}}
@@ -226,6 +232,31 @@
     </div>
     {{end}}
 
+    {{/* Filter overlay sheet */}}
+    <div class="m-filter-overlay" id="m-filter-overlay" onclick="this.classList.remove('open'); document.getElementById('m-filter-sheet').classList.remove('open');"></div>
+    <div class="m-filter-sheet" id="m-filter-sheet">
+        <div class="m-drawer-handle" onclick="document.getElementById('m-filter-overlay').classList.remove('open'); document.getElementById('m-filter-sheet').classList.remove('open');"><span></span></div>
+        <div class="m-filter-sheet-content">
+            <h3>Filter Results</h3>
+            <form id="m-filter-form" action="" method="GET">
+                <label>Edition / Set</label>
+                <select class="m-filter-set-select" id="m-filter-set">
+                    <option value="">All Sets</option>
+                </select>
+
+                <label>Finish</label>
+                <div class="m-filter-pills" id="m-finish-pills">
+                    <button type="button" class="m-filter-pill active" data-val="">All</button>
+                    <button type="button" class="m-filter-pill" data-val="nf">Non-Foil</button>
+                    <button type="button" class="m-filter-pill" data-val="f">Foil</button>
+                    <button type="button" class="m-filter-pill" data-val="e">Etched</button>
+                </div>
+
+                <button type="button" class="m-filter-apply" onclick="applyFilters()">Apply</button>
+            </form>
+        </div>
+    </div>
+
     {{/* Card image bottom drawer */}}
     <div class="m-drawer-overlay" id="m-drawer-overlay" onclick="hideCardDrawer()"></div>
     <div class="m-drawer" id="m-drawer">
@@ -242,6 +273,59 @@
 
 {{define "extra-scripts"}}
 <script>
+// Filter pills — toggle active within each group
+document.querySelectorAll('.m-filter-pills').forEach(function(group) {
+    group.querySelectorAll('.m-filter-pill').forEach(function(pill) {
+        pill.addEventListener('click', function() {
+            group.querySelectorAll('.m-filter-pill').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
+        });
+    });
+});
+
+// Populate set dropdown from data built during template render
+(function() {
+    var seen = {};
+    var select = document.getElementById('m-filter-set');
+    if (!select || !window.mFilterSets) return;
+    mFilterSets.forEach(function(s) {
+        if (!seen[s.code]) {
+            seen[s.code] = true;
+            var opt = document.createElement('option');
+            opt.value = s.code;
+            opt.textContent = s.name;
+            select.appendChild(opt);
+        }
+    });
+})();
+
+function applyFilters() {
+    var query = document.getElementById('searchbox').value.trim();
+    // Strip old set/finish modifiers from query
+    query = query.replace(/\s+s:"[^"]*"/g, '').replace(/\s+s:\S+/g, '').replace(/\s+f:\S+/g, '').trim();
+
+    var setVal = document.getElementById('m-filter-set').value.trim();
+    var finishPill = document.querySelector('#m-finish-pills .m-filter-pill.active');
+    var finish = finishPill ? finishPill.getAttribute('data-val') : '';
+
+    if (setVal) {
+        // If it has spaces, quote it; otherwise use as set code
+        if (setVal.indexOf(' ') !== -1) {
+            query += ' s:"' + setVal + '"';
+        } else {
+            query += ' s:' + setVal;
+        }
+    }
+    if (finish) query += ' f:' + finish;
+
+    // Close sheet
+    document.getElementById('m-filter-overlay').classList.remove('open');
+    document.getElementById('m-filter-sheet').classList.remove('open');
+
+    // Navigate
+    window.location.href = '?q=' + encodeURIComponent(query);
+}
+
 // Card image drawer
 function showCardDrawer(imgUrl, name) {
     var overlay = document.getElementById('m-drawer-overlay');

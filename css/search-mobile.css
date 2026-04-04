@@ -1,18 +1,17 @@
 
 .m-page {
-    padding: 0.5em;
+    padding: 0 0.5em 0.5em;
     max-width: 100%;
     box-sizing: border-box;
     overflow-x: hidden;
 }
 
-/* Search bar - sticky at top */
+/* Search bar - sticky at top, flush with nav */
 .m-search-bar-sticky {
     position: sticky;
-    top: 48px; /* below the 48px mobile nav */
     z-index: 50;
     background: var(--background);
-    padding: 0.4em 0.5em;
+    padding: 0.35em 0.5em;
     margin: 0 -0.5em; /* bleed to page edges */
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -477,4 +476,120 @@
 /* Make card header indicate it's tappable */
 .m-card-header {
     cursor: pointer;
+}
+
+/* Filter overlay sheet */
+.m-filter-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 400;
+}
+
+.m-filter-overlay.open {
+    display: block;
+}
+
+.m-filter-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 500;
+    background: var(--background);
+    border-radius: 16px 16px 0 0;
+    transform: translateY(100%);
+    transition: transform 250ms ease;
+    padding: 0.5em 1em 2em;
+    min-height: 45vh;
+    max-height: 80vh;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.m-filter-sheet.open {
+    transform: translateY(0);
+}
+
+.m-filter-sheet-content h3 {
+    font-size: 1rem;
+    margin: 0 0 0.75em;
+}
+
+.m-filter-sheet-content label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--greytext);
+    margin: 0.5em 0 0.25em;
+}
+
+.m-filter-set-select {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.5em 0.6em;
+    font-size: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    background: var(--background);
+    color: var(--text);
+    min-height: 40px;
+    box-sizing: border-box;
+    margin-bottom: 0.25em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.light-theme .m-filter-set-select {
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+.m-filter-sheet-content {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.m-filter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3em;
+}
+
+.m-filter-pill {
+    padding: 0.3em 0.65em;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: none;
+    color: var(--greytext);
+    cursor: pointer;
+    min-height: auto !important;
+}
+
+.m-filter-pill.active {
+    background: var(--dodgerblue);
+    color: white;
+    border-color: var(--dodgerblue);
+}
+
+.m-filter-apply {
+    display: block;
+    width: 100%;
+    margin-top: 1em;
+    padding: 0.6em;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    background: var(--dodgerblue);
+    color: white;
+    cursor: pointer;
+    min-height: 44px;
+}
+
+/* Filter button accent */
+.m-filter-btn {
+    position: relative;
 }
