@@ -1055,16 +1055,38 @@ var funcMap = template.FuncMap{
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	name := path.Base(tmpl)
 
+	// Check for mobile-specific template override
+	if pageVars.IsMobile {
+		mobileTmpl := fmt.Sprintf("mobile/%s", tmpl)
+		mobilePath := fmt.Sprintf("templates/%s", mobileTmpl)
+		if _, err := os.Stat(mobilePath); err == nil {
+			tmpl = mobileTmpl
+			name = path.Base(tmpl)
+		}
+	}
+
 	// Select base template: landing page uses base-landing, everything else uses base
 	base := "templates/base.html"
 	if name == "home.html" {
 		base = "templates/base-landing.html"
+	} else if pageVars.IsMobile {
+		mobileBase := "templates/mobile/base-mobile.html"
+		if _, err := os.Stat(mobileBase); err == nil {
+			base = mobileBase
+		}
 	}
 
 	templates := []string{base, fmt.Sprintf("templates/%s", tmpl)}
 
 	// Always include the navbar partial
-	templates = append(templates, "templates/partials/navbar.html")
+	navbarPartial := "templates/partials/navbar.html"
+	if pageVars.IsMobile {
+		mobileNavbar := "templates/mobile/partials/navbar.html"
+		if _, err := os.Stat(mobileNavbar); err == nil {
+			navbarPartial = mobileNavbar
+		}
+	}
+	templates = append(templates, navbarPartial)
 
 	// Add other partials as needed
 	if name == "search.html" {
