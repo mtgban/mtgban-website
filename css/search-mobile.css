@@ -2,6 +2,8 @@
 .m-page {
     padding: 0.5em;
     max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
 }
 
 /* Search bar */
@@ -60,9 +62,13 @@
 .m-card {
     border: 1px solid var(--border);
     border-radius: 8px;
-    margin-bottom: 0.75em;
+    margin-bottom: 1em;
     overflow: hidden;
     background: var(--background);
+}
+
+.m-card + .m-card {
+    margin-top: 0.25em;
 }
 
 .m-card-header {
@@ -158,23 +164,23 @@
 /* Condition pills */
 .m-cond-pills {
     display: flex;
-    gap: 0.35em;
-    padding: 0.5em 0.75em;
+    gap: 0.3em;
+    padding: 0.35em 0.75em;
     overflow-x: auto;
     border-bottom: 1px solid var(--border);
 }
 
 .m-cond-pill {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    padding: 0.3em 0.65em;
+    padding: 0.2em 0.55em;
     border: 1px solid var(--border);
-    border-radius: 99px;
+    border-radius: 4px;
     background: none;
     color: var(--greytext);
     cursor: pointer;
     white-space: nowrap;
-    min-height: 32px;
+    min-height: 28px;
     display: flex;
     align-items: center;
 }
@@ -212,6 +218,7 @@
     cursor: pointer;
     list-style: none;
     gap: 0.5em;
+    overflow: hidden;
 }
 
 .m-vendor-row summary::-webkit-details-marker {
@@ -246,7 +253,7 @@
 .m-vendor-price {
     font-family: var(--font-mono, monospace);
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     white-space: nowrap;
 }
 

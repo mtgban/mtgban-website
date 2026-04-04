@@ -93,11 +93,11 @@
     display: flex;
     align-items: center;
     gap: 0.5em;
-    padding: 0.75em 0.5em;
+    padding: 0.4em 0.5em;
     color: var(--text);
     text-decoration: none;
-    font-size: 1rem;
-    min-height: 48px;
+    font-size: 0.9rem;
+    min-height: 40px;
     border-radius: 6px;
 }
 
@@ -122,15 +122,26 @@
     height: 24px;
 }
 
-/* Mobile body: hide desktop nav */
+/* Mobile body: hide desktop elements */
 body.mobile .ban-nav,
 body.mobile .ban-nav-mobile-overlay,
 body.mobile .ban-nav-mobile-menu {
     display: none;
 }
 
+/* Prevent desktop layouts from bleeding through */
+body.mobile .search-layout,
+body.mobile .search-sidebar {
+    display: none;
+}
+
 /* Global mobile overrides */
+body.mobile {
+    overflow-x: hidden;
+}
+
 body.mobile .page-content {
     padding: 0;
     max-width: 100%;
+    overflow-x: hidden;
 }
