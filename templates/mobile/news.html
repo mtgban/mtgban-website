@@ -185,10 +185,10 @@
                         {{$ranking := $row.FieldValue "ranking"}}
                         {{if $ranking}}<span class="m-news-rank">#{{$ranking}}</span>{{end}}
 
-                        {{/* Card identity */}}
+                        {{/* Card identity — use $card (UUID lookup) for reliable fields */}}
                         <div class="m-news-card-info">
-                            <span class="m-news-card-name" lang="{{$card.LangTag}}">{{$row.CardName}}</span>
-                            <span class="m-news-card-set">{{$row.Edition}} · #{{$row.Number}}{{if $card.Foil}} · Foil{{end}}{{if $card.Etched}} · Etched{{end}}</span>
+                            <span class="m-news-card-name" lang="{{$card.LangTag}}">{{$card.Name}}</span>
+                            <span class="m-news-card-set">{{$card.Edition}} · #{{$card.Number}}{{if $card.Foil}} · Foil{{end}}{{if $card.Etched}} · Etched{{end}}</span>
                         </div>
                     </div>
 
@@ -220,7 +220,7 @@
                             {{end}}
                         {{end}}
                     {{end}}
-                    <a class="m-news-detail-search" href="search?q={{$row.CardName}} s:{{$card.SetCode}} cn:{{$row.Number}}">View prices &rarr;</a>
+                    <a class="m-news-detail-search" href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}">View prices &rarr;</a>
                 </div>
             </details>
         {{end}}
