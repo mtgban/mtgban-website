@@ -149,9 +149,7 @@
                                         </span>
                                         <span class="m-vendor-right">
                                             <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
-                                            {{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}
-                                                <span class="m-vendor-qty">{{$entry.Quantity}}</span>
-                                            {{end}}
+                                            <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{end}}</span>
                                         </span>
                                     </summary>
                                     <div class="m-vendor-detail">
@@ -192,9 +190,7 @@
                                         </span>
                                         <span class="m-vendor-right">
                                             <span class="m-vendor-price">$ {{printf "%.2f" $entry.Price}}</span>
-                                            {{if and $entry.Quantity (eq $conditions "NM")}}
-                                                <span class="m-vendor-qty">{{$entry.Quantity}}</span>
-                                            {{end}}
+                                            <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                         </span>
                                     </summary>
                                     <div class="m-vendor-detail">
