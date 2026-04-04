@@ -79,6 +79,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
 	pageVars := genPageNav("Search", sig)
+	pageVars.IsMobile = isMobileRequest(r)
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
