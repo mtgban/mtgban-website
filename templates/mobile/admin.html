@@ -1,0 +1,170 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/admin-mobile.css?hash={{.Hash}}">
+{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "content"}}
+<div class="m-page m-admin">
+    <div class="m-admin-header">
+        <h1>Admin</h1>
+    </div>
+
+    {{/* Info message / API key display */}}
+    {{if ne .InfoMessage ""}}
+        {{if .SelectableField}}
+            <div class="m-admin-key-wrap">
+                <input class="m-admin-key-input" id="m-admin-key" value="{{.InfoMessage}}" onFocus="this.setSelectionRange(0, this.value.length)" readonly>
+                <button class="m-admin-key-copy" onclick="copyKey()">Copy</button>
+            </div>
+        {{else}}
+            <div class="m-admin-msg">{{.InfoMessage}}</div>
+        {{end}}
+    {{end}}
+
+    {{/* Toast notification - hidden by default */}}
+    <div class="m-toast" id="m-toast">Copied to clipboard!</div>
+
+    {{/* Status */}}
+    <div class="m-admin-section">
+        <h2>Status</h2>
+        <div class="m-admin-status">
+            <div class="m-admin-stat"><span class="m-stat-label">Uptime</span><span class="m-stat-value">{{.Uptime}}</span></div>
+            <div class="m-admin-stat"><span class="m-stat-label">Memory</span><span class="m-stat-value">{{.MemoryStatus}}</span></div>
+            <div class="m-admin-stat"><span class="m-stat-label">Disk</span><span class="m-stat-value">{{.DiskStatus}}</span></div>
+            <div class="m-admin-stat"><span class="m-stat-label">Datastore</span><span class="m-stat-value">{{.LastUpdate.Format "Jan 02 15:04"}}</span></div>
+            <div class="m-admin-stat"><span class="m-stat-label">Newspaper</span><span class="m-stat-value">{{if .LastNews.IsZero}}not set{{else}}{{.LastNews.Format "Jan 02 15:04"}}{{end}}</span></div>
+            <div class="m-admin-stat"><span class="m-stat-label">Stash</span><span class="m-stat-value">{{if .LastStash.IsZero}}not set{{else}}{{.LastStash.Format "Jan 02 15:04"}}{{end}}</span></div>
+            <div class="m-admin-stat"><span class="m-stat-label">Hash</span><a class="m-stat-value m-stat-link" target="_blank" href="https://github.com/mtgban/mtgban-website/commit/{{.LatestHash}}">{{.LatestHash}}</a></div>
+        </div>
+    </div>
+
+    {{/* Server Actions */}}
+    <div class="m-admin-section">
+        <h2>Server Actions</h2>
+        <div class="m-admin-actions">
+            <a class="m-admin-action" href="?reboot=datastore" onclick="return confirm('Reload datastore?')">
+                <span class="m-act-icon">🔄</span>
+                <div class="m-act-text"><span class="m-act-title">Reload Datastore</span><span class="m-act-desc">Refresh from primary source</span></div>
+            </a>
+            <a class="m-admin-action" href="?reboot=datastore-backup" onclick="return confirm('Reload backup? Updates disabled until manual reload.')">
+                <span class="m-act-icon">♻️</span>
+                <div class="m-act-text"><span class="m-act-title">Reload Backup</span><span class="m-act-desc">Use backup source</span></div>
+            </a>
+            <a class="m-admin-action" href="?reboot=update" onclick="return confirm('Deploy? (Pull + Build + Restart)')">
+                <span class="m-act-icon">🏗️</span>
+                <div class="m-act-text"><span class="m-act-title">Deploy</span><span class="m-act-desc">Pull + Build + Restart</span></div>
+            </a>
+            <a class="m-admin-action" href="?reboot=code" onclick="return confirm('Pull new code?')">
+                <span class="m-act-icon">📥</span>
+                <span class="m-act-title">Pull Code</span>
+            </a>
+            <a class="m-admin-action" href="?reboot=build" onclick="return confirm('Build?')">
+                <span class="m-act-icon">🔨</span>
+                <span class="m-act-title">Build</span>
+            </a>
+            <a class="m-admin-action" href="?reboot=config" onclick="return confirm('Reload config?')">
+                <span class="m-act-icon">⚙️</span>
+                <span class="m-act-title">Reload Config</span>
+            </a>
+            <a class="m-admin-action" href="?reboot=snapshot" onclick="return confirm('Take a data snapshot?')">
+                <span class="m-act-icon">📸</span>
+                <span class="m-act-title">Take Snapshot</span>
+                {{if .DisableChart}}<span class="m-act-warn">⚠️</span>{{end}}
+            </a>
+            <a class="m-admin-action m-admin-danger" href="?reboot=server" onclick="return confirm('Restart server?')">
+                <span class="m-act-icon">⚠️</span>
+                <span class="m-act-title">Restart Server</span>
+                {{if .DisableChart}}<span class="m-act-warn">⚠️</span>{{end}}
+            </a>
+        </div>
+    </div>
+
+    {{/* Admin Tools */}}
+    <div class="m-admin-section">
+        <h2>Admin Tools</h2>
+
+        <div class="m-admin-tool">
+            <label>Spoof User Tier</label>
+            <form action="admin" method="GET">
+                <input type="hidden" name="reboot" value="spoof"/>
+                <select name="tier" onchange="this.form.submit()">
+                    <option disabled selected value="">Choose tier...</option>
+                    {{range .Tiers}}
+                        <option value="{{.}}">{{.}}</option>
+                    {{end}}
+                </select>
+            </form>
+        </div>
+
+        <div class="m-admin-tool">
+            <label>Generate API Key</label>
+            <form>
+                <input type="hidden" name="reboot" value="newKey"/>
+                <input type="text" name="user" id="m-api-user" placeholder="User email" inputmode="email">
+                <select name="duration" onchange="if (document.getElementById('m-api-user').value !== '') { this.form.submit() }">
+                    <option selected value="">Duration...</option>
+                    <option value="0">No expiration</option>
+                    <option value="15">Two weeks</option>
+                    <option value="31">One month</option>
+                    <option value="183">Half year</option>
+                    <option value="365">One year</option>
+                </select>
+            </form>
+        </div>
+
+        <div class="m-admin-tool">
+            <label>API Demo Key</label>
+            <form action="admin" method="GET">
+                <input type="hidden" name="reboot" value="demokey"/>
+                <button type="submit" class="m-admin-tool-btn">Generate Demo Key</button>
+            </form>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "extra-head"}}{{end}}
+
+{{define "extra-scripts"}}
+<script>
+function copyKey() {
+    var input = document.getElementById('m-admin-key');
+    var text = input.value;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            showToast();
+        }).catch(function() {
+            fallbackCopy(input);
+        });
+    } else {
+        fallbackCopy(input);
+    }
+}
+
+function fallbackCopy(input) {
+    input.select();
+    input.setSelectionRange(0, input.value.length);
+    document.execCommand('copy');
+    showToast();
+}
+
+function showToast() {
+    var toast = document.getElementById('m-toast');
+    toast.classList.add('show');
+    setTimeout(function() {
+        toast.classList.remove('show');
+    }, 2000);
+}
+
+// Auto-copy on page load if a key was just generated
+(function() {
+    var input = document.getElementById('m-admin-key');
+    if (input && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(function() {
+            showToast();
+        });
+    }
+})();
+</script>
+{{end}}
