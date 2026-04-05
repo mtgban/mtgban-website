@@ -52,6 +52,9 @@
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
     </script>
 
+    {{/* Toast notification */}}
+    <div class="m-toast" id="m-fav-toast"></div>
+
     {{/* Recent searches - from localStorage */}}
     <div id="m-recent-searches"></div>
 
