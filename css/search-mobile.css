@@ -593,3 +593,55 @@
 .m-filter-btn {
     position: relative;
 }
+
+/* Sealed landing page */
+.m-sealed-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0.75em 0 0.5em;
+}
+
+.m-sealed-section {
+    margin-bottom: 1em;
+}
+
+.m-sealed-section-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 0.3em;
+}
+
+.m-sealed-section-header h2 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.m-sealed-count {
+    font-size: 0.7rem;
+    color: var(--greytext);
+}
+
+.m-sealed-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2em;
+}
+
+.m-sealed-edition {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0.6em;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 0.8rem;
+    min-height: 40px;
+}
+
+.light-theme .m-sealed-edition {
+    border-color: rgba(0, 0, 0, 0.08);
+}

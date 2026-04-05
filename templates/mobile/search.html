@@ -22,8 +22,7 @@
             <p style="padding: 1em;">Options are not yet available on mobile. <a href="?page=options">View desktop version</a>.</p>
         </div>
     {{else if and (eq .SearchQuery "") .IsSealed}}
-        {{/* Sealed landing — redirect to search for now */}}
-        {{template "m-search-bar" .}}
+        {{template "m-sealed-landing" .}}
     {{else}}
         {{if eq .SearchQuery ""}}
             {{template "m-search-bar" .}}
@@ -44,6 +43,41 @@
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
     </script>
+    <script>lucide.createIcons();</script>
+</div>
+{{end}}
+
+{{define "m-sealed-landing"}}
+<div class="m-page">
+    <div class="m-search-wrap">
+        <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+            <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a product..." value="" maxlength="1000" autofocus autocapitalize="none">
+        </form>
+        <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+    </div>
+    <script type="text/javascript">
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
+    </script>
+
+    <h1 class="m-sealed-title">Sealed Products</h1>
+
+    {{range $key := .EditionSort}}
+        {{$editionList := index $.EditionList $key}}
+        <div class="m-sealed-section">
+            <div class="m-sealed-section-header">
+                <h2>{{$key}}</h2>
+                <span class="m-sealed-count">{{len $editionList}}</span>
+            </div>
+            <div class="m-sealed-grid">
+                {{range $editionList}}
+                    <a class="m-sealed-edition" href="/sealed?q=s:{{.Code}}">
+                        <i class="ss ss-{{.Keyrune}} ss-fw"></i> {{.Name}}
+                    </a>
+                {{end}}
+            </div>
+        </div>
+    {{end}}
+
     <script>lucide.createIcons();</script>
 </div>
 {{end}}
