@@ -815,3 +815,140 @@
     font-size: 1.1rem;
     color: var(--greytext);
 }
+
+/* Favorites */
+/* Star button in card header */
+.m-fav-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.2em;
+    color: var(--greytext);
+    min-height: auto !important;
+    display: flex;
+    align-items: center;
+}
+
+.m-fav-btn i,
+.m-fav-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.m-fav-btn.active {
+    color: #f5c518;
+}
+
+.m-fav-btn.active svg {
+    fill: #f5c518;
+    stroke: #f5c518;
+}
+
+/* Favorites section on landing page */
+#m-favorites {
+    margin-top: 0.75em;
+}
+
+.m-fav-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.25em 0.4em;
+}
+
+.m-fav-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--greytext);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.m-fav-clear {
+    font-size: 0.7rem;
+    color: var(--greytext);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.3em 0.5em;
+    min-height: auto !important;
+}
+
+.m-fav-clear:active {
+    color: var(--red);
+}
+
+.m-fav-list {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.light-theme .m-fav-list {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+.m-fav-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
+    padding: 0.5em 0.75em;
+    text-decoration: none;
+    color: var(--text);
+    min-height: 44px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    justify-content: center;
+}
+
+.light-theme .m-fav-item {
+    border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+.m-fav-item:last-child {
+    border-bottom: none;
+}
+
+.m-fav-item:active {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.light-theme .m-fav-item:active {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.m-fav-item-top {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    flex-wrap: wrap;
+}
+
+.m-fav-name {
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.m-fav-set {
+    font-size: 0.7rem;
+    color: var(--greytext);
+    font-family: var(--font-mono, monospace);
+}
+
+.m-fav-item-prices {
+    display: flex;
+    gap: 0.75em;
+    font-size: 0.75rem;
+}
+
+.m-fav-price {
+    font-family: var(--font-mono, monospace);
+    font-weight: 600;
+}
+
+.m-fav-price.sell {
+    color: var(--dodgerblue);
+}
+
+.m-fav-price.buy {
+    color: var(--green);
+}
