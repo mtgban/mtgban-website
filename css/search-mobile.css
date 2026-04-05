@@ -760,7 +760,8 @@
 .m-recent-list {
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
-    overflow: hidden;
+    max-height: 232px; /* ~5 items at 44px + borders */
+    overflow-y: auto;
 }
 
 .light-theme .m-recent-list {
