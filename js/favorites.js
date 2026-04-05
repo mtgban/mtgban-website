@@ -171,13 +171,21 @@
     };
 
     // Initialize
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            markExistingFavorites();
-            renderFavorites();
-        });
-    } else {
+    function init() {
         markExistingFavorites();
         renderFavorites();
     }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    // Re-render when page is restored from bfcache (back/forward navigation)
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) {
+            init();
+        }
+    });
 })();

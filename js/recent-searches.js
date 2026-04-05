@@ -96,13 +96,21 @@
     window.clearRecentSearches = clearRecentSearches;
 
     // Initialize on DOM ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            hookFormSubmit();
-            renderRecentSearches();
-        });
-    } else {
+    function init() {
         hookFormSubmit();
         renderRecentSearches();
     }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+    // Re-render when page is restored from bfcache (back/forward navigation)
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) {
+            renderRecentSearches();
+        }
+    });
 })();
