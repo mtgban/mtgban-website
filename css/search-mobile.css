@@ -31,11 +31,16 @@
 .m-search-wrap {
     display: flex;
     align-items: center;
-    gap: 0.5em;
+    gap: 0.4em;
+}
+
+.m-search-wrap form {
+    flex: 1;
+    min-width: 0;
 }
 
 .m-search-input {
-    flex: 1;
+    width: 100%;
     font-size: 1rem;
     padding: 0.6em 0.75em;
     border: 1px solid rgba(255, 255, 255, 0.25);
