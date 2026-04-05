@@ -37,30 +37,46 @@
         var isFoil = card.querySelector('.m-badge.foil') !== null;
         var isEtched = card.querySelector('.m-badge.etched') !== null;
 
-        // Get best sell price (NM condition, first vendor in sellers panel)
+        // Get best sell price + vendor name (NM condition, first vendor in sellers panel)
         var sellPrice = null;
+        var sellVendor = '';
         var sellersPanel = card.querySelector('[id^="sellers-"]');
         if (sellersPanel) {
             var activeGroup = sellersPanel.querySelector('.m-cond-group.active');
             if (activeGroup) {
-                var priceEl = activeGroup.querySelector('.m-vendor-price');
-                if (priceEl) {
-                    var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-                    if (!isNaN(parsed)) sellPrice = parsed;
+                var bestRow = activeGroup.querySelector('.m-vendor-row:not(.m-vendor-locked)');
+                if (bestRow) {
+                    var priceEl = bestRow.querySelector('.m-vendor-price');
+                    if (priceEl) {
+                        var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
+                        if (!isNaN(parsed)) sellPrice = parsed;
+                    }
+                    var nameEl = bestRow.querySelector('.m-vendor-name');
+                    if (nameEl) {
+                        sellVendor = nameEl.textContent.replace('Best', '').trim();
+                    }
                 }
             }
         }
 
-        // Get best buy price (NM condition, first vendor in buyers panel)
+        // Get best buy price + vendor name (NM condition, first vendor in buyers panel)
         var buyPrice = null;
+        var buyVendor = '';
         var buyersPanel = card.querySelector('[id^="buyers-"]');
         if (buyersPanel) {
             var activeGroup = buyersPanel.querySelector('.m-cond-group.active');
             if (activeGroup) {
-                var priceEl = activeGroup.querySelector('.m-vendor-price');
-                if (priceEl) {
-                    var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-                    if (!isNaN(parsed)) buyPrice = parsed;
+                var bestRow = activeGroup.querySelector('.m-vendor-row:not(.m-vendor-locked)');
+                if (bestRow) {
+                    var priceEl = bestRow.querySelector('.m-vendor-price');
+                    if (priceEl) {
+                        var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
+                        if (!isNaN(parsed)) buyPrice = parsed;
+                    }
+                    var nameEl = bestRow.querySelector('.m-vendor-name');
+                    if (nameEl) {
+                        buyVendor = nameEl.textContent.replace('Best', '').trim();
+                    }
                 }
             }
         }
@@ -81,7 +97,9 @@
             foil: isFoil,
             etched: isEtched,
             sellPrice: sellPrice,
+            sellVendor: sellVendor,
             buyPrice: buyPrice,
+            buyVendor: buyVendor,
             query: query,
             t: Date.now()
         };
@@ -148,8 +166,12 @@
             if (f.etched) html += '<span class="m-badge etched">Etched</span>';
             html += '</div>';
             html += '<div class="m-fav-item-prices">';
-            if (f.sellPrice !== null) html += '<span class="m-fav-price sell">Sell: $ ' + f.sellPrice.toFixed(2) + '</span>';
-            if (f.buyPrice !== null) html += '<span class="m-fav-price buy">Buy: $ ' + f.buyPrice.toFixed(2) + '</span>';
+            if (f.sellPrice !== null) {
+                html += '<span class="m-fav-price sell">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + ': $ ' + f.sellPrice.toFixed(2) + '</span>';
+            }
+            if (f.buyPrice !== null) {
+                html += '<span class="m-fav-price buy">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + ': $ ' + f.buyPrice.toFixed(2) + '</span>';
+            }
             html += '</div>';
             html += '</a>';
         });
