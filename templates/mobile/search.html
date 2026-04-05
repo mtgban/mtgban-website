@@ -12,6 +12,7 @@
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
@@ -43,6 +44,10 @@
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
     </script>
+
+    {{/* Recent searches - from localStorage */}}
+    <div id="m-recent-searches"></div>
+
     <script>lucide.createIcons();</script>
 </div>
 {{end}}
