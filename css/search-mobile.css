@@ -213,11 +213,13 @@
     color: var(--greytext);
     cursor: pointer;
     min-height: 44px;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .m-tab.active {
     color: var(--activetext);
     border-bottom-color: var(--dodgerblue);
+    background: rgba(30, 144, 255, 0.08);
 }
 
 .m-tab-panel {
