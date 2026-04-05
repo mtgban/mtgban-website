@@ -921,7 +921,10 @@
     display: flex;
     align-items: center;
     gap: 0.4em;
-    flex-wrap: wrap;
+}
+
+.m-fav-item-top .m-badge {
+    margin-left: auto;
 }
 
 .m-fav-name {
