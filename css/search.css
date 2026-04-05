@@ -293,6 +293,12 @@
     display: block;
     background: var(--search-surface-2);
 }
+.sidebar-img-wrap[data-set="LEA"] .sidebar-card-img {
+    border-radius: 22px;
+}
+.sidebar-img-wrap[data-set="LEA"].foil-wrap[data-foil="true"]::after {
+    border-radius: 22px;
+}
 
 .sidebar-printings {
     font-size: var(--text-base);

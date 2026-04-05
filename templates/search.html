@@ -309,12 +309,13 @@ Sims are not required for pre-constructed decks and other products where the sam
             <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
 
             <script type="text/javascript">
-                function updateSidebar(src, printings, products, isFoil) {
+                function updateSidebar(src, printings, products, isFoil, setCode) {
                     {{if not .IsSealed}}
                         document.getElementById('cardImage').src=src;
                         var wrapper = document.getElementById('cardImageWrapper');
                         if (wrapper) {
                             wrapper.setAttribute('data-foil', isFoil ? 'true' : 'false');
+                            wrapper.setAttribute('data-set', setCode);
                         }
                     {{else}}
                         document.getElementById('hoverImage').src=src;
@@ -464,6 +465,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{$firstPrint := ""}}
                     {{$firstProduct := ""}}
                     {{$firstFoil := false}}
+                    {{$firstSetCode := ""}}
 
                     {{if .ChartID}}
                         <div class="chart-container">
@@ -651,10 +653,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                             {{$firstPrint = $card.Printings}}
                             {{$firstProduct = $card.Products}}
                             {{$firstFoil = $card.Foil}}
+                            {{$firstSetCode = $card.SetCode}}
                         {{end}}
 
                             <div class="result-header-cover" style="z-index: {{$i}}"></div>
-                            <div class="result-header{{if eq $i 0}} result-first{{end}}" style="z-index: {{inc $i 100}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
+                            <div class="result-header{{if eq $i 0}} result-first{{end}}" style="z-index: {{inc $i 100}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -725,7 +728,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
@@ -899,7 +902,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{$firstImg = $emptyImg}}
                 {{end}}
                 <script type="text/javascript">
-                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}});
+                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstSetCode}});
                 </script>
             </div>{{/* Close .search-layout */}}
     <br>

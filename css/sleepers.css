@@ -486,3 +486,12 @@
     /* Results header */
     .sleepers-results-header h1 { font-size: var(--text-6xl); }
 }
+
+/* Card image rounding */
+.sleep-card-wrap img {
+    border-radius: 12px;
+    display: block;
+}
+.sleep-card-wrap[data-set="LEA"] img {
+    border-radius: 22px;
+}
