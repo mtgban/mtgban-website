@@ -1068,9 +1068,9 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		}
 	}
 
-	// Select base template: landing page uses base-landing, everything else uses base
+	// Select base template
 	base := "templates/base.html"
-	if name == "home.html" {
+	if name == "home.html" && !pageVars.IsMobile {
 		base = "templates/base-landing.html"
 	} else if pageVars.IsMobile {
 		mobileBase := "templates/mobile/base-mobile.html"
