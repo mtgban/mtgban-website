@@ -629,6 +629,7 @@
 
 .m-sealed-section {
     margin-bottom: 1em;
+    scroll-margin-top: 105px; /* 48px nav + ~52px search bar + small buffer */
 }
 
 .m-sealed-section-header {
