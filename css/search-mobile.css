@@ -116,10 +116,12 @@
     background: var(--background);
     max-width: 100%;
     box-sizing: border-box;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .light-theme .m-card {
     border-color: rgba(0, 0, 0, 0.18);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .m-card-header {
