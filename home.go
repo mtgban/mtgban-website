@@ -26,6 +26,10 @@ func Home(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav("Home", sig)
 	pageVars.ErrorMessage = message
+	pageVars.IsMobile = isMobileRequest(r)
+	if pageVars.IsMobile {
+		pageVars.Nav = filterNavForMobile(pageVars.Nav)
+	}
 
 	render(w, "home.html", pageVars)
 }
