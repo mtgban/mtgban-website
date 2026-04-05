@@ -330,6 +330,7 @@
     font-size: 0.85rem;
     white-space: nowrap;
     text-align: right;
+    font-variant-numeric: tabular-nums;
 }
 
 .m-vendor-qty {
