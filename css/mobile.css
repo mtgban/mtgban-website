@@ -185,6 +185,11 @@ body.mobile .page-content {
 }
 
 /* Mobile home page */
+/* Lighten secondary text in dark mode for readability */
+.dark-theme.mobile {
+    --greytext: #7a88b0;
+}
+
 /* Hide nav home button when already on home page */
 body.mobile:has(.m-home) .m-nav-home {
     visibility: hidden;
