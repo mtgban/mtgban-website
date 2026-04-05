@@ -362,6 +362,8 @@
 /* Best price highlight */
 .m-best-price summary {
     background: color-mix(in srgb, var(--dodgerblue) 8%, transparent);
+    border-left: 3px solid var(--dodgerblue);
+    padding-left: calc(0.75rem - 3px);
 }
 
 .m-best-badge {
