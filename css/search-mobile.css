@@ -265,6 +265,7 @@
     background: var(--dodgerblue);
     color: white;
     border-color: var(--dodgerblue);
+    box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
 }
 
 /* Condition groups (show/hide by active pill) */
