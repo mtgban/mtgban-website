@@ -707,6 +707,7 @@
     font-size: var(--text-lg);
     color: var(--normal);
     white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
 .price-row .price-warn {
