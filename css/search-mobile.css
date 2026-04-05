@@ -169,7 +169,7 @@
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 0.2em;
+    gap: 0.35em;
 }
 
 .m-badge {
@@ -833,11 +833,20 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0.2em;
+    padding: 0.5em;
     color: var(--greytext);
     min-height: auto !important;
     display: flex;
     align-items: center;
+    border-radius: 50%;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.m-fav-btn::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
 }
 
 .m-fav-btn i,
@@ -977,11 +986,20 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0.2em;
+    padding: 0.5em;
     color: var(--greytext);
     min-height: auto !important;
     display: flex;
     align-items: center;
+    border-radius: 50%;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.m-chart-btn::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
 }
 
 .m-chart-btn i,
