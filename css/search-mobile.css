@@ -273,6 +273,8 @@
 /* Vendor rows (details/summary) */
 .m-vendor-row {
     border-bottom: 1px solid var(--border);
+    padding: 0;
+    margin: 0;
 }
 
 .m-vendor-row:last-child {
@@ -283,11 +285,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 1em 0 0.75em;
+    padding: 0 1rem 0 0.75rem;
+    margin: 0;
     min-height: 44px;
     cursor: pointer;
     list-style: none;
-    gap: 0.5em;
+    gap: 0.5rem;
     box-sizing: border-box;
 }
 
@@ -351,29 +354,39 @@
     font-size: 0.8rem;
 }
 
-/* Expanded detail */
+/* Expanded detail — must match summary width */
 .m-vendor-detail {
-    padding: 0.5em 0.75em 0.75em;
     background: color-mix(in srgb, var(--text) 3%, var(--background));
-    font-size: 0.8rem;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    box-sizing: border-box;
 }
 
-.m-detail-row {
+/* Detail rows share the exact same layout rules as summary */
+.m-vendor-row .m-detail-row {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    padding: 0.25em 0;
-    color: var(--greytext);
+    padding: 0 1rem 0 0.75rem;
+    min-height: 32px;
+    list-style: none;
+    box-sizing: border-box;
+    gap: 0.5rem;
 }
 
-.m-detail-row span:last-child {
-    font-family: var(--font-mono, monospace);
-    font-weight: 600;
-    color: var(--text);
+.m-detail-row .m-vendor-name {
+    color: var(--greytext);
+    font-weight: 500;
+}
+
+.m-detail-row .m-vendor-price {
+    color: var(--greytext);
 }
 
 .m-detail-link {
     display: inline-block;
-    margin-top: 0.4em;
+    margin: 0.25em 0 0 0.75em;
     color: var(--dodgerblue);
     text-decoration: none;
     font-weight: 500;

@@ -214,7 +214,12 @@
                                         </span>
                                     </summary>
                                     <div class="m-vendor-detail">
-                                        {{if $entry.Credit}}<div class="m-detail-row"><span>Credit</span><span>$ {{printf "%.2f" $entry.Credit}}</span></div>{{end}}
+                                        {{if $entry.Credit}}
+                                        <div class="m-detail-row">
+                                            <span class="m-vendor-name">Credit</span>
+                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.Credit}}</span><span class="m-vendor-qty"></span></span>
+                                        </div>
+                                        {{end}}
                                         {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
                                     </div>
                                 </details>
@@ -255,9 +260,24 @@
                                         </span>
                                     </summary>
                                     <div class="m-vendor-detail">
-                                        {{if and $entry.Ratio (eq $conditions "NM")}}<div class="m-detail-row"><span>Ratio</span><span>{{printf "%.02f%%" $entry.Ratio}}</span></div>{{end}}
-                                        {{if $entry.Credit}}<div class="m-detail-row"><span>Credit</span><span>$ {{printf "%.2f" $entry.Credit}}</span></div>{{end}}
-                                        {{if $entry.MarketCredit}}<div class="m-detail-row"><span>Market Credit</span><span>$ {{printf "%.2f" $entry.MarketCredit}}</span></div>{{end}}
+                                        {{if and $entry.Ratio (eq $conditions "NM")}}
+                                        <div class="m-detail-row">
+                                            <span class="m-vendor-name">Ratio</span>
+                                            <span class="m-vendor-right"><span class="m-vendor-price">{{printf "%.02f%%" $entry.Ratio}}</span><span class="m-vendor-qty"></span></span>
+                                        </div>
+                                        {{end}}
+                                        {{if $entry.Credit}}
+                                        <div class="m-detail-row">
+                                            <span class="m-vendor-name">Credit</span>
+                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.Credit}}</span><span class="m-vendor-qty"></span></span>
+                                        </div>
+                                        {{end}}
+                                        {{if $entry.MarketCredit}}
+                                        <div class="m-detail-row">
+                                            <span class="m-vendor-name">Mkt Credit</span>
+                                            <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.MarketCredit}}</span><span class="m-vendor-qty"></span></span>
+                                        </div>
+                                        {{end}}
                                         {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
                                     </div>
                                 </details>
