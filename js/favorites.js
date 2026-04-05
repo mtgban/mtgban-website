@@ -161,7 +161,7 @@
             html += '<a class="m-fav-item" href="?q=' + encodeURIComponent(f.query) + '">';
             html += '<div class="m-fav-item-top">';
             html += '<span class="m-fav-name">' + escapeHtml(f.name) + '</span>';
-            html += '<span class="m-fav-set">' + escapeHtml(f.set) + '</span>';
+            html += '<span class="m-fav-set">' + escapeHtml(f.set) + (f.number ? ' #' + escapeHtml(f.number) : '') + '</span>';
             if (f.foil) html += '<span class="m-badge foil">Foil</span>';
             if (f.etched) html += '<span class="m-badge etched">Etched</span>';
             html += '</div>';
