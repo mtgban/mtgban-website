@@ -187,11 +187,11 @@
                 {{if $hasBuyers}}<button class="m-tab" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
             </div>
 
-            {{/* Condition pills — default to NM */}}
+            {{/* Condition pills - default to NM, hidden for sealed products */}}
+            {{if not $card.Sealed}}
             <div class="m-cond-pills" data-card="{{$cardId}}">
                 {{range $conditions := $.CondKeys}}
                     {{if ne $conditions "INDEX"}}
-                        {{/* Only show pill if this card has entries for this condition in either sellers or buyers */}}
                         {{$sellerConds := (index $.FoundSellers $cardId)}}
                         {{$vendorConds := (index $.FoundVendors $cardId)}}
                         {{$hasCond := false}}
@@ -203,6 +203,7 @@
                     {{end}}
                 {{end}}
             </div>
+            {{end}}
 
             {{/* Sellers panel */}}
             {{if $hasSellers}}
