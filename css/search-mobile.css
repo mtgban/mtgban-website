@@ -936,14 +936,19 @@
 }
 
 .m-fav-item-prices {
-    display: flex;
-    gap: 0.75em;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25em;
     font-size: 0.75rem;
+    margin-top: 0.15em;
 }
 
 .m-fav-price {
     font-family: var(--font-mono, monospace);
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .m-fav-price.sell {
