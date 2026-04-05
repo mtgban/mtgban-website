@@ -128,15 +128,7 @@
                 },
                 plugins: {
                     legend: {
-                        position: 'bottom',
-                        labels: {
-                            color: textColor,
-                            usePointStyle: true,
-                            pointStyle: 'circle',
-                            padding: 10,
-                            font: { size: 10 },
-                            boxWidth: 8,
-                        },
+                        display: false,
                     },
                     tooltip: {
                         mode: 'index',
@@ -194,6 +186,47 @@
         });
     }
 
+    var shortNames = {
+        'TCGplayer Low': 'TCG Low',
+        'TCGplayer Market': 'TCG Market',
+        'Card Kingdom Retail': 'CK Retail',
+        'Card Kingdom Buylist': 'CK Buylist',
+        'Cardmarket Low': 'MKM Low',
+        'Cardmarket Trend': 'MKM Trend',
+        'Star City Games Buylist': 'SCG Buylist',
+        'ABU Games Buylist': 'ABU Buylist',
+        'Cool Stuff Inc Buylist': 'CSI Buylist',
+    };
+
+    function shortName(name) {
+        return shortNames[name] || name;
+    }
+
+    function renderChartLegend(datasets, chart) {
+        var container = document.getElementById('m-chart-legend');
+        if (!container) return;
+        var html = '';
+        datasets.forEach(function(ds, i) {
+            var visible = chart.isDatasetVisible(i);
+            html += '<button class="m-chart-legend-item' + (visible ? '' : ' hidden') + '" data-index="' + i + '" style="border-color:' + ds.color + '">';
+            html += '<span class="m-chart-legend-dot" style="background:' + ds.color + '"></span>';
+            html += shortName(ds.name);
+            html += '</button>';
+        });
+        container.innerHTML = html;
+
+        // Toggle dataset visibility on click
+        container.querySelectorAll('.m-chart-legend-item').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var idx = parseInt(this.getAttribute('data-index'));
+                var visible = chart.isDatasetVisible(idx);
+                chart.setDatasetVisibility(idx, !visible);
+                chart.update();
+                this.classList.toggle('hidden');
+            });
+        });
+    }
+
     window.showChartDrawer = function(cardId, isSealed, cardName) {
         var overlay = document.getElementById('m-chart-overlay');
         var drawer = document.getElementById('m-chart-drawer');
@@ -201,10 +234,12 @@
         var loading = document.getElementById('m-chart-loading');
         var canvas = document.getElementById('m-chart-canvas');
         var resetBtn = document.getElementById('m-chart-reset');
+        var legendEl = document.getElementById('m-chart-legend');
 
         nameEl.textContent = cardName;
         loading.style.display = 'block';
         loading.textContent = 'Loading chart...';
+        if (legendEl) legendEl.innerHTML = '';
         canvas.style.display = 'none';
         resetBtn.style.display = 'none';
         overlay.classList.add('open');
@@ -228,6 +263,7 @@
                     canvas.style.display = 'block';
                     resetBtn.style.display = 'inline-block';
                     currentChart = createChart(canvas.getContext('2d'), data);
+                    renderChartLegend(data.datasets, currentChart);
                 })
                 .catch(function(err) {
                     loading.style.display = 'block';
