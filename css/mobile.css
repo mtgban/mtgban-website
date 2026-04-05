@@ -16,12 +16,27 @@
 
 .m-nav-home {
     text-decoration: none;
+    display: flex;
+    align-items: center;
+}
+
+.m-nav-logo-img {
+    height: 28px;
+    width: auto;
 }
 
 .m-nav-logo {
     font-weight: 800;
     font-size: 1.1rem;
-    color: var(--activetext);
+    color: var(--text);
+}
+
+.light-theme .m-nav-logo {
+    color: #000;
+}
+
+.m-nav-ban {
+    color: #e53935;
 }
 
 .m-nav-right {
