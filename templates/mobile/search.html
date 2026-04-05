@@ -10,6 +10,12 @@
 {{define "title"}}{{.Title}}{{if .CleanSearchQuery}}: {{.CleanSearchQuery}}{{end}}{{end}}
 
 {{define "extra-head"}}
+    {{if not .DisableChart}}
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js" as="script">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js" as="script">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/hammerjs@2/hammer.min.js" as="script">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2/dist/chartjs-plugin-zoom.min.js" as="script">
+    {{end}}
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
@@ -166,6 +172,7 @@
                     {{if $card.Etched}}<span class="m-badge etched">Etched</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn" data-card="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
+                    {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
                 </div>
             </div>
 
@@ -342,6 +349,22 @@
         </div>
     </div>
 
+    {{/* Chart bottom drawer */}}
+    {{if not .DisableChart}}
+    <div class="m-drawer-overlay" id="m-chart-overlay" onclick="hideChartDrawer()"></div>
+    <div class="m-chart-drawer" id="m-chart-drawer">
+        <div class="m-drawer-handle" onclick="hideChartDrawer()"><span></span></div>
+        <div class="m-chart-header">
+            <span class="m-chart-name" id="m-chart-name"></span>
+            <button class="m-chart-reset" id="m-chart-reset" onclick="resetChartZoom()">Reset Zoom</button>
+        </div>
+        <div class="m-chart-container">
+            <div class="m-chart-loading" id="m-chart-loading">Loading chart...</div>
+            <canvas id="m-chart-canvas"></canvas>
+        </div>
+    </div>
+    {{end}}
+
     {{/* Card image bottom drawer */}}
     <div class="m-drawer-overlay" id="m-drawer-overlay" onclick="hideCardDrawer()"></div>
     <div class="m-drawer" id="m-drawer">
@@ -357,6 +380,9 @@
 {{end}}
 
 {{define "extra-scripts"}}
+{{if not .DisableChart}}
+<script type="text/javascript" src="/js/mobile-chart.js?hash={{.Hash}}"></script>
+{{end}}
 <script>
 // Filter pills — toggle active within each group
 document.querySelectorAll('.m-filter-pills').forEach(function(group) {
