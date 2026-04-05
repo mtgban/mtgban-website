@@ -722,3 +722,95 @@
 .light-theme .m-sealed-cat-link:active {
     background: rgba(0, 0, 0, 0.05);
 }
+
+/* Recent Searches */
+#m-recent-searches {
+    margin-top: 0.75em;
+}
+
+.m-recent-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.25em 0.4em;
+}
+
+.m-recent-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--greytext);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.m-recent-clear {
+    font-size: 0.7rem;
+    color: var(--greytext);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.3em 0.5em;
+    min-height: auto !important;
+}
+
+.m-recent-clear:active {
+    color: var(--red);
+}
+
+.m-recent-list {
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.light-theme .m-recent-list {
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+.m-recent-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.5em 0.75em;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 0.85rem;
+    min-height: 44px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.light-theme .m-recent-item {
+    border-bottom-color: rgba(0, 0, 0, 0.05);
+}
+
+.m-recent-item:last-child {
+    border-bottom: none;
+}
+
+.m-recent-item:active {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.light-theme .m-recent-item:active {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.m-recent-icon {
+    flex-shrink: 0;
+    font-size: 0.9rem;
+    opacity: 0.5;
+}
+
+.m-recent-query {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.m-recent-arrow {
+    flex-shrink: 0;
+    font-size: 1.1rem;
+    color: var(--greytext);
+}
