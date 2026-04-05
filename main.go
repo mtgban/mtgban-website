@@ -848,6 +848,9 @@ func main() {
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
 
+	// Mobile/desktop view toggle
+	http.HandleFunc("/toggle-mobile", toggleMobileView)
+
 	for _, nav := range ExtraNavs {
 		// Set up logging
 		logFile, err := logfile.New(&logfile.LogFile{

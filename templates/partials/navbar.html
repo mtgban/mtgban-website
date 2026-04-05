@@ -54,5 +54,7 @@
         <a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" alt="Patreon"></a>
         <a {{if .PatreonLogin}}style="display:none"{{end}} href="/discord"><img src="/img/misc/discord.png" alt="Discord"></a>
     </div>
+    <hr class="ban-nav-mobile-divider">
+    <a style="padding: 8px 12px; font-size: 0.85rem; color: var(--greytext); text-decoration: none;" href="#" onclick="window.location='/toggle-mobile?redirect='+encodeURIComponent(window.location.pathname+window.location.search); return false;">Switch to Mobile View</a>
 </div>
 {{end}}
