@@ -884,6 +884,7 @@ func main() {
 	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(ChartDataAPI)))
+	http.Handle("/api/prices/", enforceSigning(http.HandlerFunc(BatchPricesAPI)))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
