@@ -175,10 +175,138 @@ body.mobile {
     max-width: 100%;
 }
 
+
 body.mobile .page-content {
     padding: 0;
     padding-top: 48px; /* space for fixed nav */
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+}
+
+/* Mobile home page */
+.m-home {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: calc(100vh - 48px);
+    padding: 0 1em;
+    box-sizing: border-box;
+}
+
+.m-home-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    margin-top: 25vh;
+    margin-bottom: 1.5em;
+}
+
+.m-home-brand img {
+    height: 48px;
+}
+
+.m-home-brand-text {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--activetext);
+}
+
+.m-home-search-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 1em;
+}
+
+.m-home-search-wrap form {
+    flex: 1;
+    min-width: 0;
+}
+
+.m-home-tools {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4em;
+    margin-bottom: 1em;
+}
+
+.m-home-tool {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    padding: 0.4em 0.6em;
+    font-size: 0.8rem;
+    color: var(--activetext);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.m-home-tool-icon {
+    font-size: 1rem;
+}
+
+.m-home-error {
+    padding: 0.5em 0.75em;
+    margin: 0.5em 0;
+    font-size: 0.85rem;
+    color: var(--red);
+}
+
+.m-home-footer {
+    margin-top: auto;
+    padding: 1.5em 0;
+    text-align: center;
+    width: 100%;
+}
+
+.m-home-game-links {
+    display: flex;
+    justify-content: center;
+    gap: 0.5em;
+    font-size: 0.75rem;
+    color: var(--greytext);
+    margin-bottom: 1em;
+}
+
+.m-home-game-links a {
+    color: var(--greytext);
+    text-decoration: none;
+}
+
+.m-home-login-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 0.75em;
+}
+
+.m-home-login-btn {
+    padding: 0.5em 1.2em;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 6px;
+    text-decoration: none;
+}
+
+.m-home-login-btn.patreon {
+    background: rgba(255, 66, 77, 0.15);
+    color: #ff424d;
+    border: 1px solid rgba(255, 66, 77, 0.3);
+}
+
+.m-home-login-btn.discord {
+    background: rgba(88, 101, 242, 0.15);
+    color: #5865f2;
+    border: 1px solid rgba(88, 101, 242, 0.3);
+}
+
+.m-home-copyright {
+    font-size: 0.7rem;
+    color: var(--greytext);
 }

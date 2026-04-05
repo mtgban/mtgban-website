@@ -1,0 +1,73 @@
+{{define "extra-css"}}
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "content"}}
+<div class="m-home">
+    <div class="m-home-brand">
+        <img src="/img/logo/ban-stroop.png" alt="BAN">
+        <span class="m-home-brand-text">MTG<span class="m-nav-ban">BAN</span></span>
+    </div>
+
+    <div class="m-home-search-wrap">
+        <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
+            <input id="searchbox" class="m-search-input" type="text" name="q"
+                   placeholder="Search for a card or product..."
+                   maxlength="1000" autofocus autocapitalize="none"
+                   onFocus="this.setSelectionRange(0, this.value.length)">
+        </form>
+        <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+    </div>
+    <script type="text/javascript">
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
+    </script>
+
+    <div class="m-home-tools">
+        {{range .Nav}}
+            {{if and (ne .Name "Home") (ne .Class "beta")}}
+                <a class="m-home-tool" href="{{.Link}}">
+                    <span class="m-home-tool-icon">{{.Short}}</span> {{.Name}}
+                </a>
+            {{end}}
+        {{end}}
+    </div>
+
+    <script>lucide.createIcons();</script>
+
+    {{if ne .ErrorMessage ""}}
+        <div class="m-home-error">{{.ErrorMessage}}</div>
+    {{end}}
+
+    <div class="m-home-footer">
+        <div class="m-home-game-links">
+            <a href="https://mtgban.com">Magic: the Gathering</a>
+            <span>|</span>
+            <a href="https://lorcana.mtgban.com">Disney Lorcana</a>
+        </div>
+
+        <div class="m-home-login-row">
+            {{if .PatreonLogin}}
+                {{range $ref, $id := .PatreonIds}}
+                    <a class="m-home-login-btn patreon" href="javascript:window.location = 'http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=' + encodeURIComponent(window.location.href + ';{{$ref}}')">Patreon</a>
+                {{end}}
+                <a class="m-home-login-btn discord" href="/discord">Discord</a>
+            {{else}}
+                <a class="m-home-login-btn discord" href="/discord">Discord</a>
+                <a class="m-home-login-btn patreon" href="/?errmsg=logout">Logout</a>
+            {{end}}
+        </div>
+
+        <div class="m-home-copyright">&copy; 2019&ndash;2026 MTGBAN Inc</div>
+    </div>
+</div>
+{{end}}
+
+{{define "extra-scripts"}}{{end}}
