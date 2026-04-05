@@ -8,12 +8,20 @@
 
 /* Search bar - sticky at top, flush with nav */
 .m-search-bar-sticky {
-    position: sticky;
-    z-index: 50;
+    position: fixed;
+    top: 48px; /* below fixed nav */
+    left: 0;
+    right: 0;
+    z-index: 90;
     background: var(--background);
     padding: 0.35em 0.5em;
-    margin: 0 -0.5em; /* bleed to page edges */
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-sizing: border-box;
+}
+
+/* Pages with a fixed search bar need extra top padding for both nav + search */
+.m-page:has(.m-search-bar-sticky) {
+    padding-top: 52px;
 }
 
 .light-theme .m-search-bar-sticky {
@@ -644,4 +652,41 @@
 
 .light-theme .m-sealed-edition {
     border-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Category jump list in filter sheet */
+.m-sealed-cat-list {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.m-sealed-cat-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45em 0.6em;
+    text-decoration: none;
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 500;
+    min-height: 36px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.light-theme .m-sealed-cat-link {
+    border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+.m-sealed-cat-link:last-child {
+    border-bottom: none;
+}
+
+.m-sealed-cat-link:active {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.light-theme .m-sealed-cat-link:active {
+    background: rgba(0, 0, 0, 0.05);
 }

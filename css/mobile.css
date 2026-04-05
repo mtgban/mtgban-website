@@ -1,4 +1,4 @@
-/* Mobile nav bar */
+/* Mobile nav bar — fixed at top */
 .m-nav {
     display: flex;
     align-items: center;
@@ -7,8 +7,10 @@
     height: 48px;
     background: var(--background);
     border-bottom: 1px solid var(--border);
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
     z-index: 100;
 }
 
@@ -150,15 +152,14 @@ body.mobile .hoverImage {
 /* Global mobile overrides */
 html:has(body.mobile),
 body.mobile {
-    overflow: hidden;
-    overflow-y: auto;
+    overflow-x: clip;
     width: 100%;
     max-width: 100%;
 }
 
 body.mobile .page-content {
     padding: 0;
-    padding-top: 0;
+    padding-top: 48px; /* space for fixed nav */
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;

@@ -49,11 +49,15 @@
 
 {{define "m-sealed-landing"}}
 <div class="m-page">
-    <div class="m-search-wrap">
-        <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
-            <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a product..." value="" maxlength="1000" autofocus autocapitalize="none">
-        </form>
-        <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+    {{/* Sticky search bar + filter */}}
+    <div class="m-search-bar-sticky">
+        <div class="m-search-wrap">
+            <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+                <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a product..." value="" maxlength="1000" autofocus autocapitalize="none">
+            </form>
+            <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+            <button class="m-search-btn m-filter-btn" type="button" title="Jump to category" onclick="document.getElementById('m-sealed-cat-overlay').classList.add('open'); document.getElementById('m-sealed-cat-sheet').classList.add('open');"><i data-lucide="sliders-horizontal"></i></button>
+        </div>
     </div>
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
@@ -63,7 +67,7 @@
 
     {{range $key := .EditionSort}}
         {{$editionList := index $.EditionList $key}}
-        <div class="m-sealed-section">
+        <div class="m-sealed-section" id="m-sealed-{{slug $key}}">
             <div class="m-sealed-section-header">
                 <h2>{{$key}}</h2>
                 <span class="m-sealed-count">{{len $editionList}}</span>
@@ -77,6 +81,23 @@
             </div>
         </div>
     {{end}}
+
+    {{/* Category jump sheet */}}
+    <div class="m-drawer-overlay" id="m-sealed-cat-overlay" onclick="this.classList.remove('open'); document.getElementById('m-sealed-cat-sheet').classList.remove('open');"></div>
+    <div class="m-filter-sheet" id="m-sealed-cat-sheet">
+        <div class="m-drawer-handle" onclick="document.getElementById('m-sealed-cat-overlay').classList.remove('open'); document.getElementById('m-sealed-cat-sheet').classList.remove('open');"><span></span></div>
+        <div class="m-filter-sheet-content">
+            <h3>Jump to Category</h3>
+            <div class="m-sealed-cat-list">
+                {{range $key := .EditionSort}}
+                    {{$editionList := index $.EditionList $key}}
+                    <a class="m-sealed-cat-link" href="#m-sealed-{{slug $key}}" onclick="document.getElementById('m-sealed-cat-overlay').classList.remove('open'); document.getElementById('m-sealed-cat-sheet').classList.remove('open');">
+                        {{$key}} <span class="m-sealed-count">{{len $editionList}}</span>
+                    </a>
+                {{end}}
+            </div>
+        </div>
+    </div>
 
     <script>lucide.createIcons();</script>
 </div>
