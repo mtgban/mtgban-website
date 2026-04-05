@@ -61,6 +61,7 @@ var mobileEnabledPages = []string{
 	"Sealed",
 	"Newspaper",
 	"Sleepers",
+	"Admin",
 }
 
 // filterNavForMobile removes nav entries that don't have mobile templates.
