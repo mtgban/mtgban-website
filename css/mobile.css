@@ -76,6 +76,9 @@
 }
 
 .m-menu-close {
+    position: absolute;
+    top: 0.5em;
+    right: 0.5em;
     font-size: 1.4rem;
     background: none;
     border: none;
