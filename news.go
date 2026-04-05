@@ -1434,6 +1434,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav("Newspaper", sig)
 	pageVars.IsMobile = isMobileRequest(r)
+	if pageVars.IsMobile {
+		pageVars.Nav = filterNavForMobile(pageVars.Nav)
+	}
 
 	// Check if any DB connection was made
 	if Config.DBAddress == "" && Config.NewNewspaperConfigLine == "" {

@@ -43,6 +43,9 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav("Sleepers", sig)
 	pageVars.IsMobile = isMobileRequest(r)
+	if pageVars.IsMobile {
+		pageVars.Nav = filterNavForMobile(pageVars.Nav)
+	}
 
 	// Load the defaul blocklist (same as Search)
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)

@@ -80,6 +80,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav("Search", sig)
 	pageVars.IsMobile = isMobileRequest(r)
+	if pageVars.IsMobile {
+		pageVars.Nav = filterNavForMobile(pageVars.Nav)
+	}
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
