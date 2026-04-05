@@ -167,7 +167,7 @@
                     {{end}}
                 </div>
                 <div class="m-card-info">
-                    <span class="m-card-name" lang="{{$card.LangTag}}">{{$card.Name}}</span>
+                    <span class="m-card-name" lang="{{$card.LangTag}}">{{strip_edition $card.Name $card.Edition $card.Sealed}}</span>
                     <span class="m-card-set">{{$card.Edition}} · #{{$card.Number}}</span>
                 </div>
                 <div class="m-card-badges">
