@@ -185,6 +185,11 @@ body.mobile .page-content {
 }
 
 /* Mobile home page */
+/* Hide nav home button when already on home page */
+body.mobile:has(.m-home) .m-nav-home {
+    visibility: hidden;
+}
+
 .m-home {
     display: flex;
     flex-direction: column;
