@@ -967,6 +967,19 @@ var funcMap = template.FuncMap{
 	"scraper_name": func(s string) string {
 		return scraperName(s)
 	},
+	"strip_edition": func(name, edition string, sealed bool) string {
+		if !sealed || edition == "" {
+			return name
+		}
+		if strings.HasPrefix(name, edition) {
+			shortened := strings.TrimPrefix(name, edition)
+			shortened = strings.TrimLeft(shortened, " :-–—")
+			if shortened != "" {
+				return shortened
+			}
+		}
+		return name
+	},
 	"slug": func(s string) string {
 		s = strings.ToLower(s)
 		s = strings.ReplaceAll(s, " ", "-")
