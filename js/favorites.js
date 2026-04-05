@@ -153,6 +153,7 @@
 
         var html = '<div class="m-fav-header">';
         html += '<span class="m-fav-title">Favorites</span>';
+        html += '<button class="m-fav-refresh" onclick="window.manualRefreshFavorites()" title="Refresh Favorites"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></button>';
         html += '<button class="m-fav-clear" onclick="window.clearFavorites()">Clear</button>';
         html += '</div>';
         html += '<div class="m-fav-list">';
@@ -192,10 +193,89 @@
         if (container) container.innerHTML = '';
     };
 
+    // Refresh stale favorites from server
+    var STALE_MS = 60 * 60 * 1000; // 1 hour
+    var lastRefreshAttempt = 0;
+
+    function refreshFavorites() {
+        var favs = getFavorites();
+        if (favs.length === 0) return;
+
+        // Check if any favorites are stale
+        var now = Date.now();
+        var stale = favs.some(function(f) { return (now - f.t) > STALE_MS; });
+        if (!stale) return;
+
+        doRefresh();
+    }
+
+    function doRefresh() {
+        var favs = getFavorites();
+        if (favs.length === 0) return;
+
+        var ids = favs.map(function(f) { return f.id; }).join(',');
+
+        fetch('/api/prices/?ids=' + encodeURIComponent(ids))
+            .then(function(r) {
+                if (!r.ok) return null;
+                return r.json();
+            })
+            .then(function(data) {
+                if (!data) return;
+
+                var favs = getFavorites();
+                var updated = false;
+
+                favs.forEach(function(f) {
+                    var prices = data[f.id];
+                    if (!prices) return;
+
+                    if (prices.sellPrice !== undefined && prices.sellPrice !== null) {
+                        f.sellPrice = prices.sellPrice;
+                        f.sellVendor = prices.sellVendor || f.sellVendor;
+                        updated = true;
+                    }
+                    if (prices.buyPrice !== undefined && prices.buyPrice !== null) {
+                        f.buyPrice = prices.buyPrice;
+                        f.buyVendor = prices.buyVendor || f.buyVendor;
+                        updated = true;
+                    }
+                    f.t = Date.now();
+                });
+
+                if (updated) {
+                    saveFavorites(favs);
+                    renderFavorites();
+                }
+            })
+            .catch(function() {
+                // Silent failure — prices stay at last known value
+            });
+    }
+
+    function scheduleRefresh() {
+        if (typeof requestIdleCallback === 'function') {
+            requestIdleCallback(refreshFavorites);
+        } else {
+            setTimeout(refreshFavorites, 1500);
+        }
+    }
+
+    // Manual refresh — rate limited to once per hour
+    window.manualRefreshFavorites = function() {
+        var now = Date.now();
+        if ((now - lastRefreshAttempt) < STALE_MS) {
+            return; // Rate limited
+        }
+        lastRefreshAttempt = now;
+        doRefresh();
+    };
+
     // Initialize
     function init() {
         markExistingFavorites();
         renderFavorites();
+        scheduleRefresh();
     }
 
     if (document.readyState === 'loading') {
