@@ -849,6 +849,19 @@
     inset: -4px;
 }
 
+.m-fav-btn {
+    transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.m-fav-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(0.85);
+}
+
+.m-fav-btn.active svg {
+    filter: drop-shadow(0 0 4px rgba(245, 197, 24, 0.4));
+}
+
 .m-fav-btn i,
 .m-fav-btn svg {
     width: 18px;
@@ -1000,6 +1013,15 @@
     content: '';
     position: absolute;
     inset: -4px;
+}
+
+.m-chart-btn {
+    transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.m-chart-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(0.85);
 }
 
 .m-chart-btn i,
