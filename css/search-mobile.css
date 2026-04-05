@@ -507,10 +507,10 @@
 }
 
 .m-drawer-handle span {
-    width: 36px;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.25);
+    width: 40px;
+    height: 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .light-theme .m-drawer-handle span {
