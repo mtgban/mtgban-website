@@ -12,11 +12,12 @@
     top: 48px; /* below fixed nav */
     left: 0;
     right: 0;
-    z-index: 90;
+    z-index: 101; /* above nav (100) so autocomplete dropdown is visible */
     background: var(--background);
     padding: 0.35em 0.5em;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     box-sizing: border-box;
+    overflow: visible;
 }
 
 /* Pages with a fixed search bar need extra top padding for both nav + search */
@@ -37,6 +38,18 @@
 .m-search-wrap form {
     flex: 1;
     min-width: 0;
+    position: relative;
+    z-index: 110;
+}
+
+/* Autocomplete must sit above fixed nav and page content */
+.m-search-wrap .autocomplete-items {
+    z-index: 110;
+}
+
+/* Ensure page doesn't clip autocomplete dropdown */
+.m-page {
+    overflow: visible !important;
 }
 
 .m-search-input {
