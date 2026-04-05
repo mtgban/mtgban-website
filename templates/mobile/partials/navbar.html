@@ -30,5 +30,7 @@
         <a href="https://www.patreon.com/mtgban"><img src="/img/misc/patreon.png" alt="Patreon"></a>
         <a {{if .PatreonLogin}}style="display:none"{{end}} href="/discord"><img src="/img/misc/discord.png" alt="Discord"></a>
     </div>
+    <hr class="m-menu-divider">
+    <a class="m-menu-view-toggle" href="#" onclick="window.location='/toggle-mobile?redirect='+encodeURIComponent(window.location.pathname+window.location.search); return false;">Switch to Desktop View</a>
 </div>
 {{end}}

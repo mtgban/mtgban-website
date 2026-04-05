@@ -123,6 +123,15 @@
     height: 24px;
 }
 
+.m-menu-view-toggle {
+    display: block;
+    padding: 0.5em;
+    font-size: 0.8rem;
+    color: var(--greytext);
+    text-decoration: none;
+    text-align: center;
+}
+
 /* Mobile body: hide ALL desktop chrome */
 body.mobile .ban-nav,
 body.mobile .ban-nav-mobile-overlay,
