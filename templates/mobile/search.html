@@ -13,6 +13,7 @@
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
@@ -47,6 +48,9 @@
 
     {{/* Recent searches - from localStorage */}}
     <div id="m-recent-searches"></div>
+
+    {{/* Favorites - from localStorage */}}
+    <div id="m-favorites"></div>
 
     <script>lucide.createIcons();</script>
 </div>
@@ -141,8 +145,8 @@
     {{range $i, $cardId := .AllKeys}}
         {{$card := (index $.Metadata $cardId)}}
         <div class="m-card">
-            {{/* Card header — tap to show image drawer */}}
-            <div class="m-card-header" onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
+            {{/* Card header - tap to show image drawer */}}
+            <div class="m-card-header" data-setcode="{{$card.SetCode}}" onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
                 <div class="m-card-icon">
                     {{if $card.Keyrune}}
                         <i class="ss {{$card.Keyrune}} ss-fw"></i>
@@ -161,6 +165,7 @@
                     {{if $card.Foil}}<span class="m-badge foil">Foil</span>{{end}}
                     {{if $card.Etched}}<span class="m-badge etched">Etched</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
+                    <button class="m-fav-btn" data-card="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
                 </div>
             </div>
 
