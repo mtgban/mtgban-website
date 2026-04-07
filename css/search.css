@@ -770,6 +770,7 @@
 .price-cond-header {
     display: flex;
     align-items: center;
+    justify-content: center;
     height: calc(var(--price-row-h, 42px) / 2);
     padding: 0 12px;
     box-sizing: border-box;
