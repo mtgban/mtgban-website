@@ -1245,4 +1245,26 @@
     .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel {
         display: block !important;
     }
+
+    /* Column headers replacing hidden tabs */
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel::before {
+        content: "Sellers";
+        display: block;
+        padding: 0.4em 0.75em;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--greytext);
+        border-bottom: 1px solid var(--border);
+        text-align: center;
+        background: rgba(30, 144, 255, 0.05);
+    }
+
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="buyers"]::before {
+        content: "Buyers";
+    }
+
+    /* Visual separator between columns */
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="buyers"] {
+        border-left: 1px solid var(--border);
+    }
 }
