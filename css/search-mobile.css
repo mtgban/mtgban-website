@@ -1069,7 +1069,8 @@
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 16px 16px 0 0;
     transform: translateY(100%);
-    transition: transform 250ms ease;
+    transition: transform 250ms ease, visibility 0s 250ms;
+    visibility: hidden;
     padding: 0.5em 0.75em 1em;
     height: 65vh;
     box-sizing: border-box;
@@ -1079,6 +1080,8 @@
 
 .m-chart-drawer.open {
     transform: translateY(0);
+    visibility: visible;
+    transition: transform 250ms ease, visibility 0s 0s;
 }
 
 .m-chart-header {
@@ -1221,19 +1224,26 @@
     color: var(--dodgerblue);
 }
 
-/* Landscape: side-by-side Sellers / Buyers */
+/* Inline card image - hidden in portrait */
+.m-card-img-landscape {
+    display: none;
+}
+
+/* Landscape: side-by-side Sellers / Buyers with inline card image */
 @media (orientation: landscape) {
 
-    /* Only apply two-column grid when both panels exist */
+    /* 3-column grid: image | sellers | buyers */
     .m-card:has(.m-tab-panel + .m-tab-panel) {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: auto 1fr 1fr;
+        grid-template-areas:
+            "image  header  header"
+            "image  pills   pills"
+            "image  sellers buyers";
     }
 
-    /* Full-width spanning elements */
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-card-header,
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-cond-pills {
-        grid-column: 1 / -1;
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-card-header {
+        grid-area: header;
     }
 
     /* Hide tab buttons — both panels are visible */
@@ -1241,9 +1251,36 @@
         display: none;
     }
 
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-cond-pills {
+        grid-area: pills;
+    }
+
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-card-img-landscape {
+        grid-area: image;
+        display: block;
+        width: 175px;
+        height: auto;
+        padding: 0.5em;
+        box-sizing: border-box;
+        object-fit: contain;
+        align-self: center;
+        border-right: 1px solid var(--border);
+    }
+
     /* Force both panels visible regardless of .active state */
     .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel {
         display: block !important;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="sellers"] {
+        grid-area: sellers;
+    }
+
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="buyers"] {
+        grid-area: buyers;
+        border-left: 1px solid var(--border);
     }
 
     /* Column headers replacing hidden tabs */
@@ -1261,11 +1298,6 @@
 
     .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="buyers"]::before {
         content: "Buyers";
-    }
-
-    /* Visual separator between columns */
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="buyers"] {
-        border-left: 1px solid var(--border);
     }
 
     /* Tighter vertical spacing in landscape */
@@ -1296,13 +1328,45 @@
         font-size: 0.8rem;
     }
 
-    /* Prevent panel content from expanding beyond column */
-    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel {
-        min-width: 0;
-        overflow: hidden;
-    }
-
     .m-best-price summary {
         padding-left: calc(0.5rem - 3px);
+    }
+
+    /* Chart drawer: slide from right instead of bottom in landscape */
+    .m-chart-drawer {
+        top: 0;
+        bottom: 0;
+        right: 0;
+        left: auto;
+        width: 55vw;
+        height: 100%;
+        border-top: none;
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 0;
+        transform: translateX(100%);
+        padding: 0.5em 0.75em 0.75em;
+    }
+
+    .m-chart-drawer.open {
+        transform: translateX(0);
+    }
+
+    /* Rotate the drag handle for horizontal drawer */
+    .m-chart-drawer > .m-drawer-handle span {
+        width: 5px;
+        height: 40px;
+    }
+
+    .m-chart-drawer > .m-drawer-handle {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        padding: 0 0.3em;
+    }
+
+    /* Legend wraps to 2 columns in the narrower panel */
+    .m-chart-legend {
+        grid-template-columns: 1fr 1fr;
     }
 }
