@@ -1295,4 +1295,14 @@
     .m-vendor-price {
         font-size: 0.8rem;
     }
+
+    /* Prevent panel content from expanding beyond column */
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel {
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .m-best-price summary {
+        padding-left: calc(0.5rem - 3px);
+    }
 }
