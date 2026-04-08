@@ -205,6 +205,9 @@
             </div>
             {{end}}
 
+            {{/* Inline card image - hidden in portrait, visible in landscape */}}
+            <img class="m-card-img-landscape" src="{{$card.ImageURL}}" loading="lazy" alt="{{$card.Name}}">
+
             {{/* Sellers panel */}}
             {{if $hasSellers}}
             <div class="m-tab-panel active" id="sellers-{{$cardId}}">
