@@ -5,20 +5,42 @@
     box-sizing: border-box;
 }
 
+/* Fixed header + toolbar bar below nav */
+.m-sets-sticky {
+    position: fixed;
+    top: 48px;
+    left: 0;
+    right: 0;
+    z-index: 101;
+    background: var(--background);
+    padding: 0.4em 0.5em 0.35em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-sizing: border-box;
+}
+
+.light-theme .m-sets-sticky {
+    border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Push card list below the fixed header */
+.m-sets-list {
+    padding-top: 150px;
+}
+
 .m-sets-header h1 {
     font-size: 1.3rem;
-    margin: 0.5em 0 0.15em;
+    margin: 0 0 0.1em;
 }
 
 .m-sets-subtitle {
     font-size: 0.75rem;
     color: var(--greytext);
-    margin: 0 0 0.75em;
+    margin: 0 0 0.5em;
 }
 
 /* Toolbar */
 .m-sets-toolbar {
-    margin-bottom: 0.75em;
+    margin-bottom: 0;
 }
 
 .m-sets-toolbar-row {
@@ -201,17 +223,21 @@
 /* Finish tags row */
 .m-set-finishes {
     display: flex;
-    gap: 0.25em;
+    gap: 0.4em;
     flex-wrap: wrap;
 }
 
 .m-set-finish-tag {
-    font-size: 0.65rem;
-    padding: 0.1em 0.5em;
-    border-radius: 3px;
+    font-size: 0.7rem;
+    padding: 0.2em 0.55em;
+    border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.15);
     color: var(--greytext);
     text-decoration: none;
+    min-height: 28px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
 }
 
 .light-theme .m-set-finish-tag {
@@ -260,20 +286,22 @@
 .m-set-colors {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25em;
+    gap: 0.4em;
     margin-bottom: 0.35em;
 }
 
 .m-set-color-tag {
     display: inline-flex;
     align-items: center;
-    gap: 0.25em;
-    font-size: 0.65rem;
-    padding: 0.1em 0.5em;
-    border-radius: 3px;
+    gap: 0.3em;
+    font-size: 0.7rem;
+    padding: 0.2em 0.55em;
+    border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--greytext);
     text-decoration: none;
+    min-height: 28px;
+    box-sizing: border-box;
 }
 
 .light-theme .m-set-color-tag {
@@ -284,14 +312,18 @@
 .m-set-rarities {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.25em;
+    gap: 0.4em;
 }
 
 .m-set-rarity-tag {
-    font-size: 0.65rem;
-    padding: 0.1em 0.5em;
-    border-radius: 3px;
+    font-size: 0.7rem;
+    padding: 0.2em 0.55em;
+    border-radius: 4px;
     text-decoration: none;
+    min-height: 28px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
 }
 
 .m-set-rarity-tag.mythic {

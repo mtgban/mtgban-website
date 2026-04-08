@@ -5,26 +5,28 @@
 
 {{define "content"}}
 <div class="m-sets-page">
-    <div class="m-sets-header">
-        <h1>Editions</h1>
-        <p class="m-sets-subtitle">
-            Tracking <strong>{{.TotalSets}}</strong> editions for
-            <strong>{{.TotalCards}}</strong> cards over
-            <strong>{{.TotalUnique}}</strong> printings.
-        </p>
-    </div>
-
-    <div class="m-sets-toolbar">
-        <div class="m-sets-toolbar-row">
-            <input class="m-sets-filter" type="text" id="setsFilter"
-                   placeholder="Filter editions..." oninput="filterEditions()">
-            <button class="m-sets-toggle" id="colorsBtn" onclick="toggleColors()">Show Colors</button>
+    <div class="m-sets-sticky">
+        <div class="m-sets-header">
+            <h1>Editions</h1>
+            <p class="m-sets-subtitle">
+                Tracking <strong>{{.TotalSets}}</strong> editions for
+                <strong>{{.TotalCards}}</strong> cards over
+                <strong>{{.TotalUnique}}</strong> printings.
+            </p>
         </div>
-        <div class="m-sets-sort">
-            <span class="m-sets-sort-label">Sort</span>
-            <a class="m-sets-sort-link{{if not .SortOption}} active{{end}}" href="/sets">Date</a>
-            <a class="m-sets-sort-link{{if eq .SortOption "name"}} active{{end}}" href="/sets?sort=name">Name</a>
-            <a class="m-sets-sort-link{{if eq .SortOption "size"}} active{{end}}" href="/sets?sort=size">Size</a>
+
+        <div class="m-sets-toolbar">
+            <div class="m-sets-toolbar-row">
+                <input class="m-sets-filter" type="text" id="setsFilter"
+                       placeholder="Filter editions..." oninput="filterEditions()">
+                <button class="m-sets-toggle" id="colorsBtn" onclick="toggleColors()">Show Colors</button>
+            </div>
+            <div class="m-sets-sort">
+                <span class="m-sets-sort-label">Sort</span>
+                <a class="m-sets-sort-link{{if not .SortOption}} active{{end}}" href="/sets">Date</a>
+                <a class="m-sets-sort-link{{if eq .SortOption "name"}} active{{end}}" href="/sets?sort=name">Name</a>
+                <a class="m-sets-sort-link{{if eq .SortOption "size"}} active{{end}}" href="/sets?sort=size">Size</a>
+            </div>
         </div>
     </div>
 
