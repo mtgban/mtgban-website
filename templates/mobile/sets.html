@@ -19,7 +19,7 @@
             <div class="m-sets-toolbar-row">
                 <input class="m-sets-filter" type="text" id="setsFilter"
                        placeholder="Filter editions..." oninput="filterEditions()">
-                <button class="m-sets-toggle" id="colorsBtn" onclick="toggleColors()">Show Colors</button>
+                <button class="m-sets-toggle" id="colorsBtn" onclick="toggleColors()">Show Details</button>
             </div>
             <div class="m-sets-sort">
                 <span class="m-sets-sort-label">Sort</span>
@@ -109,10 +109,10 @@ function toggleColors() {
     var btn = document.getElementById('colorsBtn');
     list.classList.toggle('show-colors');
     if (list.classList.contains('show-colors')) {
-        btn.textContent = 'Hide Colors';
+        btn.textContent = 'Hide Details';
         btn.classList.add('active');
     } else {
-        btn.textContent = 'Show Colors';
+        btn.textContent = 'Show Details';
         btn.classList.remove('active');
     }
 }
