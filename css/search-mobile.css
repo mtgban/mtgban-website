@@ -1267,4 +1267,32 @@
     .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel[id^="buyers"] {
         border-left: 1px solid var(--border);
     }
+
+    /* Tighter vertical spacing in landscape */
+    .m-card-header {
+        padding: 0.35em 0.75em;
+        min-height: 36px;
+    }
+
+    .m-cond-pills {
+        padding: 0.25em 0.75em;
+    }
+
+    .m-vendor-row summary {
+        min-height: 38px;
+        padding: 0 0.75rem 0 0.5rem;
+    }
+
+    /* Narrower price column to fit landscape half-width */
+    .m-vendor-right {
+        grid-template-columns: 5em 2em;
+    }
+
+    .m-vendor-name {
+        font-size: 0.8rem;
+    }
+
+    .m-vendor-price {
+        font-size: 0.8rem;
+    }
 }
