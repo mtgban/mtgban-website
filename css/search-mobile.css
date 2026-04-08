@@ -1232,6 +1232,47 @@
 /* Landscape: side-by-side Sellers / Buyers with inline card image */
 @media (orientation: landscape) {
 
+    /* Navbar inline search: show search in navbar, hide standalone bar */
+    .m-nav-search {
+        display: flex;
+        align-items: center;
+        gap: 0.35em;
+        flex: 1;
+        min-width: 0;
+        margin: 0 0.75em;
+        position: relative;
+        z-index: 110;
+    }
+
+    .m-nav-search form {
+        flex: 1;
+        min-width: 0;
+        position: relative;
+    }
+
+    /* Autocomplete dropdown from navbar search */
+    .m-nav-search .autocomplete-items {
+        z-index: 110;
+    }
+
+    /* Show filter button only when filter overlay exists on page */
+    .m-nav-filter-btn {
+        display: none;
+    }
+
+    body:has(#m-filter-overlay) .m-nav-filter-btn {
+        display: flex;
+    }
+
+    .m-search-bar-sticky {
+        display: none !important;
+    }
+
+    /* Reclaim the space: page no longer needs extra top padding for search bar */
+    .m-page:has(.m-search-bar-sticky) {
+        padding-top: 0;
+    }
+
     /* 3-column grid: image | sellers | buyers */
     .m-card:has(.m-tab-panel + .m-tab-panel) {
         display: grid;
@@ -1368,5 +1409,11 @@
     /* Legend wraps to 2 columns in the narrower panel */
     .m-chart-legend {
         grid-template-columns: 1fr 1fr;
+    }
+
+    /* Image drawer: hide in landscape since card images are already visible inline */
+    .m-drawer,
+    .m-drawer-overlay {
+        display: none !important;
     }
 }
