@@ -79,6 +79,14 @@
     </div>
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
+        // Init navbar search for landscape mode
+        (function() {
+            var navBox = document.getElementById("navsearchbox");
+            var navForm = document.getElementById("navsearchform");
+            if (navBox && navForm) {
+                autocomplete(navForm, navBox, "true");
+            }
+        })();
     </script>
 
     <h1 class="m-sealed-title">Sealed Products</h1>
@@ -135,6 +143,15 @@
     </div>
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+        // Init navbar search for landscape mode
+        (function() {
+            var navBox = document.getElementById("navsearchbox");
+            var navForm = document.getElementById("navsearchform");
+            if (navBox && navForm) {
+                navBox.value = {{.SearchQuery | printf "%q"}};
+                autocomplete(navForm, navBox, {{if .IsSealed}}"true"{{else}}"false"{{end}});
+            }
+        })();
     </script>
 
     {{/* Set data for filter dropdown - populated in extra-scripts after DOM ready */}}
