@@ -1220,3 +1220,29 @@
 .m-fav-refresh:active {
     color: var(--dodgerblue);
 }
+
+/* Landscape: side-by-side Sellers / Buyers */
+@media (orientation: landscape) {
+
+    /* Only apply two-column grid when both panels exist */
+    .m-card:has(.m-tab-panel + .m-tab-panel) {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    /* Full-width spanning elements */
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-card-header,
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-cond-pills {
+        grid-column: 1 / -1;
+    }
+
+    /* Hide tab buttons — both panels are visible */
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tabs {
+        display: none;
+    }
+
+    /* Force both panels visible regardless of .active state */
+    .m-card:has(.m-tab-panel + .m-tab-panel) > .m-tab-panel {
+        display: block !important;
+    }
+}
