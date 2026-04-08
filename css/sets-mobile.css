@@ -163,7 +163,6 @@
 .m-set-card-header {
     display: flex;
     align-items: center;
-    gap: 0.5em;
     margin-bottom: 0.35em;
 }
 
@@ -191,28 +190,16 @@
     text-overflow: ellipsis;
 }
 
-.m-set-code {
-    font-size: 0.6rem;
-    color: var(--greytext);
-    background: rgba(255, 255, 255, 0.08);
-    padding: 0.1em 0.35em;
-    border-radius: 3px;
-    flex-shrink: 0;
-    font-family: var(--font-mono, monospace);
-}
-
-.light-theme .m-set-code {
-    background: rgba(0, 0, 0, 0.06);
-}
-
 .m-set-stats {
     flex-shrink: 0;
     text-align: right;
 }
 
-.m-set-size {
+.m-set-code {
+    font-size: 0.75rem;
     font-weight: 700;
-    font-size: 0.9rem;
+    color: var(--greytext);
+    font-family: var(--font-mono, monospace);
 }
 
 .m-set-date {
