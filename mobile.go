@@ -58,6 +58,7 @@ func toggleMobileView(w http.ResponseWriter, r *http.Request) {
 var mobileEnabledPages = []string{
 	"Home",
 	"Search",
+	"Sets",
 	"Sealed",
 	"Newspaper",
 	"Sleepers",
