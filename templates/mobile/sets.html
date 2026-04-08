@@ -1,0 +1,118 @@
+{{define "extra-css"}}
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/sets-mobile.css?hash={{.Hash}}">
+{{end}}
+
+{{define "content"}}
+<div class="m-sets-page">
+    <div class="m-sets-header">
+        <h1>Editions</h1>
+        <p class="m-sets-subtitle">
+            Tracking <strong>{{.TotalSets}}</strong> editions for
+            <strong>{{.TotalCards}}</strong> cards over
+            <strong>{{.TotalUnique}}</strong> printings.
+        </p>
+    </div>
+
+    <div class="m-sets-toolbar">
+        <div class="m-sets-toolbar-row">
+            <input class="m-sets-filter" type="text" id="setsFilter"
+                   placeholder="Filter editions..." oninput="filterEditions()">
+            <button class="m-sets-toggle" id="colorsBtn" onclick="toggleColors()">Show Colors</button>
+        </div>
+        <div class="m-sets-sort">
+            <span class="m-sets-sort-label">Sort</span>
+            <a class="m-sets-sort-link{{if not .SortOption}} active{{end}}" href="/sets">Date</a>
+            <a class="m-sets-sort-link{{if eq .SortOption "name"}} active{{end}}" href="/sets?sort=name">Name</a>
+            <a class="m-sets-sort-link{{if eq .SortOption "size"}} active{{end}}" href="/sets?sort=size">Size</a>
+        </div>
+    </div>
+
+    <div class="m-sets-list" id="setsList">
+        {{range .FlatEditions}}
+        {{$edition := .}}
+        <a class="m-set-card{{if .IsChild}} child{{end}}" href="/search?q=s:{{.Code}}" data-name="{{.Name}}">
+            <div class="m-set-card-header">
+                <div class="m-set-icon">
+                    {{if .Keyrune}}
+                        <i class="ss ss-{{.Keyrune}} ss-1x ss-fw"></i>
+                    {{else}}
+                        <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+                            <circle r="11" cx="12" cy="12" fill="var(--normal)" stroke="var(--normal)"/>
+                            <text font-size="12" font-family="monospace" font-weight="bold" x="12" y="12" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{.Code}}</text>
+                        </svg>
+                    {{end}}
+                </div>
+                <span class="m-set-name">{{.Name}}</span>
+                <span class="m-set-code">{{.Code}}</span>
+                <div class="m-set-stats">
+                    <div class="m-set-size">{{.Size}}</div>
+                    <div class="m-set-date">{{.FmtDate}}</div>
+                </div>
+            </div>
+
+            {{if .Finishes}}
+            <div class="m-set-finishes">
+                {{range .Finishes}}
+                    <span class="m-set-finish-tag {{.Query}}" onclick="event.preventDefault(); window.location='/search?q=s:{{$edition.Code}}%20f:{{.Query}}';">{{.Label}}</span>
+                {{end}}
+            </div>
+            {{end}}
+
+            {{if or .ColorHex .Rarities}}
+            <div class="m-set-extra">
+                {{if .ColorHex}}
+                <div class="m-set-extra-label">Colors</div>
+                <div class="m-set-colors">
+                    {{range .ColorHex}}
+                        <span class="m-set-color-tag" onclick="event.preventDefault(); window.location='/search?q=s:{{$edition.Code}}%20c:{{.Name}}';">
+                            <svg height="10" width="10"><circle r="5" cx="5" cy="5" fill="{{.Hex}}"/></svg>
+                            {{.Name}}
+                        </span>
+                    {{end}}
+                </div>
+                {{end}}
+                {{if .Rarities}}
+                <div class="m-set-extra-label">Rarities</div>
+                <div class="m-set-rarities">
+                    {{range .Rarities}}
+                        <span class="m-set-rarity-tag {{.}}" onclick="event.preventDefault(); window.location='/search?q=s:{{$edition.Code}}%20r:{{.}}';">{{.}}</span>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+        </a>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script>
+function filterEditions() {
+    var query = document.getElementById('setsFilter').value.toLowerCase();
+    document.querySelectorAll('.m-set-card').forEach(function(card) {
+        var name = (card.getAttribute('data-name') || '').toLowerCase();
+        if (name.indexOf(query) !== -1) {
+            card.classList.remove('filtered-out');
+        } else {
+            card.classList.add('filtered-out');
+        }
+    });
+}
+
+function toggleColors() {
+    var list = document.getElementById('setsList');
+    var btn = document.getElementById('colorsBtn');
+    list.classList.toggle('show-colors');
+    if (list.classList.contains('show-colors')) {
+        btn.textContent = 'Hide Colors';
+        btn.classList.add('active');
+    } else {
+        btn.textContent = 'Show Colors';
+        btn.classList.remove('active');
+    }
+}
+</script>
+{{end}}
