@@ -874,6 +874,14 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     {{if not $condsEntry}}
                                         <div class="no-offers"><i>No offers</i></div>
                                     {{end}}
+                                    {{$maxBL := 0.0}}
+                                    {{range $cond := $.CondKeys}}
+                                        {{if ne $cond "INDEX"}}
+                                            {{range (index $condsEntry $cond)}}
+                                                {{if and (ne .Shorthand "SYP") (gt .Price $maxBL)}}{{$maxBL = .Price}}{{end}}
+                                            {{end}}
+                                        {{end}}
+                                    {{end}}
                                     {{range $conditions := $.CondKeys}}
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if ne $conditions "INDEX"}}
@@ -901,8 +909,10 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 {{if eq .Shorthand "TCGDirectNet"}}
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
+                                                {{$isBest := false}}
+                                                {{if and (ne .Shorthand "SYP") (gt $maxBL 0.0) (eq .Price $maxBL)}}{{$isBest = true}}{{end}}
                                                 <span class="price-right has-buylist-extra">
-                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
+                                                <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if $isBest}} price-best{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if $isBest}}title="Highest buylist price"{{end}}>
                                                     {{if ne .Shorthand "SYP"}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
                                                     {{else}}<span class="cur">#</span><span class="amt">{{.Quantity}}</span>
                                                     {{end}}
