@@ -563,8 +563,72 @@ function hideCardDrawer() {
                     g.classList.remove('active');
                 }
             });
+
+            // Recalculate best price badges after switching condition
+            recalcBestBadges(card);
         });
     });
 })();
+
+// Recalculate BEST badge across all active groups (including INDEX) per panel
+function recalcBestBadges(card) {
+    card.querySelectorAll('.m-tab-panel').forEach(function(panel) {
+        // Remove all existing best badges and styling
+        panel.querySelectorAll('.m-best-price').forEach(function(r) { r.classList.remove('m-best-price'); });
+        panel.querySelectorAll('.m-best-badge').forEach(function(b) { b.remove(); });
+
+        // Find lowest price across all active groups in this panel
+        var bestPrice = Infinity;
+        var bestRow = null;
+        panel.querySelectorAll('.m-cond-group.active .m-vendor-row:not(.m-vendor-locked)').forEach(function(row) {
+            var priceEl = row.querySelector('.m-vendor-price');
+            if (!priceEl) return;
+            var summary = row.querySelector('summary');
+            var target = summary || row;
+            var price = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
+            if (!isNaN(price) && price > 0) {
+                var isBuyPanel = panel.id && panel.id.indexOf('buyers-') === 0;
+                if (isBuyPanel ? price > bestPrice : price < bestPrice) {
+                    bestPrice = price;
+                    bestRow = row;
+                }
+                // Reset: for buyers, we want highest price
+                if (isBuyPanel && bestPrice === Infinity) {
+                    bestPrice = -Infinity;
+                }
+            }
+        });
+        // Re-init for buyers: find highest
+        if (panel.id && panel.id.indexOf('buyers-') === 0) {
+            bestPrice = -Infinity;
+            bestRow = null;
+            panel.querySelectorAll('.m-cond-group.active .m-vendor-row:not(.m-vendor-locked)').forEach(function(row) {
+                var priceEl = row.querySelector('.m-vendor-price');
+                if (!priceEl) return;
+                var price = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
+                if (!isNaN(price) && price > bestPrice) {
+                    bestPrice = price;
+                    bestRow = row;
+                }
+            });
+        }
+
+        if (bestRow) {
+            bestRow.classList.add('m-best-price');
+            var nameEl = bestRow.querySelector('.m-vendor-name');
+            if (nameEl && !nameEl.querySelector('.m-best-badge')) {
+                var badge = document.createElement('span');
+                badge.className = 'm-best-badge';
+                badge.textContent = 'Best';
+                nameEl.appendChild(badge);
+            }
+        }
+    });
+}
+
+// Run on page load for all cards
+document.querySelectorAll('.m-card').forEach(function(card) {
+    recalcBestBadges(card);
+});
 </script>
 {{end}}

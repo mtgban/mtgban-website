@@ -37,46 +37,40 @@
         var isFoil = card.querySelector('.m-badge.foil') !== null;
         var isEtched = card.querySelector('.m-badge.etched') !== null;
 
-        // Get best sell price + vendor name (look for Best badge, skip INDEX group)
+        // Get best sell price + vendor name (use Best badge, which accounts for INDEX)
         var sellPrice = null;
         var sellVendor = '';
         var sellersPanel = card.querySelector('[id^="sellers-"]');
         if (sellersPanel) {
-            var activeGroup = sellersPanel.querySelector('.m-cond-group.active:not([data-cond="INDEX"])');
-            if (activeGroup) {
-                var bestRow = activeGroup.querySelector('.m-best-price') || activeGroup.querySelector('.m-vendor-row:not(.m-vendor-locked)');
-                if (bestRow) {
-                    var priceEl = bestRow.querySelector('.m-vendor-price');
-                    if (priceEl) {
-                        var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-                        if (!isNaN(parsed)) sellPrice = parsed;
-                    }
-                    var nameEl = bestRow.querySelector('.m-vendor-name');
-                    if (nameEl) {
-                        sellVendor = nameEl.textContent.replace('Best', '').trim();
-                    }
+            var bestRow = sellersPanel.querySelector('.m-best-price');
+            if (bestRow) {
+                var priceEl = bestRow.querySelector('.m-vendor-price');
+                if (priceEl) {
+                    var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
+                    if (!isNaN(parsed)) sellPrice = parsed;
+                }
+                var nameEl = bestRow.querySelector('.m-vendor-name');
+                if (nameEl) {
+                    sellVendor = nameEl.textContent.replace('Best', '').trim();
                 }
             }
         }
 
-        // Get best buy price + vendor name (look for Best badge, skip INDEX group)
+        // Get best buy price + vendor name (use Best badge, which accounts for INDEX)
         var buyPrice = null;
         var buyVendor = '';
         var buyersPanel = card.querySelector('[id^="buyers-"]');
         if (buyersPanel) {
-            var activeGroup = buyersPanel.querySelector('.m-cond-group.active:not([data-cond="INDEX"])');
-            if (activeGroup) {
-                var bestRow = activeGroup.querySelector('.m-best-price') || activeGroup.querySelector('.m-vendor-row:not(.m-vendor-locked)');
-                if (bestRow) {
-                    var priceEl = bestRow.querySelector('.m-vendor-price');
-                    if (priceEl) {
-                        var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-                        if (!isNaN(parsed)) buyPrice = parsed;
-                    }
-                    var nameEl = bestRow.querySelector('.m-vendor-name');
-                    if (nameEl) {
-                        buyVendor = nameEl.textContent.replace('Best', '').trim();
-                    }
+            var bestRow = buyersPanel.querySelector('.m-best-price');
+            if (bestRow) {
+                var priceEl = bestRow.querySelector('.m-vendor-price');
+                if (priceEl) {
+                    var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
+                    if (!isNaN(parsed)) buyPrice = parsed;
+                }
+                var nameEl = bestRow.querySelector('.m-vendor-name');
+                if (nameEl) {
+                    buyVendor = nameEl.textContent.replace('Best', '').trim();
                 }
             }
         }
