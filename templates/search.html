@@ -901,16 +901,18 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 {{if eq .Shorthand "TCGDirectNet"}}
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
-                                                <span class="price-right">
+                                                <span class="price-right has-buylist-extra">
                                                 <span class="price{{if $blPriceWarn}} price-warn{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
                                                     {{if ne .Shorthand "SYP"}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
                                                     {{else}}<span class="cur">#</span><span class="amt">{{.Quantity}}</span>
                                                     {{end}}
                                                 </span>
-                                                <span class="qty"
+                                                <span class="buylist-extra"
                                                     data-ratio='{{if and .Ratio (eq $conditions "NM")}}{{printf "%.02f" .Ratio}}{{end}}'
                                                     data-credit='{{if .Credit}}{{printf "%.02f" .Credit}}{{end}}'
                                                     data-marketcredit='{{if .MarketCredit}}{{printf "%.02f" .MarketCredit}}{{end}}'>
+                                                </span>
+                                                <span class="qty">
                                                     {{if and .Quantity (eq $conditions "NM")}}
                                                         {{.Quantity}}
                                                     {{end}}
@@ -988,7 +990,7 @@ Sims are not required for pre-constructed decks and other products where the sam
             }
         }
 
-        document.querySelectorAll(".price-right .qty[data-ratio]").forEach(renderCell);
+        document.querySelectorAll(".buylist-extra[data-ratio]").forEach(renderCell);
     })();
 </script>
     <script>
