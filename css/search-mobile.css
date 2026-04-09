@@ -387,6 +387,8 @@
     box-sizing: border-box;
 }
 
+
+
 /* Detail rows share the exact same layout rules as summary */
 .m-vendor-row .m-detail-row {
     display: flex;
@@ -1277,6 +1279,7 @@
     .m-card:has(.m-tab-panel + .m-tab-panel) {
         display: grid;
         grid-template-columns: auto 1fr 1fr;
+        grid-template-rows: auto auto 1fr;
         grid-template-areas:
             "image  header  header"
             "image  pills   pills"
@@ -1304,7 +1307,7 @@
         padding: 0.5em;
         box-sizing: border-box;
         object-fit: contain;
-        align-self: center;
+        align-self: start;
         border-right: 1px solid var(--border);
     }
 
