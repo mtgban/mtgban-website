@@ -1,6 +1,281 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/guide.css?hash={{.Hash}}">
+{{end}}
+
+{{define "extra-head"}}
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+{{end}}
+
 {{define "content"}}
-<div style="padding: 2em; text-align: center;">
-    <h1>Guide</h1>
-    <p>Coming soon.</p>
+<div class="guide-container">
+    <nav class="guide-sidebar" id="guide-sidebar">
+        <div class="guide-sidebar-header">
+            <input class="guide-filter-input" id="guide-filter" type="text"
+                   placeholder="Filter sections..." autocomplete="off" />
+        </div>
+        <div class="guide-sidebar-nav" id="guide-sidebar-nav">
+            <!-- Built by JS -->
+        </div>
+    </nav>
+
+    <main class="guide-main" id="guide-main">
+        <div class="guide-hero">
+            <h1>MTGBAN Guide</h1>
+            <p class="guide-hero-sub">Search syntax, tools, and power user tips</p>
+            <div class="guide-hero-shortcut">
+                Press <kbd>Ctrl+K</kbd> or <kbd>Cmd+K</kbd> to open the command palette from any page
+            </div>
+        </div>
+        <div id="guide-sections">
+            <!-- Built by JS -->
+        </div>
+    </main>
 </div>
+
+<script>
+(function() {
+    var data = window.__BAN_GUIDE;
+    if (!data || !data.sections) return;
+
+    var sections = data.sections;
+    var sidebarNav = document.getElementById('guide-sidebar-nav');
+    var sectionsContainer = document.getElementById('guide-sections');
+
+    // Group sections by category in order
+    var categories = [];
+    var categoryMap = {};
+    for (var i = 0; i < sections.length; i++) {
+        var sec = sections[i];
+        if (!categoryMap[sec.category]) {
+            categoryMap[sec.category] = [];
+            categories.push(sec.category);
+        }
+        categoryMap[sec.category].push(sec);
+    }
+
+    // ── Build sidebar nav ──
+    for (var c = 0; c < categories.length; c++) {
+        var catName = categories[c];
+        var catHeader = document.createElement('div');
+        catHeader.className = 'guide-nav-category';
+        catHeader.setAttribute('data-category', catName);
+        catHeader.textContent = catName;
+        sidebarNav.appendChild(catHeader);
+
+        var catSections = categoryMap[catName];
+        for (var s = 0; s < catSections.length; s++) {
+            var item = catSections[s];
+            var link = document.createElement('a');
+            link.className = 'guide-nav-link';
+            link.href = '#' + item.id;
+            link.setAttribute('data-section', item.id);
+            link.setAttribute('data-category', catName);
+            link.innerHTML = '<i data-lucide="' + escapeAttr(item.icon) + '"></i>' +
+                '<span>' + escapeHtml(item.title) + '</span>';
+            sidebarNav.appendChild(link);
+        }
+    }
+
+    // ── Build main content ──
+    for (var c = 0; c < categories.length; c++) {
+        var catName = categories[c];
+
+        var divider = document.createElement('div');
+        divider.className = 'guide-category-divider';
+        divider.setAttribute('data-category', catName);
+        var h2 = document.createElement('h2');
+        h2.textContent = catName;
+        divider.appendChild(h2);
+        sectionsContainer.appendChild(divider);
+
+        var catSections = categoryMap[catName];
+        for (var s = 0; s < catSections.length; s++) {
+            var item = catSections[s];
+            var section = document.createElement('section');
+            section.className = 'guide-section';
+            section.id = item.id;
+            section.setAttribute('data-category', catName);
+            section.setAttribute('data-title', item.title);
+            section.setAttribute('data-summary', item.summary || '');
+            section.setAttribute('data-keywords', (item.keywords || []).join(' '));
+
+            var html = '';
+
+            // Header
+            html += '<div class="guide-section-header">';
+            html += '<i data-lucide="' + escapeAttr(item.icon) + '"></i>';
+            html += '<h3>' + escapeHtml(item.title) + '</h3>';
+            html += '</div>';
+
+            // Description (contains HTML — render as innerHTML)
+            if (item.content && item.content.description) {
+                html += '<div class="guide-section-desc">' + item.content.description + '</div>';
+            }
+
+            // Table
+            if (item.content && item.content.table && item.content.table.length > 0) {
+                html += '<table class="guide-table">';
+                html += '<thead><tr><th>Option</th><th>Description</th></tr></thead>';
+                html += '<tbody>';
+                for (var t = 0; t < item.content.table.length; t++) {
+                    var row = item.content.table[t];
+                    html += '<tr><td><code>' + escapeHtml(row.value) + '</code></td>';
+                    html += '<td>' + escapeHtml(row.short) + '</td></tr>';
+                }
+                html += '</tbody></table>';
+            }
+
+            // Examples
+            if (item.content && item.content.examples && item.content.examples.length > 0) {
+                html += '<div class="guide-examples">';
+                for (var e = 0; e < item.content.examples.length; e++) {
+                    var ex = item.content.examples[e];
+                    html += '<div class="guide-example">';
+                    html += '<a class="guide-example-query" href="/search?q=' + encodeURIComponent(ex.query) + '">' + escapeHtml(ex.query) + '</a>';
+                    html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
+                    html += '<button class="guide-example-copy" onclick="copySnippet(this, \'' + escapeJs(ex.query) + '\')" title="Copy to clipboard">';
+                    html += '<i data-lucide="copy"></i>';
+                    html += '</button>';
+                    html += '</div>';
+                }
+                html += '</div>';
+            }
+
+            section.innerHTML = html;
+            sectionsContainer.appendChild(section);
+        }
+    }
+
+    // ── Scroll spy ──
+    var navLinks = sidebarNav.querySelectorAll('.guide-nav-link');
+    var sectionEls = sectionsContainer.querySelectorAll('.guide-section');
+    var observer = new IntersectionObserver(function(entries) {
+        for (var i = 0; i < entries.length; i++) {
+            if (entries[i].isIntersecting) {
+                var id = entries[i].target.id;
+                for (var j = 0; j < navLinks.length; j++) {
+                    if (navLinks[j].getAttribute('data-section') === id) {
+                        navLinks[j].classList.add('active');
+                    } else {
+                        navLinks[j].classList.remove('active');
+                    }
+                }
+            }
+        }
+    }, { rootMargin: '-20% 0px -70% 0px' });
+
+    for (var i = 0; i < sectionEls.length; i++) {
+        observer.observe(sectionEls[i]);
+    }
+
+    // ── Filter ──
+    var filterInput = document.getElementById('guide-filter');
+    filterInput.addEventListener('input', function() {
+        var query = this.value.toLowerCase().trim();
+        var visibleCategories = {};
+
+        for (var i = 0; i < sectionEls.length; i++) {
+            var el = sectionEls[i];
+            var title = (el.getAttribute('data-title') || '').toLowerCase();
+            var summary = (el.getAttribute('data-summary') || '').toLowerCase();
+            var keywords = (el.getAttribute('data-keywords') || '').toLowerCase();
+            var cat = el.getAttribute('data-category');
+
+            var match = !query || title.indexOf(query) !== -1 ||
+                summary.indexOf(query) !== -1 || keywords.indexOf(query) !== -1;
+
+            if (match) {
+                el.classList.remove('hidden-by-filter');
+                visibleCategories[cat] = true;
+            } else {
+                el.classList.add('hidden-by-filter');
+            }
+        }
+
+        // Update sidebar links
+        for (var i = 0; i < navLinks.length; i++) {
+            var secId = navLinks[i].getAttribute('data-section');
+            var secEl = document.getElementById(secId);
+            if (secEl && secEl.classList.contains('hidden-by-filter')) {
+                navLinks[i].classList.add('hidden-by-filter');
+            } else {
+                navLinks[i].classList.remove('hidden-by-filter');
+            }
+        }
+
+        // Update category headers (sidebar + main)
+        var catHeaders = sidebarNav.querySelectorAll('.guide-nav-category');
+        for (var i = 0; i < catHeaders.length; i++) {
+            var cat = catHeaders[i].getAttribute('data-category');
+            if (visibleCategories[cat]) {
+                catHeaders[i].classList.remove('hidden-by-filter');
+            } else {
+                catHeaders[i].classList.add('hidden-by-filter');
+            }
+        }
+
+        var catDividers = sectionsContainer.querySelectorAll('.guide-category-divider');
+        for (var i = 0; i < catDividers.length; i++) {
+            var cat = catDividers[i].getAttribute('data-category');
+            if (visibleCategories[cat]) {
+                catDividers[i].classList.remove('hidden-by-filter');
+            } else {
+                catDividers[i].classList.add('hidden-by-filter');
+            }
+        }
+    });
+
+    // ── Anchor scroll ──
+    if (window.location.hash) {
+        var target = document.getElementById(window.location.hash.substring(1));
+        if (target) {
+            setTimeout(function() {
+                target.scrollIntoView({ behavior: 'smooth' });
+            }, 100);
+        }
+    }
+
+    // ── Lucide init ──
+    if (window.lucide) {
+        lucide.createIcons();
+    }
+
+    // ── Helpers ──
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
+
+    function escapeAttr(str) {
+        return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function escapeJs(str) {
+        return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+})();
+
+function copySnippet(btn, text) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    }
+    var toast = document.getElementById('cp-toast');
+    if (toast) {
+        toast.textContent = 'Copied!';
+        toast.classList.add('show');
+        setTimeout(function() {
+            toast.classList.remove('show');
+        }, 1500);
+    }
+}
+</script>
 {{end}}
