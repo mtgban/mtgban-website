@@ -848,6 +848,9 @@ func main() {
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
 
+	// Public guide page
+	http.Handle("/guide", noSigning(http.HandlerFunc(Guide)))
+
 	// Mobile/desktop view toggle
 	http.HandleFunc("/toggle-mobile", toggleMobileView)
 
