@@ -543,13 +543,7 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 			break
 		}
 	}
-	// Shrink icons to fit more of them
-	printings := b.String()
-	if len(co.Printings) > MaxBeforeShrink {
-		// Make sure not to capture the 2X2 set code
-		printings = strings.Replace(printings, "ss-2x\"", "ss-1x\"", -1)
-	}
-	return printings
+	return b.String()
 }
 
 func genSealedPrintings(co *mtgmatcher.CardObject) string {
