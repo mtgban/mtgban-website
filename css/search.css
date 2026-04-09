@@ -877,7 +877,6 @@
 }
 .price-row .price-best {
     color: var(--asuccess);
-    font-weight: 700;
 }
 .price-row .price-warn[data-tooltip]:hover::after {
     content: attr(data-tooltip);
