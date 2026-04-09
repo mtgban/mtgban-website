@@ -233,7 +233,29 @@
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                            {{/* Skip INDEX on mobile for now */}}
+                        <div class="m-cond-group active" data-cond="INDEX" data-card="{{$cardId}}">
+                            {{range $ei, $entry := $entries}}
+                                {{if $entry.Locked}}
+                                <div class="m-vendor-row m-vendor-locked">
+                                    <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
+                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                </div>
+                                {{else}}
+                                <details class="m-vendor-row">
+                                    <summary>
+                                        <span class="m-vendor-name">{{$entry.ScraperName}}</span>
+                                        <span class="m-vendor-right">
+                                            <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                            <span class="m-vendor-qty"></span>
+                                        </span>
+                                    </summary>
+                                    <div class="m-vendor-detail">
+                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
+                                    </div>
+                                </details>
+                                {{end}}
+                            {{end}}
+                        </div>
                         {{else}}
                         <div class="m-cond-group{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
@@ -279,7 +301,32 @@
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
-                    {{if and $entries (ne $conditions "INDEX")}}
+                    {{if $entries}}
+                        {{if eq $conditions "INDEX"}}
+                        <div class="m-cond-group active" data-cond="INDEX" data-card="{{$cardId}}">
+                            {{range $ei, $entry := $entries}}
+                                {{if $entry.Locked}}
+                                <div class="m-vendor-row m-vendor-locked">
+                                    <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
+                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                </div>
+                                {{else}}
+                                <details class="m-vendor-row">
+                                    <summary>
+                                        <span class="m-vendor-name">{{$entry.ScraperName}}</span>
+                                        <span class="m-vendor-right">
+                                            <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                            <span class="m-vendor-qty"></span>
+                                        </span>
+                                    </summary>
+                                    <div class="m-vendor-detail">
+                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
+                                    </div>
+                                </details>
+                                {{end}}
+                            {{end}}
+                        </div>
+                        {{else}}
                         <div class="m-cond-group{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
@@ -325,6 +372,7 @@
                                 {{end}}
                             {{end}}
                         </div>
+                        {{end}}
                     {{end}}
                 {{end}}
             </div>
@@ -506,6 +554,9 @@ function hideCardDrawer() {
             // Show matching condition groups across both panels
             var card = this.closest('.m-card');
             card.querySelectorAll('.m-cond-group').forEach(function(g) {
+                if (g.getAttribute('data-cond') === 'INDEX') {
+                    return; // Index rows always visible
+                }
                 if (g.getAttribute('data-cond') === cond) {
                     g.classList.add('active');
                 } else {
