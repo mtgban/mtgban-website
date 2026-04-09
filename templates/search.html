@@ -793,9 +793,11 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{if and (eq $conditions "INDEX") $.IsSealed}}
                                                 <div class="price-row index-row price-index-header">
                                                     <span class="store-name" style="visibility:hidden">&nbsp;</span>
-                                                    <span class="price">EV</span>
-                                                    <span class="price">Sim (Median)</span>
-                                                    <span class="price">Sim (StdDev)</span>
+                                                    <span class="price-right index-cols">
+                                                        <span class="price">EV</span>
+                                                        <span class="price">Sim (Median)</span>
+                                                        <span class="price">Sim (StdDev)</span>
+                                                    </span>
                                                 </div>
                                             {{else if not (eq $conditions "INDEX")}}
                                                 <div class="price-cond-header">{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
@@ -818,6 +820,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 {{end}}
                                                 {{if not .Locked}}
                                                 {{if and (eq $conditions "INDEX") $.IsSealed}}
+                                                    <span class="price-right index-cols">
                                                     <span class="price">$ {{printf "%.2f" .Price}}</span>
                                                     {{$iqr := 0.0}}{{if .Secondary}}{{$iqr = index .ExtraValues "iqr"}}{{end}}
                                                     <span class="price{{if gt $iqr 150.0}} price-warn{{end}}" {{if gt $iqr 150.0}}title="High Simulation IQR: {{printf "%.2f" $iqr}}"{{end}}>
@@ -831,11 +834,16 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                             {{if $stdDev}}$ {{printf "%.2f" $stdDev}}{{else}}n/a{{end}}
                                                         {{else}}n/a{{end}}
                                                     </span>
+                                                    </span>
                                                 {{else}}
-                                                    {{if $.IsSealed}}<span class="secondary"></span>{{end}}
                                                     {{$priceWarn := false}}
                                                     {{if eq .Shorthand "TCGDirect"}}
                                                         {{$priceWarn = invalid_direct $cardId .Price}}
+                                                    {{end}}
+                                                    {{if .Secondary}}
+                                                    <span class="price-right has-secondary">
+                                                    {{else}}
+                                                    <span class="price-right">
                                                     {{end}}
                                                     <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
                                                         {{if .Price}}
@@ -845,7 +853,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         {{end}}
                                                     </span>
                                                     {{if .Secondary}}
-                                                        <span class="secondary">/</span>
                                                         <span class="secondary">$ {{printf "%.2f" .Secondary}}</span>
                                                     {{else}}
                                                         <span class="qty" {{if eq .Shorthand "TCGDirect"}}id="qty-{{.Shorthand}}-{{$conditions}}-{{$cardId}}"{{end}}>
@@ -856,6 +863,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                             {{end}}
                                                         </span>
                                                     {{end}}
+                                                    </span>
                                                 {{end}}
                                                 {{end}}
                                             </div>
@@ -896,6 +904,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                 {{if eq .Shorthand "TCGDirectNet"}}
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
+                                                <span class="price-right">
                                                 <span class="price{{if $blPriceWarn}} price-warn{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
                                                     {{if ne .Shorthand "SYP"}}
                                                         $ {{printf "%.2f" .Price}}
@@ -903,15 +912,14 @@ Sims are not required for pre-constructed decks and other products where the sam
                                                         # {{.Quantity}}
                                                     {{end}}
                                                 </span>
-                                                <span class="secondary secondaryBuylistEntry"
+                                                <span class="qty"
                                                     data-ratio='{{if and .Ratio (eq $conditions "NM")}}{{printf "%.02f" .Ratio}}{{end}}'
                                                     data-credit='{{if .Credit}}{{printf "%.02f" .Credit}}{{end}}'
                                                     data-marketcredit='{{if .MarketCredit}}{{printf "%.02f" .MarketCredit}}{{end}}'>
-                                                </span>
-                                                <span class="qty">
                                                     {{if and .Quantity (eq $conditions "NM")}}
                                                         {{.Quantity}}
                                                     {{end}}
+                                                </span>
                                                 </span>
                                                 {{end}}
                                             </div>
@@ -985,7 +993,7 @@ Sims are not required for pre-constructed decks and other products where the sam
             }
         }
 
-        document.querySelectorAll(".secondaryBuylistEntry").forEach(renderCell);
+        document.querySelectorAll(".price-right .qty[data-ratio]").forEach(renderCell);
     })();
 </script>
     <script>
