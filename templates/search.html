@@ -791,7 +791,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if $entries}}
                                             {{if and (eq $conditions "INDEX") $.IsSealed}}
-                                                <div class="price-row index-row price-index-header">
+                                                <div class="price-row price-index-header">
                                                     <span class="store-name" style="visibility:hidden">&nbsp;</span>
                                                     <span class="price-right index-cols">
                                                         <span class="price">EV</span>
@@ -804,7 +804,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <div class="price-row{{if and (eq $conditions "INDEX") $.IsSealed}} index-row{{end}}{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
                                                 {{if .Locked}}
                                                     <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                     <span class="locked-cta">
