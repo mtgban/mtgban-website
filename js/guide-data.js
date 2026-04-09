@@ -11,20 +11,20 @@ window.__BAN_GUIDE = {
             category: 'Command Palette',
             title: 'Getting Started',
             icon: 'terminal',
-            summary: 'Open the command palette with Ctrl+K / Cmd+K or type / in the search box.',
-            snippets: ['Ctrl+K', 'Cmd+K', '?:', '>'],
+            summary: 'Open the command palette with Ctrl+K / Cmd+K or / when no input is focused',
+            snippets: ['Ctrl+K', 'Cmd+K', '?', '>'],
             keywords: ['palette', 'keyboard', 'shortcut', 'command', 'help', 'search', 'open', 'ctrl k', 'cmd k', 'slash', 'modes'],
             content: {
-                description: 'The command palette gives you fast keyboard-driven access to search syntax help and site navigation. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or by typing <code>/</code> anywhere in the main search box.<br><br>Once open, you can switch modes using prefixes:<br><code>?:</code> — inline syntax help<br><code>&gt;</code> — navigate to a page<br><code>saved:</code> — recall a saved search command',
+                description: 'The command palette gives you fast keyboard-driven access to search syntax help and site navigation. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or by pressing <code>/</code> when no input field is focused.<br><br>Once open, you can switch modes using prefixes:<br><code>?</code> — inline syntax help<br><code>&gt;</code> — navigate to a page<br><code>saved:</code> — recall a saved search command',
                 table: [
                     { value: 'Ctrl+K / Cmd+K', short: 'Open palette from anywhere' },
-                    { value: '/', short: 'Open palette from search box' },
-                    { value: '?:', short: 'Show inline syntax reference' },
+                    { value: '/', short: 'Open palette when no input is focused' },
+                    { value: '?', short: 'Show inline syntax reference' },
                     { value: '>', short: 'Navigate to a site page' },
                     { value: 'saved:', short: 'Access saved search commands' }
                 ],
                 examples: [
-                    { query: '?:rarity', desc: 'Show rarity syntax help inline' },
+                    { query: '? rarity', desc: 'Show rarity syntax help inline' },
                     { query: '>newspaper', desc: 'Navigate to the Newspaper page' },
                     { query: 'saved:my list', desc: 'Run a saved search command' }
                 ]

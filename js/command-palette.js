@@ -88,7 +88,7 @@
     footer.className = 'cp-footer';
     footer.innerHTML = '<span><kbd>\u2191\u2193</kbd> Navigate</span>' +
         '<span><kbd>Enter</kbd> Select</span>' +
-        '<span><kbd>?:</kbd> Help</span>' +
+        '<span><kbd>?</kbd> Help</span>' +
         '<span><kbd>Esc</kbd> Close</span>';
 
     dialog.appendChild(inputRow);
@@ -123,7 +123,8 @@
         document.body.style.overflow = 'hidden';
         input.value = '';
         modeIndicator.textContent = '';
-        modeIndicator.style.display = 'none';
+        modeIndicator.className = 'cp-mode-indicator';
+        modeIndicator.removeAttribute('data-mode');
         activeIndex = -1;
         renderDefault();
         input.focus();
@@ -159,14 +160,14 @@
 
     // ── Mode detection ───────────────────────────────────────────────
     function detectMode(val) {
-        if (/^(\?:|help:|syntax:)/i.test(val)) return 'help';
+        if (val.charAt(0) === '?' || /^(help:|syntax:)/i.test(val)) return 'help';
         if (val.charAt(0) === '>') return 'nav';
         if (/^saved:/i.test(val)) return 'saved';
         return 'search';
     }
 
     function stripPrefix(val) {
-        if (/^(\?:|help:|syntax:)/i.test(val)) return val.replace(/^(\?:|help:|syntax:)/i, '').trim();
+        if (/^(\?\s*|help:|syntax:|\?:)/i.test(val)) return val.replace(/^(\?\s*|help:|syntax:|\?:)/i, '').trim();
         if (val.charAt(0) === '>') return val.substring(1).trim();
         if (/^saved:/i.test(val)) return val.replace(/^saved:/i, '').trim();
         return val;
@@ -223,7 +224,7 @@
                     title: r.q,
                     subtitle: 'Recent search',
                     icon: 'clock',
-                    action: function(q) { return function() { window.location.href = '?q=' + encodeURIComponent(q); }; }(r.q)
+                    action: function(q) { return function() { window.location.href = '/search?q=' + encodeURIComponent(q); }; }(r.q)
                 });
             }
         }
@@ -241,7 +242,7 @@
                     title: f.name,
                     subtitle: (f.set ? f.set : '') + (f.number ? ' #' + f.number : ''),
                     icon: 'star',
-                    action: function(q) { return function() { window.location.href = '?q=' + encodeURIComponent(q); }; }(f.query)
+                    action: function(q) { return function() { window.location.href = '/search?q=' + encodeURIComponent(q); }; }(f.query)
                 });
             }
         }
@@ -363,7 +364,7 @@
                     title: cardNames[i],
                     subtitle: 'Search for "' + cardNames[i] + '"',
                     icon: 'search',
-                    action: (function(name) { return function() { window.location.href = '?q=' + encodeURIComponent(name); }; })(cardNames[i])
+                    action: (function(name) { return function() { window.location.href = '/search?q=' + encodeURIComponent(name); }; })(cardNames[i])
                 });
             }
         }
@@ -448,7 +449,7 @@
                             }
                         }
                         setJSON(SAVED_KEY, all);
-                        window.location.href = '?q=' + encodeURIComponent(cmd.query);
+                        window.location.href = '/search?q=' + encodeURIComponent(cmd.query);
                     }; })(s)
                 });
             }
@@ -489,7 +490,7 @@
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
             if (item.type === 'header') {
-                html += '<div class="cp-category">' + escapeHtml(item.title) + '</div>';
+                html += '<div class="cp-category-header">' + escapeHtml(item.title) + '</div>';
                 continue;
             }
 
@@ -510,7 +511,7 @@
                 html += '<span class="cp-result-badge">' + escapeHtml(badgeLabel) + '</span>';
             }
             if (item.type === 'saved') {
-                html += '<button class="cp-delete-btn" data-saved-id="' + escapeHtml(item.savedId) + '" title="Delete">';
+                html += '<button class="cp-result-delete" data-saved-id="' + escapeHtml(item.savedId) + '" title="Delete">';
                 html += '<i data-lucide="trash-2"></i>';
                 html += '</button>';
             }
@@ -538,7 +539,7 @@
             (function(index) {
                 resultEls[index].addEventListener('click', function(e) {
                     // Check if delete button was clicked
-                    var deleteBtn = e.target.closest('.cp-delete-btn');
+                    var deleteBtn = e.target.closest('.cp-result-delete');
                     if (deleteBtn) {
                         e.stopPropagation();
                         var savedId = deleteBtn.getAttribute('data-saved-id');
@@ -584,17 +585,21 @@
 
         // Update mode indicator
         if (mode === 'help') {
-            modeIndicator.textContent = '?:';
-            modeIndicator.style.display = '';
+            modeIndicator.textContent = 'HELP';
+            modeIndicator.setAttribute('data-mode', 'help');
+            modeIndicator.className = 'cp-mode-indicator active';
         } else if (mode === 'nav') {
-            modeIndicator.textContent = '>';
-            modeIndicator.style.display = '';
+            modeIndicator.textContent = 'NAV';
+            modeIndicator.setAttribute('data-mode', 'nav');
+            modeIndicator.className = 'cp-mode-indicator active';
         } else if (mode === 'saved') {
-            modeIndicator.textContent = 'saved:';
-            modeIndicator.style.display = '';
+            modeIndicator.textContent = 'SAVED';
+            modeIndicator.setAttribute('data-mode', 'saved');
+            modeIndicator.className = 'cp-mode-indicator active';
         } else {
             modeIndicator.textContent = '';
-            modeIndicator.style.display = 'none';
+            modeIndicator.className = 'cp-mode-indicator';
+            modeIndicator.removeAttribute('data-mode');
         }
 
         // Empty input → show defaults
@@ -681,7 +686,11 @@
         renderResults(items);
     }
 
-    input.addEventListener('input', handleInput);
+    var inputTimer = null;
+    input.addEventListener('input', function() {
+        if (inputTimer) clearTimeout(inputTimer);
+        inputTimer = setTimeout(handleInput, 80);
+    });
 
     // ── Saved commands ───────────────────────────────────────────────
     function showSaveRow() {
