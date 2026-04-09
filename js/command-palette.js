@@ -258,7 +258,7 @@
                     type: 'nav',
                     title: n.name,
                     subtitle: 'Navigate to ' + n.name,
-                    icon: n.icon || 'arrow-right',
+                    icon: n.icon || 'compass',
                     action: function(link) { return function() { window.location.href = link; }; }(n.link),
                     score: query ? scoreMatch(query, n.name, null) : 0
                 });
@@ -274,7 +274,7 @@
         var commands = [
             {
                 name: 'Toggle Theme',
-                icon: 'sun-moon',
+                icon: (localStorage.getItem('theme') === 'dark') ? 'sun' : 'moon',
                 keywords: ['dark', 'light', 'night', 'day', 'theme', 'mode'],
                 action: function() {
                     var t = localStorage.getItem('theme') === 'dark' ? 'light' : 'dark';
@@ -289,7 +289,7 @@
             },
             {
                 name: 'Random Card',
-                icon: 'shuffle',
+                icon: 'dice-5',
                 keywords: ['random', 'surprise', 'lucky'],
                 action: function() { window.location.href = '/random'; }
             },
@@ -297,7 +297,7 @@
                 name: 'Random Sealed',
                 icon: 'package',
                 keywords: ['random', 'sealed', 'booster', 'pack'],
-                action: function() { window.location.href = '/random?sealed=true'; }
+                action: function() { window.location.href = '/randomsealed'; }
             },
             {
                 name: 'Open Guide',
@@ -306,7 +306,7 @@
                 action: function() { window.location.href = '/guide'; }
             },
             {
-                name: 'Copy URL',
+                name: 'Copy Page URL',
                 icon: 'link',
                 keywords: ['copy', 'url', 'link', 'share', 'clipboard'],
                 action: function() {
@@ -505,6 +505,10 @@
             }
             html += '</div>';
             html += '<div class="cp-result-right">';
+            var badgeLabel = item.type === 'recent' ? 'Recent' : item.type === 'favorite' ? 'Favorite' : item.type === 'nav' ? 'Navigate' : item.type === 'card' ? 'Card' : item.type === 'command' ? 'Action' : item.type === 'saved' ? 'Saved' : item.type === 'syntax' ? 'Syntax' : item.type === 'help' ? item.badge || 'Help' : '';
+            if (badgeLabel) {
+                html += '<span class="cp-result-badge">' + escapeHtml(badgeLabel) + '</span>';
+            }
             if (item.type === 'saved') {
                 html += '<button class="cp-delete-btn" data-saved-id="' + escapeHtml(item.savedId) + '" title="Delete">';
                 html += '<i data-lucide="trash-2"></i>';
@@ -649,6 +653,31 @@
             }
         }
 
+        // Enforce global 10-item cap (excluding headers)
+        var nonHeaders = [];
+        var headers = [];
+        for (var x = 0; x < items.length; x++) {
+            if (items[x].type === 'header') {
+                headers.push({ item: items[x], nextIndex: nonHeaders.length });
+            } else {
+                nonHeaders.push(items[x]);
+            }
+        }
+        if (nonHeaders.length > 10) {
+            nonHeaders = nonHeaders.slice(0, 10);
+        }
+        // Rebuild with headers only for items that survived the cap
+        var capped = [];
+        var hi = 0;
+        for (var y = 0; y < nonHeaders.length; y++) {
+            while (hi < headers.length && headers[hi].nextIndex <= y) {
+                capped.push(headers[hi].item);
+                hi++;
+            }
+            capped.push(nonHeaders[y]);
+        }
+        items = capped;
+
         renderResults(items);
     }
 
@@ -777,6 +806,14 @@
         }
     });
 
+    // ── Focus trap on dialog level ─────────────────────────────────────
+    dialog.addEventListener('keydown', function(e) {
+        if ((e.key === 'Tab' || e.keyCode === 9) && e.target !== input) {
+            e.preventDefault();
+            input.focus();
+        }
+    });
+
     // ── Keyboard: internal (palette open) ────────────────────────────
     input.addEventListener('keydown', function(e) {
         var key = e.key || '';
@@ -820,6 +857,13 @@
         if ((e.ctrlKey || e.metaKey) && (key === 's' || code === 83)) {
             e.preventDefault();
             showSaveRow();
+            return;
+        }
+
+        // Focus trap — Tab cycles within palette
+        if (key === 'Tab' || code === 9) {
+            e.preventDefault();
+            input.focus();
             return;
         }
     });
