@@ -18,7 +18,6 @@
 
     // ── localStorage helpers ─────────────────────────────────────────
     var RECENT_KEY = 'mtgban_recent_searches';
-    var FAV_KEY = 'mtgban_favorites';
     var SAVED_KEY = 'mtgban_saved_commands';
     var MAX_SAVED = 50;
     var MAX_NAME = 60;
@@ -225,24 +224,6 @@
                     subtitle: 'Recent search',
                     icon: 'clock',
                     action: function(q) { return function() { window.location.href = '/search?q=' + encodeURIComponent(q); }; }(r.q)
-                });
-            }
-        }
-        return results;
-    }
-
-    function getFavoriteResults(query, limit) {
-        var favs = getJSON(FAV_KEY);
-        var results = [];
-        for (var i = 0; i < favs.length && results.length < limit; i++) {
-            var f = favs[i];
-            if (!query || scoreMatch(query, f.name, null) > 0) {
-                results.push({
-                    type: 'favorite',
-                    title: f.name,
-                    subtitle: (f.set ? f.set : '') + (f.number ? ' #' + f.number : ''),
-                    icon: 'star',
-                    action: function(q) { return function() { window.location.href = '/search?q=' + encodeURIComponent(q); }; }(f.query)
                 });
             }
         }
@@ -461,17 +442,12 @@
     function renderDefault() {
         var items = [];
         var recent = getRecentResults(null, 5);
-        var favs = getFavoriteResults(null, 3);
         var saved = getSavedResults(null);
         var nav = getNavResults(null);
 
         if (recent.length > 0) {
             items.push({ type: 'header', title: 'Recent Searches' });
             items = items.concat(recent);
-        }
-        if (favs.length > 0) {
-            items.push({ type: 'header', title: 'Favorites' });
-            items = items.concat(favs);
         }
         if (saved.length > 0) {
             items.push({ type: 'header', title: 'Saved Commands' });
@@ -511,7 +487,7 @@
             }
             html += '</div>';
             html += '<div class="cp-result-right">';
-            var badgeLabel = item.type === 'recent' ? 'Recent' : item.type === 'favorite' ? 'Favorite' : item.type === 'nav' ? 'Navigate' : item.type === 'card' ? 'Card' : item.type === 'command' ? 'Action' : item.type === 'saved' ? 'Saved' : item.type === 'syntax' ? 'Syntax' : item.type === 'help' ? item.badge || 'Help' : '';
+            var badgeLabel = item.type === 'recent' ? 'Recent' : item.type === 'nav' ? 'Navigate' : item.type === 'card' ? 'Card' : item.type === 'command' ? 'Action' : item.type === 'saved' ? 'Saved' : item.type === 'syntax' ? 'Syntax' : item.type === 'help' ? item.badge || 'Help' : '';
             if (badgeLabel) {
                 html += '<span class="cp-result-badge">' + escapeHtml(badgeLabel) + '</span>';
             }
@@ -636,7 +612,6 @@
         } else {
             // General search — combine sources
             var recentItems = getRecentResults(query, 3);
-            var favItems = getFavoriteResults(query, 3);
             var cmdItems = getStaticCommands(query);
             var savedItems2 = getSavedResults(query);
             var cardItems = getCardResults(query, 5);
@@ -645,10 +620,6 @@
             if (recentItems.length > 0) {
                 items.push({ type: 'header', title: 'Recent Searches' });
                 items = items.concat(recentItems.slice(0, 3));
-            }
-            if (favItems.length > 0) {
-                items.push({ type: 'header', title: 'Favorites' });
-                items = items.concat(favItems.slice(0, 3));
             }
             if (savedItems2.length > 0) {
                 items.push({ type: 'header', title: 'Saved Commands' });
