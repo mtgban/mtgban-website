@@ -8,7 +8,7 @@
     flex-direction: row;
     max-width: 1200px;
     margin: 0 auto;
-    padding: var(--content-padding-top, 60px) var(--page-gutter, 3vw) 4em;
+    padding: 0 var(--page-gutter, 3vw) 4em;
     gap: 2em;
 }
 
@@ -95,7 +95,7 @@
 /* ── Hero ── */
 .guide-hero {
     text-align: center;
-    padding: 0 0 2.5em;
+    padding: 0 0 1em;
 }
 .guide-hero h1 {
     font-size: 2rem;
