@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
     {{block "extra-css" .}}{{end}}
+    <link rel="stylesheet" type="text/css" href="/css/command-palette.css?hash={{.Hash}}">
 
     <link rel="apple-touch-icon" sizes="120x120" href="/img/favicon/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon/favicon-32x32.png">
@@ -35,5 +36,14 @@
 {{block "content" .}}{{end}}
 
 {{block "extra-scripts" .}}{{end}}
+<script>
+window.__BAN_PALETTE = {
+    nav: [{{range .Nav}}{ name:"{{.Name}}", link:"{{.Link}}", icon:"{{.Short}}" },{{end}}],
+    hash: "{{.Hash}}",
+    user: "{{.BetaNav.Short}}"
+};
+</script>
+<script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/command-palette.js?hash={{.Hash}}"></script>
 </body>
 </html>
