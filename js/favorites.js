@@ -37,14 +37,14 @@
         var isFoil = card.querySelector('.m-badge.foil') !== null;
         var isEtched = card.querySelector('.m-badge.etched') !== null;
 
-        // Get best sell price + vendor name (NM condition, first vendor in sellers panel)
+        // Get best sell price + vendor name (look for Best badge, skip INDEX group)
         var sellPrice = null;
         var sellVendor = '';
         var sellersPanel = card.querySelector('[id^="sellers-"]');
         if (sellersPanel) {
-            var activeGroup = sellersPanel.querySelector('.m-cond-group.active');
+            var activeGroup = sellersPanel.querySelector('.m-cond-group.active:not([data-cond="INDEX"])');
             if (activeGroup) {
-                var bestRow = activeGroup.querySelector('.m-vendor-row:not(.m-vendor-locked)');
+                var bestRow = activeGroup.querySelector('.m-best-price') || activeGroup.querySelector('.m-vendor-row:not(.m-vendor-locked)');
                 if (bestRow) {
                     var priceEl = bestRow.querySelector('.m-vendor-price');
                     if (priceEl) {
@@ -59,14 +59,14 @@
             }
         }
 
-        // Get best buy price + vendor name (NM condition, first vendor in buyers panel)
+        // Get best buy price + vendor name (look for Best badge, skip INDEX group)
         var buyPrice = null;
         var buyVendor = '';
         var buyersPanel = card.querySelector('[id^="buyers-"]');
         if (buyersPanel) {
-            var activeGroup = buyersPanel.querySelector('.m-cond-group.active');
+            var activeGroup = buyersPanel.querySelector('.m-cond-group.active:not([data-cond="INDEX"])');
             if (activeGroup) {
-                var bestRow = activeGroup.querySelector('.m-vendor-row:not(.m-vendor-locked)');
+                var bestRow = activeGroup.querySelector('.m-best-price') || activeGroup.querySelector('.m-vendor-row:not(.m-vendor-locked)');
                 if (bestRow) {
                     var priceEl = bestRow.querySelector('.m-vendor-price');
                     if (priceEl) {
