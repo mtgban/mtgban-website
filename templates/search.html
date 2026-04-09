@@ -309,6 +309,57 @@ Sims are not required for pre-constructed decks and other products where the sam
             <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
 
             <script type="text/javascript">
+                const PRINTINGS_THRESHOLD = 6;
+
+                function collapsePrintings() {
+                    const container = document.getElementById('printings');
+                    if (!container) return;
+
+                    // Clean up previous collapse elements
+                    const oldDropdown = container.querySelector('.sidebar-printings-dropdown');
+                    if (oldDropdown) oldDropdown.remove();
+                    const oldBtn = container.querySelector('.sidebar-printings-more');
+                    if (oldBtn) oldBtn.remove();
+                    // Unhide any previously hidden links (from prior hover)
+                    container.querySelectorAll('a.sidebar-printings-hidden').forEach(a => a.classList.remove('sidebar-printings-hidden'));
+
+                    const links = Array.from(container.querySelectorAll('a.pagination'));
+                    if (links.length <= PRINTINGS_THRESHOLD) return;
+
+                    const overflow = links.slice(PRINTINGS_THRESHOLD);
+                    overflow.forEach(a => a.classList.add('sidebar-printings-hidden'));
+
+                    // Build dropdown with only the overflow icons
+                    const dropdown = document.createElement('div');
+                    dropdown.className = 'sidebar-printings-dropdown';
+                    overflow.forEach(a => {
+                        const clone = a.cloneNode(true);
+                        clone.classList.remove('sidebar-printings-hidden');
+                        dropdown.appendChild(clone);
+                    });
+
+                    const btn = document.createElement('button');
+                    btn.className = 'sidebar-printings-more';
+                    btn.textContent = '+' + overflow.length;
+
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const isOpen = dropdown.classList.toggle('open');
+                        this.textContent = isOpen ? '\u2212' + overflow.length : '+' + overflow.length;
+                    });
+
+                    // Close on outside click
+                    document.addEventListener('click', function(e) {
+                        if (!container.contains(e.target)) {
+                            dropdown.classList.remove('open');
+                            btn.textContent = '+' + overflow.length;
+                        }
+                    });
+
+                    container.appendChild(btn);
+                    container.appendChild(dropdown);
+                }
+
                 function updateSidebar(src, printings, products, isFoil, setCode) {
                     {{if not .IsSealed}}
                         document.getElementById('cardImage').src=src;
@@ -321,6 +372,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                         document.getElementById('hoverImage').src=src;
                     {{end}}
                     document.getElementById('printings').innerHTML = printings;
+                    collapsePrintings();
 
                     let productDiv = document.getElementById('products');
                     if (productDiv) {
@@ -389,6 +441,7 @@ Sims are not required for pre-constructed decks and other products where the sam
 
                 <div class="search-sidebar">
                     {{template "sidebar-search" .}}
+                    <div class="sidebar-body">
                     {{if .IsSealed}}
                         <div class="sidebar-printings" id="printings"></div>
                         {{if .HasAvailable}}
@@ -421,42 +474,40 @@ Sims are not required for pre-constructed decks and other products where the sam
                             <a class="sidebar-action success" href="{{.StocksURL}}" target="_blank">Check MTGStocks charts</a>
                         {{end}}
                     {{end}}
+                    </div>
                     {{if .CanDownloadCSV}}
-                        <hr class="sidebar-divider">
-                        <div class="sidebar-actions">
-                            <span class="sidebar-section-label">Download CSV</span>
-                            <div class="sidebar-action-row">
+                    <div class="sidebar-footer">
+                        <div class="sidebar-actions-compact">
+                            <div class="sidebar-compact-row">
+                                <span class="sidebar-compact-label">Export</span>
                                 <a class="sidebar-action success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
                                 <a class="sidebar-action warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
+                                <a class="sidebar-action default" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">List</a>
                             </div>
-                            <a class="sidebar-action default" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">&#128203; Card List</a>
-                        </div>
-                        {{if not .IsSealed}}
-                            <hr class="sidebar-divider">
-                            <div class="sidebar-actions">
-                                <span class="sidebar-section-label">Load in Uploader</span>
-                                <form action="/upload" method="post">
+                            {{if not .IsSealed}}
+                            <div class="sidebar-compact-row">
+                                <span class="sidebar-compact-label">Upload</span>
+                                <form action="/upload" method="post" style="display:contents">
                                     <input id="mode" type="hidden" name="mode" value="false"/>
                                     {{range .CardHashes}}
                                         <input type="hidden" name="hashes" value="{{.}}"/>
                                     {{end}}
-                                    <div class="sidebar-action-row">
-                                        <a class="sidebar-action success" onclick='document.getElementById("mode").value=false; this.closest("form").submit(); return false;'>Retail</a>
-                                        <a class="sidebar-action warning" onclick='document.getElementById("mode").value=true; this.closest("form").submit(); return false;'>Buylist</a>
-                                    </div>
-                                    <noscript>
-                                        <input type="submit" value="Check Uploader!" />
-                                    </noscript>
+                                    <a class="sidebar-action success" onclick='document.getElementById("mode").value=false; this.closest("form").submit(); return false;'>Retail</a>
+                                    <a class="sidebar-action warning" onclick='document.getElementById("mode").value=true; this.closest("form").submit(); return false;'>Buylist</a>
+                                    <noscript><input type="submit" value="Check Uploader!"/></noscript>
                                 </form>
                             </div>
-                        {{end}}
+                            {{end}}
+                        </div>
+                    </div>
                     {{else if $.ShowUpsell}}
-                        <hr class="sidebar-divider">
+                    <div class="sidebar-footer">
                         <div class="sidebar-actions">
                             <i style="font-size: var(--text-sm); color: var(--greytext);">
                                 Increase your tier to be able to download any search results as CSVs{{if not .IsSealed}} or to transfer them to the Upload optimizer!{{end}}
                             </i>
                         </div>
+                    </div>
                     {{end}}
                 </div>
 
