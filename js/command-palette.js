@@ -37,6 +37,18 @@
         } catch (e) {}
     }
 
+    function recordRecentSearch(query) {
+        if (!query || query.trim().length < 2) return;
+        query = query.trim();
+        var recent = getJSON(RECENT_KEY);
+        recent = recent.filter(function(s) {
+            return (s.q || '').toLowerCase() !== query.toLowerCase();
+        });
+        recent.unshift({ q: query, t: Date.now() });
+        if (recent.length > 15) recent = recent.slice(0, 15);
+        setJSON(RECENT_KEY, recent);
+    }
+
     function escapeHtml(str) {
         var div = document.createElement('div');
         div.textContent = str;
@@ -223,7 +235,7 @@
                     title: r.q,
                     subtitle: 'Recent search',
                     icon: 'clock',
-                    action: function(q) { return function() { window.location.href = '/search?q=' + encodeURIComponent(q); }; }(r.q)
+                    action: function(q) { return function() { recordRecentSearch(q); window.location.href = '/search?q=' + encodeURIComponent(q); }; }(r.q)
                 });
             }
         }
@@ -345,7 +357,7 @@
                     title: cardNames[i],
                     subtitle: 'Search for "' + cardNames[i] + '"',
                     icon: 'search',
-                    action: (function(name) { return function() { window.location.href = '/search?q=' + encodeURIComponent(name); }; })(cardNames[i])
+                    action: (function(name) { return function() { recordRecentSearch(name); window.location.href = '/search?q=' + encodeURIComponent(name); }; })(cardNames[i])
                 });
             }
         }
@@ -430,6 +442,7 @@
                             }
                         }
                         setJSON(SAVED_KEY, all);
+                        recordRecentSearch(cmd.query);
                         window.location.href = '/search?q=' + encodeURIComponent(cmd.query);
                     }; })(s)
                 });
