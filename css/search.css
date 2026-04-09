@@ -821,15 +821,15 @@
 /* Right-side grid: consistent price + qty alignment */
 .price-right {
     display: grid;
-    grid-template-columns: 7em 3em;
+    grid-template-columns: 7em 5em;
     align-items: baseline;
     flex-shrink: 0;
     gap: 0 4px;
 }
 
-/* Seller rows with secondary pricing (e.g. "/ $ 123.45") */
+/* Seller rows with secondary pricing (e.g. Low / Market) — 3 cols to align with standard rows */
 .price-right.has-secondary {
-    grid-template-columns: 7em 7em;
+    grid-template-columns: 7em 5em;
 }
 
 /* Sealed INDEX: 3 value columns (EV, Sim Median, Sim StdDev) */
@@ -843,6 +843,16 @@
     color: var(--normal);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.3em;
+}
+.price-row .price .cur {
+    color: var(--search-text-dim);
+    flex-shrink: 0;
+}
+.price-row .price .amt {
     text-align: right;
 }
 
@@ -877,12 +887,18 @@
     color: var(--normal);
     white-space: nowrap;
     text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.3em;
+    font-variant-numeric: tabular-nums;
 }
 .price-row .qty {
     font-family: var(--font-mono);
     font-size: var(--text-base);
     color: var(--search-text-dim);
     text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
 }
 
 .price-cond-header {
@@ -1368,7 +1384,7 @@
     .price-row .price { font-size: var(--text-md); }
     .price-row .qty { font-size: var(--text-sm); }
     .price-row .secondary { font-size: var(--text-md); }
-    .price-right { grid-template-columns: 6em 2.5em; }
+    .price-right { grid-template-columns: 6em 4em; }
     .price-right.has-secondary { grid-template-columns: 6em 6em; }
     .price-right.index-cols { grid-template-columns: 5em 5em 5em; }
 
