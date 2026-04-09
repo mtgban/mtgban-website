@@ -462,6 +462,7 @@
         var items = [];
         var recent = getRecentResults(null, 5);
         var favs = getFavoriteResults(null, 3);
+        var saved = getSavedResults(null);
         var nav = getNavResults(null);
 
         if (recent.length > 0) {
@@ -471,6 +472,10 @@
         if (favs.length > 0) {
             items.push({ type: 'header', title: 'Favorites' });
             items = items.concat(favs);
+        }
+        if (saved.length > 0) {
+            items.push({ type: 'header', title: 'Saved Commands' });
+            items = items.concat(saved.slice(0, 3));
         }
         if (nav.length > 0) {
             items.push({ type: 'header', title: 'Pages' });
@@ -633,6 +638,7 @@
             var recentItems = getRecentResults(query, 3);
             var favItems = getFavoriteResults(query, 3);
             var cmdItems = getStaticCommands(query);
+            var savedItems2 = getSavedResults(query);
             var cardItems = getCardResults(query, 5);
             var navItems2 = getNavResults(query);
 
@@ -643,6 +649,10 @@
             if (favItems.length > 0) {
                 items.push({ type: 'header', title: 'Favorites' });
                 items = items.concat(favItems.slice(0, 3));
+            }
+            if (savedItems2.length > 0) {
+                items.push({ type: 'header', title: 'Saved Commands' });
+                items = items.concat(savedItems2.slice(0, 3));
             }
             if (cmdItems.length > 0) {
                 items.push({ type: 'header', title: 'Commands' });

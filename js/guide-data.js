@@ -17,11 +17,12 @@ window.__BAN_GUIDE = {
             content: {
                 description: 'The command palette gives you fast keyboard-driven access to search syntax help and site navigation. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or by pressing <code>/</code> when no input field is focused.<br><br>Once open, you can switch modes using prefixes:<br><code>?</code> — inline syntax help<br><code>&gt;</code> — navigate to a page<br><code>saved:</code> — recall a saved search command',
                 table: [
-                    { value: 'Ctrl+K / Cmd+K', short: 'Open palette from anywhere' },
+                    { value: 'Ctrl+K / Cmd+K', short: 'Toggle palette open/closed from anywhere' },
                     { value: '/', short: 'Open palette when no input is focused' },
-                    { value: '?', short: 'Show inline syntax reference' },
-                    { value: '>', short: 'Navigate to a site page' },
-                    { value: 'saved:', short: 'Access saved search commands' }
+                    { value: '?', short: 'Help mode — show inline syntax reference (also: help: syntax:)' },
+                    { value: '>', short: 'Navigation mode — jump to a site page' },
+                    { value: 'saved:', short: 'Saved mode — access saved search commands' },
+                    { value: 'Shift+Enter', short: 'In help mode: navigate to full guide section' }
                 ],
                 examples: [
                     { query: '? rarity', desc: 'Show rarity syntax help inline' },
@@ -43,7 +44,7 @@ window.__BAN_GUIDE = {
                 description: 'Any search query can be saved as a named command for quick reuse. On a search results page, open the palette and select <strong>Save Current Search</strong>, or press <code>Ctrl+S</code> / <code>Cmd+S</code> while the palette is open. You will be prompted to name the command.<br><br>Saved commands appear in the palette by default and can be filtered with the <code>saved:</code> prefix. Hover over a saved command to reveal a delete button.',
                 table: [
                     { value: 'Save Current Search', short: 'Palette command (appears on search results pages)' },
-                    { value: 'Ctrl+S / Cmd+S', short: 'Save palette input as a command (while palette is open)' },
+                    { value: 'Ctrl+S / Cmd+S', short: 'Save the current page search as a command (while palette is open)' },
                     { value: 'saved:', short: 'Browse saved commands in palette' }
                 ],
                 examples: [
