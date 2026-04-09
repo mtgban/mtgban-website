@@ -839,7 +839,7 @@
 
 .buylist-extra {
     font-family: var(--font-mono);
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
     color: var(--search-text-dim);
     text-align: right;
     white-space: nowrap;
@@ -906,7 +906,7 @@
 }
 .price-row .qty {
     font-family: var(--font-mono);
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
     color: var(--search-text-dim);
     text-align: right;
     justify-self: end;
