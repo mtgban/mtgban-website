@@ -37,14 +37,14 @@ window.__BAN_GUIDE = {
             title: 'Saved Commands',
             icon: 'bookmark',
             summary: 'Save, manage, and reuse your most-used search queries from the palette.',
-            snippets: ['saved:', 'Ctrl+S to save'],
+            snippets: ['saved:'],
             keywords: ['saved', 'bookmark', 'favorite', 'command', 'recall', 'reuse', 'store', 'manage', 'delete'],
             content: {
-                description: 'Any search query can be saved as a named command for quick reuse. To save the current query, press <code>Ctrl+S</code> (or use the save icon in the search bar). Saved commands appear in the palette under the <code>saved:</code> prefix.<br><br>To manage saved commands, open the palette and type <code>saved:</code> — you can rename, delete, or run any entry from there.',
+                description: 'Any search query can be saved as a named command for quick reuse. On a search results page, open the palette and select <strong>Save Current Search</strong>, or press <code>Ctrl+S</code> / <code>Cmd+S</code> while the palette is open. You will be prompted to name the command.<br><br>Saved commands appear in the palette by default and can be filtered with the <code>saved:</code> prefix. Hover over a saved command to reveal a delete button.',
                 table: [
-                    { value: 'Ctrl+S', short: 'Save current search as a command' },
-                    { value: 'saved:', short: 'Browse saved commands in palette' },
-                    { value: 'Delete key', short: 'Delete highlighted saved command' }
+                    { value: 'Save Current Search', short: 'Palette command (appears on search results pages)' },
+                    { value: 'Ctrl+S / Cmd+S', short: 'Save palette input as a command (while palette is open)' },
+                    { value: 'saved:', short: 'Browse saved commands in palette' }
                 ],
                 examples: [
                     { query: 'saved:fetchlands', desc: 'Run the "fetchlands" saved search' },
