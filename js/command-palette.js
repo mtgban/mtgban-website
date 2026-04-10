@@ -51,7 +51,7 @@
 
     // Check if a section is accessible based on nav permissions
     var navNames = {};
-    var nav = PALETTE.nav || [];
+    var nav = palette.nav || [];
     for (var ni = 0; ni < nav.length; ni++) {
         navNames[nav[ni].name] = true;
     }
