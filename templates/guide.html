@@ -38,9 +38,25 @@
     var data = window.__BAN_GUIDE;
     if (!data || !data.sections) return;
 
-    var sections = data.sections;
+    var allSections = data.sections;
     var sidebarNav = document.getElementById('guide-sidebar-nav');
     var sectionsContainer = document.getElementById('guide-sections');
+
+    // Build nav permission lookup from palette data
+    var navNames = {};
+    var palette = window.__BAN_PALETTE || {};
+    var navItems = palette.nav || [];
+    for (var n = 0; n < navItems.length; n++) {
+        navNames[navItems[n].name] = true;
+    }
+
+    // Filter sections by auth
+    var sections = [];
+    for (var i = 0; i < allSections.length; i++) {
+        var s = allSections[i];
+        if (s.requiresNav && !navNames[s.requiresNav]) continue;
+        sections.push(s);
+    }
 
     // Group sections by category in order
     var categories = [];

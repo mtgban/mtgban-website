@@ -49,6 +49,17 @@
         setJSON(RECENT_KEY, recent);
     }
 
+    // Check if a section is accessible based on nav permissions
+    var navNames = {};
+    var nav = PALETTE.nav || [];
+    for (var ni = 0; ni < nav.length; ni++) {
+        navNames[nav[ni].name] = true;
+    }
+    function isSectionAllowed(section) {
+        if (!section.requiresNav) return true;
+        return !!navNames[section.requiresNav];
+    }
+
     function escapeHtml(str) {
         var div = document.createElement('div');
         div.textContent = str;
@@ -369,6 +380,7 @@
         var results = [];
         for (var i = 0; i < sections.length && results.length < 10; i++) {
             var s = sections[i];
+            if (!isSectionAllowed(s)) continue;
             var match = !query || scoreMatch(query, s.title, s.keywords) > 0;
             if (!match && s.summary) {
                 match = scoreMatch(query, s.summary, null) > 0;

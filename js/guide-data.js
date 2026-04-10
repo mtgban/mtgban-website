@@ -545,6 +545,7 @@ window.__BAN_GUIDE = {
         {
             id: 'feature-newspaper',
             category: 'Features',
+            requiresNav: 'Newspaper',
             title: 'Newspaper',
             icon: 'newspaper',
             summary: 'Daily Spike scores, buylist changes, seller count trends, SYP list, and archive.',
@@ -563,6 +564,7 @@ window.__BAN_GUIDE = {
         {
             id: 'feature-sleepers',
             category: 'Features',
+            requiresNav: 'Sleepers',
             title: 'Sleepers',
             icon: 'moon',
             summary: 'Discover undervalued cards with bulk, reprint, mismatch, and gap analysis across tiers.',
@@ -578,6 +580,7 @@ window.__BAN_GUIDE = {
         {
             id: 'feature-upload',
             category: 'Features',
+            requiresNav: 'Upload',
             title: 'Upload & Optimize',
             icon: 'upload',
             summary: 'Upload a collection (CSV, Excel, Moxfield, Deckbox) and optimize across buylist vendors.',
@@ -593,6 +596,7 @@ window.__BAN_GUIDE = {
         {
             id: 'feature-arbitrage',
             category: 'Features',
+            requiresNav: 'Arbitrage',
             title: 'Arbitrage',
             icon: 'trending-up',
             summary: 'Find price gaps between retail and buylist; filter by condition, foil, rarity, and more.',
