@@ -635,7 +635,18 @@
                 items = items.concat(savedItems);
             }
         } else {
-            // General search — combine sources
+            // Always offer direct search with full query (supports syntax like s:3ED)
+            if (query) {
+                items.push({
+                    type: 'search',
+                    title: 'Search: ' + query,
+                    subtitle: 'Run full search with syntax support',
+                    icon: 'search',
+                    action: function(q) { return function() { recordRecentSearch(q); window.location.href = '/search?q=' + encodeURIComponent(q); }; }(query)
+                });
+            }
+
+            // General search - combine sources
             var recentItems = getRecentResults(query, 3);
             var cmdItems = getStaticCommands(query);
             var savedItems2 = getSavedResults(query);
@@ -727,17 +738,47 @@
         dialog.appendChild(row);
         saveInput.focus();
 
+        var pendingConflict = null;
+
         saveInput.addEventListener('keydown', function(e) {
             if (e.key === 'Enter' || e.keyCode === 13) {
                 e.preventDefault();
+
+                // If awaiting overwrite confirmation
+                if (pendingConflict) {
+                    var answer = saveInput.value.trim().toLowerCase();
+                    if (answer === 'y' || answer === 'yes') {
+                        saveCommand(pendingConflict.name, pendingConflict.query, true);
+                        removeSaveRow();
+                        input.focus();
+                    } else {
+                        // Cancel - go back to name input
+                        pendingConflict = null;
+                        label.textContent = 'Name:';
+                        saveInput.value = '';
+                        saveInput.placeholder = 'Enter a name for this search...';
+                        saveInput.maxLength = MAX_NAME;
+                    }
+                    return;
+                }
+
                 var name = saveInput.value.trim();
                 if (!name) {
                     showToast('Please enter a name');
                     return;
                 }
-                saveCommand(name, searchInput.value.trim());
-                removeSaveRow();
-                input.focus();
+                var conflict = saveCommand(name, searchInput.value.trim(), false);
+                if (conflict) {
+                    // Show confirmation prompt in the save row
+                    pendingConflict = { name: name, query: searchInput.value.trim() };
+                    label.textContent = '"' + name + '" exists with: ' + conflict.existing.query + ' — Overwrite?';
+                    saveInput.value = '';
+                    saveInput.placeholder = 'y / n';
+                    saveInput.maxLength = 3;
+                } else {
+                    removeSaveRow();
+                    input.focus();
+                }
             } else if (e.key === 'Escape' || e.keyCode === 27) {
                 e.preventDefault();
                 removeSaveRow();
@@ -751,15 +792,42 @@
         if (row) row.parentNode.removeChild(row);
     }
 
-    function saveCommand(name, query) {
+    // Returns null if saved, or a conflict object if confirmation needed
+    function saveCommand(name, query, forceOverwrite) {
         var saved = getJSON(SAVED_KEY);
+
+        // Same query already saved - just update the name silently
+        for (var i = 0; i < saved.length; i++) {
+            if (saved[i].query === query) {
+                saved[i].name = name.substring(0, MAX_NAME);
+                saved[i].lastUsed = Date.now();
+                setJSON(SAVED_KEY, saved);
+                showToast('Updated: ' + name);
+                return null;
+            }
+        }
+
+        // Same name exists with different query - needs confirmation
+        for (var j = 0; j < saved.length; j++) {
+            if (saved[j].name.toLowerCase() === name.toLowerCase()) {
+                if (!forceOverwrite) {
+                    return { existing: saved[j] };
+                }
+                // Overwrite confirmed
+                saved[j].query = query;
+                saved[j].lastUsed = Date.now();
+                setJSON(SAVED_KEY, saved);
+                showToast('Overwritten: ' + name);
+                return null;
+            }
+        }
 
         if (saved.length >= MAX_SAVED) {
             showToast('Maximum ' + MAX_SAVED + ' saved commands reached');
-            return;
+            return null;
         }
 
-        var cmd = {
+        saved.push({
             id: 'cmd_' + Date.now(),
             name: name.substring(0, MAX_NAME),
             query: query,
@@ -768,11 +836,10 @@
             created: Date.now(),
             lastUsed: Date.now(),
             useCount: 0
-        };
-
-        saved.push(cmd);
+        });
         setJSON(SAVED_KEY, saved);
         showToast('Saved: ' + name);
+        return null;
     }
 
     function deleteSavedCommand(savedId) {
