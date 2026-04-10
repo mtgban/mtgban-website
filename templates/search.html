@@ -1057,9 +1057,12 @@ Sims are not required for pre-constructed decks and other products where the sam
                 return;
             }
 
-            var tag = e.target.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-            if (e.target.isContentEditable) return;
+            // Allow PgUp/PgDn to scroll even when searchbox is focused
+            if (e.key !== 'PageDown' && e.key !== 'PageUp') {
+                var tag = e.target.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+                if (e.target.isContentEditable) return;
+            }
 
             var dest;
             if (e.key === 'PageDown') {
