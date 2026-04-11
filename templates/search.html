@@ -1010,34 +1010,8 @@ Sims are not required for pre-constructed decks and other products where the sam
 
         var searchbox = document.getElementById('searchbox');
 
-        // Blur the input so PgUp/PgDn work immediately after results load
-        if (searchbox) searchbox.blur();
-
         var STICKY_OFFSET = 69; // nav-height(48) + cover(21)
-
-        // Capture each header's true document position at page load
-        var targets = [];
-        var initialScroll = window.scrollY;
-        for (var i = 0; i < headers.length; i++) {
-            targets.push(headers[i].getBoundingClientRect().top + initialScroll - STICKY_OFFSET);
-        }
-
-        function currentFromScroll() {
-            var scrollY = window.scrollY;
-            var current = -1;
-            for (var i = 0; i < targets.length; i++) {
-                if (scrollY >= targets[i] - 2) {
-                    current = i;
-                } else {
-                    break;
-                }
-            }
-            // If we're just above the first header (within 20px), treat as at header 0
-            if (current === -1 && targets.length > 0 && targets[0] - scrollY < 20) {
-                current = 0;
-            }
-            return current;
-        }
+        var currentIdx = 0;
 
         document.addEventListener('keydown', function(e) {
             // Tab: focus the search input
@@ -1051,7 +1025,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                 }
             }
 
-            // Escape: blur the input to re-enable PgUp/PgDn
+            // Escape: blur the input
             if (e.key === 'Escape' && searchbox) {
                 searchbox.blur();
                 return;
@@ -1064,28 +1038,29 @@ Sims are not required for pre-constructed decks and other products where the sam
                 if (e.target.isContentEditable) return;
             }
 
-            var dest;
             if (e.key === 'PageDown') {
                 e.preventDefault();
-                var current = currentFromScroll();
-                dest = Math.min(current + 1, targets.length - 1);
+                if (currentIdx < headers.length - 1) {
+                    currentIdx++;
+                }
+                // Scroll so the target header lands exactly at its sticky position
+                var delta = headers[currentIdx].getBoundingClientRect().top - STICKY_OFFSET;
+                window.scrollBy(0, delta);
             } else if (e.key === 'PageUp') {
                 e.preventDefault();
-                var current = currentFromScroll();
-                if (current <= 0) {
-                    window.scrollTo({top: 0, behavior: 'smooth'});
+                if (currentIdx <= 0) {
+                    currentIdx = 0;
+                    window.scrollTo(0, 0);
                     return;
                 }
-                if (window.scrollY <= targets[current] + 2) {
-                    dest = current - 1;
-                } else {
-                    dest = current;
-                }
-            } else {
-                return;
+                currentIdx--;
+                // Stuck headers report rect.top=69 (sticky position), so
+                // briefly scroll to top to measure the natural position
+                var saved = window.scrollY;
+                window.scrollTo(0, 0);
+                var target = headers[currentIdx].getBoundingClientRect().top - STICKY_OFFSET;
+                window.scrollTo(0, target);
             }
-
-            window.scrollTo({top: targets[dest], behavior: 'smooth'});
         });
     })();
     </script>
