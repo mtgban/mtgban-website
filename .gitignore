@@ -32,3 +32,6 @@ logs/
 
 #dev container stuff
 compose-dev.yaml
+
+# IntelliJ
+.idea/
