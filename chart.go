@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -103,25 +102,6 @@ func getDataset(cardId string, labels []string, config DatasetConfig) (Dataset, 
 		Data:  data,
 		Color: config.Color,
 	}, nil
-}
-
-func deleteEntry(cardId, dataset, key string) error {
-	var db *redis.Client
-	for _, config := range Config.TimeseriesConfig.Datasets {
-		if config.PublicName != dataset {
-			continue
-		}
-		db = redis.NewClient(&redis.Options{
-			Addr: Config.TimeseriesConfig.Address,
-			DB:   config.Index,
-		})
-		break
-	}
-	if db == nil {
-		return errors.New("redis database not found")
-	}
-
-	return db.HDel(context.Background(), cardId, key).Err()
 }
 
 // A default scale for converting non-NM prices to NM
