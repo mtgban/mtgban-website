@@ -6,9 +6,11 @@ import (
 	"log"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 type TimeseriesConfig struct {
@@ -34,25 +36,30 @@ type Dataset struct {
 	Sealed bool
 }
 
-// Get all the keys that will be used as x asis labels
-func getDateAxisValues(cardId string) []string {
+// getDateAxisValues generates daily date labels from today back to earliest.
+func getDateAxisValues(earliest time.Time) []string {
 	var dates []string
-
-	// Set the current date
 	today := time.Now()
-
-	// Set the earliest date as six months ago
-	sixMonthsAgo := today.AddDate(0, -6, 0)
-
-	// Loop from today back to six months ago
-	for d := today; !d.Before(sixMonthsAgo); d = d.AddDate(0, 0, -1) {
+	for d := today; !d.Before(earliest); d = d.AddDate(0, 0, -1) {
 		dates = append(dates, d.Format("2006-01-02"))
 	}
-
 	return dates
 }
 
-func getDatasets(cardId string, sealed bool, keys []string) []Dataset {
+func lookbackForTier(tier string) timeseries.Lookback {
+	switch tier {
+	case "Vintage":
+		return timeseries.LookbackVintage
+	case "Legacy":
+		return timeseries.LookbackLegacy
+	case "Modern":
+		return timeseries.LookbackModern
+	default:
+		return timeseries.LookbackStandard
+	}
+}
+
+func getDatasets(cardId string, sealed bool, keys []string, userTier string) []Dataset {
 	var datasets []Dataset
 	for _, config := range Config.TimeseriesConfig.Datasets {
 		if sealed && !config.HasSealed {
@@ -62,7 +69,7 @@ func getDatasets(cardId string, sealed bool, keys []string) []Dataset {
 			continue
 		}
 
-		dataset, err := getDataset(cardId, keys, config)
+		dataset, err := getDataset(cardId, keys, config, userTier)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -72,26 +79,33 @@ func getDatasets(cardId string, sealed bool, keys []string) []Dataset {
 	return datasets
 }
 
-func getDataset(cardId string, labels []string, config DatasetConfig) (Dataset, error) {
-	db := redis.NewClient(&redis.Options{
-		Addr: Config.TimeseriesConfig.Address,
-		DB:   config.Index,
-	})
+func getDataset(cardId string, labels []string, config DatasetConfig, userTier string) (Dataset, error) {
+	if PricesArchiveDB == nil {
+		return Dataset{}, nil
+	}
 
-	results, err := db.HGetAll(context.Background(), cardId).Result()
+	isFoil := strings.HasSuffix(cardId, "_f")
+	if isFoil {
+		cardId = strings.TrimSuffix(cardId, "_f")
+	}
+
+	results, err := PricesArchiveDB.HGetAll(context.Background(), cardId, isFoil, nil, lookbackForTier(userTier))
 	if err != nil {
 		return Dataset{}, err
 	}
 
 	var data []string
-	var found bool
 	if len(results) > 0 {
-		// Fill in missing points with NaNs so that the values
-		// can be mapped consistently on the chart
 		data = make([]string, len(labels))
-		for i := range labels {
-			data[i], found = results[labels[i]]
-			if !found {
+		for i, label := range labels {
+			if row, ok := results[label]; ok {
+				price := row.PriceForDataset(config.Index)
+				if price != nil {
+					data[i] = fmt.Sprintf("%g", *price)
+				} else {
+					data[i] = "Number.NaN"
+				}
+			} else {
 				data[i] = "Number.NaN"
 			}
 		}

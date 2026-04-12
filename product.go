@@ -12,6 +12,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 type EditionEntry struct {
@@ -649,7 +650,7 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 
 	highestBuylistInThreeMonths := mtgban.InventoryRecord{}
 	threeMonthsAgo := time.Now().AddDate(0, 0, -90)
-	dates := getDateAxisValues("")
+	dates := getDateAxisValues(timeseries.LookbackStandard.Since())
 
 	for cardId, entries := range bl {
 		// Sanity check
