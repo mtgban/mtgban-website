@@ -26,6 +26,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
+	"github.com/mtgban/mtgban-website/timeseries"
 
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/oauth2/google"
@@ -422,9 +423,9 @@ type ConfigType struct {
 	Patreon                PatreonConfig      `json:"patreon"`
 	ApiUserSecrets         map[string]string  `json:"api_user_secrets"`
 	GoogleCredentials      string             `json:"google_credentials"`
-	BuylistMarketCredit    map[string]float64 `json:"buylist_market_credit"`
-
-	ACL map[string]map[string]map[string]string `json:"acl"`
+	BuylistMarketCredit    map[string]float64                      `json:"buylist_market_credit"`
+	SqlConfig              timeseries.SqlConfig                    `json:"sql_config"`
+	ACL                    map[string]map[string]map[string]string `json:"acl"`
 
 	Uploader map[string]string `json:"uploader"`
 
@@ -444,6 +445,8 @@ var LastNewspaperUpdate time.Time
 var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
 var NewNewspaperDB *sql.DB
+
+var PricesArchiveDB *timeseries.Client
 
 var GoogleDocsClient *http.Client
 
@@ -668,6 +671,12 @@ func loadVars(port, datastorePath, offlineKey string) error {
 }
 
 func openDBs() (err error) {
+	PricesArchiveDB, err = timeseries.NewClient(Config.SqlConfig)
+	if err != nil {
+		log.Println("error creating a SQL client:", err)
+		return err
+	}
+
 	if Config.DBAddress == "" {
 		log.Println("no DB address set, Archive won't be loaded")
 	} else {
