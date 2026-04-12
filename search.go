@@ -603,12 +603,23 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
-		pageVars.AxisLabels = getDateAxisValues(chartId)
+		userTier := GetParamFromSig(sig, "UserTier")
 		pageVars.ChartID = chartId
 
-		pageVars.Datasets = getDatasets(chartId, co.Sealed, pageVars.AxisLabels)
-		if len(pageVars.Datasets) == 0 {
+		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
+		} else {
+			lb := lookbackForTier(userTier)
+
+			isFoil := strings.HasSuffix(chartId, "_f")
+			cleanId := strings.TrimSuffix(chartId, "_f")
+			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), cleanId, isFoil, lb)
+
+			pageVars.AxisLabels = getDateAxisValues(earliest)
+			pageVars.Datasets = getDatasets(chartId, co.Sealed, pageVars.AxisLabels, userTier)
+			if len(pageVars.Datasets) == 0 {
+				pageVars.InfoMessage = "No chart data available"
+			}
 		}
 
 		altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
