@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -126,8 +125,8 @@ var defaultGradeMap = map[string]float64{
 var StashingInProgress bool
 
 func stashInTimeseries() {
-	if Config.TimeseriesConfig.Address == "" {
-		log.Println("Timeseries address not set")
+	if PricesArchiveDB == nil {
+		log.Println("PricesArchiveDB not initialized, skipping stash")
 		return
 	}
 
@@ -135,77 +134,102 @@ func stashInTimeseries() {
 	ServerNotify("timeseries", "Taking snapshot...")
 	StashingInProgress = true
 
+	// Accumulate all prices into a single row per (date, uuid, foil).
+	accumulated := map[string]*timeseries.PriceRow{}
+
+	getRow := func(uuid string, isFoil bool, date string) *timeseries.PriceRow {
+		key := date + "|" + uuid
+		if isFoil {
+			key += "_f"
+		}
+		row, ok := accumulated[key]
+		if !ok {
+			row = &timeseries.PriceRow{
+				Date:        date,
+				MtgjsonUUID: uuid,
+				IsFoil:      isFoil,
+			}
+			accumulated[key] = row
+		}
+		return row
+	}
+
+	// parseFoil strips the _f suffix and returns the clean UUID + foil flag
+	parseFoil := func(id string) (string, bool) {
+		if strings.HasSuffix(id, "_f") {
+			return strings.TrimSuffix(id, "_f"), true
+		}
+		return id, false
+	}
+
+	// Collect retail prices from sellers
 	for _, seller := range Sellers {
 		for _, config := range Config.TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Retail, seller.Info().Shorthand) {
 				continue
 			}
 
-			key := seller.Info().InventoryTimestamp.Format("2006-01-02")
-
-			db := redis.NewClient(&redis.Options{
-				Addr: Config.TimeseriesConfig.Address,
-				DB:   config.Index,
-			})
-
+			date := seller.Info().InventoryTimestamp.Format("2006-01-02")
 			log.Println("Stashing", seller.Info().Shorthand, "in", config.PublicName, "timeseries")
 
-			for uuid, entries := range seller.Inventory() {
-				// Adjust price through defaultGradeMap in case NM is not available
+			for id, entries := range seller.Inventory() {
 				price := entries[0].Price * defaultGradeMap[entries[0].Conditions]
 
-				// Check if there is a specific price entry
 				realRetail, found := entries[0].CustomFields["RetailPrice"]
 				if entries[0].Conditions != "NM" && found {
 					price, _ = strconv.ParseFloat(realRetail, 64)
 				}
 
-				// Skip empty
 				if price == 0 {
 					continue
 				}
 
-				err := db.HSetNX(context.Background(), uuid, key, price).Err()
-				if err != nil {
-					ServerNotify("timeseries", err.Error())
-					break
-				}
+				uuid, isFoil := parseFoil(id)
+				row := getRow(uuid, isFoil, date)
+				row.SetPriceForDataset(config.Index, price)
 			}
 		}
 	}
 
+	// Collect buylist prices from vendors
 	for _, vendor := range Vendors {
 		for _, config := range Config.TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Buylist, vendor.Info().Shorthand) {
 				continue
 			}
 
-			key := vendor.Info().BuylistTimestamp.Format("2006-01-02")
-
-			db := redis.NewClient(&redis.Options{
-				Addr: Config.TimeseriesConfig.Address,
-				DB:   config.Index,
-			})
-
+			date := vendor.Info().BuylistTimestamp.Format("2006-01-02")
 			log.Println("Stashing", vendor.Info().Shorthand, "in", config.PublicName, "timeseries")
 
-			for uuid, entries := range vendor.Buylist() {
-				// Adjust price through defaultGradeMap in case NM is not available
+			for id, entries := range vendor.Buylist() {
 				price := entries[0].BuyPrice * defaultGradeMap[entries[0].Conditions]
 				if price == 0 {
 					continue
 				}
 
-				err := db.HSetNX(context.Background(), uuid, key, price).Err()
-				if err != nil {
-					ServerNotify("timeseries", err.Error())
-					break
-				}
+				uuid, isFoil := parseFoil(id)
+				row := getRow(uuid, isFoil, date)
+				row.SetPriceForDataset(config.Index, price)
 			}
 		}
 	}
 
+	// Upsert all accumulated rows
+	var upserted, errCount int
+	for _, row := range accumulated {
+		err := PricesArchiveDB.UpsertRow(context.Background(), *row)
+		if err != nil {
+			errCount++
+			if errCount <= 5 {
+				ServerNotify("timeseries", fmt.Sprintf("upsert error for %s: %s", row.MtgjsonUUID, err))
+			}
+			continue
+		}
+		upserted++
+	}
+
 	LastStashUpdate = time.Now()
 	StashingInProgress = false
-	ServerNotify("timeseries", "Snapshot completed in "+fmt.Sprint(time.Since(start)))
+	msg := fmt.Sprintf("Snapshot completed in %s: %d upserted, %d errors", time.Since(start), upserted, errCount)
+	ServerNotify("timeseries", msg)
 }
