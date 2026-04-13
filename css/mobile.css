@@ -240,12 +240,27 @@ body.mobile .page-content {
 }
 
 /* Home page ambient gradient behind brand */
-.dark-theme .m-home {
-    background: radial-gradient(ellipse at 50% 30%, rgba(229, 57, 53, 0.08) 0%, transparent 60%);
+.m-home::before {
+    content: '';
+    position: absolute;
+    inset: -60px;
+    pointer-events: none;
+    z-index: -1;
+    filter: url(#grain);
 }
 
-.light-theme .m-home {
-    background: radial-gradient(ellipse at 50% 30%, rgba(229, 57, 53, 0.05) 0%, transparent 60%);
+.dark-theme .m-home::before {
+    background: radial-gradient(ellipse 120% 55% at 50% 0%,
+        oklch(45% 0.10 45 / 0.22) 0%,
+        transparent 65%
+    );
+}
+
+.light-theme .m-home::before {
+    background: radial-gradient(ellipse 120% 55% at 50% 0%,
+        oklch(45% 0.10 45 / 0.12) 0%,
+        transparent 65%
+    );
 }
 
 /* Hide nav home button when already on home page */
@@ -254,6 +269,7 @@ body.mobile:has(.m-home) .m-nav-home {
 }
 
 .m-home {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -321,18 +337,7 @@ body.mobile:has(.m-home) .m-nav-home {
 }
 
 .m-home-tool-icon {
-    font-size: 0.85rem;
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 50%;
-    width: 1.6em;
-    height: 1.6em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.light-theme .m-home-tool-icon {
-    background: rgba(0, 0, 0, 0.05);
+    font-size: 1rem;
 }
 
 .m-home-error {
