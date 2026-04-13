@@ -351,6 +351,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	}
 
 	// Build the finish chip: defaults to Foil/Etched, overridden by alt foil type
+	var treatments []string
 	finishTag := ""
 	finishClass := ""
 	if co.Etched {
