@@ -492,9 +492,9 @@
     backdrop-filter: blur(20px) saturate(1.5);
     -webkit-backdrop-filter: blur(20px) saturate(1.5);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px 16px 0 0;
+    border-radius: 20px 20px 0 0;
     transform: translateY(100%);
-    transition: transform 250ms ease;
+    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
     padding: 0.5em 1em 1.5em;
     max-height: 70vh;
 }
@@ -514,11 +514,13 @@
     width: 40px;
     height: 5px;
     border-radius: 3px;
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.1);
 }
 
 .light-theme .m-drawer-handle span {
     background: rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
 }
 
 .light-theme .m-drawer,
@@ -576,9 +578,9 @@
     backdrop-filter: blur(20px) saturate(1.5);
     -webkit-backdrop-filter: blur(20px) saturate(1.5);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px 16px 0 0;
+    border-radius: 20px 20px 0 0;
     transform: translateY(100%);
-    transition: transform 250ms ease;
+    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
     padding: 0.5em 1em 2em;
     min-height: 45vh;
     max-height: 80vh;
@@ -1069,9 +1071,9 @@
     backdrop-filter: blur(20px) saturate(1.5);
     -webkit-backdrop-filter: blur(20px) saturate(1.5);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 16px 16px 0 0;
+    border-radius: 20px 20px 0 0;
     transform: translateY(100%);
-    transition: transform 250ms ease, visibility 0s 250ms;
+    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s 300ms;
     visibility: hidden;
     padding: 0.5em 0.75em 1em;
     height: 65vh;
@@ -1083,7 +1085,7 @@
 .m-chart-drawer.open {
     transform: translateY(0);
     visibility: visible;
-    transition: transform 250ms ease, visibility 0s 0s;
+    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s 0s;
 }
 
 .m-chart-header {
