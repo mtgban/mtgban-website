@@ -124,6 +124,11 @@
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
+/* Rarity accent - colored top border from RarityColor */
+.m-card {
+    border-top: 2px solid var(--rarity-color, transparent);
+}
+
 .m-card-header {
     display: flex;
     align-items: center;
@@ -325,6 +330,15 @@
 
 .light-theme .m-vendor-row {
     border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Alternating row tint for scan-ability */
+.m-vendor-row:nth-child(even) summary {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.light-theme .m-vendor-row:nth-child(even) summary {
+    background: rgba(0, 0, 0, 0.015);
 }
 
 .m-vendor-row:last-child {
