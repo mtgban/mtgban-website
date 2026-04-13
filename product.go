@@ -5,11 +5,9 @@ import (
 	"log"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -587,18 +585,22 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 		return nil
 	}
 
-	var db *redis.Client
-	for _, config := range Config.TimeseriesConfig.Datasets {
-		if !slices.Contains(config.Buylist, store) {
-			continue
-		}
-		db = redis.NewClient(&redis.Options{
-			Addr: Config.TimeseriesConfig.Address,
-			DB:   config.Index,
-		})
-	}
-	if db == nil {
+	if PricesArchiveDB == nil {
 		log.Println(store, "does not have any db configured")
+		return nil
+	}
+
+	var datasetIndex int
+	var found bool
+	for _, config := range Config.TimeseriesConfig.Datasets {
+		if slices.Contains(config.Buylist, store) {
+			datasetIndex = config.Index
+			found = true
+			break
+		}
+	}
+	if !found {
+		log.Println(store, "does not have any dataset configured")
 		return nil
 	}
 
@@ -622,7 +624,9 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 		}
 
 		// Query history
-		results, err := db.HGetAll(context.Background(), cardId).Result()
+		isFoil := strings.HasSuffix(cardId, "_f")
+		cleanId := strings.TrimSuffix(cardId, "_f")
+		results, err := PricesArchiveDB.HGetAll(context.Background(), cleanId, isFoil, nil, timeseries.LookbackStandard)
 		if err != nil {
 			log.Println(err)
 			break
@@ -632,7 +636,12 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 		var i int
 		var lowestPrice float64
 		for i = range dates {
-			price, _ := strconv.ParseFloat(results[dates[i]], 64)
+			var price float64
+			if row, ok := results[dates[i]]; ok {
+				if p := row.PriceForDataset(datasetIndex); p != nil {
+					price = *p
+				}
+			}
 			if price > 0 && price > buylistPrice {
 				break
 			}
