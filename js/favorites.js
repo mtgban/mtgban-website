@@ -34,8 +34,23 @@
         if (parts.length >= 1) edition = parts[0].trim();
         if (parts.length >= 2) number = parts[1].replace('#', '').trim();
 
-        var isFoil = card.querySelector('.m-badge.foil') !== null;
+        var isFoil = card.querySelector('.m-badge.foil') !== null || card.querySelector('.m-badge.altfoil') !== null;
         var isEtched = card.querySelector('.m-badge.etched') !== null;
+
+        var finishBadge = card.querySelector('.m-badge.foil, .m-badge.etched, .m-badge.altfoil');
+        var finishTag = finishBadge ? finishBadge.textContent.trim() : '';
+        var finishClass = '';
+        if (finishBadge) {
+            if (finishBadge.classList.contains('altfoil')) finishClass = 'altfoil';
+            else if (finishBadge.classList.contains('etched')) finishClass = 'etched';
+            else finishClass = 'foil';
+        }
+
+        var treatments = [];
+        card.querySelectorAll('.m-badge.treatment').forEach(function(el) {
+            treatments.push(el.textContent.trim());
+        });
+
 
         // Get best sell price + vendor name (use Best badge, which accounts for INDEX)
         var sellPrice = null;
@@ -90,6 +105,9 @@
             number: number,
             foil: isFoil,
             etched: isEtched,
+            finishTag: finishTag,
+            finishClass: finishClass,
+            treatments: treatments,
             sellPrice: sellPrice,
             sellVendor: sellVendor,
             buyPrice: buyPrice,
@@ -159,8 +177,8 @@
             html += '<div class="m-fav-item-top">';
             html += '<span class="m-fav-name">' + escapeHtml(f.name) + '</span>';
             html += '<span class="m-fav-set">' + escapeHtml(f.set) + (f.number ? ' #' + escapeHtml(f.number) : '') + '</span>';
-            if (f.foil) html += '<span class="m-badge foil">Foil</span>';
-            if (f.etched) html += '<span class="m-badge etched">Etched</span>';
+            if (f.finishTag) html += '<span class="m-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
+            if (f.treatments) f.treatments.forEach(function(tag) { html += '<span class="m-badge treatment">' + escapeHtml(tag) + '</span>'; });
             html += '</div>';
             html += '<div class="m-fav-item-prices">';
             if (f.sellPrice !== null) {

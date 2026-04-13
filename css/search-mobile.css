@@ -162,6 +162,7 @@
     text-overflow: ellipsis;
 }
 
+
 .m-card-set {
     font-size: 0.75rem;
     color: var(--greytext);
@@ -191,13 +192,35 @@
 }
 
 .m-badge.foil {
-    background: linear-gradient(135deg, #ea8d66, #fdef8a, #8bcc93, #a6dced);
-    color: #222;
+    background: rgba(253, 239, 138, 0.15);
+    color: #fdef8a;
+    border: 1px solid rgba(253, 239, 138, 0.3);
+}
+.light-theme .m-badge.foil {
+    background: rgba(180, 160, 60, 0.12);
+    color: #8a7a20;
+    border-color: rgba(180, 160, 60, 0.3);
 }
 
 .m-badge.etched {
     background: linear-gradient(135deg, #a6dced, #c9b1ff);
     color: #222;
+}
+
+.m-badge.altfoil {
+    background: linear-gradient(135deg, #ea8d66, #fdef8a, #8bcc93, #a6dced);
+    color: #222;
+}
+
+.m-badge.treatment {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--greytext);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.light-theme .m-badge.treatment {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.15);
 }
 
 /* Tab toggle: Sellers / Buyers */
