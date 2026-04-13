@@ -170,7 +170,7 @@
     {{/* Results */}}
     {{range $i, $cardId := .AllKeys}}
         {{$card := (index $.Metadata $cardId)}}
-        <div class="m-card">
+        <div class="m-card"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
             {{/* Card header - tap to show image drawer */}}
             <div class="m-card-header" data-setcode="{{$card.SetCode}}" onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
                 <div class="m-card-icon">
