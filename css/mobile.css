@@ -239,6 +239,15 @@ body.mobile .page-content {
     --greytext: #7a88b0;
 }
 
+/* Home page ambient gradient behind brand */
+.dark-theme .m-home {
+    background: radial-gradient(ellipse at 50% 30%, rgba(229, 57, 53, 0.08) 0%, transparent 60%);
+}
+
+.light-theme .m-home {
+    background: radial-gradient(ellipse at 50% 30%, rgba(229, 57, 53, 0.05) 0%, transparent 60%);
+}
+
 /* Hide nav home button when already on home page */
 body.mobile:has(.m-home) .m-nav-home {
     visibility: hidden;
@@ -298,15 +307,32 @@ body.mobile:has(.m-home) .m-nav-home {
     display: flex;
     align-items: center;
     gap: 0.3em;
-    padding: 0.4em 0.6em;
+    padding: 0.4em 0.75em;
     font-size: 0.8rem;
     color: var(--activetext);
     text-decoration: none;
     white-space: nowrap;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+}
+
+.light-theme .m-home-tool {
+    border-color: rgba(0, 0, 0, 0.1);
 }
 
 .m-home-tool-icon {
-    font-size: 1rem;
+    font-size: 0.85rem;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 50%;
+    width: 1.6em;
+    height: 1.6em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.light-theme .m-home-tool-icon {
+    background: rgba(0, 0, 0, 0.05);
 }
 
 .m-home-error {
@@ -368,4 +394,35 @@ body.mobile:has(.m-home) .m-nav-home {
 .m-home-copyright {
     font-size: 0.7rem;
     color: var(--greytext);
+}
+
+/* Home page entrance animation */
+@keyframes homeReveal {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.m-home-brand {
+    animation: homeReveal 400ms ease both;
+}
+
+.m-home-search-wrap {
+    animation: homeReveal 400ms ease 80ms both;
+}
+
+.m-home-tools {
+    animation: homeReveal 400ms ease 160ms both;
+}
+
+.m-home-footer {
+    animation: homeReveal 400ms ease 240ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .m-home-brand,
+    .m-home-search-wrap,
+    .m-home-tools,
+    .m-home-footer {
+        animation: none;
+    }
 }
