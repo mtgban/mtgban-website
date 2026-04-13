@@ -692,6 +692,33 @@
     background: rgba(239,68,68,0.1);
     color: #ef4444;
 }
+.result-badge.foil {
+    background: rgba(253, 239, 138, 0.15);
+    color: #fdef8a;
+    border: 1px solid rgba(253, 239, 138, 0.3);
+}
+.light-theme .result-badge.foil {
+    background: rgba(180, 160, 60, 0.12);
+    color: #8a7a20;
+    border-color: rgba(180, 160, 60, 0.3);
+}
+.result-badge.etched {
+    background: linear-gradient(135deg, #a6dced, #c9b1ff);
+    color: #222;
+}
+.result-badge.altfoil {
+    background: linear-gradient(135deg, #ea8d66, #fdef8a, #8bcc93, #a6dced);
+    color: #222;
+}
+.result-badge.treatment {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--search-text-dim);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.light-theme .result-badge.treatment {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.15);
+}
 
 .result-quick-icons {
     grid-column: 3;

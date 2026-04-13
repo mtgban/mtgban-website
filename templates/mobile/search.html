@@ -188,8 +188,8 @@
                     <span class="m-card-set">{{$card.Edition}}{{if $card.Number}} · #{{$card.Number}}{{end}}</span>
                 </div>
                 <div class="m-card-badges">
-                    {{if $card.Foil}}<span class="m-badge foil">Foil</span>{{end}}
-                    {{if $card.Etched}}<span class="m-badge etched">Etched</span>{{end}}
+                    {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
+                    {{range $card.Treatments}}<span class="m-badge treatment">{{.}}</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn" data-card="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
                     {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
