@@ -255,17 +255,46 @@
     color: var(--greytext);
     cursor: pointer;
     white-space: nowrap;
-    height: 20px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     line-height: 1;
 }
 
 .m-cond-pill.active {
-    background: var(--dodgerblue);
     color: white;
+    box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
+}
+
+/* Condition-specific colors: green=NM through red=PO */
+.m-cond-pill[data-cond="NM"].active {
+    background: #2d8a4e;
+    border-color: #2d8a4e;
+    box-shadow: 0 0 6px rgba(45, 138, 78, 0.3);
+}
+
+.m-cond-pill[data-cond="SP"].active {
+    background: var(--dodgerblue);
     border-color: var(--dodgerblue);
     box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
+}
+
+.m-cond-pill[data-cond="MP"].active {
+    background: #c5a84a;
+    border-color: #c5a84a;
+    box-shadow: 0 0 6px rgba(197, 168, 74, 0.3);
+}
+
+.m-cond-pill[data-cond="HP"].active {
+    background: #d97706;
+    border-color: #d97706;
+    box-shadow: 0 0 6px rgba(217, 119, 6, 0.3);
+}
+
+.m-cond-pill[data-cond="PO"].active {
+    background: #dc2626;
+    border-color: #dc2626;
+    box-shadow: 0 0 6px rgba(220, 38, 38, 0.3);
 }
 
 /* Condition groups (show/hide by active pill) */
@@ -275,6 +304,16 @@
 
 .m-cond-group.active {
     display: block;
+}
+
+/* Content fade when switching conditions */
+@keyframes condFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.m-cond-group.active {
+    animation: condFadeIn 150ms ease;
 }
 
 /* Vendor rows (details/summary) */
