@@ -144,10 +144,12 @@ func stashInTimeseries() {
 		}
 		row, ok := accumulated[key]
 		if !ok {
+			lang := ""
 			row = &timeseries.PriceRow{
 				Date:        date,
 				MtgjsonUUID: uuid,
 				IsFoil:      isFoil,
+				Language:    &lang,
 			}
 			accumulated[key] = row
 		}

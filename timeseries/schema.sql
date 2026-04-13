@@ -1,22 +1,30 @@
-CREATE TABLE IF NOT EXISTS product_prices (
-    date                                DATE     NOT NULL,
-    mtgjson_uuid                        TEXT     NOT NULL,
-    is_foil                             BOOLEAN  NOT NULL DEFAULT FALSE,
-    language                            TEXT,
-    is_alt                              BOOLEAN  NOT NULL DEFAULT FALSE,
-
-    cardkingdom_buylist_price            NUMERIC(10, 2),
-    tcgplayer_market_price               NUMERIC(10, 2),
-    tcgplayer_low_price                  NUMERIC(10, 2),
-    cardkingdom_retail_price             NUMERIC(10, 2),
-    cardmarket_low_price                 NUMERIC(10, 2),
-    cardmarket_trend_price               NUMERIC(10, 2),
-    starcitygames_buylist_price          NUMERIC(10, 2),
-    abu_buylist_price                    NUMERIC(10, 2),
-    coolstuffinc_buylist_price           NUMERIC(10, 2),
-    tcgplayer_low_sealed_expected_value  NUMERIC(10, 2),
-
-    PRIMARY KEY (date, mtgjson_uuid, is_foil, language, is_alt)
+create table public.product_prices (
+    "date" date not null,
+    mtgjson_uuid uuid not null,
+    is_foil bool default false not null,
+    "language" text default ''::text not null,
+    is_alt bool default false not null,
+    cardkingdom_buylist_price numeric(10, 2) null,
+    tcgplayer_market_price numeric(10, 2) null,
+    tcgplayer_low_price numeric(10, 2) null,
+    cardkingdom_retail_price numeric(10, 2) null,
+    cardmarket_low_price numeric(10, 2) null,
+    cardmarket_trend_price numeric(10, 2) null,
+    starcitygames_buylist_price numeric(10, 2) null,
+    abu_buylist_price numeric(10, 2) null,
+    coolstuffinc_buylist_price numeric(10, 2) null,
+    tcgplayer_low_sealed_expected_value numeric(10, 2) null
 );
 
-CREATE INDEX IF NOT EXISTS idx_product_prices_uuid ON product_prices (mtgjson_uuid);
+create unique index idx_unique_price_entry on
+    public.product_prices
+    using btree (date,
+    mtgjson_uuid,
+    is_foil,
+    language,
+    is_alt);
+
+create index idx_uuid_date on
+    public.product_prices
+    using btree (mtgjson_uuid,
+    date);
