@@ -9,7 +9,6 @@ require (
 	github.com/bwmarrin/discordgo v0.27.1
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
 	github.com/extrame/xls v0.0.1
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
@@ -18,7 +17,6 @@ require (
 	github.com/mileusna/useragent v1.3.5
 	github.com/mtgban/go-mtgban v0.5.53
 	github.com/mtgban/simplecloud v0.0.7
-	github.com/redis/go-redis/v9 v9.12.1
 	github.com/xuri/excelize/v2 v2.8.0
 	golang.org/x/oauth2 v0.34.0
 	golang.org/x/sys v0.42.0
@@ -64,7 +62,6 @@ require (
 	github.com/aws/smithy-go v1.24.2 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20251210132809-ee656c7534f5 // indirect
-	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
@@ -83,7 +80,6 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
 	github.com/mtgban/go-tcgplayer v0.0.1 // indirect
-	github.com/onsi/gomega v1.27.10 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
 	github.com/richardlehane/msoleps v1.0.3 // indirect
