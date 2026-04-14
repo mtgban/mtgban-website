@@ -655,12 +655,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 attributeFilter: ['class'],
                             });
 
-                            // Store full data for date range filtering
-                            const fullLabels = cardChart.data.labels.slice();
-                            const fullDatasets = cardChart.data.datasets.map(function (ds) {
-                                return ds.data.slice();
-                            });
-
                             // Restore saved date range, default to 6 months
                             const savedRange = localStorage.getItem('chartDateRange');
                             if (savedRange !== null) {
@@ -669,24 +663,13 @@ Sims are not required for pre-constructed decks and other products where the sam
                             changeRange(parseInt(document.getElementById('dateRange').value));
 
                             function changeRange(rangeDays) {
-                                let labels, data;
-                                if (rangeDays === 0 || rangeDays >= fullLabels.length) {
-                                    labels = fullLabels;
-                                    data = fullDatasets;
+                                var allLabels = cardChart.data.labels;
+                                if (rangeDays === 0 || rangeDays >= allLabels.length) {
+                                    cardChart.options.scales.x.min = undefined;
                                 } else {
-                                    labels = fullLabels.slice(0, rangeDays);
-                                    data = fullDatasets.map(function(d) { return d.slice(0, rangeDays); });
+                                    // Labels are newest-first; element at rangeDays-1 is the cutoff
+                                    cardChart.options.scales.x.min = allLabels[rangeDays - 1];
                                 }
-
-                                cardChart.data.labels = labels;
-                                cardChart.data.datasets.forEach(function(ds, i) {
-                                    ds.data = data[i];
-                                });
-
-                                if (cardChart.options.scales.xAxes[1]) {
-                                    cardChart.options.scales.xAxes[1].labels = labels;
-                                }
-
                                 cardChart.update();
                                 localStorage.setItem('chartDateRange', rangeDays.toString());
                             }
