@@ -96,7 +96,8 @@
 /* Result metadata */
 .m-result-meta {
     display: flex;
-    align-items: baseline;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 0.4em;
     padding: 0.75em 0 0.75em;
     font-size: 0.85rem;
@@ -105,6 +106,53 @@
 
 .m-meta-sub {
     font-size: 0.75rem;
+}
+
+/* Sort pills */
+.m-sort-pills {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+}
+
+.m-sort-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5em;
+    border-radius: 50%;
+    border: none;
+    color: var(--greytext);
+    text-decoration: none;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.m-sort-pill::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+}
+
+.m-sort-pill i,
+.m-sort-pill svg {
+    width: 18px;
+    height: 18px;
+}
+
+.m-sort-pill:active {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(0.85);
+}
+
+.m-sort-pill.active {
+    color: var(--search-link);
+}
+
+.m-sort-pill.reversed svg {
+    transform: rotate(180deg);
 }
 
 /* Card container */

@@ -159,11 +159,22 @@
     var mFilterSets = [{{range .AllKeys}}{{$card := index $.Metadata .}}{code:"{{$card.SetCode}}",name:"{{$card.Edition}}"},{{end}}];
     </script>
 
-    {{/* Result count */}}
+    {{/* Result count + sort pills */}}
     {{if .TotalUnique}}
     <div class="m-result-meta">
         <span>{{.TotalUnique}} {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found</span>
         {{if gt .TotalUnique (len .AllKeys)}}<span class="m-meta-sub">({{len .AllKeys}} shown)</span>{{end}}
+        {{if not .NoSort}}
+        <div class="m-sort-pills">
+            {{$isChronoSorted := or (eq .SearchSort "chrono") (not .SearchSort)}}
+            {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
+            <a class="m-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort={{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological"><i data-lucide="clock"></i></a>
+            <a class="m-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=alpha{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical"><i data-lucide="a-large-small"></i></a>
+            <a class="m-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number"><i data-lucide="hash"></i></a>
+            <a class="m-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i></a>
+            <a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i></a>
+        </div>
+        {{end}}
     </div>
     {{end}}
 
