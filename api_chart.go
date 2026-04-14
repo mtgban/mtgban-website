@@ -27,7 +27,7 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if Config.TimeseriesConfig.Address == "" {
+	if PricesArchiveDB == nil {
 		http.Error(w, "charts not available", http.StatusServiceUnavailable)
 		return
 	}
@@ -38,8 +38,16 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	axisLabels := getDateAxisValues(uuid)
-	datasets := getDatasets(uuid, co.Sealed, axisLabels)
+	sig := r.FormValue("sig")
+	userTier := GetParamFromSig(sig, "UserTier")
+
+	isFoil := strings.HasSuffix(uuid, "_f")
+	cleanId := strings.TrimSuffix(uuid, "_f")
+	lb := lookbackForTier(userTier)
+	earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), cleanId, isFoil, lb)
+
+	axisLabels := getDateAxisValues(earliest)
+	datasets := getDatasets(uuid, co.Sealed, axisLabels, userTier)
 
 	var apiDatasets []ChartAPIDataset
 	for _, ds := range datasets {
