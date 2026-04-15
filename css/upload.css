@@ -645,6 +645,7 @@
     border-radius: var(--radius-md);
     padding: 4px;
     flex-shrink: 0;
+    align-self: flex-start;
 }
 .res-tab {
     padding: 8px 20px;
@@ -957,11 +958,10 @@
 
 @media (max-width: 640px) {
     .res-header { flex-direction: column; }
-    .res-tabs { flex-direction: row; }
+    .res-tabs { flex-direction: row; width: 100%; overflow-x: auto; }
     .res-summary-stat .val { font-size: var(--text-lg); }
     .opt-toc { flex-direction: column; }
     .res-summary { flex-direction: column; align-items: stretch; }
     .res-summary-stat { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
     .res-summary-stat:last-child { border-bottom: none; padding-bottom: 0; }
-    .res-tabs { width: 100%; overflow-x: auto; }
 }
