@@ -148,7 +148,10 @@
 }
 
 .m-sort-pill.active {
-    color: var(--search-link);
+    color: white;
+    background: rgba(30, 144, 255, 0.15);
+    border: 1px solid rgba(30, 144, 255, 0.4);
+    border-radius: 6px;
 }
 
 .m-sort-pill.reversed svg {
