@@ -152,10 +152,21 @@
     background: rgba(30, 144, 255, 0.15);
     border: 1px solid rgba(30, 144, 255, 0.4);
     border-radius: 6px;
+    padding-right: 0.2em;
 }
 
-.m-sort-pill.reversed svg {
-    transform: rotate(180deg);
+.m-sort-pill .m-sort-dir,
+.m-sort-pill .m-sort-dir svg {
+    width: 20px;
+    height: 20px;
+}
+
+.m-sort-pill:not(.reversed) .m-sort-dir {
+    color: #22c55e;
+}
+
+.m-sort-pill.reversed .m-sort-dir {
+    color: #ef4444;
 }
 
 /* Card container */
