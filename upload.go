@@ -1463,6 +1463,23 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 		var record []string
 		s.Find("td").Each(func(i int, se *goquery.Selection) {
 			record = append(record, se.Text())
+
+			// Override the Game category with the id found in the URL
+			// Example: https://www.tcgplayer.com/product/614282/optional-card-name
+			if i == 4 {
+				tcgURL, found := se.Find("a").Attr("href")
+				if !found {
+					return
+				}
+				fields := strings.Split(tcgURL, "/")
+				if len(fields) < 4 {
+					return
+				}
+				record[i] = fields[4]
+
+				// Update map header
+				indexMap["id"] = i
+			}
 		})
 
 		res, err := parseRow(indexMap, record)
