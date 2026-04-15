@@ -20,6 +20,7 @@
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
@@ -443,6 +444,150 @@
 
                 <button type="button" class="m-filter-apply" onclick="applyFilters()">Apply</button>
             </form>
+        </div>
+    </div>
+
+    {{/* Settings drawer */}}
+    <div class="m-settings-overlay" id="m-settings-overlay" onclick="closeSettings()"></div>
+    <div class="m-settings-sheet" id="m-settings-sheet">
+        <div class="m-drawer-handle" onclick="closeSettings()"><span></span></div>
+        <div class="m-settings-content">
+            <h3>Search Settings</h3>
+
+            {{/* Default Tab */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Default Tab</div>
+                <div class="m-settings-pills" id="m-set-default-tab">
+                    <button type="button" class="m-settings-pill active" data-val="sellers">Sellers</button>
+                    <button type="button" class="m-settings-pill" data-val="buyers">Buyers</button>
+                </div>
+            </div>
+
+            {{/* Listing Priority */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Listing Priority</div>
+                <div class="m-settings-pills" id="m-set-listing-priority">
+                    <button type="button" class="m-settings-pill active" data-val="stores">By Store</button>
+                    <button type="button" class="m-settings-pill" data-val="prices">By Price</button>
+                    <button type="button" class="m-settings-pill" data-val="credit">By Credit</button>
+                    <button type="button" class="m-settings-pill" data-val="market">By Market</button>
+                </div>
+            </div>
+
+            {{/* Buylist Secondary */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Buylist Secondary</div>
+                <div class="m-settings-pills" id="m-set-buylist-secondary">
+                    <button type="button" class="m-settings-pill active" data-val="priceRatio">Price Ratio</button>
+                    <button type="button" class="m-settings-pill" data-val="creditPrice">Credit</button>
+                    <button type="button" class="m-settings-pill" data-val="marketCredit">Market Credit</button>
+                </div>
+            </div>
+
+            {{/* Preferred Sort Store */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Preferred Sort Store</div>
+                <div class="m-settings-dropdowns">
+                    <div class="m-settings-dropdown-col">
+                        <div class="m-settings-dropdown-label">Retail</div>
+                        <select class="m-settings-select" id="m-set-sellers-priority">
+                            <option value="" selected>Default</option>
+                            {{range $i, $key := .SellerKeys}}
+                            <option value="{{$key}}">{{scraper_name $key}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+                    <div class="m-settings-dropdown-col">
+                        <div class="m-settings-dropdown-label">Buylist</div>
+                        <select class="m-settings-select" id="m-set-vendors-priority">
+                            <option value="" selected>Default</option>
+                            {{range $i, $key := .VendorKeys}}
+                            <option value="{{$key}}">{{scraper_name $key}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {{/* Display Options */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Display Options</div>
+                <div class="m-settings-toggles" id="m-set-misc-opts">
+                    <div class="m-settings-row">
+                        <span>Skip invalid Direct prices</span>
+                        <div class="m-settings-toggle" data-val="noSussy" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide classic promo entries</span>
+                        <div class="m-settings-toggle" data-val="hidePrelPack" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide ALL promo entries</span>
+                        <div class="m-settings-toggle" data-val="hidePromos" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Prefer flavor names</span>
+                        <div class="m-settings-toggle" data-val="preferFlavor" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide non-NM buylist</span>
+                        <div class="m-settings-toggle" data-val="hideBLconds" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Skip empty results</span>
+                        <div class="m-settings-toggle" data-val="skipEmpty" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide SYP indication</span>
+                        <div class="m-settings-toggle" data-val="noSyp" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide CSV upsell</span>
+                        <div class="m-settings-toggle" data-val="noUpsell" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            {{/* Exclude Sellers */}}
+            <div class="m-settings-section">
+                <div class="m-settings-collapse" onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('expanded');">
+                    <span class="m-settings-label">Exclude Sellers</span>
+                    <i data-lucide="chevron-right" class="m-settings-chevron"></i>
+                </div>
+                <div class="m-settings-collapse-body" id="m-set-sellers">
+                    <div class="m-settings-bulk">
+                        <button type="button" onclick="mSettingsBulk('m-set-sellers', false)">Clear</button>
+                        <button type="button" onclick="mSettingsBulk('m-set-sellers', true)">Select All</button>
+                    </div>
+                    <div class="m-settings-checks">
+                        {{range $i, $key := .SellerKeys}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+
+            {{/* Exclude Vendors */}}
+            <div class="m-settings-section">
+                <div class="m-settings-collapse" onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('expanded');">
+                    <span class="m-settings-label">Exclude Vendors</span>
+                    <i data-lucide="chevron-right" class="m-settings-chevron"></i>
+                </div>
+                <div class="m-settings-collapse-body" id="m-set-vendors">
+                    <div class="m-settings-bulk">
+                        <button type="button" onclick="mSettingsBulk('m-set-vendors', false)">Clear</button>
+                        <button type="button" onclick="mSettingsBulk('m-set-vendors', true)">Select All</button>
+                    </div>
+                    <div class="m-settings-checks">
+                        {{range $i, $key := .VendorKeys}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+
+            {{/* Apply */}}
+            <button type="button" class="m-settings-apply" onclick="saveSettings()">Apply Settings</button>
         </div>
     </div>
 
