@@ -1034,7 +1034,7 @@
         select.closest('tr').classList.add('ures-fixed-row');
         select.closest('tr').style.backgroundColor = '';
 
-        // Track the fix — only count each original row once
+        // Track the fix - only count each original row once
         var rowId = select.closest('tr').dataset.origHash || oldHash;
         if (!select.closest('tr').dataset.origHash) {
             select.closest('tr').dataset.origHash = oldHash;
