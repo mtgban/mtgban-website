@@ -414,9 +414,10 @@
     border-left: 1px solid var(--border-subtle);
     padding: 36px 24px 64px;
     position: sticky;
-    top: 75px; /* Matches mainbody padding-top — panel is outside page-content flow */
+    top: 75px;
     height: calc(100vh - 75px);
     overflow-y: auto;
+    border-radius: var(--radius-lg) 0 0 var(--radius-lg);
 }
 
 .upload-help-panel::-webkit-scrollbar {
