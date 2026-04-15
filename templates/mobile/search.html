@@ -479,16 +479,6 @@
                 </div>
             </div>
 
-            {{/* Buylist Secondary */}}
-            <div class="m-settings-section">
-                <div class="m-settings-label">Buylist Secondary</div>
-                <div class="m-settings-pills" id="m-set-buylist-secondary">
-                    <button type="button" class="m-settings-pill active" data-val="priceRatio">Price Ratio</button>
-                    <button type="button" class="m-settings-pill" data-val="creditPrice">Credit</button>
-                    <button type="button" class="m-settings-pill" data-val="marketCredit">Market Credit</button>
-                </div>
-            </div>
-
             {{/* Preferred Sort Store */}}
             <div class="m-settings-section">
                 <div class="m-settings-label">Preferred Sort Store</div>
@@ -861,15 +851,6 @@ function loadSettings() {
         });
     }
 
-    // Buylist Secondary
-    var bs = getCookie('SearchBuylistSecondary');
-    if (bs) {
-        var group = document.getElementById('m-set-buylist-secondary');
-        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
-            p.classList.toggle('active', p.getAttribute('data-val') === bs);
-        });
-    }
-
     // Preferred Sort Stores
     var sp = getCookie('SearchSellersPriority');
     if (sp) document.getElementById('m-set-sellers-priority').value = sp;
@@ -913,10 +894,6 @@ function saveSettings() {
     // Listing Priority
     var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
     setCookie('SearchListingPriority', lpPill ? lpPill.getAttribute('data-val') : 'stores', 1000);
-
-    // Buylist Secondary
-    var bsPill = document.querySelector('#m-set-buylist-secondary .m-settings-pill.active');
-    setCookie('SearchBuylistSecondary', bsPill ? bsPill.getAttribute('data-val') : 'priceRatio', 1000);
 
     // Preferred Sort Stores
     setCookie('SearchSellersPriority', document.getElementById('m-set-sellers-priority').value, 1000);
