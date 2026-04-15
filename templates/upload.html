@@ -657,28 +657,6 @@
                         {{end}}
                         <th>Index</th>
                     </tr>
-                    <tr class="ures-totals-row">
-                        <td><span class="ures-totals-label">Totals ({{.TotalQuantity}} cards)</span></td>
-                        <td></td>
-                        <td></td>
-                        <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.TotalQuantity}}</td>
-                        {{range .ScraperKeys}}
-                            <td class="ures-price" style="font-weight:700">
-                                $ {{printf "%.2f" (index $.TotalEntries .)}}
-                                {{$missing := (index $.MissingCounts .)}}
-                                {{if ne $missing 0}}
-                                    <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $.MissingPrices .)}}</div>
-                                {{end}}
-                            </td>
-                        {{end}}
-                        <td>
-                            <div class="ures-index" style="font-weight:600">
-                                {{range .IndexKeys}}
-                                    <span><span class="idx-label">{{scraper_name .}}</span> $ {{printf "%.2f" (index $.TotalEntries .)}}</span>
-                                {{end}}
-                            </div>
-                        </td>
-                    </tr>
                 </thead>
                 <tbody>
                     {{range .UploadEntries}}
@@ -704,7 +682,7 @@
                         {{$card := (index $.Metadata .CardId)}}
                         {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
                         <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
-                            {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}>
+                            {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                             <td>
                                 <div class="ures-card-cell">
                                     <img src="{{$card.ImageURL}}" loading="lazy">
@@ -744,6 +722,28 @@
                         </tr>
                         {{end}}{{/* closes {{else}} for MismatchError */}}
                     {{end}}
+                    <tr class="ures-totals-row">
+                        <td><span class="ures-totals-label">Totals ({{.TotalQuantity}} cards)</span></td>
+                        <td></td>
+                        <td></td>
+                        <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.TotalQuantity}}</td>
+                        {{range .ScraperKeys}}
+                            <td class="ures-price" style="font-weight:700">
+                                $ {{printf "%.2f" (index $.TotalEntries .)}}
+                                {{$missing := (index $.MissingCounts .)}}
+                                {{if ne $missing 0}}
+                                    <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $.MissingPrices .)}}</div>
+                                {{end}}
+                            </td>
+                        {{end}}
+                        <td>
+                            <div class="ures-index" style="font-weight:600">
+                                {{range .IndexKeys}}
+                                    <span><span class="idx-label">{{scraper_name .}}</span> $ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+                                {{end}}
+                            </div>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -1045,7 +1045,7 @@
 
         // Mark the row as fixed
         btn.closest('tr').classList.add('ures-fixed-row');
-        btn.closest('tr').style.backgroundColor = '';
+        btn.closest('tr').classList.remove('ures-alias-row');
 
         // Track the fix - only count each original row once
         var rowId = btn.closest('tr').dataset.origHash || oldHash;
