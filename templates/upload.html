@@ -712,15 +712,10 @@
                                         <span class="ures-card-name"><a href="{{$card.SearchURL}}">{{$card.Name}}</a></span>
                                         <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
                                         {{if .MismatchAlias}}
-                                        <select class="ures-alias-picker" data-hash="{{.CardId}}" onchange="updateRowHash(this)">
-                                            <option value="{{.CardId}}" selected>{{$card.Edition}} #{{$card.Number}}</option>
-                                            {{range .PossibleAliases}}
-                                                {{if ne . $cardId}}
-                                                    {{$alt := (index $.Metadata .)}}
-                                                    <option value="{{.}}">{{$alt.Edition}} #{{$alt.Number}}</option>
-                                                {{end}}
-                                            {{end}}
-                                        </select>
+                                        <button type="button" class="ures-pick-btn"
+                                            data-hash="{{.CardId}}"
+                                            data-aliases="{{range $i, $a := .PossibleAliases}}{{if $i}},{{end}}{{$a}}{{end}}"
+                                            onclick="openPrintingPicker(this)">Select printing</button>
                                         {{end}}
                                     </div>
                                 </div>
@@ -988,6 +983,19 @@
     </script>
     {{end}}
 
+    <!-- Printing picker overlay -->
+    <div id="printing-overlay" class="printing-overlay" onclick="if(event.target===this)closePrintingPicker()">
+        <div class="printing-picker">
+            <div class="printing-picker-header">
+                <span class="printing-picker-title">Select printing</span>
+                <button type="button" class="printing-picker-close" onclick="closePrintingPicker()">&times;</button>
+            </div>
+            <div id="printing-picker-grid" class="printing-picker-grid">
+                <!-- Populated dynamically by JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Hidden form for pick-printing re-submission -->
     <form id="upload_form" action="/upload" method="post" style="display:none">
         <input type="hidden" name="mode" value="{{if .IsBuylist}}true{{else}}false{{end}}">
@@ -1001,17 +1009,17 @@
 
     <script>
     var fixedRows = {};
+    var activePicker = null;
 
-    function updateRowHash(select) {
+    function updateRowHash(btn, newHash) {
         var form = document.getElementById("upload_form");
-        var newHash = select.value;
-        var oldHash = select.dataset.hash;
+        var oldHash = btn.dataset.hash;
 
         // On first pick, load all card data into hidden form (skip error rows with empty hash)
         if (form.querySelectorAll('input[name="hashes"]').length === 0) {
             form.removeAttribute("enctype");
             document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
-                if (!row.dataset.hash) return; // skip not-found cards
+                if (!row.dataset.hash) return;
                 var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
                 pairs.forEach(function(pair) {
                     var input = document.createElement("input");
@@ -1028,17 +1036,20 @@
         var input = document.getElementById("row-" + oldHash);
         if (input) {
             input.value = newHash;
-            select.dataset.hash = newHash;
+            btn.dataset.hash = newHash;
         }
 
+        // Update row data-hash so the form tracks the new value
+        btn.closest('tr').dataset.hash = newHash;
+
         // Mark the row as fixed
-        select.closest('tr').classList.add('ures-fixed-row');
-        select.closest('tr').style.backgroundColor = '';
+        btn.closest('tr').classList.add('ures-fixed-row');
+        btn.closest('tr').style.backgroundColor = '';
 
         // Track the fix - only count each original row once
-        var rowId = select.closest('tr').dataset.origHash || oldHash;
-        if (!select.closest('tr').dataset.origHash) {
-            select.closest('tr').dataset.origHash = oldHash;
+        var rowId = btn.closest('tr').dataset.origHash || oldHash;
+        if (!btn.closest('tr').dataset.origHash) {
+            btn.closest('tr').dataset.origHash = oldHash;
         }
         if (!fixedRows[rowId]) {
             fixedRows[rowId] = true;
@@ -1046,6 +1057,58 @@
         }
         document.getElementById('reload-bar').style.display = 'flex';
     }
+
+    // Metadata from Go template - maps UUID to {image, edition, number}
+    var cardMeta = {
+        {{range $uuid, $card := .Metadata}}
+        "{{$uuid}}": {
+            image: "{{$card.ImageURL}}",
+            edition: "{{$card.Edition}}",
+            number: "{{$card.Number}}"
+        },
+        {{end}}
+    };
+
+    function openPrintingPicker(btn) {
+        activePicker = btn;
+        var currentHash = btn.dataset.hash;
+        var aliases = btn.dataset.aliases.split(",").filter(Boolean);
+        var grid = document.getElementById("printing-picker-grid");
+        grid.innerHTML = "";
+
+        aliases.forEach(function(uuid) {
+            var meta = cardMeta[uuid];
+            if (!meta) return;
+            var card = document.createElement("div");
+            card.className = "printing-picker-card" + (uuid === currentHash ? " selected" : "");
+            card.innerHTML =
+                '<img src="' + meta.image + '" loading="lazy">' +
+                '<div class="pp-meta">' + meta.edition + '</div>' +
+                '<div class="pp-set">#' + meta.number + '</div>';
+            card.addEventListener("click", function() {
+                updateRowHash(activePicker, uuid);
+                // Update thumbnail and set info in the row
+                var row = activePicker.closest('tr');
+                var img = row.querySelector('.ures-card-cell img');
+                var setSpan = row.querySelector('.ures-card-set');
+                if (img) img.src = meta.image;
+                if (setSpan) setSpan.textContent = meta.edition + ' \u00B7 #' + meta.number;
+                closePrintingPicker();
+            });
+            grid.appendChild(card);
+        });
+
+        document.getElementById("printing-overlay").classList.add("open");
+    }
+
+    function closePrintingPicker() {
+        document.getElementById("printing-overlay").classList.remove("open");
+        activePicker = null;
+    }
+
+    document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") closePrintingPicker();
+    });
     </script>
 
     {{if ne .InfoMessage ""}}
