@@ -26,9 +26,10 @@
 
 {{define "content"}}
     {{if eq .Title "Options"}}
-        {{/* Options page — reuse desktop for now, future mobile version */}}
+        {{/* Redirect options page to search with settings drawer */}}
+        <script>window.location.href = '/search';</script>
         <div class="m-page">
-            <p style="padding: 1em;">Options are not yet available on mobile. <a href="?page=options">View desktop version</a>.</p>
+            <p style="padding: 1em;"><a href="/search">Return to search</a></p>
         </div>
     {{else if and (eq .SearchQuery "") .IsSealed}}
         {{template "m-sealed-landing" .}}
