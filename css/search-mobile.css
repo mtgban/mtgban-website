@@ -1508,9 +1508,13 @@
     font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: var(--greytext);
+    color: rgba(255, 255, 255, 0.5);
     font-weight: 700;
     margin-bottom: 0.5em;
+}
+
+.light-theme .m-settings-label {
+    color: rgba(0, 0, 0, 0.45);
 }
 
 /* Pill selectors (mutually exclusive) — contained group */
