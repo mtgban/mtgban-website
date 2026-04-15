@@ -1485,6 +1485,7 @@
     max-height: calc(85vh - 3em);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding-right: 0.5em;
 }
 
 .m-settings-content h3 {
