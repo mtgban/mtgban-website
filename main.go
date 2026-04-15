@@ -100,6 +100,7 @@ type PageVars struct {
 	SortOption     string
 	GlobalMode     bool
 	ReverseMode    bool
+	DefaultTab     string
 
 	Page         string
 	Subtitle     string
