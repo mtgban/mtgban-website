@@ -399,14 +399,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.EnabledSellers = enabledStores
 	}
 
-	estimate, _ := strconv.ParseBool(r.FormValue("estimate"))
-	deckbox, _ := strconv.ParseBool(r.FormValue("deckbox"))
-
-	start := time.Now()
-
 	// Set upload limit
 	maxRows := MaxUploadEntries
+
+	// Load optional modes
 	download, _ := strconv.ParseBool(r.FormValue("download"))
+	estimate, _ := strconv.ParseBool(r.FormValue("estimate"))
+	deckbox, _ := strconv.ParseBool(r.FormValue("deckbox"))
 
 	// Increase upload limit if allowed
 	optimizerOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadOptimizer"))
@@ -420,6 +419,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
 	}
+
+	start := time.Now()
 
 	// Load data
 	var uploadedData []UploadEntry
