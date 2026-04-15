@@ -346,7 +346,7 @@
                                     <summary>
                                         <span class="m-vendor-name">{{$entry.ScraperName}}</span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                            <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
                                             <span class="m-vendor-qty"></span>
                                         </span>
                                     </summary>
