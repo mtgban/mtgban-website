@@ -406,6 +406,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	download, _ := strconv.ParseBool(r.FormValue("download"))
 	estimate, _ := strconv.ParseBool(r.FormValue("estimate"))
 	deckbox, _ := strconv.ParseBool(r.FormValue("deckbox"))
+	tcgpCSV, _ := strconv.ParseBool(r.FormValue("tcgplayer_csv"))
 
 	// Increase upload limit if allowed
 	optimizerOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadOptimizer"))
@@ -415,7 +416,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	// Allow a larger upload limit if set, if dev, or if it's an external call
 	limitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
-	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate || deckbox || (download && canBuylist)
+	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
 	}
@@ -518,6 +519,37 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		csvWriter := csv.NewWriter(w)
 
 		err = deckboxIdConvert(csvWriter, uploadedData)
+		if err != nil {
+			w.Header().Del("Content-Type")
+			UserNotify("upload", err.Error())
+			pageVars.InfoMessage = "Unable to download CSV right now"
+			render(w, "upload.html", pageVars)
+		}
+		return
+	}
+	if tcgpCSV && canBuylist {
+		w.Header().Set("content-type", "text/csv")
+		w.Header().Set("content-disposition", "attachment; filename=\"mtgban_tcgplayer.csv\"")
+		csvWriter := csv.NewWriter(w)
+
+		var ids, qtys, conds []string
+		for i := range uploadedData {
+			if uploadedData[i].CardId == "" {
+				continue
+			}
+
+			qty := 1
+			if uploadedData[i].HasQuantity {
+				qty = uploadedData[i].Quantity
+			}
+			qty *= multiplier
+
+			ids = append(ids, uploadedData[i].CardId)
+			qtys = append(qtys, fmt.Sprintf("%d", qty))
+			conds = append(conds, uploadedData[i].OriginalCondition)
+		}
+
+		err = UUID2TCGCSV(csvWriter, ids, qtys, conds)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			UserNotify("upload", err.Error())
