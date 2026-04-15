@@ -222,7 +222,7 @@
                                 <input type="checkbox" id="noresults" name="noresults" onclick="javascript:saveCheckbox('noresults')">
                                 Jump to Optimizer view by default
                             </label>
-                            <label class="upload-opt-item upload-opt-wide">
+                            <label class="upload-opt-item">
                                 Sort by
                                 <select id="sorting" name="sorting" onchange="javascript:saveText('sorting')">
                                     <option value="" selected>&nbsp;keep as uploaded</option>
@@ -233,10 +233,12 @@
                                     <option value="highspread">&nbsp;highest spread</option>
                                     <option value="profitability">&nbsp;profitability</option>
                                 </select>
-                                &nbsp;&nbsp;
+                            </label>
+                            <label class="upload-opt-item">
                                 Qty multiplier:
                                 <input type="text" id="multiplier" name="multiplier" value="1" size="1" onchange="javascript:saveText('multiplier')">
-                                &nbsp;&nbsp;
+                            </label>
+                            <label class="upload-opt-item">
                                 Optimize by:
                                 <select id="pricesource" name="pricesource" onchange="javascript:saveText('pricesource')">
                                     <option value="" selected>&nbsp;cash prices</option>
