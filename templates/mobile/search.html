@@ -168,11 +168,11 @@
         <div class="m-sort-pills">
             {{$isChronoSorted := or (eq .SearchSort "chrono") (not .SearchSort)}}
             {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
-            <a class="m-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort={{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological"><i data-lucide="clock"></i></a>
-            <a class="m-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=alpha{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical"><i data-lucide="a-large-small"></i></a>
-            <a class="m-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number"><i data-lucide="hash"></i></a>
-            <a class="m-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i></a>
-            <a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i></a>
+            <a class="m-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort={{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological"><i data-lucide="clock"></i>{{if $isChronoSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=alpha{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical"><i data-lucide="a-large-small"></i>{{if $isAlphaSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number"><i data-lucide="hash"></i>{{if eq .SearchSort "number"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
         </div>
         {{end}}
     </div>
@@ -210,9 +210,10 @@
             {{/* Seller/Buyer tab toggle */}}
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
+            {{$buylistSort := eq $.SearchSort "buylist"}}
             <div class="m-tabs" data-card="{{$cardId}}">
-                {{if $hasSellers}}<button class="m-tab active" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
-                {{if $hasBuyers}}<button class="m-tab" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
+                {{if $hasSellers}}<button class="m-tab{{if not $buylistSort}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
+                {{if $hasBuyers}}<button class="m-tab{{if $buylistSort}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
             </div>
 
             {{/* Condition pills - default to NM, hidden for sealed products */}}
@@ -250,7 +251,7 @@
 
             {{/* Sellers panel */}}
             {{if $hasSellers}}
-            <div class="m-tab-panel active" id="sellers-{{$cardId}}">
+            <div class="m-tab-panel{{if not $buylistSort}} active{{end}}" id="sellers-{{$cardId}}">
                 {{$condsEntry := (index $.FoundSellers $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
@@ -320,7 +321,7 @@
 
             {{/* Buyers panel */}}
             {{if $hasBuyers}}
-            <div class="m-tab-panel" id="buyers-{{$cardId}}">
+            <div class="m-tab-panel{{if $buylistSort}} active{{end}}" id="buyers-{{$cardId}}">
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
