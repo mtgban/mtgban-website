@@ -999,7 +999,7 @@
     </div>
 
     <script>
-    var pendingFixes = 0;
+    var fixedRows = {};
 
     function updateRowHash(select) {
         var form = document.getElementById("upload_form");
@@ -1034,9 +1034,15 @@
         select.closest('tr').classList.add('ures-fixed-row');
         select.closest('tr').style.backgroundColor = '';
 
-        // Track the fix and show reload bar
-        pendingFixes++;
-        document.getElementById('reload-count').textContent = pendingFixes;
+        // Track the fix — only count each original row once
+        var rowId = select.closest('tr').dataset.origHash || oldHash;
+        if (!select.closest('tr').dataset.origHash) {
+            select.closest('tr').dataset.origHash = oldHash;
+        }
+        if (!fixedRows[rowId]) {
+            fixedRows[rowId] = true;
+            document.getElementById('reload-count').textContent = Object.keys(fixedRows).length;
+        }
         document.getElementById('reload-bar').style.display = 'flex';
     }
     </script>
