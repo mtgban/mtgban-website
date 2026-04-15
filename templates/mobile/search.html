@@ -144,6 +144,10 @@
             <button class="m-search-btn m-settings-btn" type="button" title="Settings" onclick="openSettings()"><i data-lucide="settings-2"></i></button>
         </div>
     </div>
+
+    {{/* Toast notification */}}
+    <div class="m-toast" id="m-fav-toast"></div>
+
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
         // Init navbar search for landscape mode
