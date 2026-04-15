@@ -605,40 +605,41 @@
 {{end}}
 
 {{define "upload-results"}}
-    <!-- Summary banner -->
-    <div class="res-summary">
-        <div class="res-summary-stat">
-            <span class="label">Cards</span>
-            <span class="val">{{.TotalQuantity}}</span>
+    <!-- Summary + Tabs row -->
+    <div class="res-header">
+        <div class="res-tabs">
+            <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
+            {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
         </div>
-        {{range .ScraperKeys}}
-            <div class="res-summary-stat">
-                <span class="label">{{scraper_name .}}</span>
-                <span class="val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
-                {{$missing := (index $.MissingCounts .)}}
-                {{if ne $missing 0}}
-                    <span class="label">{{$missing}} missing</span>
-                {{end}}
-            </div>
-        {{end}}
-        {{range .IndexKeys}}
-            <div class="res-summary-stat">
-                <span class="label">{{scraper_name .}}</span>
-                <span class="val blue">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
-            </div>
-        {{end}}
-        {{if .Optimized}}
-        <div class="res-summary-stat">
-            <span class="label">Optimizer Max</span>
-            <span class="val green">$ {{printf "%.2f" .HighestTotal}}</span>
-        </div>
-        {{end}}
-    </div>
 
-    <!-- Tabs -->
-    <div class="res-tabs">
-        <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
-        {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
+        <div class="res-summary">
+            <div class="res-summary-stat">
+                <span class="label">Cards</span>
+                <span class="val">{{.TotalQuantity}}</span>
+            </div>
+            {{range .ScraperKeys}}
+                <div class="res-summary-stat">
+                    <span class="label">{{scraper_name .}}</span>
+                    <span class="val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+                    {{$missing := (index $.MissingCounts .)}}
+                    {{if ne $missing 0}}
+                        <span class="label">{{$missing}} missing</span>
+                    {{end}}
+                </div>
+            {{end}}
+            {{range .IndexKeys}}
+                <div class="res-summary-stat">
+                    <span class="label">{{scraper_name .}}</span>
+                    <span class="val blue">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+                </div>
+            {{end}}
+            {{if .Optimized}}
+            <div class="res-summary-stat">
+                <span class="label">Optimizer Max</span>
+                <span class="val green">$ {{printf "%.2f" .HighestTotal}}</span>
+            </div>
+            {{end}}
+        </div>
     </div>
 
     <!-- Tab: Results -->
