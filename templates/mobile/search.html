@@ -804,5 +804,154 @@ function recalcBestBadges(card) {
 document.querySelectorAll('.m-card').forEach(function(card) {
     recalcBestBadges(card);
 });
+
+// Settings drawer open/close
+function openSettings() {
+    loadSettings();
+    document.getElementById('m-settings-overlay').classList.add('open');
+    document.getElementById('m-settings-sheet').classList.add('open');
+    lucide.createIcons({nameAttr: 'data-lucide', attrs: {}});
+}
+
+function closeSettings() {
+    document.getElementById('m-settings-overlay').classList.remove('open');
+    document.getElementById('m-settings-sheet').classList.remove('open');
+}
+
+// Settings pill switching (mutually exclusive within each group)
+document.querySelectorAll('.m-settings-pills').forEach(function(group) {
+    group.querySelectorAll('.m-settings-pill').forEach(function(pill) {
+        pill.addEventListener('click', function() {
+            group.querySelectorAll('.m-settings-pill').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
+        });
+    });
+});
+
+// Bulk select/clear for store checkboxes
+function mSettingsBulk(containerId, selectAll) {
+    var container = document.getElementById(containerId);
+    container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = selectAll;
+    });
+}
+
+// Load current cookie values into the settings UI
+function loadSettings() {
+    // Default Tab
+    var tab = getCookie('SearchDefaultTab');
+    if (tab) {
+        var group = document.getElementById('m-set-default-tab');
+        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
+            p.classList.toggle('active', p.getAttribute('data-val') === tab);
+        });
+    }
+
+    // Listing Priority
+    var lp = getCookie('SearchListingPriority');
+    if (lp) {
+        var group = document.getElementById('m-set-listing-priority');
+        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
+            p.classList.toggle('active', p.getAttribute('data-val') === lp);
+        });
+    }
+
+    // Buylist Secondary
+    var bs = getCookie('SearchBuylistSecondary');
+    if (bs) {
+        var group = document.getElementById('m-set-buylist-secondary');
+        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
+            p.classList.toggle('active', p.getAttribute('data-val') === bs);
+        });
+    }
+
+    // Preferred Sort Stores
+    var sp = getCookie('SearchSellersPriority');
+    if (sp) document.getElementById('m-set-sellers-priority').value = sp;
+
+    var vp = getCookie('SearchVendorsPriority');
+    if (vp) document.getElementById('m-set-vendors-priority').value = vp;
+
+    // Display Options (misc opts — comma-separated)
+    var misc = getCookie('SearchMiscOpts');
+    var opts = misc ? misc.split(',') : [];
+    document.querySelectorAll('#m-set-misc-opts .m-settings-toggle').forEach(function(toggle) {
+        var val = toggle.getAttribute('data-val');
+        if (opts.indexOf(val) !== -1) {
+            toggle.classList.add('on');
+        } else {
+            toggle.classList.remove('on');
+        }
+    });
+
+    // Exclude Sellers
+    var sellers = getCookie('SearchSellersList');
+    var sellerList = sellers ? sellers.split(',') : [];
+    document.querySelectorAll('#m-set-sellers input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = sellerList.indexOf(cb.name) !== -1;
+    });
+
+    // Exclude Vendors
+    var vendors = getCookie('SearchVendorsList');
+    var vendorList = vendors ? vendors.split(',') : [];
+    document.querySelectorAll('#m-set-vendors input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = vendorList.indexOf(cb.name) !== -1;
+    });
+}
+
+// Save all settings to cookies and show toast
+function saveSettings() {
+    // Default Tab
+    var tabPill = document.querySelector('#m-set-default-tab .m-settings-pill.active');
+    setCookie('SearchDefaultTab', tabPill ? tabPill.getAttribute('data-val') : 'sellers', 1000);
+
+    // Listing Priority
+    var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
+    setCookie('SearchListingPriority', lpPill ? lpPill.getAttribute('data-val') : 'stores', 1000);
+
+    // Buylist Secondary
+    var bsPill = document.querySelector('#m-set-buylist-secondary .m-settings-pill.active');
+    setCookie('SearchBuylistSecondary', bsPill ? bsPill.getAttribute('data-val') : 'priceRatio', 1000);
+
+    // Preferred Sort Stores
+    setCookie('SearchSellersPriority', document.getElementById('m-set-sellers-priority').value, 1000);
+    setCookie('SearchVendorsPriority', document.getElementById('m-set-vendors-priority').value, 1000);
+
+    // Display Options (collect active toggles into comma-separated string)
+    var miscList = '';
+    document.querySelectorAll('#m-set-misc-opts .m-settings-toggle.on').forEach(function(toggle) {
+        miscList += toggle.getAttribute('data-val') + ',';
+    });
+    setCookie('SearchMiscOpts', miscList, 1000);
+
+    // Exclude Sellers
+    var sellersList = '';
+    document.querySelectorAll('#m-set-sellers input[type="checkbox"]:checked').forEach(function(cb) {
+        sellersList += cb.name + ',';
+    });
+    setCookie('SearchSellersList', sellersList, 1000);
+
+    // Exclude Vendors
+    var vendorsList = '';
+    document.querySelectorAll('#m-set-vendors input[type="checkbox"]:checked').forEach(function(cb) {
+        vendorsList += cb.name + ',';
+    });
+    setCookie('SearchVendorsList', vendorsList, 1000);
+
+    // Close drawer
+    closeSettings();
+
+    // Show toast
+    var toast = document.getElementById('m-fav-toast');
+    if (toast) {
+        toast.textContent = 'Settings saved';
+        toast.classList.add('show');
+        setTimeout(function() {
+            toast.classList.remove('show');
+            // Reload to apply settings
+            window.location.reload();
+        }, 1500);
+    }
+}
 </script>
 {{end}}
