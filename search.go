@@ -114,28 +114,18 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.HasAvailable = len(mtgmatcher.GetSealedUUIDs()) > 0
 
+	// Populate all seller/vendor keys (for settings drawer and options page)
+	for _, seller := range Sellers {
+		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
+	}
+	for _, vendor := range Vendors {
+		pageVars.VendorKeys = append(pageVars.VendorKeys, vendor.Info().Shorthand)
+	}
+
 	page := r.FormValue("page")
 	if page == "options" {
 		pageVars.Title = "Options"
-
-		for _, seller := range Sellers {
-			if slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-				continue
-			}
-
-			pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
-		}
-
-		for _, vendor := range Vendors {
-			if slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-				continue
-			}
-
-			pageVars.VendorKeys = append(pageVars.VendorKeys, vendor.Info().Shorthand)
-		}
-
 		render(w, "search.html", pageVars)
-
 		return
 	}
 
@@ -165,6 +155,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") != "stores")
+	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
 
 	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))

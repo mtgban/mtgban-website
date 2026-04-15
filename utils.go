@@ -39,31 +39,34 @@ var colorRarityMap = map[string]map[string]string{
 }
 
 type GenericCard struct {
-	UUID      string
-	Name      string
-	Edition   string
-	SetCode   string
-	Number    string
-	Variant   string
-	Keyrune   string
-	ImageURL  string
-	Foil      bool
-	Etched    bool
-	Reserved  bool
-	Title     string
-	SearchURL string
-	SypList   bool
-	Stocks    bool
-	StocksURL string
-	Printings string
-	Products  string
-	TCGId     string
-	Date      string
-	Sealed    bool
-	Booster   bool
-	HasDeck   bool
-	Flag      string
-	LangTag   string
+	UUID        string
+	Name        string
+	Edition     string
+	SetCode     string
+	Number      string
+	Variant     string
+	Keyrune     string
+	ImageURL    string
+	Foil        bool
+	Etched      bool
+	FinishTag   string
+	FinishClass string
+	Treatments  []string
+	Reserved    bool
+	Title       string
+	SearchURL   string
+	SypList     bool
+	Stocks      bool
+	StocksURL   string
+	Printings   string
+	Products    string
+	TCGId       string
+	Date        string
+	Sealed      bool
+	Booster     bool
+	HasDeck     bool
+	Flag        string
+	LangTag     string
 
 	RarityColor  string
 	ScryfallURL  string
@@ -346,9 +349,33 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 			variant = "Retro Frame "
 		}
 	}
+
+	// Build the finish chip: defaults to Foil/Etched, overridden by alt foil type
+	var treatments []string
+	finishTag := ""
+	finishClass := ""
+	if co.Etched {
+		finishTag = "Etched"
+		finishClass = "etched"
+	} else if co.Foil {
+		finishTag = "Foil"
+		finishClass = "foil"
+	}
+
 	// Loop through the supported promo types, skipping Boosterfun already processed above
 	for _, promoType := range co.PromoTypes {
 		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != mtgmatcher.PromoTypeBoosterfun {
+			// Only physical treatments get chips (filtered by altFoilTags)
+			if slices.Contains(altFoilTags, promoType) {
+				if strings.HasSuffix(promoType, "foil") {
+					// Alt foil type replaces the generic "Foil" chip
+					finishTag = mtgmatcher.Title(strings.TrimSuffix(promoType, "foil"))
+					finishClass = "altfoil"
+				} else {
+					// Non-foil treatment gets its own chip
+					treatments = append(treatments, mtgmatcher.Title(promoType))
+				}
+			}
 			if strings.HasPrefix(promoType, "ff") {
 				variant += strings.ToUpper(promoType) + " "
 				continue
@@ -465,31 +492,34 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	}
 
 	return GenericCard{
-		UUID:      co.UUID,
-		Name:      name,
-		Edition:   co.Edition,
-		SetCode:   co.Card.SetCode,
-		Number:    co.Card.Number,
-		Variant:   variant,
-		Foil:      co.Foil,
-		Etched:    co.Etched,
-		Keyrune:   keyrune,
-		ImageURL:  imgURL,
-		Title:     editionTitle(cardId),
-		Reserved:  co.Card.IsReserved,
-		SearchURL: fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query)),
-		SypList:   sypList,
-		Stocks:    stocks,
-		StocksURL: stocksURL,
-		Printings: printings,
-		Products:  products,
-		TCGId:     tcgId,
-		Date:      co.OriginalReleaseDate,
-		Sealed:    co.Sealed,
-		Booster:   canBoosterGen,
-		HasDeck:   hasDecklist,
-		Flag:      allLanguageFlags[co.Language],
-		LangTag:   mtgmatcher.LanguageTag2LanguageCode[co.Language],
+		UUID:        co.UUID,
+		Name:        name,
+		Edition:     co.Edition,
+		SetCode:     co.Card.SetCode,
+		Number:      co.Card.Number,
+		Variant:     variant,
+		Foil:        co.Foil,
+		Etched:      co.Etched,
+		FinishTag:   finishTag,
+		FinishClass: finishClass,
+		Treatments:  treatments,
+		Keyrune:     keyrune,
+		ImageURL:    imgURL,
+		Title:       editionTitle(cardId),
+		Reserved:    co.Card.IsReserved,
+		SearchURL:   fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query)),
+		SypList:     sypList,
+		Stocks:      stocks,
+		StocksURL:   stocksURL,
+		Printings:   printings,
+		Products:    products,
+		TCGId:       tcgId,
+		Date:        co.OriginalReleaseDate,
+		Sealed:      co.Sealed,
+		Booster:     canBoosterGen,
+		HasDeck:     hasDecklist,
+		Flag:        allLanguageFlags[co.Language],
+		LangTag:     mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
 		RarityColor:  rarityColor,
 		ScryfallURL:  scryfallURL,

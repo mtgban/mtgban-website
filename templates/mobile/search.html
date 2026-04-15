@@ -20,14 +20,16 @@
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
 {{define "content"}}
     {{if eq .Title "Options"}}
-        {{/* Options page — reuse desktop for now, future mobile version */}}
+        {{/* Redirect options page to search with settings drawer */}}
+        <script>window.location.href = '/search';</script>
         <div class="m-page">
-            <p style="padding: 1em;">Options are not yet available on mobile. <a href="?page=options">View desktop version</a>.</p>
+            <p style="padding: 1em;"><a href="/search">Return to search</a></p>
         </div>
     {{else if and (eq .SearchQuery "") .IsSealed}}
         {{template "m-sealed-landing" .}}
@@ -139,8 +141,13 @@
             </form>
             <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
             <button class="m-search-btn m-filter-btn" type="button" title="Filters" onclick="document.getElementById('m-filter-overlay').classList.add('open'); document.getElementById('m-filter-sheet').classList.add('open');"><i data-lucide="sliders-horizontal"></i></button>
+            <button class="m-search-btn m-settings-btn" type="button" title="Settings" onclick="openSettings()"><i data-lucide="settings"></i></button>
         </div>
     </div>
+
+    {{/* Toast notification */}}
+    <div class="m-toast" id="m-fav-toast"></div>
+
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
         // Init navbar search for landscape mode
@@ -159,18 +166,29 @@
     var mFilterSets = [{{range .AllKeys}}{{$card := index $.Metadata .}}{code:"{{$card.SetCode}}",name:"{{$card.Edition}}"},{{end}}];
     </script>
 
-    {{/* Result count */}}
+    {{/* Result count + sort pills */}}
     {{if .TotalUnique}}
     <div class="m-result-meta">
         <span>{{.TotalUnique}} {{if .IsSealed}}product{{else}}card{{end}}{{if gt (len .AllKeys) 1}}s{{end}} found</span>
         {{if gt .TotalUnique (len .AllKeys)}}<span class="m-meta-sub">({{len .AllKeys}} shown)</span>{{end}}
+        {{if not .NoSort}}
+        <div class="m-sort-pills">
+            {{$isChronoSorted := or (eq .SearchSort "chrono") (not .SearchSort)}}
+            {{$isAlphaSorted := or (eq .SearchSort "alpha") (eq .SearchSort "hybrid")}}
+            <a class="m-sort-pill{{if $isChronoSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort={{if and $isChronoSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Chronological"><i data-lucide="clock"></i>{{if $isChronoSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if $isAlphaSorted}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=alpha{{if and $isAlphaSorted (not .ReverseMode)}}&reverse=true{{end}}" title="Alphabetical"><i data-lucide="a-large-small"></i>{{if $isAlphaSorted}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "number"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=number{{if and (eq .SearchSort "number") (not .ReverseMode)}}&reverse=true{{end}}" title="Collector Number"><i data-lucide="hash"></i>{{if eq .SearchSort "number"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "retail"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=retail{{if and (eq .SearchSort "retail") (not .ReverseMode)}}&reverse=true{{end}}" title="Retail Price"><i data-lucide="tag"></i>{{if eq .SearchSort "retail"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+            <a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
+        </div>
+        {{end}}
     </div>
     {{end}}
 
     {{/* Results */}}
     {{range $i, $cardId := .AllKeys}}
         {{$card := (index $.Metadata $cardId)}}
-        <div class="m-card">
+        <div class="m-card"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
             {{/* Card header - tap to show image drawer */}}
             <div class="m-card-header" data-setcode="{{$card.SetCode}}" onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
                 <div class="m-card-icon">
@@ -188,8 +206,8 @@
                     <span class="m-card-set">{{$card.Edition}}{{if $card.Number}} · #{{$card.Number}}{{end}}</span>
                 </div>
                 <div class="m-card-badges">
-                    {{if $card.Foil}}<span class="m-badge foil">Foil</span>{{end}}
-                    {{if $card.Etched}}<span class="m-badge etched">Etched</span>{{end}}
+                    {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
+                    {{range $card.Treatments}}<span class="m-badge treatment">{{.}}</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn" data-card="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
                     {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
@@ -199,14 +217,16 @@
             {{/* Seller/Buyer tab toggle */}}
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
+            {{$defaultBuyers := or (eq $.DefaultTab "buyers") (eq $.SearchSort "buylist")}}
             <div class="m-tabs" data-card="{{$cardId}}">
-                {{if $hasSellers}}<button class="m-tab active" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
-                {{if $hasBuyers}}<button class="m-tab" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
+                {{if $hasSellers}}<button class="m-tab{{if not $defaultBuyers}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
+                {{if $hasBuyers}}<button class="m-tab{{if $defaultBuyers}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
             </div>
 
             {{/* Condition pills - default to NM, hidden for sealed products */}}
             {{if not $card.Sealed}}
             <div class="m-cond-pills" data-card="{{$cardId}}">
+                <span class="m-cond-pills-left">
                 {{range $conditions := $.CondKeys}}
                     {{if ne $conditions "INDEX"}}
                         {{$sellerConds := (index $.FoundSellers $cardId)}}
@@ -219,6 +239,17 @@
                         {{end}}
                     {{end}}
                 {{end}}
+                </span>
+                {{$hasIndex := false}}
+                {{$sellerConds := (index $.FoundSellers $cardId)}}
+                {{$vendorConds := (index $.FoundVendors $cardId)}}
+                {{if $sellerConds}}{{if (index $sellerConds "INDEX")}}{{$hasIndex = true}}{{end}}{{end}}
+                {{if $vendorConds}}{{if (index $vendorConds "INDEX")}}{{$hasIndex = true}}{{end}}{{end}}
+                {{if $hasIndex}}
+                <span class="m-cond-pills-right">
+                    <button class="m-cond-pill" data-cond="INDEX" data-card="{{$cardId}}">Index</button>
+                </span>
+                {{end}}
             </div>
             {{end}}
 
@@ -227,13 +258,13 @@
 
             {{/* Sellers panel */}}
             {{if $hasSellers}}
-            <div class="m-tab-panel active" id="sellers-{{$cardId}}">
+            <div class="m-tab-panel{{if not $defaultBuyers}} active{{end}}" id="sellers-{{$cardId}}">
                 {{$condsEntry := (index $.FoundSellers $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                        <div class="m-cond-group active" data-cond="INDEX" data-card="{{$cardId}}">
+                        <div class="m-cond-group" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -297,13 +328,13 @@
 
             {{/* Buyers panel */}}
             {{if $hasBuyers}}
-            <div class="m-tab-panel" id="buyers-{{$cardId}}">
+            <div class="m-tab-panel{{if $defaultBuyers}} active{{end}}" id="buyers-{{$cardId}}">
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                        <div class="m-cond-group active" data-cond="INDEX" data-card="{{$cardId}}">
+                        <div class="m-cond-group" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -315,7 +346,7 @@
                                     <summary>
                                         <span class="m-vendor-name">{{$entry.ScraperName}}</span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                            <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
                                             <span class="m-vendor-qty"></span>
                                         </span>
                                     </summary>
@@ -418,6 +449,140 @@
 
                 <button type="button" class="m-filter-apply" onclick="applyFilters()">Apply</button>
             </form>
+        </div>
+    </div>
+
+    {{/* Settings drawer */}}
+    <div class="m-settings-overlay" id="m-settings-overlay" onclick="closeSettings()"></div>
+    <div class="m-settings-sheet" id="m-settings-sheet">
+        <div class="m-drawer-handle" onclick="closeSettings()"><span></span></div>
+        <div class="m-settings-content">
+            <h3>Search Settings</h3>
+
+            {{/* Default Tab */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Default Tab</div>
+                <div class="m-settings-pills" id="m-set-default-tab">
+                    <button type="button" class="m-settings-pill active" data-val="sellers">Sellers</button>
+                    <button type="button" class="m-settings-pill" data-val="buyers">Buyers</button>
+                </div>
+            </div>
+
+            {{/* Listing Priority */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Listing Priority</div>
+                <div class="m-settings-pills" id="m-set-listing-priority">
+                    <button type="button" class="m-settings-pill active" data-val="stores">By Store</button>
+                    <button type="button" class="m-settings-pill" data-val="prices">By Price</button>
+                    <button type="button" class="m-settings-pill" data-val="credit">By Credit</button>
+                    <button type="button" class="m-settings-pill" data-val="market">By Market</button>
+                </div>
+            </div>
+
+            {{/* Preferred Sort Store */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Preferred Sort Store</div>
+                <div class="m-settings-dropdowns">
+                    <div class="m-settings-dropdown-col">
+                        <div class="m-settings-dropdown-label">Retail</div>
+                        <select class="m-settings-select" id="m-set-sellers-priority">
+                            <option value="" selected>Default</option>
+                            {{range $i, $key := .SellerKeys}}
+                            <option value="{{$key}}">{{scraper_name $key}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+                    <div class="m-settings-dropdown-col">
+                        <div class="m-settings-dropdown-label">Buylist</div>
+                        <select class="m-settings-select" id="m-set-vendors-priority">
+                            <option value="" selected>Default</option>
+                            {{range $i, $key := .VendorKeys}}
+                            <option value="{{$key}}">{{scraper_name $key}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {{/* Display Options */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Display Options</div>
+                <div class="m-settings-toggles" id="m-set-misc-opts">
+                    <div class="m-settings-row">
+                        <span>Skip invalid Direct prices</span>
+                        <div class="m-settings-toggle" data-val="noSussy" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide classic promo entries</span>
+                        <div class="m-settings-toggle" data-val="hidePrelPack" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide ALL promo entries</span>
+                        <div class="m-settings-toggle" data-val="hidePromos" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Prefer flavor names</span>
+                        <div class="m-settings-toggle" data-val="preferFlavor" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide non-NM buylist</span>
+                        <div class="m-settings-toggle" data-val="hideBLconds" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Skip empty results</span>
+                        <div class="m-settings-toggle" data-val="skipEmpty" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide SYP indication</span>
+                        <div class="m-settings-toggle" data-val="noSyp" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                    <div class="m-settings-row">
+                        <span>Hide CSV upsell</span>
+                        <div class="m-settings-toggle" data-val="noUpsell" onclick="this.classList.toggle('on')"><span class="m-toggle-knob"></span></div>
+                    </div>
+                </div>
+            </div>
+
+            {{/* Exclude Sellers */}}
+            <div class="m-settings-section">
+                <div class="m-settings-collapse" onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('expanded');">
+                    <span class="m-settings-label">Exclude Sellers</span>
+                    <i data-lucide="chevron-right" class="m-settings-chevron"></i>
+                </div>
+                <div class="m-settings-collapse-body" id="m-set-sellers">
+                    <div class="m-settings-bulk">
+                        <button type="button" onclick="mSettingsBulk('m-set-sellers', false)">Clear</button>
+                        <button type="button" onclick="mSettingsBulk('m-set-sellers', true)">Select All</button>
+                    </div>
+                    <div class="m-settings-checks">
+                        {{range $i, $key := .SellerKeys}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+
+            {{/* Exclude Vendors */}}
+            <div class="m-settings-section">
+                <div class="m-settings-collapse" onclick="this.classList.toggle('expanded'); this.nextElementSibling.classList.toggle('expanded');">
+                    <span class="m-settings-label">Exclude Vendors</span>
+                    <i data-lucide="chevron-right" class="m-settings-chevron"></i>
+                </div>
+                <div class="m-settings-collapse-body" id="m-set-vendors">
+                    <div class="m-settings-bulk">
+                        <button type="button" onclick="mSettingsBulk('m-set-vendors', false)">Clear</button>
+                        <button type="button" onclick="mSettingsBulk('m-set-vendors', true)">Select All</button>
+                    </div>
+                    <div class="m-settings-checks">
+                        {{range $i, $key := .VendorKeys}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{end}}
+                    </div>
+                </div>
+            </div>
+
+            {{/* Apply */}}
+            <button type="button" class="m-settings-apply" onclick="saveSettings()">Apply Settings</button>
         </div>
     </div>
 
@@ -546,25 +711,29 @@ function hideCardDrawer() {
         pill.addEventListener('click', function() {
             var cardId = this.getAttribute('data-card');
             var cond = this.getAttribute('data-cond');
-
-            // Update active pill
-            this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function(p) { p.classList.remove('active'); });
-            this.classList.add('active');
-
-            // Show matching condition groups across both panels
             var card = this.closest('.m-card');
-            card.querySelectorAll('.m-cond-group').forEach(function(g) {
-                if (g.getAttribute('data-cond') === 'INDEX') {
-                    return; // Index rows always visible
-                }
-                if (g.getAttribute('data-cond') === cond) {
-                    g.classList.add('active');
-                } else {
-                    g.classList.remove('active');
-                }
-            });
 
-            // Recalculate best price badges after switching condition
+            if (cond === 'INDEX') {
+                // Index pill toggles independently
+                this.classList.toggle('active');
+                card.querySelectorAll('.m-cond-group[data-cond="INDEX"]').forEach(function(g) {
+                    g.classList.toggle('active');
+                });
+            } else {
+                // Condition pills are mutually exclusive
+                this.closest('.m-cond-pills').querySelectorAll('.m-cond-pills-left .m-cond-pill').forEach(function(p) { p.classList.remove('active'); });
+                this.classList.add('active');
+
+                card.querySelectorAll('.m-cond-group').forEach(function(g) {
+                    if (g.getAttribute('data-cond') === 'INDEX') return;
+                    if (g.getAttribute('data-cond') === cond) {
+                        g.classList.add('active');
+                    } else {
+                        g.classList.remove('active');
+                    }
+                });
+            }
+
             recalcBestBadges(card);
         });
     });
@@ -630,5 +799,141 @@ function recalcBestBadges(card) {
 document.querySelectorAll('.m-card').forEach(function(card) {
     recalcBestBadges(card);
 });
+
+// Settings drawer open/close
+function openSettings() {
+    loadSettings();
+    document.getElementById('m-settings-overlay').classList.add('open');
+    document.getElementById('m-settings-sheet').classList.add('open');
+    lucide.createIcons({nameAttr: 'data-lucide', attrs: {}});
+}
+
+function closeSettings() {
+    document.getElementById('m-settings-overlay').classList.remove('open');
+    document.getElementById('m-settings-sheet').classList.remove('open');
+}
+
+// Settings pill switching (mutually exclusive within each group)
+document.querySelectorAll('.m-settings-pills').forEach(function(group) {
+    group.querySelectorAll('.m-settings-pill').forEach(function(pill) {
+        pill.addEventListener('click', function() {
+            group.querySelectorAll('.m-settings-pill').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
+        });
+    });
+});
+
+// Bulk select/clear for store checkboxes
+function mSettingsBulk(containerId, selectAll) {
+    var container = document.getElementById(containerId);
+    container.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = selectAll;
+    });
+}
+
+// Load current cookie values into the settings UI
+function loadSettings() {
+    // Default Tab
+    var tab = getCookie('SearchDefaultTab');
+    if (tab) {
+        var group = document.getElementById('m-set-default-tab');
+        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
+            p.classList.toggle('active', p.getAttribute('data-val') === tab);
+        });
+    }
+
+    // Listing Priority
+    var lp = getCookie('SearchListingPriority');
+    if (lp) {
+        var group = document.getElementById('m-set-listing-priority');
+        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
+            p.classList.toggle('active', p.getAttribute('data-val') === lp);
+        });
+    }
+
+    // Preferred Sort Stores
+    var sp = getCookie('SearchSellersPriority');
+    if (sp) document.getElementById('m-set-sellers-priority').value = sp;
+
+    var vp = getCookie('SearchVendorsPriority');
+    if (vp) document.getElementById('m-set-vendors-priority').value = vp;
+
+    // Display Options (misc opts — comma-separated)
+    var misc = getCookie('SearchMiscOpts');
+    var opts = misc ? misc.split(',') : [];
+    document.querySelectorAll('#m-set-misc-opts .m-settings-toggle').forEach(function(toggle) {
+        var val = toggle.getAttribute('data-val');
+        if (opts.indexOf(val) !== -1) {
+            toggle.classList.add('on');
+        } else {
+            toggle.classList.remove('on');
+        }
+    });
+
+    // Exclude Sellers
+    var sellers = getCookie('SearchSellersList');
+    var sellerList = sellers ? sellers.split(',') : [];
+    document.querySelectorAll('#m-set-sellers input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = sellerList.indexOf(cb.name) !== -1;
+    });
+
+    // Exclude Vendors
+    var vendors = getCookie('SearchVendorsList');
+    var vendorList = vendors ? vendors.split(',') : [];
+    document.querySelectorAll('#m-set-vendors input[type="checkbox"]').forEach(function(cb) {
+        cb.checked = vendorList.indexOf(cb.name) !== -1;
+    });
+}
+
+// Save all settings to cookies and show toast
+function saveSettings() {
+    // Default Tab
+    var tabPill = document.querySelector('#m-set-default-tab .m-settings-pill.active');
+    setCookie('SearchDefaultTab', tabPill ? tabPill.getAttribute('data-val') : 'sellers', 1000);
+
+    // Listing Priority
+    var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
+    setCookie('SearchListingPriority', lpPill ? lpPill.getAttribute('data-val') : 'stores', 1000);
+
+    // Preferred Sort Stores
+    setCookie('SearchSellersPriority', document.getElementById('m-set-sellers-priority').value, 1000);
+    setCookie('SearchVendorsPriority', document.getElementById('m-set-vendors-priority').value, 1000);
+
+    // Display Options (collect active toggles into comma-separated string)
+    var miscList = '';
+    document.querySelectorAll('#m-set-misc-opts .m-settings-toggle.on').forEach(function(toggle) {
+        miscList += toggle.getAttribute('data-val') + ',';
+    });
+    setCookie('SearchMiscOpts', miscList, 1000);
+
+    // Exclude Sellers
+    var sellersList = '';
+    document.querySelectorAll('#m-set-sellers input[type="checkbox"]:checked').forEach(function(cb) {
+        sellersList += cb.name + ',';
+    });
+    setCookie('SearchSellersList', sellersList, 1000);
+
+    // Exclude Vendors
+    var vendorsList = '';
+    document.querySelectorAll('#m-set-vendors input[type="checkbox"]:checked').forEach(function(cb) {
+        vendorsList += cb.name + ',';
+    });
+    setCookie('SearchVendorsList', vendorsList, 1000);
+
+    // Close drawer
+    closeSettings();
+
+    // Show toast
+    var toast = document.getElementById('m-fav-toast');
+    if (toast) {
+        toast.textContent = 'Settings saved';
+        toast.classList.add('show');
+        setTimeout(function() {
+            toast.classList.remove('show');
+            // Reload to apply settings
+            window.location.reload();
+        }, 1500);
+    }
+}
 </script>
 {{end}}

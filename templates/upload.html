@@ -120,7 +120,7 @@
 
                     <script type="text/javascript">
                         const hiddenBools = [
-                            "upload", "download", "estimate", "deckbox"
+                            "upload", "download", "estimate", "deckbox", "tcgplayer_csv"
                         ];
                         function submitForm(field, newWindow) {
                             hiddenBools.forEach(element => {
@@ -146,6 +146,7 @@
                     <input type="hidden" id="download" name="download" value="false"/>
                     <input type="hidden" id="estimate" name="estimate" value="false"/>
                     <input type="hidden" id="deckbox" name="deckbox" value="false"/>
+                    <input type="hidden" id="tcgplayer_csv" name="tcgplayer_csv" value="false"/>
 
                     <div class="upload-actions">
                         <input type="submit" id="submit_default" class="upload-btn upload-btn-primary" value="Upload" onclick="javascript:submitForm('upload', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}}>
@@ -153,6 +154,7 @@
                             <input type="submit" id="submit_download" class="upload-btn upload-btn-secondary" value="Get CSV" onclick="javascript:submitForm('download', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
                             <input type="submit" id="submit_estimate" class="upload-btn upload-btn-secondary" value="CardConduit" onclick="javascript:submitForm('estimate', true);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
                             <input type="submit" id="submit_deckbox" class="upload-btn upload-btn-secondary" value="Deckbox" onclick="javascript:submitForm('deckbox', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_tcgplayer_csv" class="upload-btn upload-btn-secondary" value="TCGplayer CSV" onclick="javascript:submitForm('tcgplayer_csv', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
                         {{end}}
                         {{if .Optimized}}
                             <input type="button" class="upload-btn upload-btn-secondary" value="Optimizer" onclick="window.location.href = '#top';">
@@ -316,7 +318,7 @@
                 <div class="upload-help-card">
                     <h3>Privacy &amp; Access</h3>
                     <p>No data is stored on the website. Your exports are private to you only.</p>
-                    <p><strong>Buylist</strong> prices require Legacy tier. Store customization requires a higher tier. CSV download and CardConduit/Deckbox export are buylist-tier features.</p>
+                    <p>Some features may be available at certain tiers only. At <i>Modern</i> you can customize the list of Retail stores. At <i>Legacy</i>, you get access to <strong>Buylist</strong> prices, CSV downloads, and exports. At <i>Vintage</i> you have no download limits and can import custom searches.</p>
                 </div>
 
                 <div class="upload-help-card">
@@ -377,7 +379,7 @@
 
             function enabledButtons() {
                 const fields = [
-                    'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
+                    'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
                 ];
 
                 fields.forEach(element => {
@@ -393,7 +395,7 @@
                 var selectBox = document.getElementById('storesBox');
                 if (selectBox) {
                     const fields = [
-                        'submit_download', 'submit_estimate', 'submit_deckbox'
+                        'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
                     ];
                     if (mode == "buylist") {
                         selectBox.innerHTML = " \
