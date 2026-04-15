@@ -852,9 +852,6 @@
     position: relative;
 }
 
-.m-settings-btn {
-    color: var(--greytext);
-}
 
 /* Sealed landing page */
 .m-sealed-title {
