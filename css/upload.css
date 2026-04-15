@@ -737,7 +737,7 @@
 .ures-card-name { font-weight: 600; font-size: var(--text-md); }
 .ures-card-name a { color: var(--normal); }
 .ures-card-name a:hover { color: var(--ainfo); text-decoration: none; }
-.ures-card-set { font-size: var(--text-sm); color: var(--text-dim); }
+.ures-card-set { font-size: var(--text-sm); color: var(--activetext); }
 
 .ures-price {
     text-align: right;
