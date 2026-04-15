@@ -374,8 +374,8 @@
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price">$ {{printf "%.2f" $entry.Price}}</span>
-                                            <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
+                                            <span class="m-vendor-price">{{if ne $entry.Shorthand "SYP"}}$ {{printf "%.2f" $entry.Price}}{{else}}# {{$entry.Quantity}}{{end}}</span>
+                                            <span class="m-vendor-qty">{{if and (ne $entry.Shorthand "SYP") $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                         </span>
                                     </summary>
                                     <div class="m-vendor-detail">
