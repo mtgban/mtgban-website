@@ -331,10 +331,21 @@
 /* Condition pills */
 .m-cond-pills {
     display: flex;
-    gap: 0.3em;
+    align-items: center;
     padding: 0.35em 0.75em;
-    overflow-x: auto;
     border-bottom: 1px solid var(--border);
+}
+
+.m-cond-pills-left {
+    display: flex;
+    gap: 0.3em;
+    overflow-x: auto;
+}
+
+.m-cond-pills-right {
+    margin-left: auto;
+    flex-shrink: 0;
+    padding-left: 0.5em;
 }
 
 /* Override main.css @media (max-width: 768px) min-height: 44px on buttons */
@@ -393,6 +404,12 @@
     background: #dc2626;
     border-color: #dc2626;
     box-shadow: 0 0 6px rgba(220, 38, 38, 0.3);
+}
+
+.m-cond-pill[data-cond="INDEX"].active {
+    background: #7c3aed;
+    border-color: #7c3aed;
+    box-shadow: 0 0 6px rgba(124, 58, 237, 0.3);
 }
 
 /* Condition groups (show/hide by active pill) */

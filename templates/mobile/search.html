@@ -218,6 +218,7 @@
             {{/* Condition pills - default to NM, hidden for sealed products */}}
             {{if not $card.Sealed}}
             <div class="m-cond-pills" data-card="{{$cardId}}">
+                <span class="m-cond-pills-left">
                 {{range $conditions := $.CondKeys}}
                     {{if ne $conditions "INDEX"}}
                         {{$sellerConds := (index $.FoundSellers $cardId)}}
@@ -229,6 +230,17 @@
                             <button class="m-cond-pill{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">{{$conditions}}</button>
                         {{end}}
                     {{end}}
+                {{end}}
+                </span>
+                {{$hasIndex := false}}
+                {{$sellerConds := (index $.FoundSellers $cardId)}}
+                {{$vendorConds := (index $.FoundVendors $cardId)}}
+                {{if $sellerConds}}{{if (index $sellerConds "INDEX")}}{{$hasIndex = true}}{{end}}{{end}}
+                {{if $vendorConds}}{{if (index $vendorConds "INDEX")}}{{$hasIndex = true}}{{end}}{{end}}
+                {{if $hasIndex}}
+                <span class="m-cond-pills-right">
+                    <button class="m-cond-pill" data-cond="INDEX" data-card="{{$cardId}}">Index</button>
+                </span>
                 {{end}}
             </div>
             {{end}}
@@ -244,7 +256,7 @@
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                        <div class="m-cond-group active" data-cond="INDEX" data-card="{{$cardId}}">
+                        <div class="m-cond-group" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -314,7 +326,7 @@
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                        <div class="m-cond-group active" data-cond="INDEX" data-card="{{$cardId}}">
+                        <div class="m-cond-group" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -557,25 +569,29 @@ function hideCardDrawer() {
         pill.addEventListener('click', function() {
             var cardId = this.getAttribute('data-card');
             var cond = this.getAttribute('data-cond');
-
-            // Update active pill
-            this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function(p) { p.classList.remove('active'); });
-            this.classList.add('active');
-
-            // Show matching condition groups across both panels
             var card = this.closest('.m-card');
-            card.querySelectorAll('.m-cond-group').forEach(function(g) {
-                if (g.getAttribute('data-cond') === 'INDEX') {
-                    return; // Index rows always visible
-                }
-                if (g.getAttribute('data-cond') === cond) {
-                    g.classList.add('active');
-                } else {
-                    g.classList.remove('active');
-                }
-            });
 
-            // Recalculate best price badges after switching condition
+            if (cond === 'INDEX') {
+                // Index pill toggles independently
+                this.classList.toggle('active');
+                card.querySelectorAll('.m-cond-group[data-cond="INDEX"]').forEach(function(g) {
+                    g.classList.toggle('active');
+                });
+            } else {
+                // Condition pills are mutually exclusive
+                this.closest('.m-cond-pills').querySelectorAll('.m-cond-pills-left .m-cond-pill').forEach(function(p) { p.classList.remove('active'); });
+                this.classList.add('active');
+
+                card.querySelectorAll('.m-cond-group').forEach(function(g) {
+                    if (g.getAttribute('data-cond') === 'INDEX') return;
+                    if (g.getAttribute('data-cond') === cond) {
+                        g.classList.add('active');
+                    } else {
+                        g.classList.remove('active');
+                    }
+                });
+            }
+
             recalcBestBadges(card);
         });
     });
