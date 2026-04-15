@@ -1495,45 +1495,65 @@
 
 /* Section containers */
 .m-settings-section {
-    margin-bottom: 1em;
+    margin-bottom: 0;
+    padding: 0.8em 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.light-theme .m-settings-section {
+    border-bottom-color: rgba(0, 0, 0, 0.06);
 }
 
 .m-settings-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.08em;
     color: var(--greytext);
-    font-weight: 600;
-    margin-bottom: 0.4em;
+    font-weight: 700;
+    margin-bottom: 0.5em;
 }
 
-/* Pill selectors (mutually exclusive) */
+/* Pill selectors (mutually exclusive) — contained group */
 .m-settings-pills {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.3em;
+    gap: 0;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.light-theme .m-settings-pills {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
 }
 
 .m-settings-pill {
-    padding: 0.2em 0.6em;
-    border-radius: 4px;
-    font-size: 0.7rem;
+    flex: 1;
+    padding: 0.45em 0.6em;
+    border-radius: 6px;
+    font-size: 0.75rem;
     font-weight: 600;
-    border: 1px solid var(--border);
-    background: none;
+    border: none;
+    background: transparent;
     color: var(--greytext);
     cursor: pointer;
     min-height: auto !important;
+    text-align: center;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .m-settings-pill.active {
-    background: rgba(30, 144, 255, 0.15);
-    border-color: rgba(30, 144, 255, 0.4);
+    background: rgba(30, 144, 255, 0.2);
+    box-shadow: 0 1px 4px rgba(30, 144, 255, 0.15);
     color: white;
 }
 
 .light-theme .m-settings-pill.active {
+    background: rgba(30, 144, 255, 0.12);
     color: #1a1a2e;
+    box-shadow: 0 1px 4px rgba(30, 144, 255, 0.1);
 }
 
 /* Dropdowns */
@@ -1547,50 +1567,66 @@
 }
 
 .m-settings-dropdown-label {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     color: var(--greytext);
-    margin-bottom: 0.2em;
+    margin-bottom: 0.3em;
+    font-weight: 500;
 }
 
 .m-settings-select {
     width: 100%;
     padding: 0.5em 0.6em;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--background);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
     color: var(--text);
-    min-height: 36px;
+    min-height: 40px;
     box-sizing: border-box;
+}
+
+.light-theme .m-settings-select {
+    background: rgba(0, 0, 0, 0.03);
 }
 
 /* Toggle switches */
 .m-settings-toggles {
     display: flex;
     flex-direction: column;
-    gap: 0.6em;
+    gap: 0;
 }
 
 .m-settings-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 0.55em 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.light-theme .m-settings-row {
+    border-bottom-color: rgba(0, 0, 0, 0.04);
+}
+
+.m-settings-row:last-child {
+    border-bottom: none;
 }
 
 .m-settings-row > span {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     color: var(--text);
 }
 
 .m-settings-toggle {
-    width: 36px;
-    height: 20px;
-    border-radius: 10px;
+    width: 44px;
+    height: 24px;
+    border-radius: 12px;
     background: rgba(255, 255, 255, 0.15);
     position: relative;
     cursor: pointer;
-    transition: background 0.2s ease;
+    transition: background 0.25s ease;
     flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .light-theme .m-settings-toggle {
@@ -1605,15 +1641,15 @@
     position: absolute;
     top: 2px;
     left: 2px;
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     background: #888;
-    transition: left 0.2s ease, background 0.2s ease;
+    transition: left 0.25s cubic-bezier(0.32, 0.72, 0, 1), background 0.25s ease;
 }
 
 .m-settings-toggle.on .m-toggle-knob {
-    left: 18px;
+    left: 22px;
     background: white;
 }
 
@@ -1622,20 +1658,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5em 0;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.7em 0;
     cursor: pointer;
-}
-
-.light-theme .m-settings-collapse {
-    border-top-color: rgba(0, 0, 0, 0.08);
+    -webkit-tap-highlight-color: transparent;
 }
 
 .m-settings-chevron {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     color: var(--greytext);
-    transition: transform 0.2s ease;
+    transition: transform 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .m-settings-collapse.expanded .m-settings-chevron {
@@ -1644,7 +1676,7 @@
 
 .m-settings-collapse-body {
     display: none;
-    padding: 0.5em 0;
+    padding: 0 0 0.5em;
 }
 
 .m-settings-collapse-body.expanded {
@@ -1653,54 +1685,76 @@
 
 .m-settings-bulk {
     display: flex;
-    gap: 0.3em;
-    margin-bottom: 0.5em;
+    gap: 0.4em;
+    margin-bottom: 0.6em;
 }
 
 .m-settings-bulk button {
-    font-size: 0.7rem;
-    padding: 0.2em 0.5em;
+    font-size: 0.75rem;
+    padding: 0.35em 0.7em;
     border: 1px solid var(--border);
-    border-radius: 4px;
-    background: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
     color: var(--greytext);
     cursor: pointer;
     min-height: auto !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.light-theme .m-settings-bulk button {
+    background: rgba(0, 0, 0, 0.03);
 }
 
 .m-settings-checks {
     display: flex;
     flex-direction: column;
-    gap: 0.4em;
+    gap: 0;
 }
 
 .m-settings-checks label {
     display: flex;
     align-items: center;
-    gap: 0.4em;
-    font-size: 0.75rem;
+    gap: 0.5em;
+    font-size: 0.8rem;
     color: var(--text);
+    padding: 0.4em 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.light-theme .m-settings-checks label {
+    border-bottom-color: rgba(0, 0, 0, 0.03);
+}
+
+.m-settings-checks label:last-child {
+    border-bottom: none;
 }
 
 .m-settings-checks input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     flex-shrink: 0;
 }
 
 /* Apply button */
 .m-settings-apply {
     width: 100%;
-    padding: 0.75em;
-    background: dodgerblue;
+    padding: 0.85em;
+    background: var(--dodgerblue);
     color: white;
     border: none;
-    border-radius: 8px;
-    font-size: 0.85rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
     font-weight: 600;
-    margin-top: 0.5em;
+    margin-top: 1em;
     cursor: pointer;
     min-height: auto !important;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s ease;
+}
+
+.m-settings-apply:active {
+    opacity: 0.8;
 }
 
 /* Landscape: side-by-side Sellers / Buyers with inline card image */
