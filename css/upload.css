@@ -244,13 +244,12 @@
 
 .upload-source-area textarea {
     width: 100%;
-    min-height: 80px;
     background: transparent;
     border: none;
     color: var(--normal);
     font-family: var(--font-mono);
-    font-size: var(--text-md);
-    resize: vertical;
+    font-size: var(--text-lg);
+    resize: none;
     outline: none;
 }
 
