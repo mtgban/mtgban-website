@@ -1036,6 +1036,7 @@
         var input = document.getElementById("row-" + oldHash);
         if (input) {
             input.value = newHash;
+            input.id = "row-" + newHash;
             btn.dataset.hash = newHash;
         }
 
@@ -1081,10 +1082,18 @@
             if (!meta) return;
             var card = document.createElement("div");
             card.className = "printing-picker-card" + (uuid === currentHash ? " selected" : "");
-            card.innerHTML =
-                '<img src="' + meta.image + '" loading="lazy">' +
-                '<div class="pp-meta">' + meta.edition + '</div>' +
-                '<div class="pp-set">#' + meta.number + '</div>';
+            var cardImg = document.createElement("img");
+            cardImg.src = meta.image;
+            cardImg.loading = "lazy";
+            card.appendChild(cardImg);
+            var metaDiv = document.createElement("div");
+            metaDiv.className = "pp-meta";
+            metaDiv.textContent = meta.edition;
+            card.appendChild(metaDiv);
+            var setDiv = document.createElement("div");
+            setDiv.className = "pp-set";
+            setDiv.textContent = "#" + meta.number;
+            card.appendChild(setDiv);
             card.addEventListener("click", function() {
                 updateRowHash(activePicker, uuid);
                 // Update thumbnail and set info in the row
