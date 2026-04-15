@@ -210,10 +210,10 @@
             {{/* Seller/Buyer tab toggle */}}
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
-            {{$buylistSort := eq $.SearchSort "buylist"}}
+            {{$defaultBuyers := or (eq $.DefaultTab "buyers") (eq $.SearchSort "buylist")}}
             <div class="m-tabs" data-card="{{$cardId}}">
-                {{if $hasSellers}}<button class="m-tab{{if not $buylistSort}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
-                {{if $hasBuyers}}<button class="m-tab{{if $buylistSort}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
+                {{if $hasSellers}}<button class="m-tab{{if not $defaultBuyers}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
+                {{if $hasBuyers}}<button class="m-tab{{if $defaultBuyers}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
             </div>
 
             {{/* Condition pills - default to NM, hidden for sealed products */}}
@@ -251,7 +251,7 @@
 
             {{/* Sellers panel */}}
             {{if $hasSellers}}
-            <div class="m-tab-panel{{if not $buylistSort}} active{{end}}" id="sellers-{{$cardId}}">
+            <div class="m-tab-panel{{if not $defaultBuyers}} active{{end}}" id="sellers-{{$cardId}}">
                 {{$condsEntry := (index $.FoundSellers $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
@@ -321,7 +321,7 @@
 
             {{/* Buyers panel */}}
             {{if $hasBuyers}}
-            <div class="m-tab-panel{{if $buylistSort}} active{{end}}" id="buyers-{{$cardId}}">
+            <div class="m-tab-panel{{if $defaultBuyers}} active{{end}}" id="buyers-{{$cardId}}">
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
