@@ -631,6 +631,7 @@
     font-size: var(--text-2xl);
     font-weight: 700;
     font-family: var(--font-mono);
+    text-align: right;
 }
 .res-summary-stat .val.green { color: var(--asuccess); }
 .res-summary-stat .val.blue { color: var(--ainfo); }
