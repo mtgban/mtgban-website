@@ -754,6 +754,7 @@
 
 .ures-index {
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: var(--text-sm);
     color: var(--activetext);
     white-space: nowrap;
@@ -761,8 +762,9 @@
     flex-direction: column;
     gap: 1px;
 }
-.ures-index span { display: flex; justify-content: space-between; gap: 8px; }
+.ures-index > span { display: flex; justify-content: space-between; gap: 8px; }
 .ures-index .idx-label { color: var(--text-dim); font-size: var(--text-xs); }
+.ures-index .idx-val { flex: 1; text-align: right; }
 
 .cond-badge {
     display: inline-block;

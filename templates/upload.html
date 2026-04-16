@@ -717,7 +717,7 @@
                                 <div class="ures-index">
                                     {{range $.IndexKeys}}
                                         {{$idxPrice := (index $scraperEntries .)}}
-                                        <span><span class="idx-label">{{scraper_name .}}</span> {{if ne $idxPrice 0.0}}$ {{printf "%.2f" $idxPrice}}{{else}}&mdash;{{end}}</span>
+                                        <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">{{if ne $idxPrice 0.0}}$ {{printf "%.2f" $idxPrice}}{{else}}&mdash;{{end}}</span></span>
                                     {{end}}
                                 </div>
                             </td>
@@ -741,7 +741,7 @@
                         <td>
                             <div class="ures-index" style="font-weight:600">
                                 {{range .IndexKeys}}
-                                    <span><span class="idx-label">{{scraper_name .}}</span> $ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+                                    <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span></span>
                                 {{end}}
                             </div>
                         </td>
