@@ -592,6 +592,15 @@
     }
 }
 
+/* -- Results page header -- */
+.page-standard .page-header {
+    align-items: baseline;
+}
+.page-standard .page-header .page-subtitle {
+    margin: 0;
+    white-space: nowrap;
+}
+
 /* -- Results header: two-row stack -- */
 .res-header {
     display: flex;
@@ -634,6 +643,7 @@
 .res-summary-stat {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 2px;
     padding-right: 1em;
     border-right: 1px solid var(--border-subtle);
