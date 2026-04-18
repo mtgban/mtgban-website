@@ -8,14 +8,10 @@
         <div class="page-standard">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
             <div class="page-header">
-                <div>
-                    <h1>Results{{if and .SearchQuery (not (eq .SearchQuery "hashes"))}} from {{.SearchQuery}}{{end}}</h1>
-                    {{if .UploadEntries}}
-                        <p class="page-subtitle">{{len .UploadEntries}} cards matched &middot; {{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode</p>
-                    {{else}}
-                        <p class="page-subtitle">{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode &middot; Optimizer only</p>
-                    {{end}}
-                </div>
+                <h1>Results{{if and .SearchQuery (not (eq .SearchQuery "hashes"))}} from {{.SearchQuery}}{{end}}</h1>
+                <p class="page-subtitle">
+                    {{if .UploadEntries}}{{len .UploadEntries}} cards matched &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
+                </p>
             </div>
 
             {{template "upload-results" .}}
