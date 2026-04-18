@@ -607,13 +607,23 @@
 {{end}}
 
 {{define "upload-results"}}
-    <!-- Summary + Tabs row -->
     <div class="res-header">
-        <div class="res-tabs">
-            <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
-            {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
+        <!-- Row 1: View tabs + Export buttons -->
+        <div class="res-buttons-row">
+            <div class="res-tabs">
+                <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
+                {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
+            </div>
+            {{if .CanBuylist}}
+            <div class="res-btn-sep"></div>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('download', false)">Get CSV</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('estimate', true)">CardConduit</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('deckbox', false)">Deckbox</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('tcgplayer_csv', false)">TCGplayer CSV</button>
+            {{end}}
         </div>
 
+        <!-- Row 2: Summary stats -->
         <div class="res-summary">
             <div class="res-summary-stat">
                 <span class="label">Cards</span>
@@ -998,10 +1008,50 @@
         </div>
     </div>
 
-    <!-- Hidden form for pick-printing re-submission -->
+    <!-- Hidden form for pick-printing re-submission and exports -->
     <form id="upload_form" action="/upload" method="post" style="display:none">
         <input type="hidden" name="mode" value="{{if .IsBuylist}}true{{else}}false{{end}}">
+        <input type="hidden" id="res_download" name="download" value="">
+        <input type="hidden" id="res_estimate" name="estimate" value="">
+        <input type="hidden" id="res_deckbox" name="deckbox" value="">
+        <input type="hidden" id="res_tcgplayer_csv" name="tcgplayer_csv" value="">
     </form>
+
+    <script>
+    var resExportFields = ["res_download", "res_estimate", "res_deckbox", "res_tcgplayer_csv"];
+
+    function ensureHashesLoaded() {
+        var form = document.getElementById("upload_form");
+        if (form.querySelectorAll('input[name="hashes"]').length > 0) return;
+
+        form.removeAttribute("enctype");
+        document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
+            if (!row.dataset.hash) return;
+            var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
+            pairs.forEach(function(pair) {
+                var input = document.createElement("input");
+                input.type = "hidden";
+                input.name = pair[1];
+                if (pair[0] === 'hash') input.id = "row-" + row.dataset[pair[0]];
+                input.value = row.dataset[pair[0]];
+                form.appendChild(input);
+            });
+        });
+    }
+
+    function submitExport(field, newWindow) {
+        ensureHashesLoaded();
+
+        resExportFields.forEach(function(id) {
+            document.getElementById(id).value = "";
+        });
+        document.getElementById("res_" + field).value = "true";
+
+        var form = document.getElementById("upload_form");
+        form.target = newWindow ? '_blank' : '';
+        form.submit();
+    }
+    </script>
 
     <!-- Reload button (hidden until a pick is made) -->
     <div id="reload-bar" class="ures-reload-bar" style="display:none">
@@ -1017,22 +1067,7 @@
         var form = document.getElementById("upload_form");
         var oldHash = btn.dataset.hash;
 
-        // On first pick, load all card data into hidden form (skip error rows with empty hash)
-        if (form.querySelectorAll('input[name="hashes"]').length === 0) {
-            form.removeAttribute("enctype");
-            document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
-                if (!row.dataset.hash) return;
-                var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
-                pairs.forEach(function(pair) {
-                    var input = document.createElement("input");
-                    input.type = "hidden";
-                    input.name = pair[1];
-                    if (pair[0] === 'hash') input.id = "row-" + row.dataset[pair[0]];
-                    input.value = row.dataset[pair[0]];
-                    form.appendChild(input);
-                });
-            });
-        }
+        ensureHashesLoaded();
 
         // Swap the hash
         var input = document.getElementById("row-" + oldHash);
