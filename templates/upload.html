@@ -911,7 +911,8 @@
                         <thead><tr>
                             <th>Card</th>
                             <th>Set</th>
-                            <th>Prices</th>
+                            <th class="c">Offer</th>
+                            <th class="c">Loaded</th>
                             <th>Spread</th>
                         </tr></thead>
                         <tbody>
@@ -934,18 +935,12 @@
                                         <span title="Foil">&#10024;</span>
                                     {{end}}
                                 </td>
-                                <td class="opt-prices">
-                                    {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
-                                    {{$price := (index $scraperEntries $scraperKey)}}
+                                {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
+                                {{$price := (index $scraperEntries $scraperKey)}}
+                                <td class="opt-offer">
                                     <span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardId}}" target="_blank">{{printf "%.2f" $price}}</a></span>
-                                    {{if .Price}}
-                                        / <span class="loaded">$ <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a></span>
-                                        {{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}
-                                    {{end}}
-                                    {{if eq $scraperKey $card.HotlistStore}}
-                                        <span class="emoji" title="Highest price in 3 months">&#127775;</span>
-                                    {{end}}
                                 </td>
+                                <td class="opt-loaded"><span class="loaded-wrap">{{if .Price}}<span class="loaded">$ <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}<span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}{{if eq $scraperKey $card.HotlistStore}}<span class="emoji" title="Highest price in 3 months">&#127775;</span>{{end}}</span></span></td>
                                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}">
                                     {{if .Price}}
                                         {{printf "%.2f" .Spread}}%
