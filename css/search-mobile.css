@@ -1803,6 +1803,64 @@
         padding-top: 0;
     }
 
+    /* 2-column grid: image | single panel (only one of sellers/buyers) */
+    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto auto 1fr;
+        grid-template-areas:
+            "image  header"
+            "image  pills"
+            "image  panel";
+    }
+
+    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-card-header {
+        grid-area: header;
+    }
+
+    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-tabs {
+        display: none;
+    }
+
+    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-cond-pills {
+        grid-area: pills;
+    }
+
+    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-card-img-landscape {
+        grid-area: image;
+        display: block;
+        width: 175px;
+        height: auto;
+        padding: 0.5em;
+        box-sizing: border-box;
+        object-fit: contain;
+        align-self: start;
+        border-right: 1px solid var(--border);
+    }
+
+    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-tab-panel {
+        grid-area: panel;
+        display: block !important;
+        min-width: 0;
+        overflow: hidden;
+    }
+
+    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-tab-panel::before {
+        content: "Sellers";
+        display: block;
+        padding: 0.4em 0.75em;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: var(--greytext);
+        border-bottom: 1px solid var(--border);
+        text-align: center;
+        background: rgba(30, 144, 255, 0.05);
+    }
+
+    .m-card:has(.m-tab-panel):not(:has(.m-tab-panel + .m-tab-panel)) > .m-tab-panel[id^="buyers"]::before {
+        content: "Buyers";
+    }
+
     /* 3-column grid: image | sellers | buyers */
     .m-card:has(.m-tab-panel + .m-tab-panel) {
         display: grid;

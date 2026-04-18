@@ -214,14 +214,9 @@
                 </div>
             </div>
 
-            {{/* Seller/Buyer tab toggle */}}
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
             {{$defaultBuyers := or (eq $.DefaultTab "buyers") (eq $.SearchSort "buylist")}}
-            <div class="m-tabs" data-card="{{$cardId}}">
-                {{if $hasSellers}}<button class="m-tab{{if not $defaultBuyers}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
-                {{if $hasBuyers}}<button class="m-tab{{if $defaultBuyers}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
-            </div>
 
             {{/* Condition pills - default to NM, hidden for sealed products */}}
             {{if not $card.Sealed}}
@@ -252,6 +247,12 @@
                 {{end}}
             </div>
             {{end}}
+
+            {{/* Seller/Buyer tab toggle */}}
+            <div class="m-tabs" data-card="{{$cardId}}">
+                {{if $hasSellers}}<button class="m-tab{{if not $defaultBuyers}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
+                {{if $hasBuyers}}<button class="m-tab{{if $defaultBuyers}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
+            </div>
 
             {{/* Inline card image - hidden in portrait, visible in landscape */}}
             <img class="m-card-img-landscape" src="{{$card.ImageURL}}" loading="lazy" alt="{{$card.Name}}">
