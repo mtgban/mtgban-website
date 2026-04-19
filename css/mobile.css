@@ -304,11 +304,25 @@ body.mobile:has(.m-home) .m-nav-home {
     width: 100%;
     max-width: 400px;
     margin-bottom: 1em;
+    position: relative;
+    z-index: 10;
 }
 
 .m-home-search-wrap form {
     flex: 1;
     min-width: 0;
+}
+
+.dark-theme .m-home-search-wrap .autocomplete-items {
+    background: rgb(20, 24, 30);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.light-theme .m-home-search-wrap .autocomplete-items {
+    background: rgb(255, 255, 255);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .m-home-tools {
