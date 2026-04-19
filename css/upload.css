@@ -858,7 +858,7 @@
     top: var(--nav-height);
     z-index: 5;
 }
-.opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; white-space: nowrap; }
+.opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; white-space: nowrap; align-self: end; }
 .opt-header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; flex: 1; }
 .opt-store-header .opt-total { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 600; color: var(--asuccess); }
 .opt-store-header .opt-count { font-size: var(--text-sm); color: var(--text-dim); padding: 2px 8px; background: var(--surface-3); border-radius: 10px; }
