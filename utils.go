@@ -39,34 +39,36 @@ var colorRarityMap = map[string]map[string]string{
 }
 
 type GenericCard struct {
-	UUID        string
-	Name        string
-	Edition     string
-	SetCode     string
-	Number      string
-	Variant     string
-	Keyrune     string
-	ImageURL    string
-	Foil        bool
-	Etched      bool
-	FinishTag   string
-	FinishClass string
-	Treatments  []string
-	Reserved    bool
-	Title       string
-	SearchURL   string
-	SypList     bool
-	Stocks      bool
-	StocksURL   string
-	Printings   string
-	Products    string
-	TCGId       string
-	Date        string
-	Sealed      bool
-	Booster     bool
-	HasDeck     bool
-	Flag        string
-	LangTag     string
+	UUID         string
+	Name         string
+	FlavorName   string
+	Edition      string
+	SetCode      string
+	Number       string
+	Variant      string
+	VariantShort string
+	Keyrune      string
+	ImageURL     string
+	Foil         bool
+	Etched       bool
+	FinishTag    string
+	FinishClass  string
+	Treatments   []string
+	Reserved     bool
+	Title        string
+	SearchURL    string
+	SypList      bool
+	Stocks       bool
+	StocksURL    string
+	Printings    string
+	Products     string
+	TCGId        string
+	Date         string
+	Sealed       bool
+	Booster      bool
+	HasDeck      bool
+	Flag         string
+	LangTag      string
 
 	RarityColor  string
 	ScryfallURL  string
@@ -75,6 +77,12 @@ type GenericCard struct {
 	SourceSealed []string
 	HotlistStore string
 	Newspaper    bool
+}
+
+// altFoilChipLabels overrides the default title-cased chip label for
+// altFoilTags whose names are too long to render cleanly as a chip.
+var altFoilChipLabels = map[string]string{
+	"doublerainbow": "DblRnbw",
 }
 
 func fileExists(filename string) bool {
@@ -363,16 +371,21 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	}
 
 	// Loop through the supported promo types, skipping Boosterfun already processed above
+	altFoilWord := ""
 	for _, promoType := range co.PromoTypes {
 		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != mtgmatcher.PromoTypeBoosterfun {
-			// Only physical treatments get chips (filtered by altFoilTags)
 			if slices.Contains(altFoilTags, promoType) {
-				if strings.HasSuffix(promoType, "foil") {
-					// Alt foil type replaces the generic "Foil" chip
-					finishTag = mtgmatcher.Title(strings.TrimSuffix(promoType, "foil"))
+				if co.Foil || co.Etched {
+					// Foiling variant replaces the generic Foil/Etched chip
+					if short, ok := altFoilChipLabels[promoType]; ok {
+						finishTag = short
+					} else {
+						finishTag = mtgmatcher.Title(strings.TrimSuffix(promoType, "foil"))
+					}
 					finishClass = "altfoil"
+					altFoilWord = mtgmatcher.Title(promoType)
 				} else {
-					// Non-foil treatment gets its own chip
+					// Non-foil card with a foiling-style treatment — show as chip
 					treatments = append(treatments, mtgmatcher.Title(promoType))
 				}
 			}
@@ -406,6 +419,25 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		}
 		variant += "Etched"
 	}
+
+	// Build variantShort: drop the quoted flavor prefix (mobile shows it on
+	// its own line) and any terms already surfaced as chips.
+	variantShort := variant
+	if flavor != "" {
+		variantShort = strings.TrimPrefix(variantShort, fmt.Sprintf("\"%s\"", flavor))
+		variantShort = strings.TrimSpace(variantShort)
+		variantShort = strings.TrimPrefix(variantShort, "-")
+	}
+	for _, t := range treatments {
+		variantShort = strings.ReplaceAll(variantShort, t, "")
+	}
+	if altFoilWord != "" {
+		variantShort = strings.ReplaceAll(variantShort, altFoilWord, "")
+	}
+	if co.Etched {
+		variantShort = strings.ReplaceAll(variantShort, "Etched", "")
+	}
+	variantShort = strings.Join(strings.Fields(variantShort), " ")
 
 	query := genQuery(co)
 
@@ -492,34 +524,36 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	}
 
 	return GenericCard{
-		UUID:        co.UUID,
-		Name:        name,
-		Edition:     co.Edition,
-		SetCode:     co.Card.SetCode,
-		Number:      co.Card.Number,
-		Variant:     variant,
-		Foil:        co.Foil,
-		Etched:      co.Etched,
-		FinishTag:   finishTag,
-		FinishClass: finishClass,
-		Treatments:  treatments,
-		Keyrune:     keyrune,
-		ImageURL:    imgURL,
-		Title:       editionTitle(cardId),
-		Reserved:    co.Card.IsReserved,
-		SearchURL:   fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query)),
-		SypList:     sypList,
-		Stocks:      stocks,
-		StocksURL:   stocksURL,
-		Printings:   printings,
-		Products:    products,
-		TCGId:       tcgId,
-		Date:        co.OriginalReleaseDate,
-		Sealed:      co.Sealed,
-		Booster:     canBoosterGen,
-		HasDeck:     hasDecklist,
-		Flag:        allLanguageFlags[co.Language],
-		LangTag:     mtgmatcher.LanguageTag2LanguageCode[co.Language],
+		UUID:         co.UUID,
+		Name:         name,
+		FlavorName:   flavor,
+		Edition:      co.Edition,
+		SetCode:      co.Card.SetCode,
+		Number:       co.Card.Number,
+		Variant:      variant,
+		VariantShort: variantShort,
+		Foil:         co.Foil,
+		Etched:       co.Etched,
+		FinishTag:    finishTag,
+		FinishClass:  finishClass,
+		Treatments:   treatments,
+		Keyrune:      keyrune,
+		ImageURL:     imgURL,
+		Title:        editionTitle(cardId),
+		Reserved:     co.Card.IsReserved,
+		SearchURL:    fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query)),
+		SypList:      sypList,
+		Stocks:       stocks,
+		StocksURL:    stocksURL,
+		Printings:    printings,
+		Products:     products,
+		TCGId:        tcgId,
+		Date:         co.OriginalReleaseDate,
+		Sealed:       co.Sealed,
+		Booster:      canBoosterGen,
+		HasDeck:      hasDecklist,
+		Flag:         allLanguageFlags[co.Language],
+		LangTag:      mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
 		RarityColor:  rarityColor,
 		ScryfallURL:  scryfallURL,
