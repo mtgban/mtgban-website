@@ -203,7 +203,9 @@
                 </div>
                 <div class="m-card-info">
                     <span class="m-card-name" lang="{{$card.LangTag}}">{{strip_edition $card.Name $card.Edition $card.Sealed}}</span>
-                    <span class="m-card-set">{{$card.Edition}}{{if $card.Number}} · #{{$card.Number}}{{end}}</span>
+                    {{if ne $card.FlavorName ""}}<span class="m-card-flavor">"{{$card.FlavorName}}"</span>{{end}}
+                    {{if ne $card.VariantShort ""}}<span class="m-card-variant">{{$card.VariantShort}}</span>{{end}}
+                    <span class="m-card-set">{{$card.SetCode}}{{if $card.Number}} · #{{$card.Number}}{{end}}</span>
                 </div>
                 <div class="m-card-badges">
                     {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}

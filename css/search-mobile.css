@@ -224,6 +224,21 @@
     text-overflow: ellipsis;
 }
 
+.m-card-flavor {
+    font-size: 0.8rem;
+    color: var(--greytext);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.m-card-variant {
+    font-size: 0.8rem;
+    color: var(--greytext);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 .m-card-set {
     font-size: 0.75rem;
