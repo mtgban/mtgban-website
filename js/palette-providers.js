@@ -394,6 +394,100 @@
         getCandidates: setsProvider.getCandidates
     });
 
+    // ── Stores provider (store: / seller: / vendor:) ─────────────
+
+    var storesCache = null;
+    var storesCacheFetching = null;
+    function ensureStores() {
+        if (storesCache) return Promise.resolve(storesCache);
+        if (storesCacheFetching) return storesCacheFetching;
+        storesCacheFetching = fetch('/api/palette/stores.json')
+            .then(function (r) { return r.ok ? r.json() : { sellers: [], vendors: [] }; })
+            .then(function (data) {
+                storesCache = data || { sellers: [], vendors: [] };
+                storesCacheFetching = null;
+                return storesCache;
+            })
+            .catch(function () {
+                storesCache = { sellers: [], vendors: [] };
+                storesCacheFetching = null;
+                return storesCache;
+            });
+        return storesCacheFetching;
+    }
+
+    function storesAsEntries(list) {
+        var out = [];
+        for (var i = 0; i < list.length; i++) {
+            var s = list[i];
+            out.push({
+                value: s.shorthand,
+                label: s.name,
+                sublabel: s.shorthand + (s.country ? ' ' + s.country : '')
+            });
+        }
+        return out;
+    }
+
+    function makeStoresProvider(side) {
+        return {
+            name: side === 'sellers' ? 'Sellers' : side === 'vendors' ? 'Vendors' : 'Stores',
+            icon: 'store',
+            getCandidates: function (query) {
+                if (!storesCache) {
+                    ensureStores();
+                    return [{ value: '', label: 'Loading…', disabled: true }];
+                }
+                var entries;
+                if (side === 'sellers') {
+                    entries = storesAsEntries(storesCache.sellers || []);
+                } else if (side === 'vendors') {
+                    entries = storesAsEntries(storesCache.vendors || []);
+                } else {
+                    // Combined: dedupe by shorthand
+                    var seen = {};
+                    var combined = (storesCache.sellers || []).concat(storesCache.vendors || []);
+                    entries = [];
+                    for (var i = 0; i < combined.length; i++) {
+                        var c = combined[i];
+                        if (seen[c.shorthand]) continue;
+                        seen[c.shorthand] = true;
+                        entries.push({
+                            value: c.shorthand,
+                            label: c.name,
+                            sublabel: c.shorthand + (c.country ? ' ' + c.country : '')
+                        });
+                    }
+                }
+                return filterEntries(entries, query);
+            }
+        };
+    }
+
+    var combinedStoresProvider = makeStoresProvider('combined');
+    register({
+        prefix: 'store:',
+        name: combinedStoresProvider.name,
+        icon: combinedStoresProvider.icon,
+        getCandidates: combinedStoresProvider.getCandidates
+    });
+
+    var sellersProvider = makeStoresProvider('sellers');
+    register({
+        prefix: 'seller:',
+        name: sellersProvider.name,
+        icon: sellersProvider.icon,
+        getCandidates: sellersProvider.getCandidates
+    });
+
+    var vendorsProvider = makeStoresProvider('vendors');
+    register({
+        prefix: 'vendor:',
+        name: vendorsProvider.name,
+        icon: vendorsProvider.icon,
+        getCandidates: vendorsProvider.getCandidates
+    });
+
     window.__palette_providers = {
         register: register,
         detectPrefix: detectPrefix,
