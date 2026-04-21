@@ -15,6 +15,7 @@
     var isOpen = false;
     var cardNames = null;
     var cardNamesLoading = false;
+    var chips = null;
 
     // ── localStorage helpers ─────────────────────────────────────────
     var RECENT_KEY = 'mtgban_recent_searches';
@@ -84,18 +85,25 @@
     modeIndicator.className = 'cp-mode-indicator';
     modeIndicator.id = 'cp-mode';
 
+    var chipContainer = document.createElement('div');
+    chipContainer.className = 'cp-chip-container';
+    chipContainer.id = 'cp-chips';
+    chipContainer.setAttribute('role', 'list');
+
     var input = document.createElement('input');
     input.className = 'cp-input';
     input.id = 'cp-input';
+    input.type = 'text';
     input.placeholder = 'Search cards, commands, help...';
     input.setAttribute('autocomplete', 'off');
+    chipContainer.appendChild(input);
 
     var escKbd = document.createElement('kbd');
     escKbd.className = 'cp-shortcut';
     escKbd.textContent = 'ESC';
 
     inputRow.appendChild(modeIndicator);
-    inputRow.appendChild(input);
+    inputRow.appendChild(chipContainer);
     inputRow.appendChild(escKbd);
 
     // Results
@@ -118,6 +126,13 @@
     dialog.appendChild(footer);
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
+
+    // Initialize chip manager (B1) - wire container + input + filter callback
+    if (window.__palette_chips && typeof window.__palette_chips.create === 'function') {
+        chips = window.__palette_chips.create(chipContainer, input, function () {
+            if (typeof handleInput === 'function') handleInput();
+        });
+    }
 
     // Toast
     var toast = document.createElement('div');

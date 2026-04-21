@@ -381,3 +381,28 @@
 .cp-save-input::placeholder {
     color: var(--greytext, #888);
 }
+
+/* ── 9. Chip Container ──────────────────────────────────── */
+.cp-chip-container {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    padding: 2px 0;
+    max-height: calc(1.6em * 3 + 8px); /* ~3 rows before scroll */
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.cp-chip-container .cp-input {
+    flex: 1;
+    min-width: 120px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--normal, #000);
+    font: inherit;
+    padding: 2px 4px;
+}
