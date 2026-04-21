@@ -936,6 +936,23 @@
             return;
         }
 
+        // Left arrow at cursor position 0 with no chip active → activate last chip
+        if ((key === 'ArrowLeft' || code === 37) && chips && chips.count() > 0
+            && chips.activeIndex() === -1
+            && input.selectionStart === 0 && input.selectionEnd === 0) {
+            e.preventDefault();
+            chips.activate(chips.count() - 1);
+            return;
+        }
+
+        // Backspace on empty input → activate last chip (rather than doing nothing)
+        if ((key === 'Backspace' || code === 8) && input.value === ''
+            && chips && chips.count() > 0 && chips.activeIndex() === -1) {
+            e.preventDefault();
+            chips.activate(chips.count() - 1);
+            return;
+        }
+
         // Enter
         if (key === 'Enter' || code === 13) {
             e.preventDefault();
@@ -961,6 +978,97 @@
         if (key === 'Tab' || code === 9) {
             e.preventDefault();
             input.focus();
+            return;
+        }
+    });
+
+    // ── Keyboard: chip container (chip is active) ────────────────────
+    chipContainer.addEventListener('keydown', function (e) {
+        if (!chips) return;
+        var idx = chips.activeIndex();
+        if (idx < 0) return; // input handler owns this
+
+        // Left arrow — go to previous chip
+        if (e.key === 'ArrowLeft' || e.keyCode === 37) {
+            e.preventDefault();
+            if (idx > 0) chips.activate(idx - 1);
+            return;
+        }
+        // Right arrow — go to next chip, or back to input if at end
+        if (e.key === 'ArrowRight' || e.keyCode === 39) {
+            e.preventDefault();
+            if (idx < chips.count() - 1) {
+                chips.activate(idx + 1);
+            } else {
+                chips.activate(-1); // input
+            }
+            return;
+        }
+        // Delete removes current, keeps position (or moves to input if last)
+        if (e.key === 'Delete' || e.keyCode === 46) {
+            e.preventDefault();
+            var nextIdx = idx; // Delete: current position, but chips shift left
+            chips.remove(idx);
+            if (nextIdx >= 0 && nextIdx < chips.count()) {
+                chips.activate(nextIdx);
+            } else {
+                chips.activate(-1);
+            }
+            return;
+        }
+        // Backspace removes current, moves focus left (or to input)
+        if (e.key === 'Backspace' || e.keyCode === 8) {
+            e.preventDefault();
+            var prevIdx = idx - 1;
+            chips.remove(idx);
+            if (prevIdx >= 0) {
+                chips.activate(prevIdx);
+            } else {
+                chips.activate(-1);
+            }
+            return;
+        }
+        // Escape returns focus to input
+        if (e.key === 'Escape' || e.keyCode === 27) {
+            e.preventDefault();
+            chips.activate(-1);
+            return;
+        }
+        // Enter executes composed query (same as Enter from input)
+        if (e.key === 'Enter' || e.keyCode === 13) {
+            e.preventDefault();
+            chips.activate(-1);
+            // Find and execute the highlighted dropdown result, or run composed query
+            if (activeIndex >= 0 && resultItems[activeIndex] && resultItems[activeIndex].action) {
+                resultItems[activeIndex].action();
+            } else if (chips.composedQuery()) {
+                var q = chips.composedQuery();
+                recordRecentSearch(q);
+                window.location.href = '/search?q=' + encodeURIComponent(q);
+            }
+            return;
+        }
+        // Tab on active chip → edit: remove chip and put value into input (will reopen dropdown)
+        if (e.key === 'Tab' || e.keyCode === 9) {
+            e.preventDefault();
+            var chip = chips.get(idx);
+            if (!chip) return;
+            chips.remove(idx);
+            // For filter chips, put "prefix + first value" back into input so the dropdown
+            // shows that provider. For other chip types, just drop the value into input.
+            var restored;
+            if (chip.type === 'filter' && chip.prefix) {
+                var stripped = chip.value.indexOf(chip.prefix) === 0
+                    ? chip.value.substring(chip.prefix.length).split(',')[0]
+                    : chip.value.split(',')[0];
+                restored = chip.prefix + stripped;
+            } else {
+                restored = chip.value;
+            }
+            input.value = restored;
+            chips.activate(-1); // back to input
+            input.setSelectionRange(input.value.length, input.value.length);
+            if (typeof handleInput === 'function') handleInput();
             return;
         }
     });
