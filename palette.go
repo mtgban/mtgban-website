@@ -93,9 +93,63 @@ func PaletteSets(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+type PaletteStore struct {
+	Shorthand string `json:"shorthand"`
+	Name      string `json:"name"`
+	Country   string `json:"country,omitempty"`
+	Sealed    bool   `json:"sealed,omitempty"`
+}
+
+type PaletteStoresResponse struct {
+	Sellers []PaletteStore `json:"sellers"`
+	Vendors []PaletteStore `json:"vendors"`
+}
+
 // PaletteStores returns seller and vendor shorthand lists.
 func PaletteStores(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=600")
-	w.Write([]byte(`{"sellers":[],"vendors":[]}`))
+
+	out := PaletteStoresResponse{
+		Sellers: []PaletteStore{},
+		Vendors: []PaletteStore{},
+	}
+	seen := map[string]bool{}
+	for _, s := range Sellers {
+		if s == nil {
+			continue
+		}
+		info := s.Info()
+		if seen["s:"+info.Shorthand] {
+			continue
+		}
+		seen["s:"+info.Shorthand] = true
+		out.Sellers = append(out.Sellers, PaletteStore{
+			Shorthand: info.Shorthand,
+			Name:      info.Name,
+			Country:   info.CountryFlag,
+			Sealed:    info.SealedMode,
+		})
+	}
+	seen = map[string]bool{}
+	for _, v := range Vendors {
+		if v == nil {
+			continue
+		}
+		info := v.Info()
+		if seen["v:"+info.Shorthand] {
+			continue
+		}
+		seen["v:"+info.Shorthand] = true
+		out.Vendors = append(out.Vendors, PaletteStore{
+			Shorthand: info.Shorthand,
+			Name:      info.Name,
+			Country:   info.CountryFlag,
+			Sealed:    info.SealedMode,
+		})
+	}
+	sort.Slice(out.Sellers, func(i, j int) bool { return out.Sellers[i].Shorthand < out.Sellers[j].Shorthand })
+	sort.Slice(out.Vendors, func(i, j int) bool { return out.Vendors[i].Shorthand < out.Vendors[j].Shorthand })
+
+	json.NewEncoder(w).Encode(out)
 }
