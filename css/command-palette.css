@@ -55,6 +55,8 @@
     padding: 12px 16px;
     border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
     flex-shrink: 0;
+    max-height: calc(2.4em * 4);
+    overflow-y: auto;
 }
 
 /* Mode indicator pill */
@@ -391,8 +393,6 @@
     gap: 4px;
     align-items: center;
     padding: 2px 0;
-    max-height: calc(1.6em * 3 + 8px); /* ~3 rows before scroll */
-    overflow-y: auto;
     scrollbar-width: thin;
 }
 
@@ -482,8 +482,7 @@
 .cp-chip-card .cp-chip-icon { color: var(--ainfo, #559eff); }
 .cp-chip-filter .cp-chip-icon { color: var(--awarn, #d97706); }
 .cp-chip-nav .cp-chip-icon,
-.cp-chip-nav-sub .cp-chip-icon,
-.cp-chip-nav-leaf .cp-chip-icon { color: #8b5cf6; }
+.cp-chip-nav-sub .cp-chip-icon { color: #8b5cf6; }
 .cp-chip.active .cp-chip-icon { color: inherit; }
 
 /* Screen-reader only utility */
