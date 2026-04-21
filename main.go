@@ -1076,6 +1076,11 @@ var funcMap = template.FuncMap{
 		}
 		return true
 	},
+	"palette_newspaper_targets": paletteNewspaperTargetsJSON,
+	"palette_sleepers_targets":  paletteSleepersTargetsJSON,
+	"palette_arbit_targets":     func() template.JS { return paletteArbitTargetsJSON("arbit") },
+	"palette_reverse_targets":   func() template.JS { return paletteArbitTargetsJSON("reverse") },
+	"palette_global_targets":    func() template.JS { return paletteArbitTargetsJSON("global") },
 }
 
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
