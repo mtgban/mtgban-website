@@ -533,17 +533,37 @@
                     savedId: s.id,
                     action: (function(cmd) { return function() {
                         // Update usage tracking
-                        var all = getJSON(SAVED_KEY);
-                        for (var k = 0; k < all.length; k++) {
-                            if (all[k].id === cmd.id) {
-                                all[k].lastUsed = Date.now();
-                                all[k].useCount = (all[k].useCount || 0) + 1;
+                        var allSaved = getJSON(SAVED_KEY);
+                        for (var k = 0; k < allSaved.length; k++) {
+                            if (allSaved[k].id === cmd.id) {
+                                allSaved[k].lastUsed = Date.now();
+                                allSaved[k].useCount = (allSaved[k].useCount || 0) + 1;
                                 break;
                             }
                         }
-                        setJSON(SAVED_KEY, all);
+                        setJSON(SAVED_KEY, allSaved);
                         recordRecentSearch(cmd.query);
                         window.location.href = '/search?q=' + encodeURIComponent(cmd.query);
+                    }; })(s),
+                    altAction: (function(cmd) { return function() {
+                        // Shift+Enter: restore chips into the palette input for editing
+                        if (!chips) {
+                            input.value = cmd.query || '';
+                            input.focus();
+                            handleInput();
+                            return;
+                        }
+                        chips.clear();
+                        if (cmd.chips && cmd.chips.length > 0) {
+                            for (var ci = 0; ci < cmd.chips.length; ci++) {
+                                chips.add(cmd.chips[ci]);
+                            }
+                        } else if (cmd.query) {
+                            // V1 saved command (no chips field) - restore as plain input text
+                            input.value = cmd.query;
+                        }
+                        input.focus();
+                        handleInput();
                     }; })(s)
                 });
             }
@@ -1113,10 +1133,32 @@
     function saveCommand(name, query, forceOverwrite) {
         var saved = getJSON(SAVED_KEY);
 
+        // Build chips snapshot from current manager state
+        var chipsSnapshot = [];
+        if (chips && typeof chips.all === 'function') {
+            var currentChips = chips.all();
+            for (var ci = 0; ci < currentChips.length; ci++) {
+                var c = currentChips[ci];
+                chipsSnapshot.push({
+                    type: c.type,
+                    prefix: c.prefix,
+                    value: c.value,
+                    label: c.label,
+                    icon: c.icon,
+                    navName: c.navName,
+                    navLink: c.navLink,
+                    _cardName: c._cardName,
+                    _parentKey: c._parentKey,
+                    _urlParam: c._urlParam
+                });
+            }
+        }
+
         // Same query already saved - just update the name silently
         for (var i = 0; i < saved.length; i++) {
             if (saved[i].query === query) {
                 saved[i].name = name.substring(0, MAX_NAME);
+                saved[i].chips = chipsSnapshot;
                 saved[i].lastUsed = Date.now();
                 setJSON(SAVED_KEY, saved);
                 showToast('Updated: ' + name);
@@ -1132,6 +1174,7 @@
                 }
                 // Overwrite confirmed
                 saved[j].query = query;
+                saved[j].chips = chipsSnapshot;
                 saved[j].lastUsed = Date.now();
                 setJSON(SAVED_KEY, saved);
                 showToast('Overwritten: ' + name);
@@ -1148,6 +1191,7 @@
             id: 'cmd_' + Date.now(),
             name: name.substring(0, MAX_NAME),
             query: query,
+            chips: chipsSnapshot,
             icon: 'bookmark',
             userEmail: palette.user || '',
             created: Date.now(),
