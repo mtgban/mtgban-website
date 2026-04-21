@@ -37,23 +37,11 @@ window.__BAN_GUIDE = {
             snippets: ['Ctrl+K', 'Cmd+K', '?', '>'],
             keywords: ['palette', 'keyboard', 'shortcut', 'command', 'help', 'search', 'open', 'ctrl k', 'cmd k', 'slash', 'modes', 'chips', 'filter builder'],
             content: {
-                description: 'The command palette gives you fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or by pressing <code>/</code> when no input field is focused.<br><br><strong>Modes</strong> (typed as prefixes):<br><code>?</code> — inline syntax help<br><code>&gt;</code> — navigate to a page or page view<br><code>saved:</code> — recall a saved search command<br><br><strong>Chip-based query building:</strong> Type a card name, press <kbd>Tab</kbd> to lock it as a <em>chip</em>. Then type a filter prefix like <code>s:</code> and the dropdown narrows to only the sets that card appears in. Chain multiple filters by Tab-locking each one. Press <kbd>Enter</kbd> any time to execute.',
-                table: [
-                    { value: 'Ctrl+K / Cmd+K', short: 'Toggle palette open/closed from anywhere' },
-                    { value: '/', short: 'Open palette when no input is focused' },
-                    { value: '?', short: 'Help mode — show inline syntax reference (also: help: syntax:)' },
-                    { value: '>', short: 'Navigation mode — jump to a site page or sub-view' },
-                    { value: 'saved:', short: 'Saved mode — access saved search commands' },
-                    { value: 'Tab', short: 'Lock the active dropdown result as a chip' },
-                    { value: '← / →', short: 'Navigate between chips' },
-                    { value: 'Backspace / Delete', short: 'Remove the active chip' },
-                    { value: 'Tab (on active chip)', short: 'Edit the chip — reopens its dropdown' },
-                    { value: 'Shift+Enter', short: 'In help mode: go to full guide section; on saved command: load chips for editing' }
-                ],
+                description: '<p>The command palette provides fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or press <code>/</code> when no input field is focused.</p><p><strong>Modes</strong> (typed as prefixes into the palette input):</p><ul><li><code>?</code> — inline syntax help</li><li><code>&gt;</code> — navigate to a page or page view</li><li><code>saved:</code> — recall a saved search command</li></ul><p>For filter composition with guided autocomplete, see <strong>Filter Builder</strong>. For the full keyboard reference, see <strong>Cheatsheet</strong>.</p>',
+                table: [],
                 examples: [
                     { query: '? rarity', desc: 'Look up rarity syntax' },
-                    { query: '>newspaper', desc: 'Jump to Newspaper (Tab for sub-views)' },
-                    { query: 'Lightning Bolt', desc: 'Then Tab + type s: to narrow to its printings' }
+                    { query: '>newspaper', desc: 'Jump to Newspaper (Tab for sub-views)' }
                 ]
             }
         },
