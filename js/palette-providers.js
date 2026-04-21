@@ -236,6 +236,101 @@
         }
     });
 
+    // ── Color provider (c: / ci:) ────────────────────────────────
+
+    var colorOptions = [
+        { value: 'W', label: 'White', group: 'Primary' },
+        { value: 'U', label: 'Blue', group: 'Primary' },
+        { value: 'B', label: 'Black', group: 'Primary' },
+        { value: 'R', label: 'Red', group: 'Primary' },
+        { value: 'G', label: 'Green', group: 'Primary' },
+        { value: 'C', label: 'Colorless', group: 'Primary' },
+        { value: 'M', label: 'Multicolor', group: 'Primary' },
+
+        { value: 'azorius', label: 'Azorius', sublabel: 'WU', group: 'Guild', colors: 'WU' },
+        { value: 'dimir', label: 'Dimir', sublabel: 'UB', group: 'Guild', colors: 'UB' },
+        { value: 'rakdos', label: 'Rakdos', sublabel: 'BR', group: 'Guild', colors: 'BR' },
+        { value: 'gruul', label: 'Gruul', sublabel: 'RG', group: 'Guild', colors: 'RG' },
+        { value: 'selesnya', label: 'Selesnya', sublabel: 'GW', group: 'Guild', colors: 'GW' },
+        { value: 'orzhov', label: 'Orzhov', sublabel: 'WB', group: 'Guild', colors: 'WB' },
+        { value: 'izzet', label: 'Izzet', sublabel: 'UR', group: 'Guild', colors: 'UR' },
+        { value: 'golgari', label: 'Golgari', sublabel: 'BG', group: 'Guild', colors: 'BG' },
+        { value: 'boros', label: 'Boros', sublabel: 'RW', group: 'Guild', colors: 'RW' },
+        { value: 'simic', label: 'Simic', sublabel: 'GU', group: 'Guild', colors: 'GU' },
+
+        { value: 'bant', label: 'Bant', sublabel: 'GWU', group: 'Shard', colors: 'GWU' },
+        { value: 'esper', label: 'Esper', sublabel: 'WUB', group: 'Shard', colors: 'WUB' },
+        { value: 'grixis', label: 'Grixis', sublabel: 'UBR', group: 'Shard', colors: 'UBR' },
+        { value: 'jund', label: 'Jund', sublabel: 'BRG', group: 'Shard', colors: 'BRG' },
+        { value: 'naya', label: 'Naya', sublabel: 'RGW', group: 'Shard', colors: 'RGW' },
+
+        { value: 'abzan', label: 'Abzan', sublabel: 'WBG', group: 'Wedge', colors: 'WBG' },
+        { value: 'jeskai', label: 'Jeskai', sublabel: 'URW', group: 'Wedge', colors: 'URW' },
+        { value: 'sultai', label: 'Sultai', sublabel: 'BGU', group: 'Wedge', colors: 'BGU' },
+        { value: 'mardu', label: 'Mardu', sublabel: 'RWB', group: 'Wedge', colors: 'RWB' },
+        { value: 'temur', label: 'Temur', sublabel: 'GUR', group: 'Wedge', colors: 'GUR' },
+
+        { value: 'silverquill', label: 'Silverquill', sublabel: 'WB', group: 'College', colors: 'WB' },
+        { value: 'prismari', label: 'Prismari', sublabel: 'UR', group: 'College', colors: 'UR' },
+        { value: 'witherbloom', label: 'Witherbloom', sublabel: 'BG', group: 'College', colors: 'BG' },
+        { value: 'lorehold', label: 'Lorehold', sublabel: 'RW', group: 'College', colors: 'RW' },
+        { value: 'quandrix', label: 'Quandrix', sublabel: 'GU', group: 'College', colors: 'GU' },
+
+        { value: 'chaos', label: 'Chaos', sublabel: 'UBRG', group: 'Four-Color', colors: 'UBRG' },
+        { value: 'aggression', label: 'Aggression', sublabel: 'BRGW', group: 'Four-Color', colors: 'BRGW' },
+        { value: 'altruism', label: 'Altruism', sublabel: 'RGWU', group: 'Four-Color', colors: 'RGWU' },
+        { value: 'growth', label: 'Growth', sublabel: 'GWUB', group: 'Four-Color', colors: 'GWUB' },
+        { value: 'artifice', label: 'Artifice', sublabel: 'WUBR', group: 'Four-Color', colors: 'WUBR' }
+    ];
+
+    function narrowByCardColors(opts, cardColors) {
+        if (!cardColors || cardColors.length === 0) return opts;
+        var allowed = {};
+        for (var i = 0; i < cardColors.length; i++) {
+            allowed[cardColors[i].toUpperCase()] = true;
+        }
+        return opts.filter(function (o) {
+            if (o.group === 'Primary') {
+                // Always show C (colorless) and M (multicolor) regardless of card colors;
+                // primaries require that color to be part of the card
+                if (o.value === 'C' || o.value === 'M') return true;
+                return !!allowed[o.value];
+            }
+            // Multi-color combos: every letter in o.colors must be in card's colors
+            if (!o.colors) return false;
+            for (var j = 0; j < o.colors.length; j++) {
+                if (!allowed[o.colors.charAt(j)]) return false;
+            }
+            return true;
+        });
+    }
+
+    var colorProvider = {
+        name: 'Colors',
+        icon: 'palette',
+        getCandidates: function (query, ctx) {
+            var opts = colorOptions;
+            if (ctx && ctx.cardMeta && ctx.cardMeta.colors) {
+                opts = narrowByCardColors(opts, ctx.cardMeta.colors);
+            }
+            return filterEntries(opts, query);
+        }
+    };
+
+    // Register both c: and ci: with the same candidates
+    register({
+        prefix: 'c:',
+        name: colorProvider.name,
+        icon: colorProvider.icon,
+        getCandidates: colorProvider.getCandidates
+    });
+    register({
+        prefix: 'ci:',
+        name: 'Color Identity',
+        icon: colorProvider.icon,
+        getCandidates: colorProvider.getCandidates
+    });
+
     window.__palette_providers = {
         register: register,
         detectPrefix: detectPrefix,
