@@ -331,6 +331,69 @@
         getCandidates: colorProvider.getCandidates
     });
 
+    // ── Sets provider (s: / e:) ──────────────────────────────────
+
+    var setsCache = null;
+    var setsCacheFetching = null;
+    function ensureSets() {
+        if (setsCache) return Promise.resolve(setsCache);
+        if (setsCacheFetching) return setsCacheFetching;
+        setsCacheFetching = fetch('/api/palette/sets.json')
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (data) {
+                setsCache = data || [];
+                setsCacheFetching = null;
+                return setsCache;
+            })
+            .catch(function () {
+                setsCache = [];
+                setsCacheFetching = null;
+                return setsCache;
+            });
+        return setsCacheFetching;
+    }
+
+    var setsProvider = {
+        name: 'Sets',
+        icon: 'library',
+        getCandidates: function (query, ctx) {
+            if (!setsCache) {
+                ensureSets();
+                return [{ value: '', label: 'Loading…', disabled: true }];
+            }
+            var opts = [];
+            for (var i = 0; i < setsCache.length; i++) {
+                var s = setsCache[i];
+                opts.push({
+                    value: s.code,
+                    label: s.name,
+                    sublabel: s.code + (s.released ? ' \xb7 ' + s.released.substring(0, 4) : '')
+                });
+            }
+            if (ctx && ctx.cardMeta && ctx.cardMeta.printings) {
+                var allowed = {};
+                for (var j = 0; j < ctx.cardMeta.printings.length; j++) {
+                    allowed[ctx.cardMeta.printings[j]] = true;
+                }
+                opts = opts.filter(function (o) { return allowed[o.value]; });
+            }
+            return filterEntries(opts, query);
+        }
+    };
+
+    register({
+        prefix: 's:',
+        name: setsProvider.name,
+        icon: setsProvider.icon,
+        getCandidates: setsProvider.getCandidates
+    });
+    register({
+        prefix: 'e:',
+        name: setsProvider.name,
+        icon: setsProvider.icon,
+        getCandidates: setsProvider.getCandidates
+    });
+
     window.__palette_providers = {
         register: register,
         detectPrefix: detectPrefix,
