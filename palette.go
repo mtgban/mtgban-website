@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"html/template"
 	"net/http"
 	"sort"
 	"strings"
@@ -215,4 +216,94 @@ func PaletteStores(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(out.Vendors, func(i, j int) bool { return out.Vendors[i].Shorthand < out.Vendors[j].Shorthand })
 
 	json.NewEncoder(w).Encode(out)
+}
+
+type PaletteNavTarget struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+	Group string `json:"group,omitempty"`
+}
+
+type PaletteArbitTargets struct {
+	Filters []PaletteNavTarget `json:"filters"`
+	Sorts   []PaletteNavTarget `json:"sorts"`
+}
+
+// paletteNewspaperTargetsJSON returns JSON for all newspaper page views.
+func paletteNewspaperTargetsJSON() template.JS {
+	out := []PaletteNavTarget{}
+	for _, p := range NewspaperPages {
+		if p.Option == "" || p.Option == "options" {
+			continue
+		}
+		group := "Archive"
+		switch {
+		case strings.Contains(p.Option, "spike"):
+			group = "Spike Analysis"
+		case strings.Contains(p.Option, "listings"):
+			group = "Inventory Trends"
+		case strings.Contains(p.Option, "sellers"):
+			group = "Inventory Trends"
+		case strings.Contains(p.Option, "ck_buy") || strings.Contains(p.Option, "buylist"):
+			group = "Buylist Levels"
+		case p.Option == "syp" || p.Option == "old" || p.Option == "forecasting":
+			group = "Other"
+		}
+		out = append(out, PaletteNavTarget{
+			Value: p.Option,
+			Label: p.Title,
+			Group: group,
+		})
+	}
+	data, _ := json.Marshal(out)
+	return template.JS(data)
+}
+
+func paletteSleepersTargetsJSON() template.JS {
+	out := []PaletteNavTarget{
+		{Value: "bulk", Label: "Bulk Me Up"},
+		{Value: "reprint", Label: "Long Time No Reprint"},
+		{Value: "mismatch", Label: "Market Mismatch"},
+		{Value: "gap", Label: "Ocean Gap"},
+		{Value: "hotlist", Label: "Highest Buylist Growth"},
+	}
+	data, _ := json.Marshal(out)
+	return template.JS(data)
+}
+
+// paletteArbitTargetsJSON produces targets for /arbit. variant adjusts
+// visibility: "reverse" hides ArbitOnly filters; "global" shows only those
+// relevant to the global view.
+func paletteArbitTargetsJSON(variant string) template.JS {
+	out := PaletteArbitTargets{
+		Filters: []PaletteNavTarget{},
+		Sorts: []PaletteNavTarget{
+			{Value: "profitability", Label: "Profitability"},
+			{Value: "spread", Label: "Spread %"},
+			{Value: "diff", Label: "Price Difference"},
+			{Value: "available", Label: "Quantity"},
+			{Value: "sell_price", Label: "Sell Price"},
+			{Value: "buy_price", Label: "Buy Price"},
+			{Value: "edition", Label: "Edition"},
+			{Value: "alpha", Label: "Alphabetical"},
+		},
+	}
+	for _, key := range FilterOptKeys {
+		cfg, ok := FilterOptConfig[key]
+		if !ok {
+			continue
+		}
+		if variant == "reverse" && cfg.ArbitOnly {
+			continue
+		}
+		if variant == "global" && !cfg.GlobalOnly && cfg.ArbitOnly {
+			continue
+		}
+		out.Filters = append(out.Filters, PaletteNavTarget{
+			Value: key,
+			Label: cfg.Title,
+		})
+	}
+	data, _ := json.Marshal(out)
+	return template.JS(data)
 }
