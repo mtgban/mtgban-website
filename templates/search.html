@@ -520,29 +520,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                             <canvas id="cardChart" width="760" height="480"></canvas>
                             <div class="chart-controls">
                                 <p style="margin: 0;">
-                                    {{if $.CanDeleteChart}}
-                                        <form action="/{{if .IsSealed}}sealed{{else}}search{{end}}" id=deletechart method="get" style="width: 800px; display: none;">
-                                            <select name="dataset" id="dataset" style="width: 110px">
-                                                <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick dataset</option>
-                                                {{range .Datasets}}
-                                                    <option value="{{.Name}}">&nbsp;&nbsp;&nbsp;{{.Name}}</option>
-                                                {{end}}
-                                            </select>
-                                            <select name="datekey" id="datekey" style="width: 105px">
-                                                <option selected disabled hidden>&nbsp;&nbsp;&nbsp;Pick a date</option>
-                                                {{range .AxisLabels}}
-                                                    <option value="{{.}}">&nbsp;&nbsp;&nbsp;{{.}}</option>
-                                                {{end}}
-                                            </select>
-                                            <input id="chart" type="hidden" name="chart" value="{{.ChartID}}"/>
-                                            <a class="chart-pill chart-pill-danger" onclick='this.parentNode.submit(); return false;'>Delete</a>
-                                        </form>
-                                    {{end}}
-                                </p>
-                                <p style="margin: 0;">
-                                    {{if $.CanDeleteChart}}
-                                        <a class="chart-pill chart-pill-warning" onclick="document.getElementById('deletechart').style='inline'">Show delete options</a>
-                                    {{end}}
                                     <select id="dateRange" onchange="changeRange(parseInt(this.value))" style="width: 110px">
                                         <option value="30">1 Month</option>
                                         <option value="90" {{if lt $.MaxLookbackDays 90}} disabled {{end}}>3 Months{{if lt $.MaxLookbackDays 90}} (Standard+){{end}}</option>
