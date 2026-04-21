@@ -1,4 +1,4 @@
-/* Command Palette — keyboard-driven search, navigation, help, and saved commands */
+/* Command Palette - keyboard-driven search, navigation, help, and saved commands */
 (function() {
     'use strict';
 
@@ -718,7 +718,7 @@
         }
 
         if (items.length === 0 || (items.length === 1 && items[0].type === 'header')) {
-            items = [{ type: 'header', title: provider.name + ' — no matches' }];
+            items = [{ type: 'header', title: provider.name + ' - no matches' }];
         }
 
         renderResults(items);
@@ -948,7 +948,7 @@
     function handleInput() {
         var raw = input.value;
 
-        // Check for filter prefix first — takes precedence over card/nav/help modes
+        // Check for filter prefix first - takes precedence over card/nav/help modes
         if (window.__palette_providers) {
             var detected = window.__palette_providers.detectPrefix(raw);
             if (detected && chips) {
@@ -1185,7 +1185,7 @@
                 if (conflict) {
                     // Show confirmation prompt in the save row
                     pendingConflict = { name: name, query: queryToSave };
-                    label.textContent = '"' + name + '" exists with: ' + conflict.existing.query + ' — Overwrite?';
+                    label.textContent = '"' + name + '" exists with: ' + conflict.existing.query + ' - Overwrite?';
                     saveInput.value = '';
                     saveInput.placeholder = 'y / n';
                     saveInput.maxLength = 3;
@@ -1424,14 +1424,14 @@
             return;
         }
 
-        // Ctrl/Cmd+S — save current search
+        // Ctrl/Cmd+S - save current search
         if ((e.ctrlKey || e.metaKey) && (key === 's' || code === 83)) {
             e.preventDefault();
             showSaveRow();
             return;
         }
 
-        // Tab — lock highlighted dropdown result as a chip (filter / card / nav)
+        // Tab - lock highlighted dropdown result as a chip (filter / card / nav)
         if ((key === 'Tab' || code === 9) && !e.shiftKey
             && activeIndex >= 0 && resultItems[activeIndex]
             && !resultItems[activeIndex].disabled
@@ -1528,7 +1528,7 @@
             }
         }
 
-        // Focus trap — Tab cycles within palette
+        // Focus trap - Tab cycles within palette
         if (key === 'Tab' || code === 9) {
             e.preventDefault();
             input.focus();
@@ -1542,13 +1542,13 @@
         var idx = chips.activeIndex();
         if (idx < 0) return; // input handler owns this
 
-        // Left arrow — go to previous chip
+        // Left arrow - go to previous chip
         if (e.key === 'ArrowLeft' || e.keyCode === 37) {
             e.preventDefault();
             if (idx > 0) chips.activate(idx - 1);
             return;
         }
-        // Right arrow — go to next chip, or back to input if at end
+        // Right arrow - go to next chip, or back to input if at end
         if (e.key === 'ArrowRight' || e.keyCode === 39) {
             e.preventDefault();
             if (idx < chips.count() - 1) {

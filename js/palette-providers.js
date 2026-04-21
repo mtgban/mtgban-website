@@ -1,4 +1,4 @@
-/* Palette Providers — prefix-driven dropdown candidate suppliers.
+/* Palette Providers - prefix-driven dropdown candidate suppliers.
  * window.__palette_providers exposes a registry with:
  *   - register(provider)
  *   - detectPrefix(input) -> { prefix, query } | null

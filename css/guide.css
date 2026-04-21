@@ -1,5 +1,5 @@
 /* ============================================================
-   Guide Page — layout, sidebar, hero, sections, tables, examples
+   Guide Page - layout, sidebar, hero, sections, tables, examples
    ============================================================ */
 
 /* ── Layout ── */
@@ -320,7 +320,7 @@
 .guide-nav-category.hidden-by-filter { display: none; }
 .guide-category-divider.hidden-by-filter { display: none; }
 
-/* Examples header — visual separator between prose and concrete demos */
+/* Examples header - visual separator between prose and concrete demos */
 .guide-examples-heading {
     font-size: 0.72rem;
     font-weight: 600;
@@ -332,7 +332,7 @@
     border-top: 1px solid var(--border-subtle, rgba(0,0,0,0.06));
 }
 
-/* Walkthrough scenarios — semantic replacement for <br><br><strong> blocks */
+/* Walkthrough scenarios - semantic replacement for <br><br><strong> blocks */
 .guide-walkthrough {
     margin: 1em 0;
 }
@@ -349,16 +349,6 @@
 }
 .guide-walkthrough ol li {
     margin-bottom: 0.2em;
-}
-
-/* Table divider rows — visual grouping within cheatsheet tables */
-.guide-table tr.guide-table-divider td {
-    padding: 0;
-    border-bottom: 1px solid var(--border-moderate, rgba(0,0,0,0.12));
-    background: transparent;
-}
-.guide-table tr.guide-table-divider:hover td {
-    background: transparent;
 }
 
 /* Paragraph spacing inside section descriptions */

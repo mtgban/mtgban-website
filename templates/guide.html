@@ -124,7 +124,7 @@
             html += '<h3>' + escapeHtml(item.title) + '</h3>';
             html += '</div>';
 
-            // Description (contains HTML — render as innerHTML)
+            // Description (contains HTML - render as innerHTML)
             if (item.content && item.content.description) {
                 html += '<div class="guide-section-desc">' + item.content.description + '</div>';
             }
@@ -136,10 +136,6 @@
                 html += '<tbody>';
                 for (var t = 0; t < item.content.table.length; t++) {
                     var row = item.content.table[t];
-                    if (row.value === '—') {
-                        html += '<tr class="guide-table-divider"><td colspan="2"></td></tr>';
-                        continue;
-                    }
                     html += '<tr><td><code>' + escapeHtml(row.value) + '</code></td>';
                     html += '<td>' + escapeHtml(row.short) + '</td></tr>';
                 }
