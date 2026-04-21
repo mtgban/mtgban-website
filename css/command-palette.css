@@ -426,9 +426,10 @@
     background: var(--surface-3, rgba(0, 0, 0, 0.1));
 }
 .cp-chip.active {
-    background: var(--ainfo, #559eff);
-    color: white;
-    border-color: var(--ainfo, #559eff);
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    color: var(--normal, #111);
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
 }
 .cp-chip-icon {
     display: inline-flex;
@@ -470,7 +471,7 @@
     background: rgba(0, 0, 0, 0.15);
 }
 .cp-chip.active .cp-chip-delete:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(245, 158, 11, 0.25);
 }
 .cp-chip-delete svg {
     width: 11px;

@@ -130,7 +130,16 @@
         function remove(idx) {
             if (idx < 0 || idx >= chips.length) return;
             chips.splice(idx, 1);
-            if (activeIndex >= chips.length) activeIndex = chips.length - 1;
+            // Adjust activeIndex for the shift
+            if (activeIndex === idx) {
+                // Removed the active chip - drop to input (or next chip at same position)
+                activeIndex = -1;
+            } else if (activeIndex > idx) {
+                // Chips after the removed one shifted down by 1
+                activeIndex -= 1;
+            }
+            // Final safety clamp
+            if (activeIndex >= chips.length) activeIndex = -1;
             render();
             if (onChange) onChange();
         }
