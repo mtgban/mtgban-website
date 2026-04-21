@@ -424,13 +424,14 @@ type ConfigType struct {
 	ApiUserSecrets         map[string]string                       `json:"api_user_secrets"`
 	GoogleCredentials      string                                  `json:"google_credentials"`
 	BuylistMarketCredit    map[string]float64                      `json:"buylist_market_credit"`
-	SqlConfig              timeseries.SqlConfig                    `json:"sql_config"`
 	ACL                    map[string]map[string]map[string]string `json:"acl"`
 
 	Uploader map[string]string `json:"uploader"`
 
 	// The location of the configuation file
 	sourcePath string
+
+	SqlConfig timeseries.SqlConfig `json:"sql_config"`
 }
 
 var DevMode bool
