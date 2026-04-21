@@ -90,6 +90,10 @@
     width: 14px;
     height: 14px;
     flex-shrink: 0;
+    color: #FFBF00;
+}
+.guide-nav-link.active svg {
+    color: #FFBF00;
 }
 
 /* ── Hero ── */
@@ -102,6 +106,9 @@
     font-weight: 700;
     color: var(--headingtext, #17375e);
     margin: 0 0 0.25em;
+}
+.guide-hero h1 .ban {
+    color: #e53935;
 }
 .guide-hero-sub {
     font-size: 1.05rem;
@@ -163,7 +170,7 @@
 .guide-section-header svg {
     width: 22px;
     height: 22px;
-    color: var(--ainfo, #559eff);
+    color: #FFBF00;
     flex-shrink: 0;
 }
 .guide-section-header h3 {
@@ -286,7 +293,7 @@
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--greytext, #888);
+    color: #FFBF00;
     padding: 4px;
     border-radius: 4px;
     display: flex;
@@ -299,7 +306,7 @@
 }
 .guide-example-copy:hover {
     opacity: 1 !important;
-    color: var(--ainfo, #559eff);
+    color: #FFBF00;
     background: var(--surface-2, rgba(0,0,0,0.06));
 }
 .guide-example-copy svg {
@@ -312,6 +319,17 @@
 .guide-nav-link.hidden-by-filter { display: none; }
 .guide-nav-category.hidden-by-filter { display: none; }
 .guide-category-divider.hidden-by-filter { display: none; }
+
+/* Overview / walkthrough sections — more generous line-height and spacing */
+.guide-section[id="palette-overview"] .guide-section-desc,
+.guide-section[id="palette-walkthroughs"] .guide-section-desc {
+    line-height: 1.75;
+}
+.guide-section[id="palette-walkthroughs"] .guide-section-desc strong {
+    display: inline-block;
+    margin-top: 0.75em;
+    color: var(--headingtext, #17375e);
+}
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
