@@ -29,67 +29,6 @@ window.__BAN_GUIDE = {
         },
 
         {
-            id: 'palette-walkthroughs',
-            category: 'Command Palette',
-            title: 'Walkthroughs',
-            icon: 'footprints',
-            summary: 'Common workflows with exact keystrokes — follow along to get comfortable',
-            snippets: [],
-            keywords: ['walkthrough', 'tutorial', 'example', 'workflow', 'how to', 'scenario', 'step by step'],
-            content: {
-                description: '<strong>Scenario 1 — Find all foil printings of a card</strong><br>1. <kbd>Ctrl+K</kbd> to open the palette<br>2. Type <code>Birds of Paradise</code> — the card name appears in the dropdown<br>3. Press <kbd>Tab</kbd> — Birds of Paradise becomes a chip<br>4. Type <code>f:foil</code> — the Finish dropdown appears with foil highlighted<br>5. Press <kbd>Tab</kbd> — f:foil becomes a chip<br>6. Press <kbd>Enter</kbd> — navigates to search with the composed query<br><br><strong>Scenario 2 — Jump to Arbitrage with profit filters</strong><br>1. <kbd>Ctrl+K</kbd><br>2. Type <code>&gt;arb</code> — Arbitrage appears<br>3. <kbd>Tab</kbd> — Arbitrage chip locks; dropdown now shows filter presets and sort options<br>4. Type <code>yield</code> — narrows to "only Yield+"<br>5. <kbd>Tab</kbd> — filter chip added<br>6. Type <code>bucks</code>, <kbd>Tab</kbd> — second filter added<br>7. Type <code>sort</code>, <kbd>Tab</kbd> on "Spread %" — sort chip added<br>8. <kbd>Enter</kbd> — navigates to <code>/arbit?nolow=true&amp;nopenny=true&amp;sort=spread</code><br><br><strong>Scenario 3 — Save a complex query for later</strong><br>1. Build a query with chips: a card + filters (as in Scenario 1)<br>2. Press <kbd>Ctrl+S</kbd> while the palette is open<br>3. Enter a short name and <kbd>Enter</kbd> — the command is saved<br>4. Later, open the palette and type <code>saved:</code> — find your command<br>5. <kbd>Enter</kbd> to run it directly, or <kbd>Shift+Enter</kbd> to restore its chips so you can modify it before running<br><br><strong>Scenario 4 — Narrow a search with card-aware filters</strong><br>1. <kbd>Ctrl+K</kbd><br>2. Type <code>Lightning Bolt</code>, <kbd>Tab</kbd> — Lightning Bolt chip locks<br>3. Type <code>s:</code> — the sets dropdown shows ONLY sets Lightning Bolt has been printed in (not all 600+ sets)<br>4. Type <code>Alpha</code>, <kbd>Tab</kbd> — picks Limited Edition Alpha, chip locks as <code>s:Alpha</code><br>5. Type <code>f:foil</code>, <kbd>Tab</kbd>, <kbd>Enter</kbd> — composes the final query<br><br><strong>Scenario 5 — Look up syntax while building a query</strong><br>1. In any context, type <code>?</code> followed by a keyword like <code>?rarity</code> or <code>? foil</code><br>2. The dropdown shows a syntax snippet — <kbd>Enter</kbd> copies it to your clipboard<br>3. Or <kbd>Shift+Enter</kbd> to jump to the full section of this guide',
-                table: [],
-                examples: []
-            }
-        },
-
-        {
-            id: 'palette-cheatsheet',
-            category: 'Command Palette',
-            title: 'Cheatsheet',
-            icon: 'keyboard',
-            summary: 'All palette keyboard shortcuts, mode prefixes, and filter prefixes at a glance',
-            snippets: ['Ctrl+K', '?', '>', 'saved:', 'Tab'],
-            keywords: ['cheatsheet', 'reference', 'shortcuts', 'keys', 'prefixes', 'all', 'list'],
-            content: {
-                description: '<strong>Opening / closing</strong>',
-                table: [
-                    { value: 'Ctrl+K / Cmd+K', short: 'Toggle palette from anywhere' },
-                    { value: '/', short: 'Open when no input is focused' },
-                    { value: 'Escape', short: 'Close palette' },
-                    { value: '—', short: '—' },
-                    { value: 'Tab (on dropdown result)', short: 'Lock as chip' },
-                    { value: 'Tab (on active chip)', short: 'Edit — re-opens dropdown' },
-                    { value: '←  /  →', short: 'Navigate between chips' },
-                    { value: 'Backspace / Delete', short: 'Remove active chip' },
-                    { value: '↑  /  ↓', short: 'Navigate dropdown' },
-                    { value: 'Enter', short: 'Execute composed query / navigate / copy snippet' },
-                    { value: 'Shift+Enter', short: 'Alt action (see context)' },
-                    { value: 'Ctrl+S / Cmd+S', short: 'Save current query as a named command' },
-                    { value: '—', short: '—' },
-                    { value: '?  (or help: / syntax:)', short: 'Help mode — inline syntax lookup' },
-                    { value: '>', short: 'Navigation mode — pages and sub-views' },
-                    { value: 'saved:', short: 'Saved mode — browse saved commands' },
-                    { value: '—', short: '—' },
-                    { value: 's:  e:', short: 'Set / edition (accepts list, narrows to card printings)' },
-                    { value: 'r:', short: 'Rarity (accepts list, narrows to card rarities)' },
-                    { value: 'c:  ci:', short: 'Color / color identity (WUBRG + guild/shard/wedge/college/four-color)' },
-                    { value: 'f:', short: 'Finish (foil / nonfoil / etched)' },
-                    { value: 't:', short: 'Card type' },
-                    { value: 'cond:  condr:  condb:', short: 'Condition (singleton)' },
-                    { value: 'is:  not:', short: 'Property tags' },
-                    { value: 'store:  seller:  vendor:', short: 'Store shorthand' },
-                    { value: 'region:', short: 'us / eu / jp (singleton)' },
-                    { value: 'skip:', short: 'Skip categories' },
-                    { value: 'sort:', short: 'Sort order (singleton)' },
-                    { value: 'sm:', short: 'Search mode (singleton)' },
-                    { value: 'on:', short: 'Special lists (hotlist, tcgsyp, newspaper)' }
-                ],
-                examples: []
-            }
-        },
-
-        {
             id: 'palette',
             category: 'Command Palette',
             title: 'Getting Started',
@@ -196,6 +135,67 @@ window.__BAN_GUIDE = {
                     { query: 'saved:fetchlands', desc: 'Run the "fetchlands" saved search' },
                     { query: 'saved:', desc: 'Browse all saved commands' }
                 ]
+            }
+        },
+
+        {
+            id: 'palette-walkthroughs',
+            category: 'Command Palette',
+            title: 'Walkthroughs',
+            icon: 'footprints',
+            summary: 'Common workflows with exact keystrokes — follow along to get comfortable',
+            snippets: [],
+            keywords: ['walkthrough', 'tutorial', 'example', 'workflow', 'how to', 'scenario', 'step by step'],
+            content: {
+                description: '<strong>Scenario 1 — Find all foil printings of a card</strong><br>1. <kbd>Ctrl+K</kbd> to open the palette<br>2. Type <code>Birds of Paradise</code> — the card name appears in the dropdown<br>3. Press <kbd>Tab</kbd> — Birds of Paradise becomes a chip<br>4. Type <code>f:foil</code> — the Finish dropdown appears with foil highlighted<br>5. Press <kbd>Tab</kbd> — f:foil becomes a chip<br>6. Press <kbd>Enter</kbd> — navigates to search with the composed query<br><br><strong>Scenario 2 — Jump to Arbitrage with profit filters</strong><br>1. <kbd>Ctrl+K</kbd><br>2. Type <code>&gt;arb</code> — Arbitrage appears<br>3. <kbd>Tab</kbd> — Arbitrage chip locks; dropdown now shows filter presets and sort options<br>4. Type <code>yield</code> — narrows to "only Yield+"<br>5. <kbd>Tab</kbd> — filter chip added<br>6. Type <code>bucks</code>, <kbd>Tab</kbd> — second filter added<br>7. Type <code>sort</code>, <kbd>Tab</kbd> on "Spread %" — sort chip added<br>8. <kbd>Enter</kbd> — navigates to <code>/arbit?nolow=true&amp;nopenny=true&amp;sort=spread</code><br><br><strong>Scenario 3 — Save a complex query for later</strong><br>1. Build a query with chips: a card + filters (as in Scenario 1)<br>2. Press <kbd>Ctrl+S</kbd> while the palette is open<br>3. Enter a short name and <kbd>Enter</kbd> — the command is saved<br>4. Later, open the palette and type <code>saved:</code> — find your command<br>5. <kbd>Enter</kbd> to run it directly, or <kbd>Shift+Enter</kbd> to restore its chips so you can modify it before running<br><br><strong>Scenario 4 — Narrow a search with card-aware filters</strong><br>1. <kbd>Ctrl+K</kbd><br>2. Type <code>Lightning Bolt</code>, <kbd>Tab</kbd> — Lightning Bolt chip locks<br>3. Type <code>s:</code> — the sets dropdown shows ONLY sets Lightning Bolt has been printed in (not all 600+ sets)<br>4. Type <code>Alpha</code>, <kbd>Tab</kbd> — picks Limited Edition Alpha, chip locks as <code>s:Alpha</code><br>5. Type <code>f:foil</code>, <kbd>Tab</kbd>, <kbd>Enter</kbd> — composes the final query<br><br><strong>Scenario 5 — Look up syntax while building a query</strong><br>1. In any context, type <code>?</code> followed by a keyword like <code>?rarity</code> or <code>? foil</code><br>2. The dropdown shows a syntax snippet — <kbd>Enter</kbd> copies it to your clipboard<br>3. Or <kbd>Shift+Enter</kbd> to jump to the full section of this guide',
+                table: [],
+                examples: []
+            }
+        },
+
+        {
+            id: 'palette-cheatsheet',
+            category: 'Command Palette',
+            title: 'Cheatsheet',
+            icon: 'keyboard',
+            summary: 'All palette keyboard shortcuts, mode prefixes, and filter prefixes at a glance',
+            snippets: ['Ctrl+K', '?', '>', 'saved:', 'Tab'],
+            keywords: ['cheatsheet', 'reference', 'shortcuts', 'keys', 'prefixes', 'all', 'list'],
+            content: {
+                description: '<strong>Opening / closing</strong>',
+                table: [
+                    { value: 'Ctrl+K / Cmd+K', short: 'Toggle palette from anywhere' },
+                    { value: '/', short: 'Open when no input is focused' },
+                    { value: 'Escape', short: 'Close palette' },
+                    { value: '—', short: '—' },
+                    { value: 'Tab (on dropdown result)', short: 'Lock as chip' },
+                    { value: 'Tab (on active chip)', short: 'Edit — re-opens dropdown' },
+                    { value: '←  /  →', short: 'Navigate between chips' },
+                    { value: 'Backspace / Delete', short: 'Remove active chip' },
+                    { value: '↑  /  ↓', short: 'Navigate dropdown' },
+                    { value: 'Enter', short: 'Execute composed query / navigate / copy snippet' },
+                    { value: 'Shift+Enter', short: 'Alt action (see context)' },
+                    { value: 'Ctrl+S / Cmd+S', short: 'Save current query as a named command' },
+                    { value: '—', short: '—' },
+                    { value: '?  (or help: / syntax:)', short: 'Help mode — inline syntax lookup' },
+                    { value: '>', short: 'Navigation mode — pages and sub-views' },
+                    { value: 'saved:', short: 'Saved mode — browse saved commands' },
+                    { value: '—', short: '—' },
+                    { value: 's:  e:', short: 'Set / edition (accepts list, narrows to card printings)' },
+                    { value: 'r:', short: 'Rarity (accepts list, narrows to card rarities)' },
+                    { value: 'c:  ci:', short: 'Color / color identity (WUBRG + guild/shard/wedge/college/four-color)' },
+                    { value: 'f:', short: 'Finish (foil / nonfoil / etched)' },
+                    { value: 't:', short: 'Card type' },
+                    { value: 'cond:  condr:  condb:', short: 'Condition (singleton)' },
+                    { value: 'is:  not:', short: 'Property tags' },
+                    { value: 'store:  seller:  vendor:', short: 'Store shorthand' },
+                    { value: 'region:', short: 'us / eu / jp (singleton)' },
+                    { value: 'skip:', short: 'Skip categories' },
+                    { value: 'sort:', short: 'Sort order (singleton)' },
+                    { value: 'sm:', short: 'Search mode (singleton)' },
+                    { value: 'on:', short: 'Special lists (hotlist, tcgsyp, newspaper)' }
+                ],
+                examples: []
             }
         },
 
