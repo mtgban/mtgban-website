@@ -84,7 +84,6 @@ type PageVars struct {
 	CardBackURL  string
 	ShowUpsell   bool
 
-	CanDeleteChart   bool
 	CanShowAll       bool
 	CleanSearchQuery string
 
