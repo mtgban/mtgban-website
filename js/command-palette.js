@@ -225,6 +225,7 @@
     footer.className = 'cp-footer';
     footer.innerHTML = '<span><kbd>\u2191\u2193</kbd> Navigate</span>' +
         '<span><kbd>Enter</kbd> Select</span>' +
+        '<span class="cp-footer-hint-delete" style="display:none"><kbd>Shift+Del</kbd> Remove</span>' +
         '<span><kbd>?</kbd> Help</span>' +
         '<span><kbd>Esc</kbd> Close</span>';
 
@@ -388,6 +389,7 @@
                     title: r.q,
                     subtitle: 'Recent search',
                     icon: 'clock',
+                    recentQuery: r.q,
                     action: function(q) { return function() { recordRecentSearch(q); window.location.href = '/search?q=' + encodeURIComponent(q); }; }(r.q)
                 });
             }
@@ -892,6 +894,7 @@
         if (idx > 0) {
             activeIndex = 0;
         }
+        updateDeleteHint();
 
         // Render Lucide icons
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
@@ -931,6 +934,15 @@
             els[index].scrollIntoView({ block: 'nearest' });
         }
         activeIndex = index;
+        updateDeleteHint();
+    }
+
+    function updateDeleteHint() {
+        var hint = footer && footer.querySelector('.cp-footer-hint-delete');
+        if (!hint) return;
+        var item = (activeIndex >= 0 && activeIndex < resultItems.length) ? resultItems[activeIndex] : null;
+        var canDelete = item && (item.type === 'recent' || item.type === 'saved');
+        hint.style.display = canDelete ? '' : 'none';
     }
 
     function executeResult(shiftKey) {
@@ -1301,6 +1313,32 @@
         handleInput();
     }
 
+    // Delete without confirmation — used by Shift+Delete keyboard shortcut.
+    function deleteSavedCommandSilent(savedId) {
+        var saved = getJSON(SAVED_KEY);
+        var target = null;
+        for (var i = 0; i < saved.length; i++) {
+            if (saved[i].id === savedId) {
+                target = saved[i];
+                break;
+            }
+        }
+        if (!target) return;
+        saved = saved.filter(function(s) { return s.id !== savedId; });
+        setJSON(SAVED_KEY, saved);
+        showToast('Deleted: ' + target.name);
+    }
+
+    function deleteRecentSearch(query) {
+        if (!query) return;
+        var recent = getJSON(RECENT_KEY);
+        recent = recent.filter(function(r) {
+            return (r.q || '').toLowerCase() !== query.toLowerCase();
+        });
+        setJSON(RECENT_KEY, recent);
+        showToast('Removed from recent');
+    }
+
     // ── Keyboard: global ─────────────────────────────────────────────
     document.addEventListener('keydown', function(e) {
         // Ctrl/Cmd+K to toggle
@@ -1357,6 +1395,26 @@
             var prev = activeIndex - 1;
             if (prev < 0) prev = resultItems.length - 1;
             setActive(prev);
+            return;
+        }
+
+        // Shift+Delete → remove active recent/saved entry without confirmation
+        if (e.shiftKey && (key === 'Delete' || code === 46)) {
+            if (activeIndex < 0 || activeIndex >= resultItems.length) return;
+            var delItem = resultItems[activeIndex];
+            if (!delItem) return;
+            if (delItem.type === 'recent' && delItem.recentQuery) {
+                e.preventDefault();
+                deleteRecentSearch(delItem.recentQuery);
+                handleInput();
+                return;
+            }
+            if (delItem.type === 'saved' && delItem.savedId) {
+                e.preventDefault();
+                deleteSavedCommandSilent(delItem.savedId);
+                handleInput();
+                return;
+            }
             return;
         }
 
