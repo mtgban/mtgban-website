@@ -16,6 +16,7 @@
     var cardNames = null;
     var cardNamesLoading = false;
     var chips = null;
+    var suppressChipOnChange = false;
 
     // ── Nav parent detection ─────────────────────────────────────────
     // Maps the nav entry name (from palette.nav) to the key in
@@ -68,7 +69,9 @@
         cardMetaInflight[name] = fetch('/api/palette/card/' + encodeURIComponent(name))
             .then(function (r) { return r.ok ? r.json() : { found: false }; })
             .then(function (data) {
-                cardMetaCache[name] = data;
+                if (data && data.found) {
+                    cardMetaCache[name] = data;
+                }
                 delete cardMetaInflight[name];
                 // Re-run filter so dependent providers (s:, r:, c:) get narrowed results
                 if (typeof handleInput === 'function') handleInput();
@@ -191,7 +194,8 @@
     var chipContainer = document.createElement('div');
     chipContainer.className = 'cp-chip-container';
     chipContainer.id = 'cp-chips';
-    chipContainer.setAttribute('role', 'list');
+    chipContainer.setAttribute('role', 'group');
+    chipContainer.setAttribute('aria-label', 'Search composition');
 
     var input = document.createElement('input');
     input.className = 'cp-input';
@@ -253,7 +257,7 @@
                 }
             }
             lastChipCount = now;
-            if (typeof handleInput === 'function') handleInput();
+            if (!suppressChipOnChange && typeof handleInput === 'function') handleInput();
         });
     }
 
@@ -1278,16 +1282,17 @@
 
     function deleteSavedCommand(savedId) {
         var saved = getJSON(SAVED_KEY);
-        var found = false;
+        var target = null;
         for (var i = 0; i < saved.length; i++) {
             if (saved[i].id === savedId) {
-                found = true;
+                target = saved[i];
                 break;
             }
         }
-        if (!found) return;
+        if (!target) return;
 
-        // Simple confirmation
+        if (!window.confirm('Delete saved command "' + target.name + '"?')) return;
+
         saved = saved.filter(function(s) { return s.id !== savedId; });
         setJSON(SAVED_KEY, saved);
         showToast('Command deleted');
@@ -1436,6 +1441,7 @@
 
             if (item.type === 'filter-candidate' && item._providerPrefix && item._providerCandidate) {
                 var cand = item._providerCandidate;
+                suppressChipOnChange = true;
                 chips.add({
                     type: 'filter',
                     prefix: item._providerPrefix,
@@ -1443,8 +1449,10 @@
                     label: item._providerPrefix + (cand.label || cand.value),
                     icon: item.icon || 'filter'
                 });
+                suppressChipOnChange = false;
                 locked = true;
             } else if (item.type === 'card' && item.cardName) {
+                suppressChipOnChange = true;
                 chips.add({
                     type: 'card',
                     value: '"' + item.cardName + '"',
@@ -1452,9 +1460,11 @@
                     icon: 'search',
                     _cardName: item.cardName
                 });
+                suppressChipOnChange = false;
                 fetchCardMeta(item.cardName);
                 locked = true;
             } else if (item.type === 'nav' && item.navName) {
+                suppressChipOnChange = true;
                 chips.add({
                     type: 'nav',
                     value: item.navLink || '',
@@ -1463,6 +1473,7 @@
                     navName: item.navName,
                     navLink: item.navLink
                 });
+                suppressChipOnChange = false;
                 locked = true;
             } else if (item.type === 'nav-sub' && item._subView && item._parentChip) {
                 var pKey = navParentKeys[item._parentChip.navName];
@@ -1496,6 +1507,7 @@
                         }
                     }
                 }
+                suppressChipOnChange = true;
                 chips.add({
                     type: 'nav-sub',
                     value: item._subView.value,
@@ -1504,6 +1516,7 @@
                     _parentKey: pKey,
                     _urlParam: urlParam
                 });
+                suppressChipOnChange = false;
                 locked = true;
             }
 

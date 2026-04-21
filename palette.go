@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"html/template"
 	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -87,13 +88,16 @@ func PaletteCardMeta(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 
-	name := strings.TrimPrefix(r.URL.Path, "/api/palette/card/")
-	if name == "" {
+	escaped := strings.TrimPrefix(r.URL.EscapedPath(), "/api/palette/card/")
+	if escaped == "" {
 		json.NewEncoder(w).Encode(PaletteCardMetaResponse{Found: false})
 		return
 	}
-	// Handle legacy `+` -> space encoding from some clients.
-	name = strings.ReplaceAll(name, "+", " ")
+	decoded, err := url.PathUnescape(escaped)
+	if err != nil {
+		decoded = escaped
+	}
+	name := strings.ReplaceAll(decoded, "+", " ")
 
 	resp := PaletteCardMetaResponse{Name: name}
 
@@ -302,9 +306,6 @@ func paletteArbitTargetsJSON(variant string) template.JS {
 	for _, key := range FilterOptKeys {
 		cfg, ok := FilterOptConfig[key]
 		if !ok {
-			continue
-		}
-		if variant == "reverse" && cfg.ArbitOnly {
 			continue
 		}
 		if variant == "global" && cfg.ArbitOnly {
