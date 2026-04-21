@@ -88,7 +88,7 @@ func getDataset(cardId string, labels []string, config DatasetConfig, userTier s
 		return Dataset{}, err
 	}
 
-	results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil, nil, lookbackForTier(userTier))
+	results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil || co.Etched, nil, lookbackForTier(userTier))
 	if err != nil {
 		return Dataset{}, err
 	}
