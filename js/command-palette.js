@@ -92,6 +92,34 @@
         return null;
     }
 
+    // Returns a navigation URL if the chip set is a nav composition, else null.
+    // A nav composition is: exactly one nav chip (parent), optionally followed by
+    // nav-sub chips for the same parent.
+    function chipsNavURL(chipArray) {
+        if (!chipArray || chipArray.length === 0) return null;
+        var first = chipArray[0];
+        if (!first || first.type !== 'nav') return null;
+        var parentKey = first.navName ? navParentKeys[first.navName] : null;
+
+        // Leaf nav (not a parent page) - navigate directly
+        if (!parentKey) {
+            return first.navLink || null;
+        }
+
+        // Parent nav - compose params from subsequent nav-sub chips
+        var base = (first.navLink || '').split('?')[0];
+        var params = [];
+        for (var i = 1; i < chipArray.length; i++) {
+            var c = chipArray[i];
+            if (c.type !== 'nav-sub' || c._parentKey !== parentKey) {
+                // Not a pure nav composition - bail out
+                return null;
+            }
+            if (c._urlParam) params.push(c._urlParam);
+        }
+        return base + (params.length > 0 ? '?' + params.join('&') : '');
+    }
+
     // ── localStorage helpers ─────────────────────────────────────────
     var RECENT_KEY = 'mtgban_recent_searches';
     var SAVED_KEY = 'mtgban_saved_commands';
@@ -569,6 +597,13 @@
                             }
                         }
                         setJSON(SAVED_KEY, allSaved);
+                        // If this saved command is a nav composition, navigate to the composed URL
+                        var navUrl = chipsNavURL(cmd.chips);
+                        if (navUrl) {
+                            window.location.href = navUrl;
+                            return;
+                        }
+                        // Otherwise treat as a search query
                         recordRecentSearch(cmd.query);
                         window.location.href = '/search?q=' + encodeURIComponent(cmd.query);
                     }; })(s),
@@ -584,6 +619,12 @@
                         if (cmd.chips && cmd.chips.length > 0) {
                             for (var ci = 0; ci < cmd.chips.length; ci++) {
                                 chips.add(cmd.chips[ci]);
+                            }
+                            // Prefetch card meta for any restored card chips so filter narrowing works
+                            for (var cj = 0; cj < cmd.chips.length; cj++) {
+                                if (cmd.chips[cj].type === 'card' && cmd.chips[cj]._cardName) {
+                                    fetchCardMeta(cmd.chips[cj]._cardName);
+                                }
                             }
                         } else if (cmd.query) {
                             // V1 saved command (no chips field) - restore as plain input text
