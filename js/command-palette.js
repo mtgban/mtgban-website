@@ -1414,12 +1414,34 @@
             } else if (item.type === 'nav-sub' && item._subView && item._parentChip) {
                 var pKey = navParentKeys[item._parentChip.navName];
                 var urlParam;
+                var isSingleton = false;
                 if (pKey === 'newspaper' || pKey === 'sleepers') {
                     urlParam = 'page=' + encodeURIComponent(item._subView.value);
+                    isSingleton = true;
                 } else if (isArbitSortValue(pKey, item._subView.value)) {
                     urlParam = 'sort=' + encodeURIComponent(item._subView.value);
+                    isSingleton = true;
                 } else {
                     urlParam = encodeURIComponent(item._subView.value) + '=true';
+                }
+                // Remove duplicates / singletons before adding
+                var existingChips = chips.all();
+                for (var dup = existingChips.length - 1; dup >= 0; dup--) {
+                    var ec = existingChips[dup];
+                    if (ec.type !== 'nav-sub' || ec._parentKey !== pKey) continue;
+                    if (isSingleton) {
+                        // Replace: remove any existing nav-sub for this parent with the same param prefix (sort= or page=)
+                        var ecPrefix = ec._urlParam ? ec._urlParam.split('=')[0] : '';
+                        var newPrefix = urlParam.split('=')[0];
+                        if (ecPrefix === newPrefix) {
+                            chips.remove(dup);
+                        }
+                    } else {
+                        // Filter: dedupe identical urlParam
+                        if (ec._urlParam === urlParam) {
+                            chips.remove(dup);
+                        }
+                    }
                 }
                 chips.add({
                     type: 'nav-sub',
