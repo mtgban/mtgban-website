@@ -6,7 +6,6 @@ import (
 	"log"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -84,12 +83,12 @@ func getDataset(cardId string, labels []string, config DatasetConfig, userTier s
 		return Dataset{}, nil
 	}
 
-	isFoil := strings.HasSuffix(cardId, "_f")
-	if isFoil {
-		cardId = strings.TrimSuffix(cardId, "_f")
+	co, err := mtgmatcher.GetUUID(cardId)
+	if err != nil {
+		return Dataset{}, err
 	}
 
-	results, err := PricesArchiveDB.HGetAll(context.Background(), cardId, isFoil, nil, lookbackForTier(userTier))
+	results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil, nil, lookbackForTier(userTier))
 	if err != nil {
 		return Dataset{}, err
 	}
@@ -139,10 +138,7 @@ func stashInTimeseries() {
 	accumulated := map[string]*timeseries.PriceRow{}
 
 	getRow := func(uuid string, isFoil bool, date string) *timeseries.PriceRow {
-		key := date + "|" + uuid
-		if isFoil {
-			key += "_f"
-		}
+		key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil)
 		row, ok := accumulated[key]
 		if !ok {
 			lang := ""

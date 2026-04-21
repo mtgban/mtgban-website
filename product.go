@@ -624,9 +624,13 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 		}
 
 		// Query history
-		isFoil := strings.HasSuffix(cardId, "_f")
-		cleanId := strings.TrimSuffix(cardId, "_f")
-		results, err := PricesArchiveDB.HGetAll(context.Background(), cleanId, isFoil, nil, timeseries.LookbackStandard)
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil, nil, timeseries.LookbackStandard)
 		if err != nil {
 			log.Println(err)
 			break
