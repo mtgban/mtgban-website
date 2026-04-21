@@ -192,12 +192,32 @@
     dialog.appendChild(inputRow);
     dialog.appendChild(resultsEl);
     dialog.appendChild(footer);
+
+    var chipLive = document.createElement('div');
+    chipLive.className = 'cp-sr-only';
+    chipLive.id = 'cp-chip-announce';
+    chipLive.setAttribute('aria-live', 'polite');
+    chipLive.setAttribute('aria-atomic', 'true');
+    dialog.appendChild(chipLive);
+
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
 
     // Initialize chip manager (B1) - wire container + input + filter callback
+    var lastChipCount = 0;
     if (window.__palette_chips && typeof window.__palette_chips.create === 'function') {
         chips = window.__palette_chips.create(chipContainer, input, function () {
+            var now = chips ? chips.count() : 0;
+            var live = document.getElementById('cp-chip-announce');
+            if (live) {
+                if (now > lastChipCount) {
+                    var latest = chips.get(now - 1);
+                    live.textContent = 'Added chip: ' + (latest ? (latest.label || latest.value) : '');
+                } else if (now < lastChipCount) {
+                    live.textContent = 'Removed chip';
+                }
+            }
+            lastChipCount = now;
             if (typeof handleInput === 'function') handleInput();
         });
     }
