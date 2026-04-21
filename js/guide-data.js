@@ -1,4 +1,4 @@
-/* Guide Data — Shared Content Registry
+/* Guide Data - Shared Content Registry
  * Single source of truth for the command palette and /guide page.
  */
 window.__BAN_GUIDE = {
@@ -11,18 +11,18 @@ window.__BAN_GUIDE = {
             category: 'Command Palette',
             title: 'What the Palette Can Do',
             icon: 'sparkles',
-            summary: 'A tour of what the command palette can do — cards, filters, navigation, and saved commands.',
+            summary: 'A tour of what the command palette can do - cards, filters, navigation, and saved commands.',
             snippets: [],
             keywords: ['overview', 'capabilities', 'features', 'tour', 'what can', 'palette can', 'guide', 'introduction'],
             content: {
-                description: '<p>The command palette is a single keyboard-driven surface for everything on the site. Open it with <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd>, or press <kbd>/</kbd> anywhere no input is focused. Nothing requires memorizing — the palette surfaces what\'s possible as you type.</p><p><strong>Core capabilities:</strong></p><ul><li><strong>Card search</strong> — type a card name, <kbd>Enter</kbd> to search.</li><li><strong>Filter building with chips</strong> — type a prefix like <code>s:</code> or <code>r:</code> and Tab-lock the selection; chain chips to compose complex queries.</li><li><strong>Card-aware narrowing</strong> — lock a card chip first and subsequent filter dropdowns narrow to what exists for that card.</li><li><strong>Multi-stage navigation</strong> — <code>&gt;</code> to find a page, <kbd>Tab</kbd> to reveal sub-views like Newspaper spike scores or Arbitrage filter presets.</li><li><strong>Inline syntax help</strong> — <code>?</code> followed by a keyword returns a syntax snippet you can copy.</li><li><strong>Recent searches and saved commands</strong> — your recent queries and named shortcuts are one keystroke away.</li><li><strong>Round-trip editing</strong> — saved commands can be loaded back as chips (<kbd>Shift+Enter</kbd>) so you can tweak and re-run.</li></ul>',
+                description: '<p>The command palette is a single keyboard-driven surface for everything on the site. Open it with <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd>, or press <kbd>/</kbd> anywhere no input is focused. Nothing requires memorizing - the palette surfaces what\'s possible as you type.</p><p><strong>Core capabilities:</strong></p><ul><li><strong>Card search</strong> - type a card name, <kbd>Enter</kbd> to search.</li><li><strong>Filter building with chips</strong> - type a prefix like <code>s:</code> or <code>r:</code> and Tab-lock the selection; chain chips to compose complex queries.</li><li><strong>Card-aware narrowing</strong> - lock a card chip first and subsequent filter dropdowns narrow to what exists for that card.</li><li><strong>Multi-stage navigation</strong> - <code>&gt;</code> to find a page, <kbd>Tab</kbd> to reveal sub-views like Newspaper spike scores or Arbitrage filter presets.</li><li><strong>Inline syntax help</strong> - <code>?</code> followed by a keyword returns a syntax snippet you can copy.</li><li><strong>Recent searches and saved commands</strong> - your recent queries and named shortcuts are one keystroke away.</li><li><strong>Round-trip editing</strong> - saved commands can be loaded back as chips (<kbd>Shift+Enter</kbd>) so you can tweak and re-run.</li></ul>',
                 table: [],
                 examples: [
-                    { query: 'Lightning Bolt', desc: 'Simple card search — Enter to execute' },
+                    { query: 'Lightning Bolt', desc: 'Simple card search - Enter to execute' },
                     { query: '"Birds of Paradise" + Tab + s: + Tab', desc: 'Narrow sets dropdown to BoP printings, pick one' },
                     { query: '>newspaper + Tab + "Archive"', desc: 'Jump directly to Newspaper → Archive view' },
                     { query: '>arbit + Tab + "only Yield+" + Tab + "sort: Spread"', desc: 'Compose multi-filter arbitrage URL' },
-                    { query: '? rarity', desc: 'Inline rarity syntax help — Enter to copy' },
+                    { query: '? rarity', desc: 'Inline rarity syntax help - Enter to copy' },
                     { query: 'saved:', desc: 'Browse all saved commands' }
                 ]
             }
@@ -37,7 +37,7 @@ window.__BAN_GUIDE = {
             snippets: ['Ctrl+K', 'Cmd+K', '?', '>'],
             keywords: ['palette', 'keyboard', 'shortcut', 'command', 'help', 'search', 'open', 'ctrl k', 'cmd k', 'slash', 'modes', 'chips', 'filter builder'],
             content: {
-                description: '<p>The command palette provides fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or press <code>/</code> when no input field is focused.</p><p><strong>Modes</strong> (typed as prefixes into the palette input):</p><ul><li><code>?</code> — inline syntax help</li><li><code>&gt;</code> — navigate to a page or page view</li><li><code>saved:</code> — recall a saved search command</li></ul><p>For filter composition with guided autocomplete, see <strong>Filter Builder</strong>. For the full keyboard reference, see <strong>Cheatsheet</strong>.</p>',
+                description: '<p>The command palette provides fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or press <code>/</code> when no input field is focused.</p><p><strong>Modes</strong> (typed as prefixes into the palette input):</p><ul><li><code>?</code> - inline syntax help</li><li><code>&gt;</code> - navigate to a page or page view</li><li><code>saved:</code> - recall a saved search command</li></ul><p>For filter composition with guided autocomplete, see <strong>Filter Builder</strong>. For the full keyboard reference, see <strong>Cheatsheet</strong>.</p>',
                 table: [],
                 examples: [
                     { query: '? rarity', desc: 'Look up rarity syntax' },
@@ -55,7 +55,7 @@ window.__BAN_GUIDE = {
             snippets: ['Tab to lock', 's:', 'r:', 'c:', 'f:'],
             keywords: ['filter', 'chip', 'builder', 'tab', 'autocomplete', 'narrow', 'guided', 'compose'],
             content: {
-                description: '<p>The palette supports all search syntax prefixes as guided filter builders. Type a prefix and the dropdown shows matching options.</p><p>Locking a second chip with the same prefix merges it into the first: <code>s:MKM</code> followed by <code>s:LEA</code> becomes <code>s:MKM,LEA</code>. This applies to prefixes that accept multiple values — sets, rarities, colors, types, stores, tags.</p><p><strong>Card-aware narrowing:</strong> when a card chip is present, subsequent filter dropdowns narrow their options to what exists for that card. With a "Birds of Paradise" chip, <code>s:</code> only shows sets that card was printed in, and <code>c:</code> only shows green color combinations.</p>',
+                description: '<p>The palette supports all search syntax prefixes as guided filter builders. Type a prefix and the dropdown shows matching options.</p><p>Locking a second chip with the same prefix merges it into the first: <code>s:MKM</code> followed by <code>s:LEA</code> becomes <code>s:MKM,LEA</code>. This applies to prefixes that accept multiple values - sets, rarities, colors, types, stores, tags.</p><p><strong>Card-aware narrowing:</strong> when a card chip is present, subsequent filter dropdowns narrow their options to what exists for that card. With a "Birds of Paradise" chip, <code>s:</code> only shows sets that card was printed in, and <code>c:</code> only shows green color combinations.</p>',
                 table: [
                     { value: 's: / e:', short: 'Set / edition codes' },
                     { value: 'r:', short: 'Rarity (mythic, rare, uncommon, common, special, token, oversize)' },
@@ -88,7 +88,7 @@ window.__BAN_GUIDE = {
             snippets: ['>newspaper', '>arbit', '>sleepers'],
             keywords: ['navigate', 'sub-view', 'multi-stage', 'newspaper view', 'sleepers mode', 'arbit filter'],
             content: {
-                description: '<p>The <code>&gt;</code> navigation mode supports page sub-views. After typing <code>&gt;</code> and a page name, press <kbd>Tab</kbd> to lock that page as a chip — the dropdown then shows that page\'s specific views (Newspaper: Spike Score, Buylist Levels, Archive; Sleepers: Bulk, Reprint, Mismatch, Gap, Hotlist; Arbitrage: filter presets and sort orders).</p><p>For Arbitrage pages, you can lock multiple filter chips in sequence — each Tab adds another filter to the composed URL. Press Enter on a sub-view to navigate, or Enter with only a parent chip to go to the page\'s base URL.</p>',
+                description: '<p>The <code>&gt;</code> navigation mode supports page sub-views. After typing <code>&gt;</code> and a page name, press <kbd>Tab</kbd> to lock that page as a chip - the dropdown then shows that page\'s specific views (Newspaper: Spike Score, Buylist Levels, Archive; Sleepers: Bulk, Reprint, Mismatch, Gap, Hotlist; Arbitrage: filter presets and sort orders).</p><p>For Arbitrage pages, you can lock multiple filter chips in sequence - each Tab adds another filter to the composed URL. Press Enter on a sub-view to navigate, or Enter with only a parent chip to go to the page\'s base URL.</p>',
                 table: [
                     { value: '>newspaper + Tab', short: 'Shows all Newspaper views' },
                     { value: '>sleepers + Tab', short: 'Shows the 5 analysis modes' },
@@ -131,11 +131,11 @@ window.__BAN_GUIDE = {
             category: 'Command Palette',
             title: 'Walkthroughs',
             icon: 'footprints',
-            summary: 'Common workflows with exact keystrokes — follow along to get comfortable',
+            summary: 'Common workflows with exact keystrokes - follow along to get comfortable',
             snippets: [],
             keywords: ['walkthrough', 'tutorial', 'example', 'workflow', 'how to', 'scenario', 'step by step'],
             content: {
-                description: '<p>End-to-end keystroke sequences. Follow along in a live palette to build muscle memory.</p><div class="guide-walkthrough"><h4>1. Find all foil printings of a card</h4><ol><li><kbd>Ctrl+K</kbd> to open the palette.</li><li>Type <code>Birds of Paradise</code>. The card name appears in the dropdown.</li><li><kbd>Tab</kbd> — Birds of Paradise becomes a chip.</li><li>Type <code>f:foil</code>. The Finish dropdown appears with foil highlighted.</li><li><kbd>Tab</kbd> — <code>f:foil</code> becomes a chip.</li><li><kbd>Enter</kbd> — navigates to search with the composed query.</li></ol></div><div class="guide-walkthrough"><h4>2. Jump to Arbitrage with profit filters</h4><ol><li><kbd>Ctrl+K</kbd>.</li><li>Type <code>&gt;arb</code>. Arbitrage appears.</li><li><kbd>Tab</kbd> — Arbitrage chip locks; the dropdown now shows filter presets and sort options.</li><li>Type <code>yield</code> to narrow to "only Yield+".</li><li><kbd>Tab</kbd> — filter chip added.</li><li>Type <code>bucks</code>, <kbd>Tab</kbd> — second filter added.</li><li>Type <code>sort</code>, <kbd>Tab</kbd> on "Spread %" — sort chip added.</li><li><kbd>Enter</kbd> — navigates to <code>/arbit?nolow=true&amp;nopenny=true&amp;sort=spread</code>.</li></ol></div><div class="guide-walkthrough"><h4>3. Save a complex query for later</h4><ol><li>Build a query with chips: a card plus filters (as in walkthrough 1).</li><li>Press <kbd>Ctrl+S</kbd> while the palette is open.</li><li>Enter a short name and <kbd>Enter</kbd> — the command is saved.</li><li>Later, open the palette and type <code>saved:</code> to find your command.</li><li><kbd>Enter</kbd> runs it; <kbd>Shift+Enter</kbd> restores its chips for editing.</li></ol></div><div class="guide-walkthrough"><h4>4. Narrow a search with card-aware filters</h4><ol><li><kbd>Ctrl+K</kbd>.</li><li>Type <code>Lightning Bolt</code>, <kbd>Tab</kbd> — Lightning Bolt chip locks.</li><li>Type <code>s:</code> — the sets dropdown shows only sets Lightning Bolt has been printed in.</li><li>Type <code>Alpha</code>, <kbd>Tab</kbd> — picks Limited Edition Alpha, chip locks as <code>s:Alpha</code>.</li><li>Type <code>f:foil</code>, <kbd>Tab</kbd>, <kbd>Enter</kbd> — composes the final query.</li></ol></div><div class="guide-walkthrough"><h4>5. Look up syntax while building a query</h4><ol><li>In any context, type <code>?</code> followed by a keyword — e.g. <code>?rarity</code> or <code>? foil</code>.</li><li>The dropdown shows a syntax snippet — <kbd>Enter</kbd> copies it to your clipboard.</li><li><kbd>Shift+Enter</kbd> jumps to the full section of this guide.</li></ol></div>',
+                description: '<p>End-to-end keystroke sequences. Follow along in a live palette to build muscle memory.</p><div class="guide-walkthrough"><h4>1. Find all foil printings of a card</h4><ol><li><kbd>Ctrl+K</kbd> to open the palette.</li><li>Type <code>Birds of Paradise</code>. The card name appears in the dropdown.</li><li><kbd>Tab</kbd> - Birds of Paradise becomes a chip.</li><li>Type <code>f:foil</code>. The Finish dropdown appears with foil highlighted.</li><li><kbd>Tab</kbd> - <code>f:foil</code> becomes a chip.</li><li><kbd>Enter</kbd> - navigates to search with the composed query.</li></ol></div><div class="guide-walkthrough"><h4>2. Jump to Arbitrage with profit filters</h4><ol><li><kbd>Ctrl+K</kbd>.</li><li>Type <code>&gt;arb</code>. Arbitrage appears.</li><li><kbd>Tab</kbd> - Arbitrage chip locks; the dropdown now shows filter presets and sort options.</li><li>Type <code>yield</code> to narrow to "only Yield+".</li><li><kbd>Tab</kbd> - filter chip added.</li><li>Type <code>bucks</code>, <kbd>Tab</kbd> - second filter added.</li><li>Type <code>sort</code>, <kbd>Tab</kbd> on "Spread %" - sort chip added.</li><li><kbd>Enter</kbd> - navigates to <code>/arbit?nolow=true&amp;nopenny=true&amp;sort=spread</code>.</li></ol></div><div class="guide-walkthrough"><h4>3. Save a complex query for later</h4><ol><li>Build a query with chips: a card plus filters (as in walkthrough 1).</li><li>Press <kbd>Ctrl+S</kbd> while the palette is open.</li><li>Enter a short name and <kbd>Enter</kbd> - the command is saved.</li><li>Later, open the palette and type <code>saved:</code> to find your command.</li><li><kbd>Enter</kbd> runs it; <kbd>Shift+Enter</kbd> restores its chips for editing.</li></ol></div><div class="guide-walkthrough"><h4>4. Narrow a search with card-aware filters</h4><ol><li><kbd>Ctrl+K</kbd>.</li><li>Type <code>Lightning Bolt</code>, <kbd>Tab</kbd> - Lightning Bolt chip locks.</li><li>Type <code>s:</code> - the sets dropdown shows only sets Lightning Bolt has been printed in.</li><li>Type <code>Alpha</code>, <kbd>Tab</kbd> - picks Limited Edition Alpha, chip locks as <code>s:Alpha</code>.</li><li>Type <code>f:foil</code>, <kbd>Tab</kbd>, <kbd>Enter</kbd> - composes the final query.</li></ol></div><div class="guide-walkthrough"><h4>5. Look up syntax while building a query</h4><ol><li>In any context, type <code>?</code> followed by a keyword - e.g. <code>?rarity</code> or <code>? foil</code>.</li><li>The dropdown shows a syntax snippet - <kbd>Enter</kbd> copies it to your clipboard.</li><li><kbd>Shift+Enter</kbd> jumps to the full section of this guide.</li></ol></div>',
                 table: [],
                 examples: []
             }
@@ -155,20 +155,17 @@ window.__BAN_GUIDE = {
                     { value: 'Ctrl+K / Cmd+K', short: 'Toggle palette from anywhere' },
                     { value: '/', short: 'Open when no input is focused' },
                     { value: 'Escape', short: 'Close palette' },
-                    { value: '—', short: '—' },
                     { value: 'Tab (on dropdown result)', short: 'Lock as chip' },
-                    { value: 'Tab (on active chip)', short: 'Edit — re-opens dropdown' },
+                    { value: 'Tab (on active chip)', short: 'Edit - re-opens dropdown' },
                     { value: '←  /  →', short: 'Navigate between chips' },
                     { value: 'Backspace / Delete', short: 'Remove active chip' },
                     { value: '↑  /  ↓', short: 'Navigate dropdown' },
                     { value: 'Enter', short: 'Execute composed query / navigate / copy snippet' },
                     { value: 'Shift+Enter', short: 'Alt action (see context)' },
                     { value: 'Ctrl+S / Cmd+S', short: 'Save current query as a named command' },
-                    { value: '—', short: '—' },
-                    { value: '?  (or help: / syntax:)', short: 'Help mode — inline syntax lookup' },
-                    { value: '>', short: 'Navigation mode — pages and sub-views' },
-                    { value: 'saved:', short: 'Saved mode — browse saved commands' },
-                    { value: '—', short: '—' },
+                    { value: '?  (or help: / syntax:)', short: 'Help mode - inline syntax lookup' },
+                    { value: '>', short: 'Navigation mode - pages and sub-views' },
+                    { value: 'saved:', short: 'Saved mode - browse saved commands' },
                     { value: 's:  e:', short: 'Set / edition (accepts list, narrows to card printings)' },
                     { value: 'r:', short: 'Rarity (accepts list, narrows to card rarities)' },
                     { value: 'c:  ci:', short: 'Color / color identity (WUBRG + guild/shard/wedge/college/four-color)' },
@@ -198,7 +195,7 @@ window.__BAN_GUIDE = {
             snippets: ['name|set|number|finish', 'Sol Ring*', 'Sheoldred (Showcase)', 'r:rare,mythic'],
             keywords: ['basic', 'name', 'pricefall', 'notation', 'suffix', 'foil', 'nonfoil', 'etched', 'altfoil', 'finish', 'comma', 'multiple', 'syntax', 'search'],
             content: {
-                description: '<p>Start typing a card name and an autocomplete dropdown will appear. You can also use the Pricefall bot notation: <code>name[|code[|number[|finish]]]</code>.</p><p>Human-readable tags are also supported — for example, appending <code>(Extended Art)</code> or <code>(Showcase)</code> to a card name will filter to those versions (does not work in regexp mode).</p><p>Use commas to supply multiple values for any filter. Finish suffixes can be appended directly to any search term:</p>',
+                description: '<p>Start typing a card name and an autocomplete dropdown will appear. You can also use the Pricefall bot notation: <code>name[|code[|number[|finish]]]</code>.</p><p>Human-readable tags are also supported - for example, appending <code>(Extended Art)</code> or <code>(Showcase)</code> to a card name will filter to those versions (does not work in regexp mode).</p><p>Use commas to supply multiple values for any filter. Finish suffixes can be appended directly to any search term:</p>',
                 table: [
                     { value: '&', short: 'Non-foil only' },
                     { value: '*', short: 'Foil only' },
@@ -378,7 +375,7 @@ window.__BAN_GUIDE = {
             snippets: ['t:creature', 't:legendary', 't:goblin', 't:booster', 't:planeswalker'],
             keywords: ['type', 'supertype', 'subtype', 'creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'planeswalker', 'land', 'legendary', 'goblin', 'elf', 'wizard', 'booster', 'box', 'deck', 'sealed', 'product', 'redemption'],
             content: {
-                description: 'Filter by card type with <code>t:VALUE</code>, accepting any valid supertype, type, or subtype. The same option also works for sealed products — you can search by category (booster, box, deck) or subtype (draft, collector, intro), or any fragment of the product name.',
+                description: 'Filter by card type with <code>t:VALUE</code>, accepting any valid supertype, type, or subtype. The same option also works for sealed products - you can search by category (booster, box, deck) or subtype (draft, collector, intro), or any fragment of the product name.',
                 table: [],
                 examples: [
                     { query: 't:creature', desc: 'All creatures' },
@@ -505,7 +502,7 @@ window.__BAN_GUIDE = {
             snippets: ['price>10', 'price<5', 'buy_price>5', 'ratio>50', 'price>TCGLow', 'arb_price', 'rev_price'],
             keywords: ['price', 'buy_price', 'arb_price', 'rev_price', 'ratio', 'cost', 'value', 'retail', 'buylist', 'TCGLow', 'filter', 'comparison', 'desirability'],
             content: {
-                description: '<p>Filter by retail price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code>. Use <code>buy_price</code> to filter buylist prices. Filters can also reference a store\'s price — <code>price&gt;TCGLow</code> returns stores charging more than the TCG Low index for that card.</p><p>For cross-category comparisons: <code>arb_price</code> uses buylist price as a reference for retail results, and <code>rev_price</code> uses retail price as a reference for buylist results.</p><p><code>ratio&gt;VALUE</code> filters by buylist desirability percentage (max 64).</p>',
+                description: '<p>Filter by retail price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code>. Use <code>buy_price</code> to filter buylist prices. Filters can also reference a store\'s price - <code>price&gt;TCGLow</code> returns stores charging more than the TCG Low index for that card.</p><p>For cross-category comparisons: <code>arb_price</code> uses buylist price as a reference for retail results, and <code>rev_price</code> uses retail price as a reference for buylist results.</p><p><code>ratio&gt;VALUE</code> filters by buylist desirability percentage (max 64).</p>',
                 table: [
                     { value: 'price', short: 'Retail price filter' },
                     { value: 'buy_price', short: 'Buylist price filter' },
@@ -531,7 +528,7 @@ window.__BAN_GUIDE = {
             snippets: ['store:TCG', 'store:only:CK', 'vendor:CK', 'seller:SCG', 'region:eu', 'skip:index', 'skip:retail'],
             keywords: ['store', 'vendor', 'seller', 'region', 'skip', 'only', 'CK', 'TCG', 'SCG', 'MKM', 'us', 'eu', 'jp', 'index', 'retail', 'buylist', 'empty', 'filter'],
             content: {
-                description: '<p>Filter by seller or vendor with <code>store:shorthand</code>, <code>seller:shorthand</code> (retail), or <code>vendor:shorthand</code> (buylist). These drop results where the store is absent. To show only that store, use <code>store:only:shorthand</code>.</p><p>Filter by region with <code>region:us</code>, <code>region:eu</code>, or <code>region:jp</code>.</p><p>The <code>skip:</code> filter hides entire result categories. Note: store filters leave index results visible — use <code>skip:index</code> to hide them.</p>',
+                description: '<p>Filter by seller or vendor with <code>store:shorthand</code>, <code>seller:shorthand</code> (retail), or <code>vendor:shorthand</code> (buylist). These drop results where the store is absent. To show only that store, use <code>store:only:shorthand</code>.</p><p>Filter by region with <code>region:us</code>, <code>region:eu</code>, or <code>region:jp</code>.</p><p>The <code>skip:</code> filter hides entire result categories. Note: store filters leave index results visible - use <code>skip:index</code> to hide them.</p>',
                 table: [
                     { value: 'store:X', short: 'Include results from store X' },
                     { value: 'store:only:X', short: 'Show only results from store X' },
@@ -562,7 +559,7 @@ window.__BAN_GUIDE = {
             snippets: ['sm:exact', 'sm:prefix', 'sm:any', 'sm:regexp', 'sm:scryfall'],
             keywords: ['mode', 'sm:', 'exact', 'prefix', 'any', 'regexp', 'regex', 'scryfall', 'match', 'contains', 'starts', 'pattern', 'forward'],
             content: {
-                description: '<p>Change search matching behavior with <code>sm:VALUE</code>. The default mode is <code>exact</code> — only cards with that precise name are returned.</p><p>In <code>scryfall</code> mode, the query is forwarded to Scryfall. BAN card filters are disabled to avoid conflicts, but store and price filters still apply.</p>',
+                description: '<p>Change search matching behavior with <code>sm:VALUE</code>. The default mode is <code>exact</code> - only cards with that precise name are returned.</p><p>In <code>scryfall</code> mode, the query is forwarded to Scryfall. BAN card filters are disabled to avoid conflicts, but store and price filters still apply.</p>',
                 table: [
                     { value: 'exact', short: 'Exact name match (default)' },
                     { value: 'prefix', short: 'Names starting with search term' },
@@ -736,7 +733,7 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['arbitrage', 'arb', 'gap', 'price difference', 'retail', 'buylist', 'profit', 'flip', 'reverse', 'global', 'condition', 'foil', 'rarity', 'filter'],
             content: {
-                description: '<p>The Arbitrage page identifies cards where there is a meaningful gap between what stores are selling for and what other vendors are buying at — potential flip opportunities.</p><p><strong>Standard mode:</strong> Compare retail prices to buylist prices across all vendors</p><p><strong>Reverse mode:</strong> Find buylists paying more than retail prices</p><p><strong>Global mode:</strong> Cross-store arbitrage including international vendors</p><p>Filter results by condition, foil treatment, rarity, and price thresholds.</p>',
+                description: '<p>The Arbitrage page identifies cards where there is a meaningful gap between what stores are selling for and what other vendors are buying at - potential flip opportunities.</p><p><strong>Standard mode:</strong> Compare retail prices to buylist prices across all vendors</p><p><strong>Reverse mode:</strong> Find buylists paying more than retail prices</p><p><strong>Global mode:</strong> Cross-store arbitrage including international vendors</p><p>Filter results by condition, foil treatment, rarity, and price thresholds.</p>',
                 table: [],
                 examples: []
             }
@@ -753,7 +750,7 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['tips', 'tricks', 'power user', 'refresh', 'timing', 'history', 'chart', 'reprint', 'ratio', 'trade credit', 'tooltip', 'flavor name', 'condition', 'index', 'feedback'],
             content: {
-                description: '<p>A few things to know to get the most out of BAN:</p><p><strong>Price refresh:</strong> Data is updated periodically throughout the day. The exact delay is randomized to prevent sniping.</p><p><strong>Historical data:</strong> Click the 📊 chart icon on any card to view price history from major vendors.</p><p><strong>Reprint finder:</strong> Click 📖 on a card to see every product containing any reprint of that card. Source products are also accessible via "Found in * products" links.</p><p><strong>Buylist ratios:</strong> The percentage shown on buylist results reflects vendor desirability — higher means they want it more. Only shown when the vendor also has retail stock at matching conditions.</p><p><strong>Trade credit:</strong> Hover over a buylist price to see the corresponding trade credit value, if available.</p><p><strong>Conditions:</strong> Inventory prices reflect stated conditions (accuracy depends on provider). Buylist prices are always NM. Sealed products are always in sealed/unopened condition. The Index condition is for trend data only — no quantities are tracked.</p><p><strong>Flavor names:</strong> Searching a flavor name returns only those specific art versions (unless disabled in preferences). This does not work for complex multi-filter queries.</p><p><strong>Feedback:</strong> Report issues in the #feedback channel on the BAN Discord with a URL or screenshot. Some errors originate from upstream providers.</p>',
+                description: '<p>A few things to know to get the most out of BAN:</p><p><strong>Price refresh:</strong> Data is updated periodically throughout the day. The exact delay is randomized to prevent sniping.</p><p><strong>Historical data:</strong> Click the 📊 chart icon on any card to view price history from major vendors.</p><p><strong>Reprint finder:</strong> Click 📖 on a card to see every product containing any reprint of that card. Source products are also accessible via "Found in * products" links.</p><p><strong>Buylist ratios:</strong> The percentage shown on buylist results reflects vendor desirability - higher means they want it more. Only shown when the vendor also has retail stock at matching conditions.</p><p><strong>Trade credit:</strong> Hover over a buylist price to see the corresponding trade credit value, if available.</p><p><strong>Conditions:</strong> Inventory prices reflect stated conditions (accuracy depends on provider). Buylist prices are always NM. Sealed products are always in sealed/unopened condition. The Index condition is for trend data only - no quantities are tracked.</p><p><strong>Flavor names:</strong> Searching a flavor name returns only those specific art versions (unless disabled in preferences). This does not work for complex multi-filter queries.</p><p><strong>Feedback:</strong> Report issues in the #feedback channel on the BAN Discord with a URL or screenshot. Some errors originate from upstream providers.</p>',
                 table: [],
                 examples: [
                     { query: 'ratio>50 r:rare', desc: 'High-demand rares on buylists' },
