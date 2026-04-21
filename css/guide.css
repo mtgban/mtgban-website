@@ -263,14 +263,14 @@
     align-items: center;
     gap: 12px;
     padding: 8px 14px;
-    border-left: 3px solid var(--ainfo, #559eff);
-    background: color-mix(in srgb, var(--ainfo, #559eff) 5%, var(--background, #f8f8f8));
+    border-left: 3px solid #FFBF00;
+    background: color-mix(in srgb, #FFBF00 5%, var(--background, #f8f8f8));
     border-radius: 0 8px 8px 0;
     position: relative;
     transition: background 0.1s;
 }
 .guide-example:hover {
-    background: color-mix(in srgb, var(--ainfo, #559eff) 10%, var(--background, #f8f8f8));
+    background: color-mix(in srgb, #FFBF00 10%, var(--background, #f8f8f8));
 }
 .guide-example-query {
     font-family: monospace;
@@ -357,6 +357,16 @@
 }
 .guide-section-desc p:last-child {
     margin-bottom: 0;
+}
+.guide-section-desc ul,
+.guide-section-desc ol {
+    margin: 0 0 0.75em;
+    padding-left: 2em;
+    line-height: 1.6;
+}
+.guide-section-desc ul li,
+.guide-section-desc ol li {
+    margin-bottom: 0.25em;
 }
 
 /* ── Responsive ── */
