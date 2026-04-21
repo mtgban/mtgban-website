@@ -17,6 +17,39 @@
     var cardNamesLoading = false;
     var chips = null;
 
+    // ── Nav parent detection ─────────────────────────────────────────
+    // Maps the nav entry name (from palette.nav) to the key in
+    // __BAN_PALETTE_TARGETS that holds its sub-views.
+    var navParentKeys = {
+        'Newspaper': 'newspaper',
+        'Sleepers': 'sleepers',
+        'Arbitrage': 'arbit',
+        'Reverse': 'reverse',
+        'Global': 'global'
+    };
+
+    function isParentNav(name) {
+        return !!navParentKeys[name];
+    }
+
+    function getNavTargets(name) {
+        var key = navParentKeys[name];
+        if (!key) return null;
+        var targets = (window.__BAN_PALETTE_TARGETS || {})[key];
+        return targets || null;
+    }
+
+    // Used by sub-view URL composition. For arbit/reverse/global, distinguishes
+    // whether a sub-view value is a sort option (goes in ?sort=) or a filter (?key=true).
+    function isArbitSortValue(key, value) {
+        var targets = (window.__BAN_PALETTE_TARGETS || {})[key];
+        if (!targets || !targets.sorts) return false;
+        for (var i = 0; i < targets.sorts.length; i++) {
+            if (targets.sorts[i].value === value) return true;
+        }
+        return false;
+    }
+
     // ── Card meta cache ──────────────────────────────────────────────
     var cardMetaCache = {}; // { [name]: response }
     var cardMetaInflight = {};
@@ -626,6 +659,94 @@
         };
     }
 
+    // ── Sub-view rendering (parent nav chip locked) ──────────────────
+    function renderSubViewResults(parentChip, targets, query) {
+        var items = [];
+
+        function pushEntries(entries, headerLabel) {
+            if (!entries || entries.length === 0) return;
+            var filtered = window.__palette_providers
+                ? window.__palette_providers.filterEntries(entries, query)
+                : entries;
+            if (filtered.length === 0) return;
+            if (headerLabel) items.push({ type: 'header', title: headerLabel });
+            for (var i = 0; i < filtered.length; i++) {
+                items.push(buildSubViewItem(parentChip, filtered[i]));
+            }
+        }
+
+        if (Array.isArray(targets)) {
+            // Newspaper / Sleepers shape: flat array, optionally grouped by .group
+            var byGroup = {};
+            var orderedGroups = [];
+            var hadAnyGroup = false;
+            for (var i = 0; i < targets.length; i++) {
+                var g = targets[i].group || 'Views';
+                if (targets[i].group) hadAnyGroup = true;
+                if (!byGroup[g]) { byGroup[g] = []; orderedGroups.push(g); }
+                byGroup[g].push(targets[i]);
+            }
+            if (hadAnyGroup) {
+                for (var gi = 0; gi < orderedGroups.length; gi++) {
+                    pushEntries(byGroup[orderedGroups[gi]], parentChip.navName + ' · ' + orderedGroups[gi]);
+                }
+            } else {
+                pushEntries(targets, parentChip.navName + ' Views');
+            }
+        } else {
+            // Arbit/Reverse/Global shape: { filters: [...], sorts: [...] }
+            pushEntries(targets.sorts, parentChip.navName + ' · Sort');
+            pushEntries(targets.filters, parentChip.navName + ' · Filters');
+        }
+
+        if (items.length === 0) {
+            items.push({ type: 'header', title: parentChip.navName + ' - no matching sub-views' });
+        }
+        renderResults(items);
+    }
+
+    function buildSubViewItem(parentChip, entry) {
+        return {
+            type: 'nav-sub',
+            title: entry.label,
+            subtitle: entry.group || '',
+            icon: 'arrow-right',
+            _subView: entry,
+            _parentChip: parentChip,
+            action: function () {
+                var url = composeSubViewURL(parentChip, entry);
+                window.location.href = url;
+            }
+        };
+    }
+
+    function composeSubViewURL(parentChip, entry) {
+        var key = navParentKeys[parentChip.navName];
+        var base = (parentChip.navLink || '').split('?')[0];
+        var params = [];
+
+        if (key === 'newspaper' || key === 'sleepers') {
+            params.push('page=' + encodeURIComponent(entry.value));
+        } else {
+            // arbit / reverse / global
+            if (isArbitSortValue(key, entry.value)) {
+                params.push('sort=' + encodeURIComponent(entry.value));
+            } else {
+                params.push(encodeURIComponent(entry.value) + '=true');
+            }
+            // Merge prior nav-sub chips for the same parent
+            if (chips) {
+                var list = chips.all();
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i].type === 'nav-sub' && list[i]._parentKey === key && list[i]._urlParam) {
+                        params.push(list[i]._urlParam);
+                    }
+                }
+            }
+        }
+        return base + (params.length > 0 ? '?' + params.join('&') : '');
+    }
+
     // ── Render results ───────────────────────────────────────────────
     function renderResults(items) {
         resultItems = [];
@@ -741,6 +862,30 @@
                     modeIndicator.className = 'cp-mode-indicator';
                     modeIndicator.removeAttribute('data-mode');
                     renderProviderResults(detected.prefix, provider, detected.query);
+                    return;
+                }
+            }
+        }
+
+        // Sub-view mode: if the last chip is a parent nav chip (and no provider
+        // prefix took over above), dropdown shows that page's sub-views.
+        if (chips) {
+            var chipsList = chips.all();
+            var parentNavChip = null;
+            for (var ci = chipsList.length - 1; ci >= 0; ci--) {
+                if (chipsList[ci].type === 'nav' && isParentNav(chipsList[ci].navName)) {
+                    parentNavChip = chipsList[ci];
+                    break;
+                }
+            }
+            if (parentNavChip) {
+                var targets = getNavTargets(parentNavChip.navName);
+                if (targets) {
+                    // Clear mode indicator when in sub-view mode
+                    modeIndicator.textContent = '';
+                    modeIndicator.className = 'cp-mode-indicator';
+                    modeIndicator.removeAttribute('data-mode');
+                    renderSubViewResults(parentNavChip, targets, raw.trim());
                     return;
                 }
             }
@@ -1112,6 +1257,39 @@
 
         // Enter
         if (key === 'Enter' || code === 13) {
+            // D3: parent-only chip (or parent + nav-sub chips) + empty input + no highlighted result → navigate
+            if (chips && chips.count() > 0 && input.value.trim() === '' && activeIndex < 0) {
+                var chipsNow = chips.all();
+                var firstNav = chipsNow[0];
+                var onlyParentAndSubs = firstNav && firstNav.type === 'nav' && isParentNav(firstNav.navName);
+                if (onlyParentAndSubs) {
+                    var allMatchingSubs = true;
+                    var pKeyE = navParentKeys[firstNav.navName];
+                    for (var ek = 1; ek < chipsNow.length; ek++) {
+                        if (chipsNow[ek].type !== 'nav-sub' || chipsNow[ek]._parentKey !== pKeyE) {
+                            allMatchingSubs = false;
+                            break;
+                        }
+                    }
+                    if (allMatchingSubs) {
+                        e.preventDefault();
+                        if (chipsNow.length === 1) {
+                            // Only parent chip: navigate to base URL
+                            window.location.href = firstNav.navLink;
+                            return;
+                        }
+                        // Parent + sub chips: compose params
+                        var baseE = (firstNav.navLink || '').split('?')[0];
+                        var paramsE = [];
+                        for (var ep = 1; ep < chipsNow.length; ep++) {
+                            if (chipsNow[ep]._urlParam) paramsE.push(chipsNow[ep]._urlParam);
+                        }
+                        window.location.href = baseE + (paramsE.length > 0 ? '?' + paramsE.join('&') : '');
+                        return;
+                    }
+                }
+            }
+
             e.preventDefault();
             executeResult(e.shiftKey);
             return;
@@ -1167,6 +1345,25 @@
                     icon: 'compass',
                     navName: item.navName,
                     navLink: item.navLink
+                });
+                locked = true;
+            } else if (item.type === 'nav-sub' && item._subView && item._parentChip) {
+                var pKey = navParentKeys[item._parentChip.navName];
+                var urlParam;
+                if (pKey === 'newspaper' || pKey === 'sleepers') {
+                    urlParam = 'page=' + encodeURIComponent(item._subView.value);
+                } else if (isArbitSortValue(pKey, item._subView.value)) {
+                    urlParam = 'sort=' + encodeURIComponent(item._subView.value);
+                } else {
+                    urlParam = encodeURIComponent(item._subView.value) + '=true';
+                }
+                chips.add({
+                    type: 'nav-sub',
+                    value: item._subView.value,
+                    label: item._subView.label,
+                    icon: 'arrow-right',
+                    _parentKey: pKey,
+                    _urlParam: urlParam
                 });
                 locked = true;
             }
