@@ -606,7 +606,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			lb := lookbackForTier(userTier)
 			pageVars.MaxLookbackDays = lb.Days()
 
-			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, lb)
+			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil || co.Etched, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
 			pageVars.Datasets = getDatasets(chartId, co.Sealed, pageVars.AxisLabels, userTier)
