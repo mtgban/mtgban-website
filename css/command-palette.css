@@ -406,3 +406,81 @@
     font: inherit;
     padding: 2px 4px;
 }
+
+/* ── Chips ────────────────────────────────────────────── */
+.cp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 4px 2px 8px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+    border-radius: 999px;
+    color: var(--normal, #111);
+    user-select: none;
+    transition: background 0.1s, border-color 0.1s, transform 0.12s;
+}
+.cp-chip:hover {
+    background: var(--surface-3, rgba(0, 0, 0, 0.1));
+}
+.cp-chip.active {
+    background: var(--ainfo, #559eff);
+    color: white;
+    border-color: var(--ainfo, #559eff);
+}
+.cp-chip-icon {
+    display: inline-flex;
+    align-items: center;
+}
+.cp-chip-icon svg {
+    width: 13px;
+    height: 13px;
+}
+.cp-chip-label {
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cp-chip-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    margin-left: 2px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.1s, background 0.1s;
+}
+.cp-chip:hover .cp-chip-delete,
+.cp-chip.active .cp-chip-delete {
+    opacity: 0.7;
+}
+.cp-chip-delete:hover {
+    opacity: 1 !important;
+    background: rgba(0, 0, 0, 0.15);
+}
+.cp-chip.active .cp-chip-delete:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+.cp-chip-delete svg {
+    width: 11px;
+    height: 11px;
+}
+
+/* Type-specific icon color hints (only when not active) */
+.cp-chip-card .cp-chip-icon { color: var(--ainfo, #559eff); }
+.cp-chip-filter .cp-chip-icon { color: var(--awarn, #d97706); }
+.cp-chip-nav .cp-chip-icon,
+.cp-chip-nav-sub .cp-chip-icon,
+.cp-chip-nav-leaf .cp-chip-icon { color: #8b5cf6; }
+.cp-chip.active .cp-chip-icon { color: inherit; }
