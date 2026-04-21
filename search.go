@@ -609,11 +609,15 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
 		} else {
+			co, err := mtgmatcher.GetUUID(chartId)
+			if err != nil {
+				fmt.Println("Search: Failed to GetUUID: %w", err)
+				return
+			}
 			lb := lookbackForTier(userTier)
+			pageVars.MaxLookbackDays = lb.Days()
 
-			isFoil := strings.HasSuffix(chartId, "_f")
-			cleanId := strings.TrimSuffix(chartId, "_f")
-			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), cleanId, isFoil, lb)
+			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
 			pageVars.Datasets = getDatasets(chartId, co.Sealed, pageVars.AxisLabels, userTier)

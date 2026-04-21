@@ -3,18 +3,17 @@ package timeseries
 import (
 	"database/sql"
 	"fmt"
-	"time"
 
 	_ "github.com/lib/pq"
 )
 
 type SqlConfig struct {
-	Host     string `json:"sql_host"`
-	Port     int    `json:"sql_port"`
-	User     string `json:"sql_user"`
-	Password string `json:"sql_password"`
-	DBName   string `json:"sql_dbname"`
-	SSLMode  string `json:"sql_sslmode"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	DBName   string `json:"dbname"`
+	SSLMode  string `json:"sslmode"`
 }
 
 func (c SqlConfig) DSN() string {
@@ -40,12 +39,11 @@ func NewClient(cfg SqlConfig) (*Client, error) {
 		return nil, fmt.Errorf("timeseries: open: %w", err)
 	}
 
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
-
 	if err := db.Ping(); err != nil {
-		db.Close()
+		dbCloseErr := db.Close()
+		if dbCloseErr != nil {
+			return nil, fmt.Errorf("timeseries: ping: %w, close: %w", err, dbCloseErr)
+		}
 		return nil, fmt.Errorf("timeseries: ping: %w", err)
 	}
 

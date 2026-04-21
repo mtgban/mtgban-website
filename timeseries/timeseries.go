@@ -35,20 +35,19 @@ const (
 	LookbackVintage
 )
 
-func (l Lookback) Since() time.Time {
-	now := time.Now()
+func (l Lookback) Days() int {
 	switch l {
 	case LookbackStandard:
-		return now.AddDate(-2, 0, 0)
-	case LookbackModern:
-		return now.AddDate(-10, 0, 0)
-	case LookbackLegacy:
-		return now.AddDate(-10, 0, 0)
-	case LookbackVintage:
-		return now.AddDate(-10, 0, 0)
+		return 730 // 2 years
+	case LookbackModern, LookbackLegacy, LookbackVintage:
+		return 3650 // 10 years
 	default:
-		return now.AddDate(0, -1, 0)
+		return 30 // 30 days
 	}
+}
+
+func (l Lookback) Since() time.Time {
+	return time.Now().AddDate(0, 0, -l.Days())
 }
 
 // PriceForDataset returns the price column matching a dataset config index.

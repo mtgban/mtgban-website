@@ -547,12 +547,13 @@ Sims are not required for pre-constructed decks and other products where the sam
                                         <a class="chart-pill chart-pill-warning" onclick="document.getElementById('deletechart').style='inline'">Show delete options</a>
                                     {{end}}
                                     <select id="dateRange" onchange="changeRange(parseInt(this.value))" style="width: 110px">
-                                        <option value="0">All History</option>
                                         <option value="30">1 Month</option>
-                                        <option value="90">3 Months</option>
-                                        <option value="180" selected>6 Months</option>
-                                        <option value="365">1 Year</option>
-                                        <option value="730">2 Years</option>
+                                        <option value="90" {{if lt $.MaxLookbackDays 90}} disabled {{end}}>3 Months{{if lt $.MaxLookbackDays 90}} (Standard+){{end}}</option>
+                                        <option value="180" {{if ge $.MaxLookbackDays 180}} selected {{end}} {{if lt $.MaxLookbackDays 180}} disabled {{end}}>6 Months{{if lt $.MaxLookbackDays 180}} (Standard+){{end}}</option>
+                                        <option value="365" {{if lt $.MaxLookbackDays 365}} disabled {{end}}>1 Year{{if lt $.MaxLookbackDays 365}} (Standard+){{end}}</option>
+                                        <option value="730" {{if lt $.MaxLookbackDays 730}} disabled {{end}}>2 Years{{if lt $.MaxLookbackDays 730}} (Standard+){{end}}</option>
+                                        <option value="1825"{{if lt $.MaxLookbackDays 1825}} disabled {{end}}>5 Years{{if lt $.MaxLookbackDays 1825}} (Modern+){{end}}</option>
+                                        <option value="3650"{{if lt $.MaxLookbackDays 3650}} disabled {{end}}>10 Years{{if lt $.MaxLookbackDays 3650}} (Modern+){{end}}</option>
                                     </select>
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
@@ -576,17 +577,28 @@ Sims are not required for pre-constructed decks and other products where the sam
                             var legendStorageKey = 'BANChart{{if $.IsSealed}}Sealed{{end}}';
 
                             // Prepare options
-                            var opts = getChartOpts({{.AxisLabels}}, localStorage.getItem("chartSpanGaps"));
+                            var allLabels = {{.AxisLabels}};
+                            var opts = getChartOpts(allLabels, localStorage.getItem("chartSpanGaps"));
 
                             // Override legend click function
                             opts = withLegendPersistence(legendStorageKey, opts);
+
+                            // Apply saved or default date range before chart creation
+                            var savedRange = localStorage.getItem('chartDateRange');
+                            if (savedRange !== null) {
+                                document.getElementById('dateRange').value = savedRange;
+                            }
+                            var initialRange = parseInt(document.getElementById('dateRange').value);
+                            if (initialRange > 0 && initialRange < allLabels.length) {
+                                opts.scales.x.min = allLabels[initialRange - 1];
+                            }
 
                             // Create the chart
                             var ctx = document.getElementById('cardChart').getContext('2d');
                             var cardChart = new Chart(ctx, {
                                 type: 'line',
                                 data: {
-                                    labels: {{.AxisLabels}},
+                                    labels: allLabels,
                                     datasets: [
                                         {{range .Datasets}}
                                             {
@@ -654,13 +666,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 attributes: true,
                                 attributeFilter: ['class'],
                             });
-
-                            // Restore saved date range, default to 6 months
-                            const savedRange = localStorage.getItem('chartDateRange');
-                            if (savedRange !== null) {
-                                document.getElementById('dateRange').value = savedRange;
-                            }
-                            changeRange(parseInt(document.getElementById('dateRange').value));
 
                             function changeRange(rangeDays) {
                                 var allLabels = cardChart.data.labels;
