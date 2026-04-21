@@ -737,7 +737,7 @@
                         type: 'filter',
                         prefix: prefix,
                         value: prefix + candidate.value,
-                        label: prefix + candidate.value,
+                        label: prefix + (candidate.label || candidate.value),
                         icon: provider.icon
                     });
                 }
@@ -1440,7 +1440,7 @@
                     type: 'filter',
                     prefix: item._providerPrefix,
                     value: item._providerPrefix + cand.value,
-                    label: item._providerPrefix + cand.value,
+                    label: item._providerPrefix + (cand.label || cand.value),
                     icon: item.icon || 'filter'
                 });
                 locked = true;
