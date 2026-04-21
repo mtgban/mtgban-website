@@ -37,7 +37,7 @@ window.__BAN_GUIDE = {
             snippets: ['Ctrl+K', 'Cmd+K', '?', '>'],
             keywords: ['palette', 'keyboard', 'shortcut', 'command', 'help', 'search', 'open', 'ctrl k', 'cmd k', 'slash', 'modes', 'chips', 'filter builder'],
             content: {
-                description: '<p>The command palette provides fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or press <code>/</code> when no input field is focused.</p><p><strong>Modes</strong> (typed as prefixes into the palette input):</p><ul><li><code>?</code> - inline syntax help</li><li><code>&gt;</code> - navigate to a page or page view</li><li><code>saved:</code> - recall a saved search command</li></ul><p>For filter composition with guided autocomplete, see <strong>Filter Builder</strong>. For the full keyboard reference, see <strong>Cheatsheet</strong>.</p>',
+                description: '<p>The command palette provides fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or press <code>/</code> when no input field is focused.</p><p><strong>Modes</strong> (typed as prefixes into the palette input):</p><ul><li><code>?</code> - inline syntax help</li><li><code>&gt;</code> - navigate to a page or page view</li><li><code>saved:</code> - recall a saved search command</li></ul><p>Press <kbd>Shift+Delete</kbd> on a highlighted recent search or saved command to remove it instantly.</p><p>For filter composition with guided autocomplete, see <strong>Filter Builder</strong>. For the full keyboard reference, see <strong>Cheatsheet</strong>.</p>',
                 table: [],
                 examples: [
                     { query: '? rarity', desc: 'Look up rarity syntax' },
@@ -111,13 +111,14 @@ window.__BAN_GUIDE = {
             snippets: ['saved:'],
             keywords: ['saved', 'bookmark', 'favorite', 'command', 'recall', 'reuse', 'store', 'manage', 'delete', 'edit'],
             content: {
-                description: '<p>Any search query can be saved as a named command. Press <kbd>Ctrl+S</kbd> / <kbd>Cmd+S</kbd> while the palette is open, or select <strong>Save Current Search</strong> from the palette on a search results page. You\'ll be prompted to name the command.</p><p>Saved commands appear in the palette default view and can be filtered with the <code>saved:</code> prefix. Hover over a saved command to reveal a delete button.</p><p><strong>Editing:</strong> <kbd>Enter</kbd> runs a saved command directly. <kbd>Shift+Enter</kbd> restores its chips into the palette input so you can modify and re-run.</p>',
+                description: '<p>Any search query can be saved as a named command. Press <kbd>Ctrl+S</kbd> / <kbd>Cmd+S</kbd> while the palette is open, or select <strong>Save Current Search</strong> from the palette on a search results page. You\'ll be prompted to name the command.</p><p>Saved commands appear in the palette default view and can be filtered with the <code>saved:</code> prefix.</p><p><strong>Editing:</strong> <kbd>Enter</kbd> runs a saved command directly. <kbd>Shift+Enter</kbd> restores its chips into the palette input so you can modify and re-run.</p><p><strong>Deleting:</strong> highlight a saved command and press <kbd>Shift+Delete</kbd> to remove it instantly (no confirmation). You can also hover and click the trash icon for a confirmed deletion.</p>',
                 table: [
                     { value: 'Save Current Search', short: 'Palette command (appears on search results pages)' },
                     { value: 'Ctrl+S / Cmd+S', short: 'Save the current page search as a command (while palette is open)' },
                     { value: 'saved:', short: 'Browse saved commands in palette' },
                     { value: 'Enter on saved', short: 'Execute immediately' },
-                    { value: 'Shift+Enter on saved', short: 'Restore chips for editing' }
+                    { value: 'Shift+Enter on saved', short: 'Restore chips for editing' },
+                    { value: 'Shift+Delete on saved', short: 'Delete without confirmation' }
                 ],
                 examples: [
                     { query: 'saved:fetchlands', desc: 'Run the "fetchlands" saved search' },
@@ -162,6 +163,7 @@ window.__BAN_GUIDE = {
                     { value: '↑  /  ↓', short: 'Navigate dropdown' },
                     { value: 'Enter', short: 'Execute composed query / navigate / copy snippet' },
                     { value: 'Shift+Enter', short: 'Alt action (see context)' },
+                    { value: 'Shift+Delete', short: 'Remove active recent search or saved command' },
                     { value: 'Ctrl+S / Cmd+S', short: 'Save current query as a named command' },
                     { value: '?  (or help: / syntax:)', short: 'Help mode - inline syntax lookup' },
                     { value: '>', short: 'Navigation mode - pages and sub-views' },
