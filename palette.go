@@ -236,18 +236,18 @@ func paletteNewspaperTargetsJSON() template.JS {
 		if p.Option == "" || p.Option == "options" {
 			continue
 		}
-		group := "Archive"
+		group := "Other"
 		switch {
 		case strings.Contains(p.Option, "spike"):
 			group = "Spike Analysis"
 		case strings.Contains(p.Option, "listings"):
 			group = "Inventory Trends"
-		case strings.Contains(p.Option, "sellers"):
-			group = "Inventory Trends"
-		case strings.Contains(p.Option, "ck_buy") || strings.Contains(p.Option, "buylist"):
+		case strings.Contains(p.Option, "buylist") || strings.Contains(p.Option, "ck_buy"):
 			group = "Buylist Levels"
-		case p.Option == "syp" || p.Option == "old" || p.Option == "forecasting":
-			group = "Other"
+		case strings.Contains(p.Option, "stock"):
+			group = "Stock Movement"
+		case p.Option == "ensemble_forecast" || p.Option == "review":
+			group = "Analysis"
 		}
 		out = append(out, PaletteNavTarget{
 			Value: p.Option,
@@ -255,6 +255,17 @@ func paletteNewspaperTargetsJSON() template.JS {
 			Group: group,
 		})
 	}
+	// Include Newspaper SubPages from the nav tree that aren't in NewspaperPages
+	out = append(out, PaletteNavTarget{
+		Value: "old",
+		Label: "Archive",
+		Group: "Other",
+	})
+	out = append(out, PaletteNavTarget{
+		Value: "syp",
+		Label: "TCG Syp List",
+		Group: "Other",
+	})
 	data, _ := json.Marshal(out)
 	return template.JS(data)
 }
@@ -296,7 +307,7 @@ func paletteArbitTargetsJSON(variant string) template.JS {
 		if variant == "reverse" && cfg.ArbitOnly {
 			continue
 		}
-		if variant == "global" && !cfg.GlobalOnly && cfg.ArbitOnly {
+		if variant == "global" && cfg.ArbitOnly {
 			continue
 		}
 		out.Filters = append(out.Filters, PaletteNavTarget{
