@@ -320,15 +320,53 @@
 .guide-nav-category.hidden-by-filter { display: none; }
 .guide-category-divider.hidden-by-filter { display: none; }
 
-/* Overview / walkthrough sections — more generous line-height and spacing */
-.guide-section[id="palette-overview"] .guide-section-desc,
-.guide-section[id="palette-walkthroughs"] .guide-section-desc {
-    line-height: 1.75;
+/* Examples header — visual separator between prose and concrete demos */
+.guide-examples-heading {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--greytext, #888);
+    margin: 1.25em 0 0.5em;
+    padding-top: 0.75em;
+    border-top: 1px solid var(--border-subtle, rgba(0,0,0,0.06));
 }
-.guide-section[id="palette-walkthroughs"] .guide-section-desc strong {
-    display: inline-block;
-    margin-top: 0.75em;
+
+/* Walkthrough scenarios — semantic replacement for <br><br><strong> blocks */
+.guide-walkthrough {
+    margin: 1em 0;
+}
+.guide-walkthrough h4 {
+    font-size: 0.92rem;
+    font-weight: 600;
     color: var(--headingtext, #17375e);
+    margin: 0 0 0.4em;
+}
+.guide-walkthrough ol {
+    margin: 0;
+    padding-left: 1.4em;
+    line-height: 1.65;
+}
+.guide-walkthrough ol li {
+    margin-bottom: 0.2em;
+}
+
+/* Table divider rows — visual grouping within cheatsheet tables */
+.guide-table tr.guide-table-divider td {
+    padding: 0;
+    border-bottom: 1px solid var(--border-moderate, rgba(0,0,0,0.12));
+    background: transparent;
+}
+.guide-table tr.guide-table-divider:hover td {
+    background: transparent;
+}
+
+/* Paragraph spacing inside section descriptions */
+.guide-section-desc p {
+    margin: 0 0 0.75em;
+}
+.guide-section-desc p:last-child {
+    margin-bottom: 0;
 }
 
 /* ── Responsive ── */
