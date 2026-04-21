@@ -343,8 +343,10 @@
         ];
 
         // Conditionally add "Save Current Search"
+        var hasComposed = chips && chips.count() > 0 && chips.composedQuery();
         var searchInput = document.getElementById('searchbox');
-        if (searchInput && searchInput.value && searchInput.value.trim()) {
+        var hasSearchbox = searchInput && searchInput.value && searchInput.value.trim();
+        if (hasComposed || hasSearchbox) {
             commands.push({
                 name: 'Save Current Search',
                 icon: 'bookmark-plus',
@@ -651,13 +653,18 @@
             }
         } else {
             // Always offer direct search with full query (supports syntax like s:3ED)
-            if (query) {
+            var composedValue = chips ? chips.composedQuery() : query;
+            if (composedValue) {
                 items.push({
                     type: 'search',
-                    title: 'Search: ' + query,
+                    title: 'Search: ' + composedValue,
                     subtitle: 'Run full search with syntax support',
                     icon: 'search',
-                    action: function(q) { return function() { recordRecentSearch(q); window.location.href = '/search?q=' + encodeURIComponent(q); }; }(query)
+                    action: function() {
+                        var q = chips ? chips.composedQuery() : composedValue;
+                        recordRecentSearch(q);
+                        window.location.href = '/search?q=' + encodeURIComponent(q);
+                    }
                 });
             }
 
@@ -728,8 +735,15 @@
     function showSaveRow() {
         removeSaveRow();
 
-        var searchInput = document.getElementById('searchbox');
-        if (!searchInput || !searchInput.value || !searchInput.value.trim()) {
+        var queryToSave;
+        if (chips && chips.count() > 0) {
+            queryToSave = chips.composedQuery();
+        } else {
+            // V1 behavior: fall back to page searchbox value
+            var searchInput = document.getElementById('searchbox');
+            queryToSave = searchInput ? searchInput.value.trim() : '';
+        }
+        if (!queryToSave) {
             showToast('No search to save');
             return;
         }
@@ -782,10 +796,10 @@
                     showToast('Please enter a name');
                     return;
                 }
-                var conflict = saveCommand(name, searchInput.value.trim(), false);
+                var conflict = saveCommand(name, queryToSave, false);
                 if (conflict) {
                     // Show confirmation prompt in the save row
-                    pendingConflict = { name: name, query: searchInput.value.trim() };
+                    pendingConflict = { name: name, query: queryToSave };
                     label.textContent = '"' + name + '" exists with: ' + conflict.existing.query + ' — Overwrite?';
                     saveInput.value = '';
                     saveInput.placeholder = 'y / n';
