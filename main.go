@@ -737,6 +737,7 @@ func loadDatastore(ds string) error {
 	go updateStaticData()
 	go cacheNewspaper()
 	ServerNotify("init", "Datastore installed")
+	go buildPaletteSetsCache()
 
 	return nil
 }
