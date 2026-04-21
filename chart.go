@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -156,14 +157,6 @@ func stashInTimeseries() {
 		return row
 	}
 
-	// parseFoil strips the _f suffix and returns the clean UUID + foil flag
-	parseFoil := func(id string) (string, bool) {
-		if strings.HasSuffix(id, "_f") {
-			return strings.TrimSuffix(id, "_f"), true
-		}
-		return id, false
-	}
-
 	// Collect retail prices from sellers
 	for _, seller := range Sellers {
 		for _, config := range Config.TimeseriesConfig.Datasets {
@@ -177,6 +170,7 @@ func stashInTimeseries() {
 			for id, entries := range seller.Inventory() {
 				price := entries[0].Price * defaultGradeMap[entries[0].Conditions]
 
+				// Check if there is a specific price entry
 				realRetail, found := entries[0].CustomFields["RetailPrice"]
 				if entries[0].Conditions != "NM" && found {
 					price, _ = strconv.ParseFloat(realRetail, 64)
@@ -186,8 +180,13 @@ func stashInTimeseries() {
 					continue
 				}
 
-				uuid, isFoil := parseFoil(id)
-				row := getRow(uuid, isFoil, date)
+				card, err := mtgmatcher.GetUUID(id)
+				if err != nil {
+					log.Println("Error getting card for", id, err)
+					continue
+				}
+
+				row := getRow(card.UUID, card.Foil, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
@@ -209,8 +208,13 @@ func stashInTimeseries() {
 					continue
 				}
 
-				uuid, isFoil := parseFoil(id)
-				row := getRow(uuid, isFoil, date)
+				card, err := mtgmatcher.GetUUID(id)
+				if err != nil {
+					log.Println("Error getting card for", id, err)
+					continue
+				}
+
+				row := getRow(card.UUID, card.Foil, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
