@@ -54,6 +54,13 @@
     var cardMetaCache = {}; // { [name]: response }
     var cardMetaInflight = {};
 
+    // Re-render dropdown when provider data (sets/stores) finishes loading
+    if (window.__palette_providers && typeof window.__palette_providers.setOnDataReady === 'function') {
+        window.__palette_providers.setOnDataReady(function () {
+            if (isOpen && typeof handleInput === 'function') handleInput();
+        });
+    }
+
     function fetchCardMeta(name) {
         if (!name) return Promise.resolve(null);
         if (cardMetaCache[name]) return Promise.resolve(cardMetaCache[name]);
@@ -615,12 +622,17 @@
     }
 
     // ── Provider-mode rendering ──────────────────────────────────────
+    var PROVIDER_DROPDOWN_CAP = 30;
+
     function renderProviderResults(prefix, provider, query) {
         var ctx = {
             chips: chips ? chips.all() : [],
             cardMeta: activeCardMeta()
         };
         var candidates = provider.getCandidates(query, ctx) || [];
+        if (candidates.length > PROVIDER_DROPDOWN_CAP) {
+            candidates = candidates.slice(0, PROVIDER_DROPDOWN_CAP);
+        }
         var items = [];
 
         // Group candidates by their `group` field, if any

@@ -11,6 +11,9 @@
 
     var providers = {};
 
+    var onDataReady = null;
+    function setOnDataReady(cb) { onDataReady = cb; }
+
     function register(p) {
         if (!p || !p.prefix) return;
         providers[p.prefix.toLowerCase()] = p;
@@ -343,11 +346,13 @@
             .then(function (data) {
                 setsCache = data || [];
                 setsCacheFetching = null;
+                if (typeof onDataReady === 'function') onDataReady();
                 return setsCache;
             })
             .catch(function () {
                 setsCache = [];
                 setsCacheFetching = null;
+                if (typeof onDataReady === 'function') onDataReady();
                 return setsCache;
             });
         return setsCacheFetching;
@@ -406,11 +411,13 @@
             .then(function (data) {
                 storesCache = data || { sellers: [], vendors: [] };
                 storesCacheFetching = null;
+                if (typeof onDataReady === 'function') onDataReady();
                 return storesCache;
             })
             .catch(function () {
                 storesCache = { sellers: [], vendors: [] };
                 storesCacheFetching = null;
+                if (typeof onDataReady === 'function') onDataReady();
                 return storesCache;
             });
         return storesCacheFetching;
@@ -493,6 +500,7 @@
         detectPrefix: detectPrefix,
         getProvider: getProvider,
         filterEntries: filterEntries,
+        setOnDataReady: setOnDataReady,
         _all: providers
     };
 })();
