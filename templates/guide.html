@@ -21,7 +21,7 @@
 
     <main class="guide-main" id="guide-main">
         <div class="guide-hero">
-            <h1>MTGBAN Guide</h1>
+            <h1>MTG<span class="ban">BAN</span> Guide</h1>
             <p class="guide-hero-sub">Search syntax, tools, and power user tips</p>
             <div class="guide-hero-shortcut">
                 Press <kbd>Ctrl+K</kbd> or <kbd>Cmd+K</kbd> to open the command palette from any page
@@ -136,6 +136,10 @@
                 html += '<tbody>';
                 for (var t = 0; t < item.content.table.length; t++) {
                     var row = item.content.table[t];
+                    if (row.value === '—') {
+                        html += '<tr class="guide-table-divider"><td colspan="2"></td></tr>';
+                        continue;
+                    }
                     html += '<tr><td><code>' + escapeHtml(row.value) + '</code></td>';
                     html += '<td>' + escapeHtml(row.short) + '</td></tr>';
                 }
@@ -144,6 +148,7 @@
 
             // Examples
             if (item.content && item.content.examples && item.content.examples.length > 0) {
+                html += '<h4 class="guide-examples-heading">Examples</h4>';
                 html += '<div class="guide-examples">';
                 for (var e = 0; e < item.content.examples.length; e++) {
                     var ex = item.content.examples[e];
