@@ -88,7 +88,7 @@ window.__BAN_GUIDE = {
             snippets: ['>newspaper', '>arbit', '>sleepers'],
             keywords: ['navigate', 'sub-view', 'multi-stage', 'newspaper view', 'sleepers mode', 'arbit filter'],
             content: {
-                description: 'The <code>&gt;</code> navigation mode supports page sub-views. After typing <code>&gt;</code> and a page name, press <kbd>Tab</kbd> to lock that page as a chip — the dropdown then shows that page\'s specific views (Newspaper: Spike Score, Buylist Levels, Archive; Sleepers: Bulk, Reprint, Mismatch, Gap, Hotlist; Arbitrage: filter presets and sort orders).<br><br>For Arbitrage pages, you can lock multiple filter chips in sequence — each Tab adds another filter to the composed URL. Press Enter on a sub-view to navigate, or Enter with only a parent chip to go to the page\'s base URL.',
+                description: '<p>The <code>&gt;</code> navigation mode supports page sub-views. After typing <code>&gt;</code> and a page name, press <kbd>Tab</kbd> to lock that page as a chip — the dropdown then shows that page\'s specific views (Newspaper: Spike Score, Buylist Levels, Archive; Sleepers: Bulk, Reprint, Mismatch, Gap, Hotlist; Arbitrage: filter presets and sort orders).</p><p>For Arbitrage pages, you can lock multiple filter chips in sequence — each Tab adds another filter to the composed URL. Press Enter on a sub-view to navigate, or Enter with only a parent chip to go to the page\'s base URL.</p>',
                 table: [
                     { value: '>newspaper + Tab', short: 'Shows all Newspaper views' },
                     { value: '>sleepers + Tab', short: 'Shows the 5 analysis modes' },
@@ -198,7 +198,7 @@ window.__BAN_GUIDE = {
             snippets: ['name|set|number|finish', 'Sol Ring*', 'Sheoldred (Showcase)', 'r:rare,mythic'],
             keywords: ['basic', 'name', 'pricefall', 'notation', 'suffix', 'foil', 'nonfoil', 'etched', 'altfoil', 'finish', 'comma', 'multiple', 'syntax', 'search'],
             content: {
-                description: 'Start typing a card name and an autocomplete dropdown will appear. You can also use the Pricefall bot notation: <code>name[|code[|number[|finish]]]</code>.<br><br>Human-readable tags are also supported — for example, appending <code>(Extended Art)</code> or <code>(Showcase)</code> to a card name will filter to those versions (does not work in regexp mode).<br><br>Use commas to supply multiple values for any filter. Finish suffixes can be appended directly to any search term:',
+                description: '<p>Start typing a card name and an autocomplete dropdown will appear. You can also use the Pricefall bot notation: <code>name[|code[|number[|finish]]]</code>.</p><p>Human-readable tags are also supported — for example, appending <code>(Extended Art)</code> or <code>(Showcase)</code> to a card name will filter to those versions (does not work in regexp mode).</p><p>Use commas to supply multiple values for any filter. Finish suffixes can be appended directly to any search term:</p>',
                 table: [
                     { value: '&', short: 'Non-foil only' },
                     { value: '*', short: 'Foil only' },
@@ -223,7 +223,7 @@ window.__BAN_GUIDE = {
             snippets: ['s:CODE', 's:"Set Name"', 'se:REGEXP', 'e:CODE'],
             keywords: ['edition', 'set', 'expansion', 'code', 'name', 'scryfall', 'e:', 's:', 'se:', 'regex', 'regexp', 'filter'],
             content: {
-                description: 'Filter cards by edition using the Scryfall notation <code>s:CODE</code> or the full edition name in quotes: <code>s:"Aether Revolt"</code>.<br><br>Regular expressions are supported with <code>se:REGEXP</code>. For compatibility, <code>e:CODE</code> (exact match) and <code>ee:REGEXP</code> (regexp) are also accepted.',
+                description: '<p>Filter cards by edition using the Scryfall notation <code>s:CODE</code> or the full edition name in quotes: <code>s:"Aether Revolt"</code>.</p><p>Regular expressions are supported with <code>se:REGEXP</code>. For compatibility, <code>e:CODE</code> (exact match) and <code>ee:REGEXP</code> (regexp) are also accepted.</p>',
                 table: [
                     { value: 's:CODE', short: 'Set by code (e.g. s:MKM)' },
                     { value: 's:"Name"', short: 'Set by full name' },
@@ -248,7 +248,7 @@ window.__BAN_GUIDE = {
             snippets: ['cn:123', 'cn:1-50', 'cn>300', 'cn:CODE:42', 'cne:REGEXP'],
             keywords: ['collector', 'number', 'cn', 'cne', 'range', 'comparison', 'regex', 'regexp', '#', 'card number'],
             content: {
-                description: 'Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.<br><br>Regular expressions are supported via <code>cne:REGEXP</code>.<br><br>To target a specific set while leaving other results untouched, prepend the set code: <code>cn:CODE:NUMBER</code>.',
+                description: '<p>Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.</p><p>Regular expressions are supported via <code>cne:REGEXP</code>.</p><p>To target a specific set while leaving other results untouched, prepend the set code: <code>cn:CODE:NUMBER</code>.</p>',
                 table: [
                     { value: 'cn:NUMBER', short: 'Exact collector number' },
                     { value: 'cn:N-N', short: 'Range of collector numbers' },
@@ -274,7 +274,7 @@ window.__BAN_GUIDE = {
             snippets: ['f:foil', 'f:etched', 'f:nonfoil', 'is:altfoil', 'Lightning Bolt*'],
             keywords: ['finish', 'foil', 'etched', 'nonfoil', 'altfoil', 'surge', 'ripple', 'galaxy', 'treatment', 'f:', 'is:altfoil'],
             content: {
-                description: 'Filter by finish with <code>f:VALUE</code>. Accepted values are <code>nonfoil</code>, <code>foil</code>, and <code>etched</code>, with shorthand <code>nf</code>, <code>f</code>, and <code>e</code>.<br><br>For special foil variants (Galaxy, Surge, Ripple, etc.) use <code>is:altfoil</code> as an additional filter.<br><br>Alternatively, use suffix notation directly on any query:',
+                description: '<p>Filter by finish with <code>f:VALUE</code>. Accepted values are <code>nonfoil</code>, <code>foil</code>, and <code>etched</code>, with shorthand <code>nf</code>, <code>f</code>, and <code>e</code>.</p><p>For special foil variants (Galaxy, Surge, Ripple, etc.) use <code>is:altfoil</code> as an additional filter.</p><p>Alternatively, use suffix notation directly on any query:</p>',
                 table: [
                     { value: '&', short: 'Non-foil only' },
                     { value: '*', short: 'Foil only' },
@@ -299,7 +299,7 @@ window.__BAN_GUIDE = {
             snippets: ['c:WUBRG', 'ci:esper', 'c:azorius', 'c:colorless', 'c:multicolor'],
             keywords: ['color', 'colour', 'identity', 'ci', 'c:', 'WUBRG', 'white', 'blue', 'black', 'red', 'green', 'colorless', 'multicolor', 'guild', 'shard', 'wedge', 'college', 'azorius', 'dimir', 'rakdos', 'gruul', 'selesnya', 'orzhov', 'izzet', 'golgari', 'boros', 'simic', 'bant', 'esper', 'grixis', 'jund', 'naya', 'abzan', 'jeskai', 'sultai', 'mardu', 'temur'],
             content: {
-                description: 'Filter by color with <code>c:COLOR</code> and color identity with <code>ci:COLOR</code>. Use standard WUBRG letters, full color names, <code>C</code> for colorless, or <code>M</code> for multicolor.<br><br>Named groups are also supported:<br><strong>Guilds (2-color):</strong> azorius, dimir, rakdos, gruul, selesnya, orzhov, izzet, golgari, boros, simic<br><strong>Shards/Wedges (3-color):</strong> bant, esper, grixis, jund, naya, abzan, jeskai, sultai, mardu, temur<br><strong>Colleges (Strixhaven):</strong> silverquill, prismari, witherbloom, lorehold, quandrix<br><strong>Four-color:</strong> chaos, aggression, altruism, growth, artifice',
+                description: '<p>Filter by color with <code>c:COLOR</code> and color identity with <code>ci:COLOR</code>. Use standard WUBRG letters, full color names, <code>C</code> for colorless, or <code>M</code> for multicolor.</p><p>Named groups are also supported:<br><strong>Guilds (2-color):</strong> azorius, dimir, rakdos, gruul, selesnya, orzhov, izzet, golgari, boros, simic<br><strong>Shards/Wedges (3-color):</strong> bant, esper, grixis, jund, naya, abzan, jeskai, sultai, mardu, temur<br><strong>Colleges (Strixhaven):</strong> silverquill, prismari, witherbloom, lorehold, quandrix<br><strong>Four-color:</strong> chaos, aggression, altruism, growth, artifice</p>',
                 table: [
                     { value: 'c:COLOR', short: 'Filter by card color' },
                     { value: 'ci:COLOR', short: 'Filter by color identity' },
@@ -505,7 +505,7 @@ window.__BAN_GUIDE = {
             snippets: ['price>10', 'price<5', 'buy_price>5', 'ratio>50', 'price>TCGLow', 'arb_price', 'rev_price'],
             keywords: ['price', 'buy_price', 'arb_price', 'rev_price', 'ratio', 'cost', 'value', 'retail', 'buylist', 'TCGLow', 'filter', 'comparison', 'desirability'],
             content: {
-                description: 'Filter by retail price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code>. Use <code>buy_price</code> to filter buylist prices. Filters can also reference a store\'s price — <code>price&gt;TCGLow</code> returns stores charging more than the TCG Low index for that card.<br><br>For cross-category comparisons: <code>arb_price</code> uses buylist price as a reference for retail results, and <code>rev_price</code> uses retail price as a reference for buylist results.<br><br><code>ratio&gt;VALUE</code> filters by buylist desirability percentage (max 64).',
+                description: '<p>Filter by retail price with <code>price&gt;VALUE</code> or <code>price&lt;VALUE</code>. Use <code>buy_price</code> to filter buylist prices. Filters can also reference a store\'s price — <code>price&gt;TCGLow</code> returns stores charging more than the TCG Low index for that card.</p><p>For cross-category comparisons: <code>arb_price</code> uses buylist price as a reference for retail results, and <code>rev_price</code> uses retail price as a reference for buylist results.</p><p><code>ratio&gt;VALUE</code> filters by buylist desirability percentage (max 64).</p>',
                 table: [
                     { value: 'price', short: 'Retail price filter' },
                     { value: 'buy_price', short: 'Buylist price filter' },
@@ -531,7 +531,7 @@ window.__BAN_GUIDE = {
             snippets: ['store:TCG', 'store:only:CK', 'vendor:CK', 'seller:SCG', 'region:eu', 'skip:index', 'skip:retail'],
             keywords: ['store', 'vendor', 'seller', 'region', 'skip', 'only', 'CK', 'TCG', 'SCG', 'MKM', 'us', 'eu', 'jp', 'index', 'retail', 'buylist', 'empty', 'filter'],
             content: {
-                description: 'Filter by seller or vendor with <code>store:shorthand</code>, <code>seller:shorthand</code> (retail), or <code>vendor:shorthand</code> (buylist). These drop results where the store is absent. To show only that store, use <code>store:only:shorthand</code>.<br><br>Filter by region with <code>region:us</code>, <code>region:eu</code>, or <code>region:jp</code>.<br><br>The <code>skip:</code> filter hides entire result categories. Note: store filters leave index results visible — use <code>skip:index</code> to hide them.',
+                description: '<p>Filter by seller or vendor with <code>store:shorthand</code>, <code>seller:shorthand</code> (retail), or <code>vendor:shorthand</code> (buylist). These drop results where the store is absent. To show only that store, use <code>store:only:shorthand</code>.</p><p>Filter by region with <code>region:us</code>, <code>region:eu</code>, or <code>region:jp</code>.</p><p>The <code>skip:</code> filter hides entire result categories. Note: store filters leave index results visible — use <code>skip:index</code> to hide them.</p>',
                 table: [
                     { value: 'store:X', short: 'Include results from store X' },
                     { value: 'store:only:X', short: 'Show only results from store X' },
@@ -562,7 +562,7 @@ window.__BAN_GUIDE = {
             snippets: ['sm:exact', 'sm:prefix', 'sm:any', 'sm:regexp', 'sm:scryfall'],
             keywords: ['mode', 'sm:', 'exact', 'prefix', 'any', 'regexp', 'regex', 'scryfall', 'match', 'contains', 'starts', 'pattern', 'forward'],
             content: {
-                description: 'Change search matching behavior with <code>sm:VALUE</code>. The default mode is <code>exact</code> — only cards with that precise name are returned.<br><br>In <code>scryfall</code> mode, the query is forwarded to Scryfall. BAN card filters are disabled to avoid conflicts, but store and price filters still apply.',
+                description: '<p>Change search matching behavior with <code>sm:VALUE</code>. The default mode is <code>exact</code> — only cards with that precise name are returned.</p><p>In <code>scryfall</code> mode, the query is forwarded to Scryfall. BAN card filters are disabled to avoid conflicts, but store and price filters still apply.</p>',
                 table: [
                     { value: 'exact', short: 'Exact name match (default)' },
                     { value: 'prefix', short: 'Names starting with search term' },
@@ -638,7 +638,7 @@ window.__BAN_GUIDE = {
             snippets: ['name:"Lightning Bolt"', '-name:"Sol Ring"', 'namee:^The', 'id:12345'],
             keywords: ['name', 'namee', 'id', 'include', 'exclude', 'filter', 'specific', 'regex', 'regexp', 'MTGBAN', 'MTGJSON', 'scryfall', 'TCGplayer', 'product ID'],
             content: {
-                description: 'Filter by card name to include or exclude specific cards from a query using <code>name:NAME</code>. Enclose names with spaces in quotes or parentheses. Prefix with <code>-</code> to exclude.<br><br>Regular expressions are supported with <code>namee:REGEXP</code>.<br><br>Filter by internal card ID with <code>id:VALUE</code>, supporting MTGBAN, MTGJSON, Scryfall, and TCGplayer product IDs.',
+                description: '<p>Filter by card name to include or exclude specific cards from a query using <code>name:NAME</code>. Enclose names with spaces in quotes or parentheses. Prefix with <code>-</code> to exclude.</p><p>Regular expressions are supported with <code>namee:REGEXP</code>.</p><p>Filter by internal card ID with <code>id:VALUE</code>, supporting MTGBAN, MTGJSON, Scryfall, and TCGplayer product IDs.</p>',
                 table: [
                     { value: 'name:"X"', short: 'Include only cards named X' },
                     { value: '-name:"X"', short: 'Exclude cards named X' },
@@ -665,7 +665,7 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['search', 'price', 'retail', 'buylist', 'chart', 'history', 'affiliate', 'store', 'sealed', 'product', 'condition', 'index'],
             content: {
-                description: 'The main search page lets you find prices across all tracked stores and vendors for both single cards and sealed products. Results are split by retail and buylist, with condition breakdowns and index prices from aggregators like TCGplayer.<br><br>Click the chart icon (📊) on any card to load historical price data from major vendors. Use affiliate links in results to support BAN while making purchases.',
+                description: '<p>The main search page lets you find prices across all tracked stores and vendors for both single cards and sealed products. Results are split by retail and buylist, with condition breakdowns and index prices from aggregators like TCGplayer.</p><p>Click the chart icon (📊) on any card to load historical price data from major vendors. Use affiliate links in results to support BAN while making purchases.</p>',
                 table: [],
                 examples: [
                     { query: 'Lightning Bolt s:lea', desc: 'Alpha Lightning Bolt prices' },
@@ -685,7 +685,7 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['newspaper', 'spike', 'score', 'buylist', 'change', 'trend', 'seller', 'count', 'SYP', 'archive', 'daily', 'movement', 'price change'],
             content: {
-                description: 'The Newspaper page tracks daily market movements. It shows Spike scores (sudden price increases), buylist changes (vendors adjusting what they pay), and seller count trends (supply going up or down).<br><br>The SYP (Save Your Points) section lists TCGplayer store credit opportunities. An archive lets you browse historical issues.',
+                description: '<p>The Newspaper page tracks daily market movements. It shows Spike scores (sudden price increases), buylist changes (vendors adjusting what they pay), and seller count trends (supply going up or down).</p><p>The SYP (Save Your Points) section lists TCGplayer store credit opportunities. An archive lets you browse historical issues.</p>',
                 table: [],
                 examples: [
                     { query: 'on:newspaper', desc: 'Cards currently in a Newspaper spike' },
@@ -720,7 +720,7 @@ window.__BAN_GUIDE = {
             snippets: [],
             keywords: ['upload', 'collection', 'CSV', 'excel', 'google sheets', 'moxfield', 'deckbox', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket'],
             content: {
-                description: 'Upload your collection in CSV, Excel, Google Sheets, Moxfield, or Deckbox format. BAN will match your cards against all active buylists and calculate the optimal split across vendors to maximize return.<br><br>Export results in formats compatible with Card Kingdom, StarCityGames, TCGplayer, and Cardmarket.',
+                description: '<p>Upload your collection in CSV, Excel, Google Sheets, Moxfield, or Deckbox format. BAN will match your cards against all active buylists and calculate the optimal split across vendors to maximize return.</p><p>Export results in formats compatible with Card Kingdom, StarCityGames, TCGplayer, and Cardmarket.</p>',
                 table: [],
                 examples: []
             }
