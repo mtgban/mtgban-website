@@ -17,6 +17,41 @@
     var cardNamesLoading = false;
     var chips = null;
 
+    // ── Card meta cache ──────────────────────────────────────────────
+    var cardMetaCache = {}; // { [name]: response }
+    var cardMetaInflight = {};
+
+    function fetchCardMeta(name) {
+        if (!name) return Promise.resolve(null);
+        if (cardMetaCache[name]) return Promise.resolve(cardMetaCache[name]);
+        if (cardMetaInflight[name]) return cardMetaInflight[name];
+        cardMetaInflight[name] = fetch('/api/palette/card/' + encodeURIComponent(name))
+            .then(function (r) { return r.ok ? r.json() : { found: false }; })
+            .then(function (data) {
+                cardMetaCache[name] = data;
+                delete cardMetaInflight[name];
+                // Re-run filter so dependent providers (s:, r:, c:) get narrowed results
+                if (typeof handleInput === 'function') handleInput();
+                return data;
+            })
+            .catch(function () {
+                delete cardMetaInflight[name];
+                return { found: false };
+            });
+        return cardMetaInflight[name];
+    }
+
+    function activeCardMeta() {
+        if (!chips) return null;
+        var list = chips.all();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].type === 'card') {
+                return cardMetaCache[list[i]._cardName || list[i].value] || null;
+            }
+        }
+        return null;
+    }
+
     // ── localStorage helpers ─────────────────────────────────────────
     var RECENT_KEY = 'mtgban_recent_searches';
     var SAVED_KEY = 'mtgban_saved_commands';
@@ -279,6 +314,8 @@
                     title: n.name,
                     subtitle: 'Navigate to ' + n.name,
                     icon: n.icon || 'compass',
+                    navName: n.name,
+                    navLink: n.link,
                     action: function(link) { return function() { window.location.href = link; }; }(n.link),
                     score: query ? scoreMatch(query, n.name, null) : 0
                 });
@@ -385,6 +422,7 @@
                     title: cardNames[i],
                     subtitle: 'Search for "' + cardNames[i] + '"',
                     icon: 'search',
+                    cardName: cardNames[i],
                     action: (function(name) { return function() { recordRecentSearch(name); window.location.href = '/search?q=' + encodeURIComponent(name); }; })(cardNames[i])
                 });
             }
@@ -503,6 +541,91 @@
         renderResults(items);
     }
 
+    // ── Provider-mode rendering ──────────────────────────────────────
+    function renderProviderResults(prefix, provider, query) {
+        var ctx = {
+            chips: chips ? chips.all() : [],
+            cardMeta: activeCardMeta()
+        };
+        var candidates = provider.getCandidates(query, ctx) || [];
+        var items = [];
+
+        // Group candidates by their `group` field, if any
+        var grouped = {};
+        var groupOrder = [];
+        var ungrouped = [];
+        for (var i = 0; i < candidates.length; i++) {
+            var c = candidates[i];
+            if (c.group) {
+                if (!grouped[c.group]) {
+                    grouped[c.group] = [];
+                    groupOrder.push(c.group);
+                }
+                grouped[c.group].push(c);
+            } else {
+                ungrouped.push(c);
+            }
+        }
+
+        if (groupOrder.length === 0) {
+            items.push({ type: 'header', title: provider.name });
+            for (var j = 0; j < ungrouped.length; j++) {
+                items.push(buildProviderItem(prefix, provider, ungrouped[j]));
+            }
+        } else {
+            for (var g = 0; g < groupOrder.length; g++) {
+                var groupName = groupOrder[g];
+                items.push({ type: 'header', title: provider.name + ' · ' + groupName });
+                var list = grouped[groupName];
+                for (var k = 0; k < list.length; k++) {
+                    items.push(buildProviderItem(prefix, provider, list[k]));
+                }
+            }
+            for (var u = 0; u < ungrouped.length; u++) {
+                if (u === 0) items.push({ type: 'header', title: provider.name });
+                items.push(buildProviderItem(prefix, provider, ungrouped[u]));
+            }
+        }
+
+        if (items.length === 0 || (items.length === 1 && items[0].type === 'header')) {
+            items = [{ type: 'header', title: provider.name + ' — no matches' }];
+        }
+
+        renderResults(items);
+    }
+
+    function buildProviderItem(prefix, provider, candidate) {
+        return {
+            type: 'filter-candidate',
+            title: candidate.label,
+            subtitle: candidate.sublabel || '',
+            icon: candidate.icon || provider.icon,
+            disabled: !!candidate.disabled,
+            _providerPrefix: prefix,
+            _providerCandidate: candidate,
+            action: function () {
+                if (candidate.disabled) return;
+                // Lock as filter chip AND execute (Enter behavior)
+                if (chips) {
+                    chips.add({
+                        type: 'filter',
+                        prefix: prefix,
+                        value: prefix + candidate.value,
+                        label: prefix + candidate.value,
+                        icon: provider.icon
+                    });
+                }
+                input.value = '';
+                // Execute composed query immediately
+                var q = chips ? chips.composedQuery() : '';
+                if (q) {
+                    recordRecentSearch(q);
+                    window.location.href = '/search?q=' + encodeURIComponent(q);
+                }
+            }
+        };
+    }
+
     // ── Render results ───────────────────────────────────────────────
     function renderResults(items) {
         resultItems = [];
@@ -518,7 +641,8 @@
             }
 
             var activeClass = idx === 0 ? ' active' : '';
-            html += '<div class="cp-result' + activeClass + '" role="option" data-index="' + idx + '">';
+            var disabledClass = item.disabled ? ' disabled' : '';
+            html += '<div class="cp-result' + activeClass + disabledClass + '" role="option" data-index="' + idx + '"' + (item.disabled ? ' aria-disabled="true"' : '') + '>';
             html += '<div class="cp-result-icon"><i data-lucide="' + escapeHtml(item.icon || 'search') + '"></i></div>';
             html += '<div class="cp-result-body">';
             html += '<div class="cp-result-title">' + escapeHtml(item.title) + '</div>';
@@ -569,6 +693,7 @@
                         deleteSavedCommand(savedId);
                         return;
                     }
+                    if (resultItems[index] && resultItems[index].disabled) return;
                     activeIndex = index;
                     executeResult(false);
                 });
@@ -593,6 +718,7 @@
     function executeResult(shiftKey) {
         if (activeIndex < 0 || activeIndex >= resultItems.length) return;
         var item = resultItems[activeIndex];
+        if (item.disabled) return;
         if (shiftKey && item.altAction) {
             item.altAction();
         } else if (item.action) {
@@ -603,6 +729,23 @@
     // ── Search dispatcher ────────────────────────────────────────────
     function handleInput() {
         var raw = input.value;
+
+        // Check for filter prefix first — takes precedence over card/nav/help modes
+        if (window.__palette_providers) {
+            var detected = window.__palette_providers.detectPrefix(raw);
+            if (detected && chips) {
+                var provider = window.__palette_providers.getProvider(detected.prefix);
+                if (provider) {
+                    // Clear mode indicator when in provider mode
+                    modeIndicator.textContent = '';
+                    modeIndicator.className = 'cp-mode-indicator';
+                    modeIndicator.removeAttribute('data-mode');
+                    renderProviderResults(detected.prefix, provider, detected.query);
+                    return;
+                }
+            }
+        }
+
         var mode = detectMode(raw);
         var query = stripPrefix(raw).trim();
 
@@ -986,6 +1129,54 @@
             e.preventDefault();
             showSaveRow();
             return;
+        }
+
+        // Tab — lock highlighted dropdown result as a chip (filter / card / nav)
+        if ((key === 'Tab' || code === 9) && !e.shiftKey
+            && activeIndex >= 0 && resultItems[activeIndex]
+            && !resultItems[activeIndex].disabled
+            && chips) {
+            var item = resultItems[activeIndex];
+            var locked = false;
+
+            if (item.type === 'filter-candidate' && item._providerPrefix && item._providerCandidate) {
+                var cand = item._providerCandidate;
+                chips.add({
+                    type: 'filter',
+                    prefix: item._providerPrefix,
+                    value: item._providerPrefix + cand.value,
+                    label: item._providerPrefix + cand.value,
+                    icon: item.icon || 'filter'
+                });
+                locked = true;
+            } else if (item.type === 'card' && item.cardName) {
+                chips.add({
+                    type: 'card',
+                    value: '"' + item.cardName + '"',
+                    label: item.cardName,
+                    icon: 'search',
+                    _cardName: item.cardName
+                });
+                fetchCardMeta(item.cardName);
+                locked = true;
+            } else if (item.type === 'nav' && item.navName) {
+                chips.add({
+                    type: 'nav',
+                    value: item.navLink || '',
+                    label: item.navName,
+                    icon: 'compass',
+                    navName: item.navName,
+                    navLink: item.navLink
+                });
+                locked = true;
+            }
+
+            if (locked) {
+                e.preventDefault();
+                input.value = '';
+                handleInput();
+                return;
+            }
         }
 
         // Focus trap — Tab cycles within palette
