@@ -13,21 +13,81 @@ window.__BAN_GUIDE = {
             icon: 'terminal',
             summary: 'Open the command palette with Ctrl+K / Cmd+K or / when no input is focused',
             snippets: ['Ctrl+K', 'Cmd+K', '?', '>'],
-            keywords: ['palette', 'keyboard', 'shortcut', 'command', 'help', 'search', 'open', 'ctrl k', 'cmd k', 'slash', 'modes'],
+            keywords: ['palette', 'keyboard', 'shortcut', 'command', 'help', 'search', 'open', 'ctrl k', 'cmd k', 'slash', 'modes', 'chips', 'filter builder'],
             content: {
-                description: 'The command palette gives you fast keyboard-driven access to search syntax help and site navigation. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or by pressing <code>/</code> when no input field is focused.<br><br>Once open, you can switch modes using prefixes:<br><code>?</code> — inline syntax help<br><code>&gt;</code> — navigate to a page<br><code>saved:</code> — recall a saved search command',
+                description: 'The command palette gives you fast keyboard-driven access to search syntax help, site navigation, and smart filter composition. Open it with <code>Ctrl+K</code> (Windows/Linux) or <code>Cmd+K</code> (Mac), or by pressing <code>/</code> when no input field is focused.<br><br><strong>Modes</strong> (typed as prefixes):<br><code>?</code> — inline syntax help<br><code>&gt;</code> — navigate to a page or page view<br><code>saved:</code> — recall a saved search command<br><br><strong>Chip-based query building:</strong> Type a card name, press <kbd>Tab</kbd> to lock it as a <em>chip</em>. Then type a filter prefix like <code>s:</code> and the dropdown narrows to only the sets that card appears in. Chain multiple filters by Tab-locking each one. Press <kbd>Enter</kbd> any time to execute.',
                 table: [
                     { value: 'Ctrl+K / Cmd+K', short: 'Toggle palette open/closed from anywhere' },
                     { value: '/', short: 'Open palette when no input is focused' },
                     { value: '?', short: 'Help mode — show inline syntax reference (also: help: syntax:)' },
-                    { value: '>', short: 'Navigation mode — jump to a site page' },
+                    { value: '>', short: 'Navigation mode — jump to a site page or sub-view' },
                     { value: 'saved:', short: 'Saved mode — access saved search commands' },
-                    { value: 'Shift+Enter', short: 'In help mode: navigate to full guide section' }
+                    { value: 'Tab', short: 'Lock the active dropdown result as a chip' },
+                    { value: '← / →', short: 'Navigate between chips' },
+                    { value: 'Backspace / Delete', short: 'Remove the active chip' },
+                    { value: 'Tab (on active chip)', short: 'Edit the chip — reopens its dropdown' },
+                    { value: 'Shift+Enter', short: 'In help mode: go to full guide section; on saved command: load chips for editing' }
                 ],
                 examples: [
-                    { query: '? rarity', desc: 'Show rarity syntax help inline' },
-                    { query: '>newspaper', desc: 'Navigate to the Newspaper page' },
-                    { query: 'saved:my list', desc: 'Run a saved search command' }
+                    { query: '? rarity', desc: 'Look up rarity syntax' },
+                    { query: '>newspaper', desc: 'Jump to Newspaper (Tab for sub-views)' },
+                    { query: 'Lightning Bolt', desc: 'Then Tab + type s: to narrow to its printings' }
+                ]
+            }
+        },
+
+        {
+            id: 'filter-builder',
+            category: 'Command Palette',
+            title: 'Filter Builder',
+            icon: 'sliders-horizontal',
+            summary: 'Compose search queries with guided, context-aware dropdowns',
+            snippets: ['Tab to lock', 's:', 'r:', 'c:', 'f:'],
+            keywords: ['filter', 'chip', 'builder', 'tab', 'autocomplete', 'narrow', 'guided', 'compose'],
+            content: {
+                description: 'The palette supports all search syntax prefixes as guided filter builders. Type a prefix and the dropdown shows matching options. For prefixes that accept multiple values (sets, rarities, colors, types, stores), locking a second chip of the same prefix merges with the existing one — e.g., <code>s:MKM</code> then <code>s:LEA</code> becomes <code>s:MKM,LEA</code>.<br><br><strong>Card-aware narrowing:</strong> When a card chip is present, subsequent filter dropdowns narrow their options to what\'s actually available for that card. For example, with a "Birds of Paradise" chip, <code>s:</code> only shows sets the card was printed in, and <code>c:</code> only shows green color combinations.',
+                table: [
+                    { value: 's: / e:', short: 'Set / edition codes' },
+                    { value: 'r:', short: 'Rarity (mythic, rare, uncommon, common, special, token, oversize)' },
+                    { value: 'c: / ci:', short: 'Color / color identity (WUBRG, guilds, shards, wedges, colleges)' },
+                    { value: 'f:', short: 'Finish (foil, nonfoil, etched)' },
+                    { value: 't:', short: 'Card type' },
+                    { value: 'cond: / condr: / condb:', short: 'Condition filter (NM, SP, MP, HP, PO)' },
+                    { value: 'is: / not:', short: 'Card properties and tags' },
+                    { value: 'store: / seller: / vendor:', short: 'Store shorthand' },
+                    { value: 'region:', short: 'us / eu / jp' },
+                    { value: 'skip:', short: 'Skip categories (retail, buylist, empty, index)' },
+                    { value: 'sort:', short: 'Sort order' },
+                    { value: 'sm:', short: 'Search mode' },
+                    { value: 'on:', short: 'Special lists (hotlist, tcgsyp, newspaper)' }
+                ],
+                examples: [
+                    { query: 'Birds of Paradise + Tab + s:', desc: 'Sets dropdown narrows to BoP printings' },
+                    { query: 'r:mythic + Tab + r: (pick rare)', desc: 'Merges to r:mythic,rare' },
+                    { query: 's:MKM + Tab + f:foil + Enter', desc: 'All foils in MKM' }
+                ]
+            }
+        },
+
+        {
+            id: 'nav-sub-views',
+            category: 'Command Palette',
+            title: 'Multi-Stage Navigation',
+            icon: 'list-tree',
+            summary: 'Navigate directly to specific page views without touching the mouse',
+            snippets: ['>newspaper', '>arbit', '>sleepers'],
+            keywords: ['navigate', 'sub-view', 'multi-stage', 'newspaper view', 'sleepers mode', 'arbit filter'],
+            content: {
+                description: 'The <code>&gt;</code> navigation mode supports page sub-views. After typing <code>&gt;</code> and a page name, press <kbd>Tab</kbd> to lock that page as a chip — the dropdown then shows that page\'s specific views (Newspaper: Spike Score, Buylist Levels, Archive; Sleepers: Bulk, Reprint, Mismatch, Gap, Hotlist; Arbitrage: filter presets and sort orders).<br><br>For Arbitrage pages, you can lock multiple filter chips in sequence — each Tab adds another filter to the composed URL. Press Enter on a sub-view to navigate, or Enter with only a parent chip to go to the page\'s base URL.',
+                table: [
+                    { value: '>newspaper + Tab', short: 'Shows all Newspaper views' },
+                    { value: '>sleepers + Tab', short: 'Shows the 5 analysis modes' },
+                    { value: '>arbit + Tab', short: 'Shows sort options + filter presets' },
+                    { value: 'Enter on parent chip only', short: 'Navigates to base URL' }
+                ],
+                examples: [
+                    { query: '>newspaper + Tab + "Archive"', desc: 'Goes to /newspaper?page=old' },
+                    { query: '>arbit + Tab + "Yield+" + Tab + "Bucks+" + Enter', desc: '/arbit?nolow=true&nopenny=true' }
                 ]
             }
         },
@@ -37,15 +97,17 @@ window.__BAN_GUIDE = {
             category: 'Command Palette',
             title: 'Saved Commands',
             icon: 'bookmark',
-            summary: 'Save, manage, and reuse your most-used search queries from the palette.',
+            summary: 'Save and reuse your frequent searches, with chip round-trip editing',
             snippets: ['saved:'],
-            keywords: ['saved', 'bookmark', 'favorite', 'command', 'recall', 'reuse', 'store', 'manage', 'delete'],
+            keywords: ['saved', 'bookmark', 'favorite', 'command', 'recall', 'reuse', 'store', 'manage', 'delete', 'edit'],
             content: {
-                description: 'Any search query can be saved as a named command for quick reuse. On a search results page, open the palette and select <strong>Save Current Search</strong>, or press <code>Ctrl+S</code> / <code>Cmd+S</code> while the palette is open. You will be prompted to name the command.<br><br>Saved commands appear in the palette by default and can be filtered with the <code>saved:</code> prefix. Hover over a saved command to reveal a delete button.',
+                description: 'Any search query can be saved as a named command for quick reuse. On a search results page, open the palette and select <strong>Save Current Search</strong>, or press <code>Ctrl+S</code> / <code>Cmd+S</code> while the palette is open. You will be prompted to name the command.<br><br><strong>Chip round-trip:</strong> Saved commands remember their chip structure. Press <kbd>Enter</kbd> on a saved command to execute it directly, or <kbd>Shift+Enter</kbd> to restore its chips into the palette input for editing before running.<br><br>Saved commands appear in the palette by default and can be filtered with the <code>saved:</code> prefix. Hover over a saved command to reveal a delete button.',
                 table: [
                     { value: 'Save Current Search', short: 'Palette command (appears on search results pages)' },
                     { value: 'Ctrl+S / Cmd+S', short: 'Save the current page search as a command (while palette is open)' },
-                    { value: 'saved:', short: 'Browse saved commands in palette' }
+                    { value: 'saved:', short: 'Browse saved commands in palette' },
+                    { value: 'Enter on saved', short: 'Execute immediately' },
+                    { value: 'Shift+Enter on saved', short: 'Restore chips for editing' }
                 ],
                 examples: [
                     { query: 'saved:fetchlands', desc: 'Run the "fetchlands" saved search' },
