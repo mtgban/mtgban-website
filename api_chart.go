@@ -41,10 +41,8 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	sig := r.FormValue("sig")
 	userTier := GetParamFromSig(sig, "UserTier")
 
-	isFoil := strings.HasSuffix(uuid, "_f")
-	cleanId := strings.TrimSuffix(uuid, "_f")
 	lb := lookbackForTier(userTier)
-	earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), cleanId, isFoil, lb)
+	earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, lb)
 
 	axisLabels := getDateAxisValues(earliest)
 	datasets := getDatasets(uuid, co.Sealed, axisLabels, userTier)
