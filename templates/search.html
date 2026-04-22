@@ -1106,24 +1106,30 @@ Sims are not required for pre-constructed decks and other products where the sam
         <h3>Stores</h3>
     </div>
     <div class="settings-section-body">
-        <p style="margin:0 0 0.5em;font-size:0.85em;opacity:0.7;">Check stores you want to <strong>hide</strong> from results.</p>
-        <h4>Retail</h4>
-        <div class="settings-grid" id="settings-search-sellers" data-cookie="SearchSellersList">
-            {{range $key := .SellerKeys}}
-            <label>
-                <input type="checkbox" name="{{$key}}">
-                {{scraper_name $key}}{{if (contains $key "Sealed")}} <span style="font-size:0.8em;opacity:0.6;">(Sealed)</span>{{end}}
-            </label>
-            {{end}}
-        </div>
-        <h4 style="margin-top:0.75em;">Buylist</h4>
-        <div class="settings-grid" id="settings-search-vendors" data-cookie="SearchVendorsList">
-            {{range $key := .VendorKeys}}
-            <label>
-                <input type="checkbox" name="{{$key}}">
-                {{scraper_name $key}}{{if (contains $key "Sealed")}} <span style="font-size:0.8em;opacity:0.6;">(Sealed)</span>{{end}}
-            </label>
-            {{end}}
+        <p class="section-desc">Check stores you want to <strong>hide</strong> from results.</p>
+        <div class="settings-vendor-columns">
+            <div>
+                <h4>Retail</h4>
+                <div class="settings-grid" id="settings-search-sellers" data-cookie="SearchSellersList">
+                    {{range $key := .SellerKeys}}
+                    <label>
+                        <input type="checkbox" name="{{$key}}">
+                        {{scraper_name $key}}{{if (contains $key "Sealed")}} <span style="font-size:0.8em;opacity:0.6;">(Sealed)</span>{{end}}
+                    </label>
+                    {{end}}
+                </div>
+            </div>
+            <div>
+                <h4>Buylist</h4>
+                <div class="settings-grid" id="settings-search-vendors" data-cookie="SearchVendorsList">
+                    {{range $key := .VendorKeys}}
+                    <label>
+                        <input type="checkbox" name="{{$key}}">
+                        {{scraper_name $key}}{{if (contains $key "Sealed")}} <span style="font-size:0.8em;opacity:0.6;">(Sealed)</span>{{end}}
+                    </label>
+                    {{end}}
+                </div>
+            </div>
         </div>
     </div>
 </section>

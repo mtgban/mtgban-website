@@ -220,17 +220,23 @@ function checkSleepersCompare() {
     </div>
     <div class="settings-section-body">
         <p class="section-desc">Checked stores will be <strong>hidden</strong> from your Sleepers.</p>
-        <h4>Retail</h4>
-        <div class="settings-grid" id="settings-sleep-sellers">
-            {{range $key := .ModalSellerKeys}}
-                <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-            {{end}}
-        </div>
-        <h4 style="margin-top:0.75em;">Buylist</h4>
-        <div class="settings-grid" id="settings-sleep-vendors">
-            {{range $key := .ModalVendorKeys}}
-                <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-            {{end}}
+        <div class="settings-vendor-columns">
+            <div>
+                <h4>Retail</h4>
+                <div class="settings-grid" id="settings-sleep-sellers">
+                    {{range $key := .ModalSellerKeys}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                    {{end}}
+                </div>
+            </div>
+            <div>
+                <h4>Buylist</h4>
+                <div class="settings-grid" id="settings-sleep-vendors">
+                    {{range $key := .ModalVendorKeys}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                    {{end}}
+                </div>
+            </div>
         </div>
     </div>
 </section>
