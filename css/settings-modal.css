@@ -304,6 +304,30 @@
     user-select: none;
     padding: 0.25em 0;
 }
+
+/* Grid container when multiple toggles share a section */
+.settings-toggles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(22em, 1fr));
+    gap: 0.25em 1em;
+}
+.settings-toggles-grid .settings-toggle {
+    padding: 0.5em 0.6em;
+    border-radius: var(--radius-sm);
+    align-items: flex-start;
+    line-height: 1.35;
+    transition: background 0.1s ease;
+}
+.settings-toggles-grid .settings-toggle:hover {
+    background: color-mix(in srgb, var(--ainfo) 6%, transparent);
+}
+.settings-toggles-grid .settings-toggle .settings-toggle-track {
+    margin-top: 0.1em;
+}
+.settings-toggles-grid .settings-toggle > span:last-child {
+    flex: 1;
+    min-width: 0;
+}
 .settings-toggle input { display: none; }
 .settings-toggle-track {
     width: 2.4em;
