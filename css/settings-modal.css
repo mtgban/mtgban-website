@@ -471,20 +471,22 @@
     gap: 0.5em;
 }
 
-/* ── Navbar gear button ─────────────────────────────────── */
+/* ── Navbar gear button (matches .ban-nav-ext / .ban-theme-toggle hover) ── */
 .ban-settings-btn {
-    background: transparent;
-    border: 0;
-    padding: 0.25em 0.5em;
-    cursor: pointer;
-    color: var(--greytext);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.12s ease, transform 0.25s ease;
+    padding: 7px;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: var(--greytext);
+    text-decoration: none;
+    transition: background 0.12s ease, color 0.12s ease;
 }
 .ban-settings-btn:hover {
+    background: var(--surface-3, var(--navbackground));
     color: var(--ainfo);
-    transform: rotate(30deg);
 }
 .ban-settings-btn[hidden] { display: none !important; }
