@@ -45,8 +45,6 @@
         const search = root.querySelector('.editions-picker-search input');
         const groups = root.querySelectorAll('.editions-group');
         let lastClicked = null;
-        let dragging = false;
-        let dragTarget = null;
 
         function forEachGroup(fn) { groups.forEach(fn); }
 
@@ -103,24 +101,13 @@
             return label.querySelector('input[type="checkbox"]');
         }
 
-        let dragStartBox = null;
-        let dragMoved = false;
-
-        // Intercept clicks on labels/checkboxes inside the grid so the native
-        // toggle can't fight with our JS-managed state. We drive state from
-        // mousedown/mouseover/mouseup instead.
+        // Single click toggles one box. Shift-click sets every box between
+        // the previous click and this one to the opposite of the previous
+        // box's state. We preventDefault so the native checkbox/label toggle
+        // doesn't fight with our managed state.
         root.addEventListener('click', function (e) {
             const cb = boxFromEvent(e);
             if (!cb) return;
-            e.preventDefault();
-        });
-
-        root.addEventListener('mousedown', function (e) {
-            if (e.button !== 0) return;
-            const cb = boxFromEvent(e);
-            if (!cb) return;
-
-            // Suppress the native label/input click so we own the state.
             e.preventDefault();
 
             if (e.shiftKey && lastClicked && lastClicked !== cb) {
@@ -136,50 +123,14 @@
                     if (row.classList.contains('row-hidden')) continue;
                     box.checked = target;
                 }
-                lastClicked = cb;
-                groups.forEach(updateGroupState);
-                root.dispatchEvent(new Event('change', { bubbles: true }));
-                return;
+            } else {
+                cb.checked = !cb.checked;
             }
 
-            dragging = true;
-            dragStartBox = cb;
-            dragTarget = !cb.checked;
-            dragMoved = false;
             lastClicked = cb;
-            root.classList.add('dragging');
-        });
-
-        root.addEventListener('mouseover', function (e) {
-            if (!dragging) return;
-            const cb = boxFromEvent(e);
-            if (!cb || cb === dragStartBox) return;
-            const row = cb.closest('label');
-            if (row.classList.contains('row-hidden')) return;
-            if (cb.checked === dragTarget) return;
-            cb.checked = dragTarget;
-            dragMoved = true;
             groups.forEach(updateGroupState);
             root.dispatchEvent(new Event('change', { bubbles: true }));
         });
-
-        function endDrag() {
-            if (!dragging) return;
-            // Apply target state to the start box. If the drag didn't move,
-            // this is the effect of a plain click. If it did move, the start
-            // box was the first intended toggle and still needs applying.
-            if (dragStartBox && dragStartBox.checked !== dragTarget) {
-                dragStartBox.checked = dragTarget;
-                groups.forEach(updateGroupState);
-                root.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            dragging = false;
-            dragStartBox = null;
-            dragTarget = null;
-            dragMoved = false;
-            root.classList.remove('dragging');
-        }
-        document.addEventListener('mouseup', endDrag);
 
         function actOn(predicate, value) {
             allBoxes.forEach(function (cb) {
