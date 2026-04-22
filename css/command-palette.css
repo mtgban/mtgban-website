@@ -501,14 +501,11 @@
     border: 0;
 }
 
-/* Keyrune set symbols rendered inside result icons */
+/* Keyrune set symbols rendered inside result icons - follow current text color */
 .cp-result-icon .ss {
     font-size: 16px;
     line-height: 1;
-    color: var(--greytext, #888);
-}
-.cp-result.active .cp-result-icon .ss {
-    color: var(--ainfo, #559eff);
+    color: var(--normal, #111);
 }
 
 /* Preserve inline icon colors (e.g., rarity pips) over active-state override */
