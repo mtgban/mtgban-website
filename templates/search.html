@@ -1298,3 +1298,174 @@ Sims are not required for pre-constructed decks and other products where the sam
 {{define "extra-scripts"}}
 <script>lucide.createIcons();</script>
 {{end}}
+
+{{define "settings-content"}}
+<!-- Stores - hidden stores checkboxes -->
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Stores</h3>
+    </div>
+    <div class="settings-section-body">
+        <p style="margin:0 0 0.5em;font-size:0.85em;opacity:0.7;">Check stores you want to <strong>hide</strong> from results.</p>
+        <h4>Retail</h4>
+        <div class="settings-grid" id="settings-search-sellers" data-cookie="SearchSellersList">
+            {{range $key := .SellerKeys}}
+            <label>
+                <input type="checkbox" name="{{$key}}">
+                {{scraper_name $key}}{{if (contains $key "Sealed")}} <span style="font-size:0.8em;opacity:0.6;">(Sealed)</span>{{end}}
+            </label>
+            {{end}}
+        </div>
+        <h4 style="margin-top:0.75em;">Buylist</h4>
+        <div class="settings-grid" id="settings-search-vendors" data-cookie="SearchVendorsList">
+            {{range $key := .VendorKeys}}
+            <label>
+                <input type="checkbox" name="{{$key}}">
+                {{scraper_name $key}}{{if (contains $key "Sealed")}} <span style="font-size:0.8em;opacity:0.6;">(Sealed)</span>{{end}}
+            </label>
+            {{end}}
+        </div>
+    </div>
+</section>
+
+<!-- Result Sorting -->
+<section class="settings-section">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Result Sorting</h3>
+    </div>
+    <div class="settings-section-body">
+        <div class="settings-pills" id="settings-search-sort" data-cookie="SearchDefaultSort">
+            <button class="settings-pill" data-val="chrono">Chronological</button>
+            <button class="settings-pill" data-val="hybrid">Alpha + Chrono Sets</button>
+            <button class="settings-pill" data-val="alpha">Alphabetical</button>
+            <button class="settings-pill" data-val="number">Collector #</button>
+            <button class="settings-pill" data-val="retail">Best Retail</button>
+            <button class="settings-pill" data-val="buylist">Best Buylist</button>
+        </div>
+    </div>
+</section>
+
+<!-- Listing Priority -->
+<section class="settings-section">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Listing Priority</h3>
+    </div>
+    <div class="settings-section-body">
+        <div class="settings-pills" id="settings-search-listing" data-cookie="SearchListingPriority">
+            <button class="settings-pill" data-val="stores">By Store Name</button>
+            <button class="settings-pill" data-val="prices">By Price</button>
+            <button class="settings-pill" data-val="credit">By Credit Price</button>
+            <button class="settings-pill" data-val="market">By Credit Market</button>
+        </div>
+    </div>
+</section>
+
+<!-- Preferred Sort Stores - dropdowns -->
+<section class="settings-section">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Preferred Sort Stores</h3>
+    </div>
+    <div class="settings-section-body">
+        <p style="margin:0 0 0.75em;font-size:0.85em;opacity:0.7;">Store used for price-based result sorting.</p>
+        <div style="display:flex;gap:1em;flex-wrap:wrap;">
+            <div>
+                <label for="settings-sellers-priority" style="display:block;margin-bottom:0.25em;font-size:0.85em;">Retail Priority</label>
+                <select id="settings-sellers-priority" data-cookie="SearchSellersPriority">
+                    <option value="">Reset to Default</option>
+                    {{range $key := .SellerKeys}}
+                    <option value="{{$key}}">{{scraper_name $key}}</option>
+                    {{end}}
+                </select>
+            </div>
+            <div>
+                <label for="settings-vendors-priority" style="display:block;margin-bottom:0.25em;font-size:0.85em;">Buylist Priority</label>
+                <select id="settings-vendors-priority" data-cookie="SearchVendorsPriority">
+                    <option value="">Reset to Default</option>
+                    {{range $key := .VendorKeys}}
+                    <option value="{{$key}}">{{scraper_name $key}}</option>
+                    {{end}}
+                </select>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Buylist Secondary Entry -->
+<section class="settings-section">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Buylist Secondary Entry</h3>
+    </div>
+    <div class="settings-section-body">
+        <div class="settings-pills" id="settings-search-buylist-secondary" data-cookie="SearchBuylistSecondary">
+            <button class="settings-pill" data-val="priceRatio">Price Ratio</button>
+            <button class="settings-pill" data-val="creditPrice">Credit Price</button>
+            <button class="settings-pill" data-val="marketCredit">Credit Market</button>
+        </div>
+    </div>
+</section>
+
+<!-- Other Preferences - misc toggles -->
+<section class="settings-section">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Other Preferences</h3>
+    </div>
+    <div class="settings-section-body" id="settings-search-misc" data-cookie="SearchMiscOpts">
+        <label class="settings-toggle">
+            <input type="checkbox" data-misc="noSussy">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Skip invalid TCGplayer Direct prices</span>
+        </label>
+        <label class="settings-toggle">
+            <input type="checkbox" data-misc="hidePrelPack">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Hide classic Promotional entries (promopack, prerelease, etc)</span>
+        </label>
+        <label class="settings-toggle">
+            <input type="checkbox" data-misc="hidePromos">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Hide ALL Promotional entries (judge, buyabox, bundle, some sets, etc)</span>
+        </label>
+        <label class="settings-toggle">
+            <input type="checkbox" data-misc="preferFlavor">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Prefer flavor name when available (global setting)</span>
+        </label>
+        <label class="settings-toggle">
+            <input type="checkbox" data-misc="hideBLconds">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Hide non-NM Buylist entries</span>
+        </label>
+        <label class="settings-toggle">
+            <input type="checkbox" data-misc="skipEmpty">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Skip results with no prices</span>
+        </label>
+        <label class="settings-toggle">
+            <input type="checkbox" data-misc="noSyp">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Don't show the SYP indication (&dagger;)</span>
+        </label>
+        <label class="settings-toggle">
+            <input type="checkbox" data-misc="noUpsell">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Hide the upsell reminder to download CSVs</span>
+        </label>
+    </div>
+</section>
+
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#settings-modal .settings-section-header[data-role="section-toggle"]').forEach(function (h) {
+        h.addEventListener('click', function () {
+            h.parentElement.classList.toggle('expanded');
+        });
+    });
+});
+</script>
+{{end}}
