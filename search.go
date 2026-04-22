@@ -124,8 +124,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	page := r.FormValue("page")
 	if page == "options" {
-		pageVars.Title = "Options"
-		render(w, "search.html", pageVars)
+		http.Redirect(w, r, "/search?settings=1", http.StatusFound)
 		return
 	}
 
