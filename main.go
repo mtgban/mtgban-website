@@ -174,6 +174,8 @@ type PageVars struct {
 	AltKeys         []string
 	SellerKeys      []string
 	VendorKeys      []string
+	ModalSellerKeys []string
+	ModalVendorKeys []string
 	UploadEntries   []UploadEntry
 	IsBuylist       bool
 	TotalEntries    map[string]float64
