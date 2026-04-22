@@ -727,7 +727,7 @@
     }
 
     function buildProviderItem(prefix, provider, candidate) {
-        return {
+        var item = {
             type: 'filter-candidate',
             title: candidate.label,
             subtitle: candidate.sublabel || '',
@@ -756,6 +756,14 @@
                 }
             }
         };
+        if (candidate.keyrune) {
+            var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
+            item.iconHtml = '<i class="ss ss-' + kr + '"></i>';
+        }
+        if (candidate.iconColor) {
+            item.iconStyle = 'color: ' + candidate.iconColor;
+        }
+        return item;
     }
 
     // ── Sub-view rendering (parent nav chip locked) ──────────────────
@@ -863,7 +871,12 @@
             var activeClass = idx === 0 ? ' active' : '';
             var disabledClass = item.disabled ? ' disabled' : '';
             html += '<div class="cp-result' + activeClass + disabledClass + '" role="option" data-index="' + idx + '"' + (item.disabled ? ' aria-disabled="true"' : '') + '>';
-            html += '<div class="cp-result-icon"><i data-lucide="' + escapeHtml(item.icon || 'search') + '"></i></div>';
+            if (item.iconHtml) {
+                html += '<div class="cp-result-icon">' + item.iconHtml + '</div>';
+            } else {
+                var iconStyleAttr = item.iconStyle ? ' style="' + escapeHtml(item.iconStyle) + '"' : '';
+                html += '<div class="cp-result-icon"' + iconStyleAttr + '><i data-lucide="' + escapeHtml(item.icon || 'search') + '"></i></div>';
+            }
             html += '<div class="cp-result-body">';
             html += '<div class="cp-result-title">' + escapeHtml(item.title) + '</div>';
             if (item.snippets) {
