@@ -976,6 +976,11 @@
             els[index].scrollIntoView({ block: 'nearest' });
         }
         activeIndex = index;
+        // Flag the item as explicitly picked by the user so Enter executes it
+        // rather than the chip-composition fallback.
+        if (index >= 0 && index < resultItems.length && resultItems[index]) {
+            resultItems[index]._userPicked = true;
+        }
         updateDeleteHint();
     }
 
@@ -1479,36 +1484,29 @@
 
         // Enter
         if (key === 'Enter' || code === 13) {
-            // D3: parent-only chip (or parent + nav-sub chips) + empty input + no highlighted result → navigate
-            if (chips && chips.count() > 0 && input.value.trim() === '' && activeIndex < 0) {
-                var chipsNow = chips.all();
-                var firstNav = chipsNow[0];
-                var onlyParentAndSubs = firstNav && firstNav.type === 'nav' && isParentNav(firstNav.navName);
-                if (onlyParentAndSubs) {
-                    var allMatchingSubs = true;
-                    var pKeyE = navParentKeys[firstNav.navName];
-                    for (var ek = 1; ek < chipsNow.length; ek++) {
-                        if (chipsNow[ek].type !== 'nav-sub' || chipsNow[ek]._parentKey !== pKeyE) {
-                            allMatchingSubs = false;
-                            break;
-                        }
-                    }
-                    if (allMatchingSubs) {
-                        e.preventDefault();
-                        if (chipsNow.length === 1) {
-                            // Only parent chip: navigate to base URL
-                            window.location.href = firstNav.navLink;
-                            return;
-                        }
-                        // Parent + sub chips: compose params
-                        var baseE = (firstNav.navLink || '').split('?')[0];
-                        var paramsE = [];
-                        for (var ep = 1; ep < chipsNow.length; ep++) {
-                            if (chipsNow[ep]._urlParam) paramsE.push(chipsNow[ep]._urlParam);
-                        }
-                        window.location.href = baseE + (paramsE.length > 0 ? '?' + paramsE.join('&') : '');
+            // Chips locked + empty input: default to executing the composed query
+            // rather than whatever default-view result happens to be highlighted.
+            // If the user wants to pick a default-view item instead, they can arrow
+            // to it first (that changes activeIndex to a user-selected value, not
+            // the auto-select-first-result).
+            if (chips && chips.count() > 0 && input.value.trim() === '') {
+                var activeItem = (activeIndex >= 0 && activeIndex < resultItems.length)
+                    ? resultItems[activeIndex] : null;
+                // Only fall through to executeResult when the active item was explicitly
+                // arrowed-to (userPickedResult flag), otherwise treat Enter as "run chips".
+                if (!activeItem || !activeItem._userPicked) {
+                    e.preventDefault();
+                    var navUrl = chipsNavURL(chips.all());
+                    if (navUrl) {
+                        window.location.href = navUrl;
                         return;
                     }
+                    var composed = chips.composedQuery();
+                    if (composed) {
+                        recordRecentSearch(composed);
+                        window.location.href = '/search?q=' + encodeURIComponent(composed);
+                    }
+                    return;
                 }
             }
 
