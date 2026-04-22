@@ -60,6 +60,8 @@ var SealedEditionsList map[string][]EditionEntry
 var AllEditionsKeys []string
 var AllEditionsKeysNoFoilOrPromos []string
 var AllEditionsMap map[string]EditionEntry
+var AllEditionsByCategory map[string][]EditionEntry
+var AllEditionsCategoriesSorted []string
 
 // Editions with parent sets
 var TreeEditionsKeys []string
@@ -362,6 +364,48 @@ func getSealedEditions() ([]string, map[string][]EditionEntry) {
 	})
 
 	return sortedEditions, listEditions
+}
+
+// getAllEditionsByCategory returns the same edition set as getAllEditions()
+// grouped by category (using the same categoryEdition / categoryOverrides maps
+// that drive SealedEditionsList). Uncategorized set types land in "Other".
+func getAllEditionsByCategory() ([]string, map[string][]EditionEntry) {
+	sortedCategories := []string{}
+	listEditions := map[string][]EditionEntry{}
+
+	for _, code := range mtgmatcher.GetAllSets() {
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil {
+			continue
+		}
+
+		setType := set.Type
+		if rename, found := categoryOverrides[set.Code]; found {
+			setType = rename
+		}
+		category, found := categoryEdition[setType]
+		if !found {
+			category = "Other"
+		}
+
+		rename := editionRenames[set.Name]
+		entry := makeEditionEntry(set, rename)
+		listEditions[category] = append(listEditions[category], entry)
+	}
+
+	for key := range listEditions {
+		sort.Slice(listEditions[key], func(i, j int) bool {
+			return listEditions[key][i].Date.After(listEditions[key][j].Date)
+		})
+		sortedCategories = append(sortedCategories, key)
+	}
+
+	sort.Slice(sortedCategories, func(i, j int) bool {
+		return listEditions[sortedCategories[i]][0].Date.After(
+			listEditions[sortedCategories[j]][0].Date)
+	})
+
+	return sortedCategories, listEditions
 }
 
 type ReprintEntry struct {
@@ -759,6 +803,7 @@ func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDi
 func updateStaticData() {
 	SealedEditionsSorted, SealedEditionsList = getSealedEditions()
 	AllEditionsKeys, AllEditionsMap = getAllEditions()
+	AllEditionsCategoriesSorted, AllEditionsByCategory = getAllEditionsByCategory()
 	TreeEditionsKeys, TreeEditionsMap = getTreeEditions()
 
 	var filteredEditions []string
@@ -784,4 +829,8 @@ func updateStaticData() {
 		totalCards += AllEditionsMap[key].Size
 	}
 	TotalCards = totalCards
+
+	if other := AllEditionsByCategory["Other"]; len(other) > 0 {
+		log.Printf("AllEditionsByCategory: %d uncategorized sets", len(other))
+	}
 }
