@@ -2,8 +2,17 @@ package timeseries
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
+
+// NormalizeUUID strips the _f or _e suffix that mtgmatcher appends for
+// foil/etched variants, returning a clean UUID suitable for Postgres.
+func NormalizeUUID(uuid string) string {
+	uuid = strings.TrimSuffix(uuid, "_f")
+	uuid = strings.TrimSuffix(uuid, "_e")
+	return uuid
+}
 
 // PriceRow represents a single row from the product_prices table.
 // Each nullable price column uses *float64 so we can distinguish "no data" from zero.

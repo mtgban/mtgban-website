@@ -51,6 +51,7 @@ func scanRows(rows interface {
 // GetPriceHistory returns all price rows for a given UUID, foil status, and language,
 // ordered by date descending.
 func (c *Client) GetPriceHistory(ctx context.Context, uuid string, isFoil bool, isEtched bool, language string) ([]PriceRow, error) {
+	uuid = NormalizeUUID(uuid)
 	q := `SELECT` + selectColumns + `
 		FROM product_prices
 		WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND language = $4
@@ -66,6 +67,7 @@ func (c *Client) GetPriceHistory(ctx context.Context, uuid string, isFoil bool, 
 // GetPriceHistorySince returns price rows for a UUID, foil status, and language
 // on or after the given date.
 func (c *Client) GetPriceHistorySince(ctx context.Context, uuid string, isFoil bool, isEtched bool, language *string, since time.Time) ([]PriceRow, error) {
+	uuid = NormalizeUUID(uuid)
 	var q string
 	var args []any
 	if language != nil {
@@ -113,6 +115,7 @@ func (c *Client) HGetAll(ctx context.Context, cardID string, isFoil bool, isEtch
 // non-nil price columns with COALESCE so that a single UUID's prices can
 // be built up across multiple scrapers without overwriting earlier values.
 func (c *Client) UpsertRow(ctx context.Context, row PriceRow) error {
+	row.MtgjsonUUID = NormalizeUUID(row.MtgjsonUUID)
 	const q = `
 		INSERT INTO product_prices (
 			date, mtgjson_uuid, is_foil, is_etched, language, is_alt,
@@ -148,6 +151,7 @@ func (c *Client) UpsertRow(ctx context.Context, row PriceRow) error {
 // bounded by the given Lookback window. Returns the lookback boundary if no
 // rows exist or if the earliest row is newer than the boundary.
 func (c *Client) GetEarliestDate(ctx context.Context, uuid string, isFoil bool, isEtched bool, lb Lookback) (time.Time, error) {
+	uuid = NormalizeUUID(uuid)
 	boundary := lb.Since()
 	var earliest sql.NullTime
 	err := c.db.QueryRowContext(ctx,
@@ -163,6 +167,7 @@ func (c *Client) GetEarliestDate(ctx context.Context, uuid string, isFoil bool, 
 
 // GetLatestPrice returns the most recent price row for a UUID, foil status, and language.
 func (c *Client) GetLatestPrice(ctx context.Context, uuid string, isFoil bool, isEtched bool, language string) (PriceRow, error) {
+	uuid = NormalizeUUID(uuid)
 	q := `SELECT` + selectColumns + `
 		FROM product_prices
 		WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND language = $4
