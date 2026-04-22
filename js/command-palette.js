@@ -933,8 +933,18 @@
 
         resultsEl.innerHTML = html;
 
-        if (idx > 0) {
+        // Auto-select the first result UNLESS chips are locked and input is empty.
+        // In that case, Enter should run the chip composition, not a default item.
+        var skipAutoSelect = chips && chips.count() > 0 && input && input.value.trim() === '';
+        if (idx > 0 && !skipAutoSelect) {
             activeIndex = 0;
+        } else {
+            activeIndex = -1;
+            // Clear any lingering .active class on result rows
+            var activeEls = resultsEl.querySelectorAll('.cp-result.active');
+            for (var ai = 0; ai < activeEls.length; ai++) {
+                activeEls[ai].classList.remove('active');
+            }
         }
         updateDeleteHint();
 
