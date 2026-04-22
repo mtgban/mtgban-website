@@ -5,9 +5,6 @@
 
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
-    {{if not .IsMobile}}
-        <script type="text/javascript" src="/js/settings-news.js?hash={{.Hash}}"></script>
-    {{end}}
 {{end}}
 
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
