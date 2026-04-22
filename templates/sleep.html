@@ -7,6 +7,9 @@
     {{if eq .Subtitle "Options"}}
         <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     {{end}}
+    {{if not .IsMobile}}
+        <script type="text/javascript" src="/js/settings-sleep.js?hash={{.Hash}}"></script>
+    {{end}}
 {{end}}
 
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
@@ -281,4 +284,49 @@ function checkSleepersCompare() {
 {{if ne .InfoMessage ""}}
     <h2><p class=indent>{{.InfoMessage}}</p></h2>
 {{end}}
+{{end}}
+
+{{define "settings-content"}}
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Vendors &amp; Sellers</h3>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Checked stores will be <strong>hidden</strong> from your Sleepers.</p>
+        <h4>Retail</h4>
+        <div class="settings-grid" id="settings-sleep-sellers">
+            {{range $key := .SellerKeys}}
+                <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+            {{end}}
+        </div>
+        <h4 style="margin-top:0.75em;">Buylist</h4>
+        <div class="settings-grid" id="settings-sleep-vendors">
+            {{range $key := .VendorKeys}}
+                <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+            {{end}}
+        </div>
+    </div>
+</section>
+
+<section class="settings-section">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Editions</h3>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
+        {{template "editions-picker" .}}
+    </div>
+</section>
+
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#settings-modal .settings-section-header[data-role="section-toggle"]').forEach(function (h) {
+        h.addEventListener('click', function () {
+            h.parentElement.classList.toggle('expanded');
+        });
+    });
+});
+</script>
 {{end}}

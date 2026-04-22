@@ -121,7 +121,10 @@ type PageVars struct {
 	FilterFinish string
 	Rarities     []string
 	CardHashes   []string
-	EditionsMap  map[string]EditionEntry
+	EditionsMap        map[string]EditionEntry
+	EditionsCategories []string
+	EditionsByCategory map[string][]EditionEntry
+	PickerID           string
 
 	CanFilterByPrice bool
 	FilterMinPrice   float64
@@ -1126,6 +1129,11 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		switch name {
 		case "search.html", "arbit.html":
 			templates = append(templates, "templates/partials/settings-modal.html")
+		case "sleep.html":
+			templates = append(templates,
+				"templates/partials/settings-modal.html",
+				"templates/partials/editions-picker.html",
+			)
 		}
 	}
 
