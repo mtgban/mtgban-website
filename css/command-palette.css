@@ -161,6 +161,31 @@
     margin-top: 0;
 }
 
+.cp-category-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cp-category-header svg {
+    width: 12px;
+    height: 12px;
+    opacity: 0.8;
+}
+
+.cp-category-header[data-category="recent"],
+.cp-category-header[data-category="commands"] {
+    color: #FFBF00;
+}
+
+.cp-category-header[data-category="saved"] {
+    color: #8b5cf6;
+}
+
+.cp-category-header[data-category="cards"] {
+    color: var(--ainfo, #559eff);
+}
+
 /* Result row */
 .cp-result {
     display: flex;
@@ -335,7 +360,9 @@
     border: 1px solid var(--green, #4caf50);
     border-radius: 8px;
     z-index: 600;
-    transition: right 300ms ease;
+    opacity: 0;
+    transform: scale(0.96);
+    transition: right 300ms ease, opacity 220ms ease, transform 220ms ease;
     white-space: nowrap;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     pointer-events: none;
@@ -348,6 +375,8 @@
 
 .cp-toast.show {
     right: 1em;
+    opacity: 1;
+    transform: scale(1);
 }
 
 /* ── 8. Save Sub-input ──────────────────────────────────── */
