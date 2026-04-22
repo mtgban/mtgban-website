@@ -106,6 +106,15 @@
         let dragStartBox = null;
         let dragMoved = false;
 
+        // Intercept clicks on labels/checkboxes inside the grid so the native
+        // toggle can't fight with our JS-managed state. We drive state from
+        // mousedown/mouseover/mouseup instead.
+        root.addEventListener('click', function (e) {
+            const cb = boxFromEvent(e);
+            if (!cb) return;
+            e.preventDefault();
+        });
+
         root.addEventListener('mousedown', function (e) {
             if (e.button !== 0) return;
             const cb = boxFromEvent(e);
