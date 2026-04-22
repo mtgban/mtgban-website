@@ -1326,7 +1326,7 @@
         handleInput();
     }
 
-    // Delete without confirmation — used by Shift+Delete keyboard shortcut.
+    // Delete without confirmation - used by Shift+Delete keyboard shortcut.
     function deleteSavedCommandSilent(savedId) {
         var saved = getJSON(SAVED_KEY);
         var target = null;
