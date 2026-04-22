@@ -379,11 +379,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	pageVars.VendorKeys = vendorKeys
 
 	if r.FormValue("page") == "options" {
-		dest := "/arbit"
-		if reverse {
-			dest = "/reverse"
-		}
-		http.Redirect(w, r, dest+"?settings=1", http.StatusFound)
+		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
 	}
 	cookieName := "ArbitVendorsList"
@@ -467,7 +463,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	pageVars.VendorKeys = globalVendorKeys
 
 	if r.FormValue("page") == "options" {
-		http.Redirect(w, r, "/global?settings=1", http.StatusFound)
+		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
 	}
 

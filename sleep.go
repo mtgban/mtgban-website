@@ -124,7 +124,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 		return
 	case "options":
-		http.Redirect(w, r, "/sleepers?settings=1", http.StatusFound)
+		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
 	case "bulk":
 		pageVars.Subtitle = "Bulk me up"
