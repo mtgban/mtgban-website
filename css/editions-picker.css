@@ -72,6 +72,3 @@
     border-radius: 0.15em;
 }
 .editions-grid label .row-name { flex: 1; font-size: 0.85rem; }
-
-/* Drag-select: prevent text selection while dragging */
-.editions-picker.dragging { user-select: none; }
