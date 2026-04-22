@@ -1438,6 +1438,10 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
+	pageVars.EditionsCategories = AllEditionsCategoriesSorted
+	pageVars.EditionsByCategory = AllEditionsByCategory
+	pageVars.PickerID = "news-editions-picker"
+
 	// Check if any DB connection was made
 	if Config.DBAddress == "" && Config.NewNewspaperConfigLine == "" {
 		pageVars.Title = "This feature is not enabled"
@@ -1527,13 +1531,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		return
 	case "options":
-		pageVars.Subtitle = "Options"
-
-		pageVars.Editions = AllEditionsKeys
-		pageVars.EditionsMap = AllEditionsMap
-
-		render(w, "news.html", pageVars)
-
+		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
 	case "syp":
 		pageVars.Title = "TCGplayer Store-Your-Products List"

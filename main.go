@@ -1131,7 +1131,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		switch name {
 		case "search.html", "arbit.html":
 			templates = append(templates, "templates/partials/settings-modal.html")
-		case "sleep.html":
+		case "sleep.html", "news.html":
 			templates = append(templates,
 				"templates/partials/settings-modal.html",
 				"templates/partials/editions-picker.html",
