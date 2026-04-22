@@ -111,7 +111,7 @@
 }
 .editions-group-body {
     display: none;
-    padding: 0.5em 0.85em 0.85em;
+    padding: 0.5em 0.4em 0.85em;
     border-top: 1px solid var(--border-subtle);
 }
 .editions-group.expanded .editions-group-body { display: block; }
