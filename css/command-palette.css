@@ -182,8 +182,8 @@
 
 /* Result icon */
 .cp-result-icon {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -192,8 +192,8 @@
 }
 
 .cp-result-icon svg {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
 }
 
 .cp-result.active .cp-result-icon {
@@ -503,7 +503,7 @@
 
 /* Keyrune set symbols rendered inside result icons - follow current text color */
 .cp-result-icon .ss {
-    font-size: 16px;
+    font-size: 20px;
     line-height: 1;
     color: var(--normal, #111);
 }
