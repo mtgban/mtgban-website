@@ -52,6 +52,12 @@
     transform: translate(-50%, -50%) scale(1);
 }
 
+/* Semantic accents (amber = caution/cancel, green = confirm/save) */
+.settings-modal {
+    --settings-amber: #f59e0b;
+    --settings-green: #22c55e;
+}
+
 /* ── Header ──────────────────────────────────────────────── */
 .settings-modal-header {
     display: flex;
@@ -61,7 +67,7 @@
     border-bottom: 1px solid var(--border-subtle);
     background: linear-gradient(
         to bottom,
-        color-mix(in srgb, var(--ainfo) 6%, transparent),
+        color-mix(in srgb, var(--settings-amber) 7%, transparent),
         transparent
     );
     flex-shrink: 0;
@@ -82,8 +88,8 @@
     width: 0.35em;
     height: 1em;
     border-radius: 2px;
-    background: var(--ainfo);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--ainfo) 50%, transparent);
+    background: var(--settings-amber);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--settings-amber) 55%, transparent);
 }
 .settings-modal-close {
     background: transparent;
@@ -163,17 +169,31 @@
 }
 .settings-btn:active { transform: translateY(1px); }
 
-.settings-btn.primary {
-    background: var(--ainfo);
-    border-color: var(--ainfo);
-    color: var(--navbackground);
+/* Cancel - amber (caution: may lose work) */
+.settings-modal-footer .settings-btn[data-role="cancel"],
+.settings-confirm-dialog .settings-btn[data-role="confirm-discard"] {
+    background: color-mix(in srgb, var(--settings-amber) 10%, transparent);
+    border-color: color-mix(in srgb, var(--settings-amber) 45%, transparent);
+    color: var(--settings-amber);
     font-weight: 600;
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--ainfo) 25%, transparent);
 }
-.dark-theme .settings-btn.primary { color: #0c0f14; }
+.settings-modal-footer .settings-btn[data-role="cancel"]:hover,
+.settings-confirm-dialog .settings-btn[data-role="confirm-discard"]:hover {
+    background: color-mix(in srgb, var(--settings-amber) 18%, transparent);
+    border-color: var(--settings-amber);
+}
+
+/* Save (primary) - green (confirm / commit) */
+.settings-btn.primary {
+    background: var(--settings-green);
+    border-color: var(--settings-green);
+    color: #0a1f12;
+    font-weight: 600;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--settings-green) 30%, transparent);
+}
 .settings-btn.primary:hover {
-    background: color-mix(in srgb, var(--ainfo) 85%, white);
-    border-color: color-mix(in srgb, var(--ainfo) 85%, white);
+    background: color-mix(in srgb, var(--settings-green) 88%, white);
+    border-color: color-mix(in srgb, var(--settings-green) 88%, white);
 }
 .settings-btn.primary:disabled {
     background: var(--surface-3);
@@ -182,7 +202,6 @@
     cursor: not-allowed;
     box-shadow: none;
 }
-.dark-theme .settings-btn.primary:disabled { color: var(--text-dim); }
 
 /* ── Sections ────────────────────────────────────────────── */
 .settings-section {
