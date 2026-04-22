@@ -5,6 +5,9 @@
 
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+    {{if not .IsMobile}}
+        <script type="text/javascript" src="/js/settings-news.js?hash={{.Hash}}"></script>
+    {{end}}
 {{end}}
 
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
@@ -12,15 +15,13 @@
 {{define "content"}}
     {{if eq .Subtitle ""}}
         {{template "news-index" .}}
-    {{else if eq .Subtitle "Options"}}
-        {{template "news-options" .}}
     {{else}}
         {{template "news-data" .}}
     {{end}}
 {{end}}
 
 {{define "extra-scripts"}}
-{{if and (ne .Subtitle "") (ne .Subtitle "Options")}}
+{{if ne .Subtitle ""}}
 <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
 <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
 <script>
@@ -41,7 +42,6 @@
                     <span class="news-date">Published {{.LastUpdate.Format "Jan 02, 2006"}}</span>
                 </div>
             </div>
-            <a class="page-action" href="newspaper?page=options">&#9881; Settings</a>
         </div>
 
         {{if .CanSwitchDay}}
@@ -79,63 +79,6 @@
 </div>
 {{end}}
 
-{{define "news-options"}}
-<div class="news-wrap">
-    <div class="news-page-nav">
-        {{range .ToC}}
-            {{if ne .Option "options"}}
-                <a href="newspaper?page={{.Option}}" {{if eq .Option $.Page}}class="active"{{end}}>{{if .Short}}{{.Short}}{{else}}{{.Title}}{{end}}</a>
-            {{end}}
-        {{end}}
-        <span class="nav-spacer"></span>
-        <a class="page-action active" href="newspaper?page=options">&#9881; Settings</a>
-    </div>
-
-    <div class="page-standard opts-page-wrap">
-        <div class="page-header">
-            <div>
-                <h1>Newspaper Options</h1>
-                <p class="page-subtitle">Select editions to <strong>exclude</strong> from your newspaper.</p>
-            </div>
-        </div>
-
-        <div class="card opts-section">
-            <h2>Edition List</h2>
-            <p class="section-desc">Checked editions will be <strong>hidden</strong> from all newspaper pages.</p>
-            <div class="opts-bar">
-                <button class="opts-btn opts-btn-warn" onclick="clearForm('editions')">Clear</button>
-                <button class="opts-btn opts-btn-ok" onclick="selectAll('editions')">Select All</button>
-                <button class="opts-btn opts-btn-ok" onclick="saveForm('NewspaperList','editions'); location.href='/newspaper'">Save</button>
-            </div>
-            <div class="opts-checkbox-grid opts-grid-wide" id="editions">
-                {{range $i, $key := .Editions}}
-                    {{$edition := index $.EditionsMap $key}}
-                    {{if $edition}}
-                    <label>
-                        <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                        {{if $edition.Keyrune}}
-                            <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
-                        {{else}}
-                            <svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
-                                <circle r="9" cx="10" cy="10" fill="var(--normal)" stroke="var(--normal)"/>
-                                <text font-size="10" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{$key}}</text>
-                            </svg>
-                        {{end}}
-                        {{$edition.Name}}
-                    </label>
-                    {{end}}
-                {{end}}
-            </div>
-        </div>
-
-        <script>
-            window.onload = function() {
-                loadForm("NewspaperList", "editions");
-            }
-        </script>
-    </div>
-</div>
-{{end}}
 
 {{define "news-data"}}
 <div class="news-wrap">
@@ -146,7 +89,6 @@
             {{end}}
         {{end}}
         <span class="nav-spacer"></span>
-        <a class="page-action" href="newspaper?page=options">&#9881; Settings</a>
     </div>
 
     <img id="hoverImage" class="hoverImage" src=""/>
@@ -324,4 +266,17 @@
 
     </div>
 </div>
+{{end}}
+
+{{define "settings-content"}}
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Editions</h3>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Checked editions will be <strong>hidden</strong> from all newspaper pages.</p>
+        {{template "editions-picker" .}}
+    </div>
+</section>
 {{end}}
