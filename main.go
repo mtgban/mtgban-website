@@ -1119,11 +1119,14 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	}
 	templates = append(templates, navbarPartial)
 
-	// Include settings-modal partial only for pages that define a "settings-content" block.
-	// Including it unconditionally would cause template parse errors on pages without that block.
-	switch name {
-	case "search.html", "sleep.html", "arbit.html":
-		templates = append(templates, "templates/partials/settings-modal.html")
+	// Include settings-modal partial only for desktop pages that define a "settings-content" block.
+	// Including it unconditionally would cause template parse errors on pages without that block,
+	// and mobile pages use a separate settings sheet rather than this modal.
+	if !pageVars.IsMobile {
+		switch name {
+		case "search.html", "sleep.html", "arbit.html":
+			templates = append(templates, "templates/partials/settings-modal.html")
+		}
 	}
 
 	// Add other partials as needed
