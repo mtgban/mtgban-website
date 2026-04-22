@@ -411,10 +411,10 @@
 .cp-chip {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 4px 2px 8px;
+    gap: 6px;
+    padding: 3px 8px;
     font-size: 0.8rem;
-    line-height: 1.4;
+    line-height: 1.2;
     background: var(--surface-2, rgba(0, 0, 0, 0.06));
     border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
     border-radius: 999px;
@@ -450,21 +450,24 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
+    width: 0;
     height: 16px;
     padding: 0;
-    margin-left: 2px;
+    margin-left: 0;
     border: none;
     border-radius: 50%;
     background: transparent;
     color: inherit;
     cursor: pointer;
     opacity: 0;
-    transition: opacity 0.1s, background 0.1s;
+    overflow: hidden;
+    transition: opacity 0.1s, background 0.1s, width 0.12s, margin-left 0.12s;
 }
 .cp-chip:hover .cp-chip-delete,
 .cp-chip.active .cp-chip-delete {
     opacity: 0.7;
+    width: 16px;
+    margin-left: 2px;
 }
 .cp-chip-delete:hover {
     opacity: 1 !important;
@@ -496,4 +499,19 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+/* Keyrune set symbols rendered inside result icons */
+.cp-result-icon .ss {
+    font-size: 16px;
+    line-height: 1;
+    color: var(--greytext, #888);
+}
+.cp-result.active .cp-result-icon .ss {
+    color: var(--ainfo, #559eff);
+}
+
+/* Preserve inline icon colors (e.g., rarity pips) over active-state override */
+.cp-result.active .cp-result-icon[style*="color"] {
+    color: unset;
 }
