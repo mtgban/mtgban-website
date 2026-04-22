@@ -94,17 +94,33 @@
         const allBoxes = Array.from(root.querySelectorAll('.editions-grid input[type="checkbox"]'));
         function indexOf(cb) { return allBoxes.indexOf(cb); }
 
+        // Resolve a checkbox from any event target inside a grid label
+        // (labels forward clicks to their input, but mousedown on the label
+        // text doesn't bubble from the input, so find via the label).
+        function boxFromEvent(e) {
+            const label = e.target.closest('.editions-grid label');
+            if (!label) return null;
+            return label.querySelector('input[type="checkbox"]');
+        }
+
+        let dragStartBox = null;
+        let dragMoved = false;
+
         root.addEventListener('mousedown', function (e) {
-            const cb = e.target.closest('.editions-grid input[type="checkbox"]');
+            if (e.button !== 0) return;
+            const cb = boxFromEvent(e);
             if (!cb) return;
-            if (e.shiftKey && lastClicked) {
-                e.preventDefault();
+
+            // Suppress the native label/input click so we own the state.
+            e.preventDefault();
+
+            if (e.shiftKey && lastClicked && lastClicked !== cb) {
                 const from = indexOf(lastClicked);
                 const to = indexOf(cb);
                 if (from < 0 || to < 0) return;
                 const lo = Math.min(from, to);
                 const hi = Math.max(from, to);
-                const target = !lastClicked.checked ? true : false;
+                const target = !lastClicked.checked;
                 for (let i = lo; i <= hi; i++) {
                     const box = allBoxes[i];
                     const row = box.closest('label');
@@ -116,35 +132,45 @@
                 root.dispatchEvent(new Event('change', { bubbles: true }));
                 return;
             }
+
             dragging = true;
+            dragStartBox = cb;
             dragTarget = !cb.checked;
-            cb.checked = dragTarget;
+            dragMoved = false;
             lastClicked = cb;
             root.classList.add('dragging');
-            groups.forEach(updateGroupState);
-            root.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
         root.addEventListener('mouseover', function (e) {
             if (!dragging) return;
-            const cb = e.target.closest('.editions-grid input[type="checkbox"]');
-            if (!cb) return;
+            const cb = boxFromEvent(e);
+            if (!cb || cb === dragStartBox) return;
             const row = cb.closest('label');
             if (row.classList.contains('row-hidden')) return;
             if (cb.checked === dragTarget) return;
             cb.checked = dragTarget;
+            dragMoved = true;
             groups.forEach(updateGroupState);
             root.dispatchEvent(new Event('change', { bubbles: true }));
         });
 
         function endDrag() {
             if (!dragging) return;
+            // Apply target state to the start box. If the drag didn't move,
+            // this is the effect of a plain click. If it did move, the start
+            // box was the first intended toggle and still needs applying.
+            if (dragStartBox && dragStartBox.checked !== dragTarget) {
+                dragStartBox.checked = dragTarget;
+                groups.forEach(updateGroupState);
+                root.dispatchEvent(new Event('change', { bubbles: true }));
+            }
             dragging = false;
+            dragStartBox = null;
             dragTarget = null;
+            dragMoved = false;
             root.classList.remove('dragging');
         }
         document.addEventListener('mouseup', endDrag);
-        document.addEventListener('mouseleave', endDrag);
 
         function actOn(predicate, value) {
             allBoxes.forEach(function (cb) {
