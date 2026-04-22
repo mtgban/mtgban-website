@@ -2,6 +2,7 @@ create table public.product_prices (
     "date" date not null,
     mtgjson_uuid uuid not null,
     is_foil bool default false not null,
+    is_etched bool default false not null,
     "language" text default ''::text not null,
     is_alt bool default false not null,
     cardkingdom_buylist_price numeric(10, 2) null,
@@ -21,6 +22,7 @@ create unique index idx_unique_price_entry on
     using btree (date,
     mtgjson_uuid,
     is_foil,
+    is_etched,
     language,
     is_alt);
 

@@ -88,7 +88,7 @@ func getDataset(cardId string, labels []string, config DatasetConfig, userTier s
 		return Dataset{}, err
 	}
 
-	results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil || co.Etched, nil, lookbackForTier(userTier))
+	results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil, co.Etched, nil, lookbackForTier(userTier))
 	if err != nil {
 		return Dataset{}, err
 	}
@@ -134,11 +134,11 @@ func stashInTimeseries() {
 	ServerNotify("timeseries", "Taking snapshot...")
 	StashingInProgress = true
 
-	// Accumulate all prices into a single row per (date, uuid, foil).
+	// Accumulate all prices into a single row per (date, uuid, foil, etched).
 	accumulated := map[string]*timeseries.PriceRow{}
 
-	getRow := func(uuid string, isFoil bool, date string) *timeseries.PriceRow {
-		key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil)
+	getRow := func(uuid string, isFoil bool, isEtched bool, date string) *timeseries.PriceRow {
+		key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil) + "|" + strconv.FormatBool(isEtched)
 		row, ok := accumulated[key]
 		if !ok {
 			lang := ""
@@ -146,6 +146,7 @@ func stashInTimeseries() {
 				Date:        date,
 				MtgjsonUUID: uuid,
 				IsFoil:      isFoil,
+				IsEtched:    isEtched,
 				Language:    &lang,
 			}
 			accumulated[key] = row
@@ -182,7 +183,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(card.UUID, card.Foil, date)
+				row := getRow(card.UUID, card.Foil, card.Etched, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
@@ -210,7 +211,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(card.UUID, card.Foil, date)
+				row := getRow(card.UUID, card.Foil, card.Etched, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}

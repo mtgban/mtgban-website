@@ -11,6 +11,7 @@ type PriceRow struct {
 	Date        string  `json:"date"`
 	MtgjsonUUID string  `json:"mtgjson_uuid"`
 	IsFoil      bool    `json:"is_foil"`
+	IsEtched    bool    `json:"is_etched"`
 	Language    *string `json:"language"`
 	IsAlt       bool    `json:"is_alt"`
 
@@ -116,8 +117,8 @@ func (r PriceRow) String() string {
 	if r.Language != nil {
 		lang = *r.Language
 	}
-	return fmt.Sprintf("%s uuid=%s foil=%t lang=%s alt=%t ck_buy=%s tcg_mkt=%s tcg_low=%s ck_ret=%s mkm_low=%s mkm_trend=%s scg_buy=%s abu_buy=%s csi_buy=%s tcg_ev=%s",
-		r.Date, r.MtgjsonUUID, r.IsFoil, lang, r.IsAlt,
+	return fmt.Sprintf("%s uuid=%s foil=%t etched=%t lang=%s alt=%t ck_buy=%s tcg_mkt=%s tcg_low=%s ck_ret=%s mkm_low=%s mkm_trend=%s scg_buy=%s abu_buy=%s csi_buy=%s tcg_ev=%s",
+		r.Date, r.MtgjsonUUID, r.IsFoil, r.IsEtched, lang, r.IsAlt,
 		fmtPrice(r.CardkingdomBuylistPrice),
 		fmtPrice(r.TcgplayerMarketPrice),
 		fmtPrice(r.TcgplayerLowPrice),

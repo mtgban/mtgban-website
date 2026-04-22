@@ -630,7 +630,7 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 			continue
 		}
 
-		results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil || co.Etched, nil, timeseries.LookbackStandard)
+		results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil, co.Etched, nil, timeseries.LookbackStandard)
 		if err != nil {
 			log.Println(err)
 			break
