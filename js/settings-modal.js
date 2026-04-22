@@ -136,6 +136,11 @@
         modalEl.querySelectorAll('[data-role="confirm-keep"]').forEach(function (el) {
             el.addEventListener('click', confirmKeepEditing);
         });
+        modalEl.querySelectorAll('.settings-section-header[data-role="section-toggle"]').forEach(function (h) {
+            h.addEventListener('click', function () {
+                h.parentElement.classList.toggle('expanded');
+            });
+        });
         // Any change inside the modal body flags dirty
         const body = modalEl.querySelector('.settings-modal-body');
         if (body) {
