@@ -15,10 +15,10 @@
     {{range $cat := .EditionsCategories}}
     <div class="editions-group" data-category="{{$cat}}">
         <div class="editions-group-header">
-            <i class="group-chevron" data-lucide="chevron-right"></i>
             <input type="checkbox" class="editions-group-checkbox" aria-label="Toggle all in {{$cat}}">
             <span class="editions-group-title">{{$cat}}</span>
             <span class="editions-group-count">(0 of 0 selected)</span>
+            <i class="group-chevron" data-lucide="chevron-right"></i>
         </div>
         <div class="editions-group-body">
             <div class="editions-grid">
