@@ -1124,7 +1124,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// and mobile pages use a separate settings sheet rather than this modal.
 	if !pageVars.IsMobile {
 		switch name {
-		case "search.html":
+		case "search.html", "arbit.html":
 			templates = append(templates, "templates/partials/settings-modal.html")
 		}
 	}

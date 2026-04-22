@@ -4,10 +4,9 @@
 {{end}}
 
 {{define "extra-head"}}
-    {{if eq .Title "Options"}}
-        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
-    {{end}}
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/settings-arbit.js?hash={{.Hash}}"></script>
 {{end}}
 
 {{define "content"}}
@@ -629,4 +628,33 @@
         </p>
         <br>
 </div>
+{{end}}
+
+{{define "settings-content"}}
+{{$cookieName := "ArbitVendorsList"}}
+{{if .ReverseMode}}{{$cookieName = "ReverseVendorsList"}}{{end}}
+{{if .GlobalMode}}{{$cookieName = "GlobalVendorsList"}}{{end}}
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+        <h3>Vendors</h3>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Checked vendors will be <strong>hidden</strong> from results.</p>
+        <div class="settings-grid" id="settings-arbit-vendors" data-cookie="{{$cookieName}}">
+            {{range $key := .VendorKeys}}
+                <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+            {{end}}
+        </div>
+    </div>
+</section>
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('#settings-modal .settings-section-header[data-role="section-toggle"]').forEach(function (h) {
+        h.addEventListener('click', function () {
+            h.parentElement.classList.toggle('expanded');
+        });
+    });
+});
+</script>
 {{end}}
