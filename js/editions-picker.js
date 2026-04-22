@@ -44,7 +44,6 @@
     function initPicker(root) {
         const search = root.querySelector('.editions-picker-search input');
         const groups = root.querySelectorAll('.editions-group');
-        let lastClicked = null;
 
         function forEachGroup(fn) { groups.forEach(fn); }
 
@@ -90,7 +89,6 @@
         });
 
         const allBoxes = Array.from(root.querySelectorAll('.editions-grid input[type="checkbox"]'));
-        function indexOf(cb) { return allBoxes.indexOf(cb); }
 
         // Resolve a checkbox from any event target inside a grid label
         // (labels forward clicks to their input, but mousedown on the label
@@ -101,33 +99,11 @@
             return label.querySelector('input[type="checkbox"]');
         }
 
-        // Single click toggles one box. Shift-click sets every box between
-        // the previous click and this one to the opposite of the previous
-        // box's state. We preventDefault so the native checkbox/label toggle
-        // doesn't fight with our managed state.
         root.addEventListener('click', function (e) {
             const cb = boxFromEvent(e);
             if (!cb) return;
             e.preventDefault();
-
-            if (e.shiftKey && lastClicked && lastClicked !== cb) {
-                const from = indexOf(lastClicked);
-                const to = indexOf(cb);
-                if (from < 0 || to < 0) return;
-                const lo = Math.min(from, to);
-                const hi = Math.max(from, to);
-                const target = !lastClicked.checked;
-                for (let i = lo; i <= hi; i++) {
-                    const box = allBoxes[i];
-                    const row = box.closest('label');
-                    if (row.classList.contains('row-hidden')) continue;
-                    box.checked = target;
-                }
-            } else {
-                cb.checked = !cb.checked;
-            }
-
-            lastClicked = cb;
+            cb.checked = !cb.checked;
             groups.forEach(updateGroupState);
             root.dispatchEvent(new Event('change', { bubbles: true }));
         });
