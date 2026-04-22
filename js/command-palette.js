@@ -173,6 +173,32 @@
         return div.innerHTML;
     }
 
+    function categoryKeyFor(title) {
+        var t = (title || '').toLowerCase();
+        if (t.indexOf('recent') >= 0) return 'recent';
+        if (t.indexOf('saved') >= 0) return 'saved';
+        if (t.indexOf('page') >= 0 || t.indexOf('navigate') >= 0) return 'pages';
+        if (t.indexOf('card') >= 0) return 'cards';
+        if (t.indexOf('command') >= 0 || t.indexOf('action') >= 0) return 'commands';
+        if (t.indexOf('help') >= 0) return 'help';
+        if (t.indexOf('syntax') >= 0) return 'syntax';
+        return 'other';
+    }
+
+    function categoryIconFor(title) {
+        var key = categoryKeyFor(title);
+        var map = {
+            recent: 'clock',
+            saved: 'bookmark',
+            pages: 'compass',
+            cards: 'search',
+            commands: 'zap',
+            help: 'help-circle',
+            syntax: 'code'
+        };
+        return map[key] || null;
+    }
+
     // ── DOM creation ─────────────────────────────────────────────────
     var overlay = document.createElement('div');
     overlay.className = 'cp-overlay';
@@ -864,7 +890,10 @@
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
             if (item.type === 'header') {
-                html += '<div class="cp-category-header">' + escapeHtml(item.title) + '</div>';
+                var headerKey = categoryKeyFor(item.title);
+                var headerIcon = categoryIconFor(item.title);
+                var iconHtml = headerIcon ? '<i data-lucide="' + headerIcon + '"></i>' : '';
+                html += '<div class="cp-category-header" data-category="' + escapeHtml(headerKey) + '">' + iconHtml + '<span>' + escapeHtml(item.title) + '</span></div>';
                 continue;
             }
 
