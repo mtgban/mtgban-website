@@ -145,13 +145,16 @@
 
 /* Category header */
 .cp-category-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     padding: 6px 16px 4px;
     margin-top: 4px;
     font-size: 0.65rem;
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--greytext, #888);
+    color: #FFBF00;
     user-select: none;
     border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
 }
@@ -161,29 +164,10 @@
     margin-top: 0;
 }
 
-.cp-category-header {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
 .cp-category-header svg {
     width: 12px;
     height: 12px;
     opacity: 0.8;
-}
-
-.cp-category-header[data-category="recent"],
-.cp-category-header[data-category="commands"] {
-    color: #FFBF00;
-}
-
-.cp-category-header[data-category="saved"] {
-    color: #8b5cf6;
-}
-
-.cp-category-header[data-category="cards"] {
-    color: var(--ainfo, #559eff);
 }
 
 /* Result row */
