@@ -339,6 +339,7 @@
     white-space: nowrap;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     pointer-events: none;
+    overflow: hidden;
 }
 
 .light-theme .cp-toast {
@@ -348,6 +349,27 @@
 
 .cp-toast.show {
     right: 1em;
+}
+
+/* Countdown progress bar (matches .settings-toast / .m-toast pattern) */
+.cp-toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    background: var(--green, #4caf50);
+    opacity: 0.55;
+    transform-origin: left;
+    transform: scaleX(0);
+}
+.cp-toast.show::after {
+    animation: cp-toast-timer 2s linear forwards;
+}
+@keyframes cp-toast-timer {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
 }
 
 /* ── 8. Save Sub-input ──────────────────────────────────── */
