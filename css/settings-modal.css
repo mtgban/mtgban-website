@@ -552,7 +552,7 @@
     transform: scaleX(0);
 }
 .settings-toast.show::after {
-    animation: settings-toast-timer 2.2s linear forwards;
+    animation: settings-toast-timer 2s linear forwards;
 }
 @keyframes settings-toast-timer {
     from { transform: scaleX(1); }

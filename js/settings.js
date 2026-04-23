@@ -248,7 +248,7 @@
         // Force reflow so the show transition runs even if just appended
         void toast.offsetWidth;
         toast.classList.add('show');
-        setTimeout(function () { toast.classList.remove('show'); }, 2200);
+        setTimeout(function () { toast.classList.remove('show'); }, 2000);
     }
 
     function consumeSavedToast() {
