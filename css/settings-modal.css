@@ -530,12 +530,34 @@
     white-space: nowrap;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
     pointer-events: none;
+    overflow: hidden;
 }
 .light-theme .settings-toast {
     background: var(--realwhite, #fcfcfc);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 .settings-toast.show { right: 1em; }
+
+/* Countdown progress bar (matches .m-toast pattern) */
+.settings-toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    background: #22c55e;
+    opacity: 0.55;
+    transform-origin: left;
+    transform: scaleX(0);
+}
+.settings-toast.show::after {
+    animation: settings-toast-timer 2.2s linear forwards;
+}
+@keyframes settings-toast-timer {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+}
 
 /* ── Navbar gear button (matches .ban-nav-ext / .ban-theme-toggle hover) ── */
 .ban-settings-btn {
