@@ -232,7 +232,32 @@
     function saveAndClose() {
         if (!hasBindings()) { closeModal(); return; }
         saveAll();
+        try { sessionStorage.setItem('settingsSavedToast', '1'); } catch (e) {}
         window.location.reload();
+    }
+
+    function showSavedToast() {
+        let toast = document.getElementById('settings-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'settings-toast';
+            toast.className = 'settings-toast';
+            document.body.appendChild(toast);
+        }
+        toast.textContent = 'Settings saved';
+        // Force reflow so the show transition runs even if just appended
+        void toast.offsetWidth;
+        toast.classList.add('show');
+        setTimeout(function () { toast.classList.remove('show'); }, 2200);
+    }
+
+    function consumeSavedToast() {
+        try {
+            if (sessionStorage.getItem('settingsSavedToast') === '1') {
+                sessionStorage.removeItem('settingsSavedToast');
+                showSavedToast();
+            }
+        } catch (e) {}
     }
 
     function onKeydown(e) {
@@ -299,6 +324,7 @@
         bindModalChrome();
         autoWire();
         if (hasBindings()) revealNavButton();
+        consumeSavedToast();
     });
     document.addEventListener('keydown', onKeydown);
 
