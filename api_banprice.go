@@ -582,7 +582,7 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		}
 
 		// Loop through cards
-		shouldQty := qty && !vendor.Info().MetadataOnly
+		shouldQty := qty && (!vendor.Info().MetadataOnly || vendor.Info().Shorthand == "SYP")
 		shouldBaseCond := !vendor.Info().MetadataOnly && !vendor.Info().SealedMode
 		for _, cardId := range filterByHash {
 			processEntry(out, buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, shouldQty, conds, shouldBaseCond)
