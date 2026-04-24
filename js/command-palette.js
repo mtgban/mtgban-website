@@ -1275,7 +1275,7 @@
             saveInput.placeholder = 'y / n';
             saveInput.maxLength = 3;
             hintEl.innerHTML = '<span><kbd>Y</kbd> Overwrite</span>' +
-                '<span><kbd>N</kbd> / <kbd>Esc</kbd> Cancel</span>';
+                '<span><kbd>Esc</kbd> Cancel</span>';
         }
 
         // Keep all keyboard handling local to the modal input
@@ -1315,6 +1315,8 @@
                 e.preventDefault();
                 removeSaveModal();
                 input.focus();
+            } else if (e.key === 'Tab' || e.keyCode === 9) {
+                e.preventDefault();
             }
         });
 
