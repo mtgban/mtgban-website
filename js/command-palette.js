@@ -1217,25 +1217,18 @@
         var titleEl = document.createElement('div');
         titleEl.className = 'cp-save-modal-title';
         titleEl.id = 'cp-save-modal-title';
-        titleEl.textContent = 'Save search';
 
         var previewEl = document.createElement('div');
         previewEl.className = 'cp-save-modal-preview';
-        previewEl.textContent = queryToSave;
-        previewEl.title = queryToSave;
 
         var saveInput = document.createElement('input');
         saveInput.className = 'cp-save-modal-input';
         saveInput.id = 'cp-save-modal-input';
         saveInput.type = 'text';
-        saveInput.placeholder = 'Enter a name...';
-        saveInput.maxLength = MAX_NAME;
         saveInput.setAttribute('autocomplete', 'off');
 
         var hintEl = document.createElement('div');
         hintEl.className = 'cp-save-modal-hint';
-        hintEl.innerHTML = '<span><kbd>Enter</kbd> Save</span>' +
-            '<span><kbd>Esc</kbd> Cancel</span>';
 
         modal.appendChild(titleEl);
         modal.appendChild(previewEl);
@@ -1250,7 +1243,6 @@
         });
 
         saveModalOpen = true;
-        saveInput.focus();
 
         var pendingConflict = null;
 
@@ -1277,6 +1269,9 @@
             hintEl.innerHTML = '<span><kbd>Y</kbd> Overwrite</span>' +
                 '<span><kbd>Esc</kbd> Cancel</span>';
         }
+
+        enterNamingState();
+        saveInput.focus();
 
         // Keep all keyboard handling local to the modal input
         saveInput.addEventListener('keydown', function(e) {
