@@ -396,6 +396,10 @@ var gameMap = map[string]string{
 var NewspaperUUIDs map[string]struct{}
 
 func cacheNewspaper() {
+	if Config.OfflineKey != "" {
+		return
+	}
+
 	log.Println("Caching Newspaper data")
 
 	newspaperUUIDs := map[string]struct{}{}
