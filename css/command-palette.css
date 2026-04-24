@@ -397,6 +397,110 @@
     color: var(--greytext, #888);
 }
 
+/* ── 8a. Save Search Modal ───────────────────────────────── */
+.cp-save-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+    pointer-events: none;
+}
+
+.cp-save-modal-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.cp-save-modal {
+    width: 92%;
+    max-width: 420px;
+    background: var(--background, #fff);
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 12px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 140px;
+    transform: translateY(4px);
+    transition: transform 140ms ease-out;
+}
+
+.cp-save-modal-backdrop.open .cp-save-modal {
+    transform: translateY(0);
+}
+
+.cp-save-modal-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--normal, #111);
+    margin: 0;
+}
+
+.cp-save-modal-preview {
+    font-size: 0.78rem;
+    color: var(--greytext, #888);
+    background: var(--surface-1, rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    border-radius: 6px;
+    padding: 6px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cp-save-modal-input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--surface-1, rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 6px;
+    outline: none;
+    font: inherit;
+    font-size: 0.9rem;
+    color: var(--normal, #111);
+    box-sizing: border-box;
+}
+
+.cp-save-modal-input:focus {
+    border-color: var(--ainfo, #559eff);
+}
+
+.cp-save-modal-input::placeholder {
+    color: var(--greytext, #888);
+}
+
+.cp-save-modal-hint {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    font-size: 0.7rem;
+    color: var(--greytext, #888);
+    margin-top: 2px;
+}
+
+.cp-save-modal-hint kbd {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 5px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-family: inherit;
+    margin-right: 3px;
+    color: var(--normal, #111);
+}
+
 /* ── 9. Chip Container ──────────────────────────────────── */
 .cp-chip-container {
     flex: 1;
