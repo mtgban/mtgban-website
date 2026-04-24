@@ -378,6 +378,7 @@ func init() {
 var Config ConfigType
 
 type ConfigType struct {
+	OfflineKey    string `json:"offline_key,omitempty"`
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
 	Datastore     struct {
@@ -799,6 +800,17 @@ func main() {
 
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
+	} else if Config.OfflineKey != "" {
+		go func() {
+			log.Println("Loading scrapers from API")
+			err := loadScrapersAPI(context.Background(), Config.OfflineKey)
+			if err != nil {
+				log.Fatalln("error loading scrapers:", err)
+			}
+
+			// Update set values after loading prices
+			runSealedAnalysis()
+		}()
 	} else {
 		go func() {
 			log.Println("Loading", len(Config.ScraperConfig.Config), "Scrapers")
