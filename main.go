@@ -520,6 +520,10 @@ func genPageNav(activeTab, sig string) PageVars {
 			user = "Beta Public Access"
 		}
 	}
+	if Config.OfflineKey != "" {
+		user = "Offline Mode"
+	}
+
 	extra := NavElem{
 		Active: true,
 		Class:  "beta",
