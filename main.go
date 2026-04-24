@@ -613,11 +613,12 @@ func preloadConfig(configPath string) error {
 	return nil
 }
 
-func loadVars(port, datastorePath string) error {
+func loadVars(port, datastorePath, offlineKey string) error {
 	// Preload
 	Config.Port = DefaultConfigPort
 	Config.Game = DefaultGame
 	Config.DatastorePath = DefaultDSPath
+	Config.OfflineKey = offlineKey
 
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
 	if err != nil {
@@ -778,6 +779,7 @@ func main() {
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
+	offline := flag.String("offline", "", "API key to run in offline mode")
 
 	flag.Parse()
 
@@ -792,9 +794,9 @@ func main() {
 	if err != nil {
 		log.Fatalln("unable to preload config file:", err)
 	}
-	err = loadVars(*port, *datastore)
+	err = loadVars(*port, *datastore, *offline)
 	if err != nil {
-		if DevMode {
+		if DevMode || Config.OfflineKey != "" {
 			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")
 		} else {
 			log.Fatalln("unable to load config file:", err)
