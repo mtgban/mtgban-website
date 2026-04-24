@@ -1458,6 +1458,8 @@
 
     // ── Keyboard: global ─────────────────────────────────────────────
     document.addEventListener('keydown', function(e) {
+        if (saveModalOpen) return;
+
         // Ctrl/Cmd+K to toggle
         if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.keyCode === 75)) {
             e.preventDefault();
@@ -1484,6 +1486,7 @@
 
     // ── Focus trap on dialog level ─────────────────────────────────────
     dialog.addEventListener('keydown', function(e) {
+        if (saveModalOpen) return;
         if ((e.key === 'Tab' || e.keyCode === 9) && e.target !== input) {
             e.preventDefault();
             input.focus();
@@ -1492,6 +1495,8 @@
 
     // ── Keyboard: internal (palette open) ────────────────────────────
     input.addEventListener('keydown', function(e) {
+        if (saveModalOpen) return;
+
         var key = e.key || '';
         var code = e.keyCode || 0;
 
