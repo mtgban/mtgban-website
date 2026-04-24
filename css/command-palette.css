@@ -363,40 +363,6 @@
     transform: scale(1);
 }
 
-/* ── 8. Save Sub-input ──────────────────────────────────── */
-.cp-save-row {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
-    border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
-    background: var(--surface-1, rgba(0, 0, 0, 0.04));
-    flex-shrink: 0;
-}
-
-.cp-save-label {
-    font-size: 0.8rem;
-    color: var(--greytext, #888);
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
-.cp-save-input {
-    flex: 1;
-    border: none;
-    outline: none;
-    background: transparent;
-    font: inherit;
-    font-size: 0.9rem;
-    color: var(--normal, #111);
-    min-width: 0;
-}
-
-.cp-save-input::placeholder {
-    color: var(--greytext, #888);
-}
-
 /* ── 8a. Save Search Modal ───────────────────────────────── */
 .cp-save-modal-backdrop {
     position: absolute;
