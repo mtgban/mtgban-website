@@ -453,6 +453,7 @@ const (
 	DefaultSecret     = "NotVerySecret!"
 	DefaultGame       = "magic"
 	DefaultServerURL  = "http://www.mtgban.com"
+	DefaultDSPath     = "AllPrintings.json.xz"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
@@ -613,6 +614,11 @@ func preloadConfig(configPath string) error {
 }
 
 func loadVars(port, datastorePath string) error {
+	// Preload
+	Config.Port = DefaultConfigPort
+	Config.Game = DefaultGame
+	Config.DatastorePath = DefaultDSPath
+
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
 	if err != nil {
 		return err
@@ -788,7 +794,11 @@ func main() {
 	}
 	err = loadVars(*port, *datastore)
 	if err != nil {
-		log.Fatalln("unable to load config file:", err)
+		if DevMode {
+			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")
+		} else {
+			log.Fatalln("unable to load config file:", err)
+		}
 	}
 
 	_, err = os.Stat(LogDir)
