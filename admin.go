@@ -221,6 +221,20 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case "snapshot":
+		if Config.OfflineKey != "" {
+			v = url.Values{}
+			v.Set("msg", "Updating prices in the background...")
+			doReboot = true
+
+			go func() {
+				err := loadScrapersAPI(context.Background(), Config.OfflineKey)
+				if err != nil {
+					log.Println("error loading scrapers:", err)
+				}
+			}()
+			break
+		}
+
 		v = url.Values{}
 		v.Set("msg", "Moving data to timeseries in the background...")
 		doReboot = true
