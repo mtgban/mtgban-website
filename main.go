@@ -211,6 +211,9 @@ type NavElem struct {
 	// Whether this tab should always be enabled in DevMode
 	AlwaysOnForDev bool
 
+	// Enable page when running offline
+	AllowOffline bool
+
 	// Allow to receive POST requests
 	CanPOST bool
 
@@ -280,6 +283,8 @@ func init() {
 			Handle:   Search,
 			Page:     "search.html",
 			SubPages: []string{"/sets", "/sealed"},
+
+			AllowOffline: true,
 		},
 		"Newspaper": {
 			Name:   "Newspaper",
@@ -333,6 +338,7 @@ func init() {
 
 			CanPOST:        true,
 			AlwaysOnForDev: true,
+			AllowOffline:   true,
 		},
 	}
 }
@@ -453,6 +459,9 @@ func genPageNav(activeTab, sig string) PageVars {
 		// Charts are available only for one game
 		pageVars.DisableChart = true
 	}
+	if Config.OfflineKey != "" {
+		pageVars.DisableChart = true
+	}
 
 	// Set card back
 	pageVars.CardBackURL = Config.CardBackImage
@@ -467,18 +476,23 @@ func genPageNav(activeTab, sig string) PageVars {
 		validSig := expires > time.Now().Unix()
 		devMode := DevMode && !SigCheck
 		alwaysOnDev := DevMode && ExtraNavs[feat].AlwaysOnForDev
+		offline := Config.OfflineKey != "" && ExtraNavs[feat].AllowOffline
 
 		if !validSig && !devMode && !noAuth {
 			continue
 		}
 
-		allowed := devMode || noAuth || alwaysOnDev
+		allowed := devMode || noAuth || alwaysOnDev || offline
 		if !allowed {
 			param := GetParamFromSig(sig, feat)
 			allowed, _ = strconv.ParseBool(param)
 		}
 
 		if !allowed {
+			continue
+		}
+
+		if Config.OfflineKey != "" && !ExtraNavs[feat].AllowOffline {
 			continue
 		}
 
@@ -820,6 +834,10 @@ func main() {
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
 
 	for _, nav := range ExtraNavs {
+		if Config.OfflineKey != "" && !nav.AllowOffline {
+			continue
+		}
+
 		// Set up logging
 		logFile, err := logfile.New(&logfile.LogFile{
 			FileName:    path.Join(LogDir, nav.Name+".log"),

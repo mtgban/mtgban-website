@@ -480,6 +480,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		var pageTable [][]string
 		for _, navName := range OrderNav {
 			nav := ExtraNavs[navName]
+			if Config.OfflineKey != "" && !nav.AllowOffline {
+				continue
+			}
 
 			row := []string{
 				nav.Short,
