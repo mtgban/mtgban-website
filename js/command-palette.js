@@ -127,6 +127,7 @@
     var RECENT_KEY = 'mtgban_recent_searches';
     var SAVED_KEY = 'mtgban_saved_commands';
     var MAX_SAVED = 50;
+    var saveModalOpen = false;
     var MAX_NAME = 60;
 
     function getJSON(key) {
@@ -171,6 +172,32 @@
         var div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    function categoryKeyFor(title) {
+        var t = (title || '').toLowerCase();
+        if (t.indexOf('recent') >= 0) return 'recent';
+        if (t.indexOf('saved') >= 0) return 'saved';
+        if (t.indexOf('page') >= 0 || t.indexOf('navigate') >= 0) return 'pages';
+        if (t.indexOf('card') >= 0) return 'cards';
+        if (t.indexOf('command') >= 0 || t.indexOf('action') >= 0) return 'commands';
+        if (t.indexOf('help') >= 0) return 'help';
+        if (t.indexOf('syntax') >= 0) return 'syntax';
+        return 'other';
+    }
+
+    function categoryIconFor(title) {
+        var key = categoryKeyFor(title);
+        var map = {
+            recent: 'clock',
+            saved: 'bookmark',
+            pages: 'compass',
+            cards: 'search',
+            commands: 'zap',
+            help: 'help-circle',
+            syntax: 'code'
+        };
+        return map[key] || null;
     }
 
     // ── DOM creation ─────────────────────────────────────────────────
@@ -311,7 +338,7 @@
         isOpen = false;
         overlay.classList.remove('open');
         document.body.style.overflow = '';
-        removeSaveRow();
+        removeSaveModal();
         if (previousFocus) {
             previousFocus.focus();
             previousFocus = null;
@@ -482,7 +509,7 @@
                 name: 'Save Current Search',
                 icon: 'bookmark-plus',
                 keywords: ['save', 'bookmark', 'store', 'command'],
-                action: function() { showSaveRow(); }
+                action: function() { showSaveModal(); }
             });
         }
 
@@ -727,7 +754,7 @@
     }
 
     function buildProviderItem(prefix, provider, candidate) {
-        return {
+        var item = {
             type: 'filter-candidate',
             title: candidate.label,
             subtitle: candidate.sublabel || '',
@@ -756,6 +783,14 @@
                 }
             }
         };
+        if (candidate.keyrune) {
+            var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
+            item.iconHtml = '<i class="ss ss-' + kr + '"></i>';
+        }
+        if (candidate.iconColor) {
+            item.iconStyle = 'color: ' + candidate.iconColor;
+        }
+        return item;
     }
 
     // ── Sub-view rendering (parent nav chip locked) ──────────────────
@@ -856,14 +891,22 @@
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
             if (item.type === 'header') {
-                html += '<div class="cp-category-header">' + escapeHtml(item.title) + '</div>';
+                var headerKey = categoryKeyFor(item.title);
+                var headerIcon = categoryIconFor(item.title);
+                var iconHtml = headerIcon ? '<i data-lucide="' + headerIcon + '"></i>' : '';
+                html += '<div class="cp-category-header" data-category="' + escapeHtml(headerKey) + '">' + iconHtml + '<span>' + escapeHtml(item.title) + '</span></div>';
                 continue;
             }
 
             var activeClass = idx === 0 ? ' active' : '';
             var disabledClass = item.disabled ? ' disabled' : '';
             html += '<div class="cp-result' + activeClass + disabledClass + '" role="option" data-index="' + idx + '"' + (item.disabled ? ' aria-disabled="true"' : '') + '>';
-            html += '<div class="cp-result-icon"><i data-lucide="' + escapeHtml(item.icon || 'search') + '"></i></div>';
+            if (item.iconHtml) {
+                html += '<div class="cp-result-icon">' + item.iconHtml + '</div>';
+            } else {
+                var iconStyleAttr = item.iconStyle ? ' style="' + escapeHtml(item.iconStyle) + '"' : '';
+                html += '<div class="cp-result-icon"' + iconStyleAttr + '><i data-lucide="' + escapeHtml(item.icon || 'search') + '"></i></div>';
+            }
             html += '<div class="cp-result-body">';
             html += '<div class="cp-result-title">' + escapeHtml(item.title) + '</div>';
             if (item.snippets) {
@@ -891,8 +934,18 @@
 
         resultsEl.innerHTML = html;
 
-        if (idx > 0) {
+        // Auto-select the first result UNLESS chips are locked and input is empty.
+        // In that case, Enter should run the chip composition, not a default item.
+        var skipAutoSelect = chips && chips.count() > 0 && input && input.value.trim() === '';
+        if (idx > 0 && !skipAutoSelect) {
             activeIndex = 0;
+        } else {
+            activeIndex = -1;
+            // Clear any lingering .active class on result rows
+            var activeEls = resultsEl.querySelectorAll('.cp-result.active');
+            for (var ai = 0; ai < activeEls.length; ai++) {
+                activeEls[ai].classList.remove('active');
+            }
         }
         updateDeleteHint();
 
@@ -934,6 +987,11 @@
             els[index].scrollIntoView({ block: 'nearest' });
         }
         activeIndex = index;
+        // Flag the item as explicitly picked by the user so Enter executes it
+        // rather than the chip-composition fallback.
+        if (index >= 0 && index < resultItems.length && resultItems[index]) {
+            resultItems[index]._userPicked = true;
+        }
         updateDeleteHint();
     }
 
@@ -1129,14 +1187,13 @@
     });
 
     // ── Saved commands ───────────────────────────────────────────────
-    function showSaveRow() {
-        removeSaveRow();
+    function showSaveModal() {
+        removeSaveModal();
 
         var queryToSave;
         if (chips && chips.count() > 0) {
             queryToSave = chips.composedQuery();
         } else {
-            // V1 behavior: fall back to page searchbox value
             var searchInput = document.getElementById('searchbox');
             queryToSave = searchInput ? searchInput.value.trim() : '';
         }
@@ -1145,45 +1202,94 @@
             return;
         }
 
-        var row = document.createElement('div');
-        row.className = 'cp-save-row';
-        row.id = 'cp-save-row';
+        // Backdrop - scopes to the palette overlay (absolute, not fixed)
+        var backdrop = document.createElement('div');
+        backdrop.className = 'cp-save-modal-backdrop';
+        backdrop.id = 'cp-save-modal-backdrop';
 
-        var label = document.createElement('span');
-        label.className = 'cp-save-label';
-        label.textContent = 'Name:';
+        // Modal card
+        var modal = document.createElement('div');
+        modal.className = 'cp-save-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'cp-save-modal-title');
+
+        var titleEl = document.createElement('div');
+        titleEl.className = 'cp-save-modal-title';
+        titleEl.id = 'cp-save-modal-title';
+
+        var previewEl = document.createElement('div');
+        previewEl.className = 'cp-save-modal-preview';
 
         var saveInput = document.createElement('input');
-        saveInput.className = 'cp-save-input';
-        saveInput.id = 'cp-save-input';
-        saveInput.placeholder = 'Enter a name for this search...';
-        saveInput.maxLength = MAX_NAME;
+        saveInput.className = 'cp-save-modal-input';
+        saveInput.id = 'cp-save-modal-input';
+        saveInput.type = 'text';
+        saveInput.setAttribute('autocomplete', 'off');
 
-        row.appendChild(label);
-        row.appendChild(saveInput);
-        dialog.appendChild(row);
-        saveInput.focus();
+        var hintEl = document.createElement('div');
+        hintEl.className = 'cp-save-modal-hint';
+
+        modal.appendChild(titleEl);
+        modal.appendChild(previewEl);
+        modal.appendChild(saveInput);
+        modal.appendChild(hintEl);
+        backdrop.appendChild(modal);
+        overlay.appendChild(backdrop);
+
+        // Trigger opening transition on next frame
+        requestAnimationFrame(function() {
+            backdrop.classList.add('open');
+        });
+
+        saveModalOpen = true;
 
         var pendingConflict = null;
 
+        function enterNamingState() {
+            pendingConflict = null;
+            titleEl.textContent = 'Save search';
+            previewEl.textContent = queryToSave;
+            previewEl.title = queryToSave;
+            saveInput.value = '';
+            saveInput.placeholder = 'Enter a name...';
+            saveInput.maxLength = MAX_NAME;
+            hintEl.innerHTML = '<span><kbd>Enter</kbd> Save</span>' +
+                '<span><kbd>Esc</kbd> Cancel</span>';
+        }
+
+        function enterConflictState(name, existing) {
+            pendingConflict = { name: name, query: queryToSave };
+            titleEl.textContent = 'Overwrite saved search?';
+            previewEl.textContent = '"' + name + '" already exists with: ' + existing.query;
+            previewEl.title = existing.query;
+            saveInput.value = '';
+            saveInput.placeholder = 'y / n';
+            saveInput.maxLength = 3;
+            hintEl.innerHTML = '<span><kbd>Y</kbd> Overwrite</span>' +
+                '<span><kbd>Esc</kbd> Cancel</span>';
+        }
+
+        enterNamingState();
+        saveInput.focus();
+
+        // Keep all keyboard handling local to the modal input
         saveInput.addEventListener('keydown', function(e) {
+            // Stop propagation so the palette's document-level keydown
+            // handlers do not react to typing inside the modal.
+            e.stopPropagation();
+
             if (e.key === 'Enter' || e.keyCode === 13) {
                 e.preventDefault();
 
-                // If awaiting overwrite confirmation
                 if (pendingConflict) {
                     var answer = saveInput.value.trim().toLowerCase();
                     if (answer === 'y' || answer === 'yes') {
                         saveCommand(pendingConflict.name, pendingConflict.query, true);
-                        removeSaveRow();
+                        removeSaveModal();
                         input.focus();
                     } else {
-                        // Cancel - go back to name input
-                        pendingConflict = null;
-                        label.textContent = 'Name:';
-                        saveInput.value = '';
-                        saveInput.placeholder = 'Enter a name for this search...';
-                        saveInput.maxLength = MAX_NAME;
+                        enterNamingState();
                     }
                     return;
                 }
@@ -1195,27 +1301,33 @@
                 }
                 var conflict = saveCommand(name, queryToSave, false);
                 if (conflict) {
-                    // Show confirmation prompt in the save row
-                    pendingConflict = { name: name, query: queryToSave };
-                    label.textContent = '"' + name + '" exists with: ' + conflict.existing.query + ' - Overwrite?';
-                    saveInput.value = '';
-                    saveInput.placeholder = 'y / n';
-                    saveInput.maxLength = 3;
+                    enterConflictState(name, conflict.existing);
                 } else {
-                    removeSaveRow();
+                    removeSaveModal();
                     input.focus();
                 }
             } else if (e.key === 'Escape' || e.keyCode === 27) {
                 e.preventDefault();
-                removeSaveRow();
+                removeSaveModal();
+                input.focus();
+            } else if (e.key === 'Tab' || e.keyCode === 9) {
+                e.preventDefault();
+            }
+        });
+
+        // Click outside the modal card (on the backdrop) closes the modal
+        backdrop.addEventListener('click', function(e) {
+            if (e.target === backdrop) {
+                removeSaveModal();
                 input.focus();
             }
         });
     }
 
-    function removeSaveRow() {
-        var row = document.getElementById('cp-save-row');
-        if (row) row.parentNode.removeChild(row);
+    function removeSaveModal() {
+        saveModalOpen = false;
+        var bd = document.getElementById('cp-save-modal-backdrop');
+        if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
     }
 
     // Returns null if saved, or a conflict object if confirmation needed
@@ -1313,7 +1425,7 @@
         handleInput();
     }
 
-    // Delete without confirmation — used by Shift+Delete keyboard shortcut.
+    // Delete without confirmation - used by Shift+Delete keyboard shortcut.
     function deleteSavedCommandSilent(savedId) {
         var saved = getJSON(SAVED_KEY);
         var target = null;
@@ -1341,6 +1453,8 @@
 
     // ── Keyboard: global ─────────────────────────────────────────────
     document.addEventListener('keydown', function(e) {
+        if (saveModalOpen) return;
+
         // Ctrl/Cmd+K to toggle
         if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.keyCode === 75)) {
             e.preventDefault();
@@ -1367,6 +1481,7 @@
 
     // ── Focus trap on dialog level ─────────────────────────────────────
     dialog.addEventListener('keydown', function(e) {
+        if (saveModalOpen) return;
         if ((e.key === 'Tab' || e.keyCode === 9) && e.target !== input) {
             e.preventDefault();
             input.focus();
@@ -1375,6 +1490,8 @@
 
     // ── Keyboard: internal (palette open) ────────────────────────────
     input.addEventListener('keydown', function(e) {
+        if (saveModalOpen) return;
+
         var key = e.key || '';
         var code = e.keyCode || 0;
 
@@ -1437,36 +1554,29 @@
 
         // Enter
         if (key === 'Enter' || code === 13) {
-            // D3: parent-only chip (or parent + nav-sub chips) + empty input + no highlighted result → navigate
-            if (chips && chips.count() > 0 && input.value.trim() === '' && activeIndex < 0) {
-                var chipsNow = chips.all();
-                var firstNav = chipsNow[0];
-                var onlyParentAndSubs = firstNav && firstNav.type === 'nav' && isParentNav(firstNav.navName);
-                if (onlyParentAndSubs) {
-                    var allMatchingSubs = true;
-                    var pKeyE = navParentKeys[firstNav.navName];
-                    for (var ek = 1; ek < chipsNow.length; ek++) {
-                        if (chipsNow[ek].type !== 'nav-sub' || chipsNow[ek]._parentKey !== pKeyE) {
-                            allMatchingSubs = false;
-                            break;
-                        }
-                    }
-                    if (allMatchingSubs) {
-                        e.preventDefault();
-                        if (chipsNow.length === 1) {
-                            // Only parent chip: navigate to base URL
-                            window.location.href = firstNav.navLink;
-                            return;
-                        }
-                        // Parent + sub chips: compose params
-                        var baseE = (firstNav.navLink || '').split('?')[0];
-                        var paramsE = [];
-                        for (var ep = 1; ep < chipsNow.length; ep++) {
-                            if (chipsNow[ep]._urlParam) paramsE.push(chipsNow[ep]._urlParam);
-                        }
-                        window.location.href = baseE + (paramsE.length > 0 ? '?' + paramsE.join('&') : '');
+            // Chips locked + empty input: default to executing the composed query
+            // rather than whatever default-view result happens to be highlighted.
+            // If the user wants to pick a default-view item instead, they can arrow
+            // to it first (that changes activeIndex to a user-selected value, not
+            // the auto-select-first-result).
+            if (chips && chips.count() > 0 && input.value.trim() === '') {
+                var activeItem = (activeIndex >= 0 && activeIndex < resultItems.length)
+                    ? resultItems[activeIndex] : null;
+                // Only fall through to executeResult when the active item was explicitly
+                // arrowed-to (userPickedResult flag), otherwise treat Enter as "run chips".
+                if (!activeItem || !activeItem._userPicked) {
+                    e.preventDefault();
+                    var navUrl = chipsNavURL(chips.all());
+                    if (navUrl) {
+                        window.location.href = navUrl;
                         return;
                     }
+                    var composed = chips.composedQuery();
+                    if (composed) {
+                        recordRecentSearch(composed);
+                        window.location.href = '/search?q=' + encodeURIComponent(composed);
+                    }
+                    return;
                 }
             }
 
@@ -1485,7 +1595,7 @@
         // Ctrl/Cmd+S - save current search
         if ((e.ctrlKey || e.metaKey) && (key === 's' || code === 83)) {
             e.preventDefault();
-            showSaveRow();
+            showSaveModal();
             return;
         }
 
@@ -1689,8 +1799,8 @@
     dialog.addEventListener('keydown', function(e) {
         if ((e.key === 'Escape' || e.keyCode === 27) && e.target.id !== 'cp-input') {
             e.preventDefault();
-            if (document.getElementById('cp-save-row')) {
-                removeSaveRow();
+            if (saveModalOpen) {
+                removeSaveModal();
                 input.focus();
             } else {
                 closePalette();

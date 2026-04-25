@@ -63,13 +63,13 @@
         icon: 'diamond',
         getCandidates: function (query, ctx) {
             var base = [
-                { value: 'mythic', label: 'Mythic', sublabel: 'm' },
-                { value: 'rare', label: 'Rare', sublabel: 'r' },
-                { value: 'uncommon', label: 'Uncommon', sublabel: 'u' },
-                { value: 'common', label: 'Common', sublabel: 'c' },
-                { value: 'special', label: 'Special', sublabel: 's' },
-                { value: 'token', label: 'Token', sublabel: 't' },
-                { value: 'oversize', label: 'Oversize', sublabel: 'o' }
+                { value: 'mythic', label: 'Mythic', sublabel: 'm', iconColor: '#f59e0b' },
+                { value: 'rare', label: 'Rare', sublabel: 'r', iconColor: '#d4af37' },
+                { value: 'uncommon', label: 'Uncommon', sublabel: 'u', iconColor: '#c0c0c0' },
+                { value: 'common', label: 'Common', sublabel: 'c', iconColor: '#555' },
+                { value: 'special', label: 'Special', sublabel: 's', iconColor: '#8b5cf6' },
+                { value: 'token', label: 'Token', sublabel: 't', iconColor: '#888' },
+                { value: 'oversize', label: 'Oversize', sublabel: 'o', iconColor: '#888' }
             ];
             if (ctx && ctx.cardMeta && ctx.cardMeta.rarities && ctx.cardMeta.rarities.length > 0) {
                 var allowed = {};
@@ -89,9 +89,9 @@
         icon: 'sparkles',
         getCandidates: function (query) {
             var base = [
-                { value: 'foil', label: 'Foil' },
-                { value: 'nonfoil', label: 'Non-foil' },
-                { value: 'etched', label: 'Etched' }
+                { value: 'foil', label: 'Foil', iconColor: '#d4af37' },
+                { value: 'nonfoil', label: 'Non-foil', iconColor: '#888' },
+                { value: 'etched', label: 'Etched', iconColor: '#06b6d4' }
             ];
             return filterEntries(base, query);
         }
@@ -372,7 +372,8 @@
                 opts.push({
                     value: s.code,
                     label: s.name,
-                    sublabel: s.code + (s.released ? ' \xb7 ' + s.released.substring(0, 4) : '')
+                    sublabel: s.code + (s.released ? ' \xb7 ' + s.released.substring(0, 4) : ''),
+                    keyrune: s.keyrune || ''
                 });
             }
             if (ctx && ctx.cardMeta && ctx.cardMeta.printings) {
