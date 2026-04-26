@@ -42,7 +42,7 @@ async function autocomplete(form, inp, sealed) {
                 arr[i].normalize("NFD").replace(/[\u0300-\u036f]/g, "").substr(0, val.length).toUpperCase() == inputText ||
                 arr[i].replace(/^The /g, "").substr(0, val.length).toUpperCase() == inputText ||
                 arr[i].replace(/^Secret Lair Drop /g, "").substr(0, val.length).toUpperCase() == inputText ||
-                arr[i].replace(/[^A-Za-z0-9]/g, "").substr(0, val.replace(/[^A-Za-z0-9]/g, "").length).toUpperCase() == val.replace(/[^A-Za-z0-9]/g, "").toUpperCase()) {
+                arr[i].replace(/[^A-Za-z0-9 ]/g, "").substr(0, val.replace(/[^A-Za-z0-9 ]/g, "").length).toUpperCase() == val.replace(/[^A-Za-z0-9 ]/g, "").toUpperCase()) {
                 /* Create a DIV element for each matching element */
                 b = document.createElement("DIV");
 
