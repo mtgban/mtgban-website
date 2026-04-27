@@ -1445,3 +1445,237 @@
     .result-quick-icons { width: 100%; justify-content: flex-start; }
     .result-set-title { margin-left: 0; width: 100%; }
 }
+
+/* === Search landing panes === */
+
+.search-landing {
+    max-width: 80vw;
+    margin: 2rem auto 0 auto;
+}
+
+.search-landing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: stretch;
+}
+
+.landing-pane {
+    display: flex;
+    flex-direction: column;
+    background: var(--background);
+    border: 0.1rem solid var(--syntax-border-color);
+    border-radius: 0.5em;
+    overflow: hidden;
+    min-height: 50vh;
+}
+
+.landing-pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5em 0.75em;
+    background: var(--headerbackground);
+    border-bottom: 1px solid var(--syntax-border-color);
+    font-weight: 600;
+    color: var(--normal);
+}
+
+.landing-pane-title {
+    font-size: 1.05em;
+}
+
+.landing-pane-actions {
+    display: flex;
+    gap: 0.5em;
+}
+
+.landing-pane-btn {
+    background: transparent;
+    border: 1px solid var(--syntax-border-color);
+    color: var(--normal);
+    padding: 0.25em 0.6em;
+    border-radius: 0.25em;
+    cursor: pointer;
+    font-size: 0.85em;
+}
+
+.landing-pane-btn:hover {
+    background: var(--headerbackground);
+}
+
+.landing-pane-body {
+    flex: 1 1 auto;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.landing-pane-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    padding: 0.5em;
+    border-top: 1px solid var(--syntax-border-color);
+}
+
+.landing-page-btn {
+    background: transparent;
+    border: 1px solid var(--syntax-border-color);
+    color: var(--normal);
+    padding: 0.15em 0.6em;
+    border-radius: 0.25em;
+    cursor: pointer;
+}
+
+.landing-page-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.landing-page-label {
+    font-size: 0.9em;
+    color: var(--normaltext);
+}
+
+.landing-empty {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--greytext);
+    font-style: italic;
+    padding: 2em 1em;
+}
+
+.landing-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.5em 0.75em;
+    border-bottom: 1px solid var(--syntax-border-color);
+    color: var(--normal);
+    text-decoration: none;
+}
+
+.landing-item:hover {
+    background: var(--headerbackground);
+}
+
+.landing-item:last-child {
+    border-bottom: none;
+}
+
+.landing-item-thumb {
+    flex: 0 0 auto;
+    width: 2.5em;
+    height: 3.5em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--headerbackground);
+    border-radius: 0.2em;
+    overflow: hidden;
+}
+
+.landing-item-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.landing-item-thumb i.ss {
+    font-size: 1.5em;
+    color: var(--normal);
+}
+
+.landing-item-thumb-placeholder {
+    font-size: 1.2em;
+    opacity: 0.6;
+    color: var(--normaltext);
+}
+
+.landing-item-info {
+    flex: 1 1 auto;
+    overflow: hidden;
+    min-width: 0;
+}
+
+.landing-item-line1,
+.landing-item-line2 {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4em;
+    flex-wrap: wrap;
+}
+
+.landing-item-name {
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.landing-item-set {
+    font-size: 0.8em;
+    color: var(--greytext);
+}
+
+.landing-item-price {
+    font-size: 0.85em;
+}
+
+.landing-item-price.sell { color: var(--asuccess); }
+.landing-item-price.buy { color: var(--awarning); }
+
+.landing-item-query {
+    font-size: 0.95em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    color: var(--normal);
+}
+
+.landing-item-arrow {
+    flex: 0 0 auto;
+    color: var(--greytext);
+}
+
+.landing-syntax-link {
+    margin-top: 1em;
+    text-align: center;
+    color: var(--greytext);
+    font-size: 0.9em;
+}
+
+.landing-syntax-link a {
+    color: var(--anormal);
+}
+
+/* === Favorite star button on desktop result rows === */
+
+.result-quick-icons .fav-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.15em;
+    color: var(--greytext);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.result-quick-icons .fav-btn:hover {
+    color: var(--normal);
+}
+
+.result-quick-icons .fav-btn.active {
+    color: var(--darkeryellow, gold);
+}
+
+.result-quick-icons .fav-btn.active svg {
+    fill: var(--darkeryellow, gold);
+}
