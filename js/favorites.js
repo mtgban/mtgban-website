@@ -238,10 +238,16 @@
                 if (f.finishTag) html += '<span class="m-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
                 html += '</div>';
                 if (f.sellPrice !== null && f.sellPrice !== undefined) {
-                    html += '<div class="landing-item-line2"><span class="landing-item-price sell">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + ': $ ' + f.sellPrice.toFixed(2) + '</span></div>';
+                    html += '<div class="landing-item-price-row sell">';
+                    html += '<span class="landing-item-price-label">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + '</span>';
+                    html += '<span class="landing-item-price-value">$ ' + f.sellPrice.toFixed(2) + '</span>';
+                    html += '</div>';
                 }
                 if (f.buyPrice !== null && f.buyPrice !== undefined) {
-                    html += '<div class="landing-item-line2"><span class="landing-item-price buy">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + ': $ ' + f.buyPrice.toFixed(2) + '</span></div>';
+                    html += '<div class="landing-item-price-row buy">';
+                    html += '<span class="landing-item-price-label">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + '</span>';
+                    html += '<span class="landing-item-price-value">$ ' + f.buyPrice.toFixed(2) + '</span>';
+                    html += '</div>';
                 }
                 html += '</div>';
                 html += '</a>';
