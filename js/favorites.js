@@ -13,84 +13,76 @@
 
     function saveFavorites(favs) {
         try {
+            var MAX_FAVORITES = 50;
+            if (favs.length > MAX_FAVORITES) {
+                favs = favs.slice(0, MAX_FAVORITES);
+            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
         } catch (e) {}
     }
 
     function extractCardData(btn) {
-        var card = btn.closest('.m-card');
-        if (!card) return null;
-
-        var header = card.querySelector('.m-card-header');
-        var cardId = btn.getAttribute('data-card');
-        var name = card.querySelector('.m-card-name').textContent.trim();
-        var setCode = header.getAttribute('data-setcode') || '';
-        var setLine = card.querySelector('.m-card-set').textContent.trim();
-
-        // Parse "Edition · #Number"
-        var edition = '';
-        var number = '';
-        var parts = setLine.split(' · ');
-        if (parts.length >= 1) edition = parts[0].trim();
-        if (parts.length >= 2) number = parts[1].replace('#', '').trim();
-
-        var isFoil = card.querySelector('.m-badge.foil') !== null || card.querySelector('.m-badge.altfoil') !== null;
-        var isEtched = card.querySelector('.m-badge.etched') !== null;
-
-        var finishBadge = card.querySelector('.m-badge.foil, .m-badge.etched, .m-badge.altfoil');
-        var finishTag = finishBadge ? finishBadge.textContent.trim() : '';
-        var finishClass = '';
-        if (finishBadge) {
-            if (finishBadge.classList.contains('altfoil')) finishClass = 'altfoil';
-            else if (finishBadge.classList.contains('etched')) finishClass = 'etched';
-            else finishClass = 'foil';
+        // Find ancestor with data-card-id (works for both mobile .m-card-header and desktop .result-header)
+        var row = btn.closest('[data-card-id]');
+        if (!row) {
+            // Fall back to closest .m-card-header or .result-header parent
+            var parent = btn.closest('.m-card-header, .result-header');
+            if (parent) row = parent;
         }
+        if (!row) return null;
 
-        var treatments = [];
-        card.querySelectorAll('.m-badge.treatment').forEach(function(el) {
-            treatments.push(el.textContent.trim());
-        });
+        var cardId = row.getAttribute('data-card-id') || btn.getAttribute('data-card-id');
+        if (!cardId) return null;
 
+        var name = row.getAttribute('data-card-name') || '';
+        var setCode = row.getAttribute('data-set-code') || '';
+        var edition = row.getAttribute('data-edition') || '';
+        var number = row.getAttribute('data-number') || '';
+        var imageUrl = row.getAttribute('data-image-url') || '';
+        var finishTag = row.getAttribute('data-finish-tag') || '';
+        var finishClass = row.getAttribute('data-finish-class') || '';
+        var treatmentsAttr = row.getAttribute('data-treatments') || '';
+        var treatments = treatmentsAttr ? treatmentsAttr.split(',').filter(function(t) { return t.length > 0; }) : [];
 
-        // Get best sell price + vendor name (use Best badge, which accounts for INDEX)
+        var isFoil = finishClass === 'foil' || finishClass === 'altfoil';
+        var isEtched = finishClass === 'etched';
+
+        // Locate the surrounding card container to find best-price rows.
+        // Mobile: .m-card. Desktop: each card's results sit between .result-header rows; the .result-body follows.
+        var cardContainer = row.closest('.m-card') || row.parentNode;
+
         var sellPrice = null;
         var sellVendor = '';
-        var sellersPanel = card.querySelector('[id^="sellers-"]');
+        var sellersPanel = cardContainer.querySelector('[id^="sellers-"]');
         if (sellersPanel) {
-            var bestRow = sellersPanel.querySelector('.m-best-price');
-            if (bestRow) {
-                var priceEl = bestRow.querySelector('.m-vendor-price');
-                if (priceEl) {
-                    var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-                    if (!isNaN(parsed)) sellPrice = parsed;
+            var bestSell = sellersPanel.querySelector('.m-best-price');
+            if (bestSell) {
+                var sp = bestSell.querySelector('.m-vendor-price');
+                if (sp) {
+                    var psp = parseFloat(sp.textContent.trim().replace('$', '').trim());
+                    if (!isNaN(psp)) sellPrice = psp;
                 }
-                var nameEl = bestRow.querySelector('.m-vendor-name');
-                if (nameEl) {
-                    sellVendor = nameEl.textContent.replace('Best', '').trim();
-                }
+                var sn = bestSell.querySelector('.m-vendor-name');
+                if (sn) sellVendor = sn.textContent.replace('Best', '').trim();
             }
         }
 
-        // Get best buy price + vendor name (use Best badge, which accounts for INDEX)
         var buyPrice = null;
         var buyVendor = '';
-        var buyersPanel = card.querySelector('[id^="buyers-"]');
+        var buyersPanel = cardContainer.querySelector('[id^="buyers-"]');
         if (buyersPanel) {
-            var bestRow = buyersPanel.querySelector('.m-best-price');
-            if (bestRow) {
-                var priceEl = bestRow.querySelector('.m-vendor-price');
-                if (priceEl) {
-                    var parsed = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-                    if (!isNaN(parsed)) buyPrice = parsed;
+            var bestBuy = buyersPanel.querySelector('.m-best-price');
+            if (bestBuy) {
+                var bp = bestBuy.querySelector('.m-vendor-price');
+                if (bp) {
+                    var pbp = parseFloat(bp.textContent.trim().replace('$', '').trim());
+                    if (!isNaN(pbp)) buyPrice = pbp;
                 }
-                var nameEl = bestRow.querySelector('.m-vendor-name');
-                if (nameEl) {
-                    buyVendor = nameEl.textContent.replace('Best', '').trim();
-                }
+                var bn = bestBuy.querySelector('.m-vendor-name');
+                if (bn) buyVendor = bn.textContent.replace('Best', '').trim();
             }
         }
 
-        // Build search query
         var query = name;
         if (setCode) query += ' s:' + setCode;
         if (number) query += ' cn:' + number;
@@ -113,13 +105,15 @@
             buyPrice: buyPrice,
             buyVendor: buyVendor,
             query: query,
-            t: Date.now()
+            t: Date.now(),
+            img: imageUrl
         };
     }
 
     // Toggle favorite on star click
     window.toggleFavorite = function(btn) {
-        var cardId = btn.getAttribute('data-card');
+        var cardId = btn.getAttribute('data-card-id') || btn.getAttribute('data-card');
+        if (!cardId) return;
         var favs = getFavorites();
         var idx = -1;
         for (var i = 0; i < favs.length; i++) {
@@ -148,8 +142,9 @@
         var favIds = {};
         favs.forEach(function(f) { favIds[f.id] = true; });
 
-        document.querySelectorAll('.m-fav-btn').forEach(function(btn) {
-            if (favIds[btn.getAttribute('data-card')]) {
+        document.querySelectorAll('.fav-btn').forEach(function(btn) {
+            var id = btn.getAttribute('data-card-id') || btn.getAttribute('data-card');
+            if (id && favIds[id]) {
                 btn.classList.add('active');
             }
         });
@@ -157,41 +152,115 @@
 
     // Render favorites on landing page
     function renderFavorites() {
-        var container = document.getElementById('m-favorites');
+        renderFavoritesInto(document.getElementById('m-favorites'), 'mobile');
+        renderFavoritesInto(document.getElementById('desktop-favorites'), 'desktop');
+    }
+
+    var paginationState = {}; // { containerId: { page: 0 } }
+
+    function renderFavoritesInto(container, mode) {
         if (!container) return;
-
         var favs = getFavorites();
-        if (favs.length === 0) return;
 
-        var html = '<div class="m-fav-header">';
-        html += '<span class="m-fav-title">Favorites</span>';
-        html += '<span class="m-fav-actions">';
-        html += '<button class="m-fav-refresh" onclick="window.manualRefreshFavorites()" title="Refresh prices"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></button>';
-        html += '<button class="m-fav-clear" onclick="window.clearFavorites()">Clear</button>';
-        html += '</span>';
-        html += '</div>';
-        html += '<div class="m-fav-list">';
+        var containerId = container.id;
+        if (!paginationState[containerId]) paginationState[containerId] = { page: 0 };
+        var pageSize = mode === 'desktop' ? 10 : favs.length || 1;
+        var totalPages = Math.max(1, Math.ceil(favs.length / pageSize));
+        if (paginationState[containerId].page >= totalPages) paginationState[containerId].page = 0;
+        var page = paginationState[containerId].page;
 
-        favs.forEach(function(f) {
-            html += '<a class="m-fav-item" href="?q=' + encodeURIComponent(f.query) + '">';
-            html += '<div class="m-fav-item-top">';
-            html += '<span class="m-fav-name">' + escapeHtml(f.name) + '</span>';
-            html += '<span class="m-fav-set">' + escapeHtml(f.set) + (f.number ? ' #' + escapeHtml(f.number) : '') + '</span>';
-            if (f.finishTag) html += '<span class="m-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
-            if (f.treatments) f.treatments.forEach(function(tag) { html += '<span class="m-badge treatment">' + escapeHtml(tag) + '</span>'; });
-            html += '</div>';
-            html += '<div class="m-fav-item-prices">';
-            if (f.sellPrice !== null) {
-                html += '<span class="m-fav-price sell">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + ': $ ' + f.sellPrice.toFixed(2) + '</span>';
+        if (favs.length === 0) {
+            if (mode === 'desktop') {
+                container.innerHTML = '<div class="landing-empty">Star cards from any search to favorite them.</div>';
+            } else {
+                container.innerHTML = '';
             }
-            if (f.buyPrice !== null) {
-                html += '<span class="m-fav-price buy">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + ': $ ' + f.buyPrice.toFixed(2) + '</span>';
-            }
-            html += '</div>';
-            html += '</a>';
-        });
+            return;
+        }
 
-        html += '</div>';
+        var html = '';
+        if (mode === 'mobile') {
+            html += '<div class="m-fav-header">';
+            html += '<span class="m-fav-title">Favorites</span>';
+            html += '<span class="m-fav-actions">';
+            html += '<button class="m-fav-refresh" onclick="window.manualRefreshFavorites()" title="Refresh prices"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></button>';
+            html += '<button class="m-fav-clear" onclick="window.clearFavorites()">Clear</button>';
+            html += '</span>';
+            html += '</div>';
+            html += '<div class="m-fav-list">';
+
+            favs.forEach(function(f) {
+                html += '<a class="m-fav-item" href="?q=' + encodeURIComponent(f.query) + '">';
+                if (f.img) {
+                    html += '<img class="m-fav-thumb" src="' + escapeAttr(f.img) + '" loading="lazy" alt="">';
+                }
+                html += '<div class="m-fav-item-body">';
+                html += '<div class="m-fav-item-top">';
+                html += '<span class="m-fav-name">' + escapeHtml(f.name) + '</span>';
+                html += '<span class="m-fav-set">' + escapeHtml(f.set) + (f.number ? ' #' + escapeHtml(f.number) : '') + '</span>';
+                if (f.finishTag) html += '<span class="m-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
+                if (f.treatments) f.treatments.forEach(function(tag) { html += '<span class="m-badge treatment">' + escapeHtml(tag) + '</span>'; });
+                html += '</div>';
+                html += '<div class="m-fav-item-prices">';
+                if (f.sellPrice !== null && f.sellPrice !== undefined) {
+                    html += '<span class="m-fav-price sell">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + ': $ ' + f.sellPrice.toFixed(2) + '</span>';
+                }
+                if (f.buyPrice !== null && f.buyPrice !== undefined) {
+                    html += '<span class="m-fav-price buy">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + ': $ ' + f.buyPrice.toFixed(2) + '</span>';
+                }
+                html += '</div>';
+                html += '</div>';
+                html += '</a>';
+            });
+            html += '</div>';
+        } else {
+            // desktop
+            var start = page * pageSize;
+            var slice = favs.slice(start, start + pageSize);
+
+            html += '<div class="landing-pane-header">';
+            html += '<span class="landing-pane-title">Favorites</span>';
+            html += '<span class="landing-pane-actions">';
+            html += '<button class="landing-pane-btn" onclick="window.manualRefreshFavorites()" title="Refresh prices">Refresh</button>';
+            html += '<button class="landing-pane-btn" onclick="window.clearFavorites()">Clear</button>';
+            html += '</span>';
+            html += '</div>';
+            html += '<div class="landing-pane-body">';
+            slice.forEach(function(f) {
+                html += '<a class="landing-item landing-item-fav" href="?q=' + encodeURIComponent(f.query) + '">';
+                html += '<div class="landing-item-thumb">';
+                if (f.img) {
+                    html += '<img src="' + escapeAttr(f.img) + '" loading="lazy" alt="">';
+                } else {
+                    html += '<span class="landing-item-thumb-placeholder">&#9733;</span>';
+                }
+                html += '</div>';
+                html += '<div class="landing-item-info">';
+                html += '<div class="landing-item-line1">';
+                html += '<span class="landing-item-name">' + escapeHtml(f.name) + '</span>';
+                html += '<span class="landing-item-set">' + escapeHtml(f.set) + (f.number ? ' #' + escapeHtml(f.number) : '') + '</span>';
+                if (f.finishTag) html += '<span class="m-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
+                html += '</div>';
+                html += '<div class="landing-item-line2">';
+                if (f.sellPrice !== null && f.sellPrice !== undefined) {
+                    html += '<span class="landing-item-price sell">S' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + ': $ ' + f.sellPrice.toFixed(2) + '</span>';
+                }
+                if (f.buyPrice !== null && f.buyPrice !== undefined) {
+                    html += '<span class="landing-item-price buy">B' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + ': $ ' + f.buyPrice.toFixed(2) + '</span>';
+                }
+                html += '</div>';
+                html += '</div>';
+                html += '</a>';
+            });
+            html += '</div>';
+            if (totalPages > 1) {
+                html += '<div class="landing-pane-footer">';
+                html += '<button class="landing-page-btn" onclick="window.favPage(\'' + containerId + '\', -1)" ' + (page === 0 ? 'disabled' : '') + '>&lsaquo;</button>';
+                html += '<span class="landing-page-label">' + (page + 1) + ' / ' + totalPages + '</span>';
+                html += '<button class="landing-page-btn" onclick="window.favPage(\'' + containerId + '\', 1)" ' + (page === totalPages - 1 ? 'disabled' : '') + '>&rsaquo;</button>';
+                html += '</div>';
+            }
+        }
         container.innerHTML = html;
     }
 
@@ -200,6 +269,16 @@
         div.textContent = str;
         return div.innerHTML;
     }
+
+    function escapeAttr(str) {
+        return String(str).replace(/"/g, '&quot;');
+    }
+
+    window.favPage = function(containerId, delta) {
+        if (!paginationState[containerId]) paginationState[containerId] = { page: 0 };
+        paginationState[containerId].page += delta;
+        renderFavorites();
+    };
 
     window.clearFavorites = function() {
         localStorage.removeItem(STORAGE_KEY);
@@ -272,6 +351,10 @@
                 if (prices.buyPrice !== undefined && prices.buyPrice !== null) {
                     f.buyPrice = prices.buyPrice;
                     f.buyVendor = prices.buyVendor || f.buyVendor;
+                    updated = true;
+                }
+                if (prices.imageURL && !f.img) {
+                    f.img = prices.imageURL;
                     updated = true;
                 }
                 f.t = Date.now();
