@@ -237,16 +237,18 @@
                 html += '<span class="landing-item-set">' + escapeHtml(f.set) + (f.number ? ' #' + escapeHtml(f.number) : '') + '</span>';
                 if (f.finishTag) html += '<span class="m-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
                 html += '</div>';
-                if (f.sellPrice !== null && f.sellPrice !== undefined) {
-                    html += '<div class="landing-item-price-row sell">';
-                    html += '<span class="landing-item-price-label">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + '</span>';
-                    html += '<span class="landing-item-price-value">$ ' + f.sellPrice.toFixed(2) + '</span>';
-                    html += '</div>';
-                }
-                if (f.buyPrice !== null && f.buyPrice !== undefined) {
-                    html += '<div class="landing-item-price-row buy">';
-                    html += '<span class="landing-item-price-label">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + '</span>';
-                    html += '<span class="landing-item-price-value">$ ' + f.buyPrice.toFixed(2) + '</span>';
+                var hasSell = f.sellPrice !== null && f.sellPrice !== undefined;
+                var hasBuy = f.buyPrice !== null && f.buyPrice !== undefined;
+                if (hasSell || hasBuy) {
+                    html += '<div class="landing-item-prices">';
+                    if (hasSell) {
+                        html += '<span class="landing-item-price-label sell">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + '</span>';
+                        html += '<span class="landing-item-price-value sell">$ ' + f.sellPrice.toFixed(2) + '</span>';
+                    }
+                    if (hasBuy) {
+                        html += '<span class="landing-item-price-label buy">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + '</span>';
+                        html += '<span class="landing-item-price-value buy">$ ' + f.buyPrice.toFixed(2) + '</span>';
+                    }
                     html += '</div>';
                 }
                 html += '</div>';

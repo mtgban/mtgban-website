@@ -1626,30 +1626,32 @@
     color: var(--greytext);
 }
 
-.landing-item-price-row {
-    display: flex;
+.landing-item-prices {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) max-content;
+    column-gap: 1em;
+    row-gap: 0.15em;
     align-items: baseline;
-    justify-content: space-between;
-    gap: 0.5em;
     font-size: 0.88em;
 }
-
-.landing-item-price-row.sell { color: var(--asuccess); }
-.landing-item-price-row.buy { color: var(--awarning); }
 
 .landing-item-price-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    flex: 0 1 auto;
-    min-width: 0;
 }
 
 .landing-item-price-value {
-    flex: 0 0 auto;
+    text-align: right;
     font-variant-numeric: tabular-nums;
     font-weight: 500;
 }
+
+.landing-item-price-label.sell,
+.landing-item-price-value.sell { color: var(--asuccess); }
+
+.landing-item-price-label.buy,
+.landing-item-price-value.buy { color: var(--awarning); }
 
 .landing-item-query {
     font-size: 0.95em;
@@ -1674,6 +1676,25 @@
 
 .landing-syntax-link a {
     color: var(--anormal);
+}
+
+/* === 2-column grid for favorites pane === */
+
+.landing-pane-favorites .landing-pane-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.4em;
+    padding: 0.5em;
+}
+
+.landing-pane-favorites .landing-item {
+    border-bottom: none;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+    border-radius: 0.4em;
+}
+
+.landing-pane-favorites .landing-item:last-child {
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
 }
 
 /* === Favorite star button on desktop result rows === */
