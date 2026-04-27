@@ -626,13 +626,13 @@ body.settings-open {
     text-align: right;
 }
 .settings-upload-fields {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.6em 1.5em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
 }
 .settings-field-row {
     display: grid;
-    grid-template-columns: minmax(8em, max-content) 1fr;
+    grid-template-columns: 12em 1fr;
     align-items: center;
     gap: 0 0.75em;
     cursor: pointer;
@@ -642,7 +642,4 @@ body.settings-open {
     font-size: var(--text-md);
     color: var(--normal);
     opacity: 0.78;
-}
-@media (max-width: 720px) {
-    .settings-upload-fields { grid-template-columns: 1fr; }
 }
