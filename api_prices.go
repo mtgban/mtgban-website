@@ -110,6 +110,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 			result.BuyVendor = bestBuyName
 		}
 
+		// Prefer thumbnail for inline favorites/recents render; fall back to full.
 		if co, err := mtgmatcher.GetUUID(cardId); err == nil {
 			if img, ok := co.Images["thumbnail"]; ok && img != "" {
 				result.ImageURL = img
