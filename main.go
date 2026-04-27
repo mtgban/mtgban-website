@@ -79,6 +79,7 @@ type PageVars struct {
 	Metadata     map[string]GenericCard
 	PromoTags    []string
 	NoSort       bool
+	NoSettings   bool
 	HasAvailable bool
 	CardBackURL  string
 	ShowUpsell   bool
@@ -90,7 +91,6 @@ type PageVars struct {
 	ScraperShort   string
 	HasAffiliate   bool
 	CanDownloadCSV bool
-	ShowSYP        bool
 
 	Arb            []Arbitrage
 	ArbitOptKeys   []string
@@ -121,7 +121,10 @@ type PageVars struct {
 	FilterFinish string
 	Rarities     []string
 	CardHashes   []string
-	EditionsMap  map[string]EditionEntry
+	EditionsMap        map[string]EditionEntry
+	EditionsCategories []string
+	EditionsByCategory map[string][]EditionEntry
+	PickerID           string
 
 	CanFilterByPrice bool
 	FilterMinPrice   float64
@@ -171,6 +174,8 @@ type PageVars struct {
 	AltKeys         []string
 	SellerKeys      []string
 	VendorKeys      []string
+	ModalSellerKeys []string
+	ModalVendorKeys []string
 	UploadEntries   []UploadEntry
 	IsBuylist       bool
 	TotalEntries    map[string]float64
@@ -1166,6 +1171,21 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		}
 	}
 	templates = append(templates, navbarPartial)
+
+	// Include settings-modal partial only for desktop pages that define a "settings-content" block.
+	// Including it unconditionally would cause template parse errors on pages without that block,
+	// and mobile pages use a separate settings sheet rather than this modal.
+	if !pageVars.IsMobile {
+		switch name {
+		case "search.html", "arbit.html", "upload.html":
+			templates = append(templates, "templates/partials/settings-modal.html")
+		case "sleep.html", "news.html":
+			templates = append(templates,
+				"templates/partials/settings-modal.html",
+				"templates/partials/editions-picker.html",
+			)
+		}
+	}
 
 	// Add other partials as needed
 	if name == "search.html" {

@@ -118,6 +118,37 @@
                         const hiddenBools = [
                             "upload", "download", "estimate", "deckbox", "tcgplayer_csv"
                         ];
+                        function syncUploadOptionsFromSettings() {
+                            var form = document.getElementById('upload_form');
+                            if (!form) return;
+                            // Remove any previously-injected hidden inputs
+                            form.querySelectorAll('[data-injected-opt]').forEach(function (el) { el.remove(); });
+                            function add(name, val) {
+                                var inp = document.createElement('input');
+                                inp.type = 'hidden';
+                                inp.name = name;
+                                inp.value = val == null ? '' : val;
+                                inp.dataset.injectedOpt = '1';
+                                form.appendChild(inp);
+                            }
+                            var optsRaw = getCookie('UploadOptimizerOpts');
+                            var opts = (optsRaw === null || optsRaw === '')
+                                ? ['lowval', 'lowvalabs', 'minmargin', 'customperc']
+                                : optsRaw.split(',').filter(Boolean);
+                            ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
+                                if (opts.indexOf(k) >= 0) add(k, 'true');
+                            });
+                            add('percspread',     getCookie('UploadPercSpread')    || '60');
+                            add('percspreadmax',  getCookie('UploadPercSpreadMax') || '0');
+                            add('minval',         getCookie('UploadMinVal')        || '1');
+                            add('maxval',         getCookie('UploadMaxVal')        || '0');
+                            add('margin',         getCookie('UploadMargin')        || '10');
+                            add('custompercmax',  getCookie('UploadCustomPercMax') || '100');
+                            add('multiplier',     getCookie('UploadMultiplier')    || '1');
+                            add('sorting',        getCookie('UploadSorting')       || '');
+                            add('altPrice',       getCookie('UploadAltPrice')      || '');
+                            add('pricesource',    getCookie('UploadPriceSource')   || '');
+                        }
                         function submitForm(field, newWindow) {
                             hiddenBools.forEach(element => {
                                 let formField = document.getElementById(element);
@@ -135,6 +166,7 @@
                                     form.target = '_blank';
                                 }
                             }
+                            syncUploadOptionsFromSettings();
                             form.submit();
                         }
                     </script>
@@ -157,93 +189,6 @@
                         {{end}}
                     </div>
 
-                    <!-- Optimizer Options (collapsible) -->
-                    <div class="upload-opts-toggle" onclick="toggleOpts(this)">
-                        <span class="upload-chevron">&#9654;</span>
-                        Optimizer Options
-                    </div>
-                    <div class="upload-opts-panel" id="optsPanel">
-                        <div class="upload-opts-grid">
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="lowval" name="lowval" checked onclick="javascript:saveCheckbox('lowval')">
-                                Hide low spread offers (below
-                                <input type="text" id="percspread" name="percspread" value="60" size="1" onchange="javascript:saveText('percspread')">
-                                %)
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="highval" name="highval" onclick="javascript:saveCheckbox('highval')">
-                                Hide high spread offers (above
-                                <input type="text" id="percspreadmax" name="percspreadmax" value="0" size="1" onchange="javascript:saveText('percspreadmax')">
-                                %)
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="lowvalabs" name="lowvalabs" checked onclick="javascript:saveCheckbox('lowvalabs')">
-                                Hide low value offers (below $
-                                <input type="text" id="minval" name="minval" value="1" size="1" onchange="javascript:saveText('minval')">
-                                )
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="highvalabs" name="highvalabs" onclick="javascript:saveCheckbox('highvalabs')">
-                                Hide high value offers (above $
-                                <input type="text" id="maxval" name="maxval" value="0" size="1" onchange="javascript:saveText('maxval')">
-                                )
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="minmargin" name="minmargin" checked onclick="javascript:saveCheckbox('minmargin')">
-                                Allow
-                                <input type="text" id="margin" name="margin" value="10" size="1" onchange="javascript:saveText('margin')">
-                                % difference for multi-select
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="nocond" name="nocond" onclick="javascript:saveCheckbox('nocond')">
-                                Ignore conditions when loading
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="noprice" name="noprice" onclick="javascript:saveCheckbox('noprice')">
-                                Ignore prices (use
-                                <select id="altPrice" name="altPrice" onchange="javascript:saveText('altPrice')">
-                                    {{range $.AltKeys}}
-                                        <option value="{{.}}" selected>&nbsp;{{scraper_name .}}</option>
-                                    {{end}}
-                                </select>
-                                instead)
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="customperc" name="customperc" checked onclick="javascript:saveCheckbox('customperc')">
-                                Visual indicator above
-                                <input type="text" id="custompercmax" name="custompercmax" value="100" size="1" onchange="javascript:saveText('custompercmax')">
-                                % spread
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="noresults" name="noresults" onclick="javascript:saveCheckbox('noresults')">
-                                Jump to Optimizer view by default
-                            </label>
-                            <label class="upload-opt-item">
-                                Sort by
-                                <select id="sorting" name="sorting" onchange="javascript:saveText('sorting')">
-                                    <option value="" selected>&nbsp;keep as uploaded</option>
-                                    <option value="setchrono">&nbsp;set(chrono)/name/number</option>
-                                    <option value="setalpha">&nbsp;set(alpha)/name/number</option>
-                                    <option value="alphabetical">&nbsp;alphabetical</option>
-                                    <option value="highprice">&nbsp;highest offer</option>
-                                    <option value="highspread">&nbsp;highest spread</option>
-                                    <option value="profitability">&nbsp;profitability</option>
-                                </select>
-                            </label>
-                            <label class="upload-opt-item">
-                                Qty multiplier:
-                                <input type="text" id="multiplier" name="multiplier" value="1" size="1" onchange="javascript:saveText('multiplier')">
-                            </label>
-                            <label class="upload-opt-item">
-                                Optimize by:
-                                <select id="pricesource" name="pricesource" onchange="javascript:saveText('pricesource')">
-                                    <option value="" selected>&nbsp;cash prices</option>
-                                    <option value="credit">&nbsp;store credit</option>
-                                    <option value="marketCredit">&nbsp;market store credit</option>
-                                </select>
-                            </label>
-                        </div>
-                    </div>
                 </div>
 
                 </form>
@@ -328,53 +273,6 @@
         </div><!-- /.upload-layout -->
 
         <script type="text/javascript">
-            function saveCheckbox(box) {
-                var checkbox = document.getElementById(box);
-                localStorage.setItem(box, checkbox.checked);
-            }
-
-            function saveText(input) {
-                var textInput = document.getElementById(input);
-                localStorage.setItem(input, textInput.value);
-            }
-
-            const checkboxes = [
-                "lowval",
-                "highval",
-                "lowvalabs",
-                "highvalabs",
-                "minmargin",
-                "nocond",
-                "noprice",
-                "noresults",
-                "customperc",
-            ];
-            checkboxes.forEach(element => {
-                var checked = JSON.parse(localStorage.getItem(element));
-                if (checked !== null) {
-                    document.getElementById(element).checked = checked;
-                }
-            })
-
-            const textInputs = [
-                "percspread",
-                "percspreadmax",
-                "minval",
-                "maxval",
-                "margin",
-                "sorting",
-                "custompercmax",
-                "altPrice",
-                "multiplier",
-                "pricesource",
-            ];
-            textInputs.forEach(element => {
-                var input = localStorage.getItem(element);
-                if (input) {
-                    document.getElementById(element).value = input;
-                }
-            })
-
             function enabledButtons() {
                 const fields = [
                     'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
@@ -445,11 +343,6 @@
                 if (type === 'text') {
                     enabledButtons();
                 }
-            };
-
-            window.toggleOpts = function(el) {
-                el.classList.toggle('open');
-                document.getElementById('optsPanel').classList.toggle('open');
             };
 
             window.pressed = function() {
@@ -925,7 +818,6 @@
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
                                     {{if $card.Reserved}} *{{end}}
                                     {{if $card.Stocks}} &bull;{{end}}
-                                    {{if $card.SypList}} &dagger;{{end}}
                                 </td>
                                 <td class="opt-set">
                                     <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.SetCode}} #{{$card.Number}}
@@ -968,14 +860,45 @@
         document.querySelectorAll('.res-tab').forEach(function(t) { t.classList.remove('on'); });
         btn.classList.add('on');
     }
+    // One-time localStorage → cookie migration for the upload optimizer
+    document.addEventListener('DOMContentLoaded', function migrateUploadPrefs() {
+        var existing = getCookie('UploadOptimizerOpts');
+        if (existing !== null && existing !== '') return; // already migrated or has cookie state
+        if (localStorage.getItem('lowval') === null && localStorage.getItem('percspread') === null) return; // nothing to migrate
+        var bits = [];
+        ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
+            if (localStorage.getItem(k) === 'true') bits.push(k);
+        });
+        setCookie('UploadOptimizerOpts', bits.join(',') + (bits.length ? ',' : ''), 1000);
+        var textMap = {
+            percspread: 'UploadPercSpread',
+            percspreadmax: 'UploadPercSpreadMax',
+            minval: 'UploadMinVal',
+            maxval: 'UploadMaxVal',
+            margin: 'UploadMargin',
+            custompercmax: 'UploadCustomPercMax',
+            multiplier: 'UploadMultiplier',
+            sorting: 'UploadSorting',
+            altPrice: 'UploadAltPrice',
+            pricesource: 'UploadPriceSource',
+        };
+        Object.keys(textMap).forEach(function (k) {
+            var v = localStorage.getItem(k);
+            if (v !== null && v !== '') setCookie(textMap[k], v, 1000);
+        });
+        // Cleanup so we don't migrate again
+        var allKeys = Object.keys(textMap).concat(['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults']);
+        allKeys.forEach(function (k) { localStorage.removeItem(k); });
+    });
     // Auto-activate optimizer tab when "skip results" was checked
-    (function() {
-        var skipResults = JSON.parse(localStorage.getItem('noresults'));
+    document.addEventListener('DOMContentLoaded', function () {
+        var opts = (getCookie('UploadOptimizerOpts') || '').split(',').filter(Boolean);
+        var skipResults = opts.indexOf('noresults') >= 0;
         var optBtn = document.querySelector('.res-tab:nth-child(2)');
         if (skipResults && optBtn) {
             showResTab('optimizer', optBtn);
         }
-    })();
+    });
     </script>
 
     {{if .Optimized}}
@@ -1154,4 +1077,106 @@
             <h4><i>{{.InfoMessage}}</i></h4>
         </div>
     {{end}}
+{{end}}
+
+{{define "settings-content"}}
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Optimizer Filters</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body" id="settings-upload-checks" data-cookie="UploadOptimizerOpts">
+        <p class="section-desc">Hide offers outside your spread or value range, plus tolerance and condition handling.</p>
+        <div class="settings-toggles-grid">
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="lowval">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Hide low spread offers (below <input type="text" id="opt-percspread" value="60" class="settings-inline-num">%)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="highval">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Hide high spread offers (above <input type="text" id="opt-percspreadmax" value="0" class="settings-inline-num">%)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="lowvalabs">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Hide low value offers (below $<input type="text" id="opt-minval" value="1" class="settings-inline-num">)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="highvalabs">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Hide high value offers (above $<input type="text" id="opt-maxval" value="0" class="settings-inline-num">)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="minmargin">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Allow <input type="text" id="opt-margin" value="10" class="settings-inline-num">% difference for multi-select</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="nocond">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Ignore conditions when loading</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="noprice">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Ignore prices (use the alternate price source instead)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="customperc">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Visual indicator above <input type="text" id="opt-custompercmax" value="100" class="settings-inline-num">% spread</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="noresults">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Jump to Optimizer view by default</span>
+            </label>
+        </div>
+    </div>
+</section>
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Sorting &amp; Pricing</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">How optimized rows are ordered and which price source drives the math.</p>
+        <div class="settings-upload-fields">
+            <label class="settings-field-row">
+                <span>Sort by</span>
+                <select id="opt-sorting" data-cookie="UploadSorting">
+                    <option value="">keep as uploaded</option>
+                    <option value="setchrono">set (chronological), name, number</option>
+                    <option value="setalpha">set (alphabetical), name, number</option>
+                    <option value="alphabetical">alphabetical</option>
+                    <option value="highprice">highest offer</option>
+                    <option value="highspread">highest spread</option>
+                    <option value="profitability">profitability</option>
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Optimize by</span>
+                <select id="opt-pricesource" data-cookie="UploadPriceSource">
+                    <option value="">cash prices</option>
+                    <option value="credit">store credit</option>
+                    <option value="marketCredit">market store credit</option>
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Alternate price source</span>
+                <select id="opt-altPrice" data-cookie="UploadAltPrice">
+                    {{range $.AltKeys}}{{$name := scraper_name .}}{{if $name}}
+                    <option value="{{.}}">{{$name}}</option>
+                    {{end}}{{end}}
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Quantity multiplier</span>
+                <input type="text" id="opt-multiplier" value="1" class="settings-inline-num">
+            </label>
+        </div>
+    </div>
+</section>
 {{end}}

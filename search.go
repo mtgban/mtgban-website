@@ -124,8 +124,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	page := r.FormValue("page")
 	if page == "options" {
-		pageVars.Title = "Options"
-		render(w, "search.html", pageVars)
+		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
 	}
 
@@ -250,7 +249,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
-	pageVars.ShowSYP = !slices.Contains(miscSearchOpts, "noSyp")
 
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	if pageVars.IsSealed {

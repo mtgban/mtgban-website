@@ -330,43 +330,6 @@
     cursor: not-allowed;
 }
 
-/* ── Optimizer Options (Collapsible) ── */
-.upload-opts-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    color: var(--activetext);
-    font-size: var(--text-md);
-    font-weight: 500;
-    padding: 10px 0 0;
-    user-select: none;
-}
-
-.upload-opts-toggle .upload-chevron {
-    transition: transform 0.2s;
-    font-size: var(--text-sm);
-}
-
-.upload-opts-toggle.open .upload-chevron {
-    transform: rotate(90deg);
-}
-
-.upload-opts-panel {
-    display: none;
-    padding-top: 16px;
-}
-
-.upload-opts-panel.open {
-    display: block;
-}
-
-.upload-opts-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-}
-
 .upload-opt-item {
     display: flex;
     align-items: flex-start;
@@ -572,10 +535,6 @@
     }
 
     .upload-source-options {
-        grid-template-columns: 1fr;
-    }
-
-    .upload-opts-grid {
         grid-template-columns: 1fr;
     }
 

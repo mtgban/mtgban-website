@@ -1,0 +1,37 @@
+{{define "editions-picker"}}
+<div class="editions-picker" id="{{.PickerID}}">
+    <div class="editions-picker-search">
+        <input type="text" placeholder="Search editions..." autocomplete="off">
+    </div>
+    <div class="editions-picker-actions">
+        <button type="button" class="settings-btn" data-action="select-all">Select All</button>
+        <button type="button" class="settings-btn" data-action="clear-all">Clear All</button>
+        <span data-role="visible-actions" hidden>
+            <button type="button" class="settings-btn" data-action="select-visible">Select Visible</button>
+            <button type="button" class="settings-btn" data-action="clear-visible">Clear Visible</button>
+        </span>
+    </div>
+
+    {{range $cat := .EditionsCategories}}
+    <div class="editions-group" data-category="{{$cat}}">
+        <div class="editions-group-header">
+            <input type="checkbox" class="editions-group-checkbox" aria-label="Toggle all in {{$cat}}">
+            <span class="editions-group-title">{{$cat}}</span>
+            <span class="editions-group-count">(0 of 0 selected)</span>
+            <i class="group-chevron" data-lucide="chevron-right"></i>
+        </div>
+        <div class="editions-group-body">
+            <div class="editions-grid">
+                {{range $edition := index $.EditionsByCategory $cat}}
+                <label data-name="{{$edition.Name}}" data-code="{{$edition.Code}}">
+                    <input type="checkbox" name="{{$edition.Code}}">
+                    <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
+                    <span class="row-name">{{$edition.Name}}</span>
+                </label>
+                {{end}}
+            </div>
+        </div>
+    </div>
+    {{end}}
+</div>
+{{end}}

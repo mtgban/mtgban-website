@@ -83,6 +83,34 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
+	// Populate modal data for the settings panel (shown on every sleepers page).
+	// Uses a stricter filter than the main seller list: excludes international
+	// sellers (CountryFlag), metadata-only scrapers, and the standard blocklists.
+	var modalSellerKeys, modalVendorKeys []string
+	for _, seller := range Sellers {
+		if seller.Info().CountryFlag != "" ||
+			seller.Info().SealedMode ||
+			seller.Info().MetadataOnly ||
+			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+			continue
+		}
+		modalSellerKeys = append(modalSellerKeys, seller.Info().Shorthand)
+	}
+	for _, vendor := range Vendors {
+		if vendor.Info().CountryFlag != "" ||
+			vendor.Info().SealedMode ||
+			vendor.Info().MetadataOnly ||
+			slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
+			continue
+		}
+		modalVendorKeys = append(modalVendorKeys, vendor.Info().Shorthand)
+	}
+	pageVars.ModalSellerKeys = modalSellerKeys
+	pageVars.ModalVendorKeys = modalVendorKeys
+	pageVars.EditionsCategories = AllEditionsCategoriesSorted
+	pageVars.EditionsByCategory = AllEditionsByCategory
+	pageVars.PickerID = "sleep-editions-picker"
+
 	var tiers map[string]int
 
 	start := time.Now()
@@ -96,38 +124,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 		return
 	case "options":
-		pageVars.Subtitle = "Options"
-
-		var sellerKeys, vendorKeys []string
-		for _, seller := range Sellers {
-			if seller.Info().CountryFlag != "" ||
-				seller.Info().SealedMode ||
-				seller.Info().MetadataOnly ||
-				slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-				continue
-			}
-
-			sellerKeys = append(sellerKeys, seller.Info().Shorthand)
-		}
-
-		for _, vendor := range Vendors {
-			if vendor.Info().CountryFlag != "" ||
-				vendor.Info().SealedMode ||
-				vendor.Info().MetadataOnly ||
-				slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-				continue
-			}
-
-			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
-		}
-
-		pageVars.Editions = AllEditionsKeys
-		pageVars.EditionsMap = AllEditionsMap
-		pageVars.SellerKeys = sellerKeys
-		pageVars.VendorKeys = vendorKeys
-
-		render(w, "sleep.html", pageVars)
-
+		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
 	case "bulk":
 		pageVars.Subtitle = "Bulk me up"

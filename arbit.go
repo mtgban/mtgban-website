@@ -359,32 +359,27 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 		blocklistVendors = strings.Split(blocklistVendorsOpt, ",")
 	}
 
-	if r.FormValue("page") == "options" {
-		pageVars.Title = "Options"
-		// Load editions
-		pageVars.Editions = AllEditionsKeys
-		pageVars.EditionsMap = AllEditionsMap
-
-		// Load all available vendors
-		var vendorKeys []string
-		if reverse {
-			for _, seller := range Sellers {
-				if slices.Contains(blocklistVendors, seller.Info().Shorthand) {
-					continue
-				}
-				vendorKeys = append(vendorKeys, seller.Info().Shorthand)
+	// Populate vendor keys for the settings modal (shown on every page load)
+	var vendorKeys []string
+	if reverse {
+		for _, seller := range Sellers {
+			if slices.Contains(blocklistVendors, seller.Info().Shorthand) {
+				continue
 			}
-		} else {
-			for _, vendor := range Vendors {
-				if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
-					continue
-				}
-				vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
-			}
+			vendorKeys = append(vendorKeys, seller.Info().Shorthand)
 		}
-		pageVars.VendorKeys = vendorKeys
+	} else {
+		for _, vendor := range Vendors {
+			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
+				continue
+			}
+			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
+		}
+	}
+	pageVars.VendorKeys = vendorKeys
 
-		render(w, "arbit.html", pageVars)
+	if r.FormValue("page") == "options" {
+		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
 	}
 	cookieName := "ArbitVendorsList"
@@ -457,23 +452,18 @@ func Global(w http.ResponseWriter, r *http.Request) {
 		blocklistVendors = append(blocklistVendors, seller.Info().Shorthand)
 	}
 
-	if r.FormValue("page") == "options" {
-		pageVars.Title = "Options"
-		// Load editions
-		pageVars.Editions = AllEditionsKeys
-		pageVars.EditionsMap = AllEditionsMap
-
-		// Load all available vendors
-		var vendorKeys []string
-		for _, vendor := range Vendors {
-			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
-				continue
-			}
-			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
+	// Populate vendor keys for the settings modal (shown on every page load)
+	var globalVendorKeys []string
+	for _, vendor := range Vendors {
+		if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
+			continue
 		}
-		pageVars.VendorKeys = vendorKeys
+		globalVendorKeys = append(globalVendorKeys, vendor.Info().Shorthand)
+	}
+	pageVars.VendorKeys = globalVendorKeys
 
-		render(w, "arbit.html", pageVars)
+	if r.FormValue("page") == "options" {
+		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
 		return
 	}
 

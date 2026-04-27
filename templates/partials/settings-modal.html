@@ -1,0 +1,25 @@
+{{define "settings-modal-slot"}}
+<div class="settings-backdrop" id="settings-backdrop"></div>
+<div class="settings-modal" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <div class="settings-modal-header">
+        <h2 id="settings-modal-title">Settings</h2>
+    </div>
+    <div class="settings-modal-body">
+        {{template "settings-content" .}}
+    </div>
+    <div class="settings-modal-footer">
+        <button class="settings-btn" data-role="cancel" type="button">Cancel</button>
+        <button class="settings-btn primary" data-role="save" type="button" disabled>Save</button>
+    </div>
+
+    <div class="settings-confirm-backdrop"></div>
+    <div class="settings-confirm-dialog">
+        <p>You have unsaved changes. Save, discard, or keep editing?</p>
+        <div class="settings-confirm-actions">
+            <button class="settings-btn" data-role="confirm-keep" type="button">Keep editing</button>
+            <button class="settings-btn" data-role="confirm-discard" type="button">Discard</button>
+            <button class="settings-btn primary" data-role="confirm-save" type="button">Save</button>
+        </div>
+    </div>
+</div>
+{{end}}
