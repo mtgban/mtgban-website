@@ -8,6 +8,9 @@
         <h1>Admin</h1>
     </div>
 
+    {{if ne .WarningMessage ""}}
+        <div class="admin-msg admin-msg-error">{{.WarningMessage}}</div>
+    {{end}}
     {{if ne .InfoMessage ""}}
         {{if .SelectableField}}
             <div class="admin-msg">

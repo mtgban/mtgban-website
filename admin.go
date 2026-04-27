@@ -292,17 +292,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 		err := json.Unmarshal([]byte(newConfig), &config)
 		if err != nil {
-			pageVars.InfoMessage = err.Error()
+			pageVars.WarningMessage = err.Error()
 		} else {
 			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
 			if err != nil {
-				pageVars.InfoMessage = err.Error()
+				pageVars.WarningMessage = err.Error()
 			} else {
 				defer writer.Close()
 				err = writeConfigFile(config, writer)
 				if err != nil {
 					log.Println(err)
-					pageVars.InfoMessage = err.Error()
+					pageVars.WarningMessage = err.Error()
 				} else {
 					Config = config
 					Config.sourcePath = configSourcePath

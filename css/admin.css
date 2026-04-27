@@ -23,6 +23,11 @@
     font-weight: 500;
     margin-bottom: 14px;
 }
+.admin-msg-error {
+    background: rgba(255,66,77,0.1);
+    border-color: rgba(255,66,77,0.25);
+    color: var(--adanger);
+}
 
 /* ── Status Banner ── */
 .admin-status-bar {
