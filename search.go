@@ -110,6 +110,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	isSetsPage := r.URL.Path == "/sets"
 	if query == "" {
 		pageVars.PromoTags = mtgmatcher.AllPromoTypes()
+		if !pageVars.IsSealed && !isSetsPage {
+			pageVars.SetKeyrunes = getSetKeyrunes()
+		}
 	}
 
 	pageVars.HasAvailable = len(mtgmatcher.GetSealedUUIDs()) > 0
