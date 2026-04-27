@@ -1,7 +1,7 @@
 {{define "search-landing-panes"}}
 <script type="text/javascript">
     window.BAN_SET_KEYRUNES = {
-        {{range $code, $kr := .SetKeyrunes}}{{$code | printf "%q"}}: {{$kr | printf "%q"}},
+        {{range $code, $kr := .SetKeyrunes}}{{$code}}: {{$kr}},
         {{end}}
     };
 </script>
