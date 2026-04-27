@@ -1671,6 +1671,32 @@
     color: var(--greytext);
 }
 
+.landing-item-delete {
+    display: none;
+    background: transparent;
+    border: none;
+    color: var(--greytext);
+    cursor: pointer;
+    padding: 0.3em;
+    border-radius: 0.25em;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+}
+
+.landing-item:hover .landing-item-delete {
+    display: inline-flex;
+}
+
+.landing-item:hover .landing-item-arrow {
+    display: none;
+}
+
+.landing-item-delete:hover {
+    color: var(--adanger);
+    background: var(--surface-2);
+}
+
 .landing-syntax-link {
     margin-top: 1em;
     text-align: center;
