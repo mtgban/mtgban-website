@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 type PriceResult struct {
@@ -12,6 +14,7 @@ type PriceResult struct {
 	SellVendor string   `json:"sellVendor,omitempty"`
 	BuyPrice   *float64 `json:"buyPrice"`
 	BuyVendor  string   `json:"buyVendor,omitempty"`
+	ImageURL   string   `json:"imageURL,omitempty"`
 }
 
 func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +108,14 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		if bestBuyPrice > 0 {
 			result.BuyPrice = &bestBuyPrice
 			result.BuyVendor = bestBuyName
+		}
+
+		if co, err := mtgmatcher.GetUUID(cardId); err == nil {
+			if img, ok := co.Images["thumbnail"]; ok && img != "" {
+				result.ImageURL = img
+			} else if img, ok := co.Images["full"]; ok {
+				result.ImageURL = img
+			}
 		}
 
 		results[cardId] = result
