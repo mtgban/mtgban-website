@@ -190,7 +190,18 @@
         {{$card := (index $.Metadata $cardId)}}
         <div class="m-card"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
             {{/* Card header - tap to show image drawer */}}
-            <div class="m-card-header" data-setcode="{{$card.SetCode}}" onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
+            <div class="m-card-header"
+                 data-card-id="{{$cardId}}"
+                 data-card-name="{{$card.Name}}"
+                 data-set-code="{{$card.SetCode}}"
+                 data-edition="{{$card.Edition}}"
+                 data-number="{{$card.Number}}"
+                 data-image-url="{{$card.ImageURL}}"
+                 data-finish-tag="{{$card.FinishTag}}"
+                 data-finish-class="{{$card.FinishClass}}"
+                 data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
+                 data-setcode="{{$card.SetCode}}"
+                 onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
                 <div class="m-card-icon">
                     {{if $card.Keyrune}}
                         <i class="ss {{$card.Keyrune}} ss-fw"></i>
@@ -211,7 +222,7 @@
                     {{if $card.FinishTag}}<span class="m-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
                     {{range $card.Treatments}}<span class="m-badge treatment">{{.}}</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
-                    <button class="m-fav-btn" data-card="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
+                    <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
                     {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
                 </div>
             </div>
