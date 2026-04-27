@@ -56,7 +56,7 @@
     {{else}}
         {{if eq .SearchQuery ""}}
             {{template "search-bar" .}}
-            {{template "syntax" .}}
+            {{template "search-landing-panes" .}}
         {{else}}
             {{template "search-results" .}}
         {{end}}
