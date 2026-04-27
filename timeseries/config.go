@@ -14,6 +14,7 @@ type SqlConfig struct {
 	Password string `json:"password"`
 	DBName   string `json:"dbname"`
 	SSLMode  string `json:"sslmode"`
+	ReadOnly bool   `json:"readonly"`
 }
 
 func (c SqlConfig) DSN() string {
@@ -29,7 +30,8 @@ func (c SqlConfig) DSN() string {
 
 // Client wraps a Postgres connection pool for the timeseries price table.
 type Client struct {
-	db *sql.DB
+	db       *sql.DB
+	readOnly bool
 }
 
 // NewClient opens a connection pool to the Postgres database described by cfg.
@@ -47,7 +49,7 @@ func NewClient(cfg SqlConfig) (*Client, error) {
 		return nil, fmt.Errorf("timeseries: ping: %w", err)
 	}
 
-	return &Client{db: db}, nil
+	return &Client{db: db, readOnly: cfg.ReadOnly}, nil
 }
 
 // Close shuts down the connection pool.

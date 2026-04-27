@@ -117,6 +117,9 @@ func (c *Client) HGetAll(ctx context.Context, cardID string, isFoil bool, isEtch
 // non-nil price columns with COALESCE so that a single UUID's prices can
 // be built up across multiple scrapers without overwriting earlier values.
 func (c *Client) UpsertRow(ctx context.Context, row PriceRow) error {
+	if c.readOnly {
+		return nil
+	}
 	row.MtgjsonUUID = NormalizeUUID(row.MtgjsonUUID)
 	const q = `
 		INSERT INTO product_prices (
@@ -156,6 +159,9 @@ const colsPerRow = 16
 // reduces the number of database round-trips. Rows are sent in batches of
 // the given batchSize (capped to stay under Postgres's 65535 parameter limit).
 func (c *Client) UpsertRows(ctx context.Context, rows []PriceRow, batchSize int) (int, error) {
+	if c.readOnly {
+		return 0, nil
+	}
 	if len(rows) == 0 {
 		return 0, nil
 	}
