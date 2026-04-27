@@ -1628,7 +1628,7 @@
 
 .landing-item-prices {
     display: grid;
-    grid-template-columns: minmax(0, max-content) max-content;
+    grid-template-columns: var(--landing-price-label-w, 14em) max-content;
     column-gap: 1em;
     row-gap: 0.15em;
     align-items: baseline;
