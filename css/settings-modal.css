@@ -65,11 +65,7 @@
     justify-content: space-between;
     padding: 1em 1.25em;
     border-bottom: 1px solid var(--border-subtle);
-    background: linear-gradient(
-        to bottom,
-        color-mix(in srgb, var(--settings-amber) 7%, transparent),
-        transparent
-    );
+    background: var(--surface-2);
     flex-shrink: 0;
 }
 .settings-modal-header h2 {
@@ -81,15 +77,6 @@
     display: flex;
     align-items: center;
     gap: 0.5em;
-}
-.settings-modal-header h2::before {
-    content: "";
-    display: inline-block;
-    width: 0.35em;
-    height: 1em;
-    border-radius: 2px;
-    background: var(--settings-amber);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--settings-amber) 55%, transparent);
 }
 .settings-modal-close {
     background: transparent;
