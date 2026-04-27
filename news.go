@@ -1538,6 +1538,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.ScraperShort = "SYP"
 		pageVars.LargeTable = true
 		pageVars.Metadata = map[string]GenericCard{}
+		pageVars.NoSettings = true
 
 		syp, err := findVendorBuylist("SYP")
 		if err != nil {

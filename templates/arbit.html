@@ -555,6 +555,7 @@
 {{end}}
 
 {{define "settings-content"}}
+{{if not .NoSettings}}
 {{$cookieName := "ArbitVendorsList"}}
 {{if .ReverseMode}}{{$cookieName = "ReverseVendorsList"}}{{end}}
 {{if .GlobalMode}}{{$cookieName = "GlobalVendorsList"}}{{end}}
@@ -572,4 +573,5 @@
         </div>
     </div>
 </section>
+{{end}}
 {{end}}

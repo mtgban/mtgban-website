@@ -79,6 +79,7 @@ type PageVars struct {
 	Metadata     map[string]GenericCard
 	PromoTags    []string
 	NoSort       bool
+	NoSettings   bool
 	HasAvailable bool
 	CardBackURL  string
 	ShowUpsell   bool
