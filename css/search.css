@@ -1586,8 +1586,12 @@
     object-fit: cover;
 }
 
+.landing-item-thumb:has(.ss) {
+    background: transparent;
+}
+
 .landing-item-thumb i.ss {
-    font-size: 2em;
+    font-size: 2.5em;
     color: var(--normal);
 }
 
