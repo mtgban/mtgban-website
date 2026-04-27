@@ -818,7 +818,6 @@
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
                                     {{if $card.Reserved}} *{{end}}
                                     {{if $card.Stocks}} &bull;{{end}}
-                                    {{if $card.SypList}} &dagger;{{end}}
                                 </td>
                                 <td class="opt-set">
                                     <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.SetCode}} #{{$card.Number}}

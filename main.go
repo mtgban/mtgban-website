@@ -90,7 +90,6 @@ type PageVars struct {
 	ScraperShort   string
 	HasAffiliate   bool
 	CanDownloadCSV bool
-	ShowSYP        bool
 
 	Arb            []Arbitrage
 	ArbitOptKeys   []string

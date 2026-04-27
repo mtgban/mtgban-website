@@ -684,10 +684,6 @@
     background: rgba(91,141,239,0.1);
     color: var(--search-link);
 }
-.result-badge.syp {
-    background: rgba(63,185,80,0.1);
-    color: var(--asuccess);
-}
 .result-badge.news {
     background: rgba(239,68,68,0.1);
     color: #ef4444;

@@ -726,7 +726,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                                             {{range $card.Treatments}}<span class="result-badge treatment">{{.}}</span>{{end}}
                                             {{if $card.Reserved}}<span class="result-badge rl">RL</span>{{end}}
                                             {{if $card.Stocks}}<span class="result-badge stocks">Stocks</span>{{end}}
-                                            {{if and $.ShowSYP $card.SypList}}<span class="result-badge syp">SYP</span>{{end}}
                                             {{if $card.Newspaper}}<span class="result-badge news">News</span>{{end}}
                                         </div>
                                     </div>
@@ -1254,11 +1253,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                 <input type="checkbox" data-misc="skipEmpty">
                 <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
                 <span>Skip results with no prices</span>
-            </label>
-            <label class="settings-toggle">
-                <input type="checkbox" data-misc="noSyp">
-                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
-                <span>Don't show the SYP indication (&dagger;)</span>
             </label>
             <label class="settings-toggle">
                 <input type="checkbox" data-misc="noUpsell">

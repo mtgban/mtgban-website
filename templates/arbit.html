@@ -420,7 +420,6 @@
                                         <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
                                         {{if $card.Reserved}} *{{end}}
                                         {{if $card.Stocks}} •{{end}}
-                                        {{if $card.SypList}} †{{end}}
                                         {{if eq $.ScraperShort $card.HotlistStore}}
                                             <span class="emoji" title="Highest price in 3 months">🌟</span>
                                         {{end}}

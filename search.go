@@ -249,7 +249,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
-	pageVars.ShowSYP = !slices.Contains(miscSearchOpts, "noSyp")
 
 	config := parseSearchOptionsNG(query, blocklistRetail, blocklistBuylist, miscSearchOpts)
 	if pageVars.IsSealed {
