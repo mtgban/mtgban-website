@@ -1678,25 +1678,6 @@
     color: var(--anormal);
 }
 
-/* === 2-column grid for favorites pane === */
-
-.landing-pane-favorites .landing-pane-body {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.4em;
-    padding: 0.5em;
-}
-
-.landing-pane-favorites .landing-item {
-    border-bottom: none;
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
-    border-radius: 0.4em;
-}
-
-.landing-pane-favorites .landing-item:last-child {
-    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
-}
-
 /* === Favorite star button on desktop result rows === */
 
 .result-quick-icons .fav-btn {
