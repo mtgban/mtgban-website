@@ -633,11 +633,12 @@ body.settings-open {
 }
 .settings-field-row {
     display: grid;
-    grid-template-columns: 12em 1fr;
+    grid-template-columns: 12em auto;
     align-items: center;
     gap: 0 0.75em;
     cursor: pointer;
     user-select: none;
+    justify-content: start;
 }
 .settings-field-row > span {
     font-size: var(--text-md);
