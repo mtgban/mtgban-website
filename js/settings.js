@@ -41,6 +41,9 @@
         },
         upload: {
             misc: { 'settings-upload-checks': 'UploadOptimizerOpts' },
+            miscDefaults: {
+                'settings-upload-checks': ['lowval', 'lowvalabs', 'minmargin', 'customperc'],
+            },
             selects: ['UploadSorting', 'UploadAltPrice', 'UploadPriceSource'],
             texts: {
                 'opt-percspread': 'UploadPercSpread',
@@ -150,12 +153,15 @@
         });
         return names.join(',') + (names.length ? ',' : '');
     }
-    function bindMiscBitmap(containerId, cookieName) {
+    function bindMiscBitmap(containerId, cookieName, defaults) {
         const c = document.getElementById(containerId);
         if (!c) return;
         addBinding({
             load: function () {
-                const items = (getCookie(cookieName) || '').split(',').filter(Boolean);
+                const raw = getCookie(cookieName);
+                const items = (raw === null || raw === '')
+                    ? (defaults || [])
+                    : raw.split(',').filter(Boolean);
                 c.querySelectorAll('[data-misc]').forEach(function (el) {
                     el.checked = items.indexOf(el.dataset.misc) >= 0;
                 });
@@ -186,7 +192,10 @@
             Object.entries(page.pills || {}).forEach(function (e) { bindPills(e[0], e[1]); });
             (page.selects || []).forEach(bindSelect);
             Object.entries(page.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
-            Object.entries(page.misc || {}).forEach(function (e) { bindMiscBitmap(e[0], e[1]); });
+            Object.entries(page.misc || {}).forEach(function (e) {
+                const defaults = (page.miscDefaults || {})[e[0]];
+                bindMiscBitmap(e[0], e[1], defaults);
+            });
             (page.dynamicLists || []).forEach(bindDynamicList);
             Object.entries(page.editions || {}).forEach(function (e) { bindEditions(e[0], e[1]); });
         });
