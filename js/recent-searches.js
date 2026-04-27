@@ -3,20 +3,24 @@
     var STORAGE_KEY = 'mtgban_recent_searches';
     var MAX_ENTRIES = 15;
 
-    // Parse a query for set tokens. Returns {set, keyrune} or {set:'', keyrune:''} if none.
-    // Recognizes: s:CODE, s:"Name", e:CODE, ee:CODE
+    // Parse a query for set tokens. Returns {set, keyrune} only when the query is
+    // a "pure set search" - the first token is s:/e:/ee:. A query like "Birds s:7ed"
+    // is a card search with a set filter, not a set browse, so no keyrune.
     function parseSetToken(query) {
         if (!query) return { set: '', keyrune: '' };
+        var trimmed = query.trim();
 
-        // Quoted set name: s:"Aether Revolt"
-        var qm = query.match(/\bs:"([^"]+)"/i);
-        if (qm) {
-            // We don't resolve names to codes client-side - leave keyrune empty.
+        // Must start with s:, e:, or ee: to count as a pure set search.
+        if (!/^(?:s|e|ee):/i.test(trimmed)) {
             return { set: '', keyrune: '' };
         }
 
-        // Set code variants: s:CODE, e:CODE, ee:CODE
-        var cm = query.match(/\b(?:s|e|ee):([A-Za-z0-9]{2,6})\b/i);
+        // Quoted set name: s:"Aether Revolt" - can't resolve to keyrune client-side.
+        if (/^s:"[^"]+"/i.test(trimmed)) {
+            return { set: '', keyrune: '' };
+        }
+
+        var cm = trimmed.match(/^(?:s|e|ee):([A-Za-z0-9]{2,6})\b/i);
         if (cm) {
             var code = cm[1].toUpperCase();
             var keyrunes = window.BAN_SET_KEYRUNES || {};
@@ -134,9 +138,12 @@
             html += '<div class="landing-pane-body">';
             slice.forEach(function(s) {
                 html += '<a class="landing-item landing-item-recent" href="?q=' + encodeURIComponent(s.q) + '">';
+                // Re-derive thumbnail treatment so legacy entries (with stale set/keyrune
+                // for non-pure-set queries) render correctly.
+                var token = parseSetToken(s.q);
                 html += '<div class="landing-item-thumb">';
-                if (s.keyrune) {
-                    html += '<i class="ss ' + escapeAttr(s.keyrune) + ' ss-fw"></i>';
+                if (token.keyrune) {
+                    html += '<i class="ss ' + escapeAttr(token.keyrune) + ' ss-fw"></i>';
                 } else if (s.img) {
                     html += '<img src="' + escapeAttr(s.img) + '" loading="lazy" alt="">';
                 } else {
