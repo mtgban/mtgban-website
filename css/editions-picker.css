@@ -152,9 +152,11 @@
     overflow-wrap: anywhere;
 }
 .editions-grid label .ss {
-    color: var(--text-dim);
+    color: var(--normal);
+    opacity: 0.85;
     flex-shrink: 0;
 }
+.editions-grid label:hover .ss { opacity: 1; }
 .editions-grid label mark {
     background: color-mix(in srgb, var(--ainfo) 30%, transparent);
     color: var(--headingtext);
