@@ -22,13 +22,9 @@
     }
 
     function extractCardData(btn) {
-        // Find ancestor with data-card-id (works for both mobile .m-card-header and desktop .result-header)
-        var row = btn.closest('[data-card-id]');
-        if (!row) {
-            // Fall back to closest .m-card-header or .result-header parent
-            var parent = btn.closest('.m-card-header, .result-header');
-            if (parent) row = parent;
-        }
+        // Walk to the row container by class. Both button and row carry data-card-id,
+        // so a [data-card-id] selector would match the button itself first.
+        var row = btn.closest('.m-card-header, .result-header');
         if (!row) return null;
 
         var cardId = row.getAttribute('data-card-id') || btn.getAttribute('data-card-id');
@@ -296,10 +292,13 @@
         var favs = getFavorites();
         if (favs.length === 0) return;
 
-        // Check if any favorites are stale
+        // Refresh if any entry is older than STALE_MS, or if any entry is missing
+        // prices (desktop favorites have no inline DOM to scrape best-price from).
         var now = Date.now();
-        var stale = favs.some(function(f) { return (now - f.t) > STALE_MS; });
-        if (!stale) return;
+        var needsRefresh = favs.some(function(f) {
+            return (now - f.t) > STALE_MS || (f.sellPrice == null && f.buyPrice == null);
+        });
+        if (!needsRefresh) return;
 
         doRefresh();
     }
