@@ -1,0 +1,19 @@
+{{define "search-landing-panes"}}
+<script type="text/javascript">
+    window.BAN_SET_KEYRUNES = {
+        {{range $code, $kr := .SetKeyrunes}}{{$code | printf "%q"}}: {{$kr | printf "%q"}},
+        {{end}}
+    };
+</script>
+<div class="search-landing">
+    <div class="search-landing-grid">
+        <div class="landing-pane landing-pane-recent" id="desktop-recent-searches">
+            <div class="landing-empty">Your recent searches will appear here.</div>
+        </div>
+        <div class="landing-pane landing-pane-favorites" id="desktop-favorites">
+            <div class="landing-empty">Star cards from any search to favorite them.</div>
+        </div>
+    </div>
+    <p class="landing-syntax-link">Looking for syntax help? See the <a href="/guide">guide</a> page.</p>
+</div>
+{{end}}
