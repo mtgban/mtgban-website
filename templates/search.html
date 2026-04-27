@@ -631,12 +631,10 @@ Sims are not required for pre-constructed decks and other products where the sam
                             // Re-run on theme flips (class changes on <body>/<html>)
                             const rerun = () => cardChart && rethemeFirstAxes(cardChart);
                             const mo = new MutationObserver(rerun);
-                            if (document.body) {
-                                mo.observe(document.body, {
-                                    attributes: true,
-                                    attributeFilter: ['class'],
-                                });
-                            }
+                            mo.observe(document.body, {
+                                attributes: true,
+                                attributeFilter: ['class'],
+                            });
                             mo.observe(document.documentElement, {
                                 attributes: true,
                                 attributeFilter: ['class'],

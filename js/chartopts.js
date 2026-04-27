@@ -249,33 +249,28 @@ function readVar(name) {
 }
 
 function rethemeFirstAxes(chart) {
-    if (!chart || !chart.options) return;
+    if (!chart || !chart.config) return;
 
-    var grid = readVar('--chartjs-grid');
-    var text = readVar('--chartjs-text') || '#000000';
+    var isDark = document.body.classList.contains('dark-theme');
+    var grid = isDark ? 'rgba(140,140,140,0.2)' : 'rgba(0,0,0,0.1)';
+    var text = isDark ? '#dddddd' : '#000000';
 
-    // Legend text
-    var legend = chart.options.plugins && chart.options.plugins.legend;
-    if (legend && legend.labels) {
-        legend.labels.color = text;
+    // Build a plain options overlay — avoids triggering Chart.js
+    // reactive proxy setters that cause infinite recursion in Firefox
+    var opts = chart.config.options;
+
+    if (opts.plugins && opts.plugins.legend && opts.plugins.legend.labels) {
+        opts.plugins.legend.labels.color = text;
     }
-
-    // X axis
-    var xScale = chart.options.scales && chart.options.scales.x;
-    if (xScale) {
-        xScale.ticks = xScale.ticks || {};
-        xScale.ticks.color = text;
-        xScale.grid  = xScale.grid  || {};
-        xScale.grid.color = grid;
-    }
-
-    // Y axis
-    var yScale = chart.options.scales && chart.options.scales.y;
-    if (yScale) {
-        yScale.ticks = yScale.ticks || {};
-        yScale.ticks.color = text;
-        yScale.grid  = yScale.grid  || {};
-        yScale.grid.color = grid;
+    if (opts.scales) {
+        if (opts.scales.x) {
+            opts.scales.x.ticks.color = text;
+            opts.scales.x.grid.color = grid;
+        }
+        if (opts.scales.y) {
+            opts.scales.y.ticks.color = text;
+            opts.scales.y.grid.color = grid;
+        }
     }
 
     chart.update('none');
