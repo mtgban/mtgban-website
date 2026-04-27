@@ -282,8 +282,10 @@
 
     window.clearFavorites = function() {
         localStorage.removeItem(STORAGE_KEY);
-        var container = document.getElementById('m-favorites');
-        if (container) container.innerHTML = '';
+        var mobile = document.getElementById('m-favorites');
+        if (mobile) mobile.innerHTML = '';
+        var desktop = document.getElementById('desktop-favorites');
+        if (desktop) renderFavoritesInto(desktop, 'desktop');
     };
 
     // Refresh stale favorites from server
