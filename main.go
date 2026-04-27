@@ -1205,7 +1205,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 
 	// Add other partials as needed
 	if name == "search.html" {
-		templates = append(templates, "templates/partials/syntax.html")
+		templates = append(templates, "templates/partials/search-landing.html")
 	}
 
 	// Parse and execute via the base template
