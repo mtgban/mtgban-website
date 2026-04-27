@@ -80,6 +80,7 @@ type PageVars struct {
 	Metadata     map[string]GenericCard
 	PromoTags    []string
 	NoSort       bool
+	NoSettings   bool
 	HasAvailable bool
 	CardBackURL  string
 	ShowUpsell   bool
@@ -90,7 +91,6 @@ type PageVars struct {
 	ScraperShort   string
 	HasAffiliate   bool
 	CanDownloadCSV bool
-	ShowSYP        bool
 
 	Arb            []Arbitrage
 	ArbitOptKeys   []string
@@ -100,6 +100,7 @@ type PageVars struct {
 	SortOption     string
 	GlobalMode     bool
 	ReverseMode    bool
+	DefaultTab     string
 
 	Page         string
 	Subtitle     string
@@ -120,7 +121,10 @@ type PageVars struct {
 	FilterFinish string
 	Rarities     []string
 	CardHashes   []string
-	EditionsMap  map[string]EditionEntry
+	EditionsMap        map[string]EditionEntry
+	EditionsCategories []string
+	EditionsByCategory map[string][]EditionEntry
+	PickerID           string
 
 	CanFilterByPrice bool
 	FilterMinPrice   float64
@@ -171,6 +175,8 @@ type PageVars struct {
 	AltKeys         []string
 	SellerKeys      []string
 	VendorKeys      []string
+	ModalSellerKeys []string
+	ModalVendorKeys []string
 	UploadEntries   []UploadEntry
 	IsBuylist       bool
 	TotalEntries    map[string]float64
@@ -212,6 +218,9 @@ type NavElem struct {
 
 	// Whether this tab should always be enabled in DevMode
 	AlwaysOnForDev bool
+
+	// Enable page when running offline
+	AllowOffline bool
 
 	// Allow to receive POST requests
 	CanPOST bool
@@ -299,6 +308,7 @@ func init() {
 					},
 				},
 			},
+			AllowOffline: true,
 		},
 		"Newspaper": {
 			Name:   "Newspaper",
@@ -371,6 +381,7 @@ func init() {
 
 			CanPOST:        true,
 			AlwaysOnForDev: true,
+			AllowOffline:   true,
 		},
 	}
 }
@@ -378,6 +389,7 @@ func init() {
 var Config ConfigType
 
 type ConfigType struct {
+	OfflineKey    string `json:"offline_key,omitempty"`
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
 	Datastore     struct {
@@ -451,6 +463,7 @@ const (
 	DefaultSecret     = "NotVerySecret!"
 	DefaultGame       = "magic"
 	DefaultServerURL  = "http://www.mtgban.com"
+	DefaultDSPath     = "AllPrintings.json.xz"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
@@ -494,6 +507,9 @@ func genPageNav(activeTab, sig string) PageVars {
 		// Charts are available only for one game
 		pageVars.DisableChart = true
 	}
+	if Config.OfflineKey != "" {
+		pageVars.DisableChart = true
+	}
 
 	// Set card back
 	pageVars.CardBackURL = Config.CardBackImage
@@ -508,18 +524,23 @@ func genPageNav(activeTab, sig string) PageVars {
 		validSig := expires > time.Now().Unix()
 		devMode := DevMode && !SigCheck
 		alwaysOnDev := DevMode && ExtraNavs[feat].AlwaysOnForDev
+		offline := Config.OfflineKey != "" && ExtraNavs[feat].AllowOffline
 
 		if !validSig && !devMode && !noAuth {
 			continue
 		}
 
-		allowed := devMode || noAuth || alwaysOnDev
+		allowed := devMode || noAuth || alwaysOnDev || offline
 		if !allowed {
 			param := GetParamFromSig(sig, feat)
 			allowed, _ = strconv.ParseBool(param)
 		}
 
 		if !allowed {
+			continue
+		}
+
+		if Config.OfflineKey != "" && !ExtraNavs[feat].AllowOffline {
 			continue
 		}
 
@@ -553,11 +574,18 @@ func genPageNav(activeTab, sig string) PageVars {
 			user = "Beta Public Access"
 		}
 	}
-	pageVars.BetaNav = &NavElem{
-		Class: "beta",
-		Short: user,
-		Link:  "javascript:void(0)",
+
+	if Config.OfflineKey != "" {
+		user = "Offline Mode"
 	}
+
+	extra := NavElem{
+		Active: true,
+		Class:  "beta",
+		Short:  user,
+		Link:   "javascript:void(0)",
+	}
+	pageVars.BetaNav = &extra
 	return pageVars
 }
 
@@ -595,7 +623,13 @@ func preloadConfig(configPath string) error {
 	return nil
 }
 
-func loadVars(port, datastorePath string) error {
+func loadVars(port, datastorePath, offlineKey string) error {
+	// Preload
+	Config.Port = DefaultConfigPort
+	Config.Game = DefaultGame
+	Config.DatastorePath = DefaultDSPath
+	Config.OfflineKey = offlineKey
+
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
 	if err != nil {
 		return err
@@ -747,6 +781,7 @@ func loadDatastore(ds string) error {
 	go updateStaticData()
 	go cacheNewspaper()
 	ServerNotify("init", "Datastore installed")
+	go buildPaletteSetsCache()
 
 	return nil
 }
@@ -760,6 +795,7 @@ func main() {
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
+	offline := flag.String("offline", "", "API key to run in offline mode")
 
 	flag.Parse()
 
@@ -774,9 +810,13 @@ func main() {
 	if err != nil {
 		log.Fatalln("unable to preload config file:", err)
 	}
-	err = loadVars(*port, *datastore)
+	err = loadVars(*port, *datastore, *offline)
 	if err != nil {
-		log.Fatalln("unable to load config file:", err)
+		if DevMode || Config.OfflineKey != "" {
+			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")
+		} else {
+			log.Fatalln("unable to load config file:", err)
+		}
 	}
 
 	_, err = os.Stat(LogDir)
@@ -808,6 +848,17 @@ func main() {
 
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
+	} else if Config.OfflineKey != "" {
+		go func() {
+			log.Println("Loading scrapers from API")
+			err := loadScrapersAPI(context.Background(), Config.OfflineKey)
+			if err != nil {
+				log.Fatalln("error loading scrapers:", err)
+			}
+
+			// Update set values after loading prices
+			runSealedAnalysis()
+		}()
 	} else {
 		go func() {
 			log.Println("Loading", len(Config.ScraperConfig.Config), "Scrapers")
@@ -859,10 +910,17 @@ func main() {
 	// when navigating to /home it should serve the home page
 	http.Handle("/", noSigning(http.HandlerFunc(Home)))
 
+	// Public guide page
+	http.Handle("/guide", noSigning(http.HandlerFunc(Guide)))
+
 	// Mobile/desktop view toggle
 	http.HandleFunc("/toggle-mobile", toggleMobileView)
 
 	for _, nav := range ExtraNavs {
+		if Config.OfflineKey != "" && !nav.AllowOffline {
+			continue
+		}
+
 		// Set up logging
 		logFile, err := logfile.New(&logfile.LogFile{
 			FileName:    path.Join(LogDir, nav.Name+".log"),
@@ -899,6 +957,9 @@ func main() {
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
+	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(PaletteCardMeta)))
+	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(PaletteSets)))
+	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(PaletteStores)))
 
 	http.HandleFunc("/auth", Auth)
 
@@ -1079,6 +1140,11 @@ var funcMap = template.FuncMap{
 		}
 		return true
 	},
+	"palette_newspaper_targets": paletteNewspaperTargetsJSON,
+	"palette_sleepers_targets":  paletteSleepersTargetsJSON,
+	"palette_arbit_targets":     func() template.JS { return paletteArbitTargetsJSON("arbit") },
+	"palette_reverse_targets":   func() template.JS { return paletteArbitTargetsJSON("reverse") },
+	"palette_global_targets":    func() template.JS { return paletteArbitTargetsJSON("global") },
 }
 
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
@@ -1116,6 +1182,21 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 		}
 	}
 	templates = append(templates, navbarPartial)
+
+	// Include settings-modal partial only for desktop pages that define a "settings-content" block.
+	// Including it unconditionally would cause template parse errors on pages without that block,
+	// and mobile pages use a separate settings sheet rather than this modal.
+	if !pageVars.IsMobile {
+		switch name {
+		case "search.html", "arbit.html", "upload.html":
+			templates = append(templates, "templates/partials/settings-modal.html")
+		case "sleep.html", "news.html":
+			templates = append(templates,
+				"templates/partials/settings-modal.html",
+				"templates/partials/editions-picker.html",
+			)
+		}
+	}
 
 	// Add other partials as needed
 	if name == "search.html" {

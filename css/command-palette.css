@@ -1,0 +1,619 @@
+/* ============================================================
+   Command Palette - overlay, dialog, results, toast, save flow
+   ============================================================ */
+
+/* ── 1. Overlay ─────────────────────────────────────────── */
+.cp-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 500;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 20vh;
+}
+
+.cp-overlay.open {
+    display: flex;
+}
+
+/* ── 2. Dialog ──────────────────────────────────────────── */
+.cp-dialog {
+    width: 100%;
+    max-width: 640px;
+    max-height: 70vh;
+    background: var(--background, #fff);
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: cp-appear 0.15s ease-out;
+}
+
+@keyframes cp-appear {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* ── 3. Input Row ───────────────────────────────────────── */
+.cp-input-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    flex-shrink: 0;
+    max-height: calc(2.4em * 4);
+    overflow-y: auto;
+}
+
+/* Mode indicator pill */
+.cp-mode-indicator {
+    display: none;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cp-mode-indicator.active {
+    display: flex;
+}
+
+.cp-mode-indicator[data-mode="help"] {
+    background: color-mix(in srgb, var(--ainfo, #559eff) 15%, transparent);
+    color: var(--ainfo, #559eff);
+}
+
+.cp-mode-indicator[data-mode="nav"] {
+    background: color-mix(in srgb, var(--awarn, #f59e0b) 15%, transparent);
+    color: var(--awarn, #f59e0b);
+}
+
+.cp-mode-indicator[data-mode="saved"] {
+    background: color-mix(in srgb, #8b5cf6 15%, transparent);
+    color: #8b5cf6;
+}
+
+/* Search input */
+.cp-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    font-size: 1rem;
+    color: var(--normal, #111);
+    min-width: 0;
+}
+
+.cp-input::placeholder {
+    color: var(--greytext, #888);
+}
+
+/* Shortcut pill (ESC) */
+.cp-shortcut {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: var(--greytext, #888);
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-family: inherit;
+}
+
+/* ── 4. Results ─────────────────────────────────────────── */
+.cp-results {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-moderate, rgba(0, 0, 0, 0.12)) transparent;
+    max-height: calc(70vh - 110px);
+    flex: 1 1 auto;
+}
+
+.cp-results::-webkit-scrollbar {
+    width: 6px;
+}
+
+.cp-results::-webkit-scrollbar-thumb {
+    background: var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 3px;
+}
+
+.cp-results::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Category header */
+.cp-category-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 16px 4px;
+    margin-top: 4px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #FFBF00;
+    user-select: none;
+    border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+}
+
+.cp-category-header:first-child {
+    border-top: none;
+    margin-top: 0;
+}
+
+.cp-category-header svg {
+    width: 12px;
+    height: 12px;
+    opacity: 0.8;
+}
+
+/* Result row */
+.cp-result {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.cp-result:hover {
+    background: var(--surface-1, rgba(0, 0, 0, 0.04));
+}
+
+.cp-result.active {
+    background: color-mix(in srgb, var(--ainfo, #559eff) 15%, transparent);
+}
+
+/* Result icon */
+.cp-result-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--greytext, #888);
+}
+
+.cp-result-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.cp-result.active .cp-result-icon {
+    color: var(--ainfo, #559eff);
+}
+
+/* Result body */
+.cp-result-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cp-result-title {
+    font-size: 0.9rem;
+    color: var(--normal, #111);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cp-result-subtitle {
+    font-size: 0.75rem;
+    color: var(--greytext, #888);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cp-result-inline {
+    font-size: 0.75rem;
+    font-family: monospace;
+    color: var(--ainfo, #559eff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Badge pill */
+.cp-result-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    color: var(--greytext, #888);
+    flex-shrink: 0;
+}
+
+/* Delete button (shown on hover) */
+.cp-result-delete {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--adanger, #ef4444);
+    padding: 0;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.cp-result-delete svg {
+    width: 14px;
+    height: 14px;
+}
+
+.cp-result:hover .cp-result-delete {
+    display: flex;
+}
+
+/* Right column */
+.cp-result-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+/* ── 5. Footer ──────────────────────────────────────────── */
+.cp-footer {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    font-size: 0.7rem;
+    color: var(--greytext, #888);
+    flex-shrink: 0;
+}
+
+.cp-footer-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.cp-footer kbd {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 5px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-family: inherit;
+    color: var(--greytext, #888);
+    line-height: 1.4;
+}
+
+/* ── 6. Empty State ─────────────────────────────────────── */
+.cp-empty {
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--greytext, #888);
+    font-size: 0.9rem;
+}
+
+/* ── 7. Toast ───────────────────────────────────────────── */
+.cp-toast {
+    position: fixed;
+    bottom: 1em;
+    right: -100%;
+    padding: 0.6em 1em;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: var(--lightblack, #161616);
+    color: var(--green, #4caf50);
+    border: 1px solid var(--green, #4caf50);
+    border-radius: 8px;
+    z-index: 600;
+    opacity: 0;
+    transform: scale(0.96);
+    transition: right 300ms ease, opacity 220ms ease, transform 220ms ease;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.light-theme .cp-toast {
+    background: var(--realwhite, #fcfcfc);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.cp-toast.show {
+    right: 1em;
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Countdown progress bar (matches .settings-toast / .m-toast pattern) */
+.cp-toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    background: var(--green, #4caf50);
+    opacity: 0.55;
+    transform-origin: left;
+    transform: scaleX(0);
+}
+.cp-toast.show::after {
+    animation: cp-toast-timer 2s linear forwards;
+}
+@keyframes cp-toast-timer {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+}
+
+/* ── 8a. Save Search Modal ───────────────────────────────── */
+.cp-save-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+    pointer-events: none;
+}
+
+.cp-save-modal-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.cp-save-modal {
+    width: 92%;
+    max-width: 420px;
+    background: var(--background, #fff);
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 12px;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 140px;
+    transform: translateY(4px);
+    transition: transform 140ms ease-out;
+}
+
+.cp-save-modal-backdrop.open .cp-save-modal {
+    transform: translateY(0);
+}
+
+.cp-save-modal-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--normal, #111);
+    margin: 0;
+}
+
+.cp-save-modal-preview {
+    font-size: 0.78rem;
+    color: var(--greytext, #888);
+    background: var(--surface-1, rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    border-radius: 6px;
+    padding: 6px 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.cp-save-modal-input {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--surface-1, rgba(0, 0, 0, 0.04));
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 6px;
+    outline: none;
+    font: inherit;
+    font-size: 0.9rem;
+    color: var(--normal, #111);
+    box-sizing: border-box;
+}
+
+.cp-save-modal-input:focus {
+    border-color: var(--ainfo, #559eff);
+}
+
+.cp-save-modal-input::placeholder {
+    color: var(--greytext, #888);
+}
+
+.cp-save-modal-hint {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    font-size: 0.7rem;
+    color: var(--greytext, #888);
+    margin-top: 2px;
+}
+
+.cp-save-modal-hint kbd {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 5px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-family: inherit;
+    margin-right: 3px;
+    color: var(--normal, #111);
+}
+
+/* ── 9. Chip Container ──────────────────────────────────── */
+.cp-chip-container {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    padding: 2px 0;
+    scrollbar-width: thin;
+}
+
+.cp-chip-container .cp-input {
+    flex: 1;
+    min-width: 120px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--normal, #000);
+    font: inherit;
+    padding: 2px 4px;
+}
+
+/* ── Chips ────────────────────────────────────────────── */
+.cp-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    border: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.06));
+    border-radius: 999px;
+    color: var(--normal, #111);
+    user-select: none;
+    transition: background 0.1s, border-color 0.1s, transform 0.12s;
+}
+.cp-chip:hover {
+    background: var(--surface-3, rgba(0, 0, 0, 0.1));
+}
+.cp-chip.active {
+    background: var(--surface-2, rgba(0, 0, 0, 0.06));
+    color: var(--normal, #111);
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+.cp-chip-icon {
+    display: inline-flex;
+    align-items: center;
+}
+.cp-chip-icon svg {
+    width: 13px;
+    height: 13px;
+}
+.cp-chip-label {
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cp-chip-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 0;
+    height: 16px;
+    padding: 0;
+    margin-left: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0;
+    overflow: hidden;
+    transition: opacity 0.1s, background 0.1s, width 0.12s, margin-left 0.12s;
+}
+.cp-chip:hover .cp-chip-delete,
+.cp-chip.active .cp-chip-delete {
+    opacity: 0.7;
+    width: 16px;
+    margin-left: 2px;
+}
+.cp-chip-delete:hover {
+    opacity: 1 !important;
+    background: rgba(0, 0, 0, 0.15);
+}
+.cp-chip.active .cp-chip-delete:hover {
+    background: rgba(245, 158, 11, 0.25);
+}
+.cp-chip-delete svg {
+    width: 11px;
+    height: 11px;
+}
+
+/* Type-specific icon color hints (only when not active) */
+.cp-chip-card .cp-chip-icon { color: var(--ainfo, #559eff); }
+.cp-chip-filter .cp-chip-icon { color: var(--awarn, #d97706); }
+.cp-chip-nav .cp-chip-icon,
+.cp-chip-nav-sub .cp-chip-icon { color: #8b5cf6; }
+.cp-chip.active .cp-chip-icon { color: inherit; }
+
+/* Screen-reader only utility */
+.cp-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Keyrune set symbols rendered inside result icons - follow current text color */
+.cp-result-icon .ss {
+    font-size: 20px;
+    line-height: 1;
+    color: var(--normal, #111);
+}
+
+/* Preserve inline icon colors (e.g., rarity pips) over active-state override */
+.cp-result.active .cp-result-icon[style*="color"] {
+    color: unset;
+}

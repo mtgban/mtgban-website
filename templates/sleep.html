@@ -4,9 +4,6 @@
 {{end}}
 
 {{define "extra-head"}}
-    {{if eq .Subtitle "Options"}}
-        <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
-    {{end}}
 {{end}}
 
 {{define "title"}}{{.Title}} - {{.Subtitle}}{{end}}
@@ -14,8 +11,6 @@
 {{define "content"}}
     {{if eq .Subtitle "Index"}}
         {{template "sleep-index" .}}
-    {{else if eq .Subtitle "Options"}}
-        {{template "sleep-options" .}}
     {{else}}
         {{template "sleep-results" .}}
     {{end}}
@@ -29,9 +24,6 @@
             <h1>Sleepers</h1>
             <p class="page-subtitle">Cards the market hasn't caught up on yet.</p>
         </div>
-        <a class="page-action" href="?page=options">
-            <span>&#9881;</span> Filters
-        </a>
     </div>
 
     <div class="card sleepers-info-card">
@@ -177,72 +169,6 @@ function checkSleepersCompare() {
 {{end}}
 
 
-{{define "sleep-options"}}
-<script type="text/javascript">
-    window.onload = function(e) {
-        loadForm("SleepersSellersList", "sellers");
-        loadForm("SleepersVendorsList", "vendors");
-        loadForm("SleepersEditionList", "editions");
-    }
-</script>
-
-<div class="page-standard opts-page-wrap">
-    <div class="page-header">
-        <div>
-            <h1>Sleepers Options</h1>
-            <p class="page-subtitle">Select sellers, vendors, and editions to <strong>exclude</strong> from results.</p>
-        </div>
-    </div>
-
-    <div class="card opts-section">
-        <h2>Vendors &amp; Sellers</h2>
-        <p class="section-desc">Checked stores will be <strong>hidden</strong> from your Sleepers.</p>
-        <div class="opts-bar">
-            <button class="opts-btn opts-btn-warn" onclick="clearForm('sellers'); clearForm('vendors');">Clear</button>
-            <button class="opts-btn opts-btn-ok" onclick="selectAll('sellers');">Select All</button>
-            <button class="opts-btn opts-btn-ok" onclick="saveForm('SleepersSellersList', 'sellers'); saveForm('SleepersVendorsList', 'vendors'); window.location.href = '/sleepers'">Save</button>
-        </div>
-        <div class="opts-two-col">
-            <div id="sellers">
-                <h3>Retail</h3>
-                <div class="opts-checkbox-grid">
-                    {{range $i, $key := .SellerKeys}}
-                        <label><input type="checkbox" id="s{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
-                    {{end}}
-                </div>
-            </div>
-            <div id="vendors">
-                <h3>Buylist</h3>
-                <div class="opts-checkbox-grid">
-                    {{range $i, $key := .VendorKeys}}
-                        <label><input type="checkbox" id="v{{$key}}" name="{{$key}}"> {{scraper_name $key}}</label>
-                    {{end}}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card opts-section">
-        <h2>Editions</h2>
-        <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
-        <div class="opts-bar">
-            <button class="opts-btn opts-btn-warn" onclick="clearForm('editions');">Clear</button>
-            <button class="opts-btn opts-btn-ok" onclick="selectAll('editions');">Select All</button>
-            <button class="opts-btn opts-btn-ok" onclick="saveForm('SleepersEditionList', 'editions'); window.location.href = '/sleepers'">Save</button>
-        </div>
-        <div class="opts-checkbox-grid opts-grid-wide" id="editions">
-            {{range $i, $key := .Editions}}
-                {{$edition := index $.EditionsMap $key}}
-                {{if $edition}}
-                    <label><input type="checkbox" id="{{$key}}" name="{{$key}}"> <i class="ss ss-{{$edition.Keyrune}} ss-2x ss-fw"></i> {{$edition.Name}}</label>
-                {{end}}
-            {{end}}
-        </div>
-    </div>
-</div>
-{{end}}
-
-
 {{define "sleep-results"}}
 <div class="page-standard sleepers-results">
     <div class="page-header">
@@ -281,4 +207,46 @@ function checkSleepersCompare() {
 {{if ne .InfoMessage ""}}
     <h2><p class=indent>{{.InfoMessage}}</p></h2>
 {{end}}
+{{end}}
+
+{{define "settings-content"}}
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">        <h3>Vendors &amp; Sellers</h3>
+
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Checked stores will be <strong>hidden</strong> from your Sleepers.</p>
+        <div class="settings-vendor-columns">
+            <div>
+                <h4>Retail</h4>
+                <div class="settings-grid" id="settings-sleep-sellers">
+                    {{range $key := .ModalSellerKeys}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                    {{end}}
+                </div>
+            </div>
+            <div>
+                <h4>Buylist</h4>
+                <div class="settings-grid" id="settings-sleep-vendors">
+                    {{range $key := .ModalVendorKeys}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">        <h3>Editions</h3>
+
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">Checked editions will be <strong>hidden</strong> from results.</p>
+        {{template "editions-picker" .}}
+    </div>
+</section>
+
 {{end}}

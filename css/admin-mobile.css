@@ -72,10 +72,32 @@
     transition: top 300ms ease;
     white-space: nowrap;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
 }
 
 .m-toast.show {
     top: 60px;
+}
+
+/* Countdown progress bar */
+.m-toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    background: white;
+    opacity: 0.6;
+    transform-origin: left;
+    transform: scaleX(0);
+}
+.m-toast.show::after {
+    animation: m-admin-toast-timer 2s linear forwards;
+}
+@keyframes m-admin-toast-timer {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
 }
 
 /* Sections */

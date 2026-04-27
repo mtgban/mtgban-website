@@ -8,14 +8,10 @@
         <div class="page-standard">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
             <div class="page-header">
-                <div>
-                    <h1>Results{{if and .SearchQuery (not (eq .SearchQuery "hashes"))}} from {{.SearchQuery}}{{end}}</h1>
-                    {{if .UploadEntries}}
-                        <p class="page-subtitle">{{len .UploadEntries}} cards matched &middot; {{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode</p>
-                    {{else}}
-                        <p class="page-subtitle">{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode &middot; Optimizer only</p>
-                    {{end}}
-                </div>
+                <h1>Results{{if and .SearchQuery (not (eq .SearchQuery "hashes"))}} from {{.SearchQuery}}{{end}}</h1>
+                <p class="page-subtitle">
+                    {{if .UploadEntries}}{{len .UploadEntries}} cards matched &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
+                </p>
             </div>
 
             {{template "upload-results" .}}
@@ -105,7 +101,7 @@
                         </div>
 
                         <div class="upload-source-area upload-source-hidden" id="source-text">
-                            <textarea id="textArea" name="textArea" rows="4" placeholder="Paste card list or decklist here..."></textarea>
+                            <textarea id="textArea" name="textArea" rows="1" placeholder="Paste card list or decklist here..."></textarea>
                         </div>
                     {{end}}
                 </div>
@@ -120,8 +116,39 @@
 
                     <script type="text/javascript">
                         const hiddenBools = [
-                            "upload", "download", "estimate", "deckbox"
+                            "upload", "download", "estimate", "deckbox", "tcgplayer_csv"
                         ];
+                        function syncUploadOptionsFromSettings() {
+                            var form = document.getElementById('upload_form');
+                            if (!form) return;
+                            // Remove any previously-injected hidden inputs
+                            form.querySelectorAll('[data-injected-opt]').forEach(function (el) { el.remove(); });
+                            function add(name, val) {
+                                var inp = document.createElement('input');
+                                inp.type = 'hidden';
+                                inp.name = name;
+                                inp.value = val == null ? '' : val;
+                                inp.dataset.injectedOpt = '1';
+                                form.appendChild(inp);
+                            }
+                            var optsRaw = getCookie('UploadOptimizerOpts');
+                            var opts = (optsRaw === null || optsRaw === '')
+                                ? ['lowval', 'lowvalabs', 'minmargin', 'customperc']
+                                : optsRaw.split(',').filter(Boolean);
+                            ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
+                                if (opts.indexOf(k) >= 0) add(k, 'true');
+                            });
+                            add('percspread',     getCookie('UploadPercSpread')    || '60');
+                            add('percspreadmax',  getCookie('UploadPercSpreadMax') || '0');
+                            add('minval',         getCookie('UploadMinVal')        || '1');
+                            add('maxval',         getCookie('UploadMaxVal')        || '0');
+                            add('margin',         getCookie('UploadMargin')        || '10');
+                            add('custompercmax',  getCookie('UploadCustomPercMax') || '100');
+                            add('multiplier',     getCookie('UploadMultiplier')    || '1');
+                            add('sorting',        getCookie('UploadSorting')       || '');
+                            add('altPrice',       getCookie('UploadAltPrice')      || '');
+                            add('pricesource',    getCookie('UploadPriceSource')   || '');
+                        }
                         function submitForm(field, newWindow) {
                             hiddenBools.forEach(element => {
                                 let formField = document.getElementById(element);
@@ -139,6 +166,7 @@
                                     form.target = '_blank';
                                 }
                             }
+                            syncUploadOptionsFromSettings();
                             form.submit();
                         }
                     </script>
@@ -146,104 +174,21 @@
                     <input type="hidden" id="download" name="download" value="false"/>
                     <input type="hidden" id="estimate" name="estimate" value="false"/>
                     <input type="hidden" id="deckbox" name="deckbox" value="false"/>
+                    <input type="hidden" id="tcgplayer_csv" name="tcgplayer_csv" value="false"/>
 
                     <div class="upload-actions">
-                        <input type="submit" id="submit_default" class="upload-btn upload-btn-primary" value="Upload" onclick="javascript:submitForm('upload', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}}>
+                        <input type="submit" id="submit_default" class="upload-btn upload-btn-primary" value="Upload" onclick="submitForm('upload', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}}>
                         {{if .CanBuylist}}
-                            <input type="submit" id="submit_download" class="upload-btn upload-btn-secondary" value="Get CSV" onclick="javascript:submitForm('download', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
-                            <input type="submit" id="submit_estimate" class="upload-btn upload-btn-secondary" value="CardConduit" onclick="javascript:submitForm('estimate', true);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
-                            <input type="submit" id="submit_deckbox" class="upload-btn upload-btn-secondary" value="Deckbox" onclick="javascript:submitForm('deckbox', false);" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_download" class="upload-btn upload-btn-secondary" value="Get CSV" onclick="submitForm('download', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_estimate" class="upload-btn upload-btn-secondary" value="CardConduit" onclick="submitForm('estimate', true); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_deckbox" class="upload-btn upload-btn-secondary" value="Deckbox" onclick="submitForm('deckbox', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            <input type="submit" id="submit_tcgplayer_csv" class="upload-btn upload-btn-secondary" value="TCGplayer CSV" onclick="submitForm('tcgplayer_csv', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
                         {{end}}
                         {{if .Optimized}}
                             <input type="button" class="upload-btn upload-btn-secondary" value="Optimizer" onclick="window.location.href = '#top';">
                         {{end}}
                     </div>
 
-                    <!-- Optimizer Options (collapsible) -->
-                    <div class="upload-opts-toggle" onclick="toggleOpts(this)">
-                        <span class="upload-chevron">&#9654;</span>
-                        Optimizer Options
-                    </div>
-                    <div class="upload-opts-panel" id="optsPanel">
-                        <div class="upload-opts-grid">
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="lowval" name="lowval" checked onclick="javascript:saveCheckbox('lowval')">
-                                Hide low spread offers (below
-                                <input type="text" id="percspread" name="percspread" value="60" size="1" onchange="javascript:saveText('percspread')">
-                                %)
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="highval" name="highval" onclick="javascript:saveCheckbox('highval')">
-                                Hide high spread offers (above
-                                <input type="text" id="percspreadmax" name="percspreadmax" value="0" size="1" onchange="javascript:saveText('percspreadmax')">
-                                %)
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="lowvalabs" name="lowvalabs" checked onclick="javascript:saveCheckbox('lowvalabs')">
-                                Hide low value offers (below $
-                                <input type="text" id="minval" name="minval" value="1" size="1" onchange="javascript:saveText('minval')">
-                                )
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="highvalabs" name="highvalabs" onclick="javascript:saveCheckbox('highvalabs')">
-                                Hide high value offers (above $
-                                <input type="text" id="maxval" name="maxval" value="0" size="1" onchange="javascript:saveText('maxval')">
-                                )
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="minmargin" name="minmargin" checked onclick="javascript:saveCheckbox('minmargin')">
-                                Allow
-                                <input type="text" id="margin" name="margin" value="10" size="1" onchange="javascript:saveText('margin')">
-                                % difference for multi-select
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="nocond" name="nocond" onclick="javascript:saveCheckbox('nocond')">
-                                Ignore conditions when loading
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="noprice" name="noprice" onclick="javascript:saveCheckbox('noprice')">
-                                Ignore prices (use
-                                <select id="altPrice" name="altPrice" onchange="javascript:saveText('altPrice')">
-                                    {{range $.AltKeys}}
-                                        <option value="{{.}}" selected>&nbsp;{{scraper_name .}}</option>
-                                    {{end}}
-                                </select>
-                                instead)
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="customperc" name="customperc" checked onclick="javascript:saveCheckbox('customperc')">
-                                Visual indicator above
-                                <input type="text" id="custompercmax" name="custompercmax" value="100" size="1" onchange="javascript:saveText('custompercmax')">
-                                % spread
-                            </label>
-                            <label class="upload-opt-item">
-                                <input type="checkbox" id="noresults" name="noresults" onclick="javascript:saveCheckbox('noresults')">
-                                Jump to Optimizer view by default
-                            </label>
-                            <label class="upload-opt-item upload-opt-wide">
-                                Sort by
-                                <select id="sorting" name="sorting" onchange="javascript:saveText('sorting')">
-                                    <option value="" selected>&nbsp;keep as uploaded</option>
-                                    <option value="setchrono">&nbsp;set(chrono)/name/number</option>
-                                    <option value="setalpha">&nbsp;set(alpha)/name/number</option>
-                                    <option value="alphabetical">&nbsp;alphabetical</option>
-                                    <option value="highprice">&nbsp;highest offer</option>
-                                    <option value="highspread">&nbsp;highest spread</option>
-                                    <option value="profitability">&nbsp;profitability</option>
-                                </select>
-                                &nbsp;&nbsp;
-                                Qty multiplier:
-                                <input type="text" id="multiplier" name="multiplier" value="1" size="1" onchange="javascript:saveText('multiplier')">
-                                &nbsp;&nbsp;
-                                Optimize by:
-                                <select id="pricesource" name="pricesource" onchange="javascript:saveText('pricesource')">
-                                    <option value="" selected>&nbsp;cash prices</option>
-                                    <option value="credit">&nbsp;store credit</option>
-                                    <option value="marketCredit">&nbsp;market store credit</option>
-                                </select>
-                            </label>
-                        </div>
-                    </div>
                 </div>
 
                 </form>
@@ -316,7 +261,7 @@
                 <div class="upload-help-card">
                     <h3>Privacy &amp; Access</h3>
                     <p>No data is stored on the website. Your exports are private to you only.</p>
-                    <p><strong>Buylist</strong> prices require Legacy tier. Store customization requires a higher tier. CSV download and CardConduit/Deckbox export are buylist-tier features.</p>
+                    <p>Some features may be available at certain tiers only. At <i>Modern</i> you can customize the list of Retail stores. At <i>Legacy</i>, you get access to <strong>Buylist</strong> prices, CSV downloads, and exports. At <i>Vintage</i> you have no download limits and can import custom searches.</p>
                 </div>
 
                 <div class="upload-help-card">
@@ -328,56 +273,9 @@
         </div><!-- /.upload-layout -->
 
         <script type="text/javascript">
-            function saveCheckbox(box) {
-                var checkbox = document.getElementById(box);
-                localStorage.setItem(box, checkbox.checked);
-            }
-
-            function saveText(input) {
-                var textInput = document.getElementById(input);
-                localStorage.setItem(input, textInput.value);
-            }
-
-            const checkboxes = [
-                "lowval",
-                "highval",
-                "lowvalabs",
-                "highvalabs",
-                "minmargin",
-                "nocond",
-                "noprice",
-                "noresults",
-                "customperc",
-            ];
-            checkboxes.forEach(element => {
-                var checked = JSON.parse(localStorage.getItem(element));
-                if (checked !== null) {
-                    document.getElementById(element).checked = checked;
-                }
-            })
-
-            const textInputs = [
-                "percspread",
-                "percspreadmax",
-                "minval",
-                "maxval",
-                "margin",
-                "sorting",
-                "custompercmax",
-                "altPrice",
-                "multiplier",
-                "pricesource",
-            ];
-            textInputs.forEach(element => {
-                var input = localStorage.getItem(element);
-                if (input) {
-                    document.getElementById(element).value = input;
-                }
-            })
-
             function enabledButtons() {
                 const fields = [
-                    'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox'
+                    'submit_default', 'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
                 ];
 
                 fields.forEach(element => {
@@ -393,7 +291,7 @@
                 var selectBox = document.getElementById('storesBox');
                 if (selectBox) {
                     const fields = [
-                        'submit_download', 'submit_estimate', 'submit_deckbox'
+                        'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
                     ];
                     if (mode == "buylist") {
                         selectBox.innerHTML = " \
@@ -445,11 +343,6 @@
                 if (type === 'text') {
                     enabledButtons();
                 }
-            };
-
-            window.toggleOpts = function(el) {
-                el.classList.toggle('open');
-                document.getElementById('optsPanel').classList.toggle('open');
             };
 
             window.pressed = function() {
@@ -603,40 +496,51 @@
 {{end}}
 
 {{define "upload-results"}}
-    <!-- Summary banner -->
-    <div class="res-summary">
-        <div class="res-summary-stat">
-            <span class="label">Cards</span>
-            <span class="val">{{.TotalQuantity}}</span>
-        </div>
-        {{range .ScraperKeys}}
-            <div class="res-summary-stat">
-                <span class="label">{{scraper_name .}}</span>
-                <span class="val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
-                {{$missing := (index $.MissingCounts .)}}
-                {{if ne $missing 0}}
-                    <span class="label">{{$missing}} missing</span>
-                {{end}}
+    <div class="res-header">
+        <!-- Row 1: View tabs + Export buttons -->
+        <div class="res-buttons-row">
+            <div class="res-tabs">
+                <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
+                {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
             </div>
-        {{end}}
-        {{range .IndexKeys}}
-            <div class="res-summary-stat">
-                <span class="label">{{scraper_name .}}</span>
-                <span class="val blue">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
-            </div>
-        {{end}}
-        {{if .Optimized}}
-        <div class="res-summary-stat">
-            <span class="label">Optimizer Max</span>
-            <span class="val green">$ {{printf "%.2f" .HighestTotal}}</span>
+            {{if .CanBuylist}}
+            <div class="res-btn-sep"></div>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('download', false)">Get CSV</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('estimate', true)">CardConduit</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('deckbox', false)">Deckbox</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('tcgplayer_csv', false)">TCGplayer CSV</button>
+            {{end}}
         </div>
-        {{end}}
-    </div>
 
-    <!-- Tabs -->
-    <div class="res-tabs">
-        <button class="res-tab on" onclick="showResTab('results',this)">Results</button>
-        {{if .Optimized}}<button class="res-tab" onclick="showResTab('optimizer',this)">Optimizer</button>{{end}}
+        <!-- Row 2: Summary stats -->
+        <div class="res-summary">
+            <div class="res-summary-stat">
+                <span class="label">Cards</span>
+                <span class="val">{{.TotalQuantity}}</span>
+            </div>
+            {{range .ScraperKeys}}
+                <div class="res-summary-stat">
+                    <span class="label">{{scraper_name .}}</span>
+                    <span class="val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+                    {{$missing := (index $.MissingCounts .)}}
+                    {{if ne $missing 0}}
+                        <span class="label">{{$missing}} missing</span>
+                    {{end}}
+                </div>
+            {{end}}
+            {{range .IndexKeys}}
+                <div class="res-summary-stat">
+                    <span class="label">{{scraper_name .}}</span>
+                    <span class="val blue">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
+                </div>
+            {{end}}
+            {{if .Optimized}}
+            <div class="res-summary-stat">
+                <span class="label">Optimizer Max</span>
+                <span class="val green">$ {{printf "%.2f" .HighestTotal}}</span>
+            </div>
+            {{end}}
+        </div>
     </div>
 
     <!-- Tab: Results -->
@@ -653,28 +557,6 @@
                             <th class="r">{{scraper_name .}}</th>
                         {{end}}
                         <th>Index</th>
-                    </tr>
-                    <tr class="ures-totals-row">
-                        <td><span class="ures-totals-label">Totals ({{.TotalQuantity}} cards)</span></td>
-                        <td></td>
-                        <td></td>
-                        <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.TotalQuantity}}</td>
-                        {{range .ScraperKeys}}
-                            <td class="ures-price" style="font-weight:700">
-                                $ {{printf "%.2f" (index $.TotalEntries .)}}
-                                {{$missing := (index $.MissingCounts .)}}
-                                {{if ne $missing 0}}
-                                    <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $.MissingPrices .)}}</div>
-                                {{end}}
-                            </td>
-                        {{end}}
-                        <td>
-                            <div class="ures-index" style="font-weight:600">
-                                {{range .IndexKeys}}
-                                    <span><span class="idx-label">{{scraper_name .}}</span> $ {{printf "%.2f" (index $.TotalEntries .)}}</span>
-                                {{end}}
-                            </div>
-                        </td>
                     </tr>
                 </thead>
                 <tbody>
@@ -701,7 +583,7 @@
                         {{$card := (index $.Metadata .CardId)}}
                         {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
                         <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
-                            {{if .MismatchAlias}}style="background-color:var(--aliasing)"{{end}}>
+                            {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                             <td>
                                 <div class="ures-card-cell">
                                     <img src="{{$card.ImageURL}}" loading="lazy">
@@ -709,15 +591,10 @@
                                         <span class="ures-card-name"><a href="{{$card.SearchURL}}">{{$card.Name}}</a></span>
                                         <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
                                         {{if .MismatchAlias}}
-                                        <select class="ures-alias-picker" data-hash="{{.CardId}}" onchange="updateRowHash(this)">
-                                            <option value="{{.CardId}}" selected>{{$card.Edition}} #{{$card.Number}}</option>
-                                            {{range .PossibleAliases}}
-                                                {{if ne . $cardId}}
-                                                    {{$alt := (index $.Metadata .)}}
-                                                    <option value="{{.}}">{{$alt.Edition}} #{{$alt.Number}}</option>
-                                                {{end}}
-                                            {{end}}
-                                        </select>
+                                        <button type="button" class="ures-pick-btn"
+                                            data-hash="{{.CardId}}"
+                                            data-aliases="{{range $i, $a := .PossibleAliases}}{{if $i}},{{end}}{{$a}}{{end}}"
+                                            onclick="openPrintingPicker(this)">Select printing</button>
                                         {{end}}
                                     </div>
                                 </div>
@@ -739,13 +616,35 @@
                                 <div class="ures-index">
                                     {{range $.IndexKeys}}
                                         {{$idxPrice := (index $scraperEntries .)}}
-                                        <span><span class="idx-label">{{scraper_name .}}</span> {{if ne $idxPrice 0.0}}$ {{printf "%.2f" $idxPrice}}{{else}}&mdash;{{end}}</span>
+                                        <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">{{if ne $idxPrice 0.0}}$ {{printf "%.2f" $idxPrice}}{{else}}&mdash;{{end}}</span></span>
                                     {{end}}
                                 </div>
                             </td>
                         </tr>
                         {{end}}{{/* closes {{else}} for MismatchError */}}
                     {{end}}
+                    <tr class="ures-totals-row">
+                        <td><span class="ures-totals-label">Totals ({{.TotalQuantity}} cards)</span></td>
+                        <td></td>
+                        <td></td>
+                        <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.TotalQuantity}}</td>
+                        {{range .ScraperKeys}}
+                            <td class="ures-price" style="font-weight:700">
+                                $ {{printf "%.2f" (index $.TotalEntries .)}}
+                                {{$missing := (index $.MissingCounts .)}}
+                                {{if ne $missing 0}}
+                                    <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $.MissingPrices .)}}</div>
+                                {{end}}
+                            </td>
+                        {{end}}
+                        <td>
+                            <div class="ures-index" style="font-weight:600">
+                                {{range .IndexKeys}}
+                                    <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span></span>
+                                {{end}}
+                            </div>
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -905,7 +804,8 @@
                         <thead><tr>
                             <th>Card</th>
                             <th>Set</th>
-                            <th>Prices</th>
+                            <th class="c">Offer</th>
+                            <th class="c">Loaded</th>
                             <th>Spread</th>
                         </tr></thead>
                         <tbody>
@@ -918,7 +818,6 @@
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
                                     {{if $card.Reserved}} *{{end}}
                                     {{if $card.Stocks}} &bull;{{end}}
-                                    {{if $card.SypList}} &dagger;{{end}}
                                 </td>
                                 <td class="opt-set">
                                     <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.SetCode}} #{{$card.Number}}
@@ -928,18 +827,12 @@
                                         <span title="Foil">&#10024;</span>
                                     {{end}}
                                 </td>
-                                <td class="opt-prices">
-                                    {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
-                                    {{$price := (index $scraperEntries $scraperKey)}}
+                                {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
+                                {{$price := (index $scraperEntries $scraperKey)}}
+                                <td class="opt-offer">
                                     <span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardId}}" target="_blank">{{printf "%.2f" $price}}</a></span>
-                                    {{if .Price}}
-                                        / <span class="loaded">$ <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a></span>
-                                        {{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}
-                                    {{end}}
-                                    {{if eq $scraperKey $card.HotlistStore}}
-                                        <span class="emoji" title="Highest price in 3 months">&#127775;</span>
-                                    {{end}}
                                 </td>
+                                <td class="opt-loaded"><span class="loaded-wrap">{{if .Price}}<span class="loaded">$ <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}<span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}{{if eq $scraperKey $card.HotlistStore}}<span class="emoji" title="Highest price in 3 months">&#127775;</span>{{end}}</span></span></td>
                                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}">
                                     {{if .Price}}
                                         {{printf "%.2f" .Spread}}%
@@ -967,14 +860,45 @@
         document.querySelectorAll('.res-tab').forEach(function(t) { t.classList.remove('on'); });
         btn.classList.add('on');
     }
+    // One-time localStorage → cookie migration for the upload optimizer
+    document.addEventListener('DOMContentLoaded', function migrateUploadPrefs() {
+        var existing = getCookie('UploadOptimizerOpts');
+        if (existing !== null && existing !== '') return; // already migrated or has cookie state
+        if (localStorage.getItem('lowval') === null && localStorage.getItem('percspread') === null) return; // nothing to migrate
+        var bits = [];
+        ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
+            if (localStorage.getItem(k) === 'true') bits.push(k);
+        });
+        setCookie('UploadOptimizerOpts', bits.join(',') + (bits.length ? ',' : ''), 1000);
+        var textMap = {
+            percspread: 'UploadPercSpread',
+            percspreadmax: 'UploadPercSpreadMax',
+            minval: 'UploadMinVal',
+            maxval: 'UploadMaxVal',
+            margin: 'UploadMargin',
+            custompercmax: 'UploadCustomPercMax',
+            multiplier: 'UploadMultiplier',
+            sorting: 'UploadSorting',
+            altPrice: 'UploadAltPrice',
+            pricesource: 'UploadPriceSource',
+        };
+        Object.keys(textMap).forEach(function (k) {
+            var v = localStorage.getItem(k);
+            if (v !== null && v !== '') setCookie(textMap[k], v, 1000);
+        });
+        // Cleanup so we don't migrate again
+        var allKeys = Object.keys(textMap).concat(['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults']);
+        allKeys.forEach(function (k) { localStorage.removeItem(k); });
+    });
     // Auto-activate optimizer tab when "skip results" was checked
-    (function() {
-        var skipResults = JSON.parse(localStorage.getItem('noresults'));
+    document.addEventListener('DOMContentLoaded', function () {
+        var opts = (getCookie('UploadOptimizerOpts') || '').split(',').filter(Boolean);
+        var skipResults = opts.indexOf('noresults') >= 0;
         var optBtn = document.querySelector('.res-tab:nth-child(2)');
         if (skipResults && optBtn) {
             showResTab('optimizer', optBtn);
         }
-    })();
+    });
     </script>
 
     {{if .Optimized}}
@@ -985,10 +909,63 @@
     </script>
     {{end}}
 
-    <!-- Hidden form for pick-printing re-submission -->
+    <!-- Printing picker overlay -->
+    <div id="printing-overlay" class="printing-overlay" onclick="if(event.target===this)closePrintingPicker()">
+        <div class="printing-picker">
+            <div class="printing-picker-header">
+                <span class="printing-picker-title">Select printing</span>
+                <button type="button" class="printing-picker-close" onclick="closePrintingPicker()">&times;</button>
+            </div>
+            <div id="printing-picker-grid" class="printing-picker-grid">
+                <!-- Populated dynamically by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden form for pick-printing re-submission and exports -->
     <form id="upload_form" action="/upload" method="post" style="display:none">
         <input type="hidden" name="mode" value="{{if .IsBuylist}}true{{else}}false{{end}}">
+        <input type="hidden" id="res_download" name="download" value="">
+        <input type="hidden" id="res_estimate" name="estimate" value="">
+        <input type="hidden" id="res_deckbox" name="deckbox" value="">
+        <input type="hidden" id="res_tcgplayer_csv" name="tcgplayer_csv" value="">
     </form>
+
+    <script>
+    var resExportFields = ["res_download", "res_estimate", "res_deckbox", "res_tcgplayer_csv"];
+
+    function ensureHashesLoaded() {
+        var form = document.getElementById("upload_form");
+        if (form.querySelectorAll('input[name="hashes"]').length > 0) return;
+
+        form.removeAttribute("enctype");
+        document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
+            if (!row.dataset.hash) return;
+            var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
+            pairs.forEach(function(pair) {
+                var input = document.createElement("input");
+                input.type = "hidden";
+                input.name = pair[1];
+                if (pair[0] === 'hash') input.id = "row-" + row.dataset[pair[0]];
+                input.value = row.dataset[pair[0]];
+                form.appendChild(input);
+            });
+        });
+    }
+
+    function submitExport(field, newWindow) {
+        ensureHashesLoaded();
+
+        resExportFields.forEach(function(id) {
+            document.getElementById(id).value = "";
+        });
+        document.getElementById("res_" + field).value = "true";
+
+        var form = document.getElementById("upload_form");
+        form.target = newWindow ? '_blank' : '';
+        form.submit();
+    }
+    </script>
 
     <!-- Reload button (hidden until a pick is made) -->
     <div id="reload-bar" class="ures-reload-bar" style="display:none">
@@ -997,46 +974,101 @@
     </div>
 
     <script>
-    var pendingFixes = 0;
+    var fixedRows = {};
+    var activePicker = null;
 
-    function updateRowHash(select) {
+    function updateRowHash(btn, newHash) {
         var form = document.getElementById("upload_form");
-        var newHash = select.value;
-        var oldHash = select.dataset.hash;
+        var oldHash = btn.dataset.hash;
 
-        // On first pick, load all card data into hidden form (skip error rows with empty hash)
-        if (form.querySelectorAll('input[name="hashes"]').length === 0) {
-            form.removeAttribute("enctype");
-            document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
-                if (!row.dataset.hash) return; // skip not-found cards
-                var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
-                pairs.forEach(function(pair) {
-                    var input = document.createElement("input");
-                    input.type = "hidden";
-                    input.name = pair[1];
-                    if (pair[0] === 'hash') input.id = "row-" + row.dataset[pair[0]];
-                    input.value = row.dataset[pair[0]];
-                    form.appendChild(input);
-                });
-            });
-        }
+        ensureHashesLoaded();
 
         // Swap the hash
         var input = document.getElementById("row-" + oldHash);
         if (input) {
             input.value = newHash;
-            select.dataset.hash = newHash;
+            input.id = "row-" + newHash;
+            btn.dataset.hash = newHash;
         }
 
-        // Mark the row as fixed
-        select.closest('tr').classList.add('ures-fixed-row');
-        select.closest('tr').style.backgroundColor = '';
+        // Update row data-hash so the form tracks the new value
+        btn.closest('tr').dataset.hash = newHash;
 
-        // Track the fix and show reload bar
-        pendingFixes++;
-        document.getElementById('reload-count').textContent = pendingFixes;
+        // Mark the row as fixed
+        btn.closest('tr').classList.add('ures-fixed-row');
+        btn.closest('tr').classList.remove('ures-alias-row');
+
+        // Track the fix - only count each original row once
+        var rowId = btn.closest('tr').dataset.origHash || oldHash;
+        if (!btn.closest('tr').dataset.origHash) {
+            btn.closest('tr').dataset.origHash = oldHash;
+        }
+        if (!fixedRows[rowId]) {
+            fixedRows[rowId] = true;
+            document.getElementById('reload-count').textContent = Object.keys(fixedRows).length;
+        }
         document.getElementById('reload-bar').style.display = 'flex';
     }
+
+    // Metadata from Go template - maps UUID to {image, edition, number}
+    var cardMeta = {
+        {{range $uuid, $card := .Metadata}}
+        "{{$uuid}}": {
+            image: "{{$card.ImageURL}}",
+            edition: "{{$card.Edition}}",
+            number: "{{$card.Number}}"
+        },
+        {{end}}
+    };
+
+    function openPrintingPicker(btn) {
+        activePicker = btn;
+        var currentHash = btn.dataset.hash;
+        var aliases = btn.dataset.aliases.split(",").filter(Boolean);
+        var grid = document.getElementById("printing-picker-grid");
+        grid.innerHTML = "";
+
+        aliases.forEach(function(uuid) {
+            var meta = cardMeta[uuid];
+            if (!meta) return;
+            var card = document.createElement("div");
+            card.className = "printing-picker-card" + (uuid === currentHash ? " selected" : "");
+            var cardImg = document.createElement("img");
+            cardImg.src = meta.image;
+            cardImg.loading = "lazy";
+            card.appendChild(cardImg);
+            var metaDiv = document.createElement("div");
+            metaDiv.className = "pp-meta";
+            metaDiv.textContent = meta.edition;
+            card.appendChild(metaDiv);
+            var setDiv = document.createElement("div");
+            setDiv.className = "pp-set";
+            setDiv.textContent = "#" + meta.number;
+            card.appendChild(setDiv);
+            card.addEventListener("click", function() {
+                updateRowHash(activePicker, uuid);
+                // Update thumbnail and set info in the row
+                var row = activePicker.closest('tr');
+                var img = row.querySelector('.ures-card-cell img');
+                var setSpan = row.querySelector('.ures-card-set');
+                if (img) img.src = meta.image;
+                if (setSpan) setSpan.textContent = meta.edition + ' \u00B7 #' + meta.number;
+                closePrintingPicker();
+            });
+            grid.appendChild(card);
+        });
+
+        document.getElementById("printing-overlay").classList.add("open");
+    }
+
+    function closePrintingPicker() {
+        document.getElementById("printing-overlay").classList.remove("open");
+        activePicker = null;
+    }
+
+    document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") closePrintingPicker();
+    });
     </script>
 
     {{if ne .InfoMessage ""}}
@@ -1045,4 +1077,106 @@
             <h4><i>{{.InfoMessage}}</i></h4>
         </div>
     {{end}}
+{{end}}
+
+{{define "settings-content"}}
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Optimizer Filters</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body" id="settings-upload-checks" data-cookie="UploadOptimizerOpts">
+        <p class="section-desc">Hide offers outside your spread or value range, plus tolerance and condition handling.</p>
+        <div class="settings-toggles-grid">
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="lowval">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Hide low spread offers (below <input type="text" id="opt-percspread" value="60" class="settings-inline-num">%)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="highval">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Hide high spread offers (above <input type="text" id="opt-percspreadmax" value="0" class="settings-inline-num">%)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="lowvalabs">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Hide low value offers (below $<input type="text" id="opt-minval" value="1" class="settings-inline-num">)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="highvalabs">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Hide high value offers (above $<input type="text" id="opt-maxval" value="0" class="settings-inline-num">)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="minmargin">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Allow <input type="text" id="opt-margin" value="10" class="settings-inline-num">% difference for multi-select</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="nocond">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Ignore conditions when loading</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="noprice">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Ignore prices (use the alternate price source instead)</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="customperc">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Visual indicator above <input type="text" id="opt-custompercmax" value="100" class="settings-inline-num">% spread</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="noresults">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Jump to Optimizer view by default</span>
+            </label>
+        </div>
+    </div>
+</section>
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Sorting &amp; Pricing</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">How optimized rows are ordered and which price source drives the math.</p>
+        <div class="settings-upload-fields">
+            <label class="settings-field-row">
+                <span>Sort by</span>
+                <select id="opt-sorting" data-cookie="UploadSorting">
+                    <option value="">keep as uploaded</option>
+                    <option value="setchrono">set (chronological), name, number</option>
+                    <option value="setalpha">set (alphabetical), name, number</option>
+                    <option value="alphabetical">alphabetical</option>
+                    <option value="highprice">highest offer</option>
+                    <option value="highspread">highest spread</option>
+                    <option value="profitability">profitability</option>
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Optimize by</span>
+                <select id="opt-pricesource" data-cookie="UploadPriceSource">
+                    <option value="">cash prices</option>
+                    <option value="credit">store credit</option>
+                    <option value="marketCredit">market store credit</option>
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Alternate price source</span>
+                <select id="opt-altPrice" data-cookie="UploadAltPrice">
+                    {{range $.AltKeys}}{{$name := scraper_name .}}{{if $name}}
+                    <option value="{{.}}">{{$name}}</option>
+                    {{end}}{{end}}
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Quantity multiplier</span>
+                <input type="text" id="opt-multiplier" value="1" class="settings-inline-num">
+            </label>
+        </div>
+    </div>
+</section>
 {{end}}

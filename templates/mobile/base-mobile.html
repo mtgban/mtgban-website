@@ -22,6 +22,12 @@
 </head>
 
 <body class="light-theme mobile">
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+  <filter id="grain" color-interpolation-filters="sRGB">
+    <feTurbulence type="fractalNoise" baseFrequency="0.97" numOctaves="4"/>
+    <feDisplacementMap in="SourceGraphic" scale="120" xChannelSelector="R"/>
+  </filter>
+</svg>
 {{template "navbar" .}}
 
 <div class="page-content">

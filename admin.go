@@ -203,12 +203,26 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "New config loaded!")
 		doReboot = true
 
-		err := loadVars("", "")
+		err := loadVars(Config.Port, Config.DatastorePath, Config.OfflineKey)
 		if err != nil {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}
 
 	case "snapshot":
+		if Config.OfflineKey != "" {
+			v = url.Values{}
+			v.Set("msg", "Updating prices in the background...")
+			doReboot = true
+
+			go func() {
+				err := loadScrapersAPI(context.Background(), Config.OfflineKey)
+				if err != nil {
+					log.Println("error loading scrapers:", err)
+				}
+			}()
+			break
+		}
+
 		v = url.Values{}
 		v.Set("msg", "Moving data to timeseries in the background...")
 		doReboot = true
@@ -415,6 +429,10 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	var pageTable [][]string
 	for _, navName := range OrderNav {
 		nav := ExtraNavs[navName]
+		if Config.OfflineKey != "" && !nav.AllowOffline {
+			continue
+		}
+
 		row := []string{
 			nav.Short,
 			nav.Name,
