@@ -102,25 +102,25 @@ type PageVars struct {
 	ReverseMode    bool
 	DefaultTab     string
 
-	Page         string
-	Subtitle     string
-	ToC          []NewspaperPage
-	Headings     []Heading
-	Cards        []GenericCard
-	Table        []NewspaperResult
-	IsOneDay     bool
-	CanSwitchDay bool
-	SortDir      string
-	LargeTable   bool
-	OffsetCards  int
-	FilterSet    string
-	Editions     []string
-	FlatEditions []FlatEditionEntry
-	FilterRarity string
-	FilterBucket string
-	FilterFinish string
-	Rarities     []string
-	CardHashes   []string
+	Page               string
+	Subtitle           string
+	ToC                []NewspaperPage
+	Headings           []Heading
+	Cards              []GenericCard
+	Table              []NewspaperResult
+	IsOneDay           bool
+	CanSwitchDay       bool
+	SortDir            string
+	LargeTable         bool
+	OffsetCards        int
+	FilterSet          string
+	Editions           []string
+	FlatEditions       []FlatEditionEntry
+	FilterRarity       string
+	FilterBucket       string
+	FilterFinish       string
+	Rarities           []string
+	CardHashes         []string
 	EditionsMap        map[string]EditionEntry
 	EditionsCategories []string
 	EditionsByCategory map[string][]EditionEntry
@@ -432,7 +432,7 @@ type ConfigType struct {
 	// The location of the configuation file
 	sourcePath string
 
-	SqlConfig timeseries.SqlConfig `json:"sql_config"`
+	SqlConfig *timeseries.SqlConfig `json:"sql_config"`
 }
 
 var DevMode bool
@@ -673,10 +673,14 @@ func loadVars(port, datastorePath, offlineKey string) error {
 }
 
 func openDBs() (err error) {
-	PricesArchiveDB, err = timeseries.NewClient(Config.SqlConfig)
-	if err != nil {
-		log.Println("error creating a SQL client:", err)
-		return err
+	if Config.SqlConfig == nil {
+		log.Println("no SQL configuration set, Charts won't be available")
+	} else {
+		PricesArchiveDB, err = timeseries.NewClient(*Config.SqlConfig)
+		if err != nil {
+			log.Println("error creating a SQL client:", err)
+			return err
+		}
 	}
 
 	if Config.DBAddress == "" {
