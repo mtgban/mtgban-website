@@ -3,6 +3,8 @@ package timeseries
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -145,6 +147,91 @@ func (c *Client) UpsertRow(ctx context.Context, row PriceRow) error {
 		row.CoolstuffincBuylistPrice, row.TcgplayerLowSealedExpectedValue,
 	)
 	return err
+}
+
+const colsPerRow = 16
+
+// UpsertRows inserts or updates multiple price rows in a single statement.
+// This is significantly faster than calling UpsertRow in a loop because it
+// reduces the number of database round-trips. Rows are sent in batches of
+// the given batchSize (capped to stay under Postgres's 65535 parameter limit).
+func (c *Client) UpsertRows(ctx context.Context, rows []PriceRow, batchSize int) (int, error) {
+	if len(rows) == 0 {
+		return 0, nil
+	}
+
+	maxBatch := 65535 / colsPerRow // ~4096
+	if batchSize <= 0 || batchSize > maxBatch {
+		batchSize = maxBatch
+	}
+
+	var totalUpserted int
+	for start := 0; start < len(rows); start += batchSize {
+		end := start + batchSize
+		if end > len(rows) {
+			end = len(rows)
+		}
+		batch := rows[start:end]
+
+		n, err := c.upsertBatch(ctx, batch)
+		totalUpserted += n
+		if err != nil {
+			return totalUpserted, fmt.Errorf("batch starting at row %d: %w", start, err)
+		}
+	}
+	return totalUpserted, nil
+}
+
+func (c *Client) upsertBatch(ctx context.Context, batch []PriceRow) (int, error) {
+	var valueClauses []string
+	args := make([]any, 0, len(batch)*colsPerRow)
+
+	for i := range batch {
+		batch[i].MtgjsonUUID = NormalizeUUID(batch[i].MtgjsonUUID)
+		offset := i * colsPerRow
+		valueClauses = append(valueClauses, fmt.Sprintf(
+			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
+			offset+1, offset+2, offset+3, offset+4, offset+5, offset+6,
+			offset+7, offset+8, offset+9, offset+10, offset+11, offset+12,
+			offset+13, offset+14, offset+15, offset+16,
+		))
+		r := batch[i]
+		args = append(args,
+			r.Date, r.MtgjsonUUID, r.IsFoil, r.IsEtched, r.Language, r.IsAlt,
+			r.CardkingdomBuylistPrice, r.TcgplayerMarketPrice,
+			r.TcgplayerLowPrice, r.CardkingdomRetailPrice,
+			r.CardmarketLowPrice, r.CardmarketTrendPrice,
+			r.StarcitygamesBuylistPrice, r.AbuBuylistPrice,
+			r.CoolstuffincBuylistPrice, r.TcgplayerLowSealedExpectedValue,
+		)
+	}
+
+	q := `INSERT INTO product_prices (
+			date, mtgjson_uuid, is_foil, is_etched, language, is_alt,
+			cardkingdom_buylist_price, tcgplayer_market_price,
+			tcgplayer_low_price, cardkingdom_retail_price,
+			cardmarket_low_price, cardmarket_trend_price,
+			starcitygames_buylist_price, abu_buylist_price,
+			coolstuffinc_buylist_price, tcgplayer_low_sealed_expected_value
+		) VALUES ` + strings.Join(valueClauses, ",") + `
+		ON CONFLICT (date, mtgjson_uuid, is_foil, is_etched, language, is_alt) DO UPDATE SET
+			cardkingdom_buylist_price         = COALESCE(EXCLUDED.cardkingdom_buylist_price,         product_prices.cardkingdom_buylist_price),
+			tcgplayer_market_price            = COALESCE(EXCLUDED.tcgplayer_market_price,            product_prices.tcgplayer_market_price),
+			tcgplayer_low_price               = COALESCE(EXCLUDED.tcgplayer_low_price,               product_prices.tcgplayer_low_price),
+			cardkingdom_retail_price          = COALESCE(EXCLUDED.cardkingdom_retail_price,          product_prices.cardkingdom_retail_price),
+			cardmarket_low_price              = COALESCE(EXCLUDED.cardmarket_low_price,              product_prices.cardmarket_low_price),
+			cardmarket_trend_price            = COALESCE(EXCLUDED.cardmarket_trend_price,            product_prices.cardmarket_trend_price),
+			starcitygames_buylist_price       = COALESCE(EXCLUDED.starcitygames_buylist_price,       product_prices.starcitygames_buylist_price),
+			abu_buylist_price                 = COALESCE(EXCLUDED.abu_buylist_price,                 product_prices.abu_buylist_price),
+			coolstuffinc_buylist_price        = COALESCE(EXCLUDED.coolstuffinc_buylist_price,        product_prices.coolstuffinc_buylist_price),
+			tcgplayer_low_sealed_expected_value = COALESCE(EXCLUDED.tcgplayer_low_sealed_expected_value, product_prices.tcgplayer_low_sealed_expected_value)`
+
+	res, err := c.db.ExecContext(ctx, q, args...)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
 }
 
 // GetEarliestDate returns the oldest date on record for a UUID and foil status,
