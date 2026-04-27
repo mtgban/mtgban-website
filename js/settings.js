@@ -307,9 +307,14 @@
         }
     }
 
-    function revealNavButton() {
+    function enableNavButton() {
         const navBtn = document.getElementById('nav-settings-btn');
-        if (navBtn) navBtn.hidden = false;
+        if (navBtn) {
+            navBtn.classList.remove('is-disabled');
+            navBtn.removeAttribute('aria-disabled');
+            navBtn.removeAttribute('tabindex');
+            navBtn.title = 'Settings (Ctrl+,)';
+        }
         const params = new URLSearchParams(window.location.search);
         if (params.get('settings') === '1') {
             params.delete('settings');
@@ -323,7 +328,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         bindModalChrome();
         autoWire();
-        if (hasBindings()) revealNavButton();
+        if (hasBindings()) enableNavButton();
         consumeSavedToast();
     });
     document.addEventListener('keydown', onKeydown);

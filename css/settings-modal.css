@@ -577,4 +577,13 @@
     background: var(--surface-3, var(--navbackground));
     color: var(--ainfo);
 }
-.ban-settings-btn[hidden] { display: none !important; }
+.ban-settings-btn.is-disabled {
+    color: var(--text-dim);
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.ban-settings-btn.is-disabled:hover {
+    background: transparent;
+    color: var(--text-dim);
+}
