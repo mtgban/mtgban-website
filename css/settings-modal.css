@@ -593,13 +593,14 @@
 }
 
 .settings-grid label .scraper-tag {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     margin-left: 0.4em;
-    padding: 0.05em 0.5em;
+    padding: 0.25em 0.55em;
     font-size: 0.72em;
     font-weight: 600;
-    line-height: 1.4;
-    vertical-align: 0.05em;
+    line-height: 1;
+    vertical-align: 0.1em;
     border-radius: 999px;
     border: 1px solid color-mix(in srgb, var(--settings-blue) 45%, transparent);
     color: var(--normal);
