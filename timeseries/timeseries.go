@@ -16,6 +16,15 @@ func NormalizeUUID(uuid string) string {
 	return uuid
 }
 
+// NormalizeLanguage treats "English" and "" as equivalent, storing both as "".
+func NormalizeLanguage(lang *string) *string {
+	if lang != nil && *lang == "English" {
+		empty := ""
+		return &empty
+	}
+	return lang
+}
+
 // PriceRow represents a single row from the product_prices table.
 // Each nullable price column uses *float64 so we can distinguish "no data" from zero.
 type PriceRow struct {

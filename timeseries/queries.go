@@ -54,6 +54,7 @@ func scanRows(rows interface {
 // ordered by date descending.
 func (c *Client) GetPriceHistory(ctx context.Context, uuid string, isFoil bool, isEtched bool, language string) ([]PriceRow, error) {
 	uuid = NormalizeUUID(uuid)
+	language = *NormalizeLanguage(&language)
 	q := `SELECT` + selectColumns + `
 		FROM product_prices
 		WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND language = $4
@@ -70,6 +71,7 @@ func (c *Client) GetPriceHistory(ctx context.Context, uuid string, isFoil bool, 
 // on or after the given date.
 func (c *Client) GetPriceHistorySince(ctx context.Context, uuid string, isFoil bool, isEtched bool, language *string, since time.Time) ([]PriceRow, error) {
 	uuid = NormalizeUUID(uuid)
+	language = NormalizeLanguage(language)
 	var q string
 	var args []any
 	if language != nil {
@@ -118,6 +120,7 @@ func (c *Client) HGetAll(ctx context.Context, cardID string, isFoil bool, isEtch
 // be built up across multiple scrapers without overwriting earlier values.
 func (c *Client) UpsertRow(ctx context.Context, row PriceRow) error {
 	row.MtgjsonUUID = NormalizeUUID(row.MtgjsonUUID)
+	row.Language = NormalizeLanguage(row.Language)
 	const q = `
 		INSERT INTO product_prices (
 			date, mtgjson_uuid, is_foil, is_etched, language, is_alt,
@@ -188,6 +191,7 @@ func (c *Client) upsertBatch(ctx context.Context, batch []PriceRow) (int, error)
 
 	for i := range batch {
 		batch[i].MtgjsonUUID = NormalizeUUID(batch[i].MtgjsonUUID)
+		batch[i].Language = NormalizeLanguage(batch[i].Language)
 		offset := i * colsPerRow
 		valueClauses = append(valueClauses, fmt.Sprintf(
 			"($%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d,$%d)",
@@ -255,6 +259,7 @@ func (c *Client) GetEarliestDate(ctx context.Context, uuid string, isFoil bool, 
 // GetLatestPrice returns the most recent price row for a UUID, foil status, and language.
 func (c *Client) GetLatestPrice(ctx context.Context, uuid string, isFoil bool, isEtched bool, language string) (PriceRow, error) {
 	uuid = NormalizeUUID(uuid)
+	language = *NormalizeLanguage(&language)
 	q := `SELECT` + selectColumns + `
 		FROM product_prices
 		WHERE mtgjson_uuid = $1 AND is_foil = $2 AND is_etched = $3 AND language = $4
