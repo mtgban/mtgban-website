@@ -310,7 +310,7 @@
     }
 
     function showToast(msg) {
-        var toast = document.getElementById('m-fav-toast');
+        var toast = document.getElementById('m-fav-toast') || document.getElementById('desktop-fav-toast');
         if (!toast) return;
         toast.textContent = msg;
         toast.classList.add('show');
