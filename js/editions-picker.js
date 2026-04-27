@@ -134,8 +134,6 @@
             });
         });
 
-        const exp = root.querySelector('.editions-group[data-category="Expansions"]');
-        if (exp) exp.classList.add('expanded');
     }
 
     function loadFromCookie(root, cookieName) {
