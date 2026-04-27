@@ -2,15 +2,17 @@ package timeseries
 
 import (
 	"fmt"
-	"strings"
 	"time"
 )
 
-// NormalizeUUID strips the _f or _e suffix that mtgmatcher appends for
-// foil/etched variants, returning a clean UUID suitable for Postgres.
+// NormalizeUUID strips the _f, _e, and language suffixes that mtgmatcher
+// appends for foil/etched/language variants, returning a clean UUID
+// suitable for Postgres. A standard UUID is 36 characters; anything
+// appended after that (e.g. _jpn, _ita, _alt, _f, _e) is stripped.
 func NormalizeUUID(uuid string) string {
-	uuid = strings.TrimSuffix(uuid, "_f")
-	uuid = strings.TrimSuffix(uuid, "_e")
+	if len(uuid) > 36 {
+		uuid = uuid[:36]
+	}
 	return uuid
 }
 

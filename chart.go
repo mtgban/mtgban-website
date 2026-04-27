@@ -122,17 +122,16 @@ var defaultGradeMap = map[string]float64{
 	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
 }
 
-func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil bool, isEtched bool, date string) *timeseries.PriceRow {
-	key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil) + "|" + strconv.FormatBool(isEtched)
+func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil bool, isEtched bool, language string, date string) *timeseries.PriceRow {
+	key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil) + "|" + strconv.FormatBool(isEtched) + "|" + language
 	row, ok := accumulated[key]
 	if !ok {
-		lang := ""
 		row = &timeseries.PriceRow{
 			Date:        date,
 			MtgjsonUUID: uuid,
 			IsFoil:      isFoil,
 			IsEtched:    isEtched,
-			Language:    &lang,
+			Language:    &language,
 		}
 		accumulated[key] = row
 	}
@@ -183,7 +182,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, date)
+				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.Language, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
@@ -211,24 +210,23 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, date)
+				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.Language, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
 	}
 
-	// Upsert all accumulated rows
-	var upserted, errCount int
+	// Upsert all accumulated rows in batches
+	rows := make([]timeseries.PriceRow, 0, len(accumulated))
 	for _, row := range accumulated {
-		err := PricesArchiveDB.UpsertRow(context.Background(), *row)
-		if err != nil {
-			errCount++
-			if errCount <= 5 {
-				ServerNotify("timeseries", fmt.Sprintf("upsert error for %s: %s", row.MtgjsonUUID, err))
-			}
-			continue
-		}
-		upserted++
+		rows = append(rows, *row)
+	}
+
+	upserted, err := PricesArchiveDB.UpsertRows(context.Background(), rows, 500)
+	var errCount int
+	if err != nil {
+		errCount = len(rows) - upserted
+		ServerNotify("timeseries", fmt.Sprintf("batch upsert error: %s", err))
 	}
 
 	LastStashUpdate = time.Now()
