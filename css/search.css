@@ -1682,6 +1682,59 @@
     color: var(--anormal);
 }
 
+/* === Toast (mirrors .m-toast for desktop refresh feedback) === */
+
+.search-toast {
+    position: fixed;
+    bottom: 1em;
+    right: -100%;
+    padding: 0.6em 1em;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: rgba(22, 22, 22, 0.85);
+    backdrop-filter: blur(12px) saturate(1.4);
+    -webkit-backdrop-filter: blur(12px) saturate(1.4);
+    color: var(--green);
+    border: 1px solid var(--green);
+    border-radius: 8px;
+    z-index: 600;
+    transition: right 300ms ease;
+    white-space: nowrap;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+}
+
+.light-theme .search-toast {
+    background: rgba(252, 252, 252, 0.85);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.search-toast.show {
+    right: 1em;
+}
+
+.search-toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    background: var(--green);
+    opacity: 0.5;
+    transform-origin: left;
+    transform: scaleX(0);
+}
+
+.search-toast.show::after {
+    animation: searchToastTimer 2s linear forwards;
+}
+
+@keyframes searchToastTimer {
+    from { transform: scaleX(1); }
+    to   { transform: scaleX(0); }
+}
+
 /* === Favorite star button on desktop result rows === */
 
 .result-quick-icons .fav-btn {
