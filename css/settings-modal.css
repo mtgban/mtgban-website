@@ -600,3 +600,7 @@
     background: color-mix(in srgb, var(--ainfo) 6%, transparent);
     white-space: nowrap;
 }
+
+body.settings-open {
+    overflow: hidden;
+}

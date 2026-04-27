@@ -206,6 +206,12 @@
         updateDirtyUI();
         backdropEl.classList.add('open');
         modalEl.classList.add('open');
+        document.body.classList.add('settings-open');
+        const body = modalEl.querySelector('.settings-modal-body');
+        if (body) {
+            body.setAttribute('tabindex', '-1');
+            body.focus({ preventScroll: true });
+        }
         if (window.lucide && lucide.createIcons) {
             lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
         }
@@ -215,6 +221,7 @@
         if (!ensureEls()) return;
         modalEl.classList.remove('open', 'confirm-open');
         backdropEl.classList.remove('open');
+        document.body.classList.remove('settings-open');
     }
 
     function requestClose() {
