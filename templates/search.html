@@ -46,6 +46,7 @@
     {{end}}
     <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
@@ -712,7 +713,18 @@ Sims are not required for pre-constructed decks and other products where the sam
                         {{end}}
 
                             <div class="result-header-cover" style="z-index: {{$i}}"></div>
-                            <div class="result-header{{if eq $i 0}} result-first{{end}}" style="z-index: {{inc $i 100}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}});">
+                            <div class="result-header{{if eq $i 0}} result-first{{end}}"
+                                 style="z-index: {{inc $i 100}}"
+                                 data-card-id="{{$cardId}}"
+                                 data-card-name="{{$card.Name}}"
+                                 data-set-code="{{$card.SetCode}}"
+                                 data-edition="{{$card.Edition}}"
+                                 data-number="{{$card.Number}}"
+                                 data-image-url="{{$card.ImageURL}}"
+                                 data-finish-tag="{{$card.FinishTag}}"
+                                 data-finish-class="{{$card.FinishClass}}"
+                                 data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
+                                 onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -772,6 +784,9 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     {{if and (not $.DisableChart) (eq $.ChartID "")}}
                                         <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
                                     {{end}}
+                                    <button class="fav-btn" data-card-id="{{$cardId}}" onclick="toggleFavorite(this)" title="Toggle favorite">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                    </button>
                                 </div>
                             </div>
                             {{if or (ne $card.Variant "") $card.Flag}}
