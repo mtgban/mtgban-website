@@ -315,26 +315,30 @@
 
 /* Grid container when multiple toggles share a section */
 .settings-toggles-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(22em, 1fr));
-    gap: 0.25em 1em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
 }
 .settings-toggles-grid .settings-toggle {
     padding: 0.5em 0.6em;
     border-radius: var(--radius-sm);
-    align-items: flex-start;
+    align-items: center;
     line-height: 1.35;
     transition: background 0.1s ease;
+    gap: 0.75em;
 }
 .settings-toggles-grid .settings-toggle:hover {
     background: color-mix(in srgb, var(--ainfo) 6%, transparent);
 }
 .settings-toggles-grid .settings-toggle .settings-toggle-track {
-    margin-top: 0.1em;
+    flex-shrink: 0;
 }
 .settings-toggles-grid .settings-toggle > span:last-child {
     flex: 1;
     min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .settings-toggle input { display: none; }
 .settings-toggle-track {
