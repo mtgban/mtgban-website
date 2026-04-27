@@ -645,3 +645,10 @@ body.settings-open {
     color: var(--normal);
     opacity: 0.78;
 }
+.settings-field-row > select {
+    width: 14em;
+    min-width: 0;
+}
+.settings-field-row > .settings-inline-num {
+    margin: 0;
+}
