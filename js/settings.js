@@ -39,6 +39,19 @@
         news: {
             editions: { 'news-editions-picker': 'NewspaperList' },
         },
+        upload: {
+            misc: { 'settings-upload-checks': 'UploadOptimizerOpts' },
+            selects: ['UploadSorting', 'UploadAltPrice', 'UploadPriceSource'],
+            texts: {
+                'opt-percspread': 'UploadPercSpread',
+                'opt-percspreadmax': 'UploadPercSpreadMax',
+                'opt-minval': 'UploadMinVal',
+                'opt-maxval': 'UploadMaxVal',
+                'opt-margin': 'UploadMargin',
+                'opt-custompercmax': 'UploadCustomPercMax',
+                'opt-multiplier': 'UploadMultiplier',
+            },
+        },
     };
 
     // ============================================================
@@ -118,6 +131,17 @@
         });
     }
 
+    // ─── Text input (single value → cookie) ──────────────────────
+    function bindText(elementId, cookieName) {
+        const el = document.getElementById(elementId);
+        if (!el) return;
+        addBinding({
+            load: function () { el.value = getCookie(cookieName) || el.defaultValue || ''; },
+            save: function () { setCookie(cookieName, el.value, 1000); },
+            serialize: function () { return cookieName + '=' + el.value; },
+        });
+    }
+
     // ─── Misc bitmap (many [data-misc] checkboxes → CSV cookie) ──
     function readMisc(container) {
         const names = [];
@@ -161,6 +185,7 @@
             Object.entries(page.lists || {}).forEach(function (e) { bindList(e[0], e[1]); });
             Object.entries(page.pills || {}).forEach(function (e) { bindPills(e[0], e[1]); });
             (page.selects || []).forEach(bindSelect);
+            Object.entries(page.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
             Object.entries(page.misc || {}).forEach(function (e) { bindMiscBitmap(e[0], e[1]); });
             (page.dynamicLists || []).forEach(bindDynamicList);
             Object.entries(page.editions || {}).forEach(function (e) { bindEditions(e[0], e[1]); });
