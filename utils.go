@@ -149,6 +149,21 @@ func keyruneForCardSet(cardId string) string {
 	return out
 }
 
+// getSetKeyrunes returns a map of set code -> bare "ss-CODE" keyrune class.
+// Used by the search landing page to render set-search recent-search items.
+func getSetKeyrunes() map[string]string {
+	codes := mtgmatcher.GetAllSets()
+	out := make(map[string]string, len(codes))
+	for _, code := range codes {
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil || set.KeyruneCode == "" {
+			continue
+		}
+		out[code] = "ss-" + strings.ToLower(set.KeyruneCode)
+	}
+	return out
+}
+
 func editionTitle(cardId string) string {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
