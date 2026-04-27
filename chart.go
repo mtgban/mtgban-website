@@ -122,6 +122,23 @@ var defaultGradeMap = map[string]float64{
 	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
 }
 
+func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil bool, isEtched bool, date string) *timeseries.PriceRow {
+	key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil) + "|" + strconv.FormatBool(isEtched)
+	row, ok := accumulated[key]
+	if !ok {
+		lang := ""
+		row = &timeseries.PriceRow{
+			Date:        date,
+			MtgjsonUUID: uuid,
+			IsFoil:      isFoil,
+			IsEtched:    isEtched,
+			Language:    &lang,
+		}
+		accumulated[key] = row
+	}
+	return row
+}
+
 var StashingInProgress bool
 
 func stashInTimeseries() {
@@ -136,23 +153,6 @@ func stashInTimeseries() {
 
 	// Accumulate all prices into a single row per (date, uuid, foil, etched).
 	accumulated := map[string]*timeseries.PriceRow{}
-
-	getRow := func(uuid string, isFoil bool, isEtched bool, date string) *timeseries.PriceRow {
-		key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil) + "|" + strconv.FormatBool(isEtched)
-		row, ok := accumulated[key]
-		if !ok {
-			lang := ""
-			row = &timeseries.PriceRow{
-				Date:        date,
-				MtgjsonUUID: uuid,
-				IsFoil:      isFoil,
-				IsEtched:    isEtched,
-				Language:    &lang,
-			}
-			accumulated[key] = row
-		}
-		return row
-	}
 
 	// Collect retail prices from sellers
 	for _, seller := range Sellers {
@@ -183,7 +183,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(card.UUID, card.Foil, card.Etched, date)
+				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
@@ -211,7 +211,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(card.UUID, card.Foil, card.Etched, date)
+				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
