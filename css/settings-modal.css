@@ -610,6 +610,10 @@
     letter-spacing: 0.04em;
 }
 
+/* Reserve the scrollbar gutter so the page doesn't shift when settings opens */
+html {
+    scrollbar-gutter: stable;
+}
 body.settings-open {
     overflow: hidden;
 }
