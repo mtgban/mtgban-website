@@ -1144,8 +1144,8 @@
     <div class="settings-section-body">
         <p class="section-desc">How optimized rows are ordered and which price source drives the math.</p>
         <div class="settings-upload-fields">
-            <div>
-                <label for="opt-sorting" class="settings-field-label">Sort by</label>
+            <label class="settings-field-row">
+                <span>Sort by</span>
                 <select id="opt-sorting" data-cookie="UploadSorting">
                     <option value="">keep as uploaded</option>
                     <option value="setchrono">set (chronological), name, number</option>
@@ -1155,27 +1155,27 @@
                     <option value="highspread">highest spread</option>
                     <option value="profitability">profitability</option>
                 </select>
-            </div>
-            <div>
-                <label for="opt-pricesource" class="settings-field-label">Optimize by</label>
+            </label>
+            <label class="settings-field-row">
+                <span>Optimize by</span>
                 <select id="opt-pricesource" data-cookie="UploadPriceSource">
                     <option value="">cash prices</option>
                     <option value="credit">store credit</option>
                     <option value="marketCredit">market store credit</option>
                 </select>
-            </div>
-            <div>
-                <label for="opt-altPrice" class="settings-field-label">Alternate price source</label>
+            </label>
+            <label class="settings-field-row">
+                <span>Alternate price source</span>
                 <select id="opt-altPrice" data-cookie="UploadAltPrice">
-                    {{range $.AltKeys}}
-                    <option value="{{.}}">{{scraper_name .}}</option>
-                    {{end}}
+                    {{range $.AltKeys}}{{$name := scraper_name .}}{{if $name}}
+                    <option value="{{.}}">{{$name}}</option>
+                    {{end}}{{end}}
                 </select>
-            </div>
-            <div>
-                <label for="opt-multiplier" class="settings-field-label">Quantity multiplier</label>
+            </label>
+            <label class="settings-field-row">
+                <span>Quantity multiplier</span>
                 <input type="text" id="opt-multiplier" value="1" class="settings-inline-num">
-            </div>
+            </label>
         </div>
     </div>
 </section>

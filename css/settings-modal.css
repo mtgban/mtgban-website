@@ -625,17 +625,23 @@ body.settings-open {
     font-size: 0.92em;
     text-align: right;
 }
-.settings-field-label {
-    display: block;
-    margin-bottom: 0.25em;
-    font-size: var(--text-md);
-    color: var(--normal);
-    opacity: 0.78;
-}
 .settings-upload-fields {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 0.85em 1em;
+    gap: 0.6em 1.5em;
+}
+.settings-field-row {
+    display: grid;
+    grid-template-columns: minmax(8em, max-content) 1fr;
+    align-items: center;
+    gap: 0 0.75em;
+    cursor: pointer;
+    user-select: none;
+}
+.settings-field-row > span {
+    font-size: var(--text-md);
+    color: var(--normal);
+    opacity: 0.78;
 }
 @media (max-width: 720px) {
     .settings-upload-fields { grid-template-columns: 1fr; }
