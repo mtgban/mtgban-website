@@ -574,3 +574,17 @@
     background: transparent;
     color: var(--text-dim);
 }
+
+.settings-grid label .scraper-tag {
+    display: inline-block;
+    margin-left: 0.4em;
+    padding: 0.05em 0.45em;
+    font-size: 0.75em;
+    line-height: 1.4;
+    vertical-align: 0.05em;
+    border-radius: 999px;
+    border: 1px solid var(--border-moderate);
+    color: var(--text-dim);
+    background: color-mix(in srgb, var(--ainfo) 6%, transparent);
+    white-space: nowrap;
+}

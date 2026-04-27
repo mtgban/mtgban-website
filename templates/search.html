@@ -1113,7 +1113,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{range $key := .SellerKeys}}
                     <label>
                         <input type="checkbox" name="{{$key}}">
-                        {{scraper_name $key}}{{if (contains $key "Sealed")}} <span style="font-size:0.8em;opacity:0.6;">(Sealed)</span>{{end}}
+                        {{scraper_name $key}}{{if (contains $key "Sealed")}} <span class="scraper-tag">Sealed</span>{{end}}
                     </label>
                     {{end}}
                 </div>
@@ -1124,7 +1124,7 @@ Sims are not required for pre-constructed decks and other products where the sam
                     {{range $key := .VendorKeys}}
                     <label>
                         <input type="checkbox" name="{{$key}}">
-                        {{scraper_name $key}}{{if (contains $key "Sealed")}} <span style="font-size:0.8em;opacity:0.6;">(Sealed)</span>{{end}}
+                        {{scraper_name $key}}{{if (contains $key "Sealed")}} <span class="scraper-tag">Sealed</span>{{end}}
                     </label>
                     {{end}}
                 </div>
