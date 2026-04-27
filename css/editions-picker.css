@@ -154,6 +154,7 @@
 .editions-grid label .ss {
     color: var(--normal);
     opacity: 0.85;
+    font-size: 1.4em;
     flex-shrink: 0;
 }
 .editions-grid label:hover .ss { opacity: 1; }
