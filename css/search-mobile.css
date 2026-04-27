@@ -1147,14 +1147,14 @@
 
 .m-fav-item {
     display: flex;
-    flex-direction: column;
-    gap: 0.15em;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75em;
     padding: 0.5em 0.75em;
     text-decoration: none;
     color: var(--text);
     min-height: 44px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    justify-content: center;
 }
 
 .light-theme .m-fav-item {
@@ -1181,6 +1181,23 @@
 
 .m-fav-item-top .m-badge {
     margin-left: auto;
+}
+
+.m-fav-thumb {
+    flex: 0 0 auto;
+    width: 2.5em;
+    height: 3.5em;
+    object-fit: cover;
+    border-radius: 0.2em;
+}
+
+.m-fav-item-body {
+    flex: 1 1 auto;
+    overflow: hidden;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15em;
 }
 
 .m-fav-name {
