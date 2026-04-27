@@ -153,6 +153,9 @@
                 html += '<div class="landing-item-info">';
                 html += '<span class="landing-item-query">' + escapeHtml(s.q) + '</span>';
                 html += '</div>';
+                html += '<button class="landing-item-delete" data-q="' + escapeAttr(s.q) + '" onclick="window.deleteRecentSearch(this.dataset.q, event)" title="Remove from recent searches">';
+                html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+                html += '</button>';
                 html += '<span class="landing-item-arrow">&rsaquo;</span>';
                 html += '</a>';
             });
@@ -181,6 +184,14 @@
     window.recentPage = function(containerId, delta) {
         if (!rsPaginationState[containerId]) rsPaginationState[containerId] = { page: 0 };
         rsPaginationState[containerId].page += delta;
+        renderRecentSearches();
+    };
+
+    window.deleteRecentSearch = function(query, ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        if (!query) return;
+        var searches = getRecentSearches().filter(function(s) { return s.q !== query; });
+        saveRecentSearches(searches);
         renderRecentSearches();
     };
 
