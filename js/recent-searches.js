@@ -135,10 +135,10 @@
             slice.forEach(function(s) {
                 html += '<a class="landing-item landing-item-recent" href="?q=' + encodeURIComponent(s.q) + '">';
                 html += '<div class="landing-item-thumb">';
-                if (s.img) {
-                    html += '<img src="' + escapeAttr(s.img) + '" loading="lazy" alt="">';
-                } else if (s.keyrune) {
+                if (s.keyrune) {
                     html += '<i class="ss ' + escapeAttr(s.keyrune) + ' ss-fw"></i>';
+                } else if (s.img) {
+                    html += '<img src="' + escapeAttr(s.img) + '" loading="lazy" alt="">';
                 } else {
                     html += '<span class="landing-item-thumb-placeholder">&#128269;</span>';
                 }
