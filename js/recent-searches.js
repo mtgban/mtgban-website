@@ -3,6 +3,29 @@
     var STORAGE_KEY = 'mtgban_recent_searches';
     var MAX_ENTRIES = 15;
 
+    // Parse a query for set tokens. Returns {set, keyrune} or {set:'', keyrune:''} if none.
+    // Recognizes: s:CODE, s:"Name", e:CODE, ee:CODE
+    function parseSetToken(query) {
+        if (!query) return { set: '', keyrune: '' };
+
+        // Quoted set name: s:"Aether Revolt"
+        var qm = query.match(/\bs:"([^"]+)"/i);
+        if (qm) {
+            // We don't resolve names to codes client-side - leave keyrune empty.
+            return { set: '', keyrune: '' };
+        }
+
+        // Set code variants: s:CODE, e:CODE, ee:CODE
+        var cm = query.match(/\b(?:s|e|ee):([A-Za-z0-9]{2,6})\b/i);
+        if (cm) {
+            var code = cm[1].toUpperCase();
+            var keyrunes = window.BAN_SET_KEYRUNES || {};
+            return { set: code, keyrune: keyrunes[code] || '' };
+        }
+
+        return { set: '', keyrune: '' };
+    }
+
     function getRecentSearches() {
         try {
             var data = localStorage.getItem(STORAGE_KEY);
@@ -31,10 +54,16 @@
             return s.q.toLowerCase() !== query.toLowerCase();
         });
 
-        // Add to front with current timestamp
-        searches.unshift({ q: query, t: Date.now() });
+        var token = parseSetToken(query);
 
-        // Cap at MAX_ENTRIES
+        searches.unshift({
+            q: query,
+            t: Date.now(),
+            img: '',
+            set: token.set,
+            keyrune: token.keyrune
+        });
+
         if (searches.length > MAX_ENTRIES) {
             searches = searches.slice(0, MAX_ENTRIES);
         }
@@ -44,32 +73,91 @@
 
     function clearRecentSearches() {
         localStorage.removeItem(STORAGE_KEY);
-        var container = document.getElementById('m-recent-searches');
-        if (container) container.innerHTML = '';
+        var mobile = document.getElementById('m-recent-searches');
+        if (mobile) mobile.innerHTML = '';
+        var desktop = document.getElementById('desktop-recent-searches');
+        if (desktop) renderRecentSearchesInto(desktop, 'desktop');
     }
 
     function renderRecentSearches() {
-        var container = document.getElementById('m-recent-searches');
+        renderRecentSearchesInto(document.getElementById('m-recent-searches'), 'mobile');
+        renderRecentSearchesInto(document.getElementById('desktop-recent-searches'), 'desktop');
+    }
+
+    var rsPaginationState = {};
+
+    function renderRecentSearchesInto(container, mode) {
         if (!container) return;
-
         var searches = getRecentSearches();
-        if (searches.length === 0) return;
 
-        var html = '<div class="m-recent-header">';
-        html += '<span class="m-recent-title">Recent Searches</span>';
-        html += '<button class="m-recent-clear" onclick="window.clearRecentSearches()">Clear</button>';
-        html += '</div>';
-        html += '<div class="m-recent-list">';
+        var containerId = container.id;
+        if (!rsPaginationState[containerId]) rsPaginationState[containerId] = { page: 0 };
+        var pageSize = mode === 'desktop' ? 10 : searches.length || 1;
+        var totalPages = Math.max(1, Math.ceil(searches.length / pageSize));
+        if (rsPaginationState[containerId].page >= totalPages) rsPaginationState[containerId].page = 0;
+        var page = rsPaginationState[containerId].page;
 
-        searches.forEach(function(s) {
-            html += '<a class="m-recent-item" href="?q=' + encodeURIComponent(s.q) + '">';
-            html += '<span class="m-recent-icon">&#128269;</span>';
-            html += '<span class="m-recent-query">' + escapeHtml(s.q) + '</span>';
-            html += '<span class="m-recent-arrow">&rsaquo;</span>';
-            html += '</a>';
-        });
+        if (searches.length === 0) {
+            if (mode === 'desktop') {
+                container.innerHTML = '<div class="landing-empty">Your recent searches will appear here.</div>';
+            } else {
+                container.innerHTML = '';
+            }
+            return;
+        }
 
-        html += '</div>';
+        var html = '';
+        if (mode === 'mobile') {
+            html += '<div class="m-recent-header">';
+            html += '<span class="m-recent-title">Recent Searches</span>';
+            html += '<button class="m-recent-clear" onclick="window.clearRecentSearches()">Clear</button>';
+            html += '</div>';
+            html += '<div class="m-recent-list">';
+            searches.forEach(function(s) {
+                html += '<a class="m-recent-item" href="?q=' + encodeURIComponent(s.q) + '">';
+                html += '<span class="m-recent-icon">&#128269;</span>';
+                html += '<span class="m-recent-query">' + escapeHtml(s.q) + '</span>';
+                html += '<span class="m-recent-arrow">&rsaquo;</span>';
+                html += '</a>';
+            });
+            html += '</div>';
+        } else {
+            var start = page * pageSize;
+            var slice = searches.slice(start, start + pageSize);
+
+            html += '<div class="landing-pane-header">';
+            html += '<span class="landing-pane-title">Recent Searches</span>';
+            html += '<span class="landing-pane-actions">';
+            html += '<button class="landing-pane-btn" onclick="window.clearRecentSearches()">Clear</button>';
+            html += '</span>';
+            html += '</div>';
+            html += '<div class="landing-pane-body">';
+            slice.forEach(function(s) {
+                html += '<a class="landing-item landing-item-recent" href="?q=' + encodeURIComponent(s.q) + '">';
+                html += '<div class="landing-item-thumb">';
+                if (s.img) {
+                    html += '<img src="' + escapeAttr(s.img) + '" loading="lazy" alt="">';
+                } else if (s.keyrune) {
+                    html += '<i class="ss ' + escapeAttr(s.keyrune) + ' ss-fw"></i>';
+                } else {
+                    html += '<span class="landing-item-thumb-placeholder">&#128269;</span>';
+                }
+                html += '</div>';
+                html += '<div class="landing-item-info">';
+                html += '<span class="landing-item-query">' + escapeHtml(s.q) + '</span>';
+                html += '</div>';
+                html += '<span class="landing-item-arrow">&rsaquo;</span>';
+                html += '</a>';
+            });
+            html += '</div>';
+            if (totalPages > 1) {
+                html += '<div class="landing-pane-footer">';
+                html += '<button class="landing-page-btn" onclick="window.recentPage(\'' + containerId + '\', -1)" ' + (page === 0 ? 'disabled' : '') + '>&lsaquo;</button>';
+                html += '<span class="landing-page-label">' + (page + 1) + ' / ' + totalPages + '</span>';
+                html += '<button class="landing-page-btn" onclick="window.recentPage(\'' + containerId + '\', 1)" ' + (page === totalPages - 1 ? 'disabled' : '') + '>&rsaquo;</button>';
+                html += '</div>';
+            }
+        }
         container.innerHTML = html;
     }
 
@@ -78,6 +166,16 @@
         div.textContent = str;
         return div.innerHTML;
     }
+
+    function escapeAttr(str) {
+        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    window.recentPage = function(containerId, delta) {
+        if (!rsPaginationState[containerId]) rsPaginationState[containerId] = { page: 0 };
+        rsPaginationState[containerId].page += delta;
+        renderRecentSearches();
+    };
 
     // Record search on form submit
     function hookFormSubmit() {
@@ -92,12 +190,36 @@
         });
     }
 
+    function captureFirstResultImage() {
+        var params = new URLSearchParams(window.location.search);
+        var q = (params.get('q') || '').trim();
+        if (!q) return;
+
+        var firstRow = document.querySelector('.result-header[data-image-url], .m-card-header[data-image-url]');
+        if (!firstRow) return;
+
+        var img = firstRow.getAttribute('data-image-url');
+        if (!img) return;
+
+        var searches = getRecentSearches();
+        var changed = false;
+        for (var i = 0; i < searches.length; i++) {
+            if (searches[i].q === q && !searches[i].img) {
+                searches[i].img = img;
+                changed = true;
+                break;
+            }
+        }
+        if (changed) saveRecentSearches(searches);
+    }
+
     // Expose clear function globally for onclick handler
     window.clearRecentSearches = clearRecentSearches;
 
     // Initialize on DOM ready
     function init() {
         hookFormSubmit();
+        captureFirstResultImage();
         renderRecentSearches();
     }
 
