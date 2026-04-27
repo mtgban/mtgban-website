@@ -237,14 +237,12 @@
                 html += '<span class="landing-item-set">' + escapeHtml(f.set) + (f.number ? ' #' + escapeHtml(f.number) : '') + '</span>';
                 if (f.finishTag) html += '<span class="m-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
                 html += '</div>';
-                html += '<div class="landing-item-line2">';
                 if (f.sellPrice !== null && f.sellPrice !== undefined) {
-                    html += '<span class="landing-item-price sell">S' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + ': $ ' + f.sellPrice.toFixed(2) + '</span>';
+                    html += '<div class="landing-item-line2"><span class="landing-item-price sell">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + ': $ ' + f.sellPrice.toFixed(2) + '</span></div>';
                 }
                 if (f.buyPrice !== null && f.buyPrice !== undefined) {
-                    html += '<span class="landing-item-price buy">B' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + ': $ ' + f.buyPrice.toFixed(2) + '</span>';
+                    html += '<div class="landing-item-line2"><span class="landing-item-price buy">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + ': $ ' + f.buyPrice.toFixed(2) + '</span></div>';
                 }
-                html += '</div>';
                 html += '</div>';
                 html += '</a>';
             });

@@ -1463,8 +1463,8 @@
 .landing-pane {
     display: flex;
     flex-direction: column;
-    background: var(--background);
-    border: 0.1rem solid var(--syntax-border-color);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: 0.5em;
     overflow: hidden;
     min-height: 50vh;
@@ -1474,9 +1474,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5em 0.75em;
-    background: var(--headerbackground);
-    border-bottom: 1px solid var(--syntax-border-color);
+    padding: 0.6em 0.85em;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     font-weight: 600;
     color: var(--normal);
 }
@@ -1492,7 +1492,7 @@
 
 .landing-pane-btn {
     background: transparent;
-    border: 1px solid var(--syntax-border-color);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
     color: var(--normal);
     padding: 0.25em 0.6em;
     border-radius: 0.25em;
@@ -1501,7 +1501,7 @@
 }
 
 .landing-pane-btn:hover {
-    background: var(--headerbackground);
+    background: var(--surface-3);
 }
 
 .landing-pane-body {
@@ -1517,12 +1517,12 @@
     justify-content: center;
     gap: 0.75em;
     padding: 0.5em;
-    border-top: 1px solid var(--syntax-border-color);
+    border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
 }
 
 .landing-page-btn {
     background: transparent;
-    border: 1px solid var(--syntax-border-color);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
     color: var(--normal);
     padding: 0.15em 0.6em;
     border-radius: 0.25em;
@@ -1553,15 +1553,15 @@
 .landing-item {
     display: flex;
     align-items: center;
-    gap: 0.75em;
-    padding: 0.5em 0.75em;
-    border-bottom: 1px solid var(--syntax-border-color);
+    gap: 0.85em;
+    padding: 0.65em 0.85em;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
     color: var(--normal);
     text-decoration: none;
 }
 
 .landing-item:hover {
-    background: var(--headerbackground);
+    background: var(--surface-2);
 }
 
 .landing-item:last-child {
@@ -1570,13 +1570,13 @@
 
 .landing-item-thumb {
     flex: 0 0 auto;
-    width: 2.5em;
-    height: 3.5em;
+    width: 3.5em;
+    height: 4.9em;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--headerbackground);
-    border-radius: 0.2em;
+    background: var(--surface-2);
+    border-radius: 0.25em;
     overflow: hidden;
 }
 
@@ -1587,12 +1587,12 @@
 }
 
 .landing-item-thumb i.ss {
-    font-size: 1.5em;
+    font-size: 2em;
     color: var(--normal);
 }
 
 .landing-item-thumb-placeholder {
-    font-size: 1.2em;
+    font-size: 1.5em;
     opacity: 0.6;
     color: var(--normaltext);
 }
