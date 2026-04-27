@@ -271,7 +271,7 @@
     }
 
     function escapeAttr(str) {
-        return String(str).replace(/"/g, '&quot;');
+        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
 
     window.favPage = function(containerId, delta) {
