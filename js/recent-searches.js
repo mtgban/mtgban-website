@@ -202,9 +202,10 @@
         if (!img) return;
 
         var searches = getRecentSearches();
+        var qLower = q.toLowerCase();
         var changed = false;
         for (var i = 0; i < searches.length; i++) {
-            if (searches[i].q === q && !searches[i].img) {
+            if (searches[i].q.toLowerCase() === qLower && !searches[i].img) {
                 searches[i].img = img;
                 changed = true;
                 break;
