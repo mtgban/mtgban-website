@@ -1,8 +1,39 @@
 // Mobile Chart - price history in a bottom drawer with pinch/pan/zoom
 (function() {
     var currentChart = null;
+    var currentCardId = null;
+    var currentMaxLoaded = 0;
+    var prefetchPromise = null;
     var libsLoaded = false;
     var libsLoading = false;
+
+    function pickInitialRange() {
+        var saved = parseInt(localStorage.getItem('chartDateRange'));
+        if (isNaN(saved) || saved <= 0) saved = 180;
+        var sel = document.getElementById('m-chart-range');
+        if (!sel) return saved;
+        var bestEnabled = 30;
+        var matched = false;
+        for (var i = 0; i < sel.options.length; i++) {
+            var opt = sel.options[i];
+            if (opt.disabled) continue;
+            var v = parseInt(opt.value);
+            if (v <= saved && v > bestEnabled) bestEnabled = v;
+            if (v === saved) matched = true;
+        }
+        return matched ? saved : bestEnabled;
+    }
+
+    function applyRangeFilter(range) {
+        if (!currentChart) return;
+        var labels = currentChart.data.labels;
+        if (!labels || range === 0 || range >= labels.length) {
+            currentChart.options.scales.x.min = undefined;
+        } else {
+            currentChart.options.scales.x.min = labels[range - 1];
+        }
+        currentChart.update();
+    }
 
     function loadChartLibs(callback) {
         if (libsLoaded) { callback(); return; }
@@ -235,6 +266,7 @@
         var canvas = document.getElementById('m-chart-canvas');
         var resetBtn = document.getElementById('m-chart-reset');
         var legendEl = document.getElementById('m-chart-legend');
+        var rangeSel = document.getElementById('m-chart-range');
 
         nameEl.textContent = cardName;
         loading.style.display = 'block';
@@ -242,6 +274,7 @@
         if (legendEl) legendEl.innerHTML = '';
         canvas.style.display = 'none';
         resetBtn.style.display = 'none';
+        if (rangeSel) rangeSel.disabled = true;
         overlay.classList.add('open');
         drawer.classList.add('open');
 
@@ -249,11 +282,18 @@
             currentChart.destroy();
             currentChart = null;
         }
+        currentCardId = cardId;
+        currentMaxLoaded = 0;
+        prefetchPromise = null;
+
+        var initialRange = pickInitialRange();
+        if (rangeSel) rangeSel.value = String(initialRange);
 
         loadChartLibs(function() {
-            fetch('/api/chart/' + encodeURIComponent(cardId))
+            fetch('/api/chart/' + encodeURIComponent(cardId) + '?range=' + initialRange)
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
+                    if (currentCardId !== cardId) return;
                     loading.style.display = 'none';
                     if (!data.datasets || data.datasets.length === 0) {
                         loading.style.display = 'block';
@@ -264,6 +304,8 @@
                     resetBtn.style.display = 'inline-block';
                     currentChart = createChart(canvas.getContext('2d'), data);
                     renderChartLegend(data.datasets, currentChart);
+                    currentMaxLoaded = initialRange;
+                    if (rangeSel) rangeSel.disabled = false;
                 })
                 .catch(function(err) {
                     loading.style.display = 'block';
@@ -281,4 +323,28 @@
     window.resetChartZoom = function() {
         if (currentChart) currentChart.resetZoom();
     };
+
+    window.changeChartRange = function(range) {
+        if (isNaN(range) || range <= 0) return;
+        localStorage.setItem('chartDateRange', String(range));
+        if (currentChart) currentChart.resetZoom();
+        if (range <= currentMaxLoaded) {
+            applyRangeFilter(range);
+        }
+    };
+
+    function wireRangePicker() {
+        var sel = document.getElementById('m-chart-range');
+        if (!sel) return;
+        sel.addEventListener('change', function() {
+            var v = parseInt(this.value);
+            window.changeChartRange(v);
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', wireRangePicker);
+    } else {
+        wireRangePicker();
+    }
 })();
