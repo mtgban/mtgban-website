@@ -1570,6 +1570,48 @@
     border-radius: 2px;
 }
 
+/* Favorites pane: 2-column grid of card-style tiles */
+.landing-pane-favorites .landing-pane-body {
+    overflow: visible;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 0.75em;
+    padding: 0.75em;
+    align-content: start;
+}
+
+.landing-pane-favorites .landing-item-fav {
+    position: relative;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-radius: 0.5em;
+    background: var(--surface-2);
+    padding: 0.85em;
+    transition: border-color 150ms, transform 150ms, box-shadow 150ms;
+}
+.landing-pane-favorites .landing-item-fav:hover {
+    background: var(--surface-2);
+    border-color: var(--accent-border, rgba(91,141,239,0.25));
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-thumb {
+    width: 7em;
+    height: 9.8em;
+    background: transparent;
+    border-radius: 0.35em;
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-prices {
+    grid-template-columns: 1fr max-content;
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-delete {
+    position: absolute;
+    top: 0.35em;
+    right: 0.35em;
+}
+
 .landing-item {
     display: flex;
     align-items: center;
