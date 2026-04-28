@@ -35,6 +35,31 @@
         currentChart.update();
     }
 
+    function prefetchFullRange(cardId, fullRange) {
+        prefetchPromise = fetch('/api/chart/' + encodeURIComponent(cardId) + '?range=' + fullRange)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (currentCardId !== cardId || !currentChart) return;
+                if (!data || !data.datasets) return;
+                currentChart.data.labels = data.axisLabels;
+                data.datasets.forEach(function(ds, i) {
+                    if (currentChart.data.datasets[i]) {
+                        currentChart.data.datasets[i].data = ds.data.map(function(v) {
+                            var n = parseFloat(v);
+                            return isNaN(n) ? null : n;
+                        });
+                    }
+                });
+                currentChart.update('none');
+                currentMaxLoaded = fullRange;
+            })
+            .catch(function(err) {
+                console.error('chart prefetch failed', err);
+                prefetchPromise = null;
+            });
+        return prefetchPromise;
+    }
+
     function loadChartLibs(callback) {
         if (libsLoaded) { callback(); return; }
         if (libsLoading) {
@@ -306,6 +331,9 @@
                     renderChartLegend(data.datasets, currentChart);
                     currentMaxLoaded = initialRange;
                     if (rangeSel) rangeSel.disabled = false;
+                    if (data.maxLookbackDays && data.maxLookbackDays > initialRange) {
+                        prefetchFullRange(cardId, data.maxLookbackDays);
+                    }
                 })
                 .catch(function(err) {
                     loading.style.display = 'block';
@@ -328,9 +356,32 @@
         if (isNaN(range) || range <= 0) return;
         localStorage.setItem('chartDateRange', String(range));
         if (currentChart) currentChart.resetZoom();
+
         if (range <= currentMaxLoaded) {
             applyRangeFilter(range);
+            return;
         }
+
+        var rangeSel = document.getElementById('m-chart-range');
+        var cardId = currentCardId;
+        if (rangeSel) rangeSel.disabled = true;
+
+        var p = prefetchPromise;
+        if (!p) {
+            // Prefetch was never started or failed - fire one now.
+            // Fall back to `range` itself as the upper bound; this is a best-effort
+            // expansion since we no longer know maxLookbackDays in this scope.
+            p = prefetchFullRange(cardId, range);
+        }
+
+        p.then(function() {
+            if (currentCardId !== cardId) return;
+            applyRangeFilter(range);
+        }).catch(function() {
+            // Swallow - the catch in prefetchFullRange already logged.
+        }).then(function() {
+            if (currentCardId === cardId && rangeSel) rangeSel.disabled = false;
+        });
     };
 
     function wireRangePicker() {
