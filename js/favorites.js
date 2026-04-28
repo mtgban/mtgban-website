@@ -242,11 +242,11 @@
                 if (hasSell || hasBuy) {
                     html += '<div class="landing-item-prices">';
                     if (hasSell) {
-                        html += '<span class="landing-item-price-label sell">' + (f.sellVendor ? escapeHtml(f.sellVendor) : 'Sellers') + '</span>';
+                        html += '<span class="landing-item-price-label sell">Sellers' + (f.sellVendor ? ' (' + escapeHtml(f.sellVendor) + ')' : '') + '</span>';
                         html += '<span class="landing-item-price-value sell">$ ' + f.sellPrice.toFixed(2) + '</span>';
                     }
                     if (hasBuy) {
-                        html += '<span class="landing-item-price-label buy">' + (f.buyVendor ? escapeHtml(f.buyVendor) + ' (buy)' : 'Buyers') + '</span>';
+                        html += '<span class="landing-item-price-label buy">Buyers' + (f.buyVendor ? ' (' + escapeHtml(f.buyVendor) + ')' : '') + '</span>';
                         html += '<span class="landing-item-price-value buy">$ ' + f.buyPrice.toFixed(2) + '</span>';
                     }
                     html += '</div>';
