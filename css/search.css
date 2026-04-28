@@ -1455,9 +1455,15 @@
 
 .search-landing-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 260px 1fr;
     gap: 1rem;
     align-items: stretch;
+}
+
+@media (max-width: 900px) {
+    .search-landing-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .landing-pane {
