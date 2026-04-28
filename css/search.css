@@ -1450,7 +1450,7 @@
 
 .search-landing {
     max-width: 80vw;
-    margin: 2rem auto 0 auto;
+    margin: 0.5rem auto 0 auto;
 }
 
 .search-landing-grid {
@@ -1588,8 +1588,8 @@
     overflow: visible;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-    gap: 0.75em;
-    padding: 0.75em;
+    gap: 0.4em;
+    padding: 0.5em;
     align-content: start;
 }
 
@@ -1599,7 +1599,7 @@
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: 0.5em;
     background: var(--surface-2);
-    padding: 0.85em;
+    padding: 0.6em;
     transition: border-color 150ms, transform 150ms, box-shadow 150ms;
 }
 .landing-pane-favorites .landing-item-fav:hover {
