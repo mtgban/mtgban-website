@@ -719,6 +719,38 @@
     flex-shrink: 0;
     border: 1px solid var(--border-subtle);
 }
+.ures-card-cell .foil-wrap[data-foil="true"]::after {
+    border-radius: 4px;
+}
+.ures-card-name .result-badge {
+    margin-left: 6px;
+    vertical-align: 2px;
+    font-size: var(--text-xs);
+    line-height: 1.3;
+    padding: 0 6px;
+    border-radius: var(--radius-sm, 6px);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.ures-card-name .result-badge.foil {
+    background: rgba(253, 239, 138, 0.15);
+    color: #fdef8a;
+    border: 1px solid rgba(253, 239, 138, 0.3);
+}
+.light-theme .ures-card-name .result-badge.foil {
+    background: rgba(180, 160, 60, 0.12);
+    color: #8a7a20;
+    border-color: rgba(180, 160, 60, 0.3);
+}
+.ures-card-name .result-badge.etched {
+    background: linear-gradient(135deg, #a6dced, #c9b1ff);
+    color: #222;
+}
+.ures-card-name .result-badge.altfoil {
+    background: linear-gradient(135deg, #ea8d66, #fdef8a, #8bcc93, #a6dced);
+    color: #222;
+}
+
 .ures-card-info { display: flex; flex-direction: column; gap: 2px; }
 .ures-card-name { font-weight: 600; font-size: var(--text-md); }
 .ures-card-name a { color: var(--normal); }
