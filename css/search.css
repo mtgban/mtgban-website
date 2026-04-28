@@ -1617,6 +1617,7 @@
 
 .landing-pane-favorites .landing-item-fav .landing-item-line1 {
     width: 100%;
+    align-items: center;
     padding-bottom: 0.45em;
     margin-bottom: 0.5em;
     background: linear-gradient(90deg, transparent, var(--border-subtle, rgba(255,255,255,0.12)) 20%, var(--border-subtle, rgba(255,255,255,0.12)) 80%, transparent) bottom / 100% 1px no-repeat;
