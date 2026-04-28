@@ -160,7 +160,7 @@
 
         var containerId = container.id;
         if (!paginationState[containerId]) paginationState[containerId] = { page: 0 };
-        var pageSize = mode === 'desktop' ? 10 : favs.length || 1;
+        var pageSize = mode === 'desktop' ? 8 : favs.length || 1;
         var totalPages = Math.max(1, Math.ceil(favs.length / pageSize));
         if (paginationState[containerId].page >= totalPages) paginationState[containerId].page = 0;
         var page = paginationState[containerId].page;
