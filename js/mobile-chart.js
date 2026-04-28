@@ -10,18 +10,44 @@
     function pickInitialRange() {
         var saved = parseInt(localStorage.getItem('chartDateRange'));
         if (isNaN(saved) || saved <= 0) saved = 180;
-        var sel = document.getElementById('m-chart-range');
-        if (!sel) return saved;
+        var menu = document.getElementById('m-chart-range-menu');
+        if (!menu) return saved;
+        var opts = menu.querySelectorAll('.m-chart-range-opt');
         var bestEnabled = 30;
         var matched = false;
-        for (var i = 0; i < sel.options.length; i++) {
-            var opt = sel.options[i];
-            if (opt.disabled) continue;
-            var v = parseInt(opt.value);
+        for (var i = 0; i < opts.length; i++) {
+            var opt = opts[i];
+            if (opt.classList.contains('is-locked')) continue;
+            var v = parseInt(opt.getAttribute('data-value'));
             if (v <= saved && v > bestEnabled) bestEnabled = v;
             if (v === saved) matched = true;
         }
         return matched ? saved : bestEnabled;
+    }
+
+    function setRangePickerValue(v) {
+        var btn = document.getElementById('m-chart-range-btn');
+        var menu = document.getElementById('m-chart-range-menu');
+        if (!btn || !menu) return;
+        var label = btn.querySelector('.m-chart-range-label');
+        var opts = menu.querySelectorAll('.m-chart-range-opt');
+        for (var i = 0; i < opts.length; i++) {
+            var opt = opts[i];
+            if (parseInt(opt.getAttribute('data-value')) === v) {
+                opt.classList.add('is-active');
+                var text = opt.querySelector('.m-chart-range-text');
+                if (label && text) label.textContent = text.textContent;
+            } else {
+                opt.classList.remove('is-active');
+            }
+        }
+    }
+
+    function setRangePickerDisabled(disabled) {
+        var btn = document.getElementById('m-chart-range-btn');
+        var wrapper = document.getElementById('m-chart-range');
+        if (btn) btn.disabled = disabled;
+        if (disabled && wrapper) wrapper.classList.remove('open');
     }
 
     function applyRangeFilter(range) {
@@ -291,15 +317,13 @@
         var canvas = document.getElementById('m-chart-canvas');
         var resetBtn = document.getElementById('m-chart-reset');
         var legendEl = document.getElementById('m-chart-legend');
-        var rangeSel = document.getElementById('m-chart-range');
-
         nameEl.textContent = cardName;
         loading.style.display = 'block';
         loading.textContent = 'Loading chart...';
         if (legendEl) legendEl.innerHTML = '';
         canvas.style.display = 'none';
         resetBtn.style.display = 'none';
-        if (rangeSel) rangeSel.disabled = true;
+        setRangePickerDisabled(true);
         overlay.classList.add('open');
         drawer.classList.add('open');
 
@@ -312,7 +336,7 @@
         prefetchPromise = null;
 
         var initialRange = pickInitialRange();
-        if (rangeSel) rangeSel.value = String(initialRange);
+        setRangePickerValue(initialRange);
 
         loadChartLibs(function() {
             fetch('/api/chart/' + encodeURIComponent(cardId) + '?range=' + initialRange)
@@ -330,7 +354,7 @@
                     currentChart = createChart(canvas.getContext('2d'), data);
                     renderChartLegend(data.datasets, currentChart);
                     currentMaxLoaded = initialRange;
-                    if (rangeSel) rangeSel.disabled = false;
+                    setRangePickerDisabled(false);
                     if (data.maxLookbackDays && data.maxLookbackDays > initialRange) {
                         prefetchFullRange(cardId, data.maxLookbackDays);
                     }
@@ -355,6 +379,7 @@
     window.changeChartRange = function(range) {
         if (isNaN(range) || range <= 0) return;
         localStorage.setItem('chartDateRange', String(range));
+        setRangePickerValue(range);
         if (currentChart) currentChart.resetZoom();
 
         if (range <= currentMaxLoaded) {
@@ -362,9 +387,8 @@
             return;
         }
 
-        var rangeSel = document.getElementById('m-chart-range');
         var cardId = currentCardId;
-        if (rangeSel) rangeSel.disabled = true;
+        setRangePickerDisabled(true);
 
         var p = prefetchPromise;
         if (!p) {
@@ -380,16 +404,34 @@
         }).catch(function() {
             // Swallow - the catch in prefetchFullRange already logged.
         }).then(function() {
-            if (currentCardId === cardId && rangeSel) rangeSel.disabled = false;
+            if (currentCardId === cardId) setRangePickerDisabled(false);
         });
     };
 
     function wireRangePicker() {
-        var sel = document.getElementById('m-chart-range');
-        if (!sel) return;
-        sel.addEventListener('change', function() {
-            var v = parseInt(this.value);
+        var wrapper = document.getElementById('m-chart-range');
+        var btn = document.getElementById('m-chart-range-btn');
+        var menu = document.getElementById('m-chart-range-menu');
+        if (!wrapper || !btn || !menu) return;
+
+        btn.addEventListener('click', function(e) {
+            if (btn.disabled) return;
+            e.stopPropagation();
+            wrapper.classList.toggle('open');
+        });
+
+        menu.addEventListener('click', function(e) {
+            var opt = e.target.closest('.m-chart-range-opt');
+            if (!opt || !menu.contains(opt)) return;
+            if (opt.classList.contains('is-locked')) return;
+            var v = parseInt(opt.getAttribute('data-value'));
+            if (isNaN(v)) return;
+            wrapper.classList.remove('open');
             window.changeChartRange(v);
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!wrapper.contains(e.target)) wrapper.classList.remove('open');
         });
     }
 
