@@ -549,7 +549,7 @@
             <table class="ures-table">
                 <thead>
                     <tr>
-                        <th style="width:280px;">Card</th>
+                        <th style="width:380px;">Card</th>
                         <th class="r">Your Price</th>
                         <th class="c">Cond</th>
                         <th class="c">Qty</th>
@@ -586,9 +586,14 @@
                             {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                             <td>
                                 <div class="ures-card-cell">
-                                    <img src="{{$card.ImageURL}}" loading="lazy">
+                                    <div class="foil-wrap" data-foil="{{$card.Foil}}">
+                                        <img src="{{$card.ImageURL}}" loading="lazy">
+                                    </div>
                                     <div class="ures-card-info">
-                                        <span class="ures-card-name"><a href="{{$card.SearchURL}}">{{$card.Name}}</a></span>
+                                        <span class="ures-card-name">
+                                            <a href="{{$card.SearchURL}}">{{$card.Name}}</a>
+                                            {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
+                                        </span>
                                         <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
                                         {{if .MismatchAlias}}
                                         <button type="button" class="ures-pick-btn"
