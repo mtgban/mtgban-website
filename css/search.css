@@ -1589,7 +1589,6 @@
     transition: border-color 150ms, transform 150ms, box-shadow 150ms;
 }
 .landing-pane-favorites .landing-item-fav:hover {
-    background: var(--surface-2);
     border-color: var(--accent-border, rgba(91,141,239,0.25));
     transform: translateY(-2px);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
