@@ -603,15 +603,42 @@
         <div class="m-drawer-handle" onclick="hideChartDrawer()"><span></span></div>
         <div class="m-chart-header">
             <span class="m-chart-name" id="m-chart-name"></span>
-            <select class="m-chart-range" id="m-chart-range" disabled>
-                <option value="30">1mo</option>
-                <option value="90"   {{if lt $.MaxLookbackDays 90}}   disabled{{end}}>3mo{{if lt $.MaxLookbackDays 90}} 🔒{{end}}</option>
-                <option value="180"  {{if ge $.MaxLookbackDays 180}}  selected{{end}}{{if lt $.MaxLookbackDays 180}} disabled{{end}}>6mo{{if lt $.MaxLookbackDays 180}} 🔒{{end}}</option>
-                <option value="365"  {{if lt $.MaxLookbackDays 365}}  disabled{{end}}>1yr{{if lt $.MaxLookbackDays 365}} 🔒{{end}}</option>
-                <option value="730"  {{if lt $.MaxLookbackDays 730}}  disabled{{end}}>2yr{{if lt $.MaxLookbackDays 730}} 🔒{{end}}</option>
-                <option value="1825" {{if lt $.MaxLookbackDays 1825}} disabled{{end}}>5yr{{if lt $.MaxLookbackDays 1825}} 🔒{{end}}</option>
-                <option value="3650" {{if lt $.MaxLookbackDays 3650}} disabled{{end}}>10yr{{if lt $.MaxLookbackDays 3650}} 🔒{{end}}</option>
-            </select>
+            <div class="m-chart-range" id="m-chart-range">
+                <button type="button" class="m-chart-range-btn" id="m-chart-range-btn" disabled>
+                    <span class="m-chart-range-label">6mo</span>
+                    <span class="m-chart-range-caret" aria-hidden="true">▾</span>
+                </button>
+                <ul class="m-chart-range-menu" id="m-chart-range-menu" role="listbox">
+                    <li class="m-chart-range-opt" data-value="30" role="option">
+                        <span class="m-chart-range-text">1mo</span>
+                        <span class="m-chart-range-lock" aria-hidden="true"></span>
+                    </li>
+                    <li class="m-chart-range-opt{{if lt $.MaxLookbackDays 90}} is-locked{{end}}" data-value="90" role="option"{{if lt $.MaxLookbackDays 90}} aria-disabled="true"{{end}}>
+                        <span class="m-chart-range-text">3mo</span>
+                        <span class="m-chart-range-lock" aria-hidden="true">{{if lt $.MaxLookbackDays 90}}🔒{{end}}</span>
+                    </li>
+                    <li class="m-chart-range-opt{{if lt $.MaxLookbackDays 180}} is-locked{{end}}" data-value="180" role="option"{{if lt $.MaxLookbackDays 180}} aria-disabled="true"{{end}}>
+                        <span class="m-chart-range-text">6mo</span>
+                        <span class="m-chart-range-lock" aria-hidden="true">{{if lt $.MaxLookbackDays 180}}🔒{{end}}</span>
+                    </li>
+                    <li class="m-chart-range-opt{{if lt $.MaxLookbackDays 365}} is-locked{{end}}" data-value="365" role="option"{{if lt $.MaxLookbackDays 365}} aria-disabled="true"{{end}}>
+                        <span class="m-chart-range-text">1yr</span>
+                        <span class="m-chart-range-lock" aria-hidden="true">{{if lt $.MaxLookbackDays 365}}🔒{{end}}</span>
+                    </li>
+                    <li class="m-chart-range-opt{{if lt $.MaxLookbackDays 730}} is-locked{{end}}" data-value="730" role="option"{{if lt $.MaxLookbackDays 730}} aria-disabled="true"{{end}}>
+                        <span class="m-chart-range-text">2yr</span>
+                        <span class="m-chart-range-lock" aria-hidden="true">{{if lt $.MaxLookbackDays 730}}🔒{{end}}</span>
+                    </li>
+                    <li class="m-chart-range-opt{{if lt $.MaxLookbackDays 1825}} is-locked{{end}}" data-value="1825" role="option"{{if lt $.MaxLookbackDays 1825}} aria-disabled="true"{{end}}>
+                        <span class="m-chart-range-text">5yr</span>
+                        <span class="m-chart-range-lock" aria-hidden="true">{{if lt $.MaxLookbackDays 1825}}🔒{{end}}</span>
+                    </li>
+                    <li class="m-chart-range-opt{{if lt $.MaxLookbackDays 3650}} is-locked{{end}}" data-value="3650" role="option"{{if lt $.MaxLookbackDays 3650}} aria-disabled="true"{{end}}>
+                        <span class="m-chart-range-text">10yr</span>
+                        <span class="m-chart-range-lock" aria-hidden="true">{{if lt $.MaxLookbackDays 3650}}🔒{{end}}</span>
+                    </li>
+                </ul>
+            </div>
             <button class="m-chart-reset" id="m-chart-reset" onclick="resetChartZoom()">Reset Zoom</button>
         </div>
         <div class="m-chart-container">
