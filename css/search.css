@@ -1570,6 +1570,19 @@
     border-radius: 2px;
 }
 
+/* Recents pane: tighter rows so card names fit in the 260px column */
+.landing-pane-recent .landing-item {
+    gap: 0.6em;
+    padding: 0.7em 0.7em;
+}
+.landing-pane-recent .landing-item-thumb {
+    width: 2.6em;
+    height: 3.6em;
+}
+.landing-pane-recent .landing-item-thumb i.ss {
+    font-size: 1.8em;
+}
+
 /* Favorites pane: 2-column grid of card-style tiles */
 .landing-pane-favorites .landing-pane-body {
     overflow: visible;
