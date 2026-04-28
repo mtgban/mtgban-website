@@ -1631,6 +1631,7 @@
 
 .landing-pane-favorites .landing-item-fav .landing-item-prices {
     grid-template-columns: 1fr max-content;
+    row-gap: 0.5em;
 }
 
 .landing-pane-favorites .landing-item-fav .landing-item-delete {
