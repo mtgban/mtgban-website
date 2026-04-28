@@ -1595,6 +1595,7 @@
 
 .landing-pane-favorites .landing-item-fav {
     position: relative;
+    align-items: flex-start;
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-radius: 0.5em;
     background: var(--surface-2);
@@ -1608,10 +1609,23 @@
 }
 
 .landing-pane-favorites .landing-item-fav .landing-item-thumb {
-    width: 7em;
-    height: 9.8em;
+    width: 5.6em;
+    height: 7.84em;
     background: transparent;
     border-radius: 0.35em;
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-line1 {
+    width: 100%;
+    padding-bottom: 0.45em;
+    margin-bottom: 0.5em;
+    background: linear-gradient(90deg, transparent, var(--border-subtle, rgba(255,255,255,0.12)) 20%, var(--border-subtle, rgba(255,255,255,0.12)) 80%, transparent) bottom / 100% 1px no-repeat;
+}
+
+.landing-pane-favorites .landing-item-fav .landing-item-set {
+    color: var(--search-link);
+    font-weight: 600;
+    font-size: 0.85em;
 }
 
 .landing-pane-favorites .landing-item-fav .landing-item-prices {
