@@ -1556,6 +1556,20 @@
     padding: 2em 1em;
 }
 
+/* Recents pane: scrolls instead of paginating on desktop */
+.landing-pane-recent .landing-pane-body {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-4, #323840) transparent;
+}
+.landing-pane-recent .landing-pane-body::-webkit-scrollbar {
+    width: 4px;
+}
+.landing-pane-recent .landing-pane-body::-webkit-scrollbar-thumb {
+    background: var(--surface-4, #323840);
+    border-radius: 2px;
+}
+
 .landing-item {
     display: flex;
     align-items: center;
@@ -1589,7 +1603,7 @@
 .landing-item-thumb img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
 }
 
 .landing-item-thumb:has(.ss) {
