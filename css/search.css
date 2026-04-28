@@ -1558,6 +1558,8 @@
 
 /* Recents pane: scrolls instead of paginating on desktop */
 .landing-pane-recent .landing-pane-body {
+    /* ~8 rows tall before the body starts to scroll */
+    max-height: 41em;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--surface-4, #323840) transparent;
