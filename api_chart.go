@@ -3,14 +3,17 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 type ChartAPIResponse struct {
-	AxisLabels []string          `json:"axisLabels"`
-	Datasets   []ChartAPIDataset `json:"datasets"`
+	MaxLookbackDays int               `json:"maxLookbackDays"`
+	AxisLabels      []string          `json:"axisLabels"`
+	Datasets        []ChartAPIDataset `json:"datasets"`
 }
 
 type ChartAPIDataset struct {
@@ -42,7 +45,21 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	userTier := GetParamFromSig(sig, "UserTier")
 
 	lb := lookbackForTier(userTier)
+	maxDays := lb.Days()
+
 	earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
+
+	if rangeStr := r.FormValue("range"); rangeStr != "" {
+		if days, err := strconv.Atoi(rangeStr); err == nil && days > 0 {
+			if days > maxDays {
+				days = maxDays
+			}
+			cutoff := time.Now().AddDate(0, 0, -days)
+			if cutoff.After(earliest) {
+				earliest = cutoff
+			}
+		}
+	}
 
 	axisLabels := getDateAxisValues(earliest)
 	datasets := getDatasets(uuid, co.Sealed, axisLabels, userTier)
@@ -60,8 +77,9 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ChartAPIResponse{
-		AxisLabels: axisLabels,
-		Datasets:   apiDatasets,
+		MaxLookbackDays: maxDays,
+		AxisLabels:      axisLabels,
+		Datasets:        apiDatasets,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
