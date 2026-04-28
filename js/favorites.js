@@ -217,7 +217,7 @@
             html += '<div class="landing-pane-header">';
             html += '<span class="landing-pane-title">Favorites</span>';
             html += '<span class="landing-pane-actions">';
-            html += '<button class="landing-pane-btn" onclick="window.manualRefreshFavorites()" title="Refresh prices">Refresh</button>';
+            html += '<button class="landing-pane-btn" onclick="window.manualRefreshFavorites()" title="Update prices">Update Prices</button>';
             html += '<button class="landing-pane-btn" onclick="window.clearFavorites()">Clear</button>';
             html += '</span>';
             html += '</div>';
@@ -385,7 +385,7 @@
             if (updated) {
                 saveFavorites(favs);
                 renderFavorites();
-                if (showNotification) showToast('Favorites refreshed!');
+                if (showNotification) showToast('Prices updated');
             } else if (showNotification) {
                 showToast('Prices are up to date');
             }
