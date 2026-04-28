@@ -603,6 +603,15 @@
         <div class="m-drawer-handle" onclick="hideChartDrawer()"><span></span></div>
         <div class="m-chart-header">
             <span class="m-chart-name" id="m-chart-name"></span>
+            <select class="m-chart-range" id="m-chart-range" disabled>
+                <option value="30">1mo</option>
+                <option value="90"   {{if lt $.MaxLookbackDays 90}}   disabled{{end}}>3mo{{if lt $.MaxLookbackDays 90}} 🔒{{end}}</option>
+                <option value="180"  {{if ge $.MaxLookbackDays 180}}  selected{{end}}{{if lt $.MaxLookbackDays 180}} disabled{{end}}>6mo{{if lt $.MaxLookbackDays 180}} 🔒{{end}}</option>
+                <option value="365"  {{if lt $.MaxLookbackDays 365}}  disabled{{end}}>1yr{{if lt $.MaxLookbackDays 365}} 🔒{{end}}</option>
+                <option value="730"  {{if lt $.MaxLookbackDays 730}}  disabled{{end}}>2yr{{if lt $.MaxLookbackDays 730}} 🔒{{end}}</option>
+                <option value="1825" {{if lt $.MaxLookbackDays 1825}} disabled{{end}}>5yr{{if lt $.MaxLookbackDays 1825}} 🔒{{end}}</option>
+                <option value="3650" {{if lt $.MaxLookbackDays 3650}} disabled{{end}}>10yr{{if lt $.MaxLookbackDays 3650}} 🔒{{end}}</option>
+            </select>
             <button class="m-chart-reset" id="m-chart-reset" onclick="resetChartZoom()">Reset Zoom</button>
         </div>
         <div class="m-chart-container">
