@@ -88,18 +88,9 @@
         renderRecentSearchesInto(document.getElementById('desktop-recent-searches'), 'desktop');
     }
 
-    var rsPaginationState = {};
-
     function renderRecentSearchesInto(container, mode) {
         if (!container) return;
         var searches = getRecentSearches();
-
-        var containerId = container.id;
-        if (!rsPaginationState[containerId]) rsPaginationState[containerId] = { page: 0 };
-        var pageSize = mode === 'desktop' ? 10 : searches.length || 1;
-        var totalPages = Math.max(1, Math.ceil(searches.length / pageSize));
-        if (rsPaginationState[containerId].page >= totalPages) rsPaginationState[containerId].page = 0;
-        var page = rsPaginationState[containerId].page;
 
         if (searches.length === 0) {
             if (mode === 'desktop') {
@@ -126,9 +117,6 @@
             });
             html += '</div>';
         } else {
-            var start = page * pageSize;
-            var slice = searches.slice(start, start + pageSize);
-
             html += '<div class="landing-pane-header">';
             html += '<span class="landing-pane-title">Recent Searches</span>';
             html += '<span class="landing-pane-actions">';
@@ -136,7 +124,7 @@
             html += '</span>';
             html += '</div>';
             html += '<div class="landing-pane-body">';
-            slice.forEach(function(s) {
+            searches.forEach(function(s) {
                 html += '<a class="landing-item landing-item-recent" href="?q=' + encodeURIComponent(s.q) + '">';
                 // Re-derive thumbnail treatment so legacy entries (with stale set/keyrune
                 // for non-pure-set queries) render correctly.
@@ -147,7 +135,7 @@
                 } else if (s.img) {
                     html += '<img src="' + escapeAttr(s.img) + '" loading="lazy" alt="">';
                 } else {
-                    html += '<span class="landing-item-thumb-placeholder">&#128269;</span>';
+                    html += '<span class="landing-item-thumb-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>';
                 }
                 html += '</div>';
                 html += '<div class="landing-item-info">';
@@ -160,13 +148,6 @@
                 html += '</a>';
             });
             html += '</div>';
-            if (totalPages > 1) {
-                html += '<div class="landing-pane-footer">';
-                html += '<button class="landing-page-btn" onclick="window.recentPage(\'' + containerId + '\', -1)" ' + (page === 0 ? 'disabled' : '') + '>&lsaquo;</button>';
-                html += '<span class="landing-page-label">' + (page + 1) + ' / ' + totalPages + '</span>';
-                html += '<button class="landing-page-btn" onclick="window.recentPage(\'' + containerId + '\', 1)" ' + (page === totalPages - 1 ? 'disabled' : '') + '>&rsaquo;</button>';
-                html += '</div>';
-            }
         }
         container.innerHTML = html;
     }
@@ -180,12 +161,6 @@
     function escapeAttr(str) {
         return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
-
-    window.recentPage = function(containerId, delta) {
-        if (!rsPaginationState[containerId]) rsPaginationState[containerId] = { page: 0 };
-        rsPaginationState[containerId].page += delta;
-        renderRecentSearches();
-    };
 
     window.deleteRecentSearch = function(query, ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
