@@ -235,7 +235,7 @@
                 html += '<div class="landing-item-line1">';
                 html += '<span class="landing-item-name">' + escapeHtml(f.name) + '</span>';
                 html += '<span class="landing-item-set">' + escapeHtml(f.set) + (f.number ? ' · #' + escapeHtml(f.number) : '') + '</span>';
-                if (f.finishTag) html += '<span class="m-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
+                if (f.finishTag) html += '<span class="result-badge ' + (f.finishClass || 'foil') + '">' + escapeHtml(f.finishTag) + '</span>';
                 html += '</div>';
                 var hasSell = f.sellPrice !== null && f.sellPrice !== undefined;
                 var hasBuy = f.buyPrice !== null && f.buyPrice !== undefined;
