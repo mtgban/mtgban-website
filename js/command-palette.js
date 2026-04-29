@@ -354,14 +354,20 @@
     function detectMode(val) {
         if (val.charAt(0) === '?' || /^(help:|syntax:)/i.test(val)) return 'help';
         if (val.charAt(0) === '>') return 'nav';
+        if (val.charAt(0) === '*') return 'saved';
+        if (val.charAt(0) === '<') return 'recent';
         if (/^saved:/i.test(val)) return 'saved';
+        if (/^recent:/i.test(val)) return 'recent';
         return 'search';
     }
 
     function stripPrefix(val) {
         if (/^(\?\s*|help:|syntax:|\?:)/i.test(val)) return val.replace(/^(\?\s*|help:|syntax:|\?:)/i, '').trim();
         if (val.charAt(0) === '>') return val.substring(1).trim();
+        if (val.charAt(0) === '*') return val.substring(1).trim();
+        if (val.charAt(0) === '<') return val.substring(1).trim();
         if (/^saved:/i.test(val)) return val.replace(/^saved:/i, '').trim();
+        if (/^recent:/i.test(val)) return val.replace(/^recent:/i, '').trim();
         return val;
     }
 
