@@ -251,8 +251,10 @@
     // Footer
     var footer = document.createElement('div');
     footer.className = 'cp-footer';
-    footer.innerHTML = '<span><kbd>\u2191\u2193</kbd> Navigate</span>' +
-        '<span><kbd>Enter</kbd> Select</span>' +
+    footer.innerHTML =
+        '<span><kbd>\u2191\u2193</kbd> Navigate</span>' +
+        '<span class="cp-footer-action"><kbd>Enter</kbd> Select</span>' +
+        '<span class="cp-footer-tab" style="display:none"></span>' +
         '<span class="cp-footer-hint-delete" style="display:none"><kbd>Shift+Del</kbd> Remove</span>' +
         '<span><kbd>?</kbd> Help</span>' +
         '<span><kbd>Esc</kbd> Close</span>';
@@ -1051,6 +1053,7 @@
             }
         }
         updateDeleteHint();
+        updateFooterHints();
 
         // Render Lucide icons
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
@@ -1096,6 +1099,7 @@
             resultItems[index]._userPicked = true;
         }
         updateDeleteHint();
+        updateFooterHints();
     }
 
     function updateDeleteHint() {
@@ -1104,6 +1108,86 @@
         var item = (activeIndex >= 0 && activeIndex < resultItems.length) ? resultItems[activeIndex] : null;
         var canDelete = item && (item.type === 'recent' || item.type === 'saved');
         hint.style.display = canDelete ? '' : 'none';
+    }
+
+    // Update the central footer slot based on the active result type.
+    // Mirrors the row-type - hint table in the spec.
+    function updateFooterHints() {
+        var actionEl = footer && footer.querySelector('.cp-footer-action');
+        var tabEl = footer && footer.querySelector('.cp-footer-tab');
+        if (!actionEl || !tabEl) return;
+
+        var item = (activeIndex >= 0 && activeIndex < resultItems.length) ? resultItems[activeIndex] : null;
+        if (!item) {
+            actionEl.innerHTML = '<kbd>Enter</kbd> Select';
+            tabEl.style.display = 'none';
+            tabEl.innerHTML = '';
+            return;
+        }
+
+        var actionHtml = '<kbd>Enter</kbd> Select';
+        var tabHtml = '';
+
+        switch (item.type) {
+            case 'shortcut':
+                actionHtml = '<kbd>Enter</kbd> Open';
+                break;
+            case 'nav':
+                actionHtml = '<kbd>Enter</kbd> Go to page';
+                if (item.navName && isParentNav(item.navName)) {
+                    tabHtml = '<kbd>Tab</kbd> Browse subpages';
+                }
+                break;
+            case 'nav-sub':
+                actionHtml = '<kbd>Enter</kbd> Open';
+                // Arbit/reverse/global filters (not sorts, not singletons) accept Tab to lock filter chip
+                if (item._parentChip && item._subView) {
+                    var pKey = navParentKeys[item._parentChip.navName];
+                    if (pKey && pKey !== 'newspaper' && pKey !== 'sleepers'
+                        && !isArbitSortValue(pKey, item._subView.value)) {
+                        tabHtml = '<kbd>Tab</kbd> Add filter';
+                    }
+                }
+                break;
+            case 'card':
+                actionHtml = '<kbd>Enter</kbd> Search';
+                tabHtml = '<kbd>Tab</kbd> Add card chip';
+                break;
+            case 'filter-candidate':
+                actionHtml = '<kbd>Enter</kbd> Search';
+                tabHtml = '<kbd>Tab</kbd> Lock filter';
+                break;
+            case 'recent':
+                actionHtml = '<kbd>Enter</kbd> Run';
+                break;
+            case 'saved':
+                actionHtml = '<kbd>Enter</kbd> Run';
+                tabHtml = '<kbd>Shift+Enter</kbd> Restore chips';
+                break;
+            case 'help':
+                if (item.isSyntax) {
+                    actionHtml = '<kbd>Enter</kbd> Copy snippet';
+                    tabHtml = '<kbd>Shift+Enter</kbd> Open guide';
+                } else {
+                    actionHtml = '<kbd>Enter</kbd> Open guide';
+                }
+                break;
+            case 'command':
+                actionHtml = '<kbd>Enter</kbd> Run';
+                break;
+            case 'search':
+                actionHtml = '<kbd>Enter</kbd> Search';
+                break;
+        }
+
+        actionEl.innerHTML = actionHtml;
+        if (tabHtml) {
+            tabEl.innerHTML = tabHtml;
+            tabEl.style.display = '';
+        } else {
+            tabEl.style.display = 'none';
+            tabEl.innerHTML = '';
+        }
     }
 
     function executeResult(shiftKey) {
