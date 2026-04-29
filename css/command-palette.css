@@ -623,57 +623,13 @@
     color: unset;
 }
 
-/* -- Hint card (default empty state) -------------------------------- */
-.cp-hint-card {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 20px;
-    margin: 8px 12px 4px;
-    background: var(--surface-1, rgba(0, 0, 0, 0.04));
-    border: 1px dashed var(--border-moderate, rgba(0, 0, 0, 0.12));
-    border-radius: 10px;
-}
-
-.cp-hint-icon {
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    color: var(--ainfo, #559eff);
-}
-
-.cp-hint-icon svg {
-    width: 22px;
-    height: 22px;
-}
-
-.cp-hint-body {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.cp-hint-title {
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--normal, #111);
-}
-
-.cp-hint-subtitle {
-    font-size: 0.75rem;
-    color: var(--greytext, #888);
-}
-
 /* Shortcut row variant of cp-result */
 .cp-shortcut-row .cp-result-right kbd.cp-shortcut {
     font-size: 0.8rem;
     font-weight: 700;
     padding: 2px 8px;
     min-width: 22px;
+    justify-content: center;
     text-align: center;
 }
 
