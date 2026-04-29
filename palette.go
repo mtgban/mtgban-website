@@ -236,6 +236,16 @@ type PaletteArbitTargets struct {
 // paletteNewspaperTargetsJSON returns JSON for all newspaper page views.
 func paletteNewspaperTargetsJSON() template.JS {
 	out := []PaletteNavTarget{}
+	titleCounts := map[string]int{}
+
+	// First pass: count title occurrences so we know which need disambiguation.
+	for _, p := range NewspaperPages {
+		if p.Option == "" || p.Option == "options" {
+			continue
+		}
+		titleCounts[p.Title]++
+	}
+
 	for _, p := range NewspaperPages {
 		if p.Option == "" || p.Option == "options" {
 			continue
@@ -253,9 +263,18 @@ func paletteNewspaperTargetsJSON() template.JS {
 		case p.Option == "ensemble_forecast" || p.Option == "review":
 			group = "Analysis"
 		}
+
+		// Disambiguate duplicate titles by source.
+		// TCG-sourced options:  greatest_*, *_buylist, *_listings
+		// CK-sourced options:   buylist_*, stock_*, ck_buy*
+		label := p.Title
+		if titleCounts[p.Title] > 1 {
+			label = label + " " + paletteNewspaperSourceSuffix(p.Option)
+		}
+
 		out = append(out, PaletteNavTarget{
 			Value: p.Option,
-			Label: p.Title,
+			Label: label,
 			Group: group,
 		})
 	}
@@ -272,6 +291,23 @@ func paletteNewspaperTargetsJSON() template.JS {
 	})
 	data, _ := json.Marshal(out)
 	return template.JS(data)
+}
+
+// paletteNewspaperSourceSuffix returns "(TCG)" or "(CK)" based on the option key.
+// Falls back to "(<option>)" for novel keys so duplicates always render distinctly.
+func paletteNewspaperSourceSuffix(option string) string {
+	switch {
+	case strings.HasPrefix(option, "greatest_"),
+		strings.HasSuffix(option, "_buylist"),
+		strings.HasSuffix(option, "_listings"):
+		return "(TCG)"
+	case strings.HasPrefix(option, "buylist_"),
+		strings.HasPrefix(option, "stock_"),
+		strings.HasPrefix(option, "ck_buy"):
+		return "(CK)"
+	default:
+		return "(" + option + ")"
+	}
 }
 
 func paletteSleepersTargetsJSON() template.JS {
