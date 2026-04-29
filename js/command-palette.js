@@ -224,7 +224,7 @@
     chipContainer.setAttribute('role', 'group');
     chipContainer.setAttribute('aria-label', 'Search composition');
 
-    var DEFAULT_PLACEHOLDER = 'Type to search';
+    var DEFAULT_PLACEHOLDER = 'Search...';
     var input = document.createElement('input');
     input.className = 'cp-input';
     input.id = 'cp-input';
@@ -730,7 +730,7 @@
     // ── Default results ──────────────────────────────────────────────
     function renderDefault() {
         var items = [
-            { type: 'hint' },
+            { type: 'header', title: 'Shortcuts' },
             {
                 type: 'shortcut',
                 title: 'Pages',
@@ -970,18 +970,6 @@
                 continue;
             }
 
-            if (item.type === 'hint') {
-                html += '<div class="cp-hint-card">' +
-                    '<div class="cp-hint-icon"><i data-lucide="search"></i></div>' +
-                    '<div class="cp-hint-body">' +
-                        '<div class="cp-hint-title">Type to search</div>' +
-                        '<div class="cp-hint-subtitle">Cards, syntax - anything goes</div>' +
-                    '</div>' +
-                '</div>';
-                // Hint card is non-interactive: do not push to resultItems and do not increment idx
-                continue;
-            }
-
             if (item.type === 'shortcut') {
                 var sActiveClass = idx === 0 ? ' active' : '';
                 html += '<div class="cp-result cp-shortcut-row' + sActiveClass + '" role="option" data-index="' + idx + '">';
@@ -1017,10 +1005,6 @@
             }
             html += '</div>';
             html += '<div class="cp-result-right">';
-            var badgeLabel = item.type === 'recent' ? 'Recent' : item.type === 'nav' ? 'Navigate' : item.type === 'card' ? 'Card' : item.type === 'command' ? 'Action' : item.type === 'saved' ? 'Saved' : item.type === 'syntax' ? 'Syntax' : item.type === 'help' ? item.badge || 'Help' : '';
-            if (badgeLabel) {
-                html += '<span class="cp-result-badge">' + escapeHtml(badgeLabel) + '</span>';
-            }
             // Parent-nav rows advertise Tab to browse sub-pages
             if (item.type === 'nav' && item.navName && isParentNav(item.navName)) {
                 html += '<kbd class="cp-shortcut cp-tab-hint">Tab</kbd>';
