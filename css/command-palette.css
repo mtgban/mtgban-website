@@ -676,3 +676,9 @@
     min-width: 22px;
     text-align: center;
 }
+
+.cp-tab-hint {
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    margin-top: 2px;
+}

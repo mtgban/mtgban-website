@@ -1019,6 +1019,10 @@
             if (badgeLabel) {
                 html += '<span class="cp-result-badge">' + escapeHtml(badgeLabel) + '</span>';
             }
+            // Parent-nav rows advertise Tab to browse sub-pages
+            if (item.type === 'nav' && item.navName && isParentNav(item.navName)) {
+                html += '<kbd class="cp-shortcut cp-tab-hint">Tab</kbd>';
+            }
             if (item.type === 'saved') {
                 html += '<button class="cp-result-delete" data-saved-id="' + escapeHtml(item.savedId) + '" title="Delete">';
                 html += '<i data-lucide="trash-2"></i>';
