@@ -1139,21 +1139,12 @@
                 });
             }
 
-            // General search - combine sources
-            var recentItems = getRecentResults(query, 3);
+            // General search - combine sources (Recent and Saved live behind their own
+            // gated panels via < and * shortcuts, so omit them from the mixed view)
             var cmdItems = getStaticCommands(query);
-            var savedItems2 = getSavedResults(query);
             var cardItems = getCardResults(query, 5);
             var navItems2 = getNavResults(query);
 
-            if (recentItems.length > 0) {
-                items.push({ type: 'header', title: 'Recent Searches' });
-                items = items.concat(recentItems.slice(0, 3));
-            }
-            if (savedItems2.length > 0) {
-                items.push({ type: 'header', title: 'Saved Commands' });
-                items = items.concat(savedItems2.slice(0, 3));
-            }
             if (cmdItems.length > 0) {
                 items.push({ type: 'header', title: 'Commands' });
                 items = items.concat(cmdItems.slice(0, 3));
