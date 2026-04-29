@@ -224,11 +224,12 @@
     chipContainer.setAttribute('role', 'group');
     chipContainer.setAttribute('aria-label', 'Search composition');
 
+    var DEFAULT_PLACEHOLDER = 'Type to search';
     var input = document.createElement('input');
     input.className = 'cp-input';
     input.id = 'cp-input';
     input.type = 'text';
-    input.placeholder = 'Search cards, commands, help...';
+    input.placeholder = DEFAULT_PLACEHOLDER;
     input.setAttribute('autocomplete', 'off');
     chipContainer.appendChild(input);
 
@@ -285,6 +286,7 @@
                 }
             }
             lastChipCount = now;
+            if (typeof updatePlaceholder === 'function') updatePlaceholder();
             if (!suppressChipOnChange && typeof handleInput === 'function') handleInput();
         });
     }
@@ -369,6 +371,51 @@
         if (/^saved:/i.test(val)) return val.replace(/^saved:/i, '').trim();
         if (/^recent:/i.test(val)) return val.replace(/^recent:/i, '').trim();
         return val;
+    }
+
+    // Update the input placeholder based on current mode/chip context.
+    // Detection order mirrors handleInput's dispatch order.
+    function updatePlaceholder() {
+        var raw = input.value;
+
+        // 1. Provider prefix detected
+        if (window.__palette_providers) {
+            var detected = window.__palette_providers.detectPrefix(raw);
+            if (detected) {
+                var provider = window.__palette_providers.getProvider(detected.prefix);
+                if (provider) {
+                    input.placeholder = 'Filter ' + (provider.name || 'options').toLowerCase() + '...';
+                    return;
+                }
+            }
+        }
+
+        // 2. Parent nav chip locked - sub-view mode
+        if (chips) {
+            var chipsList = chips.all();
+            for (var ci = chipsList.length - 1; ci >= 0; ci--) {
+                if (chipsList[ci].type === 'nav' && isParentNav(chipsList[ci].navName)) {
+                    input.placeholder = 'Filter ' + chipsList[ci].navName + ' sub-views...';
+                    return;
+                }
+            }
+        }
+
+        // 3. Mode prefix in input
+        var mode = detectMode(raw);
+        if (mode === 'nav')    { input.placeholder = 'Filter pages...'; return; }
+        if (mode === 'help')   { input.placeholder = 'Search help & syntax...'; return; }
+        if (mode === 'saved')  { input.placeholder = 'Filter saved searches...'; return; }
+        if (mode === 'recent') { input.placeholder = 'Filter recent searches...'; return; }
+
+        // 4. Chips present, no mode prefix
+        if (chips && chips.count() > 0) {
+            input.placeholder = 'Add filters or press Enter to search...';
+            return;
+        }
+
+        // 5. Default
+        input.placeholder = DEFAULT_PLACEHOLDER;
     }
 
     // ── Matching algorithm ───────────────────────────────────────────
@@ -1069,6 +1116,7 @@
     // ── Search dispatcher ────────────────────────────────────────────
     function handleInput() {
         var raw = input.value;
+        updatePlaceholder();
 
         // Check for filter prefix first - takes precedence over card/nav/help modes
         if (window.__palette_providers) {
