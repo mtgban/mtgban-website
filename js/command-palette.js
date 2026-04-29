@@ -1080,6 +1080,10 @@
             modeIndicator.textContent = 'SAVED';
             modeIndicator.setAttribute('data-mode', 'saved');
             modeIndicator.className = 'cp-mode-indicator active';
+        } else if (mode === 'recent') {
+            modeIndicator.textContent = 'RECENT';
+            modeIndicator.setAttribute('data-mode', 'recent');
+            modeIndicator.className = 'cp-mode-indicator active';
         } else {
             modeIndicator.textContent = '';
             modeIndicator.className = 'cp-mode-indicator';
@@ -1111,6 +1115,12 @@
             if (savedItems.length > 0) {
                 items.push({ type: 'header', title: 'Saved Commands' });
                 items = items.concat(savedItems);
+            }
+        } else if (mode === 'recent') {
+            var recentItems = getRecentResults(query, 50);
+            if (recentItems.length > 0) {
+                items.push({ type: 'header', title: 'Recent Searches' });
+                items = items.concat(recentItems);
             }
         } else {
             // Always offer direct search with full query (supports syntax like s:3ED)

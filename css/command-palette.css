@@ -90,6 +90,11 @@
     color: #8b5cf6;
 }
 
+.cp-mode-indicator[data-mode="recent"] {
+    background: color-mix(in srgb, #14b8a6 15%, transparent);
+    color: #14b8a6;
+}
+
 /* Search input */
 .cp-input {
     flex: 1;
