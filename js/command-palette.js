@@ -1733,17 +1733,27 @@
                 fetchCardMeta(item.cardName);
                 locked = true;
             } else if (item.type === 'nav' && item.navName) {
-                suppressChipOnChange = true;
-                chips.add({
-                    type: 'nav',
-                    value: item.navLink || '',
-                    label: item.navName,
-                    icon: 'compass',
-                    navName: item.navName,
-                    navLink: item.navLink
-                });
-                suppressChipOnChange = false;
-                locked = true;
+                if (isParentNav(item.navName)) {
+                    // Parent nav (Newspaper, Sleepers, etc.) - lock as chip and reveal sub-views
+                    suppressChipOnChange = true;
+                    chips.add({
+                        type: 'nav',
+                        value: item.navLink || '',
+                        label: item.navName,
+                        icon: 'compass',
+                        navName: item.navName,
+                        navLink: item.navLink
+                    });
+                    suppressChipOnChange = false;
+                    locked = true;
+                } else {
+                    // Leaf nav (Search, Sets, Sealed, Upload, Home...) - no sub-pages.
+                    // Tab navigates immediately, identical to Enter. Avoids the leaky-NAV
+                    // bug where a locked leaf chip drops the user into general search.
+                    e.preventDefault();
+                    if (item.action) item.action();
+                    return;
+                }
             } else if (item.type === 'nav-sub' && item._subView && item._parentChip) {
                 var pKey = navParentKeys[item._parentChip.navName];
                 var urlParam;
