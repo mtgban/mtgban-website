@@ -680,24 +680,41 @@
 
     // ── Default results ──────────────────────────────────────────────
     function renderDefault() {
-        var items = [];
-        var recent = getRecentResults(null, 5);
-        var saved = getSavedResults(null);
-        var nav = getNavResults(null);
-
-        if (recent.length > 0) {
-            items.push({ type: 'header', title: 'Recent Searches' });
-            items = items.concat(recent);
-        }
-        if (saved.length > 0) {
-            items.push({ type: 'header', title: 'Saved Commands' });
-            items = items.concat(saved.slice(0, 3));
-        }
-        if (nav.length > 0) {
-            items.push({ type: 'header', title: 'Pages' });
-            items = items.concat(nav);
-        }
-
+        var items = [
+            { type: 'hint' },
+            {
+                type: 'shortcut',
+                title: 'Pages',
+                subtitle: 'Browse navigation and sub-pages',
+                icon: 'compass',
+                shortcut: '>',
+                action: function () { input.value = '>'; handleInput(); }
+            },
+            {
+                type: 'shortcut',
+                title: 'Help & syntax',
+                subtitle: 'Search reference and snippets',
+                icon: 'help-circle',
+                shortcut: '?',
+                action: function () { input.value = '?'; handleInput(); }
+            },
+            {
+                type: 'shortcut',
+                title: 'Saved',
+                subtitle: 'Your saved searches and commands',
+                icon: 'bookmark',
+                shortcut: '*',
+                action: function () { input.value = '*'; handleInput(); }
+            },
+            {
+                type: 'shortcut',
+                title: 'Recent',
+                subtitle: 'Your recent searches',
+                icon: 'clock',
+                shortcut: '<',
+                action: function () { input.value = '<'; handleInput(); }
+            }
+        ];
         renderResults(items);
     }
 
@@ -901,6 +918,35 @@
                 var headerIcon = categoryIconFor(item.title);
                 var iconHtml = headerIcon ? '<i data-lucide="' + headerIcon + '"></i>' : '';
                 html += '<div class="cp-category-header" data-category="' + escapeHtml(headerKey) + '">' + iconHtml + '<span>' + escapeHtml(item.title) + '</span></div>';
+                continue;
+            }
+
+            if (item.type === 'hint') {
+                html += '<div class="cp-hint-card">' +
+                    '<div class="cp-hint-icon"><i data-lucide="search"></i></div>' +
+                    '<div class="cp-hint-body">' +
+                        '<div class="cp-hint-title">Type to search</div>' +
+                        '<div class="cp-hint-subtitle">Cards, syntax - anything goes</div>' +
+                    '</div>' +
+                '</div>';
+                // Hint card is non-interactive: do not push to resultItems and do not increment idx
+                continue;
+            }
+
+            if (item.type === 'shortcut') {
+                var sActiveClass = idx === 0 ? ' active' : '';
+                html += '<div class="cp-result cp-shortcut-row' + sActiveClass + '" role="option" data-index="' + idx + '">';
+                html += '<div class="cp-result-icon"><i data-lucide="' + escapeHtml(item.icon) + '"></i></div>';
+                html += '<div class="cp-result-body">';
+                html += '<div class="cp-result-title">' + escapeHtml(item.title) + '</div>';
+                html += '<div class="cp-result-subtitle">' + escapeHtml(item.subtitle) + '</div>';
+                html += '</div>';
+                html += '<div class="cp-result-right">';
+                html += '<kbd class="cp-shortcut">' + escapeHtml(item.shortcut) + '</kbd>';
+                html += '</div>';
+                html += '</div>';
+                resultItems.push(item);
+                idx++;
                 continue;
             }
 
