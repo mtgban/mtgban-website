@@ -167,7 +167,7 @@
 
         if (favs.length === 0) {
             if (mode === 'desktop') {
-                container.innerHTML = '<div class="landing-empty">Star cards from any search to favorite them.</div>';
+                container.innerHTML = renderFavEmptyState();
             } else {
                 container.innerHTML = '';
             }
@@ -267,6 +267,72 @@
             }
         }
         container.innerHTML = html;
+    }
+
+    function renderFavEmptyState() {
+        return '' +
+            '<div class="landing-pane-header">' +
+                '<span class="landing-pane-title">Favorites</span>' +
+            '</div>' +
+            '<div class="landing-empty-fav">' +
+                '<div class="landing-empty-headline">' +
+                    '<h3>Track your watchlist here</h3>' +
+                    '<p>Star a card from search results and its best sell &amp; buy prices appear in this pane.</p>' +
+                '</div>' +
+                '<div class="landing-empty-flow">' +
+                    '<div class="landing-empty-side">' +
+                        '<div class="landing-empty-side-label">From any search</div>' +
+                        '<div class="landing-empty-mini-result">' +
+                            '<div class="landing-empty-mini-result-head">' +
+                                '<i class="ss ss-pmei ss-timeshifted ss-2x ss-fw landing-empty-mini-seticon" aria-hidden="true"></i>' +
+                                '<div class="landing-empty-mini-text">' +
+                                    '<div class="landing-empty-mini-title-row">' +
+                                        '<span class="landing-empty-mini-title">Mox Opal</span>' +
+                                        '<span class="result-badge etched">Etched</span>' +
+                                    '</div>' +
+                                    '<div class="landing-empty-mini-meta">SLD &middot; #1072</div>' +
+                                '</div>' +
+                                '<div class="landing-empty-mini-tools">' +
+                                    '<svg class="landing-empty-star" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                                        '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>' +
+                                    '</svg>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="landing-empty-tooltip">Click the star to favorite</div>' +
+                    '</div>' +
+                    '<div class="landing-empty-arrow" aria-hidden="true">' +
+                        '<svg width="50" height="40" viewBox="0 0 50 40" fill="none">' +
+                            '<defs>' +
+                                '<marker id="landing-empty-arrowhead-js" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
+                                    '<path d="M0,0 L6,3 L0,6 z" fill="currentColor"/>' +
+                                '</marker>' +
+                            '</defs>' +
+                            '<path d="M5,20 L42,20" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#landing-empty-arrowhead-js)" stroke-linecap="round" stroke-dasharray="4,3"/>' +
+                        '</svg>' +
+                    '</div>' +
+                    '<div class="landing-empty-side">' +
+                        '<div class="landing-empty-side-label">Saved here</div>' +
+                        '<div class="landing-empty-mini-fav">' +
+                            '<div class="landing-empty-mini-fav-thumb">' +
+                                '<img src="https://cards.scryfall.io/normal/front/6/a/6a2dbb1a-4b83-47b6-92ca-145fa5c9c16b.jpg" alt="" loading="lazy">' +
+                            '</div>' +
+                            '<div class="landing-empty-mini-fav-info">' +
+                                '<div class="landing-empty-mini-fav-name-row">' +
+                                    '<span class="landing-empty-mini-fav-name">Mox Opal</span>' +
+                                    '<span class="result-badge etched">Etched</span>' +
+                                '</div>' +
+                                '<div class="landing-empty-mini-fav-set">SLD &middot; #1072</div>' +
+                                '<div class="landing-empty-mini-fav-prices">' +
+                                    '<span class="sell">Sell</span><span class="sell">$ 214.04</span>' +
+                                    '<span class="buy">Buy</span><span class="buy">$ 204.76</span>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="landing-empty-tooltip">Best prices, kept fresh</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
     }
 
     function escapeHtml(str) {
