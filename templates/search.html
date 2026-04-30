@@ -518,6 +518,7 @@ Sims are not required for pre-constructed decks and other products where the sam
 
                     {{if .ChartID}}
                         <div class="chart-container">
+                            <div class="chart-legend" id="chartLegend"></div>
                             <canvas id="cardChart" width="760" height="480"></canvas>
                             <div class="chart-controls">
                                 <p style="margin: 0;">
@@ -628,6 +629,9 @@ Sims are not required for pre-constructed decks and other products where the sam
 
                             // Load state from local storage
                             applySavedLegendState(cardChart, legendStorageKey);
+
+                            // Build custom HTML legend
+                            renderChartLegend(cardChart, 'chartLegend');
 
                             // Apply theme (light/dark)
                             rethemeFirstAxes(cardChart);

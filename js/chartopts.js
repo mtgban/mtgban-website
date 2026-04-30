@@ -149,17 +149,7 @@ function getChartOpts(xAxisLabels, gaps) {
 
         plugins: {
             legend: {
-                position: 'top',
-                align: 'center',
-                labels: {
-                    color: textColor,
-                    usePointStyle: true,
-                    pointStyle: 'circle',
-                    padding: 16,
-                    font: { size: 11 },
-                },
-                onHover: function (e) { e.native.target.style.cursor = 'pointer'; },
-                onLeave: function (e) { e.native.target.style.cursor = 'default'; },
+                display: false,
             },
             tooltip: {
                 enabled: false,
@@ -246,6 +236,31 @@ function readVar(name) {
         el = document.body;
     }
     return window.getComputedStyle(el).getPropertyValue(name).trim();
+}
+
+function renderChartLegend(chart, containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    var html = '';
+    chart.data.datasets.forEach(function(ds, i) {
+        var visible = chart.isDatasetVisible(i);
+        var color = ds.borderColor || ds.backgroundColor || '#888';
+        html += '<button class="chart-legend-item' + (visible ? '' : ' hidden') + '" data-index="' + i + '" style="border-color:' + color + '">';
+        html += '<span class="chart-legend-dot" style="background:' + color + '"></span>';
+        html += ds.label;
+        html += '</button>';
+    });
+    container.innerHTML = html;
+
+    container.querySelectorAll('.chart-legend-item').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var idx = parseInt(this.getAttribute('data-index'));
+            var visible = chart.isDatasetVisible(idx);
+            chart.setDatasetVisibility(idx, !visible);
+            chart.update();
+            this.classList.toggle('hidden');
+        });
+    });
 }
 
 function rethemeFirstAxes(chart) {

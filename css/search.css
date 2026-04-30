@@ -1033,6 +1033,38 @@
     background: rgba(24, 27, 32, 0.7);
 }
 
+.chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding-bottom: 8px;
+}
+.chart-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: var(--text-sm);
+    color: var(--normal);
+    background: none;
+    border: none;
+    border-left: 2px solid;
+    padding: 3px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: inherit;
+    transition: opacity 0.12s;
+}
+.chart-legend-item.hidden {
+    opacity: 0.35;
+    text-decoration: line-through;
+}
+.chart-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
 .chart-controls {
     display: flex;
     justify-content: space-between;
