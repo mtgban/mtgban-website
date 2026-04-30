@@ -160,6 +160,17 @@
     background: var(--accent-muted);
 }
 
+.arb-store-select {
+    background: transparent;
+    border: none;
+    color: var(--ainfo);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+}
+
 .arb-opts-link {
     margin-left: auto;
     display: flex;
