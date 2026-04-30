@@ -104,40 +104,38 @@
         <!-- Selector bar (hidden for SYP) -->
         {{if ne .ScraperShort "SYP"}}
         <div class="arb-selector-bar">
-            {{range .ExtraNav}}
-                {{if .Active}}
-                    <div class="arb-current-store">
-                        <span class="store-type">{{if $.GlobalMode}}Index{{else if $.ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
-                        {{.Name}}
-                    </div>
-                {{end}}
-            {{end}}
-
-            <div class="arb-alt-stores">
-                {{range .ExtraNav}}
-                    {{if and (not .Active) (not (contains .Name "Sealed"))}}
-                        <a class="arb-alt-pill" href="{{.Link}}">{{.Name}}</a>
-                    {{end}}
-                {{end}}
-            </div>
-
-            {{$hasSealed := false}}
-            {{range .ExtraNav}}
-                {{if and (not .Active) (contains .Name "Sealed")}}
-                    {{$hasSealed = true}}
-                {{end}}
-            {{end}}
-            {{if $hasSealed}}
-                <span class="toolbar-sep"></span>
-                <div class="arb-alt-stores">
+            <div class="arb-current-store">
+                <span class="store-type">{{if .GlobalMode}}Index{{else if .ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
+                <select class="arb-store-select" onchange="if(this.value) window.location.href=this.value">
                     {{range .ExtraNav}}
-                        {{if and (not .Active) (contains .Name "Sealed")}}
-                            <a class="arb-alt-pill" href="{{.Link}}">{{.Name}}</a>
+                        {{if and .Active (not (contains .Name "Sealed"))}}
+                            <option value="" selected>{{.Name}}</option>
                         {{end}}
                     {{end}}
-                </div>
-            {{end}}
-
+                    {{range .ExtraNav}}
+                        {{if and (not .Active) (not (contains .Name "Sealed"))}}
+                            <option value="{{.Link}}">{{.Name}}</option>
+                        {{end}}
+                    {{end}}
+                    {{$hasSealed := false}}
+                    {{range .ExtraNav}}
+                        {{if contains .Name "Sealed"}}{{$hasSealed = true}}{{end}}
+                    {{end}}
+                    {{if $hasSealed}}
+                        <option disabled>──────────</option>
+                        {{range .ExtraNav}}
+                            {{if and .Active (contains .Name "Sealed")}}
+                                <option value="" selected>{{.Name}}</option>
+                            {{end}}
+                        {{end}}
+                        {{range .ExtraNav}}
+                            {{if and (not .Active) (contains .Name "Sealed")}}
+                                <option value="{{.Link}}">{{.Name}}</option>
+                            {{end}}
+                        {{end}}
+                    {{end}}
+                </select>
+            </div>
         </div>
         {{end}}
 
