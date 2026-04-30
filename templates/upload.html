@@ -34,25 +34,26 @@
                         <h2>Select Mode &amp; Stores</h2>
                     </div>
 
-                    <div class="upload-mode-row">
-                        <div class="upload-mode-toggle">
-                            <input type="radio" id="retail" name="mode" value="false" {{if not .IsBuylist}}checked{{end}} onchange="reloadSelect('retail')">
-                            <label for="retail">Retail</label>
-                            <input type="radio" id="buylist" name="mode" value="true" {{if .IsBuylist}}checked{{end}} onchange="reloadSelect('buylist')" {{if not .CanBuylist}}disabled{{end}}>
-                            <label for="buylist" {{if not .CanBuylist}}class="disabled"{{end}}>
-                                {{if .CanBuylist}}
-                                    Buylist
-                                {{else}}
-                                    <s>Buylist</s>
-                                {{end}}
-                            </label>
+                    <div class="upload-mode-stores-row">
+                        <div class="upload-mode-col">
+                            <div class="upload-mode-toggle">
+                                <input type="radio" id="retail" name="mode" value="false" {{if not .IsBuylist}}checked{{end}} onchange="reloadSelect('retail')">
+                                <label for="retail">Retail</label>
+                                <input type="radio" id="buylist" name="mode" value="true" {{if .IsBuylist}}checked{{end}} onchange="reloadSelect('buylist')" {{if not .CanBuylist}}disabled{{end}}>
+                                <label for="buylist" {{if not .CanBuylist}}class="disabled"{{end}}>
+                                    {{if .CanBuylist}}
+                                        Buylist
+                                    {{else}}
+                                        <s>Buylist</s>
+                                    {{end}}
+                                </label>
+                            </div>
+                            {{if not .CanBuylist}}
+                                <span class="upload-mode-hint">Buylist access requires Legacy tier</span>
+                            {{end}}
                         </div>
-                        {{if not .CanBuylist}}
-                            <span class="upload-mode-hint">Buylist access requires Legacy tier</span>
-                        {{end}}
-                    </div>
-
-                    <div class="upload-store-grid" id="storesBox">
+                        <div class="upload-store-grid" id="storesBox">
+                        </div>
                     </div>
                     {{if not .CanChangeStores}}
                         <span class="upload-mode-hint">Customizing the list of stores requires Modern tier</span>
