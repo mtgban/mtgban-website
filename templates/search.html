@@ -1127,15 +1127,17 @@ Sims are not required for pre-constructed decks and other products where the sam
     </div>
     <div class="settings-section-body">
         <p class="section-desc">Check stores you want to <strong>hide</strong> from results.</p>
-        <div class="settings-vendor-columns">
-            <div>
-                <h4>Retail</h4>
-                {{template "settings-stores-grouped" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList")}}
-            </div>
-            <div>
-                <h4>Buylist</h4>
-                {{template "settings-stores-grouped" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList")}}
-            </div>
+        <div class="settings-stores-layout">
+            <h4 class="settings-stores-col-label">Retail</h4>
+            <h4 class="settings-stores-col-label">Buylist</h4>
+
+            <h5 class="settings-stores-row-label">Singles</h5>
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "singles")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "singles")}}
+
+            <h5 class="settings-stores-row-label">Sealed</h5>
+            {{template "settings-stores-grouped-section" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList" "Section" "sealed")}}
+            {{template "settings-stores-grouped-section" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList" "Section" "sealed")}}
         </div>
     </div>
 </section>

@@ -658,3 +658,35 @@ body.settings-open {
 .settings-subgroup .settings-grid + .settings-subgroup-label {
     margin-top: 0.9em;
 }
+
+/* === Stores section: row-aligned Singles/Sealed across Retail+Buylist columns === */
+.settings-stores-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.5em;
+    row-gap: 0;
+    align-items: start;
+}
+
+.settings-stores-col-label {
+    margin: 0 0 0.4em;
+}
+
+.settings-stores-row-label {
+    grid-column: 1 / -1;
+    margin: 0.6em 0 0.3em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--greytext, #888);
+}
+
+.settings-stores-layout > .settings-grid {
+    margin-bottom: 0.4em;
+}
+
+@media (max-width: 720px) {
+    .settings-stores-layout { grid-template-columns: 1fr; }
+    .settings-stores-row-label { grid-column: 1 / -1; }
+}

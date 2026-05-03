@@ -1,16 +1,39 @@
 {{/*
-    settings-stores-grouped - render a list of scraper shorthands as two
-    subgroups: Singles (default) and Sealed (any key whose scraper has
-    SealedMode = true, looked up server-side via is_sealed_scraper). Each
-    subgroup is alphabetical by display name (sort happens server-side at
-    SellerKeys/VendorKeys population time).
+    settings-stores-grouped-section - render one half (Singles or Sealed) of a
+    scraper-shorthand list as a settings-grid. Use `Section = "singles"` or
+    `Section = "sealed"`. Sealed classification uses the canonical SealedMode
+    flag via the is_sealed_scraper template func. Renders nothing if the
+    selected section is empty.
 
     Expected dot context:
         {
             "Keys":       []string,  // shorthands to render
-            "GridId":     string,    // id="..." for the wrapping settings-grid
+            "GridId":     string,    // id prefix; final id is "{GridId}-{Section}"
             "CookieName": string,    // data-cookie="..." for the grid
+            "Section":    string,    // "singles" | "sealed"
         }
+*/}}
+{{define "settings-stores-grouped-section"}}
+{{$keys := .Keys}}
+{{$wantSealed := eq .Section "sealed"}}
+{{/* Always emit the grid container (even if empty) so multi-column grid layouts
+    don't shift cells when one column has no entries for this section. */}}
+<div class="settings-grid" id="{{.GridId}}-{{.Section}}" data-cookie="{{.CookieName}}">
+    {{range $key := $keys}}
+        {{if and $wantSealed (is_sealed_scraper $key)}}
+        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+        {{end}}
+        {{if and (not $wantSealed) (not (is_sealed_scraper $key))}}
+        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+        {{end}}
+    {{end}}
+</div>
+{{end}}
+
+{{/*
+    Backwards-compatible single-column rendering used by arbit.html, which has
+    only one list (Vendors) so per-row alignment with another column does not
+    apply. Renders Singles then Sealed stacked in a single subgroup.
 */}}
 {{define "settings-stores-grouped"}}
 <div class="settings-subgroup">
@@ -22,20 +45,12 @@
 
     {{if $hasSingles}}
     <h5 class="settings-subgroup-label">Singles</h5>
-    <div class="settings-grid" id="{{.GridId}}-singles" data-cookie="{{.CookieName}}">
-        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
-        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-        {{end}}{{end}}
-    </div>
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "GridId" .GridId "CookieName" .CookieName "Section" "singles")}}
     {{end}}
 
     {{if $hasSealed}}
     <h5 class="settings-subgroup-label">Sealed</h5>
-    <div class="settings-grid" id="{{.GridId}}-sealed" data-cookie="{{.CookieName}}">
-        {{range $key := $keys}}{{if is_sealed_scraper $key}}
-        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-        {{end}}{{end}}
-    </div>
+    {{template "settings-stores-grouped-section" (dict "Keys" $keys "GridId" .GridId "CookieName" .CookieName "Section" "sealed")}}
     {{end}}
 </div>
 {{end}}
