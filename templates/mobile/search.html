@@ -423,6 +423,12 @@
             </div>
             {{end}}
         </div>
+    {{else}}
+        <div class="m-no-results">
+            <i data-lucide="search-x" class="m-no-results-icon"></i>
+            <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
+            <p class="m-no-results-hint">Try a broader search or check spelling.</p>
+        </div>
     {{end}}
 
     {{/* Pagination */}}

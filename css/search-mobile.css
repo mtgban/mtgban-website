@@ -1877,6 +1877,36 @@
     opacity: 0.8;
 }
 
+/* === No results empty state === */
+.m-no-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3em 1.5em;
+    text-align: center;
+    color: var(--greytext, #888);
+}
+
+.m-no-results-icon {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 0.75em;
+    opacity: 0.55;
+}
+
+.m-no-results-msg {
+    margin: 0 0 0.35em;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text, currentColor);
+}
+
+.m-no-results-hint {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
 /* Landscape: side-by-side Sellers / Buyers with inline card image */
 @media (orientation: landscape) {
 
