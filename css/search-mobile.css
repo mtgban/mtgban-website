@@ -2124,3 +2124,13 @@
         display: none !important;
     }
 }
+
+.m-fav-pin {
+    flex: 0 0 auto;
+    padding: 0.3em;
+    background: transparent;
+    border: 0;
+    color: var(--greytext, #888);
+    cursor: pointer;
+}
+.m-fav-pin.pinned { color: var(--accent, #5b8def); }

@@ -2212,3 +2212,19 @@
     color: #fff;
 }
 .ban-confirm-btn-danger:hover { background: #e74c3c; border-color: #e74c3c; }
+
+/* === Pin button on landing items === */
+.landing-item-pin {
+    flex: 0 0 auto;
+    padding: 0.35em;
+    background: transparent;
+    border: 0;
+    color: var(--greytext, #888);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms, color 120ms;
+}
+.landing-item:hover .landing-item-pin,
+.landing-item-pin.pinned { opacity: 1; }
+.landing-item-pin:hover { color: var(--accent, #5b8def); }
+.landing-item-pin.pinned { color: var(--accent, #5b8def); }
