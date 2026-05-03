@@ -679,28 +679,79 @@ document.querySelectorAll('.m-filter-pills').forEach(function(group) {
     });
 });
 
-// Populate set dropdown from data built during template render
+// Populate set picker from data built during template render
 (function() {
     var seen = {};
-    var select = document.getElementById('m-filter-set');
-    if (!select || !window.mFilterSets) return;
+    var list = document.getElementById('m-filter-set-list');
+    if (!list || !window.mFilterSets) return;
+
+    // "All Sets" entry first
+    var allLi = document.createElement('li');
+    allLi.dataset.value = '';
+    allLi.dataset.name = 'All Sets';
+    allLi.textContent = 'All Sets';
+    allLi.addEventListener('click', selectSet);
+    list.appendChild(allLi);
+
+    // Dedupe and sort alphabetically by name
+    var entries = [];
     mFilterSets.forEach(function(s) {
         if (!seen[s.code]) {
             seen[s.code] = true;
-            var opt = document.createElement('option');
-            opt.value = s.code;
-            opt.textContent = s.name;
-            select.appendChild(opt);
+            entries.push(s);
         }
     });
+    entries.sort(function(a, b) { return a.name.localeCompare(b.name); });
+
+    entries.forEach(function(s) {
+        var li = document.createElement('li');
+        li.dataset.value = s.code;
+        li.dataset.name = s.name;
+        if (s.keyrune) {
+            var icon = document.createElement('i');
+            icon.className = 'ss ss-' + s.keyrune + ' ss-fw';
+            li.appendChild(icon);
+        }
+        var label = document.createElement('span');
+        label.textContent = s.name;
+        li.appendChild(label);
+        li.addEventListener('click', selectSet);
+        list.appendChild(li);
+    });
 })();
+
+function selectSet(e) {
+    var li = e.currentTarget;
+    var picker = document.getElementById('m-filter-set');
+    var current = document.getElementById('m-filter-set-current');
+    var list = document.getElementById('m-filter-set-list');
+    picker.dataset.value = li.dataset.value;
+    current.textContent = li.dataset.name;
+    list.hidden = true;
+}
+
+function toggleSetPicker(e) {
+    e.stopPropagation();
+    var list = document.getElementById('m-filter-set-list');
+    list.hidden = !list.hidden;
+}
+
+// Close picker on outside click
+document.addEventListener('click', function(e) {
+    var picker = document.getElementById('m-filter-set');
+    var list = document.getElementById('m-filter-set-list');
+    if (!picker || !list) return;
+    if (!picker.contains(e.target)) {
+        list.hidden = true;
+    }
+});
 
 function applyFilters() {
     var query = document.getElementById('searchbox').value.trim();
     // Strip old set/finish modifiers from query
     query = query.replace(/\s+s:"[^"]*"/g, '').replace(/\s+s:\S+/g, '').replace(/\s+f:\S+/g, '').trim();
 
-    var setVal = document.getElementById('m-filter-set').value.trim();
+    var setVal = (document.getElementById('m-filter-set').dataset.value || '').trim();
     var finishPill = document.querySelector('#m-finish-pills .m-filter-pill.active');
     var finish = finishPill ? finishPill.getAttribute('data-val') : '';
 
