@@ -707,9 +707,10 @@ document.querySelectorAll('.m-filter-pills').forEach(function(group) {
         var li = document.createElement('li');
         li.dataset.value = s.code;
         li.dataset.name = s.name;
-        if (s.keyrune) {
+        var bareKeyrune = (s.keyrune || '').split(' ')[0];
+        if (bareKeyrune) {
             var icon = document.createElement('i');
-            icon.className = 'ss ss-' + s.keyrune + ' ss-fw';
+            icon.className = 'ss ' + bareKeyrune + ' ss-fw';
             li.appendChild(icon);
         }
         var label = document.createElement('span');
