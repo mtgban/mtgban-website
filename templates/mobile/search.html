@@ -163,7 +163,7 @@
 
     {{/* Set data for filter dropdown - populated in extra-scripts after DOM ready */}}
     <script>
-    var mFilterSets = [{{range .AllKeys}}{{$card := index $.Metadata .}}{code:"{{$card.SetCode}}",name:"{{$card.Edition}}"},{{end}}];
+    var mFilterSets = [{{range .AllKeys}}{{$card := index $.Metadata .}}{code:"{{$card.SetCode}}",name:"{{$card.Edition}}",keyrune:"{{$card.Keyrune}}"},{{end}}];
     </script>
 
     {{/* Result count + sort pills */}}
