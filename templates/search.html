@@ -1130,25 +1130,11 @@ Sims are not required for pre-constructed decks and other products where the sam
         <div class="settings-vendor-columns">
             <div>
                 <h4>Retail</h4>
-                <div class="settings-grid" id="settings-search-sellers" data-cookie="SearchSellersList">
-                    {{range $key := .SellerKeys}}
-                    <label>
-                        <input type="checkbox" name="{{$key}}">
-                        {{scraper_name $key}}{{if (contains $key "Sealed")}} <span class="scraper-tag">Sealed</span>{{end}}
-                    </label>
-                    {{end}}
-                </div>
+                {{template "settings-stores-grouped" (dict "Keys" .SellerKeys "GridId" "settings-search-sellers" "CookieName" "SearchSellersList")}}
             </div>
             <div>
                 <h4>Buylist</h4>
-                <div class="settings-grid" id="settings-search-vendors" data-cookie="SearchVendorsList">
-                    {{range $key := .VendorKeys}}
-                    <label>
-                        <input type="checkbox" name="{{$key}}">
-                        {{scraper_name $key}}{{if (contains $key "Sealed")}} <span class="scraper-tag">Sealed</span>{{end}}
-                    </label>
-                    {{end}}
-                </div>
+                {{template "settings-stores-grouped" (dict "Keys" .VendorKeys "GridId" "settings-search-vendors" "CookieName" "SearchVendorsList")}}
             </div>
         </div>
     </div>

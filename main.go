@@ -1150,6 +1150,20 @@ var funcMap = template.FuncMap{
 	"palette_arbit_targets":     func() template.JS { return paletteArbitTargetsJSON("arbit") },
 	"palette_reverse_targets":   func() template.JS { return paletteArbitTargetsJSON("reverse") },
 	"palette_global_targets":    func() template.JS { return paletteArbitTargetsJSON("global") },
+	"dict": func(values ...interface{}) (map[string]interface{}, error) {
+		if len(values)%2 != 0 {
+			return nil, errors.New("dict requires even number of args")
+		}
+		m := make(map[string]interface{}, len(values)/2)
+		for i := 0; i < len(values); i += 2 {
+			k, ok := values[i].(string)
+			if !ok {
+				return nil, errors.New("dict keys must be strings")
+			}
+			m[k] = values[i+1]
+		}
+		return m, nil
+	},
 }
 
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
@@ -1193,7 +1207,12 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	// and mobile pages use a separate settings sheet rather than this modal.
 	if !pageVars.IsMobile {
 		switch name {
-		case "search.html", "arbit.html", "upload.html":
+		case "search.html", "arbit.html":
+			templates = append(templates,
+				"templates/partials/settings-modal.html",
+				"templates/partials/settings-stores-grouped.html",
+			)
+		case "upload.html":
 			templates = append(templates, "templates/partials/settings-modal.html")
 		case "sleep.html", "news.html":
 			templates = append(templates,
