@@ -12,7 +12,7 @@
         host.hidden = true;
         host.innerHTML =
             '<div class="ban-confirm-backdrop" data-role="cancel"></div>' +
-            '<div class="ban-confirm-modal" role="dialog" aria-modal="true">' +
+            '<div class="ban-confirm-modal" role="dialog" aria-modal="true" aria-label="Confirm action">' +
                 '<p class="ban-confirm-message"></p>' +
                 '<div class="ban-confirm-actions">' +
                     '<button type="button" class="ban-confirm-btn" data-role="cancel">Cancel</button>' +
@@ -26,15 +26,19 @@
     window.confirmDialog = function(message, onConfirm, opts) {
         opts = opts || {};
         var h = ensureHost();
+        if (!h.hidden) return; // re-entrant call while open: ignore
         h.querySelector('.ban-confirm-message').textContent = message;
         var confirmBtn = h.querySelector('[data-role="confirm"]');
         confirmBtn.textContent = opts.confirmLabel || 'Clear all';
+        var trigger = document.activeElement;
         h.hidden = false;
+        confirmBtn.focus();
 
         function cleanup() {
             h.hidden = true;
             h.removeEventListener('click', onClick);
             document.removeEventListener('keydown', onKey);
+            if (trigger && typeof trigger.focus === 'function') trigger.focus();
         }
         function onClick(e) {
             var role = e.target.getAttribute && e.target.getAttribute('data-role');

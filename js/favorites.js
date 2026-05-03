@@ -505,7 +505,8 @@
         // prices (desktop favorites have no inline DOM to scrape best-price from).
         var now = Date.now();
         var needsRefresh = favs.some(function(f) {
-            return (now - f.t) > STALE_MS || (f.sellPrice == null && f.buyPrice == null);
+            var lastFetched = f.refreshedAt || f.t;
+            return (now - lastFetched) > STALE_MS || (f.sellPrice == null && f.buyPrice == null);
         });
         if (!needsRefresh) return;
 
@@ -567,7 +568,9 @@
                     f.img = prices.imageURL;
                     updated = true;
                 }
-                f.t = Date.now();
+                // Track last-fetched time separately from added time (f.t),
+                // so chrono sort by add order isn't shuffled on refresh.
+                f.refreshedAt = Date.now();
             });
 
             if (updated) {
