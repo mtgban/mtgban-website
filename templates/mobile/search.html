@@ -310,15 +310,18 @@
                                     <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                 </div>
                                 {{else}}
+                                {{$hasDetail := $entry.Credit}}
+                                {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
                                         <span class="m-vendor-name">
-                                            {{$entry.ScraperName}} {{$entry.Country}}
+                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
                                             <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
                                             <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{end}}</span>
+                                            <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
                                     </summary>
                                     <div class="m-vendor-detail">
@@ -328,9 +331,33 @@
                                             <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.Credit}}</span><span class="m-vendor-qty"></span></span>
                                         </div>
                                         {{end}}
-                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
                                     </div>
                                 </details>
+                                {{else}}
+                                {{if $entry.URL}}
+                                <a class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}" href="{{$entry.URL}}" target="_blank" rel="nofollow">
+                                    <span class="m-vendor-name">
+                                        {{$entry.ScraperName}} {{$entry.Country}}
+                                        {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
+                                    </span>
+                                    <span class="m-vendor-right">
+                                        <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{end}}</span>
+                                    </span>
+                                </a>
+                                {{else}}
+                                <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
+                                    <span class="m-vendor-name">
+                                        {{$entry.ScraperName}} {{$entry.Country}}
+                                        {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
+                                    </span>
+                                    <span class="m-vendor-right">
+                                        <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{end}}</span>
+                                    </span>
+                                </div>
+                                {{end}}
+                                {{end}}
                                 {{end}}
                             {{end}}
                         </div>
