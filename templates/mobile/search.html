@@ -449,9 +449,10 @@
             <h3>Filter Results</h3>
             <form id="m-filter-form" action="" method="GET">
                 <label>Edition / Set</label>
-                <select class="m-filter-set-select" id="m-filter-set">
-                    <option value="">All Sets</option>
-                </select>
+                <div class="m-filter-set-picker" id="m-filter-set" data-value="">
+                    <button type="button" class="m-filter-set-current" id="m-filter-set-current" onclick="toggleSetPicker(event)">All Sets</button>
+                    <ul class="m-filter-set-list" id="m-filter-set-list" hidden></ul>
+                </div>
 
                 <label>Finish</label>
                 <div class="m-filter-pills" id="m-finish-pills">
