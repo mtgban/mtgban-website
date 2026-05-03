@@ -472,11 +472,13 @@
 }
 
 /* Alternating row tint for scan-ability */
-.m-vendor-row:nth-child(even) summary {
+.m-vendor-row:nth-child(even) summary,
+.m-vendor-row.m-vendor-flat:nth-child(even) {
     background: rgba(255, 255, 255, 0.02);
 }
 
-.light-theme .m-vendor-row:nth-child(even) summary {
+.light-theme .m-vendor-row:nth-child(even) summary,
+.light-theme .m-vendor-row.m-vendor-flat:nth-child(even) {
     background: rgba(0, 0, 0, 0.015);
 }
 
@@ -531,8 +533,8 @@
 
 .m-vendor-right {
     display: grid;
-    grid-template-columns: 6em 2em;
-    align-items: baseline;
+    grid-template-columns: 6em 2em auto;
+    align-items: center;
     flex-shrink: 0;
 }
 
@@ -552,7 +554,8 @@
 }
 
 /* Best price highlight */
-.m-best-price summary {
+.m-best-price summary,
+.m-best-price.m-vendor-flat {
     background: color-mix(in srgb, var(--dodgerblue) 8%, transparent);
     border-left: 3px solid var(--dodgerblue);
     padding-left: calc(0.75rem - 3px);
@@ -600,15 +603,6 @@
 
 .m-detail-row .m-vendor-price {
     color: var(--greytext);
-}
-
-.m-detail-link {
-    display: inline-block;
-    margin: 0.25em 0 0.5em 0.75em;
-    font-size: 0.8rem;
-    color: var(--dodgerblue);
-    text-decoration: none;
-    font-weight: 500;
 }
 
 /* Locked vendor */
@@ -2123,4 +2117,51 @@
     .m-drawer-overlay {
         display: none !important;
     }
+}
+
+/* === Flat vendor row (no expandable detail) === */
+.m-vendor-row.m-vendor-flat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1rem 0 0.75rem;
+    min-height: 44px;
+    text-decoration: none;
+    color: inherit;
+    box-sizing: border-box;
+    gap: 0.5rem;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.1s ease;
+}
+
+.m-vendor-row.m-vendor-flat:active {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.light-theme .m-vendor-row.m-vendor-flat:active {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* === Vendor name as inline link inside <summary> === */
+.m-vendor-row .m-vendor-link {
+    color: inherit;
+    text-decoration: none;
+}
+.m-vendor-row .m-vendor-link:hover,
+.m-vendor-row .m-vendor-link:focus {
+    text-decoration: underline;
+}
+
+/* === Chevron, only visible inside <details> === */
+.m-vendor-chevron {
+    width: 14px;
+    height: 14px;
+    margin-left: 0.4em;
+    opacity: 0.5;
+    transition: transform 150ms ease;
+    flex-shrink: 0;
+}
+
+.m-vendor-row[open] .m-vendor-chevron {
+    transform: rotate(180deg);
 }
