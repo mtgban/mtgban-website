@@ -564,11 +564,27 @@
                         <button type="button" onclick="mSettingsBulk('m-set-sellers', false)">Clear</button>
                         <button type="button" onclick="mSettingsBulk('m-set-sellers', true)">Select All</button>
                     </div>
+                    {{$keys := .SellerKeys}}
+                    {{$hasSingles := false}}
+                    {{range $k := $keys}}{{if not (contains $k "Sealed")}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{$hasSealed := false}}
+                    {{range $k := $keys}}{{if (contains $k "Sealed")}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{if $hasSingles}}
+                    <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $i, $key := .SellerKeys}}
+                        {{range $key := $keys}}{{if not (contains $key "Sealed")}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-                        {{end}}
+                        {{end}}{{end}}
                     </div>
+                    {{end}}
+                    {{if $hasSealed}}
+                    <h5 class="m-settings-subgroup-label">Sealed</h5>
+                    <div class="m-settings-checks">
+                        {{range $key := $keys}}{{if (contains $key "Sealed")}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{end}}{{end}}
+                    </div>
+                    {{end}}
                 </div>
             </div>
 
@@ -583,11 +599,27 @@
                         <button type="button" onclick="mSettingsBulk('m-set-vendors', false)">Clear</button>
                         <button type="button" onclick="mSettingsBulk('m-set-vendors', true)">Select All</button>
                     </div>
+                    {{$keys := .VendorKeys}}
+                    {{$hasSingles := false}}
+                    {{range $k := $keys}}{{if not (contains $k "Sealed")}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{$hasSealed := false}}
+                    {{range $k := $keys}}{{if (contains $k "Sealed")}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{if $hasSingles}}
+                    <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $i, $key := .VendorKeys}}
+                        {{range $key := $keys}}{{if not (contains $key "Sealed")}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-                        {{end}}
+                        {{end}}{{end}}
                     </div>
+                    {{end}}
+                    {{if $hasSealed}}
+                    <h5 class="m-settings-subgroup-label">Sealed</h5>
+                    <div class="m-settings-checks">
+                        {{range $key := $keys}}{{if (contains $key "Sealed")}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{end}}{{end}}
+                    </div>
+                    {{end}}
                 </div>
             </div>
 
