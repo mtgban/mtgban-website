@@ -2155,8 +2155,11 @@
 
 /* === Pin button on landing items === */
 .landing-item-pin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
-    padding: 0.35em;
+    padding: 0.3em;
     background: transparent;
     border: 0;
     color: var(--greytext, #888);
@@ -2169,12 +2172,19 @@
 .landing-item-pin:hover { color: var(--accent, #5b8def); }
 .landing-item-pin.pinned { color: var(--accent, #5b8def); }
 
-/* === Favorites sort pills === */
+/* Pin sits left of the trash button on favorite tiles (both absolutely positioned) */
+.landing-pane-favorites .landing-item-fav .landing-item-pin {
+    position: absolute;
+    top: 0.35em;
+    right: 2.2em;
+}
+
+/* === Favorites sort pills (inline in pane header next to action buttons) === */
 .landing-pane-sort {
-    display: flex;
-    gap: 0.35em;
-    padding: 0 1em 0.6em;
-    flex-wrap: wrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    margin-right: 0.25em;
 }
 .fav-sort-pill {
     display: inline-flex;

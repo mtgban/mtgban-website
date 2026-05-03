@@ -291,11 +291,11 @@
             html += '<div class="landing-pane-header">';
             html += '<span class="landing-pane-title">Favorites</span>';
             html += '<span class="landing-pane-actions">';
+            html += '<span class="landing-pane-sort">' + sortPillsHtml() + '</span>';
             html += '<button class="landing-pane-btn" onclick="window.manualRefreshFavorites()" title="Update prices">Update Prices</button>';
             html += '<button class="landing-pane-btn" onclick="window.clearFavorites()">Clear</button>';
             html += '</span>';
             html += '</div>';
-            html += '<div class="landing-pane-sort">' + sortPillsHtml() + '</div>';
             html += '<div class="landing-pane-body">';
             slice.forEach(function(f) {
                 html += '<a class="landing-item landing-item-fav" href="?q=' + encodeURIComponent(f.query) + '">';
