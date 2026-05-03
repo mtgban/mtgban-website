@@ -10,6 +10,42 @@ async function autocomplete(form, inp, sealed) {
     var minlen = 3;
     const arr = await fetchNames(sealed);
 
+    // Track viewport listeners so we can detach them when the dropdown closes
+    var viewportListenersAttached = false;
+    var currentItemsDiv = null;
+
+    function fitToViewport() {
+        if (!currentItemsDiv || !document.body.contains(currentItemsDiv)) return;
+        var vv = window.visualViewport;
+        var inputRect = inp.getBoundingClientRect();
+        var bottom = vv ? vv.height : window.innerHeight;
+        var available = Math.max(120, bottom - inputRect.bottom - 8);
+        currentItemsDiv.style.maxHeight = available + 'px';
+        currentItemsDiv.style.overflowY = 'auto';
+    }
+
+    function attachViewportListeners() {
+        if (viewportListenersAttached) return;
+        viewportListenersAttached = true;
+        var vv = window.visualViewport;
+        if (vv) {
+            vv.addEventListener('resize', fitToViewport);
+            vv.addEventListener('scroll', fitToViewport);
+        }
+        window.addEventListener('resize', fitToViewport);
+    }
+
+    function detachViewportListeners() {
+        if (!viewportListenersAttached) return;
+        viewportListenersAttached = false;
+        var vv = window.visualViewport;
+        if (vv) {
+            vv.removeEventListener('resize', fitToViewport);
+            vv.removeEventListener('scroll', fitToViewport);
+        }
+        window.removeEventListener('resize', fitToViewport);
+    }
+
     /* Execute a function when someone writes in the text field: */
     inp.addEventListener("input", function(e) {
         var a, b, i, val = this.value;
@@ -73,6 +109,9 @@ async function autocomplete(form, inp, sealed) {
         /* Only append the dropdown if there are matching items */
         if (a.hasChildNodes()) {
             this.parentNode.appendChild(a);
+            currentItemsDiv = a;
+            fitToViewport();
+            attachViewportListeners();
         }
     });
 
@@ -158,10 +197,16 @@ async function autocomplete(form, inp, sealed) {
     /* Close all autocomplete lists in the document, except the one passed as an argument */
     function closeAllLists(elmnt) {
         var x = document.getElementsByClassName("autocomplete-items");
+        var anyRemoved = false;
         for (var i = 0; i < x.length; i++) {
             if (elmnt != x[i] && elmnt != inp) {
                 x[i].parentNode.removeChild(x[i]);
+                anyRemoved = true;
             }
+        }
+        if (anyRemoved) {
+            currentItemsDiv = null;
+            detachViewportListeners();
         }
     }
 
