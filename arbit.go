@@ -376,7 +376,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
 		}
 	}
-	pageVars.VendorKeys = vendorKeys
+	pageVars.VendorKeys = sortKeysByScraperName(vendorKeys)
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
@@ -460,7 +460,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 		}
 		globalVendorKeys = append(globalVendorKeys, vendor.Info().Shorthand)
 	}
-	pageVars.VendorKeys = globalVendorKeys
+	pageVars.VendorKeys = sortKeysByScraperName(globalVendorKeys)
 
 	if r.FormValue("page") == "options" {
 		http.Redirect(w, r, r.URL.Path+"?settings=1", http.StatusFound)
