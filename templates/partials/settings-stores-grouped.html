@@ -1,8 +1,9 @@
 {{/*
     settings-stores-grouped - render a list of scraper shorthands as two
-    subgroups: Singles (default) and Sealed (any key whose shorthand contains
-    the substring "Sealed"). Each subgroup is alphabetical by display name
-    (sort happens server-side at SellerKeys/VendorKeys population time).
+    subgroups: Singles (default) and Sealed (any key whose scraper has
+    SealedMode = true, looked up server-side via is_sealed_scraper). Each
+    subgroup is alphabetical by display name (sort happens server-side at
+    SellerKeys/VendorKeys population time).
 
     Expected dot context:
         {
@@ -15,14 +16,14 @@
 <div class="settings-subgroup">
     {{$keys := .Keys}}
     {{$hasSingles := false}}
-    {{range $k := $keys}}{{if not (contains $k "Sealed")}}{{$hasSingles = true}}{{end}}{{end}}
+    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
     {{$hasSealed := false}}
-    {{range $k := $keys}}{{if (contains $k "Sealed")}}{{$hasSealed = true}}{{end}}{{end}}
+    {{range $k := $keys}}{{if is_sealed_scraper $k}}{{$hasSealed = true}}{{end}}{{end}}
 
     {{if $hasSingles}}
     <h5 class="settings-subgroup-label">Singles</h5>
     <div class="settings-grid" id="{{.GridId}}-singles" data-cookie="{{.CookieName}}">
-        {{range $key := $keys}}{{if not (contains $key "Sealed")}}
+        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
         {{end}}{{end}}
     </div>
@@ -31,7 +32,7 @@
     {{if $hasSealed}}
     <h5 class="settings-subgroup-label">Sealed</h5>
     <div class="settings-grid" id="{{.GridId}}-sealed" data-cookie="{{.CookieName}}">
-        {{range $key := $keys}}{{if (contains $key "Sealed")}}
+        {{range $key := $keys}}{{if is_sealed_scraper $key}}
         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
         {{end}}{{end}}
     </div>

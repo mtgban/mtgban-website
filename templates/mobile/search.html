@@ -566,13 +566,13 @@
                     </div>
                     {{$keys := .SellerKeys}}
                     {{$hasSingles := false}}
-                    {{range $k := $keys}}{{if not (contains $k "Sealed")}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
                     {{$hasSealed := false}}
-                    {{range $k := $keys}}{{if (contains $k "Sealed")}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
                     {{if $hasSingles}}
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if not (contains $key "Sealed")}}
+                        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
                         {{end}}{{end}}
                     </div>
@@ -580,7 +580,7 @@
                     {{if $hasSealed}}
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if (contains $key "Sealed")}}
+                        {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
                         {{end}}{{end}}
                     </div>
@@ -601,13 +601,13 @@
                     </div>
                     {{$keys := .VendorKeys}}
                     {{$hasSingles := false}}
-                    {{range $k := $keys}}{{if not (contains $k "Sealed")}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
                     {{$hasSealed := false}}
-                    {{range $k := $keys}}{{if (contains $k "Sealed")}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
                     {{if $hasSingles}}
                     <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if not (contains $key "Sealed")}}
+                        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
                         {{end}}{{end}}
                     </div>
@@ -615,7 +615,7 @@
                     {{if $hasSealed}}
                     <h5 class="m-settings-subgroup-label">Sealed</h5>
                     <div class="m-settings-checks">
-                        {{range $key := $keys}}{{if (contains $key "Sealed")}}
+                        {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
                         {{end}}{{end}}
                     </div>

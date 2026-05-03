@@ -1077,6 +1077,19 @@ var funcMap = template.FuncMap{
 	"contains": func(s, p string) bool {
 		return strings.Contains(s, p)
 	},
+	"is_sealed_scraper": func(shorthand string) bool {
+		for _, seller := range Sellers {
+			if seller != nil && seller.Info().Shorthand == shorthand {
+				return seller.Info().SealedMode
+			}
+		}
+		for _, vendor := range Vendors {
+			if vendor != nil && vendor.Info().Shorthand == shorthand {
+				return vendor.Info().SealedMode
+			}
+		}
+		return false
+	},
 	"triple_column_start": func(i int, length int) bool {
 		return i == 0 || i == length/3 || i == length*2/3
 	},
