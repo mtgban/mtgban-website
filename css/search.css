@@ -2189,18 +2189,19 @@
 .fav-sort-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.25em;
-    padding: 0.3em 0.55em;
+    gap: 0.2em;
+    padding: 0.1em 0.45em;
     background: var(--surface-2, rgba(255,255,255,0.04));
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
-    border-radius: 0.35em;
+    border-radius: 0.25em;
     color: var(--greytext, #888);
     cursor: pointer;
     font: inherit;
+    line-height: 1;
 }
 .fav-sort-pill:hover { color: var(--text, currentColor); }
 .fav-sort-pill.active {
     color: var(--accent, #5b8def);
     border-color: var(--accent-border, rgba(91,141,239,0.35));
 }
-.fav-sort-pill i { width: 14px; height: 14px; }
+.fav-sort-pill i { width: 12px; height: 12px; }
