@@ -388,18 +388,23 @@
                                     <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                 </div>
                                 {{else}}
-                                <details class="m-vendor-row">
-                                    <summary>
-                                        <span class="m-vendor-name">{{$entry.ScraperName}}</span>
-                                        <span class="m-vendor-right">
-                                            <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
-                                            <span class="m-vendor-qty"></span>
-                                        </span>
-                                    </summary>
-                                    <div class="m-vendor-detail">
-                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
-                                    </div>
-                                </details>
+                                {{if $entry.URL}}
+                                <a class="m-vendor-row m-vendor-flat" href="{{$entry.URL}}" target="_blank" rel="nofollow">
+                                    <span class="m-vendor-name">{{$entry.ScraperName}}</span>
+                                    <span class="m-vendor-right">
+                                        <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-qty"></span>
+                                    </span>
+                                </a>
+                                {{else}}
+                                <div class="m-vendor-row m-vendor-flat">
+                                    <span class="m-vendor-name">{{$entry.ScraperName}}</span>
+                                    <span class="m-vendor-right">
+                                        <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-qty"></span>
+                                    </span>
+                                </div>
+                                {{end}}
                                 {{end}}
                             {{end}}
                         </div>
