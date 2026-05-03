@@ -58,7 +58,7 @@
         <div class="m-home-login-row">
             {{if .PatreonLogin}}
                 {{range $ref, $id := .PatreonIds}}
-                    <a class="m-home-login-btn patreon" href="javascript:window.location = 'http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=' + encodeURIComponent(window.location.href + ';{{$ref}}')">Patreon</a>
+                    <a class="m-home-login-btn patreon" href="javascript:window.location = 'http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=' + encodeURIComponent(window.location.href + ';{{$ref}}')">Login</a>
                 {{end}}
                 <a class="m-home-login-btn discord" href="/discord">Discord</a>
             {{else}}
