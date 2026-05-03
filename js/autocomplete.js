@@ -31,8 +31,9 @@ async function autocomplete(form, inp, sealed) {
         if (vv) {
             vv.addEventListener('resize', fitToViewport);
             vv.addEventListener('scroll', fitToViewport);
+        } else {
+            window.addEventListener('resize', fitToViewport);
         }
-        window.addEventListener('resize', fitToViewport);
     }
 
     function detachViewportListeners() {
@@ -42,8 +43,9 @@ async function autocomplete(form, inp, sealed) {
         if (vv) {
             vv.removeEventListener('resize', fitToViewport);
             vv.removeEventListener('scroll', fitToViewport);
+        } else {
+            window.removeEventListener('resize', fitToViewport);
         }
-        window.removeEventListener('resize', fitToViewport);
     }
 
     /* Execute a function when someone writes in the text field: */
@@ -196,7 +198,8 @@ async function autocomplete(form, inp, sealed) {
 
     /* Close all autocomplete lists in the document, except the one passed as an argument */
     function closeAllLists(elmnt) {
-        var x = document.getElementsByClassName("autocomplete-items");
+        // Snapshot the live HTMLCollection so removeChild iteration is robust
+        var x = Array.from(document.getElementsByClassName("autocomplete-items"));
         var anyRemoved = false;
         for (var i = 0; i < x.length; i++) {
             if (elmnt != x[i] && elmnt != inp) {
