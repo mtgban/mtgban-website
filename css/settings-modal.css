@@ -656,3 +656,23 @@ body.settings-open {
 .settings-field-row > .settings-inline-num {
     margin: 0;
 }
+
+/* === Settings store subgroups (Singles / Sealed) === */
+.settings-subgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+}
+
+.settings-subgroup-label {
+    margin: 0.4em 0 0.2em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--greytext, #888);
+}
+
+.settings-subgroup .settings-grid + .settings-subgroup-label {
+    margin-top: 0.9em;
+}
