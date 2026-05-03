@@ -12,10 +12,9 @@
     // ============================================================
     const PAGE_BINDINGS = {
         search: {
-            lists: {
-                'settings-search-sellers': 'SearchSellersList',
-                'settings-search-vendors': 'SearchVendorsList',
-            },
+            // Use cookieLists (not lists) so both Singles and Sealed grids are
+            // collected via data-cookie attribute rather than a single element id.
+            cookieLists: ['SearchSellersList', 'SearchVendorsList'],
             pills: {
                 'settings-search-sort': 'SearchDefaultSort',
                 'settings-search-listing': 'SearchListingPriority',
@@ -86,6 +85,35 @@
             },
             save: function () { setCookie(cookieName, readList(containerId), 1000); },
             serialize: function () { return cookieName + '=' + readList(containerId); },
+        });
+    }
+    // bindListByCookie collects checkboxes across all grids sharing a data-cookie value.
+    // Used when one logical list is split into multiple grid elements (e.g. Singles + Sealed).
+    function readListByCookie(cookieName) {
+        const grids = document.querySelectorAll('[data-cookie="' + cookieName + '"]');
+        if (!grids.length) return '';
+        const names = [];
+        grids.forEach(function (grid) {
+            grid.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+                names.push(cb.name);
+            });
+        });
+        return names.join(',') + (names.length ? ',' : '');
+    }
+    function bindListByCookie(cookieName) {
+        const grids = document.querySelectorAll('[data-cookie="' + cookieName + '"]');
+        if (!grids.length) return;
+        addBinding({
+            load: function () {
+                const items = (getCookie(cookieName) || '').split(',').filter(Boolean);
+                grids.forEach(function (grid) {
+                    grid.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+                        cb.checked = items.indexOf(cb.name) >= 0;
+                    });
+                });
+            },
+            save: function () { setCookie(cookieName, readListByCookie(cookieName), 1000); },
+            serialize: function () { return cookieName + '=' + readListByCookie(cookieName); },
         });
     }
     function bindDynamicList(containerId) {
@@ -189,6 +217,7 @@
     function autoWire() {
         Object.values(PAGE_BINDINGS).forEach(function (page) {
             Object.entries(page.lists || {}).forEach(function (e) { bindList(e[0], e[1]); });
+            (page.cookieLists || []).forEach(bindListByCookie);
             Object.entries(page.pills || {}).forEach(function (e) { bindPills(e[0], e[1]); });
             (page.selects || []).forEach(bindSelect);
             Object.entries(page.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
