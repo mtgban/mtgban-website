@@ -76,11 +76,18 @@
     }
 
     function clearRecentSearches() {
-        localStorage.removeItem(STORAGE_KEY);
-        var mobile = document.getElementById('m-recent-searches');
-        if (mobile) mobile.innerHTML = '';
-        var desktop = document.getElementById('desktop-recent-searches');
-        if (desktop) renderRecentSearchesInto(desktop, 'desktop');
+        var doClear = function() {
+            localStorage.removeItem(STORAGE_KEY);
+            var mobile = document.getElementById('m-recent-searches');
+            if (mobile) mobile.innerHTML = '';
+            var desktop = document.getElementById('desktop-recent-searches');
+            if (desktop) renderRecentSearchesInto(desktop, 'desktop');
+        };
+        if (typeof window.confirmDialog === 'function') {
+            window.confirmDialog('Clear all recent searches?', doClear);
+        } else {
+            doClear();
+        }
     }
 
     function renderRecentSearches() {

@@ -364,11 +364,18 @@
     };
 
     window.clearFavorites = function() {
-        localStorage.removeItem(STORAGE_KEY);
-        var mobile = document.getElementById('m-favorites');
-        if (mobile) mobile.innerHTML = '';
-        var desktop = document.getElementById('desktop-favorites');
-        if (desktop) renderFavoritesInto(desktop, 'desktop');
+        var doClear = function() {
+            localStorage.removeItem(STORAGE_KEY);
+            var mobile = document.getElementById('m-favorites');
+            if (mobile) mobile.innerHTML = '';
+            var desktop = document.getElementById('desktop-favorites');
+            if (desktop) renderFavoritesInto(desktop, 'desktop');
+        };
+        if (typeof window.confirmDialog === 'function') {
+            window.confirmDialog('Clear all favorites? This cannot be undone.', doClear);
+        } else {
+            doClear();
+        }
     };
 
     // Refresh stale favorites from server
