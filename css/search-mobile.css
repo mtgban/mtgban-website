@@ -777,7 +777,7 @@
     padding: 0.5em 1em 2em;
     min-height: 45vh;
     max-height: 80vh;
-    overflow: hidden;
+    overflow: visible;
     box-sizing: border-box;
 }
 
@@ -798,29 +798,9 @@
     margin: 0.5em 0 0.25em;
 }
 
-.m-filter-set-select {
-    width: 100%;
-    max-width: 100%;
-    padding: 0.5em 0.6em;
-    font-size: 0.85rem;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    background: var(--background);
-    color: var(--text);
-    min-height: 40px;
-    box-sizing: border-box;
-    margin-bottom: 0.25em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.light-theme .m-filter-set-select {
-    border-color: rgba(0, 0, 0, 0.15);
-}
-
 .m-filter-sheet-content {
     max-width: 100%;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .m-filter-pills {
