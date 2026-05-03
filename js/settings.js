@@ -118,8 +118,16 @@
     }
     function bindDynamicList(containerId) {
         const c = document.getElementById(containerId);
-        if (!c || !c.dataset.cookie) return;
-        bindList(containerId, c.dataset.cookie);
+        if (c && c.dataset.cookie) {
+            bindList(containerId, c.dataset.cookie);
+            return;
+        }
+        // Fall back to split-grid: find any grid whose id starts with containerId
+        // and read the shared data-cookie from it, then bind across all such grids.
+        const first = document.querySelector('[id^="' + containerId + '"][data-cookie]');
+        if (first && first.dataset.cookie) {
+            bindListByCookie(first.dataset.cookie);
+        }
     }
 
     // ─── Pills (radio-like, one .active at a time) ───────────────
