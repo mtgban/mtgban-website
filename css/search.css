@@ -2228,3 +2228,29 @@
 .landing-item-pin.pinned { opacity: 1; }
 .landing-item-pin:hover { color: var(--accent, #5b8def); }
 .landing-item-pin.pinned { color: var(--accent, #5b8def); }
+
+/* === Favorites sort pills === */
+.landing-pane-sort {
+    display: flex;
+    gap: 0.35em;
+    padding: 0 1em 0.6em;
+    flex-wrap: wrap;
+}
+.fav-sort-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    padding: 0.3em 0.55em;
+    background: var(--surface-2, rgba(255,255,255,0.04));
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    border-radius: 0.35em;
+    color: var(--greytext, #888);
+    cursor: pointer;
+    font: inherit;
+}
+.fav-sort-pill:hover { color: var(--text, currentColor); }
+.fav-sort-pill.active {
+    color: var(--accent, #5b8def);
+    border-color: var(--accent-border, rgba(91,141,239,0.35));
+}
+.fav-sort-pill i { width: 14px; height: 14px; }

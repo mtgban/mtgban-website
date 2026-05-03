@@ -21,6 +21,49 @@
         } catch (e) {}
     }
 
+    var SORT_KEY = 'mtgban_fav_sort';
+    var SORT_DIR_KEY = 'mtgban_fav_sort_dir';
+
+    function getSort() {
+        return localStorage.getItem(SORT_KEY) || 'chrono';
+    }
+    function getSortDir() {
+        return localStorage.getItem(SORT_DIR_KEY) || 'desc';
+    }
+    function setSort(key, dir) {
+        try {
+            localStorage.setItem(SORT_KEY, key);
+            localStorage.setItem(SORT_DIR_KEY, dir);
+        } catch (e) {}
+    }
+
+    function sortFavs(list) {
+        var key = getSort();
+        var dir = getSortDir() === 'asc' ? 1 : -1;
+        var sorted = list.slice();
+        sorted.sort(function(a, b) {
+            var av, bv;
+            switch (key) {
+                case 'alpha':
+                    av = (a.name || '').toLowerCase();
+                    bv = (b.name || '').toLowerCase();
+                    return av < bv ? -1 * dir : av > bv ? 1 * dir : 0;
+                case 'sell':
+                    av = a.sellPrice == null ? -Infinity : a.sellPrice;
+                    bv = b.sellPrice == null ? -Infinity : b.sellPrice;
+                    return (av - bv) * dir;
+                case 'buy':
+                    av = a.buyPrice == null ? -Infinity : a.buyPrice;
+                    bv = b.buyPrice == null ? -Infinity : b.buyPrice;
+                    return (av - bv) * dir;
+                case 'chrono':
+                default:
+                    return ((a.t || 0) - (b.t || 0)) * dir;
+            }
+        });
+        return sorted;
+    }
+
     function pinnedFirst(list) {
         // Stable two-pass: pinned items first (by pin time desc), unpinned after (original order)
         var pinned = [];
@@ -30,6 +73,24 @@
         });
         pinned.sort(function(a, b) { return (b.pinned || 0) - (a.pinned || 0); });
         return pinned.concat(unpinned);
+    }
+
+    function sortPillsHtml() {
+        var key = getSort();
+        var dir = getSortDir();
+        var pills = [
+            { val: 'chrono', icon: 'clock', title: 'Added' },
+            { val: 'alpha', icon: 'a-large-small', title: 'Name' },
+            { val: 'sell', icon: 'tag', title: 'Sell price' },
+            { val: 'buy', icon: 'shopping-cart', title: 'Buy price' }
+        ];
+        var html = '';
+        pills.forEach(function(p) {
+            var active = p.val === key;
+            var arrow = active ? (dir === 'asc' ? '<i data-lucide="arrow-up"></i>' : '<i data-lucide="arrow-down"></i>') : '';
+            html += '<button class="fav-sort-pill' + (active ? ' active' : '') + '" data-val="' + p.val + '" onclick="window.cycleFavSort(\'' + p.val + '\')" title="' + p.title + '"><i data-lucide="' + p.icon + '"></i>' + arrow + '</button>';
+        });
+        return html;
     }
 
     function extractCardData(btn) {
@@ -167,7 +228,7 @@
 
     function renderFavoritesInto(container, mode) {
         if (!container) return;
-        var favs = pinnedFirst(getFavorites());
+        var favs = pinnedFirst(sortFavs(getFavorites()));
 
         var containerId = container.id;
         if (!paginationState[containerId]) paginationState[containerId] = { page: 0 };
@@ -194,6 +255,7 @@
             html += '<button class="m-fav-clear" onclick="window.clearFavorites()">Clear</button>';
             html += '</span>';
             html += '</div>';
+            html += '<div class="m-fav-sort">' + sortPillsHtml() + '</div>';
             html += '<div class="m-fav-list">';
 
             favs.forEach(function(f) {
@@ -233,6 +295,7 @@
             html += '<button class="landing-pane-btn" onclick="window.clearFavorites()">Clear</button>';
             html += '</span>';
             html += '</div>';
+            html += '<div class="landing-pane-sort">' + sortPillsHtml() + '</div>';
             html += '<div class="landing-pane-body">';
             slice.forEach(function(f) {
                 html += '<a class="landing-item landing-item-fav" href="?q=' + encodeURIComponent(f.query) + '">';
@@ -282,6 +345,9 @@
             }
         }
         container.innerHTML = html;
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
+        }
     }
 
     function renderFavEmptyState() {
@@ -398,6 +464,18 @@
             saveFavorites(favs);
             renderFavorites();
         }
+    };
+
+    window.cycleFavSort = function(val) {
+        var current = getSort();
+        var dir = getSortDir();
+        if (val === current) {
+            dir = dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            dir = 'desc';
+        }
+        setSort(val, dir);
+        renderFavorites();
     };
 
     window.clearFavorites = function() {

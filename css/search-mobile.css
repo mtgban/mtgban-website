@@ -2134,3 +2134,22 @@
     cursor: pointer;
 }
 .m-fav-pin.pinned { color: var(--accent, #5b8def); }
+
+.m-fav-sort {
+    display: flex;
+    gap: 0.35em;
+    padding: 0.3em 0.6em 0.6em;
+    flex-wrap: wrap;
+}
+.m-fav-sort .fav-sort-pill {
+    padding: 0.4em 0.6em;
+    background: var(--surface-2, rgba(255,255,255,0.04));
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    border-radius: 0.35em;
+    color: var(--greytext, #888);
+    font: inherit;
+}
+.m-fav-sort .fav-sort-pill.active {
+    color: var(--accent, #5b8def);
+    border-color: var(--accent-border, rgba(91,141,239,0.35));
+}
