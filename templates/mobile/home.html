@@ -22,7 +22,7 @@
         <form class="autocomplete" action="search" autocomplete="off" spellcheck="false" id="searchform">
             <input id="searchbox" class="m-search-input" type="text" name="q"
                    placeholder="Search for a card or product..."
-                   maxlength="1000" autofocus autocapitalize="none"
+                   maxlength="1000" autofocus autocapitalize="none" autocorrect="off" spellcheck="false"
                    onFocus="this.setSelectionRange(0, this.value.length)">
         </form>
         <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
@@ -57,7 +57,7 @@
         <div class="m-home-login-row">
             {{if .PatreonLogin}}
                 {{range $ref, $id := .PatreonIds}}
-                    <a class="m-home-login-btn patreon" href="javascript:window.location = 'http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=' + encodeURIComponent(window.location.href + ';{{$ref}}')">Patreon</a>
+                    <a class="m-home-login-btn patreon" href="javascript:window.location = 'http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=' + encodeURIComponent(window.location.href + ';{{$ref}}')">Login</a>
                 {{end}}
                 <a class="m-home-login-btn discord" href="/discord">Discord</a>
             {{else}}

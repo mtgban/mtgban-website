@@ -47,6 +47,16 @@
         }
     }
 
+    function pinnedFirst(list) {
+        var pinned = [];
+        var unpinned = [];
+        list.forEach(function(item) {
+            if (item.pinned) pinned.push(item); else unpinned.push(item);
+        });
+        pinned.sort(function(a, b) { return (b.pinned || 0) - (a.pinned || 0); });
+        return pinned.concat(unpinned);
+    }
+
     function addSearch(query) {
         query = query.trim();
         if (!query || query.length < 2) return;
@@ -76,11 +86,18 @@
     }
 
     function clearRecentSearches() {
-        localStorage.removeItem(STORAGE_KEY);
-        var mobile = document.getElementById('m-recent-searches');
-        if (mobile) mobile.innerHTML = '';
-        var desktop = document.getElementById('desktop-recent-searches');
-        if (desktop) renderRecentSearchesInto(desktop, 'desktop');
+        var doClear = function() {
+            localStorage.removeItem(STORAGE_KEY);
+            var mobile = document.getElementById('m-recent-searches');
+            if (mobile) mobile.innerHTML = '';
+            var desktop = document.getElementById('desktop-recent-searches');
+            if (desktop) renderRecentSearchesInto(desktop, 'desktop');
+        };
+        if (typeof window.confirmDialog === 'function') {
+            window.confirmDialog('Clear all recent searches?', doClear);
+        } else {
+            doClear();
+        }
     }
 
     function renderRecentSearches() {
@@ -90,7 +107,7 @@
 
     function renderRecentSearchesInto(container, mode) {
         if (!container) return;
-        var searches = getRecentSearches();
+        var searches = pinnedFirst(getRecentSearches());
 
         if (searches.length === 0) {
             if (mode === 'desktop') {
@@ -141,6 +158,9 @@
                 html += '<div class="landing-item-info">';
                 html += '<span class="landing-item-query">' + escapeHtml(s.q) + '</span>';
                 html += '</div>';
+                html += '<button class="landing-item-pin' + (s.pinned ? ' pinned' : '') + '" data-q="' + escapeAttr(s.q) + '" onclick="window.toggleRecentPin(this.dataset.q, event)" title="' + (s.pinned ? 'Unpin' : 'Pin to top') + '">';
+                html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="' + (s.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
+                html += '</button>';
                 html += '<button class="landing-item-delete" data-q="' + escapeAttr(s.q) + '" onclick="window.deleteRecentSearch(this.dataset.q, event)" title="Remove from recent searches">';
                 html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
                 html += '</button>';
@@ -168,6 +188,28 @@
         var searches = getRecentSearches().filter(function(s) { return s.q !== query; });
         saveRecentSearches(searches);
         renderRecentSearches();
+    };
+
+    window.toggleRecentPin = function(query, ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        if (!query) return;
+        var searches = getRecentSearches();
+        var changed = false;
+        for (var i = 0; i < searches.length; i++) {
+            if (searches[i].q === query) {
+                if (searches[i].pinned) {
+                    delete searches[i].pinned;
+                } else {
+                    searches[i].pinned = Date.now();
+                }
+                changed = true;
+                break;
+            }
+        }
+        if (changed) {
+            saveRecentSearches(searches);
+            renderRecentSearches();
+        }
     };
 
     // Record search on form submit

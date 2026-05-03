@@ -18,6 +18,7 @@
     {{end}}
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
@@ -46,7 +47,7 @@
 <div class="m-page">
     <div class="m-search-wrap">
         <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
-            <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a {{if .IsSealed}}product{{else}}card{{end}}..." value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
+            <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a {{if .IsSealed}}product{{else}}card{{end}}..." value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none" autocorrect="off" spellcheck="false">
         </form>
         <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
     </div>
@@ -73,7 +74,7 @@
     <div class="m-search-bar-sticky">
         <div class="m-search-wrap">
             <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
-                <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a product..." value="" maxlength="1000" autofocus autocapitalize="none">
+                <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search for a product..." value="" maxlength="1000" autofocus autocapitalize="none" autocorrect="off" spellcheck="false">
             </form>
             <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
             <button class="m-search-btn m-filter-btn" type="button" title="Jump to category" onclick="document.getElementById('m-sealed-cat-overlay').classList.add('open'); document.getElementById('m-sealed-cat-sheet').classList.add('open');"><i data-lucide="sliders-horizontal"></i></button>
@@ -137,7 +138,7 @@
     <div class="m-search-bar-sticky">
         <div class="m-search-wrap">
             <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
-                <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search..." value="{{.SearchQuery}}" maxlength="1000" autocapitalize="none">
+                <input id="searchbox" class="m-search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Search..." value="{{.SearchQuery}}" maxlength="1000" autocapitalize="none" autocorrect="off" spellcheck="false">
             </form>
             <button class="m-search-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
             <button class="m-search-btn m-filter-btn" type="button" title="Filters" onclick="document.getElementById('m-filter-overlay').classList.add('open'); document.getElementById('m-filter-sheet').classList.add('open');"><i data-lucide="sliders-horizontal"></i></button>
@@ -286,18 +287,15 @@
                                     <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                 </div>
                                 {{else}}
-                                <details class="m-vendor-row">
-                                    <summary>
-                                        <span class="m-vendor-name">{{$entry.ScraperName}}</span>
-                                        <span class="m-vendor-right">
-                                            <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
-                                            <span class="m-vendor-qty"></span>
-                                        </span>
-                                    </summary>
-                                    <div class="m-vendor-detail">
-                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
-                                    </div>
-                                </details>
+                                <div class="m-vendor-row m-vendor-flat">
+                                    <span class="m-vendor-name">
+                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
+                                    </span>
+                                    <span class="m-vendor-right">
+                                        <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-qty"></span>
+                                    </span>
+                                </div>
                                 {{end}}
                             {{end}}
                         </div>
@@ -310,15 +308,18 @@
                                     <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                 </div>
                                 {{else}}
+                                {{$hasDetail := $entry.Credit}}
+                                {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
                                         <span class="m-vendor-name">
-                                            {{$entry.ScraperName}} {{$entry.Country}}
+                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
                                             <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
                                             <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{end}}</span>
+                                            <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
                                     </summary>
                                     <div class="m-vendor-detail">
@@ -328,9 +329,20 @@
                                             <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.Credit}}</span><span class="m-vendor-qty"></span></span>
                                         </div>
                                         {{end}}
-                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
                                     </div>
                                 </details>
+                                {{else}}
+                                <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
+                                    <span class="m-vendor-name">
+                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
+                                        {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
+                                    </span>
+                                    <span class="m-vendor-right">
+                                        <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-qty">{{if and (not $entry.NoQuantity) (not (eq $entry.Quantity 0))}}{{$entry.Quantity}}{{end}}</span>
+                                    </span>
+                                </div>
+                                {{end}}
                                 {{end}}
                             {{end}}
                         </div>
@@ -356,18 +368,15 @@
                                     <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                 </div>
                                 {{else}}
-                                <details class="m-vendor-row">
-                                    <summary>
-                                        <span class="m-vendor-name">{{$entry.ScraperName}}</span>
-                                        <span class="m-vendor-right">
-                                            <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
-                                            <span class="m-vendor-qty"></span>
-                                        </span>
-                                    </summary>
-                                    <div class="m-vendor-detail">
-                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
-                                    </div>
-                                </details>
+                                <div class="m-vendor-row m-vendor-flat">
+                                    <span class="m-vendor-name">
+                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
+                                    </span>
+                                    <span class="m-vendor-right">
+                                        <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-qty"></span>
+                                    </span>
+                                </div>
                                 {{end}}
                             {{end}}
                         </div>
@@ -380,16 +389,19 @@
                                     <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                 </div>
                                 {{else}}
+                                {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM"))}}
+                                {{if $hasDetail}}
                                 <details class="m-vendor-row{{if eq $ei 0}} m-best-price{{end}}">
                                     <summary>
                                         <span class="m-vendor-name">
-                                            {{$entry.ScraperName}} {{$entry.Country}}
+                                            {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow" onclick="event.stopPropagation()">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
                                             {{if eq $entry.Shorthand $card.HotlistStore}} <span class="m-hot">&#127775;</span>{{end}}
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
                                             <span class="m-vendor-price">$ {{printf "%.2f" $entry.Price}}</span>
                                             <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
+                                            <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
                                     </summary>
                                     <div class="m-vendor-detail">
@@ -411,9 +423,21 @@
                                             <span class="m-vendor-right"><span class="m-vendor-price">$ {{printf "%.2f" $entry.MarketCredit}}</span><span class="m-vendor-qty"></span></span>
                                         </div>
                                         {{end}}
-                                        {{if $entry.URL}}<a class="m-detail-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">View at store</a>{{end}}
                                     </div>
                                 </details>
+                                {{else}}
+                                <div class="m-vendor-row m-vendor-flat{{if eq $ei 0}} m-best-price{{end}}">
+                                    <span class="m-vendor-name">
+                                        {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}} {{$entry.Country}}</a>{{else}}{{$entry.ScraperName}} {{$entry.Country}}{{end}}
+                                        {{if eq $entry.Shorthand $card.HotlistStore}} <span class="m-hot">&#127775;</span>{{end}}
+                                        {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
+                                    </span>
+                                    <span class="m-vendor-right">
+                                        <span class="m-vendor-price">$ {{printf "%.2f" $entry.Price}}</span>
+                                        <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
+                                    </span>
+                                </div>
+                                {{end}}
                                 {{end}}
                             {{end}}
                         </div>
@@ -422,6 +446,12 @@
                 {{end}}
             </div>
             {{end}}
+        </div>
+    {{else}}
+        <div class="m-no-results">
+            <i data-lucide="search-x" class="m-no-results-icon"></i>
+            <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
+            <p class="m-no-results-hint">Try a broader search or check spelling.</p>
         </div>
     {{end}}
 
@@ -565,11 +595,27 @@
                         <button type="button" onclick="mSettingsBulk('m-set-sellers', false)">Clear</button>
                         <button type="button" onclick="mSettingsBulk('m-set-sellers', true)">Select All</button>
                     </div>
+                    {{$keys := .SellerKeys}}
+                    {{$hasSingles := false}}
+                    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{$hasSealed := false}}
+                    {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{if $hasSingles}}
+                    <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $i, $key := .SellerKeys}}
+                        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-                        {{end}}
+                        {{end}}{{end}}
                     </div>
+                    {{end}}
+                    {{if $hasSealed}}
+                    <h5 class="m-settings-subgroup-label">Sealed</h5>
+                    <div class="m-settings-checks">
+                        {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{end}}{{end}}
+                    </div>
+                    {{end}}
                 </div>
             </div>
 
@@ -584,11 +630,27 @@
                         <button type="button" onclick="mSettingsBulk('m-set-vendors', false)">Clear</button>
                         <button type="button" onclick="mSettingsBulk('m-set-vendors', true)">Select All</button>
                     </div>
+                    {{$keys := .VendorKeys}}
+                    {{$hasSingles := false}}
+                    {{range $k := $keys}}{{if not (is_sealed_scraper $k)}}{{$hasSingles = true}}{{end}}{{end}}
+                    {{$hasSealed := false}}
+                    {{range $k := $keys}}{{if (is_sealed_scraper $k)}}{{$hasSealed = true}}{{end}}{{end}}
+                    {{if $hasSingles}}
+                    <h5 class="m-settings-subgroup-label">Singles</h5>
                     <div class="m-settings-checks">
-                        {{range $i, $key := .VendorKeys}}
+                        {{range $key := $keys}}{{if not (is_sealed_scraper $key)}}
                         <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-                        {{end}}
+                        {{end}}{{end}}
                     </div>
+                    {{end}}
+                    {{if $hasSealed}}
+                    <h5 class="m-settings-subgroup-label">Sealed</h5>
+                    <div class="m-settings-checks">
+                        {{range $key := $keys}}{{if (is_sealed_scraper $key)}}
+                        <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
+                        {{end}}{{end}}
+                    </div>
+                    {{end}}
                 </div>
             </div>
 

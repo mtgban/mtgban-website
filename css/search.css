@@ -1634,11 +1634,10 @@
     border-radius: 0.5em;
     background: var(--surface-2);
     padding: 0.6em;
-    transition: border-color 150ms, transform 150ms, box-shadow 150ms;
+    transition: border-color 150ms, box-shadow 150ms;
 }
 .landing-pane-favorites .landing-item-fav:hover {
     border-color: var(--accent-border, rgba(91,141,239,0.25));
-    transform: translateY(-2px);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 
@@ -2153,3 +2152,56 @@
 .result-quick-icons .fav-btn.active svg {
     fill: var(--darkeryellow, gold);
 }
+
+/* === Pin button on landing items === */
+.landing-item-pin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    padding: 0.3em;
+    background: transparent;
+    border: 0;
+    color: var(--greytext, #888);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 120ms, color 120ms;
+}
+.landing-item:hover .landing-item-pin,
+.landing-item-pin.pinned { opacity: 1; }
+.landing-item-pin:hover { color: var(--accent, #5b8def); }
+.landing-item-pin.pinned { color: var(--accent, #5b8def); }
+
+/* Pin sits left of the trash button on favorite tiles (both absolutely positioned) */
+.landing-pane-favorites .landing-item-fav .landing-item-pin {
+    position: absolute;
+    top: 0.35em;
+    right: 2.2em;
+}
+
+/* === Favorites sort pills (inline in pane header next to action buttons) === */
+.landing-pane-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    margin-right: 0.25em;
+}
+.fav-sort-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2em;
+    padding: 0.1em 0.45em;
+    background: var(--surface-2, rgba(255,255,255,0.04));
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    border-radius: 0.25em;
+    color: var(--greytext, #888);
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+}
+.fav-sort-pill:hover { color: var(--text, currentColor); }
+.fav-sort-pill.active {
+    color: var(--accent, #5b8def);
+    border-color: var(--accent-border, rgba(91,141,239,0.35));
+}
+.fav-sort-pill i { width: 12px; height: 12px; }
