@@ -124,6 +124,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	for _, vendor := range Vendors {
 		pageVars.VendorKeys = append(pageVars.VendorKeys, vendor.Info().Shorthand)
 	}
+	pageVars.SellerKeys = sortKeysByScraperName(pageVars.SellerKeys)
+	pageVars.VendorKeys = sortKeysByScraperName(pageVars.VendorKeys)
 
 	page := r.FormValue("page")
 	if page == "options" {

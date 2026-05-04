@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -908,6 +909,17 @@ func scraperName(shorthand string) string {
 		}
 	}
 	return ""
+}
+
+// sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
+// by their resolved display name (case-insensitive). Stable for equal names.
+func sortKeysByScraperName(keys []string) []string {
+	out := make([]string, len(keys))
+	copy(out, keys)
+	sort.SliceStable(out, func(i, j int) bool {
+		return strings.ToLower(scraperName(out[i])) < strings.ToLower(scraperName(out[j]))
+	})
+	return out
 }
 
 // Special function to detect if the input price is bigger than

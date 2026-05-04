@@ -592,24 +592,6 @@
     color: var(--text-dim);
 }
 
-.settings-grid label .scraper-tag {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 0.4em;
-    padding: 0.25em 0.55em;
-    font-size: 0.72em;
-    font-weight: 600;
-    line-height: 1;
-    vertical-align: 0.1em;
-    border-radius: 999px;
-    border: 1px solid color-mix(in srgb, var(--settings-blue) 45%, transparent);
-    color: var(--normal);
-    background: color-mix(in srgb, var(--settings-blue) 18%, transparent);
-    white-space: nowrap;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-}
-
 /* Reserve the scrollbar gutter so the page doesn't shift when settings opens */
 html {
     scrollbar-gutter: stable;
@@ -655,4 +637,56 @@ body.settings-open {
 }
 .settings-field-row > .settings-inline-num {
     margin: 0;
+}
+
+/* === Settings store subgroups (Singles / Sealed) === */
+.settings-subgroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+}
+
+.settings-subgroup-label {
+    margin: 0.4em 0 0.2em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--greytext, #888);
+}
+
+.settings-subgroup .settings-grid + .settings-subgroup-label {
+    margin-top: 0.9em;
+}
+
+/* === Stores section: row-aligned Singles/Sealed across Retail+Buylist columns === */
+.settings-stores-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.5em;
+    row-gap: 0;
+    align-items: start;
+}
+
+.settings-stores-col-label {
+    margin: 0 0 0.4em;
+}
+
+.settings-stores-row-label {
+    grid-column: 1 / -1;
+    margin: 0.6em 0 0.3em;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--greytext, #888);
+}
+
+.settings-stores-layout > .settings-grid {
+    margin-bottom: 0.4em;
+}
+
+@media (max-width: 720px) {
+    .settings-stores-layout { grid-template-columns: 1fr; }
+    .settings-stores-row-label { grid-column: 1 / -1; }
 }
