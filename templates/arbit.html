@@ -564,11 +564,7 @@
     </div>
     <div class="settings-section-body">
         <p class="section-desc">Checked vendors will be <strong>hidden</strong> from results.</p>
-        <div class="settings-grid" id="settings-arbit-vendors" data-cookie="{{$cookieName}}">
-            {{range $key := .VendorKeys}}
-                <label><input type="checkbox" name="{{$key}}"> {{scraper_name $key}}</label>
-            {{end}}
-        </div>
+        {{template "settings-stores-grouped" (dict "Keys" .VendorKeys "GridId" "settings-arbit-vendors" "CookieName" $cookieName)}}
     </div>
 </section>
 {{end}}
