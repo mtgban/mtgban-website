@@ -1430,11 +1430,7 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	if deckID == "" {
 		return nil, errors.New("invalid Moxfield deck URL")
 	}
-	base := "moxdeck"
-	if strings.Contains(link, "/binders/") {
-		base = "moxcollection"
-	}
-	moxURL := fmt.Sprintf("%s/%s", Config.Uploader[base], deckID)
+	moxURL := fmt.Sprintf("%s%s", Config.Uploader["moxfield"], link)
 
 	items, err := moxfield.Load(ctx, moxURL, maxRows)
 	if err != nil {
