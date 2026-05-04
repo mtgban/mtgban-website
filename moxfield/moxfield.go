@@ -192,7 +192,7 @@ func getMoxCollection(ctx context.Context, collectionURL string, maxRows int) ([
 }
 
 func Load(ctx context.Context, link string, maxRows int) ([]Item, error) {
-	if strings.Contains(link, "/collection/") {
+	if !strings.Contains(link, "/decks/") {
 		return getMoxCollection(ctx, link, maxRows)
 	}
 
