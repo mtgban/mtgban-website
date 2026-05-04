@@ -2204,4 +2204,5 @@
     color: var(--accent, #5b8def);
     border-color: var(--accent-border, rgba(91,141,239,0.35));
 }
-.fav-sort-pill i { width: 12px; height: 12px; }
+.fav-sort-pill i,
+.fav-sort-pill svg { width: 12px; height: 12px; }
