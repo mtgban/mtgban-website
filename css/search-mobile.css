@@ -1153,8 +1153,13 @@
     gap: 0.4em;
 }
 
-.m-fav-item-top .m-badge {
+/* Chip slot is always rendered (may be empty) and pushed to the right edge of the
+   top row, so the pin button that follows it is anchored consistently. */
+.m-fav-item-top .m-fav-chips {
     margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3em;
 }
 
 .m-fav-thumb {
@@ -2248,24 +2253,37 @@
     border: 0;
     color: var(--greytext, #888);
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 .m-fav-pin.pinned { color: var(--accent, #5b8def); }
 
 .m-fav-sort {
-    display: flex;
-    gap: 0.35em;
-    padding: 0.3em 0.6em 0.6em;
-    flex-wrap: wrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    margin-right: 0.15em;
 }
 .m-fav-sort .fav-sort-pill {
-    padding: 0.4em 0.6em;
-    background: var(--surface-2, rgba(255,255,255,0.04));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
-    border-radius: 0.35em;
-    color: var(--greytext, #888);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15em;
+    padding: 0.3em 0.4em;
+    background: none;
+    border: none;
+    color: var(--greytext);
+    cursor: pointer;
     font: inherit;
+    line-height: 1;
+    min-height: auto;
+}
+.m-fav-sort .fav-sort-pill:active {
+    color: var(--dodgerblue);
 }
 .m-fav-sort .fav-sort-pill.active {
-    color: var(--accent, #5b8def);
-    border-color: var(--accent-border, rgba(91,141,239,0.35));
+    color: var(--dodgerblue);
 }
+.m-fav-sort .fav-sort-pill i,
+.m-fav-sort .fav-sort-pill svg { width: 16px; height: 16px; }
