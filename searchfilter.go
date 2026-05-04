@@ -448,6 +448,7 @@ var FilterOperations = map[string][]string{
 	"skip":      []string{":"},
 	"sort":      []string{":"},
 	"edition":   []string{":"},
+	"set":       []string{":"},
 	"e":         []string{":"},
 	"s":         []string{":"},
 	"se":        []string{":"},
@@ -679,7 +680,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				// but remove any possible containing characters on the sides
 				Values: []string{strings.Trim(code, "\"()")},
 			})
-		case "s", "edition", "e":
+		case "s", "set", "edition", "e":
 			filters = append(filters, FilterElem{
 				Name:   "edition",
 				Negate: negate,
