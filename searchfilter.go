@@ -487,6 +487,8 @@ var FilterOperations = map[string][]string{
 	"seller":    []string{":"},
 	"vendor":    []string{":"},
 	"region":    []string{":"},
+	"quantity":  []string{">", "<"},
+	"qty":       []string{">", "<"},
 }
 
 func init() {
@@ -898,7 +900,26 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			filterPost = append(filterPost, FilterPostElem{
 				Name: "empty",
 			})
+
 		// Pricing Options
+		case "quantity", "qty":
+			var optName string
+			if operation == ">" {
+				optName = "qty_greater_than"
+			} else if operation == "<" {
+				optName = "qty_less_than"
+			}
+			filterEntries = append(filterEntries, FilterEntryElem{
+				Name:   optName,
+				Negate: negate,
+				Values: []string{code},
+			})
+
+			// Remove any empty entry if no results
+			filterPost = append(filterPost, FilterPostElem{
+				Name: "empty",
+			})
+
 		case "cond", "condr", "condb":
 			opt := "condition"
 			if operation == ">" {
@@ -1996,6 +2017,22 @@ var FilterEntryFuncs = map[string]func(filters []string, entry mtgban.GenericEnt
 		}
 		return condIndex <= conditionMap[entry.Condition()]
 	},
+
+	"qty_greater_than": func(filters []string, entry mtgban.GenericEntry) bool {
+		if entry.Qty() == 0 {
+			return true
+		}
+		num, _ := strconv.Atoi(filters[0])
+		return num >= entry.Qty()
+	},
+	"qty_less_than": func(filters []string, entry mtgban.GenericEntry) bool {
+		if entry.Qty() == 0 {
+			return true
+		}
+		num, _ := strconv.Atoi(filters[0])
+		return num <= entry.Qty()
+	},
+
 	"ratio_greater_than": func(filters []string, entry mtgban.GenericEntry) bool {
 		buylist, ok := entry.(mtgban.BuylistEntry)
 		if !ok || buylist.PriceRatio == 0 {
