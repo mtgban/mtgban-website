@@ -368,10 +368,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if len(hashes) != 0 {
 		log.Printf("Loading from POST %d cards", len(hashes))
 		pageVars.CardHashes = hashes
-	} else if gdocURL != "" {
-		log.Printf("Loading spreadsheet: %+v", gdocURL)
 	} else if textArea != "" {
 		log.Printf("Loading freeform text area (%d bytes)", len(textArea))
+	} else if gdocURL != "" {
+		log.Printf("Loading spreadsheet: %+v", gdocURL)
 	} else {
 		log.Printf("Uploaded File: %+v", handler.Filename)
 		log.Printf("File Size: %+v bytes", handler.Size)
