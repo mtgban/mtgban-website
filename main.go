@@ -459,12 +459,12 @@ var ConfigBucket simplecloud.ReadWriter
 var ServerURL string
 
 const (
-	DefaultConfigPort = "8080"
-	DefaultConfigPath = "config.json"
-	DefaultSecret     = "NotVerySecret!"
-	DefaultGame       = "magic"
-	DefaultServerURL  = "http://www.mtgban.com"
-	DefaultDSPath     = "AllPrintings.json.xz"
+	DefaultServerPort    = "8080"
+	DefaultConfigPath    = "config.json"
+	DefaultSecret        = "NotVerySecret!"
+	DefaultGame          = "magic"
+	DefaultServerURL     = "http://www.mtgban.com"
+	DefaultDatastorePath = "AllPrintings.json.xz"
 
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
@@ -626,9 +626,9 @@ func preloadConfig(configPath string) error {
 
 func loadVars(port, datastorePath, offlineKey string) error {
 	// Preload
-	Config.Port = DefaultConfigPort
+	Config.Port = port
 	Config.Game = DefaultGame
-	Config.DatastorePath = DefaultDSPath
+	Config.DatastorePath = DefaultDatastorePath
 	Config.OfflineKey = offlineKey
 
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
@@ -643,24 +643,18 @@ func loadVars(port, datastorePath, offlineKey string) error {
 		return err
 	}
 
-	// Load from command line
-	if port != "" {
-		Config.Port = port
-	}
+	// Ensure needed defaults
 	if Config.Port == "" {
-		Config.Port = DefaultConfigPort
+		log.Println("Server port not configured, listening on", DefaultServerPort)
+		Config.Port = DefaultServerPort
 	}
-
-	// Ensure default
 	if Config.Game == "" {
+		log.Println("Game not configured, defaulting to", DefaultGame)
 		Config.Game = DefaultGame
 	}
-
-	if datastorePath != "" {
-		Config.DatastorePath = datastorePath
-	}
 	if Config.DatastorePath == "" {
-		return errors.New("missing datastore configuration")
+		log.Println("Datastore path not configured, using", DefaultDatastorePath)
+		Config.DatastorePath = DefaultDatastorePath
 	}
 
 	// Load from env
@@ -793,8 +787,8 @@ func loadDatastore(ds string) error {
 
 func main() {
 	configFilePath := flag.String("cfg", "", "Load configuration file")
-	port := flag.String("port", "", "Override server port")
-	datastore := flag.String("ds", "", "Override datastore path")
+	port := flag.String("port", DefaultServerPort, "Override server port")
+	datastore := flag.String("ds", DefaultDatastorePath, "Override datastore path")
 
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
