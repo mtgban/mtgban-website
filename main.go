@@ -436,6 +436,7 @@ type ConfigType struct {
 var DevMode bool
 var SigCheck bool
 var SkipPrices bool
+var SkipNewspaper bool
 var LogDir string
 
 var LastDatastoreUpdate time.Time
@@ -778,6 +779,7 @@ func main() {
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
+	flag.BoolVar(&SkipNewspaper, "nonews", false, "Do not load newspaper data")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 	offline := flag.String("offline", "", "API key to run in offline mode")
 
