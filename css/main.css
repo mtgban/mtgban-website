@@ -1670,52 +1670,74 @@ table.tiers td div {
     align-items: center;
     justify-content: center;
 }
+/* Anchored mode: scope overlay to the parent element (passed as opts.anchor). */
+.ban-confirm-dialog-host.anchored {
+    position: absolute;
+    z-index: 5;
+}
 
 .ban-confirm-backdrop {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(2px);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+.ban-confirm-dialog-host.anchored .ban-confirm-backdrop {
+    border-radius: inherit;
 }
 
 .ban-confirm-modal {
     position: relative;
-    max-width: 22em;
-    width: calc(100% - 2em);
-    padding: 1.25em 1.4em;
-    background: var(--surface-1, #181a22);
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
-    border-radius: 0.6em;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+    max-width: 24em;
+    width: calc(100% - 3em);
+    padding: 1.25em 1.3em 1.15em;
+    background: rgba(24, 26, 34, 0.72);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 0.75em;
+    box-shadow:
+        0 18px 52px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
     color: var(--text, currentColor);
+    text-align: center;
 }
 
 .ban-confirm-message {
-    margin: 0 0 1em;
-    font-size: 0.95rem;
-    line-height: 1.4;
+    margin: 0 0 1.2em;
+    font-size: 1rem;
+    line-height: 1.45;
 }
 
 .ban-confirm-actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 0.5em;
+    justify-content: center;
+    gap: 0.6em;
 }
 
 .ban-confirm-btn {
     padding: 0.5em 0.95em;
-    border-radius: 0.35em;
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
-    background: var(--surface-2, rgba(255,255,255,0.04));
+    border-radius: 0.4em;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
     color: var(--text, currentColor);
     font: inherit;
+    white-space: nowrap;
     cursor: pointer;
+    transition: border-color 0.12s ease, background 0.12s ease;
 }
-.ban-confirm-btn:hover { border-color: var(--accent-border, rgba(91,141,239,0.35)); }
+.ban-confirm-btn:hover {
+    border-color: var(--accent-border, rgba(91, 141, 239, 0.45));
+    background: rgba(255, 255, 255, 0.1);
+}
 
 .ban-confirm-btn-danger {
     background: #c0392b;
-    border-color: #c0392b;
+    border-color: rgba(255, 255, 255, 0.22);
     color: #fff;
 }
-.ban-confirm-btn-danger:hover { background: #e74c3c; border-color: #e74c3c; }
+.ban-confirm-btn-danger:hover {
+    background: #e74c3c;
+    border-color: rgba(255, 255, 255, 0.32);
+}

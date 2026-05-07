@@ -85,7 +85,7 @@
         saveRecentSearches(searches);
     }
 
-    function clearRecentSearches() {
+    function clearRecentSearches(trigger) {
         var doClear = function() {
             localStorage.removeItem(STORAGE_KEY);
             var mobile = document.getElementById('m-recent-searches');
@@ -94,7 +94,8 @@
             if (desktop) renderRecentSearchesInto(desktop, 'desktop');
         };
         if (typeof window.confirmDialog === 'function') {
-            window.confirmDialog('Clear all recent searches?', doClear);
+            var anchor = trigger && trigger.closest ? trigger.closest('#desktop-recent-searches') : null;
+            window.confirmDialog('Clear all recent searches?', doClear, { anchor: anchor });
         } else {
             doClear();
         }
@@ -122,7 +123,7 @@
         if (mode === 'mobile') {
             html += '<div class="m-recent-header">';
             html += '<span class="m-recent-title">Recent Searches</span>';
-            html += '<button class="m-recent-clear" onclick="window.clearRecentSearches()">Clear</button>';
+            html += '<button class="m-recent-clear" onclick="window.clearRecentSearches(this)">Clear</button>';
             html += '</div>';
             html += '<div class="m-recent-list">';
             searches.forEach(function(s) {
@@ -137,7 +138,7 @@
             html += '<div class="landing-pane-header">';
             html += '<span class="landing-pane-title">Recent Searches</span>';
             html += '<span class="landing-pane-actions">';
-            html += '<button class="landing-pane-btn" onclick="window.clearRecentSearches()">Clear</button>';
+            html += '<button class="landing-pane-btn" onclick="window.clearRecentSearches(this)">Clear</button>';
             html += '</span>';
             html += '</div>';
             html += '<div class="landing-pane-body">';
