@@ -253,7 +253,7 @@
             html += '<span class="m-fav-actions">';
             html += '<span class="m-fav-sort">' + sortPillsHtml() + '</span>';
             html += '<button class="m-fav-refresh" onclick="window.manualRefreshFavorites()" title="Refresh prices"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg></button>';
-            html += '<button class="m-fav-clear" onclick="window.clearFavorites()">Clear</button>';
+            html += '<button class="m-fav-clear" onclick="window.clearFavorites(this)">Clear</button>';
             html += '</span>';
             html += '</div>';
             html += '<div class="m-fav-list">';
@@ -295,7 +295,7 @@
             html += '<span class="landing-pane-actions">';
             html += '<span class="landing-pane-sort">' + sortPillsHtml() + '</span>';
             html += '<button class="landing-pane-btn" onclick="window.manualRefreshFavorites()" title="Update prices">Update Prices</button>';
-            html += '<button class="landing-pane-btn" onclick="window.clearFavorites()">Clear</button>';
+            html += '<button class="landing-pane-btn" onclick="window.clearFavorites(this)">Clear</button>';
             html += '</span>';
             html += '</div>';
             html += '<div class="landing-pane-body">';
@@ -480,7 +480,7 @@
         renderFavorites();
     };
 
-    window.clearFavorites = function() {
+    window.clearFavorites = function(trigger) {
         var doClear = function() {
             localStorage.removeItem(STORAGE_KEY);
             var mobile = document.getElementById('m-favorites');
@@ -489,7 +489,8 @@
             if (desktop) renderFavoritesInto(desktop, 'desktop');
         };
         if (typeof window.confirmDialog === 'function') {
-            window.confirmDialog('Clear all favorites? This cannot be undone.', doClear);
+            var anchor = trigger && trigger.closest ? trigger.closest('#desktop-favorites') : null;
+            window.confirmDialog('Clear all favorites? This cannot be undone.', doClear, { anchor: anchor });
         } else {
             doClear();
         }
