@@ -124,21 +124,6 @@
 {{end}}
 
 {{define "search-sealed"}}
-            <div class="search-bar-wrap" style="display:none">
-                <div class="search-input-row">
-                    <form class="search autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
-                        <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
-                    </form>
-                    <div class="search-actions">
-                <button class="search-action-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
-                <a class="search-action-btn" href="/random{{if .IsSealed}}sealed{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
-            </div>
-                </div>
-            </div>
-            <script type="text/javascript">
-                autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
-            </script>
-
         <div class="sealed-layout">
             <div class="sealed-toc" id="sealed-toc">
                 <div class="sealed-toc-title">Categories</div>
@@ -153,10 +138,15 @@
                 <h1>Sealed Products</h1>
 
                 <div class="sealed-toolbar">
-                    <input class="sealed-search" type="text" placeholder="Search for a product...">
+                    <form class="sealed-search-form autocomplete" id="searchform" action="/sealed" method="get" autocomplete="off" spellcheck="false">
+                        <input id="searchbox" class="sealed-search" type="text" name="q" placeholder="Search for a product..." autocomplete="off" autocapitalize="none" maxlength="1000">
+                    </form>
                     <a id="sealed-surprise" href="#">Surprise Me</a>
                     <a href="/guide#faq">F.A.Q.</a>
                 </div>
+                <script type="text/javascript">
+                    autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
+                </script>
 
                 {{range $key := .EditionSort}}
                     {{$editionList := index $.EditionList $key}}
