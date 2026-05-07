@@ -102,7 +102,7 @@
                         </div>
 
                         <div class="upload-source-area upload-source-hidden" id="source-text">
-                            <textarea id="textArea" name="textArea" rows="1" placeholder="Paste card list or decklist here..."></textarea>
+                            <textarea id="textArea" name="textArea" rows="10" placeholder="Paste card list or decklist here..." oninput="autoGrowTextArea(this)"></textarea>
                         </div>
                     {{end}}
                 </div>
@@ -325,6 +325,11 @@
                         })
                     }
                 }
+            };
+
+            window.autoGrowTextArea = function(el) {
+                el.style.height = 'auto';
+                el.style.height = el.scrollHeight + 'px';
             };
 
             window.selectSource = function(type) {
