@@ -961,8 +961,8 @@
 .ures-error-row { opacity: 0.5; }
 .ures-not-found { color: var(--adanger); font-style: italic; }
 .ures-alias-row {
-    background: rgb(207, 154, 0) !important;
-    border-left: 3px solid rgba(234, 179, 8, 0.6);
+    background: rgba(234, 179, 8, 0.12) !important;
+    border-left: 3px solid rgba(234, 179, 8, 0.5);
 }
 .ures-reload-bar {
     position: fixed;
@@ -980,9 +980,61 @@
     color: var(--activetext);
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
 }
-.ures-reload-bar span { font-weight: 700; color: var(--asuccess); }
+.ures-reload-bar .reload-stat {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    color: var(--activetext);
+    font-weight: 500;
+    line-height: 1;
+}
+.ures-reload-bar .count-fixed { color: var(--asuccess); font-weight: 700; }
+.ures-reload-bar .count-removed { color: var(--adanger); font-weight: 700; }
 
-.ures-fixed-row { background: rgba(63,185,80,0.08) !important; }
+.ures-fixed-row {
+    background: rgba(63,185,80,0.08) !important;
+    border-left: 3px solid rgba(63,185,80,0.5);
+}
+
+.ures-removed-row {
+    background: rgba(248,81,73,0.12) !important;
+    border-left: 3px solid rgba(248,81,73,0.5);
+}
+.ures-removed-row td:not(:last-child) { opacity: 0.55; }
+.ures-removed-row .ures-card-name a { text-decoration: line-through; }
+
+.ures-remove-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-left: auto;
+    flex-shrink: 0;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s ease, color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+.ures-table tr:hover .ures-remove-btn,
+.ures-removed-row .ures-remove-btn {
+    opacity: 1;
+}
+.ures-remove-btn:hover {
+    color: var(--adanger);
+    border-color: rgba(248,81,73,0.4);
+    background: rgba(248,81,73,0.1);
+}
+.ures-removed-row .ures-remove-btn {
+    color: var(--adanger);
+    border-color: rgba(248,81,73,0.4);
+}
 
 .ures-pick-btn {
     display: inline-block;
