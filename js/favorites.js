@@ -87,7 +87,7 @@
         var html = '';
         pills.forEach(function(p) {
             var active = p.val === key;
-            var arrow = active ? (dir === 'asc' ? '<i data-lucide="arrow-up"></i>' : '<i data-lucide="arrow-down"></i>') : '';
+            var arrow = active ? (dir === 'asc' ? '<i data-lucide="arrow-up" class="fav-sort-dir asc"></i>' : '<i data-lucide="arrow-down" class="fav-sort-dir desc"></i>') : '';
             html += '<button class="fav-sort-pill' + (active ? ' active' : '') + '" data-val="' + p.val + '" onclick="window.cycleFavSort(\'' + p.val + '\')" title="' + p.title + '"><i data-lucide="' + p.icon + '"></i>' + arrow + '</button>';
         });
         return html;

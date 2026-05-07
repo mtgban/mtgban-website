@@ -2222,3 +2222,5 @@
 }
 .fav-sort-pill i,
 .fav-sort-pill svg { width: 16px; height: 16px; }
+.fav-sort-pill .fav-sort-dir.asc { color: #22c55e; }
+.fav-sort-pill .fav-sort-dir.desc { color: #ef4444; }
