@@ -131,7 +131,6 @@
                     {{$editionList := index $.EditionList $key}}
                     <a class="sealed-toc-item" href="#sealed-{{slug $key}}">{{$key}} <span class="toc-count">{{len $editionList}}</span></a>
                 {{end}}
-                <a class="sealed-toc-item" href="/guide#faq">F.A.Q.</a>
             </div>
 
             <div class="sealed-main" id="sealed-main">
@@ -142,7 +141,6 @@
                         <input id="searchbox" class="sealed-search" type="text" name="q" placeholder="Search for a product..." autocomplete="off" autocapitalize="none" maxlength="1000">
                     </form>
                     <a id="sealed-surprise" href="#">Surprise Me</a>
-                    <a href="/guide#faq">F.A.Q.</a>
                 </div>
                 <script type="text/javascript">
                     autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
