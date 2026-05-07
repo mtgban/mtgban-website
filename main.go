@@ -1239,6 +1239,9 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	if name == "search.html" {
 		templates = append(templates, "templates/partials/search-landing.html")
 	}
+	if name == "guide.html" {
+		templates = append(templates, "templates/partials/guide-faq.html")
+	}
 
 	// Parse and execute via the base template
 	baseName := path.Base(base)

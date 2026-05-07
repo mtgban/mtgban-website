@@ -27,8 +27,17 @@
                 Press <kbd>Ctrl+K</kbd> or <kbd>Cmd+K</kbd> to open the command palette from any page
             </div>
         </div>
-        <div id="guide-sections">
+        <div class="guide-tabs" role="tablist">
+            <button type="button" class="guide-tab" data-tab="overview" role="tab">Overview</button>
+            <button type="button" class="guide-tab" data-tab="palette" role="tab">Command Palette</button>
+            <button type="button" class="guide-tab" data-tab="syntax" role="tab">Syntax</button>
+            <button type="button" class="guide-tab" data-tab="faq" role="tab">F.A.Q.</button>
+        </div>
+        <div id="guide-sections" data-tab-pane="structured">
             <!-- Built by JS -->
+        </div>
+        <div id="faq" data-tab="faq">
+            {{template "guide-faq-content" .}}
         </div>
     </main>
 </div>
@@ -41,6 +50,15 @@
     var allSections = data.sections;
     var sidebarNav = document.getElementById('guide-sidebar-nav');
     var sectionsContainer = document.getElementById('guide-sections');
+
+    var TAB_BY_CATEGORY = {
+        'Command Palette': 'palette',
+        'Search Syntax': 'syntax',
+        'Features': 'overview',
+        'Tips & Tricks': 'overview'
+    };
+    var DEFAULT_TAB = 'overview';
+    var VALID_TABS = ['overview', 'palette', 'syntax', 'faq'];
 
     // Build nav permission lookup from palette data
     var navNames = {};
@@ -73,9 +91,11 @@
     // ── Build sidebar nav ──
     for (var c = 0; c < categories.length; c++) {
         var catName = categories[c];
+        var catTab = TAB_BY_CATEGORY[catName] || DEFAULT_TAB;
         var catHeader = document.createElement('div');
         catHeader.className = 'guide-nav-category';
         catHeader.setAttribute('data-category', catName);
+        catHeader.setAttribute('data-tab', catTab);
         catHeader.textContent = catName;
         sidebarNav.appendChild(catHeader);
 
@@ -87,6 +107,7 @@
             link.href = '#' + item.id;
             link.setAttribute('data-section', item.id);
             link.setAttribute('data-category', catName);
+            link.setAttribute('data-tab', catTab);
             link.innerHTML = '<i data-lucide="' + escapeAttr(item.icon) + '"></i>' +
                 '<span>' + escapeHtml(item.title) + '</span>';
             sidebarNav.appendChild(link);
@@ -96,10 +117,12 @@
     // ── Build main content ──
     for (var c = 0; c < categories.length; c++) {
         var catName = categories[c];
+        var catTab = TAB_BY_CATEGORY[catName] || DEFAULT_TAB;
 
         var divider = document.createElement('div');
         divider.className = 'guide-category-divider';
         divider.setAttribute('data-category', catName);
+        divider.setAttribute('data-tab', catTab);
         var h2 = document.createElement('h2');
         h2.textContent = catName;
         divider.appendChild(h2);
@@ -112,6 +135,7 @@
             section.className = 'guide-section';
             section.id = item.id;
             section.setAttribute('data-category', catName);
+            section.setAttribute('data-tab', catTab);
             section.setAttribute('data-title', item.title);
             section.setAttribute('data-summary', item.summary || '');
             section.setAttribute('data-keywords', (item.keywords || []).join(' '));
@@ -243,10 +267,68 @@
         }
     });
 
+    // ── Tabs ──
+    var tabButtons = document.querySelectorAll('.guide-tab');
+    var faqPane = document.getElementById('faq');
+
+    var tabRoots = [sectionsContainer, faqPane, sidebarNav];
+
+    function setActiveTab(tab) {
+        if (VALID_TABS.indexOf(tab) === -1) tab = DEFAULT_TAB;
+        tabRoots.forEach(function (root) {
+            if (!root) return;
+            if (root.dataset && root.dataset.tab) {
+                root.classList.toggle('tab-hidden', root.dataset.tab !== tab);
+            }
+            root.querySelectorAll('[data-tab]').forEach(function (el) {
+                el.classList.toggle('tab-hidden', el.dataset.tab !== tab);
+            });
+        });
+        tabButtons.forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.tab === tab);
+        });
+        document.body.dataset.guideTab = tab;
+    }
+
+    function tabForHash(hash) {
+        if (!hash) return null;
+        if (VALID_TABS.indexOf(hash) !== -1) return hash;
+        var el = document.getElementById(hash);
+        if (el && el.dataset && el.dataset.tab) return el.dataset.tab;
+        return null;
+    }
+
+    function initialTab() {
+        var params = new URLSearchParams(window.location.search);
+        var qTab = params.get('tab');
+        if (qTab && VALID_TABS.indexOf(qTab) !== -1) return qTab;
+        var hashTab = tabForHash((window.location.hash || '').substring(1));
+        if (hashTab) return hashTab;
+        return DEFAULT_TAB;
+    }
+
+    setActiveTab(initialTab());
+
+    tabButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            setActiveTab(btn.dataset.tab);
+            // Reset filter input + clear filter classes when switching tabs
+            if (filterInput && filterInput.value) {
+                filterInput.value = '';
+                filterInput.dispatchEvent(new Event('input'));
+            }
+        });
+    });
+
+    window.addEventListener('hashchange', function () {
+        var hashTab = tabForHash((window.location.hash || '').substring(1));
+        if (hashTab) setActiveTab(hashTab);
+    });
+
     // ── Anchor scroll ──
     if (window.location.hash) {
         var target = document.getElementById(window.location.hash.substring(1));
-        if (target) {
+        if (target && !target.classList.contains('tab-hidden')) {
             setTimeout(function() {
                 target.scrollIntoView({ behavior: 'smooth' });
             }, 100);
