@@ -61,9 +61,6 @@
             var allSections = document.querySelectorAll('.sealed-section');
 
             allSections.forEach(function(section) {
-                // Skip the FAQ section
-                if (section.id === 'sealed-faq') return;
-
                 var editions = section.querySelectorAll('.sealed-edition');
                 var visibleCount = 0;
 

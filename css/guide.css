@@ -130,6 +130,57 @@
     color: var(--normal, #000);
 }
 
+/* ── Tab strip ── */
+.guide-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4em;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+    margin: 1em 0 0.5em;
+}
+.guide-tab {
+    padding: 0.55em 1.1em;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 0.4em 0.4em 0 0;
+    color: var(--text-dim, var(--greytext));
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.guide-tab:hover {
+    color: var(--normal);
+    background: var(--surface-2, rgba(255,255,255,0.04));
+}
+.guide-tab.active {
+    color: var(--ainfo, #559eff);
+    border-color: var(--border-subtle, rgba(255,255,255,0.12));
+    background: var(--surface-1);
+}
+
+.tab-hidden { display: none !important; }
+
+/* ── FAQ pane ── */
+.guide-faq {
+    margin-top: 24px;
+    scroll-margin-top: 120px;
+}
+.guide-faq h3 {
+    font-size: var(--text-6xl);
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+.guide-faq h4 {
+    margin-bottom: 4px;
+}
+.guide-faq li {
+    margin-bottom: 16px;
+}
+
 /* ── Category Divider ── */
 .guide-category-divider {
     padding: 2.5em 0 0.75em;
