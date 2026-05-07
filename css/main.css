@@ -94,7 +94,7 @@ html { font-size: 17px; }
     /* ── Layout tokens ── */
     --nav-height: 48px;
     --page-gutter: 3vw;
-    --page-max-width: 80vw;
+    --page-max-width: min(80vw, 1600px);
     --content-padding-top: calc(var(--nav-height) + 2vh);
 
     /* ── Font Size Scale ── */
@@ -747,7 +747,7 @@ a.selected:hover{
 
 /* ═══ Page width tiers ═══ */
 .page-standard {
-    max-width: 80vw;
+    max-width: var(--page-max-width);
     margin: 0 auto;
     /*padding: 0 var(--page-gutter);*/
 }
