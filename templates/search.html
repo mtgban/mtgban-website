@@ -177,10 +177,6 @@
             <p style="color: var(--activetext); font-size: var(--text-3xl);"><em>{{.InfoMessage}}</em></p>
         </div>
     {{else}}
-    {{if .IsSealed}}
-        <img id="hoverImage" class="hoverImage" src=""/>
-        <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
-    {{end}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
             <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
 
@@ -262,16 +258,12 @@
                 }
 
                 function updateSidebar(src, printings, products, isFoil, setCode) {
-                    {{if not .IsSealed}}
-                        document.getElementById('cardImage').src=src;
-                        var wrapper = document.getElementById('cardImageWrapper');
-                        if (wrapper) {
-                            wrapper.setAttribute('data-foil', isFoil ? 'true' : 'false');
-                            wrapper.setAttribute('data-set', setCode);
-                        }
-                    {{else}}
-                        document.getElementById('hoverImage').src=src;
-                    {{end}}
+                    document.getElementById('cardImage').src=src;
+                    var wrapper = document.getElementById('cardImageWrapper');
+                    if (wrapper) {
+                        wrapper.setAttribute('data-foil', isFoil ? 'true' : 'false');
+                        wrapper.setAttribute('data-set', setCode);
+                    }
                     document.getElementById('printings').innerHTML = printings;
                     collapsePrintings();
 
@@ -338,33 +330,27 @@
 
             {{$emptyImg := "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"}}
 
-            <div class="search-layout" {{if .IsSealed}}onmouseout="document.getElementById('hoverImage').src='{{$emptyImg}}';"{{end}}>
+            <div class="search-layout">
 
                 <div class="search-sidebar">
                     {{template "sidebar-search" .}}
                     <div class="sidebar-body">
-                    {{if .IsSealed}}
-                        <div class="sidebar-printings" id="printings"></div>
-                        {{if .HasAvailable}}
-                            <div class="sidebar-products-card">
-                                <div class="sidebar-products-title">Available In</div>
-                                <div class="sidebar-products-list" id="products"></div>
-                            </div>
-                        {{end}}
-                    {{else}}
                         <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper">
                             <img class="sidebar-card-img" id="cardImage" src="" onclick="var input = document.getElementById('searchbox'); input.focus(); input.setSelectionRange(0, input.value.length); return false;"/>
                         </div>
                         <div class="sidebar-printings" id="printings"></div>
+                    {{if not .IsSealed}}
                         {{if .CanShowAll}}
                             <a class="sidebar-action primary" href="search?q={{.CleanSearchQuery}}">Show all versions</a>
                         {{end}}
+                    {{end}}
                         {{if .HasAvailable}}
                             <div class="sidebar-products-card">
                                 <div class="sidebar-products-title">Available In</div>
                                 <div class="sidebar-products-list" id="products"></div>
                             </div>
                         {{end}}
+                    {{if not .IsSealed}}
                         {{if not (eq .Alternative "")}}
                             <a class="sidebar-action warning" href="/search?chart={{.Alternative}}">Switch Foil/Non-Foil</a>
                         {{end}}
@@ -879,9 +865,6 @@
 
                 {{if eq $firstImg ""}}
                     {{$firstImg = $.CardBackURL}}
-                {{end}}
-                {{if .IsSealed}}
-                    {{$firstImg = $emptyImg}}
                 {{end}}
                 <script type="text/javascript">
                     updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstSetCode}});
