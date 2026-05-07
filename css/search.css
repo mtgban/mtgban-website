@@ -1542,6 +1542,19 @@
     background: var(--surface-3);
 }
 
+.landing-pane-btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.3em;
+    line-height: 1;
+}
+.landing-pane-btn-icon i,
+.landing-pane-btn-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
 .landing-pane-body {
     flex: 1 1 auto;
     overflow: hidden;
@@ -2184,25 +2197,28 @@
     display: inline-flex;
     align-items: center;
     gap: 0.25em;
+    padding-right: 0.55em;
     margin-right: 0.25em;
+    border-right: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
 }
 .fav-sort-pill {
     display: inline-flex;
     align-items: center;
-    gap: 0.2em;
-    padding: 0.1em 0.45em;
-    background: var(--surface-2, rgba(255,255,255,0.04));
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    justify-content: center;
+    gap: 0.15em;
+    padding: 0.3em;
+    background: transparent;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
     border-radius: 0.25em;
-    color: var(--greytext, #888);
+    color: var(--normal);
     cursor: pointer;
     font: inherit;
     line-height: 1;
 }
-.fav-sort-pill:hover { color: var(--text, currentColor); }
+.fav-sort-pill:hover { color: var(--text, currentColor); background: var(--surface-3); }
 .fav-sort-pill.active {
     color: var(--accent, #5b8def);
     border-color: var(--accent-border, rgba(91,141,239,0.35));
 }
 .fav-sort-pill i,
-.fav-sort-pill svg { width: 22px; height: 22px; }
+.fav-sort-pill svg { width: 16px; height: 16px; }
