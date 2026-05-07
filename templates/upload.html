@@ -607,6 +607,7 @@
                                             onclick="openPrintingPicker(this)">Select printing</button>
                                         {{end}}
                                     </div>
+                                    <button type="button" class="ures-remove-btn" onclick="toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>
                                 </div>
                             </td>
                             <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
@@ -946,11 +947,16 @@
 
     function ensureHashesLoaded() {
         var form = document.getElementById("upload_form");
-        if (form.querySelectorAll('input[name="hashes"]').length > 0) return;
+
+        // Always rebuild from current row state so removed/picked rows take effect.
+        form.querySelectorAll('input[name="hashes"], input[name="hashesQtys"], input[name="hashesCond"], input[name="hashesPrice"]').forEach(function(el) {
+            el.remove();
+        });
 
         form.removeAttribute("enctype");
         document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
             if (!row.dataset.hash) return;
+            if (row.classList.contains('ures-removed-row')) return;
             var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
             pairs.forEach(function(pair) {
                 var input = document.createElement("input");
@@ -977,15 +983,47 @@
     }
     </script>
 
-    <!-- Reload button (hidden until a pick is made) -->
+    <!-- Reload button (hidden until a pick or remove is made) -->
     <div id="reload-bar" class="ures-reload-bar" style="display:none">
-        <span id="reload-count">0</span> printing(s) updated
-        <button class="opt-btn load" onclick="document.getElementById('upload_form').submit()">Reload with fixes</button>
+        <span class="reload-stat" id="reload-fixed-wrap" style="display:none"><span class="count-fixed" id="reload-fixed-count">0</span> updated</span>
+        <span class="reload-stat" id="reload-removed-wrap" style="display:none"><span class="count-removed" id="reload-removed-count">0</span> removed</span>
+        <button class="opt-btn load" onclick="document.getElementById('upload_form').submit()">Reload</button>
     </div>
 
     <script>
     var fixedRows = {};
+    var removedRows = {};
     var activePicker = null;
+
+    function updateReloadBar() {
+        var fixedCount = Object.keys(fixedRows).length;
+        var removedCount = Object.keys(removedRows).length;
+        var total = fixedCount + removedCount;
+        document.getElementById('reload-fixed-count').textContent = fixedCount;
+        document.getElementById('reload-removed-count').textContent = removedCount;
+        document.getElementById('reload-fixed-wrap').style.display = fixedCount > 0 ? '' : 'none';
+        document.getElementById('reload-removed-wrap').style.display = removedCount > 0 ? '' : 'none';
+        document.getElementById('reload-bar').style.display = total > 0 ? 'flex' : 'none';
+    }
+
+    function rowOriginId(row) {
+        if (!row.dataset.origHash) row.dataset.origHash = row.dataset.hash;
+        return row.dataset.origHash;
+    }
+
+    function toggleRemoveRow(btn) {
+        var row = btn.closest('tr');
+        if (!row || !row.dataset.hash) return;
+        var rowId = rowOriginId(row);
+        if (row.classList.contains('ures-removed-row')) {
+            row.classList.remove('ures-removed-row');
+            delete removedRows[rowId];
+        } else {
+            row.classList.add('ures-removed-row');
+            removedRows[rowId] = true;
+        }
+        updateReloadBar();
+    }
 
     function updateRowHash(btn, newHash) {
         var form = document.getElementById("upload_form");
@@ -1013,11 +1051,8 @@
         if (!btn.closest('tr').dataset.origHash) {
             btn.closest('tr').dataset.origHash = oldHash;
         }
-        if (!fixedRows[rowId]) {
-            fixedRows[rowId] = true;
-            document.getElementById('reload-count').textContent = Object.keys(fixedRows).length;
-        }
-        document.getElementById('reload-bar').style.display = 'flex';
+        fixedRows[rowId] = true;
+        updateReloadBar();
     }
 
     // Metadata from Go template - maps UUID to {image, edition, number}
