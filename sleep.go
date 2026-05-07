@@ -56,6 +56,30 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		blocklistBuylist = append(blocklistBuylist, Config.SleepersBlockList...)
 	}
 
+	// Built before merging the user's cookie hide-list so hidden vendors still
+	// appear in the picker (rendered as pre-checked by js/settings.js bindList).
+	var modalSellerKeys, modalVendorKeys []string
+	for _, seller := range Sellers {
+		if seller.Info().CountryFlag != "" ||
+			seller.Info().SealedMode ||
+			seller.Info().MetadataOnly ||
+			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+			continue
+		}
+		modalSellerKeys = append(modalSellerKeys, seller.Info().Shorthand)
+	}
+	for _, vendor := range Vendors {
+		if vendor.Info().CountryFlag != "" ||
+			vendor.Info().SealedMode ||
+			vendor.Info().MetadataOnly ||
+			slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
+			continue
+		}
+		modalVendorKeys = append(modalVendorKeys, vendor.Info().Shorthand)
+	}
+	pageVars.ModalSellerKeys = modalSellerKeys
+	pageVars.ModalVendorKeys = modalVendorKeys
+
 	skipSellersOpt := readCookie(r, "SleepersSellersList")
 	if skipSellersOpt != "" {
 		blocklistRetail = append(blocklistRetail, strings.Split(skipSellersOpt, ",")...)
@@ -83,30 +107,6 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
-	// Populate modal data for the settings panel (shown on every sleepers page).
-	// Uses a stricter filter than the main seller list: excludes international
-	// sellers (CountryFlag), metadata-only scrapers, and the standard blocklists.
-	var modalSellerKeys, modalVendorKeys []string
-	for _, seller := range Sellers {
-		if seller.Info().CountryFlag != "" ||
-			seller.Info().SealedMode ||
-			seller.Info().MetadataOnly ||
-			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-			continue
-		}
-		modalSellerKeys = append(modalSellerKeys, seller.Info().Shorthand)
-	}
-	for _, vendor := range Vendors {
-		if vendor.Info().CountryFlag != "" ||
-			vendor.Info().SealedMode ||
-			vendor.Info().MetadataOnly ||
-			slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-			continue
-		}
-		modalVendorKeys = append(modalVendorKeys, vendor.Info().Shorthand)
-	}
-	pageVars.ModalSellerKeys = modalSellerKeys
-	pageVars.ModalVendorKeys = modalVendorKeys
 	pageVars.EditionsCategories = AllEditionsCategoriesSorted
 	pageVars.EditionsByCategory = AllEditionsByCategory
 	pageVars.PickerID = "sleep-editions-picker"
