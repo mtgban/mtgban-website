@@ -166,7 +166,7 @@ var gameMap = map[string]string{
 var NewspaperUUIDs map[string]struct{}
 
 func cacheNewspaper() {
-	if Config.OfflineKey != "" {
+	if Config.OfflineKey != "" || SkipNewspaper {
 		return
 	}
 
