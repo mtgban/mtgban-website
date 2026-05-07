@@ -142,6 +142,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 2px;
     padding: 6px;
     border-radius: 8px;
     font-size: var(--text-base);
@@ -164,9 +165,8 @@
     border-color: var(--accent-border, rgba(91,141,239,0.25));
     color: var(--search-link);
 }
-.search-sort-pill.reversed svg {
-    transform: rotate(180deg);
-}
+.search-sort-pill .search-sort-dir.asc { color: #22c55e; }
+.search-sort-pill .search-sort-dir.desc { color: #ef4444; }
 
 .search-result-divider {
     display: flex;
