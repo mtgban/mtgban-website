@@ -294,8 +294,8 @@
             html += '<span class="landing-pane-title">Favorites</span>';
             html += '<span class="landing-pane-actions">';
             html += '<span class="landing-pane-sort">' + sortPillsHtml() + '</span>';
-            html += '<button class="landing-pane-btn" onclick="window.manualRefreshFavorites()" title="Update prices">Update Prices</button>';
-            html += '<button class="landing-pane-btn" onclick="window.clearFavorites(this)">Clear</button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.manualRefreshFavorites()" title="Update prices" aria-label="Update prices"><i data-lucide="refresh-cw"></i></button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.clearFavorites(this)" title="Clear favorites" aria-label="Clear favorites"><i data-lucide="trash-2"></i></button>';
             html += '</span>';
             html += '</div>';
             html += '<div class="landing-pane-body">';

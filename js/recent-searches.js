@@ -138,7 +138,7 @@
             html += '<div class="landing-pane-header">';
             html += '<span class="landing-pane-title">Recent Searches</span>';
             html += '<span class="landing-pane-actions">';
-            html += '<button class="landing-pane-btn" onclick="window.clearRecentSearches(this)">Clear</button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.clearRecentSearches(this)" title="Clear recent searches" aria-label="Clear recent searches"><i data-lucide="trash-2"></i></button>';
             html += '</span>';
             html += '</div>';
             html += '<div class="landing-pane-body">';
@@ -171,6 +171,9 @@
             html += '</div>';
         }
         container.innerHTML = html;
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
+        }
     }
 
     function escapeHtml(str) {
