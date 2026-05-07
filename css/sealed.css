@@ -175,22 +175,6 @@
     color: var(--activetext);
 }
 
-/* ── FAQ section ── */
-.sealed-faq {
-    margin-top: 48px;
-    scroll-margin-top: 120px;
-}
-.sealed-faq h3 {
-    font-size: var(--text-6xl);
-    font-weight: 700;
-    margin-bottom: 16px;
-}
-.sealed-faq h4 {
-    margin-bottom: 4px;
-}
-.sealed-faq li {
-    margin-bottom: 16px;
-}
 
 /* ── Hidden by search filter ── */
 .sealed-edition.hidden-by-filter {
