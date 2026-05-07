@@ -163,7 +163,7 @@
                     <div class="sealed-section" id="sealed-{{slug $key}}">
                         <div class="sealed-section-header">
                             <h2>{{$key}}</h2>
-                            <span class="section-count">{{len $editionList}} editions</span>
+                            <span class="section-count">{{len $editionList}} {{if eq (len $editionList) 1}}edition{{else}}editions{{end}}</span>
                         </div>
                         <div class="sealed-grid">
                             {{range $editionList}}
