@@ -259,6 +259,22 @@
     font-size: var(--text-lg);
     resize: none;
     outline: none;
+    min-height: 12em;
+    max-height: 20vh;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-4) transparent;
+}
+
+.upload-source-area textarea::-webkit-scrollbar {
+    width: 6px;
+}
+.upload-source-area textarea::-webkit-scrollbar-thumb {
+    background: var(--surface-4);
+    border-radius: 3px;
+}
+.upload-source-area textarea::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .upload-source-area input[type="text"] {
