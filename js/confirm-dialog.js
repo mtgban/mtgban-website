@@ -1,16 +1,17 @@
 // Custom in-page confirm dialog - replaces window.confirm() for Clear actions
 // Usage: window.confirmDialog("Clear all favorites?", function() { ... });
+//        window.confirmDialog(msg, onOk, { anchor: someEl, confirmLabel: 'Clear all' });
+// When `anchor` is supplied the overlay scopes to that element's box instead of fullscreen.
 (function() {
     var hostId = 'ban-confirm-dialog';
     var host = null;
 
-    function ensureHost() {
-        if (host && document.body.contains(host)) return host;
-        host = document.createElement('div');
-        host.id = hostId;
-        host.className = 'ban-confirm-dialog-host';
-        host.hidden = true;
-        host.innerHTML =
+    function buildHost() {
+        var h = document.createElement('div');
+        h.id = hostId;
+        h.className = 'ban-confirm-dialog-host';
+        h.hidden = true;
+        h.innerHTML =
             '<div class="ban-confirm-backdrop" data-role="cancel"></div>' +
             '<div class="ban-confirm-modal" role="dialog" aria-modal="true" aria-label="Confirm action">' +
                 '<p class="ban-confirm-message"></p>' +
@@ -19,13 +20,31 @@
                     '<button type="button" class="ban-confirm-btn ban-confirm-btn-danger" data-role="confirm">Clear all</button>' +
                 '</div>' +
             '</div>';
-        document.body.appendChild(host);
+        return h;
+    }
+
+    function ensureHost(anchor) {
+        var parent = anchor || document.body;
+        if (!host) host = buildHost();
+        if (host.parentElement !== parent) {
+            if (host.parentElement) host.parentElement.removeChild(host);
+            parent.appendChild(host);
+        }
+        if (anchor) {
+            host.classList.add('anchored');
+            // Anchor must establish a positioning context so position:absolute fills it.
+            if (getComputedStyle(anchor).position === 'static') {
+                anchor.style.position = 'relative';
+            }
+        } else {
+            host.classList.remove('anchored');
+        }
         return host;
     }
 
     window.confirmDialog = function(message, onConfirm, opts) {
         opts = opts || {};
-        var h = ensureHost();
+        var h = ensureHost(opts.anchor || null);
         if (!h.hidden) return; // re-entrant call while open: ignore
         h.querySelector('.ban-confirm-message').textContent = message;
         var confirmBtn = h.querySelector('[data-role="confirm"]');
