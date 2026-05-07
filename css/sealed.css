@@ -143,7 +143,6 @@
 .sealed-section-header .section-count {
     font-size: var(--text-lg);
     color: var(--text-dim);
-    margin-left: auto;
 }
 
 /* ── Edition grid ── */

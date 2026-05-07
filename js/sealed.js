@@ -77,6 +77,9 @@
                     }
                 });
 
+                var sectionCount = section.querySelector('.section-count');
+                if (sectionCount) sectionCount.textContent = visibleCount + (visibleCount === 1 ? ' edition' : ' editions');
+
                 // Hide entire section if no editions match
                 if (filter && visibleCount === 0) {
                     section.classList.add('hidden-by-filter');
