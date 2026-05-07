@@ -229,12 +229,6 @@
         });
     }
 
-    function captureUrlQuery() {
-        var params = new URLSearchParams(window.location.search);
-        var q = (params.get('q') || '').trim();
-        if (q) addSearch(q);
-    }
-
     function captureFirstResultImage() {
         var params = new URLSearchParams(window.location.search);
         var q = (params.get('q') || '').trim();
@@ -265,7 +259,6 @@
     // Initialize on DOM ready
     function init() {
         hookFormSubmit();
-        captureUrlQuery();
         captureFirstResultImage();
         renderRecentSearches();
     }
