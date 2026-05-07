@@ -90,22 +90,13 @@
 
         const allBoxes = Array.from(root.querySelectorAll('.editions-grid input[type="checkbox"]'));
 
-        // Resolve a checkbox from any event target inside a grid label
-        // (labels forward clicks to their input, but mousedown on the label
-        // text doesn't bubble from the input, so find via the label).
-        function boxFromEvent(e) {
-            const label = e.target.closest('.editions-grid label');
-            if (!label) return null;
-            return label.querySelector('input[type="checkbox"]');
-        }
-
-        root.addEventListener('click', function (e) {
-            const cb = boxFromEvent(e);
-            if (!cb) return;
-            e.preventDefault();
-            cb.checked = !cb.checked;
-            groups.forEach(updateGroupState);
-            root.dispatchEvent(new Event('change', { bubbles: true }));
+        // Native checkbox + label association handles toggling. We just need to
+        // refresh the group counter / tri-state when an edition checkbox changes.
+        root.addEventListener('change', function (e) {
+            const t = e.target;
+            if (t && t.matches && t.matches('.editions-grid input[type="checkbox"]')) {
+                groups.forEach(updateGroupState);
+            }
         });
 
         function actOn(predicate, value) {
