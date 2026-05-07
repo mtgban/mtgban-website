@@ -87,10 +87,15 @@
     margin-left: -36px;
     margin-right: -36px;
 }
-.sealed-search {
+.sealed-search-form {
     flex: 1;
     min-width: 240px;
     max-width: 420px;
+    position: relative;
+}
+.sealed-search {
+    width: 100%;
+    box-sizing: border-box;
     padding: 10px 16px;
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-moderate);
@@ -233,6 +238,7 @@
         padding-right: 12px;
         gap: 8px;
     }
+    .sealed-search-form { min-width: 0; max-width: none; }
     .sealed-search { min-width: 0; width: 100%; max-width: none; }
     .sealed-grid { grid-template-columns: 1fr; }
     .sealed-edition { font-size: var(--text-lg); }
