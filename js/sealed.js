@@ -48,14 +48,8 @@
     var searchInput = document.querySelector('.sealed-search');
     if (searchInput) {
         searchInput.addEventListener('keyup', function(e) {
-            // If Enter is pressed, submit as a sealed search query
-            if (e.key === 'Enter') {
-                var q = searchInput.value.trim();
-                if (q) {
-                    window.location.href = '/sealed?q=' + encodeURIComponent(q);
-                }
-                return;
-            }
+            // Enter is handled by the surrounding form (submits to /sealed?q=...).
+            if (e.key === 'Enter') return;
 
             var filter = searchInput.value.toUpperCase();
             var allSections = document.querySelectorAll('.sealed-section');
