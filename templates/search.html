@@ -204,8 +204,8 @@
                     // Clean up previous collapse elements
                     const oldDropdown = container.querySelector('.sidebar-printings-dropdown');
                     if (oldDropdown) oldDropdown.remove();
-                    const oldBtn = container.querySelector('.sidebar-printings-more');
-                    if (oldBtn) oldBtn.remove();
+                    const oldFilter = container.querySelector('.sidebar-printings-filter');
+                    if (oldFilter) oldFilter.remove();
                     // Unhide any previously hidden links (from prior hover)
                     container.querySelectorAll('a.sidebar-printings-hidden').forEach(a => a.classList.remove('sidebar-printings-hidden'));
 
@@ -224,25 +224,50 @@
                         dropdown.appendChild(clone);
                     });
 
-                    const btn = document.createElement('button');
-                    btn.className = 'sidebar-printings-more';
-                    btn.textContent = '+' + overflow.length;
+                    const filter = document.createElement('input');
+                    filter.type = 'text';
+                    filter.className = 'sidebar-printings-filter';
+                    filter.placeholder = '+' + overflow.length;
+                    filter.setAttribute('aria-label', 'Filter editions');
+                    filter.autocomplete = 'off';
 
-                    btn.addEventListener('click', function(e) {
-                        e.stopPropagation();
-                        const isOpen = dropdown.classList.toggle('open');
-                        this.textContent = isOpen ? '\u2212' + overflow.length : '+' + overflow.length;
+                    filter.addEventListener('focus', function() {
+                        dropdown.classList.add('open');
+                    });
+                    // mousedown on dropdown links would steal focus; keep dropdown open
+                    // long enough for the click to register before blur closes it.
+                    filter.addEventListener('blur', function() {
+                        setTimeout(function() {
+                            if (!container.contains(document.activeElement)) {
+                                dropdown.classList.remove('open');
+                            }
+                        }, 150);
+                    });
+                    filter.addEventListener('input', function() {
+                        const q = this.value.trim().toLowerCase();
+                        dropdown.querySelectorAll('a.pagination').forEach(function(a) {
+                            const title = (a.getAttribute('title') || '').toLowerCase();
+                            const href = (a.getAttribute('href') || '').toLowerCase();
+                            const matches = !q || title.indexOf(q) !== -1 || href.indexOf(q) !== -1;
+                            a.style.display = matches ? '' : 'none';
+                        });
+                    });
+                    filter.addEventListener('keydown', function(e) {
+                        if (e.key === 'Escape') {
+                            this.value = '';
+                            this.dispatchEvent(new Event('input'));
+                            this.blur();
+                        }
                     });
 
                     // Close on outside click
                     document.addEventListener('click', function(e) {
                         if (!container.contains(e.target)) {
                             dropdown.classList.remove('open');
-                            btn.textContent = '+' + overflow.length;
                         }
                     });
 
-                    container.appendChild(btn);
+                    container.appendChild(filter);
                     container.appendChild(dropdown);
                 }
 
