@@ -22,6 +22,7 @@
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
@@ -225,7 +226,55 @@
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
                     {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
+                    <button class="m-actions-btn" onclick="event.stopPropagation(); toggleActionsMenu(this);" title="More actions"><i data-lucide="more-vertical"></i></button>
                 </div>
+            </div>
+            <div class="m-actions-menu" data-card="{{$cardId}}">
+                {{if $card.Sealed}}
+                    {{if $card.Booster}}
+                        <a class="m-actions-item" href='/search?q=unpack:"{{$card.Name}}"' onclick="closeActionsMenus()">
+                            <i data-lucide="gift"></i><span>Simulate booster pack</span>
+                        </a>
+                    {{end}}
+                    {{if $card.HasDeck}}
+                        <a class="m-actions-item" href="/api/tcgplayer/decklist/{{$card.UUID}}" onclick="closeActionsMenus()">
+                            <img src="/img/misc/decklist.png" alt=""><span>TCGplayer decklist</span>
+                        </a>
+                        <a class="m-actions-item" href="/api/cardmarket/decklist/{{$card.UUID}}" onclick="closeActionsMenus()">
+                            <img src="/img/misc/decklist-mkm.png" alt=""><span>Cardmarket decklist</span>
+                        </a>
+                    {{end}}
+                    <a class="m-actions-item" href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' onclick="closeActionsMenus()">
+                        <i data-lucide="search"></i><span>Search contents</span>
+                    </a>
+                {{else if $.HasAvailable}}
+                    <a class="m-actions-item" href='/sealed?q=container:"{{$card.Name}}"' onclick="closeActionsMenus()">
+                        <i data-lucide="package"></i><span>Find in sealed products</span>
+                    </a>
+                {{end}}
+                <button type="button" class="m-actions-item" onclick="event.stopPropagation(); copyAndBlink(this, '{{$card.Name}}'); closeActionsMenus();">
+                    <i data-lucide="clipboard-copy"></i><span>Copy card name</span>
+                </button>
+                {{if not $card.Sealed}}
+                    <a class="m-actions-item" href="{{$card.DeckboxURL}}" target="_blank" rel="noopener" onclick="closeActionsMenus()">
+                        <img src="/img/logo/deckbox.webp" alt=""><span>Open on Deckbox</span>
+                    </a>
+                {{end}}
+                {{if $card.CKRestockURL}}
+                    <a class="m-actions-item" href="{{$card.CKRestockURL}}" target="_blank" rel="noopener" onclick="closeActionsMenus()">
+                        <i data-lucide="bell"></i><span>CardKingdom restock notice</span>
+                    </a>
+                {{end}}
+                {{if $card.ScryfallURL}}
+                    <a class="m-actions-item" href="{{$card.ScryfallURL}}" target="_blank" rel="noopener" onclick="closeActionsMenus()">
+                        <img src="/img/logo/scryfall.svg" alt=""><span>Open on Scryfall</span>
+                    </a>
+                {{end}}
+                {{if $card.TCGId}}
+                    <a class="m-actions-item" href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" target="_blank" rel="noopener" onclick="closeActionsMenus()">
+                        <img src="/img/logo/tcgapp.png" alt=""><span>TCGplayer inventory</span>
+                    </a>
+                {{end}}
             </div>
 
             {{$hasSellers := (index $.FoundSellers $cardId)}}
@@ -854,6 +903,35 @@ function applyFilters() {
     // Navigate
     window.location.href = '?q=' + encodeURIComponent(query);
 }
+
+// Per-card actions menu
+function toggleActionsMenu(btn) {
+    var card = btn.closest('.m-card');
+    var menu = card.querySelector('.m-actions-menu');
+    if (!menu) return;
+    var wasOpen = menu.classList.contains('open');
+    closeActionsMenus();
+    if (!wasOpen) {
+        var rect = btn.getBoundingClientRect();
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+        menu.classList.add('open');
+    }
+}
+
+function closeActionsMenus() {
+    document.querySelectorAll('.m-actions-menu.open').forEach(function(m) {
+        m.classList.remove('open');
+    });
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.m-actions-menu') && !e.target.closest('.m-actions-btn')) {
+        closeActionsMenus();
+    }
+});
+window.addEventListener('scroll', closeActionsMenus, { passive: true });
+window.addEventListener('resize', closeActionsMenus);
 
 // Card image drawer
 function showCardDrawer(imgUrl, name) {
