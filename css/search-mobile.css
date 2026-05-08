@@ -1250,6 +1250,84 @@
     height: 18px;
 }
 
+/* Per-card actions kebab + dropdown menu */
+.m-actions-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5em;
+    color: var(--greytext);
+    min-height: auto !important;
+    display: flex;
+    align-items: center;
+    position: relative;
+    transition: transform 0.1s ease, background-color 0.1s ease;
+}
+
+.m-actions-btn::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+}
+
+.m-actions-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(0.85);
+}
+
+.m-actions-btn i,
+.m-actions-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.m-actions-menu {
+    position: fixed;
+    z-index: 600;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: 0.6em;
+    padding: 0.35em 0;
+    min-width: 13em;
+    max-width: calc(100vw - 1em);
+    display: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.m-actions-menu.open {
+    display: block;
+}
+
+.m-actions-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7em;
+    padding: 0.75em 0.95em;
+    color: var(--text);
+    font-size: 0.9rem;
+    text-decoration: none;
+    background: none;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.m-actions-item:active {
+    background: var(--surface-3);
+}
+
+.m-actions-item i,
+.m-actions-item svg,
+.m-actions-item img {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    object-fit: contain;
+}
+
 /* Chart drawer */
 .m-chart-drawer {
     position: fixed;
