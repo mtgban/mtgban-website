@@ -160,6 +160,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") != "stores")
 	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
+	pageVars.DefaultView = readCookie(r, "SearchDefaultView")
 
 	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))

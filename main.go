@@ -102,6 +102,7 @@ type PageVars struct {
 	GlobalMode     bool
 	ReverseMode    bool
 	DefaultTab     string
+	DefaultView    string
 
 	Page               string
 	Subtitle           string
