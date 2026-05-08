@@ -7,6 +7,23 @@
     var libsLoaded = false;
     var libsLoading = false;
 
+    var HIDDEN_COOKIE = 'MobileChartHidden';
+
+    function readHiddenVendors() {
+        var match = document.cookie.match(new RegExp('(?:^|; )' + HIDDEN_COOKIE + '=([^;]*)'));
+        if (!match) return [];
+        try {
+            return decodeURIComponent(match[1]).split(',').filter(Boolean);
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function writeHiddenVendors(names) {
+        var maxAge = 60 * 60 * 24 * 365 * 5;
+        document.cookie = HIDDEN_COOKIE + '=' + encodeURIComponent(names.join(',')) + '; path=/; max-age=' + maxAge + '; SameSite=Lax';
+    }
+
     function pickInitialRange() {
         var saved = parseInt(localStorage.getItem('chartDateRange'));
         if (isNaN(saved) || saved <= 0) saved = 180;
@@ -352,6 +369,18 @@
                     canvas.style.display = 'block';
                     resetBtn.style.display = 'inline-block';
                     currentChart = createChart(canvas.getContext('2d'), data);
+
+                    // Restore previously hidden vendors (global preference across cards)
+                    var hidden = readHiddenVendors();
+                    if (hidden.length) {
+                        data.datasets.forEach(function(ds, i) {
+                            if (hidden.indexOf(ds.name) !== -1) {
+                                currentChart.setDatasetVisibility(i, false);
+                            }
+                        });
+                        currentChart.update('none');
+                    }
+
                     renderChartLegend(data.datasets, currentChart);
                     currentMaxLoaded = initialRange;
                     setRangePickerDisabled(false);
@@ -368,6 +397,13 @@
     };
 
     window.hideChartDrawer = function() {
+        if (currentChart) {
+            var hidden = [];
+            currentChart.data.datasets.forEach(function(ds, i) {
+                if (!currentChart.isDatasetVisible(i)) hidden.push(ds.label);
+            });
+            writeHiddenVendors(hidden);
+        }
         document.getElementById('m-chart-overlay').classList.remove('open');
         document.getElementById('m-chart-drawer').classList.remove('open');
     };
