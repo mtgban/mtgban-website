@@ -232,31 +232,37 @@
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
             {{$defaultBuyers := or (eq $.DefaultTab "buyers") (eq $.SearchSort "buylist")}}
 
-            {{/* Condition pills - default to NM, hidden for sealed products */}}
+            {{/* Resolve the active condition view for this card: user preference, falling back to NM if unavailable. */}}
+            {{$sellerConds := (index $.FoundSellers $cardId)}}
+            {{$vendorConds := (index $.FoundVendors $cardId)}}
+            {{$defView := $.DefaultView}}
+            {{if eq $defView ""}}{{$defView = "NM"}}{{end}}
+            {{$hasDefault := false}}
+            {{if $sellerConds}}{{if (index $sellerConds $defView)}}{{$hasDefault = true}}{{end}}{{end}}
+            {{if $vendorConds}}{{if (index $vendorConds $defView)}}{{$hasDefault = true}}{{end}}{{end}}
+            {{if not $hasDefault}}{{$defView = "NM"}}{{end}}
+
+            {{/* Condition pills - default driven by user preference, hidden for sealed products */}}
             {{if not $card.Sealed}}
             <div class="m-cond-pills" data-card="{{$cardId}}">
                 <span class="m-cond-pills-left">
                 {{range $conditions := $.CondKeys}}
                     {{if ne $conditions "INDEX"}}
-                        {{$sellerConds := (index $.FoundSellers $cardId)}}
-                        {{$vendorConds := (index $.FoundVendors $cardId)}}
                         {{$hasCond := false}}
                         {{if $sellerConds}}{{if (index $sellerConds $conditions)}}{{$hasCond = true}}{{end}}{{end}}
                         {{if $vendorConds}}{{if (index $vendorConds $conditions)}}{{$hasCond = true}}{{end}}{{end}}
                         {{if $hasCond}}
-                            <button class="m-cond-pill{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">{{$conditions}}</button>
+                            <button class="m-cond-pill{{if eq $conditions $defView}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">{{$conditions}}</button>
                         {{end}}
                     {{end}}
                 {{end}}
                 </span>
                 {{$hasIndex := false}}
-                {{$sellerConds := (index $.FoundSellers $cardId)}}
-                {{$vendorConds := (index $.FoundVendors $cardId)}}
                 {{if $sellerConds}}{{if (index $sellerConds "INDEX")}}{{$hasIndex = true}}{{end}}{{end}}
                 {{if $vendorConds}}{{if (index $vendorConds "INDEX")}}{{$hasIndex = true}}{{end}}{{end}}
                 {{if $hasIndex}}
                 <span class="m-cond-pills-right">
-                    <button class="m-cond-pill" data-cond="INDEX" data-card="{{$cardId}}">Index</button>
+                    <button class="m-cond-pill{{if eq $defView "INDEX"}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">Index</button>
                 </span>
                 {{end}}
             </div>
@@ -279,7 +285,7 @@
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                        <div class="m-cond-group" data-cond="INDEX" data-card="{{$cardId}}">
+                        <div class="m-cond-group{{if eq $defView "INDEX"}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -300,7 +306,7 @@
                             {{end}}
                         </div>
                         {{else}}
-                        <div class="m-cond-group{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
+                        <div class="m-cond-group{{if eq $conditions $defView}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -360,7 +366,7 @@
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                        <div class="m-cond-group" data-cond="INDEX" data-card="{{$cardId}}">
+                        <div class="m-cond-group{{if eq $defView "INDEX"}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -381,7 +387,7 @@
                             {{end}}
                         </div>
                         {{else}}
-                        <div class="m-cond-group{{if eq $conditions "NM"}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
+                        <div class="m-cond-group{{if eq $conditions $defView}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -510,6 +516,19 @@
                 <div class="m-settings-pills" id="m-set-default-tab">
                     <button type="button" class="m-settings-pill active" data-val="sellers">Sellers</button>
                     <button type="button" class="m-settings-pill" data-val="buyers">Buyers</button>
+                </div>
+            </div>
+
+            {{/* Default View - which condition (or Index) is initially active in result cards */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Default View</div>
+                <div class="m-settings-pills" id="m-set-default-view">
+                    <button type="button" class="m-settings-pill active" data-val="NM">NM</button>
+                    <button type="button" class="m-settings-pill" data-val="SP">SP</button>
+                    <button type="button" class="m-settings-pill" data-val="MP">MP</button>
+                    <button type="button" class="m-settings-pill" data-val="HP">HP</button>
+                    <button type="button" class="m-settings-pill" data-val="PO">PO</button>
+                    <button type="button" class="m-settings-pill" data-val="INDEX">Index</button>
                 </div>
             </div>
 
@@ -867,33 +886,22 @@ function hideCardDrawer() {
         });
     });
 
-    // Condition pill switching
+    // Condition pill switching - all pills (including Index) are mutually exclusive
     document.querySelectorAll('.m-cond-pill').forEach(function(pill) {
         pill.addEventListener('click', function() {
-            var cardId = this.getAttribute('data-card');
             var cond = this.getAttribute('data-cond');
             var card = this.closest('.m-card');
 
-            if (cond === 'INDEX') {
-                // Index pill toggles independently
-                this.classList.toggle('active');
-                card.querySelectorAll('.m-cond-group[data-cond="INDEX"]').forEach(function(g) {
-                    g.classList.toggle('active');
-                });
-            } else {
-                // Condition pills are mutually exclusive
-                this.closest('.m-cond-pills').querySelectorAll('.m-cond-pills-left .m-cond-pill').forEach(function(p) { p.classList.remove('active'); });
-                this.classList.add('active');
+            this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function(p) { p.classList.remove('active'); });
+            this.classList.add('active');
 
-                card.querySelectorAll('.m-cond-group').forEach(function(g) {
-                    if (g.getAttribute('data-cond') === 'INDEX') return;
-                    if (g.getAttribute('data-cond') === cond) {
-                        g.classList.add('active');
-                    } else {
-                        g.classList.remove('active');
-                    }
-                });
-            }
+            card.querySelectorAll('.m-cond-group').forEach(function(g) {
+                if (g.getAttribute('data-cond') === cond) {
+                    g.classList.add('active');
+                } else {
+                    g.classList.remove('active');
+                }
+            });
 
             recalcBestBadges(card);
         });
@@ -1003,6 +1011,15 @@ function loadSettings() {
         });
     }
 
+    // Default View
+    var view = getCookie('SearchDefaultView');
+    if (view) {
+        var group = document.getElementById('m-set-default-view');
+        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
+            p.classList.toggle('active', p.getAttribute('data-val') === view);
+        });
+    }
+
     // Listing Priority
     var lp = getCookie('SearchListingPriority');
     if (lp) {
@@ -1051,6 +1068,10 @@ function saveSettings() {
     // Default Tab
     var tabPill = document.querySelector('#m-set-default-tab .m-settings-pill.active');
     setCookie('SearchDefaultTab', tabPill ? tabPill.getAttribute('data-val') : 'sellers', 1000);
+
+    // Default View
+    var viewPill = document.querySelector('#m-set-default-view .m-settings-pill.active');
+    setCookie('SearchDefaultView', viewPill ? viewPill.getAttribute('data-val') : 'NM', 1000);
 
     // Listing Priority
     var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
