@@ -646,7 +646,7 @@
         upload: {
             prefix: '+',
             label: 'UPLOAD',
-            placeholder: 'Paste URL or pick a file...',
+            placeholder: 'Paste a Sheets, Moxfield, or TCG URL, or pick a file...',
             tile: { title: 'Upload', subtitle: 'Send a URL, file, or page results', icon: 'upload' },
             builder: buildUploadItems,
             skipCap: true,
