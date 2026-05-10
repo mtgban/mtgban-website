@@ -961,10 +961,12 @@
                         for (var ci = 0; ci < cmd.chips.length; ci++) {
                             chips.add(cmd.chips[ci]);
                         }
-                        // Prefetch card meta for restored card chips so filter narrowing works.
+                        // Prefetch meta for restored chips so dependent narrowing/gating works.
                         for (var cj = 0; cj < cmd.chips.length; cj++) {
                             if (cmd.chips[cj].type === 'card' && cmd.chips[cj]._cardName) {
                                 fetchCardMeta(cmd.chips[cj]._cardName);
+                            } else if (cmd.chips[cj].type === 'sealed' && cmd.chips[cj]._sealedName) {
+                                fetchSealedMeta(cmd.chips[cj]._sealedName);
                             }
                         }
                     } else if (cmd.query) {
