@@ -1226,6 +1226,21 @@
             });
         }
 
+        // On /upload results page: surface the same export buttons the page renders.
+        if (window.location.pathname === '/upload' && document.getElementById('submit_download')) {
+            rows.push({ type: 'header', title: 'Export Results' });
+            rows.push(
+                { type: 'upload-export', title: 'Get CSV',             subtitle: 'All results as CSV',
+                  icon: 'download',      exportButtonId: 'submit_download' },
+                { type: 'upload-export', title: 'CardConduit Estimate', subtitle: 'Send to CardConduit (new tab)',
+                  icon: 'external-link', exportButtonId: 'submit_estimate' },
+                { type: 'upload-export', title: 'Deckbox CSV',         subtitle: 'Deckbox-format CSV',
+                  icon: 'archive',       exportButtonId: 'submit_deckbox' },
+                { type: 'upload-export', title: 'TCGplayer CSV',       subtitle: 'TCGplayer-format CSV',
+                  icon: 'shopping-cart', exportButtonId: 'submit_tcgplayer_csv' }
+            );
+        }
+
         return rows;
     }
 
@@ -1547,6 +1562,17 @@
             render:  rowHTML,
             footer:  function () { return { action: '' }; },
             onEnter: function () { /* no-op */ }
+        },
+
+        'upload-export': {
+            render:  rowHTML,
+            footer:  function (item) { return { action: item.title }; },
+            onEnter: function (item) {
+                var btn = document.getElementById(item.exportButtonId);
+                if (!btn) return;
+                closePalette();
+                btn.click();
+            }
         }
     };
 
