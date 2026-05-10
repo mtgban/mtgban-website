@@ -402,7 +402,10 @@ func PaletteSealed(w http.ResponseWriter, r *http.Request) {
 	resp.UUID = co.UUID
 	resp.SetCode = co.SetCode
 
-	if uuids := fixupContents(co.UUID); len(uuids) > 0 {
+	// hasContents and hasPicks both check actual data availability via mtgmatcher;
+	// a "found+sealed" product can still legitimately have neither (e.g., a Case that
+	// contains other sealed products but no decklist of its own).
+	if _, contentsErr := mtgmatcher.GetDecklist(co.SetCode, co.UUID); contentsErr == nil {
 		resp.HasContents = true
 	}
 	if _, picksErr := mtgmatcher.GetPicksForSealed(co.SetCode, co.UUID); picksErr == nil {
