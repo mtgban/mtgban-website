@@ -533,6 +533,21 @@
             mode:  'sealed',
             test:  function (v) { return v.charAt(0) === '$'; },
             strip: function (v) { return v.substring(1).trim(); }
+        },
+        {
+            mode:  'upload',
+            test:  function (v) {
+                if (!NAV_NAMES['Upload']) return false;
+                if (v.charAt(0) !== '+')   return false;
+                // Only treat `+` as upload-mode if it's bare, followed by a space, or starts a URL.
+                // Preserves common card/search-prefix queries like "+1 counter", "+aurora" so they
+                // still flow through the default search path for tier-permitted users.
+                if (v.length === 1)        return true;
+                if (v.charAt(1) === ' ')   return true;
+                if (/^\+https?:\/\//.test(v)) return true;
+                return false;
+            },
+            strip: function (v) { return v.substring(1).trim(); }
         }
     ];
 
@@ -595,7 +610,8 @@
                 nav:    'Filter pages...',
                 saved:  'Filter saved searches...',
                 recent: 'Filter recent searches...',
-                sealed: 'Search sealed products...'
+                sealed: 'Search sealed products...',
+                upload: 'Paste URL or pick a file...'
             })[ctx.mode];
             return;
         }
@@ -609,7 +625,7 @@
     function applyModeIndicator(ctx) {
         var label = '';
         if (ctx.kind === 'mode') {
-            label = ({ help: 'HELP', nav: 'NAV', saved: 'SAVED', recent: 'RECENT', sealed: 'SEALED' })[ctx.mode] || '';
+            label = ({ help: 'HELP', nav: 'NAV', saved: 'SAVED', recent: 'RECENT', sealed: 'SEALED', upload: 'UPLOAD' })[ctx.mode] || '';
         }
         if (label) {
             modeTag.textContent = label;
@@ -1309,7 +1325,7 @@
     // ════════════════════════════════════════════════════════════════
 
     function renderDefault() {
-        renderResults([
+        var tiles = [
             { type: 'header', title: 'Shortcuts' },
             { type: 'shortcut', title: 'Pages',         subtitle: 'Browse navigation and sub-pages',
               icon: 'compass',     shortcut: '>', action: function () { input.value = '>'; handleInput(); } },
@@ -1321,7 +1337,15 @@
               icon: 'clock',       shortcut: '<', action: function () { input.value = '<'; handleInput(); } },
             { type: 'shortcut', title: 'Sealed',        subtitle: 'Search sealed products and open contents',
               icon: 'package',     shortcut: '$', action: function () { input.value = '$'; handleInput(); } }
-        ]);
+        ];
+        if (NAV_NAMES['Upload']) {
+            tiles.push({
+                type: 'shortcut', title: 'Upload', subtitle: 'Send a URL, file, or page results',
+                icon: 'upload', shortcut: '+',
+                action: function () { input.value = '+'; handleInput(); }
+            });
+        }
+        renderResults(tiles);
     }
 
     function renderResults(items) {
