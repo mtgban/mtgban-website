@@ -1673,9 +1673,11 @@
         applyPlaceholder(ctx);
         applyModeIndicator(ctx);
 
-        // Empty input falls through to the default ("Shortcuts") view, EXCEPT in
-        // sub-view mode where we still want to render the parent's sub-views.
-        if (!raw.trim() && ctx.kind !== 'subview') {
+        // Render the default Shortcuts view only for kinds that have nothing meaningful
+        // to show on empty input (no chip-locked context, no provider prefix). New stateful
+        // kinds (subview, sealed-actions, future ones) opt out by NOT being listed here -
+        // their builders are expected to handle the empty-query case themselves.
+        if (!raw.trim() && (ctx.kind === 'mode' || ctx.kind === 'search')) {
             renderDefault();
             return;
         }
