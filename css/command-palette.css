@@ -328,6 +328,13 @@
     white-space: nowrap;
 }
 
+.cp-footer-tab {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
 .cp-footer-hint {
     display: inline-flex;
     align-items: center;

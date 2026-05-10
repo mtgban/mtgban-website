@@ -1446,8 +1446,8 @@
             footer:       function () {
                 return {
                     action: 'Search',
-                    tab: '<span class="cp-pair"><kbd>Shift+Enter</kbd> Contents</span> · '
-                       + '<span class="cp-pair"><kbd>Ctrl+Enter</kbd> Pack Pull</span> · '
+                    tab: '<span class="cp-pair"><kbd>Shift+Enter</kbd> Contents</span>'
+                       + '<span class="cp-pair"><kbd>Ctrl+Enter</kbd> Pack Pull</span>'
                        + '<span class="cp-pair"><kbd>Tab</kbd> Lock</span>'
                 };
             },
