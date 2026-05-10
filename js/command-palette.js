@@ -580,34 +580,80 @@
     //  Mode prefixes & context resolution
     // ════════════════════════════════════════════════════════════════
 
-    var MODE_PREFIXES = [
-        {
-            mode:  'help',
-            test:  function (v) { return v.charAt(0) === '?' || /^(help:|syntax:)/i.test(v); },
-            strip: function (v) { return v.replace(/^(\?\s*|help:|syntax:|\?:)/i, '').trim(); }
-        },
-        {
-            mode:  'nav',
+    // Single source of truth for everything per-mode. Adding a new mode is one entry here.
+    //
+    // Required fields:
+    //   prefix       - single character shown on the shortcut tile (also typed by user)
+    //   label        - mode-indicator text in the input row
+    //   placeholder  - input placeholder when this mode is active
+    //   tile         - { title, subtitle, icon } for the default-view Shortcuts row
+    //   test(v)      - returns true when raw input v should enter this mode
+    //   strip(v)     - returns the prefix-stripped query
+    //
+    // Optional fields:
+    //   builder(ctx)   - per-mode item builder; falls back to buildModeItems when absent
+    //   skipCap        - true to bypass GLOBAL_ITEM_CAP (the builder is expected to self-cap)
+    //   requiresNav    - nav entry name; mode is hidden (and tile suppressed) when absent
+    //
+    // Iteration order matters: it determines tile order in renderDefault and the
+    // scan order for resolveContext's prefix detection. All current tests are
+    // mutually exclusive on the first character, so detection order is
+    // behaviorally irrelevant; tile order is what users see.
+    //
+    // Forward references to buildSealedItems / buildUploadItems are fine: function
+    // declarations are hoisted to the top of the IIFE, and these slots are only
+    // dereferenced at call time (inside handleInput), well after hoisting completes.
+    var MODES = {
+        nav: {
+            prefix: '>',
+            label: 'NAV',
+            placeholder: 'Filter pages...',
+            tile: { title: 'Pages', subtitle: 'Browse navigation and sub-pages', icon: 'compass' },
             test:  function (v) { return v.charAt(0) === '>'; },
             strip: function (v) { return v.substring(1).trim(); }
         },
-        {
-            mode:  'saved',
+        help: {
+            prefix: '?',
+            label: 'HELP',
+            placeholder: 'Search help & syntax...',
+            tile: { title: 'Help & syntax', subtitle: 'Search reference and snippets', icon: 'help-circle' },
+            test:  function (v) { return v.charAt(0) === '?' || /^(help:|syntax:)/i.test(v); },
+            strip: function (v) { return v.replace(/^(\?\s*|help:|syntax:|\?:)/i, '').trim(); }
+        },
+        saved: {
+            prefix: '*',
+            label: 'SAVED',
+            placeholder: 'Filter saved searches...',
+            tile: { title: 'Saved', subtitle: 'Your saved searches and commands', icon: 'bookmark' },
             test:  function (v) { return v.charAt(0) === '*' || /^saved:/i.test(v); },
             strip: function (v) { return v.replace(/^(\*|saved:)/i, '').trim(); }
         },
-        {
-            mode:  'recent',
+        recent: {
+            prefix: '<',
+            label: 'RECENT',
+            placeholder: 'Filter recent searches...',
+            tile: { title: 'Recent', subtitle: 'Your recent searches', icon: 'clock' },
             test:  function (v) { return v.charAt(0) === '<' || /^recent:/i.test(v); },
             strip: function (v) { return v.replace(/^(<|recent:)/i, '').trim(); }
         },
-        {
-            mode:  'sealed',
+        sealed: {
+            prefix: '$',
+            label: 'SEALED',
+            placeholder: 'Search sealed products...',
+            tile: { title: 'Sealed', subtitle: 'Search sealed products and open contents', icon: 'package' },
+            builder: buildSealedItems,
+            skipCap: true,
             test:  function (v) { return v.charAt(0) === '$'; },
             strip: function (v) { return v.substring(1).trim(); }
         },
-        {
-            mode:  'upload',
+        upload: {
+            prefix: '+',
+            label: 'UPLOAD',
+            placeholder: 'Paste URL or pick a file...',
+            tile: { title: 'Upload', subtitle: 'Send a URL, file, or page results', icon: 'upload' },
+            builder: buildUploadItems,
+            skipCap: true,
+            requiresNav: 'Upload',
             test:  function (v) {
                 if (!NAV_NAMES['Upload']) return false;
                 if (v.charAt(0) !== '+')   return false;
@@ -621,7 +667,7 @@
             },
             strip: function (v) { return v.substring(1).trim(); }
         }
-    ];
+    };
 
     // Returns one of:
     //   { kind: 'provider', prefix, provider, query }
@@ -658,9 +704,11 @@
             }
         }
         // 3. Mode prefix in input.
-        for (var m = 0; m < MODE_PREFIXES.length; m++) {
-            if (MODE_PREFIXES[m].test(raw)) {
-                return { kind: 'mode', mode: MODE_PREFIXES[m].mode, query: MODE_PREFIXES[m].strip(raw) };
+        var modeKeys = Object.keys(MODES);
+        for (var m = 0; m < modeKeys.length; m++) {
+            var mk = modeKeys[m];
+            if (MODES[mk].test(raw)) {
+                return { kind: 'mode', mode: mk, query: MODES[mk].strip(raw) };
             }
         }
         // 4. Default search.
@@ -677,14 +725,7 @@
             return;
         }
         if (ctx.kind === 'mode') {
-            input.placeholder = ({
-                help:   'Search help & syntax...',
-                nav:    'Filter pages...',
-                saved:  'Filter saved searches...',
-                recent: 'Filter recent searches...',
-                sealed: 'Search sealed products...',
-                upload: 'Paste URL or pick a file...'
-            })[ctx.mode];
+            input.placeholder = (MODES[ctx.mode] && MODES[ctx.mode].placeholder) || '';
             return;
         }
         if (chips && chips.count() > 0) {
@@ -697,7 +738,7 @@
     function applyModeIndicator(ctx) {
         var label = '';
         if (ctx.kind === 'mode') {
-            label = ({ help: 'HELP', nav: 'NAV', saved: 'SAVED', recent: 'RECENT', sealed: 'SEALED', upload: 'UPLOAD' })[ctx.mode] || '';
+            label = (MODES[ctx.mode] && MODES[ctx.mode].label) || '';
         }
         if (label) {
             modeTag.textContent = label;
@@ -1459,24 +1500,19 @@
     // ════════════════════════════════════════════════════════════════
 
     function renderDefault() {
-        var tiles = [
-            { type: 'header', title: 'Shortcuts' },
-            { type: 'shortcut', title: 'Pages',         subtitle: 'Browse navigation and sub-pages',
-              icon: 'compass',     shortcut: '>', action: function () { input.value = '>'; handleInput(); } },
-            { type: 'shortcut', title: 'Help & syntax', subtitle: 'Search reference and snippets',
-              icon: 'help-circle', shortcut: '?', action: function () { input.value = '?'; handleInput(); } },
-            { type: 'shortcut', title: 'Saved',         subtitle: 'Your saved searches and commands',
-              icon: 'bookmark',    shortcut: '*', action: function () { input.value = '*'; handleInput(); } },
-            { type: 'shortcut', title: 'Recent',        subtitle: 'Your recent searches',
-              icon: 'clock',       shortcut: '<', action: function () { input.value = '<'; handleInput(); } },
-            { type: 'shortcut', title: 'Sealed',        subtitle: 'Search sealed products and open contents',
-              icon: 'package',     shortcut: '$', action: function () { input.value = '$'; handleInput(); } }
-        ];
-        if (NAV_NAMES['Upload']) {
+        var tiles = [{ type: 'header', title: 'Shortcuts' }];
+        var keys = Object.keys(MODES);
+        for (var i = 0; i < keys.length; i++) {
+            var key = keys[i];
+            var def = MODES[key];
+            if (def.requiresNav && !NAV_NAMES[def.requiresNav]) continue;
             tiles.push({
-                type: 'shortcut', title: 'Upload', subtitle: 'Send a URL, file, or page results',
-                icon: 'upload', shortcut: '+',
-                action: function () { input.value = '+'; handleInput(); }
+                type:     'shortcut',
+                title:    def.tile.title,
+                subtitle: def.tile.subtitle,
+                icon:     def.tile.icon,
+                shortcut: def.prefix,
+                action:   (function (p) { return function () { input.value = p; handleInput(); }; })(def.prefix)
             });
         }
         renderResults(tiles);
@@ -1625,19 +1661,10 @@
     //  handleInput — the dispatcher
     // ════════════════════════════════════════════════════════════════
 
-    // Per-mode item builders. Modes not present here fall through to buildModeItems.
-    // Forward references to buildSealedItems / buildUploadItems are fine: function
-    // declarations are hoisted to the top of the IIFE, and these tables are only
-    // indexed at call time (inside handleInput), well after hoisting completes.
-    var MODE_BUILDERS = {
-        sealed: buildSealedItems,
-        upload: buildUploadItems
-    };
-
-    // kinds and modes whose results bypass the GLOBAL_ITEM_CAP. Provider has its own
-    // internal cap (DROPDOWN_CAP=30); sub-views and mode-specific builders self-cap.
+    // kinds whose results bypass the GLOBAL_ITEM_CAP. Provider has its own internal
+    // cap (DROPDOWN_CAP=30); sub-views and sealed-actions menus self-cap. Per-mode
+    // skipCap lives on each MODES entry alongside its other metadata.
     var KINDS_SKIP_CAP = { provider: true, subview: true, 'sealed-actions': true };
-    var MODES_SKIP_CAP = { sealed: true, upload: true };
 
     function handleInput() {
         var raw = input.value;
@@ -1657,7 +1684,9 @@
         switch (ctx.kind) {
             case 'provider':       items = buildProviderItems(ctx); break;
             case 'subview':        items = buildSubViewItems(ctx);  break;
-            case 'mode':           items = (MODE_BUILDERS[ctx.mode] || buildModeItems)(ctx); break;
+            case 'mode':
+                items = ((MODES[ctx.mode] && MODES[ctx.mode].builder) || buildModeItems)(ctx);
+                break;
             case 'sealed-actions': items = buildSealedActionItems(ctx); break;
             default:               items = buildSearchItems(ctx.query);
         }
@@ -1665,7 +1694,7 @@
         // sub-view results have no internal cap by design (full filter/sort menu). Mode-
         // specific builders (sealed/upload) self-cap. Everything else gets GLOBAL_ITEM_CAP.
         var skipCap = KINDS_SKIP_CAP[ctx.kind]
-                   || (ctx.kind === 'mode' && MODES_SKIP_CAP[ctx.mode]);
+                   || (ctx.kind === 'mode' && MODES[ctx.mode] && MODES[ctx.mode].skipCap);
         var capped = skipCap ? items : capItems(items, GLOBAL_ITEM_CAP);
         renderResults(capped);
     }
