@@ -141,6 +141,22 @@
         setJSON(RECENT_KEY, recent);
     }
 
+    function parseUploadURL(s) {
+        try {
+            var u = new URL(s);
+            if (u.host === 'store.tcgplayer.com')                            return { label: 'TCGplayer collection' };
+            if (u.host === 'moxfield.com' || u.host === 'www.moxfield.com')  return { label: 'Moxfield deck' };
+            if (u.host === 'docs.google.com')                                 return { label: 'Google Sheets' };
+            return null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function countDataHashRows() {
+        return document.querySelectorAll('tr[data-hash]').length;
+    }
+
     function sealedAction(kind, name) {
         var path = '/sealed?q=';
         if      (kind === 'contents') path += encodeURIComponent('contents:' + name);
@@ -1026,6 +1042,44 @@
         return [{ type: 'header', title: 'Sealed' }].concat(matches);
     }
 
+    function buildUploadItems(ctx) {
+        var query = ctx.query.trim();
+        var rows  = [{ type: 'header', title: 'Upload' }];
+
+        if (query) {
+            var parsed = parseUploadURL(query);
+            if (parsed) {
+                rows.push({
+                    type: 'upload-url', title: 'Upload from ' + parsed.label,
+                    subtitle: query, icon: 'link', uploadURL: query
+                });
+            } else {
+                rows.push({
+                    type: 'upload-error', title: 'Unsupported URL',
+                    subtitle: 'Allowed: TCGplayer collection, Moxfield deck, Google Sheets',
+                    icon: 'alert-circle', disabled: true
+                });
+            }
+        }
+
+        rows.push({
+            type: 'upload-file', title: 'Browse for file...',
+            subtitle: 'CSV, XLS, or XLSX', icon: 'file-up'
+        });
+
+        var hashCount = countDataHashRows();
+        if (hashCount > 0 && window.location.pathname !== '/upload') {
+            rows.push({
+                type: 'upload-page-results',
+                title: 'Send ' + hashCount + ' result' + (hashCount === 1 ? '' : 's') + ' to Uploader',
+                subtitle: 'Posts the hashes from the current page',
+                icon: 'send'
+            });
+        }
+
+        return rows;
+    }
+
     function buildSealedActionItems(ctx) {
         var name = ctx.sealedChip._sealedName;
         var meta = S.sealedMetaCache[name];
@@ -1317,6 +1371,30 @@
             onEnter:      function (item) { sealedAction(item.actionKey, item.sealedName); },
             onShiftEnter: function (item) { sealedAction('contents',     item.sealedName); },
             onCtrlEnter:  function (item) { sealedAction('unpack',       item.sealedName); }
+        },
+
+        'upload-url': {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Submit URL' }; },
+            onEnter: function (item) { /* filled in next task */ }
+        },
+
+        'upload-file': {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Pick file' }; },
+            onEnter: function (item) { /* filled in next task */ }
+        },
+
+        'upload-page-results': {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Send results' }; },
+            onEnter: function (item) { /* filled in next task */ }
+        },
+
+        'upload-error': {
+            render:  rowHTML,
+            footer:  function () { return { action: '' }; },
+            onEnter: function () { /* no-op */ }
         }
     };
 
@@ -1476,7 +1554,7 @@
             tabEl.innerHTML = '';
             return;
         }
-        actionEl.innerHTML = '<kbd>Enter</kbd> ' + hints.action;
+        actionEl.innerHTML = hints.action ? '<kbd>Enter</kbd> ' + hints.action : '';
         if (hints.tab) {
             // hints.tab can be a plain label or a full "<kbd>X</kbd> Label" string.
             tabEl.innerHTML = /<kbd>/i.test(hints.tab) ? hints.tab : '<kbd>Tab</kbd> ' + hints.tab;
@@ -1496,13 +1574,14 @@
     // declarations are hoisted to the top of the IIFE, and these tables are only
     // indexed at call time (inside handleInput), well after hoisting completes.
     var MODE_BUILDERS = {
-        sealed: buildSealedItems
+        sealed: buildSealedItems,
+        upload: buildUploadItems
     };
 
     // kinds and modes whose results bypass the GLOBAL_ITEM_CAP. Provider has its own
     // internal cap (DROPDOWN_CAP=30); sub-views and mode-specific builders self-cap.
     var KINDS_SKIP_CAP = { provider: true, subview: true, 'sealed-actions': true };
-    var MODES_SKIP_CAP = { sealed: true };
+    var MODES_SKIP_CAP = { sealed: true, upload: true };
 
     function handleInput() {
         var raw = input.value;
