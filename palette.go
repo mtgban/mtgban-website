@@ -355,3 +355,59 @@ func paletteArbitTargetsJSON(variant string) template.JS {
 	data, _ := json.Marshal(out)
 	return template.JS(data)
 }
+
+type PaletteSealedMetaResponse struct {
+	Name        string `json:"name"`
+	Found       bool   `json:"found"`
+	UUID        string `json:"uuid,omitempty"`
+	SetCode     string `json:"setCode,omitempty"`
+	HasContents bool   `json:"hasContents"`
+	HasPicks    bool   `json:"hasPicks"`
+}
+
+// PaletteSealed reports availability of contents-mode and pack-pull-mode searches
+// for a sealed product, used by the palette to gate action rows.
+func PaletteSealed(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+
+	escaped := strings.TrimPrefix(r.URL.EscapedPath(), "/api/palette/sealed/")
+	if escaped == "" {
+		json.NewEncoder(w).Encode(PaletteSealedMetaResponse{Found: false})
+		return
+	}
+	decoded, err := url.PathUnescape(escaped)
+	if err != nil {
+		decoded = escaped
+	}
+	name := strings.ReplaceAll(decoded, "+", " ")
+
+	resp := PaletteSealedMetaResponse{Name: name}
+
+	// Direct UUID lookup first; fall back to name resolution via the sealed-name index.
+	co, err := mtgmatcher.GetUUID(name)
+	if err != nil || co == nil {
+		co, err = mtgmatcher.GetUUID(sealedname2uuid(name))
+		if err != nil || co == nil {
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
+	}
+	if !co.Sealed {
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
+
+	resp.Found = true
+	resp.UUID = co.UUID
+	resp.SetCode = co.SetCode
+
+	if uuids := fixupContents(co.UUID); len(uuids) > 0 {
+		resp.HasContents = true
+	}
+	if _, picksErr := mtgmatcher.GetPicksForSealed(co.SetCode, co.UUID); picksErr == nil {
+		resp.HasPicks = true
+	}
+
+	json.NewEncoder(w).Encode(resp)
+}

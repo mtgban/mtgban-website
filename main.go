@@ -960,6 +960,7 @@ func main() {
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
 	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(PaletteCardMeta)))
+	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(PaletteSealed)))
 	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(PaletteSets)))
 	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(PaletteStores)))
 
