@@ -1227,17 +1227,18 @@
         }
 
         // On /upload results page: surface the same export buttons the page renders.
-        if (window.location.pathname === '/upload' && document.getElementById('submit_download')) {
+        // Results page exposes window.submitExport(field, newWindow); input page does not.
+        if (window.location.pathname === '/upload' && typeof window.submitExport === 'function') {
             rows.push({ type: 'header', title: 'Export Results' });
             rows.push(
-                { type: 'upload-export', title: 'Get CSV',             subtitle: 'All results as CSV',
-                  icon: 'download',      exportButtonId: 'submit_download' },
+                { type: 'upload-export', title: 'Get CSV',              subtitle: 'All results as CSV',
+                  icon: 'download',      exportField: 'download',       exportNewWindow: false },
                 { type: 'upload-export', title: 'CardConduit Estimate', subtitle: 'Send to CardConduit (new tab)',
-                  icon: 'external-link', exportButtonId: 'submit_estimate' },
-                { type: 'upload-export', title: 'Deckbox CSV',         subtitle: 'Deckbox-format CSV',
-                  icon: 'archive',       exportButtonId: 'submit_deckbox' },
-                { type: 'upload-export', title: 'TCGplayer CSV',       subtitle: 'TCGplayer-format CSV',
-                  icon: 'shopping-cart', exportButtonId: 'submit_tcgplayer_csv' }
+                  icon: 'external-link', exportField: 'estimate',       exportNewWindow: true },
+                { type: 'upload-export', title: 'Deckbox CSV',          subtitle: 'Deckbox-format CSV',
+                  icon: 'archive',       exportField: 'deckbox',        exportNewWindow: false },
+                { type: 'upload-export', title: 'TCGplayer CSV',        subtitle: 'TCGplayer-format CSV',
+                  icon: 'shopping-cart', exportField: 'tcgplayer_csv',  exportNewWindow: false }
             );
         }
 
@@ -1568,10 +1569,9 @@
             render:  rowHTML,
             footer:  function (item) { return { action: item.title }; },
             onEnter: function (item) {
-                var btn = document.getElementById(item.exportButtonId);
-                if (!btn) return;
+                if (typeof window.submitExport !== 'function') return;
                 closePalette();
-                btn.click();
+                window.submitExport(item.exportField, item.exportNewWindow);
             }
         }
     };
