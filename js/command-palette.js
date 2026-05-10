@@ -1831,7 +1831,8 @@
                 chipsSnapshot.push({
                     type: c.type, prefix: c.prefix, value: c.value, label: c.label, icon: c.icon,
                     navName: c.navName, navLink: c.navLink,
-                    _cardName: c._cardName, _parentKey: c._parentKey, _urlParam: c._urlParam
+                    _cardName: c._cardName, _sealedName: c._sealedName,
+                    _parentKey: c._parentKey, _urlParam: c._urlParam
                 });
             }
         }
