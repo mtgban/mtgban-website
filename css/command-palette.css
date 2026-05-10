@@ -222,6 +222,11 @@
     object-fit: contain;
 }
 
+/* CardConduit logo is monochrome black; invert to white in dark mode. */
+body.dark-theme .cp-result-icon img[src*="cardconduit"] {
+    filter: invert(1);
+}
+
 .cp-result.active .cp-result-icon {
     color: var(--ainfo, #559eff);
 }
