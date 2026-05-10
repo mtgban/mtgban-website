@@ -598,14 +598,15 @@
 .cp-chip-nav-sub .cp-chip-icon { color: #8b5cf6; }
 .cp-chip.active .cp-chip-icon { color: inherit; }
 
-/* Sealed chip variant: amber-tinted background + border to distinguish
-   sealed-product chips from card/filter/nav chips. Icon color matches. */
+/* Sealed chip variant: cyan-tinted background + border to distinguish
+   sealed-product chips from card/filter/nav chips. Cyan evokes "package/box"
+   semantically and avoids the amber hue used by the filter chip. Icon color matches. */
 .cp-chip-sealed {
-    background: rgba(217, 119, 6, 0.12);
-    border-color: rgba(217, 119, 6, 0.3);
+    background: rgba(8, 145, 178, 0.14);
+    border-color: rgba(8, 145, 178, 0.4);
     color: var(--normal, #111);
 }
-.cp-chip-sealed .cp-chip-icon { color: rgb(217, 119, 6); }
+.cp-chip-sealed .cp-chip-icon { color: rgb(8, 145, 178); }
 
 /* Disabled result row (e.g. unsupported-URL upload error): muted body,
    warning-tinted icon. */
