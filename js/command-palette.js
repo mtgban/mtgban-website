@@ -1235,7 +1235,7 @@
                   icon: 'download',
                   exportField: 'download',       exportNewWindow: false },
                 { type: 'upload-export', title: 'CardConduit Estimate', subtitle: 'Send to CardConduit (new tab)',
-                  icon: 'external-link',
+                  iconHtml: '<img src="/img/logo/cardconduit.svg" alt="">',
                   exportField: 'estimate',       exportNewWindow: true },
                 { type: 'upload-export', title: 'Deckbox CSV',          subtitle: 'Deckbox-format CSV',
                   iconHtml: '<img src="/img/logo/deckbox.webp" alt="">',
