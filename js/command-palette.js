@@ -173,6 +173,20 @@
         form.appendChild(i);
     }
 
+    function showUploadingState(msg) {
+        resultsEl.innerHTML =
+            '<div class="cp-result"><div class="cp-result-icon cp-spinner">'
+            + '<i data-lucide="loader-2"></i></div>'
+            + '<div class="cp-result-body"><div class="cp-result-title">' + esc(msg) + '</div>'
+            + '<div class="cp-result-subtitle">Hang tight, this can take a few seconds...</div>'
+            + '</div></div>';
+        S.items = [];
+        S.activeIndex = -1;
+        if (typeof lucide !== 'undefined' && lucide.createIcons) {
+            lucide.createIcons({ nodes: resultsEl.querySelectorAll('[data-lucide]') });
+        }
+    }
+
     // upload.go's cookie fallback for stores only fires when hashes is non-empty;
     // URL/file submissions must include the saved store list explicitly.
     function appendUserStores(form) {
@@ -195,6 +209,7 @@
         appendHidden(form, 'gdocURL', url);
         appendUserStores(form);
         document.body.appendChild(form);
+        showUploadingState('Submitting URL to Uploader...');
         form.submit();
     }
 
@@ -212,6 +227,7 @@
         picker.addEventListener('change', function () {
             if (!picker.files || !picker.files[0]) return;
             appendUserStores(form);
+            showUploadingState('Uploading ' + picker.files[0].name + '...');
             form.submit();
         });
 
@@ -240,6 +256,7 @@
             }
         });
         document.body.appendChild(form);
+        showUploadingState('Sending ' + sources.length + ' result' + (sources.length === 1 ? '' : 's') + ' to Uploader...');
         form.submit();
     }
 
