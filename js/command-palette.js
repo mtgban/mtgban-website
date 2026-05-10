@@ -45,6 +45,8 @@
         previousFocus:      null,
         cardNames:          null,
         cardNamesLoading:   false,
+        sealedNames:        null,
+        sealedNamesLoading: false,
         cardMetaCache:      {},
         cardMetaInflight:   {},
         lastChipCount:      0,
@@ -251,6 +253,19 @@
             }
         }
         return null;
+    }
+
+    function ensureSealedNames() {
+        if (S.sealedNames || S.sealedNamesLoading) return;
+        if (typeof fetchNames !== 'function') return;
+        S.sealedNamesLoading = true;
+        fetchNames('true')
+            .then(function (names) {
+                S.sealedNames = names || [];
+                S.sealedNamesLoading = false;
+                if (S.open) handleInput();
+            })
+            .catch(function () { S.sealedNamesLoading = false; });
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -913,6 +928,34 @@
         return list.length ? [{ type: 'header', title: headerTitle }].concat(list) : [];
     }
 
+    function buildSealedItems(ctx) {
+        var query = ctx.query;
+        if (!S.sealedNames) {
+            ensureSealedNames();
+            return [{ type: 'header', title: 'Sealed - loading...' }];
+        }
+        var matches = [];
+        for (var i = 0; i < S.sealedNames.length && matches.length < 8; i++) {
+            if (!query || matchCardName(query, S.sealedNames[i])) {
+                matches.push({
+                    type:       'sealed-suggestion',
+                    title:      S.sealedNames[i],
+                    subtitle:   'Sealed product',
+                    icon:       'package',
+                    sealedName: S.sealedNames[i]
+                });
+            }
+        }
+        if (matches.length === 0 && query) {
+            return [
+                { type: 'header', title: 'Sealed' },
+                { type: 'sealed-fallback', title: 'Search sealed for "' + query + '"',
+                  icon: 'search', sealedQuery: query }
+            ];
+        }
+        return [{ type: 'header', title: 'Sealed' }].concat(matches);
+    }
+
     function buildSearchItems(query) {
         var items = [];
 
@@ -1151,6 +1194,18 @@
             render:  rowHTML,
             footer:  function () { return { action: 'Search' }; },
             onEnter: function (item) { item.action(); }
+        },
+
+        'sealed-suggestion': {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Search', tab: 'Lock product' }; },
+            onEnter: function (item) { /* filled in next task */ }
+        },
+
+        'sealed-fallback': {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Search' }; },
+            onEnter: function (item) { /* filled in next task */ }
         }
     };
 
@@ -1317,6 +1372,19 @@
     //  handleInput — the dispatcher
     // ════════════════════════════════════════════════════════════════
 
+    // Per-mode item builders. Modes not present here fall through to buildModeItems.
+    // Forward references to buildSealedItems / buildUploadItems are fine: function
+    // declarations are hoisted to the top of the IIFE, and these tables are only
+    // indexed at call time (inside handleInput), well after hoisting completes.
+    var MODE_BUILDERS = {
+        sealed: buildSealedItems
+    };
+
+    // kinds and modes whose results bypass the GLOBAL_ITEM_CAP. Provider has its own
+    // internal cap (DROPDOWN_CAP=30); sub-views and mode-specific builders self-cap.
+    var KINDS_SKIP_CAP = { provider: true, subview: true };
+    var MODES_SKIP_CAP = { sealed: true };
+
     function handleInput() {
         var raw = input.value;
         var ctx = resolveContext(raw);
@@ -1335,15 +1403,15 @@
         switch (ctx.kind) {
             case 'provider': items = buildProviderItems(ctx); break;
             case 'subview':  items = buildSubViewItems(ctx);  break;
-            case 'mode':     items = buildModeItems(ctx);     break;
+            case 'mode':     items = (MODE_BUILDERS[ctx.mode] || buildModeItems)(ctx); break;
             default:         items = buildSearchItems(ctx.query);
         }
         // Provider results are already capped at DROPDOWN_CAP (30) inside buildProviderItems;
-        // sub-view results have no internal cap by design (full filter/sort menu). Only the
-        // mode and search branches get the smaller GLOBAL_ITEM_CAP (10).
-        var capped = (ctx.kind === 'provider' || ctx.kind === 'subview')
-            ? items
-            : capItems(items, GLOBAL_ITEM_CAP);
+        // sub-view results have no internal cap by design (full filter/sort menu). Mode-
+        // specific builders (sealed/upload) self-cap. Everything else gets GLOBAL_ITEM_CAP.
+        var skipCap = KINDS_SKIP_CAP[ctx.kind]
+                   || (ctx.kind === 'mode' && MODES_SKIP_CAP[ctx.mode]);
+        var capped = skipCap ? items : capItems(items, GLOBAL_ITEM_CAP);
         renderResults(capped);
     }
 
