@@ -691,3 +691,10 @@
     padding: 1px 6px;
     margin-top: 2px;
 }
+
+@keyframes cp-spin {
+    to { transform: rotate(360deg); }
+}
+.cp-spinner svg {
+    animation: cp-spin 0.9s linear infinite;
+}
