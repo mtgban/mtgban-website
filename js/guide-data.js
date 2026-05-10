@@ -157,6 +157,33 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'upload-mode',
+            category: 'Command Palette',
+            title: 'Upload Mode',
+            icon: 'upload',
+            summary: 'Send URLs, files, or current results to the Uploader without leaving the palette.',
+            snippets: ['+', '+https://docs.google.com/...', '+ Browse for file...', '+ Send results'],
+            keywords: ['upload', 'uploader', 'url', 'file', 'csv', 'xls', 'xlsx', 'sheets', 'moxfield', 'tcgplayer', 'send', 'hashes', 'collection'],
+            requiresNav: 'Upload',
+            content: {
+                description: '<p>Type <code>+</code> as the first character to enter <strong>Upload mode</strong> (available when your tier includes the Uploader). The dropdown adapts to what is available:</p><ul><li><strong>Pasted URL</strong> - any input matching <code>store.tcgplayer.com</code>, <code>moxfield.com</code>, or <code>docs.google.com</code> shows an "Upload from..." row identifying the source.</li><li><strong>Browse for file...</strong> - always present; opens the native file picker for CSV / XLS / XLSX.</li><li><strong>Send N results to Uploader</strong> - shown on any page with row hashes (search and contents results); posts the visible hashes to the Uploader.</li></ul><p>All paths submit to <code>/upload</code> as a POST. Your saved upload preferences (mode, store list, optimizer settings) ride along automatically as cookies, so the result page reflects whatever you last configured at <code>/upload</code>.</p><p>Unsupported URL hosts render an error row that ignores Enter; pick one of the supported sources or use the file picker.</p>',
+                table: [
+                    { value: '+',                                    short: 'Enter upload mode (when tier permits)' },
+                    { value: '+<URL>',                               short: 'Submit a Sheets / Moxfield / TCGplayer URL' },
+                    { value: 'Browse for file...',                   short: 'Open native file picker (CSV/XLS/XLSX)' },
+                    { value: 'Send N results to Uploader',           short: 'Shown on results pages; posts row hashes to /upload' },
+                    { value: 'Cookies (mode, stores, optimizer)',    short: 'Honored from your last /upload session' }
+                ],
+                examples: [
+                    { query: '+https://docs.google.com/spreadsheets/d/...',         desc: 'Submit a Google Sheets collection' },
+                    { query: '+https://www.moxfield.com/decks/abc',                  desc: 'Submit a Moxfield deck' },
+                    { query: 'On /search?q=lightning bolt -> + -> Send results',     desc: 'Push current results to Uploader' },
+                    { query: '+ -> Browse for file... -> pick collection.csv',       desc: 'Local file path' }
+                ]
+            }
+        },
+
+        {
             id: 'palette-walkthroughs',
             category: 'Command Palette',
             title: 'Walkthroughs',
