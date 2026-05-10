@@ -1170,6 +1170,12 @@
                     icon: 'alert-circle', disabled: true
                 });
             }
+        } else {
+            rows.push({
+                type: 'upload-hint', title: 'Type or paste a URL',
+                subtitle: 'TCGplayer collection, Moxfield deck, or Google Sheets',
+                icon: 'link', disabled: true
+            });
         }
 
         rows.push({
@@ -1499,6 +1505,12 @@
         },
 
         'upload-error': {
+            render:  rowHTML,
+            footer:  function () { return { action: '' }; },
+            onEnter: function () { /* no-op */ }
+        },
+
+        'upload-hint': {
             render:  rowHTML,
             footer:  function () { return { action: '' }; },
             onEnter: function () { /* no-op */ }
