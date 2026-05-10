@@ -49,6 +49,8 @@
         sealedNamesLoading: false,
         cardMetaCache:      {},
         cardMetaInflight:   {},
+        sealedMetaCache:    {},
+        sealedMetaInflight: {},
         lastChipCount:      0,
         suppressChipOnChange: false,
         saveModalOpen:      false,
@@ -256,6 +258,10 @@
         return S.cardMetaInflight[name];
     }
 
+    function fetchSealedMeta(_name) {
+        return Promise.resolve(null);
+    }
+
     function activeCardMeta() {
         if (!chips) return null;
         var list = chips.all();
@@ -405,6 +411,18 @@
         fetchCardMeta(item.cardName);
     }
 
+    function lockSealedChip(item) {
+        addChipSilent({
+            type:        'sealed',
+            value:       item.sealedName,
+            label:       item.sealedName,
+            icon:        'package',
+            _sealedName: item.sealedName
+        });
+        fetchSealedMeta(item.sealedName);
+        input.value = '';
+    }
+
     function lockParentNavChip(item) {
         addChipSilent({
             type:    'nav',
@@ -525,6 +543,15 @@
                     var t = getNavTargets(list[i].navName);
                     if (t) return { kind: 'subview', parentChip: list[i], targets: t, query: raw.trim() };
                     break;
+                }
+            }
+        }
+        // 2b. Sealed chip locked → sealed-actions menu.
+        if (chips) {
+            var sealedList = chips.all();
+            for (var si = sealedList.length - 1; si >= 0; si--) {
+                if (sealedList[si].type === 'sealed') {
+                    return { kind: 'sealed-actions', sealedChip: sealedList[si], query: raw.trim() };
                 }
             }
         }
@@ -968,6 +995,31 @@
         return [{ type: 'header', title: 'Sealed' }].concat(matches);
     }
 
+    function buildSealedActionItems(ctx) {
+        var name = ctx.sealedChip._sealedName;
+        var meta = S.sealedMetaCache[name];
+
+        var rows = [{
+            type: 'sealed-action', title: 'Search', subtitle: 'Price grid for this product',
+            icon: 'search', actionKey: 'search', actionLabel: 'Search', sealedName: name
+        }];
+        // Show contents and pack-pull rows optimistically until meta resolves; hide only
+        // when the backend confirms the action would dead-end (hasContents=false / hasPicks=false).
+        if (!meta || meta.hasContents) {
+            rows.push({
+                type: 'sealed-action', title: 'View Contents', subtitle: 'Cards inside this product',
+                icon: 'list', actionKey: 'contents', actionLabel: 'View Contents', sealedName: name
+            });
+        }
+        if (!meta || meta.hasPicks) {
+            rows.push({
+                type: 'sealed-action', title: 'Pack Pull', subtitle: 'Simulate opening this product',
+                icon: 'shuffle', actionKey: 'unpack', actionLabel: 'Pack Pull', sealedName: name
+            });
+        }
+        return [{ type: 'header', title: 'Actions: ' + name }].concat(rows);
+    }
+
     function buildSearchItems(query) {
         var items = [];
 
@@ -1218,13 +1270,22 @@
             },
             onEnter:      function (item) { sealedAction('search',   item.sealedName); },
             onShiftEnter: function (item) { sealedAction('contents', item.sealedName); },
-            onCtrlEnter:  function (item) { sealedAction('unpack',   item.sealedName); }
+            onCtrlEnter:  function (item) { sealedAction('unpack',   item.sealedName); },
+            onTab:        function (item) { lockSealedChip(item); return true; }
         },
 
         'sealed-fallback': {
             render:  rowHTML,
             footer:  function () { return { action: 'Search' }; },
             onEnter: function (item) { sealedAction('search', item.sealedQuery); }
+        },
+
+        'sealed-action': {
+            render:       rowHTML,
+            footer:       function (item) { return { action: item.actionLabel }; },
+            onEnter:      function (item) { sealedAction(item.actionKey, item.sealedName); },
+            onShiftEnter: function (item) { sealedAction('contents',     item.sealedName); },
+            onCtrlEnter:  function (item) { sealedAction('unpack',       item.sealedName); }
         }
     };
 
@@ -1401,7 +1462,7 @@
 
     // kinds and modes whose results bypass the GLOBAL_ITEM_CAP. Provider has its own
     // internal cap (DROPDOWN_CAP=30); sub-views and mode-specific builders self-cap.
-    var KINDS_SKIP_CAP = { provider: true, subview: true };
+    var KINDS_SKIP_CAP = { provider: true, subview: true, 'sealed-actions': true };
     var MODES_SKIP_CAP = { sealed: true };
 
     function handleInput() {
@@ -1420,10 +1481,11 @@
 
         var items;
         switch (ctx.kind) {
-            case 'provider': items = buildProviderItems(ctx); break;
-            case 'subview':  items = buildSubViewItems(ctx);  break;
-            case 'mode':     items = (MODE_BUILDERS[ctx.mode] || buildModeItems)(ctx); break;
-            default:         items = buildSearchItems(ctx.query);
+            case 'provider':       items = buildProviderItems(ctx); break;
+            case 'subview':        items = buildSubViewItems(ctx);  break;
+            case 'mode':           items = (MODE_BUILDERS[ctx.mode] || buildModeItems)(ctx); break;
+            case 'sealed-actions': items = buildSealedActionItems(ctx); break;
+            default:               items = buildSearchItems(ctx.query);
         }
         // Provider results are already capped at DROPDOWN_CAP (30) inside buildProviderItems;
         // sub-view results have no internal cap by design (full filter/sort menu). Mode-
