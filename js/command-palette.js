@@ -153,8 +153,16 @@
         }
     }
 
+    function pageUploadHashInputs() {
+        // Search results render hashes as hidden inputs in a sidebar /upload form.
+        // Upload-results pages render them as tr[data-hash] rows.
+        var inputs = document.querySelectorAll('form[action="/upload"] input[name="hashes"]');
+        if (inputs.length > 0) return inputs;
+        return document.querySelectorAll('tr[data-hash]');
+    }
+
     function countDataHashRows() {
-        return document.querySelectorAll('tr[data-hash]').length;
+        return pageUploadHashInputs().length;
     }
 
     function appendHidden(form, name, value) {
@@ -197,17 +205,23 @@
     }
 
     function submitUploadPageResults() {
-        var rows = document.querySelectorAll('tr[data-hash]');
-        if (rows.length === 0) { showToast('No results on this page'); return; }
+        var sources = pageUploadHashInputs();
+        if (sources.length === 0) { showToast('No results on this page'); return; }
         var form = document.createElement('form');
         form.method = 'post';
         form.action = '/upload';
         form.style.display = 'none';
-        rows.forEach(function (row) {
-            appendHidden(form, 'hashes',      row.dataset.hash  || '');
-            appendHidden(form, 'hashesQtys',  row.dataset.qtys  || '');
-            appendHidden(form, 'hashesCond',  row.dataset.cond  || '');
-            appendHidden(form, 'hashesPrice', row.dataset.price || '');
+        sources.forEach(function (el) {
+            // input[name="hashes"] (sidebar form) → use el.value
+            // tr[data-hash] (upload results) → use el.dataset.* with qty/cond/price
+            if (el.tagName === 'INPUT') {
+                appendHidden(form, 'hashes', el.value || '');
+            } else {
+                appendHidden(form, 'hashes',      el.dataset.hash  || '');
+                appendHidden(form, 'hashesQtys',  el.dataset.qtys  || '');
+                appendHidden(form, 'hashesCond',  el.dataset.cond  || '');
+                appendHidden(form, 'hashesPrice', el.dataset.price || '');
+            }
         });
         document.body.appendChild(form);
         form.submit();
