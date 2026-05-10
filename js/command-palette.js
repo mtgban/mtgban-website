@@ -970,7 +970,7 @@
                             }
                         }
                     } else if (cmd.query) {
-                        // V1 saved command (no chips field) — restore as plain input text.
+                        // V1 saved command (no chips field) - restore as plain input text.
                         input.value = cmd.query;
                     }
                     input.focus();
@@ -1449,7 +1449,7 @@
             footer:       function () {
                 return {
                     action: 'Search',
-                    tab: '<kbd>Shift+Enter</kbd> Contents <kbd>Ctrl+Enter</kbd> Pack Pull <kbd>Tab</kbd> Lock'
+                    tab: '<kbd>Shift+Enter</kbd> Contents · <kbd>Ctrl+Enter</kbd> Pack Pull · <kbd>Tab</kbd> Lock'
                 };
             },
             onEnter:      function (item) { sealedAction('search',   item.sealedName); },

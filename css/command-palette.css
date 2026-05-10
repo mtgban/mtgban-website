@@ -95,6 +95,16 @@
     color: #14b8a6;
 }
 
+.cp-mode-indicator[data-mode="sealed"] {
+    background: color-mix(in srgb, #0891b2 15%, transparent);
+    color: #0891b2;
+}
+
+.cp-mode-indicator[data-mode="upload"] {
+    background: color-mix(in srgb, #f43f5e 15%, transparent);
+    color: #f43f5e;
+}
+
 /* Search input */
 .cp-input {
     flex: 1;
