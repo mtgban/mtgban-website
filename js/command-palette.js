@@ -214,20 +214,11 @@
     }
 
     function sealedAction(kind, name) {
-        // contents: and unpack: must route through /search, not /sealed: the /sealed
-        // handler force-overrides config.SearchMode = "sealed" AFTER parsing, which
-        // defeats the contents: filter's "mixed" mode and the unpack: filter's
-        // idlookup expansion. The product name must be quoted so multi-word names
-        // (e.g., "Final Fantasy Collector Booster Pack") parse as a single token.
-        // Mirrors the existing in-page links in templates/search.html (container/contents/unpack).
+        // contents:/unpack: must route through /search; /sealed force-sets SearchMode="sealed".
         var path;
         if      (kind === 'contents') path = '/search?q=' + encodeURIComponent('contents:"' + name + '"');
         else if (kind === 'unpack')   path = '/search?q=' + encodeURIComponent('unpack:"'   + name + '"');
         else                          path = '/sealed?q=' + encodeURIComponent(name);
-        // Note: deliberately NOT calling recordRecentSearch. Recents are scoped to /search
-        // (their action is hard-coded to /search?q=), so a tagged sealed entry would dead-end
-        // on a card search. If sealed-recents persistence is wanted later, it requires a
-        // scope field on the recent record + dispatch in getRecentResults; out of scope for v1.
         window.location.href = path;
     }
 
