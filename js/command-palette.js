@@ -772,6 +772,10 @@
             input.placeholder = (MODES[ctx.mode] && MODES[ctx.mode].placeholder) || '';
             return;
         }
+        if (ctx.kind === 'sealed-actions') {
+            input.placeholder = 'Pick an action below or press Backspace to change product...';
+            return;
+        }
         if (chips && chips.count() > 0) {
             input.placeholder = 'Add filters or press Enter to search...';
             return;
