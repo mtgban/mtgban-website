@@ -130,6 +130,33 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'sealed-mode',
+            category: 'Command Palette',
+            title: 'Sealed Mode',
+            icon: 'package',
+            summary: 'Search sealed products and open their contents, prices, or simulated pack pulls.',
+            snippets: ['$', '$Booster Box', 'Shift+Enter contents', 'Ctrl+Enter unpack'],
+            keywords: ['sealed', 'product', 'booster', 'pack', 'contents', 'unpack', 'pack pull', 'sealed mode', 'box', 'bundle'],
+            content: {
+                description: '<p>Type <code>$</code> as the first character to enter <strong>Sealed mode</strong>. The autocomplete dropdown switches to the sealed-product dataset (booster boxes, bundles, packs, decks, cases, displays).</p><p>For any highlighted product the palette offers three actions:</p><ul><li><kbd>Enter</kbd> - search the sealed page for that product (price grid).</li><li><kbd>Shift+Enter</kbd> - <strong>View Contents</strong> - displays the cards inside the product.</li><li><kbd>Ctrl+Enter</kbd> - <strong>Pack Pull</strong> - simulates opening the product (when supported by the data).</li></ul><p><strong>Tab</strong> locks the highlighted product as a chip; the dropdown then morphs into a 3-row action menu where the same actions are reachable via arrow keys + Enter for users who prefer the menu over the modifier keys. Pack Pull is hidden if the product has no picks data.</p><p>If your typed query matches no products, <kbd>Enter</kbd> falls back to a generic <code>/sealed?q=&lt;text&gt;</code> search.</p>',
+                table: [
+                    { value: '$',                  short: 'Enter sealed mode (autocomplete switches to sealed products)' },
+                    { value: 'Enter',              short: 'Search prices for the highlighted product' },
+                    { value: 'Shift+Enter',        short: 'View contents (cards inside)' },
+                    { value: 'Ctrl+Enter',         short: 'Pack Pull (simulated open) - hidden when unsupported' },
+                    { value: 'Tab',                short: 'Lock product as chip and show the action menu' },
+                    { value: 'Enter on no match',  short: 'Falls back to generic sealed search of typed text' }
+                ],
+                examples: [
+                    { query: '$Booster Box LCI',                desc: 'Find Lost Caverns booster boxes' },
+                    { query: '$bundle mkm + Tab',                desc: 'Lock Bundle MKM, choose action from menu' },
+                    { query: '$collector + Shift+Enter',         desc: 'Jump straight to the contents of a collector booster' },
+                    { query: '$prerelease + Ctrl+Enter',         desc: 'Simulate opening a prerelease pack' }
+                ]
+            }
+        },
+
+        {
             id: 'palette-walkthroughs',
             category: 'Command Palette',
             title: 'Walkthroughs',
