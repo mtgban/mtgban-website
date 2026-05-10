@@ -1446,7 +1446,9 @@
             footer:       function () {
                 return {
                     action: 'Search',
-                    tab: '<kbd>Shift+Enter</kbd> Contents · <kbd>Ctrl+Enter</kbd> Pack Pull · <kbd>Tab</kbd> Lock'
+                    tab: '<span class="cp-pair"><kbd>Shift+Enter</kbd> Contents</span> · '
+                       + '<span class="cp-pair"><kbd>Ctrl+Enter</kbd> Pack Pull</span> · '
+                       + '<span class="cp-pair"><kbd>Tab</kbd> Lock</span>'
                 };
             },
             onEnter:      function (item) { sealedAction('search',   item.sealedName); },
