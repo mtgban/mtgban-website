@@ -157,6 +157,62 @@
         return document.querySelectorAll('tr[data-hash]').length;
     }
 
+    function appendHidden(form, name, value) {
+        var i = document.createElement('input');
+        i.type  = 'hidden';
+        i.name  = name;
+        i.value = value;
+        form.appendChild(i);
+    }
+
+    function submitUploadURL(url) {
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = '/upload';
+        form.style.display = 'none';
+        appendHidden(form, 'gdocURL', url);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    function triggerUploadFilePicker() {
+        var form = document.createElement('form');
+        form.method  = 'post';
+        form.action  = '/upload';
+        form.enctype = 'multipart/form-data';
+        form.style.display = 'none';
+
+        var picker = document.createElement('input');
+        picker.type   = 'file';
+        picker.name   = 'cardListFile';
+        picker.accept = '.csv,.xls,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        picker.addEventListener('change', function () {
+            if (!picker.files || !picker.files[0]) return;
+            form.submit();
+        });
+
+        form.appendChild(picker);
+        document.body.appendChild(form);
+        picker.click();   // MUST be synchronous in the user-gesture handler
+    }
+
+    function submitUploadPageResults() {
+        var rows = document.querySelectorAll('tr[data-hash]');
+        if (rows.length === 0) { showToast('No results on this page'); return; }
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = '/upload';
+        form.style.display = 'none';
+        rows.forEach(function (row) {
+            appendHidden(form, 'hashes',      row.dataset.hash  || '');
+            appendHidden(form, 'hashesQtys',  row.dataset.qtys  || '');
+            appendHidden(form, 'hashesCond',  row.dataset.cond  || '');
+            appendHidden(form, 'hashesPrice', row.dataset.price || '');
+        });
+        document.body.appendChild(form);
+        form.submit();
+    }
+
     function sealedAction(kind, name) {
         var path = '/sealed?q=';
         if      (kind === 'contents') path += encodeURIComponent('contents:' + name);
@@ -1376,19 +1432,19 @@
         'upload-url': {
             render:  rowHTML,
             footer:  function () { return { action: 'Submit URL' }; },
-            onEnter: function (item) { /* filled in next task */ }
+            onEnter: function (item) { submitUploadURL(item.uploadURL); }
         },
 
         'upload-file': {
             render:  rowHTML,
             footer:  function () { return { action: 'Pick file' }; },
-            onEnter: function (item) { /* filled in next task */ }
+            onEnter: function (_item) { triggerUploadFilePicker(); }
         },
 
         'upload-page-results': {
             render:  rowHTML,
             footer:  function () { return { action: 'Send results' }; },
-            onEnter: function (item) { /* filled in next task */ }
+            onEnter: function (_item) { submitUploadPageResults(); }
         },
 
         'upload-error': {
