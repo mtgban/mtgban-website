@@ -1180,18 +1180,13 @@
         var name = ctx.sealedChip._sealedName;
         var meta = S.sealedMetaCache[name];
 
-        var rows = [{
-            type: 'sealed-action', title: 'Search', subtitle: 'Price grid for this product',
-            icon: 'search', actionKey: 'search', actionLabel: 'Search', sealedName: name
-        }];
-        // Show contents and pack-pull rows optimistically until meta resolves; hide only
-        // when the backend confirms the action would dead-end (hasContents=false / hasPicks=false).
-        if (!meta || meta.hasContents) {
-            rows.push({
-                type: 'sealed-action', title: 'View Contents', subtitle: 'Cards inside this product',
-                icon: 'list', actionKey: 'contents', actionLabel: 'View Contents', sealedName: name
-            });
-        }
+        // View Contents is always shown; backend hasContents (GetDecklist) is too strict.
+        var rows = [
+            { type: 'sealed-action', title: 'Search', subtitle: 'Price grid for this product',
+              icon: 'search', actionKey: 'search', actionLabel: 'Search', sealedName: name },
+            { type: 'sealed-action', title: 'View Contents', subtitle: 'Cards inside this product',
+              icon: 'list', actionKey: 'contents', actionLabel: 'View Contents', sealedName: name }
+        ];
         if (!meta || meta.hasPicks) {
             rows.push({
                 type: 'sealed-action', title: 'Pack Pull', subtitle: 'Simulate opening this product',
