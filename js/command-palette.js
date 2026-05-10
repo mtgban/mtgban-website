@@ -258,8 +258,23 @@
         return S.cardMetaInflight[name];
     }
 
-    function fetchSealedMeta(_name) {
-        return Promise.resolve(null);
+    function fetchSealedMeta(name) {
+        if (!name) return Promise.resolve(null);
+        if (S.sealedMetaCache[name])    return Promise.resolve(S.sealedMetaCache[name]);
+        if (S.sealedMetaInflight[name]) return S.sealedMetaInflight[name];
+        S.sealedMetaInflight[name] = fetch('/api/palette/sealed/' + encodeURIComponent(name))
+            .then(function (r) { return r.ok ? r.json() : { found: false }; })
+            .then(function (data) {
+                if (data && data.found) S.sealedMetaCache[name] = data;
+                delete S.sealedMetaInflight[name];
+                if (S.open) handleInput();
+                return data;
+            })
+            .catch(function () {
+                delete S.sealedMetaInflight[name];
+                return { found: false };
+            });
+        return S.sealedMetaInflight[name];
     }
 
     function activeCardMeta() {
