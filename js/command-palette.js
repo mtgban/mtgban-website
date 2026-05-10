@@ -468,6 +468,11 @@
             mode:  'recent',
             test:  function (v) { return v.charAt(0) === '<' || /^recent:/i.test(v); },
             strip: function (v) { return v.replace(/^(<|recent:)/i, '').trim(); }
+        },
+        {
+            mode:  'sealed',
+            test:  function (v) { return v.charAt(0) === '$'; },
+            strip: function (v) { return v.substring(1).trim(); }
         }
     ];
 
@@ -520,7 +525,8 @@
                 help:   'Search help & syntax...',
                 nav:    'Filter pages...',
                 saved:  'Filter saved searches...',
-                recent: 'Filter recent searches...'
+                recent: 'Filter recent searches...',
+                sealed: 'Search sealed products...'
             })[ctx.mode];
             return;
         }
@@ -534,7 +540,7 @@
     function applyModeIndicator(ctx) {
         var label = '';
         if (ctx.kind === 'mode') {
-            label = ({ help: 'HELP', nav: 'NAV', saved: 'SAVED', recent: 'RECENT' })[ctx.mode] || '';
+            label = ({ help: 'HELP', nav: 'NAV', saved: 'SAVED', recent: 'RECENT', sealed: 'SEALED' })[ctx.mode] || '';
         }
         if (label) {
             modeTag.textContent = label;
@@ -1162,7 +1168,9 @@
             { type: 'shortcut', title: 'Saved',         subtitle: 'Your saved searches and commands',
               icon: 'bookmark',    shortcut: '*', action: function () { input.value = '*'; handleInput(); } },
             { type: 'shortcut', title: 'Recent',        subtitle: 'Your recent searches',
-              icon: 'clock',       shortcut: '<', action: function () { input.value = '<'; handleInput(); } }
+              icon: 'clock',       shortcut: '<', action: function () { input.value = '<'; handleInput(); } },
+            { type: 'shortcut', title: 'Sealed',        subtitle: 'Search sealed products and open contents',
+              icon: 'package',     shortcut: '$', action: function () { input.value = '$'; handleInput(); } }
         ]);
     }
 
