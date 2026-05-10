@@ -1,47 +1,170 @@
 /* Command Palette - keyboard-driven search, navigation, help, and saved commands */
-(function() {
+(function () {
     'use strict';
 
-    // ── Mobile guard ─────────────────────────────────────────────────
+    // Mobile guard + externals
     if (!window.__BAN_PALETTE || window.innerWidth < 768) return;
 
-    var palette = window.__BAN_PALETTE;
-    var guide = window.__BAN_GUIDE || { sections: [] };
+    var palette   = window.__BAN_PALETTE;
+    var guide     = window.__BAN_GUIDE || { sections: [] };
+    var providers = window.__palette_providers || null;
+    var chipsAPI  = window.__palette_chips || null;
 
-    // ── State ────────────────────────────────────────────────────────
-    var activeIndex = -1;
-    var resultItems = [];
-    var previousFocus = null;
-    var isOpen = false;
-    var cardNames = null;
-    var cardNamesLoading = false;
-    var chips = null;
-    var suppressChipOnChange = false;
+    // Constants
+    var RECENT_KEY      = 'mtgban_recent_searches';
+    var SAVED_KEY       = 'mtgban_saved_commands';
+    var MAX_SAVED       = 50;
+    var MAX_NAME        = 60;
+    var MAX_RECENT      = 15;
+    var DROPDOWN_CAP    = 30;
+    var GLOBAL_ITEM_CAP = 10;
+    var DEFAULT_PLACEHOLDER = 'Search...';
 
-    // ── Nav parent detection ─────────────────────────────────────────
-    // Maps the nav entry name (from palette.nav) to the key in
-    // __BAN_PALETTE_TARGETS that holds its sub-views.
-    var navParentKeys = {
-        'Newspaper': 'newspaper',
-        'Sleepers': 'sleepers',
-        'Arbitrage': 'arbit',
-        'Reverse': 'reverse',
-        'Global': 'global'
+    // Maps nav entry name → key in __BAN_PALETTE_TARGETS that holds sub-views.
+    var NAV_PARENTS = {
+        Newspaper: 'newspaper',
+        Sleepers:  'sleepers',
+        Arbitrage: 'arbit',
+        Reverse:   'reverse',
+        Global:    'global'
     };
 
-    function isParentNav(name) {
-        return !!navParentKeys[name];
+    // Allowlist of nav entries the user actually has access to. Used to gate help sections.
+    var NAV_NAMES = (function () {
+        var out = {};
+        var nav = palette.nav || [];
+        for (var i = 0; i < nav.length; i++) out[nav[i].name] = true;
+        return out;
+    })();
+
+    // State
+    var S = {
+        open:               false,
+        items:              [],     // current rendered result items
+        activeIndex:        -1,
+        previousFocus:      null,
+        cardNames:          null,
+        cardNamesLoading:   false,
+        cardMetaCache:      {},
+        cardMetaInflight:   {},
+        lastChipCount:      0,
+        suppressChipOnChange: false,
+        saveModalOpen:      false,
+        inputTimer:         null,
+        toastTimer:         null
+    };
+
+    // ════════════════════════════════════════════════════════════════
+    //  Pure utilities
+    // ════════════════════════════════════════════════════════════════
+
+    function esc(str) {
+        var d = document.createElement('div');
+        d.textContent = str == null ? '' : String(str);
+        return d.innerHTML;
     }
+
+    function scoreMatch(query, name, keywords) {
+        var q = query.toLowerCase();
+        var n = name.toLowerCase();
+        if (n.indexOf(q) === 0) return 3;                    // prefix
+        var words = n.split(/[\s\-_]+/);
+        for (var i = 0; i < words.length; i++) {
+            if (words[i].indexOf(q) === 0) return 2;          // word-boundary
+        }
+        if (n.indexOf(q) >= 0) return 1;                      // substring
+        if (keywords) {
+            var kw = typeof keywords === 'string' ? keywords.split(/[\s,]+/) : keywords;
+            for (var j = 0; j < kw.length; j++) {
+                if (kw[j].toLowerCase().indexOf(q) >= 0) return 1;
+            }
+        }
+        return 0;
+    }
+
+    // Mirrors autocomplete.js semantics for card-name prefix matching.
+    function matchCardName(query, name) {
+        var q = query.toUpperCase();
+        var L = query.length;
+        if (name.substr(0, L).toUpperCase() === q) return true;
+        if (name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').substr(0, L).toUpperCase() === q) return true;
+        if (name.replace(/^The /g, '').substr(0, L).toUpperCase() === q) return true;
+        if (name.replace(/[^A-Za-z0-9 ]/g, '').substr(0, L).toUpperCase() === q) return true;
+        return false;
+    }
+
+    function categoryKeyFor(title) {
+        var t = (title || '').toLowerCase();
+        if (t.indexOf('recent')  >= 0) return 'recent';
+        if (t.indexOf('saved')   >= 0) return 'saved';
+        if (t.indexOf('page')    >= 0 || t.indexOf('navigate') >= 0) return 'pages';
+        if (t.indexOf('card')    >= 0) return 'cards';
+        if (t.indexOf('command') >= 0 || t.indexOf('action')   >= 0) return 'commands';
+        if (t.indexOf('help')    >= 0) return 'help';
+        if (t.indexOf('syntax')  >= 0) return 'syntax';
+        return 'other';
+    }
+
+    function categoryIconFor(title) {
+        var key = categoryKeyFor(title);
+        return ({
+            recent: 'clock', saved: 'bookmark', pages: 'compass', cards: 'search',
+            commands: 'zap', help: 'help-circle', syntax: 'code'
+        })[key] || null;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Storage helpers
+    // ════════════════════════════════════════════════════════════════
+
+    function getJSON(key) {
+        try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : []; }
+        catch (e) { return []; }
+    }
+
+    function setJSON(key, val) {
+        try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+    }
+
+    function recordRecentSearch(query) {
+        if (!query || query.trim().length < 2) return;
+        query = query.trim();
+        var recent = getJSON(RECENT_KEY).filter(function (s) {
+            return (s.q || '').toLowerCase() !== query.toLowerCase();
+        });
+        recent.unshift({ q: query, t: Date.now() });
+        if (recent.length > MAX_RECENT) recent = recent.slice(0, MAX_RECENT);
+        setJSON(RECENT_KEY, recent);
+    }
+
+    function deleteRecentSearch(query) {
+        if (!query) return;
+        var recent = getJSON(RECENT_KEY).filter(function (r) {
+            return (r.q || '').toLowerCase() !== query.toLowerCase();
+        });
+        setJSON(RECENT_KEY, recent);
+        showToast('Removed from recent');
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Nav helpers (parent/sub-view URL composition)
+    // ════════════════════════════════════════════════════════════════
+
+    function isParentNav(name) { return !!NAV_PARENTS[name]; }
 
     function getNavTargets(name) {
-        var key = navParentKeys[name];
+        var key = NAV_PARENTS[name];
         if (!key) return null;
-        var targets = (window.__BAN_PALETTE_TARGETS || {})[key];
-        return targets || null;
+        return (window.__BAN_PALETTE_TARGETS || {})[key] || null;
     }
 
-    // Used by sub-view URL composition. For arbit/reverse/global, distinguishes
-    // whether a sub-view value is a sort option (goes in ?sort=) or a filter (?key=true).
+    function isSectionAllowed(section) {
+        if (!section.requiresNav) return true;
+        return !!NAV_NAMES[section.requiresNav];
+    }
+
+    // For arbit/reverse/global, distinguishes whether a sub-view value goes in
+    // ?sort= (singleton) or ?key=true (filter, multi).
     function isArbitSortValue(key, value) {
         var targets = (window.__BAN_PALETTE_TARGETS || {})[key];
         if (!targets || !targets.sorts) return false;
@@ -51,896 +174,39 @@
         return false;
     }
 
-    // ── Card meta cache ──────────────────────────────────────────────
-    var cardMetaCache = {}; // { [name]: response }
-    var cardMetaInflight = {};
-
-    // Re-render dropdown when provider data (sets/stores) finishes loading
-    if (window.__palette_providers && typeof window.__palette_providers.setOnDataReady === 'function') {
-        window.__palette_providers.setOnDataReady(function () {
-            if (isOpen && typeof handleInput === 'function') handleInput();
-        });
-    }
-
-    function fetchCardMeta(name) {
-        if (!name) return Promise.resolve(null);
-        if (cardMetaCache[name]) return Promise.resolve(cardMetaCache[name]);
-        if (cardMetaInflight[name]) return cardMetaInflight[name];
-        cardMetaInflight[name] = fetch('/api/palette/card/' + encodeURIComponent(name))
-            .then(function (r) { return r.ok ? r.json() : { found: false }; })
-            .then(function (data) {
-                if (data && data.found) {
-                    cardMetaCache[name] = data;
-                }
-                delete cardMetaInflight[name];
-                // Re-run filter so dependent providers (s:, r:, c:) get narrowed results
-                if (typeof handleInput === 'function') handleInput();
-                return data;
-            })
-            .catch(function () {
-                delete cardMetaInflight[name];
-                return { found: false };
-            });
-        return cardMetaInflight[name];
-    }
-
-    function activeCardMeta() {
-        if (!chips) return null;
-        var list = chips.all();
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].type === 'card') {
-                return cardMetaCache[list[i]._cardName || list[i].value] || null;
-            }
-        }
-        return null;
-    }
-
-    // Returns a navigation URL if the chip set is a nav composition, else null.
-    // A nav composition is: exactly one nav chip (parent), optionally followed by
-    // nav-sub chips for the same parent.
+    // Returns a navigation URL if the chip set is a "nav composition" (one parent
+    // nav chip + zero or more nav-sub chips for that parent), else null.
     function chipsNavURL(chipArray) {
         if (!chipArray || chipArray.length === 0) return null;
         var first = chipArray[0];
         if (!first || first.type !== 'nav') return null;
-        var parentKey = first.navName ? navParentKeys[first.navName] : null;
+        var parentKey = first.navName ? NAV_PARENTS[first.navName] : null;
+        if (!parentKey) return first.navLink || null;     // leaf nav
 
-        // Leaf nav (not a parent page) - navigate directly
-        if (!parentKey) {
-            return first.navLink || null;
-        }
-
-        // Parent nav - compose params from subsequent nav-sub chips
         var base = (first.navLink || '').split('?')[0];
         var params = [];
         for (var i = 1; i < chipArray.length; i++) {
             var c = chipArray[i];
-            if (c.type !== 'nav-sub' || c._parentKey !== parentKey) {
-                // Not a pure nav composition - bail out
-                return null;
-            }
+            if (c.type !== 'nav-sub' || c._parentKey !== parentKey) return null;
             if (c._urlParam) params.push(c._urlParam);
         }
-        return base + (params.length > 0 ? '?' + params.join('&') : '');
-    }
-
-    // ── localStorage helpers ─────────────────────────────────────────
-    var RECENT_KEY = 'mtgban_recent_searches';
-    var SAVED_KEY = 'mtgban_saved_commands';
-    var MAX_SAVED = 50;
-    var saveModalOpen = false;
-    var MAX_NAME = 60;
-
-    function getJSON(key) {
-        try {
-            var data = localStorage.getItem(key);
-            return data ? JSON.parse(data) : [];
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function setJSON(key, val) {
-        try {
-            localStorage.setItem(key, JSON.stringify(val));
-        } catch (e) {}
-    }
-
-    function recordRecentSearch(query) {
-        if (!query || query.trim().length < 2) return;
-        query = query.trim();
-        var recent = getJSON(RECENT_KEY);
-        recent = recent.filter(function(s) {
-            return (s.q || '').toLowerCase() !== query.toLowerCase();
-        });
-        recent.unshift({ q: query, t: Date.now() });
-        if (recent.length > 15) recent = recent.slice(0, 15);
-        setJSON(RECENT_KEY, recent);
-    }
-
-    // Check if a section is accessible based on nav permissions
-    var navNames = {};
-    var nav = palette.nav || [];
-    for (var ni = 0; ni < nav.length; ni++) {
-        navNames[nav[ni].name] = true;
-    }
-    function isSectionAllowed(section) {
-        if (!section.requiresNav) return true;
-        return !!navNames[section.requiresNav];
-    }
-
-    function escapeHtml(str) {
-        var div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function categoryKeyFor(title) {
-        var t = (title || '').toLowerCase();
-        if (t.indexOf('recent') >= 0) return 'recent';
-        if (t.indexOf('saved') >= 0) return 'saved';
-        if (t.indexOf('page') >= 0 || t.indexOf('navigate') >= 0) return 'pages';
-        if (t.indexOf('card') >= 0) return 'cards';
-        if (t.indexOf('command') >= 0 || t.indexOf('action') >= 0) return 'commands';
-        if (t.indexOf('help') >= 0) return 'help';
-        if (t.indexOf('syntax') >= 0) return 'syntax';
-        return 'other';
-    }
-
-    function categoryIconFor(title) {
-        var key = categoryKeyFor(title);
-        var map = {
-            recent: 'clock',
-            saved: 'bookmark',
-            pages: 'compass',
-            cards: 'search',
-            commands: 'zap',
-            help: 'help-circle',
-            syntax: 'code'
-        };
-        return map[key] || null;
-    }
-
-    // ── DOM creation ─────────────────────────────────────────────────
-    var overlay = document.createElement('div');
-    overlay.className = 'cp-overlay';
-    overlay.id = 'cp-overlay';
-
-    var dialog = document.createElement('div');
-    dialog.className = 'cp-dialog';
-    dialog.setAttribute('role', 'dialog');
-    dialog.setAttribute('aria-modal', 'true');
-
-    // Input row
-    var inputRow = document.createElement('div');
-    inputRow.className = 'cp-input-row';
-
-    var modeIndicator = document.createElement('span');
-    modeIndicator.className = 'cp-mode-indicator';
-    modeIndicator.id = 'cp-mode';
-
-    var chipContainer = document.createElement('div');
-    chipContainer.className = 'cp-chip-container';
-    chipContainer.id = 'cp-chips';
-    chipContainer.setAttribute('role', 'group');
-    chipContainer.setAttribute('aria-label', 'Search composition');
-
-    var DEFAULT_PLACEHOLDER = 'Search...';
-    var input = document.createElement('input');
-    input.className = 'cp-input';
-    input.id = 'cp-input';
-    input.type = 'text';
-    input.placeholder = DEFAULT_PLACEHOLDER;
-    input.setAttribute('autocomplete', 'off');
-    chipContainer.appendChild(input);
-
-    var escKbd = document.createElement('kbd');
-    escKbd.className = 'cp-shortcut';
-    escKbd.textContent = 'ESC';
-
-    inputRow.appendChild(modeIndicator);
-    inputRow.appendChild(chipContainer);
-    inputRow.appendChild(escKbd);
-
-    // Results
-    var resultsEl = document.createElement('div');
-    resultsEl.className = 'cp-results';
-    resultsEl.id = 'cp-results';
-    resultsEl.setAttribute('role', 'listbox');
-    resultsEl.setAttribute('aria-label', 'Results');
-
-    // Footer
-    var footer = document.createElement('div');
-    footer.className = 'cp-footer';
-    footer.innerHTML =
-        '<span><kbd>\u2191\u2193</kbd> Navigate</span>' +
-        '<span class="cp-footer-action"><kbd>Enter</kbd> Select</span>' +
-        '<span class="cp-footer-tab" style="display:none"></span>' +
-        '<span class="cp-footer-hint-delete" style="display:none"><kbd>Shift+Del</kbd> Remove</span>' +
-        '<span><kbd>?</kbd> Help</span>' +
-        '<span><kbd>Esc</kbd> Close</span>';
-
-    dialog.appendChild(inputRow);
-    dialog.appendChild(resultsEl);
-    dialog.appendChild(footer);
-
-    var chipLive = document.createElement('div');
-    chipLive.className = 'cp-sr-only';
-    chipLive.id = 'cp-chip-announce';
-    chipLive.setAttribute('aria-live', 'polite');
-    chipLive.setAttribute('aria-atomic', 'true');
-    dialog.appendChild(chipLive);
-
-    overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
-
-    // Initialize chip manager (B1) - wire container + input + filter callback
-    var lastChipCount = 0;
-    if (window.__palette_chips && typeof window.__palette_chips.create === 'function') {
-        chips = window.__palette_chips.create(chipContainer, input, function () {
-            var now = chips ? chips.count() : 0;
-            var live = document.getElementById('cp-chip-announce');
-            if (live) {
-                if (now > lastChipCount) {
-                    var latest = chips.get(now - 1);
-                    live.textContent = 'Added chip: ' + (latest ? (latest.label || latest.value) : '');
-                } else if (now < lastChipCount) {
-                    live.textContent = 'Removed chip';
-                }
-            }
-            lastChipCount = now;
-            if (typeof updatePlaceholder === 'function') updatePlaceholder();
-            if (!suppressChipOnChange && typeof handleInput === 'function') handleInput();
-        });
-    }
-
-    // Toast
-    var toast = document.createElement('div');
-    toast.className = 'cp-toast';
-    toast.id = 'cp-toast';
-    document.body.appendChild(toast);
-
-    // ── Toast helper ─────────────────────────────────────────────────
-    var toastTimer = null;
-    function showToast(msg) {
-        toast.textContent = msg;
-        toast.classList.add('show');
-        if (toastTimer) clearTimeout(toastTimer);
-        toastTimer = setTimeout(function() {
-            toast.classList.remove('show');
-        }, 2000);
-    }
-
-    // ── Open / Close ─────────────────────────────────────────────────
-    function openPalette() {
-        if (isOpen) return;
-        isOpen = true;
-        previousFocus = document.activeElement;
-        overlay.classList.add('open');
-        document.body.style.overflow = 'hidden';
-        input.value = '';
-        modeIndicator.textContent = '';
-        modeIndicator.className = 'cp-mode-indicator';
-        modeIndicator.removeAttribute('data-mode');
-        activeIndex = -1;
-        renderDefault();
-        input.focus();
-
-        // Lazy-load card names on first open
-        if (!cardNames && !cardNamesLoading && typeof fetchNames === 'function') {
-            cardNamesLoading = true;
-            fetchNames('false').then(function(names) {
-                cardNames = names || [];
-                cardNamesLoading = false;
-            }).catch(function() {
-                cardNamesLoading = false;
-            });
-        }
-    }
-
-    function closePalette() {
-        if (!isOpen) return;
-        isOpen = false;
-        overlay.classList.remove('open');
-        document.body.style.overflow = '';
-        removeSaveModal();
-        if (previousFocus) {
-            previousFocus.focus();
-            previousFocus = null;
-        }
-    }
-
-    // ── Click overlay to close ───────────────────────────────────────
-    overlay.addEventListener('click', function(e) {
-        if (e.target === overlay) closePalette();
-    });
-
-    // ── Mode detection ───────────────────────────────────────────────
-    function detectMode(val) {
-        if (val.charAt(0) === '?' || /^(help:|syntax:)/i.test(val)) return 'help';
-        if (val.charAt(0) === '>') return 'nav';
-        if (val.charAt(0) === '*') return 'saved';
-        if (val.charAt(0) === '<') return 'recent';
-        if (/^saved:/i.test(val)) return 'saved';
-        if (/^recent:/i.test(val)) return 'recent';
-        return 'search';
-    }
-
-    function stripPrefix(val) {
-        if (/^(\?\s*|help:|syntax:|\?:)/i.test(val)) return val.replace(/^(\?\s*|help:|syntax:|\?:)/i, '').trim();
-        if (val.charAt(0) === '>') return val.substring(1).trim();
-        if (val.charAt(0) === '*') return val.substring(1).trim();
-        if (val.charAt(0) === '<') return val.substring(1).trim();
-        if (/^saved:/i.test(val)) return val.replace(/^saved:/i, '').trim();
-        if (/^recent:/i.test(val)) return val.replace(/^recent:/i, '').trim();
-        return val;
-    }
-
-    // Update the input placeholder based on current mode/chip context.
-    // Detection order mirrors handleInput's dispatch order.
-    function updatePlaceholder() {
-        var raw = input.value;
-
-        // 1. Provider prefix detected
-        if (window.__palette_providers) {
-            var detected = window.__palette_providers.detectPrefix(raw);
-            if (detected) {
-                var provider = window.__palette_providers.getProvider(detected.prefix);
-                if (provider) {
-                    input.placeholder = 'Filter ' + (provider.name || 'options').toLowerCase() + '...';
-                    return;
-                }
-            }
-        }
-
-        // 2. Parent nav chip locked - sub-view mode
-        if (chips) {
-            var chipsList = chips.all();
-            for (var ci = chipsList.length - 1; ci >= 0; ci--) {
-                if (chipsList[ci].type === 'nav' && isParentNav(chipsList[ci].navName)) {
-                    input.placeholder = 'Filter ' + chipsList[ci].navName + ' sub-views...';
-                    return;
-                }
-            }
-        }
-
-        // 3. Mode prefix in input
-        var mode = detectMode(raw);
-        if (mode === 'nav')    { input.placeholder = 'Filter pages...'; return; }
-        if (mode === 'help')   { input.placeholder = 'Search help & syntax...'; return; }
-        if (mode === 'saved')  { input.placeholder = 'Filter saved searches...'; return; }
-        if (mode === 'recent') { input.placeholder = 'Filter recent searches...'; return; }
-
-        // 4. Chips present, no mode prefix
-        if (chips && chips.count() > 0) {
-            input.placeholder = 'Add filters or press Enter to search...';
-            return;
-        }
-
-        // 5. Default
-        input.placeholder = DEFAULT_PLACEHOLDER;
-    }
-
-    // ── Matching algorithm ───────────────────────────────────────────
-    function scoreMatch(query, name, keywords) {
-        var q = query.toLowerCase();
-        var n = name.toLowerCase();
-
-        // Prefix match
-        if (n.indexOf(q) === 0) return 3;
-
-        // Word-boundary match
-        var words = n.split(/[\s\-_]+/);
-        for (var i = 0; i < words.length; i++) {
-            if (words[i].indexOf(q) === 0) return 2;
-        }
-
-        // Substring in name
-        if (n.indexOf(q) >= 0) return 1;
-
-        // Keywords
-        if (keywords) {
-            var kw = keywords;
-            if (typeof kw === 'string') kw = kw.split(/[\s,]+/);
-            for (var j = 0; j < kw.length; j++) {
-                if (kw[j].toLowerCase().indexOf(q) >= 0) return 1;
-            }
-        }
-
-        return 0;
-    }
-
-    // ── Card name matching (mirrors autocomplete.js) ─────────────────
-    function matchCardName(query, name) {
-        var q = query.toUpperCase();
-        if (name.substr(0, query.length).toUpperCase() === q) return true;
-        if (name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').substr(0, query.length).toUpperCase() === q) return true;
-        if (name.replace(/^The /g, '').substr(0, query.length).toUpperCase() === q) return true;
-        if (name.replace(/[^A-Za-z0-9 ]/g, '').substr(0, query.length).toUpperCase() === q) return true;
-        return false;
-    }
-
-    // ── Search sources ───────────────────────────────────────────────
-    function getRecentResults(query, limit) {
-        var recent = getJSON(RECENT_KEY);
-        var results = [];
-        for (var i = 0; i < recent.length && results.length < limit; i++) {
-            var r = recent[i];
-            if (!query || scoreMatch(query, r.q, null) > 0) {
-                results.push({
-                    type: 'recent',
-                    title: r.q,
-                    subtitle: 'Recent search',
-                    icon: 'clock',
-                    recentQuery: r.q,
-                    action: function(q) { return function() { recordRecentSearch(q); window.location.href = '/search?q=' + encodeURIComponent(q); }; }(r.q)
-                });
-            }
-        }
-        return results;
-    }
-
-    function getNavResults(query) {
-        var nav = palette.nav || [];
-        var results = [];
-        for (var i = 0; i < nav.length; i++) {
-            var n = nav[i];
-            if (!query || scoreMatch(query, n.name, null) > 0) {
-                results.push({
-                    type: 'nav',
-                    title: n.name,
-                    subtitle: 'Navigate to ' + n.name,
-                    icon: n.icon || 'compass',
-                    navName: n.name,
-                    navLink: n.link,
-                    action: function(link) { return function() { window.location.href = link; }; }(n.link),
-                    score: query ? scoreMatch(query, n.name, null) : 0
-                });
-            }
-        }
-        if (query) {
-            results.sort(function(a, b) { return b.score - a.score; });
-        }
-        return results;
-    }
-
-    function getStaticCommands(query) {
-        var commands = [
-            {
-                name: 'Toggle Theme',
-                icon: (localStorage.getItem('theme') === 'dark') ? 'sun' : 'moon',
-                keywords: ['dark', 'light', 'night', 'day', 'theme', 'mode'],
-                action: function() {
-                    var t = localStorage.getItem('theme') === 'dark' ? 'light' : 'dark';
-                    document.body.classList.toggle('dark-theme', t === 'dark');
-                    document.body.classList.toggle('light-theme', t === 'light');
-                    localStorage.setItem('theme', t);
-                    var toggle = document.getElementById('theme-toggle');
-                    if (toggle) toggle.title = t === 'dark' ? 'Nightbound' : 'Daybound';
-                    closePalette();
-                    showToast('Theme: ' + t);
-                }
-            },
-            {
-                name: 'Random Card',
-                icon: 'dice-5',
-                keywords: ['random', 'surprise', 'lucky'],
-                action: function() { window.location.href = '/random'; }
-            },
-            {
-                name: 'Random Sealed',
-                icon: 'package',
-                keywords: ['random', 'sealed', 'booster', 'pack'],
-                action: function() { window.location.href = '/randomsealed'; }
-            },
-            {
-                name: 'Open Guide',
-                icon: 'book-open',
-                keywords: ['guide', 'help', 'documentation', 'syntax'],
-                action: function() { window.location.href = '/guide'; }
-            },
-            {
-                name: 'Copy Page URL',
-                icon: 'link',
-                keywords: ['copy', 'url', 'link', 'share', 'clipboard'],
-                action: function() {
-                    if (navigator.clipboard) {
-                        navigator.clipboard.writeText(window.location.href).then(function() {
-                            showToast('URL copied to clipboard');
-                        });
-                    } else {
-                        showToast('Clipboard not available');
-                    }
-                    closePalette();
-                }
-            }
-        ];
-
-        // Conditionally add "Save Current Search"
-        var hasComposed = chips && chips.count() > 0 && chips.composedQuery();
-        var searchInput = document.getElementById('searchbox');
-        var hasSearchbox = searchInput && searchInput.value && searchInput.value.trim();
-        if (hasComposed || hasSearchbox) {
-            commands.push({
-                name: 'Save Current Search',
-                icon: 'bookmark-plus',
-                keywords: ['save', 'bookmark', 'store', 'command'],
-                action: function() { showSaveModal(); }
-            });
-        }
-
-        var results = [];
-        for (var i = 0; i < commands.length; i++) {
-            var c = commands[i];
-            if (!query || scoreMatch(query, c.name, c.keywords) > 0) {
-                results.push({
-                    type: 'command',
-                    title: c.name,
-                    subtitle: '',
-                    icon: c.icon,
-                    action: c.action,
-                    score: query ? scoreMatch(query, c.name, c.keywords) : 0
-                });
-            }
-        }
-        if (query) {
-            results.sort(function(a, b) { return b.score - a.score; });
-        }
-        return results;
-    }
-
-    function getCardResults(query, limit) {
-        if (!cardNames || !query || query.length < 2) return [];
-        var results = [];
-        for (var i = 0; i < cardNames.length && results.length < limit; i++) {
-            if (matchCardName(query, cardNames[i])) {
-                results.push({
-                    type: 'card',
-                    title: cardNames[i],
-                    subtitle: 'Search for "' + cardNames[i] + '"',
-                    icon: 'search',
-                    cardName: cardNames[i],
-                    action: (function(name) { return function() { recordRecentSearch(name); window.location.href = '/search?q=' + encodeURIComponent(name); }; })(cardNames[i])
-                });
-            }
-        }
-        return results;
-    }
-
-    function getHelpResults(query) {
-        var sections = guide.sections || [];
-        var results = [];
-        for (var i = 0; i < sections.length && results.length < 10; i++) {
-            var s = sections[i];
-            if (!isSectionAllowed(s)) continue;
-            var match = !query || scoreMatch(query, s.title, s.keywords) > 0;
-            if (!match && s.summary) {
-                match = scoreMatch(query, s.summary, null) > 0;
-            }
-            if (!match && s.snippets) {
-                for (var j = 0; j < s.snippets.length; j++) {
-                    if (s.snippets[j].toLowerCase().indexOf(query.toLowerCase()) >= 0) {
-                        match = true;
-                        break;
-                    }
-                }
-            }
-            if (match) {
-                var isSyntax = s.category === 'Search Syntax';
-                var subtitle = s.summary || '';
-                var snippetText = '';
-                if (isSyntax && s.snippets && s.snippets.length > 0) {
-                    snippetText = s.snippets.join('  ');
-                }
-                results.push({
-                    type: 'help',
-                    title: s.title,
-                    subtitle: subtitle,
-                    snippets: snippetText,
-                    icon: s.icon || 'help-circle',
-                    isSyntax: isSyntax,
-                    sectionId: s.id,
-                    action: isSyntax
-                        ? (function(snip) { return function() {
-                            if (navigator.clipboard && snip) {
-                                navigator.clipboard.writeText(snip).then(function() {
-                                    showToast('Copied: ' + snip);
-                                });
-                            }
-                            closePalette();
-                        }; })(s.snippets && s.snippets[0] ? s.snippets[0] : '')
-                        : (function(id) { return function() { window.location.href = '/guide#' + id; }; })(s.id),
-                    altAction: isSyntax
-                        ? (function(id) { return function() { window.location.href = '/guide#' + id; }; })(s.id)
-                        : null,
-                    score: query ? scoreMatch(query, s.title, s.keywords) : 0
-                });
-            }
-        }
-        if (query) {
-            results.sort(function(a, b) { return b.score - a.score; });
-        }
-        return results;
-    }
-
-    function getSavedResults(query) {
-        var saved = getJSON(SAVED_KEY);
-        var results = [];
-        for (var i = 0; i < saved.length; i++) {
-            var s = saved[i];
-            if (!query || scoreMatch(query, s.name, s.query) > 0) {
-                results.push({
-                    type: 'saved',
-                    title: s.name,
-                    subtitle: s.query,
-                    icon: s.icon || 'bookmark',
-                    savedId: s.id,
-                    action: (function(cmd) { return function() {
-                        // Update usage tracking
-                        var allSaved = getJSON(SAVED_KEY);
-                        for (var k = 0; k < allSaved.length; k++) {
-                            if (allSaved[k].id === cmd.id) {
-                                allSaved[k].lastUsed = Date.now();
-                                allSaved[k].useCount = (allSaved[k].useCount || 0) + 1;
-                                break;
-                            }
-                        }
-                        setJSON(SAVED_KEY, allSaved);
-                        // If this saved command is a nav composition, navigate to the composed URL
-                        var navUrl = chipsNavURL(cmd.chips);
-                        if (navUrl) {
-                            window.location.href = navUrl;
-                            return;
-                        }
-                        // Otherwise treat as a search query
-                        recordRecentSearch(cmd.query);
-                        window.location.href = '/search?q=' + encodeURIComponent(cmd.query);
-                    }; })(s),
-                    altAction: (function(cmd) { return function() {
-                        // Shift+Enter: restore chips into the palette input for editing
-                        if (!chips) {
-                            input.value = cmd.query || '';
-                            input.focus();
-                            handleInput();
-                            return;
-                        }
-                        chips.clear();
-                        if (cmd.chips && cmd.chips.length > 0) {
-                            for (var ci = 0; ci < cmd.chips.length; ci++) {
-                                chips.add(cmd.chips[ci]);
-                            }
-                            // Prefetch card meta for any restored card chips so filter narrowing works
-                            for (var cj = 0; cj < cmd.chips.length; cj++) {
-                                if (cmd.chips[cj].type === 'card' && cmd.chips[cj]._cardName) {
-                                    fetchCardMeta(cmd.chips[cj]._cardName);
-                                }
-                            }
-                        } else if (cmd.query) {
-                            // V1 saved command (no chips field) - restore as plain input text
-                            input.value = cmd.query;
-                        }
-                        input.focus();
-                        handleInput();
-                    }; })(s)
-                });
-            }
-        }
-        return results;
-    }
-
-    // ── Default results ──────────────────────────────────────────────
-    function renderDefault() {
-        var items = [
-            { type: 'header', title: 'Shortcuts' },
-            {
-                type: 'shortcut',
-                title: 'Pages',
-                subtitle: 'Browse navigation and sub-pages',
-                icon: 'compass',
-                shortcut: '>',
-                action: function () { input.value = '>'; handleInput(); }
-            },
-            {
-                type: 'shortcut',
-                title: 'Help & syntax',
-                subtitle: 'Search reference and snippets',
-                icon: 'help-circle',
-                shortcut: '?',
-                action: function () { input.value = '?'; handleInput(); }
-            },
-            {
-                type: 'shortcut',
-                title: 'Saved',
-                subtitle: 'Your saved searches and commands',
-                icon: 'bookmark',
-                shortcut: '*',
-                action: function () { input.value = '*'; handleInput(); }
-            },
-            {
-                type: 'shortcut',
-                title: 'Recent',
-                subtitle: 'Your recent searches',
-                icon: 'clock',
-                shortcut: '<',
-                action: function () { input.value = '<'; handleInput(); }
-            }
-        ];
-        renderResults(items);
-    }
-
-    // ── Provider-mode rendering ──────────────────────────────────────
-    var PROVIDER_DROPDOWN_CAP = 30;
-
-    function renderProviderResults(prefix, provider, query) {
-        var ctx = {
-            chips: chips ? chips.all() : [],
-            cardMeta: activeCardMeta()
-        };
-        var candidates = provider.getCandidates(query, ctx) || [];
-        if (candidates.length > PROVIDER_DROPDOWN_CAP) {
-            candidates = candidates.slice(0, PROVIDER_DROPDOWN_CAP);
-        }
-        var items = [];
-
-        // Group candidates by their `group` field, if any
-        var grouped = {};
-        var groupOrder = [];
-        var ungrouped = [];
-        for (var i = 0; i < candidates.length; i++) {
-            var c = candidates[i];
-            if (c.group) {
-                if (!grouped[c.group]) {
-                    grouped[c.group] = [];
-                    groupOrder.push(c.group);
-                }
-                grouped[c.group].push(c);
-            } else {
-                ungrouped.push(c);
-            }
-        }
-
-        if (groupOrder.length === 0) {
-            items.push({ type: 'header', title: provider.name });
-            for (var j = 0; j < ungrouped.length; j++) {
-                items.push(buildProviderItem(prefix, provider, ungrouped[j]));
-            }
-        } else {
-            for (var g = 0; g < groupOrder.length; g++) {
-                var groupName = groupOrder[g];
-                items.push({ type: 'header', title: provider.name + ' · ' + groupName });
-                var list = grouped[groupName];
-                for (var k = 0; k < list.length; k++) {
-                    items.push(buildProviderItem(prefix, provider, list[k]));
-                }
-            }
-            for (var u = 0; u < ungrouped.length; u++) {
-                if (u === 0) items.push({ type: 'header', title: provider.name });
-                items.push(buildProviderItem(prefix, provider, ungrouped[u]));
-            }
-        }
-
-        if (items.length === 0 || (items.length === 1 && items[0].type === 'header')) {
-            items = [{ type: 'header', title: provider.name + ' - no matches' }];
-        }
-
-        renderResults(items);
-    }
-
-    function buildProviderItem(prefix, provider, candidate) {
-        var item = {
-            type: 'filter-candidate',
-            title: candidate.label,
-            subtitle: candidate.sublabel || '',
-            icon: candidate.icon || provider.icon,
-            disabled: !!candidate.disabled,
-            _providerPrefix: prefix,
-            _providerCandidate: candidate,
-            action: function () {
-                if (candidate.disabled) return;
-                // Lock as filter chip AND execute (Enter behavior)
-                if (chips) {
-                    chips.add({
-                        type: 'filter',
-                        prefix: prefix,
-                        value: prefix + candidate.value,
-                        label: prefix + (candidate.label || candidate.value),
-                        icon: provider.icon
-                    });
-                }
-                input.value = '';
-                // Execute composed query immediately
-                var q = chips ? chips.composedQuery() : '';
-                if (q) {
-                    recordRecentSearch(q);
-                    window.location.href = '/search?q=' + encodeURIComponent(q);
-                }
-            }
-        };
-        if (candidate.keyrune) {
-            var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
-            item.iconHtml = '<i class="ss ss-' + kr + '"></i>';
-        }
-        if (candidate.iconColor) {
-            item.iconStyle = 'color: ' + candidate.iconColor;
-        }
-        return item;
-    }
-
-    // ── Sub-view rendering (parent nav chip locked) ──────────────────
-    function renderSubViewResults(parentChip, targets, query) {
-        var items = [];
-
-        function pushEntries(entries, headerLabel) {
-            if (!entries || entries.length === 0) return;
-            var filtered = window.__palette_providers
-                ? window.__palette_providers.filterEntries(entries, query)
-                : entries;
-            if (filtered.length === 0) return;
-            if (headerLabel) items.push({ type: 'header', title: headerLabel });
-            for (var i = 0; i < filtered.length; i++) {
-                items.push(buildSubViewItem(parentChip, filtered[i]));
-            }
-        }
-
-        if (Array.isArray(targets)) {
-            // Newspaper / Sleepers shape: flat array, optionally grouped by .group
-            var byGroup = {};
-            var orderedGroups = [];
-            var hadAnyGroup = false;
-            for (var i = 0; i < targets.length; i++) {
-                var g = targets[i].group || 'Views';
-                if (targets[i].group) hadAnyGroup = true;
-                if (!byGroup[g]) { byGroup[g] = []; orderedGroups.push(g); }
-                byGroup[g].push(targets[i]);
-            }
-            if (hadAnyGroup) {
-                for (var gi = 0; gi < orderedGroups.length; gi++) {
-                    pushEntries(byGroup[orderedGroups[gi]], parentChip.navName + ' · ' + orderedGroups[gi]);
-                }
-            } else {
-                pushEntries(targets, parentChip.navName + ' Views');
-            }
-        } else {
-            // Arbit/Reverse/Global shape: { filters: [...], sorts: [...] }
-            pushEntries(targets.sorts, parentChip.navName + ' · Sort');
-            pushEntries(targets.filters, parentChip.navName + ' · Filters');
-        }
-
-        if (items.length === 0) {
-            items.push({ type: 'header', title: parentChip.navName + ' - no matching sub-views' });
-        }
-        renderResults(items);
-    }
-
-    function buildSubViewItem(parentChip, entry) {
-        return {
-            type: 'nav-sub',
-            title: entry.label,
-            subtitle: entry.group || '',
-            icon: 'arrow-right',
-            _subView: entry,
-            _parentChip: parentChip,
-            action: function () {
-                var url = composeSubViewURL(parentChip, entry);
-                window.location.href = url;
-            }
-        };
+        return base + (params.length ? '?' + params.join('&') : '');
     }
 
     function composeSubViewURL(parentChip, entry) {
-        var key = navParentKeys[parentChip.navName];
+        var key  = NAV_PARENTS[parentChip.navName];
         var base = (parentChip.navLink || '').split('?')[0];
         var params = [];
 
         if (key === 'newspaper' || key === 'sleepers') {
             params.push('page=' + encodeURIComponent(entry.value));
         } else {
-            // arbit / reverse / global
             if (isArbitSortValue(key, entry.value)) {
                 params.push('sort=' + encodeURIComponent(entry.value));
             } else {
                 params.push(encodeURIComponent(entry.value) + '=true');
             }
-            // Merge prior nav-sub chips for the same parent
+            // Merge prior nav-sub chips for the same parent.
             if (chips) {
                 var list = chips.all();
                 for (var i = 0; i < list.length; i++) {
@@ -950,223 +216,1088 @@
                 }
             }
         }
-        return base + (params.length > 0 ? '?' + params.join('&') : '');
+        return base + (params.length ? '?' + params.join('&') : '');
     }
 
-    // ── Render results ───────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    //  Card meta cache (for filter narrowing)
+    // ════════════════════════════════════════════════════════════════
+
+    function fetchCardMeta(name) {
+        if (!name) return Promise.resolve(null);
+        if (S.cardMetaCache[name])    return Promise.resolve(S.cardMetaCache[name]);
+        if (S.cardMetaInflight[name]) return S.cardMetaInflight[name];
+        S.cardMetaInflight[name] = fetch('/api/palette/card/' + encodeURIComponent(name))
+            .then(function (r) { return r.ok ? r.json() : { found: false }; })
+            .then(function (data) {
+                if (data && data.found) S.cardMetaCache[name] = data;
+                delete S.cardMetaInflight[name];
+                handleInput();
+                return data;
+            })
+            .catch(function () {
+                delete S.cardMetaInflight[name];
+                return { found: false };
+            });
+        return S.cardMetaInflight[name];
+    }
+
+    function activeCardMeta() {
+        if (!chips) return null;
+        var list = chips.all();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].type === 'card') {
+                return S.cardMetaCache[list[i]._cardName || list[i].value] || null;
+            }
+        }
+        return null;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  DOM construction
+    // ════════════════════════════════════════════════════════════════
+
+    function buildDOM() {
+        var overlay = document.createElement('div');
+        overlay.className = 'cp-overlay';
+        overlay.id = 'cp-overlay';
+        overlay.innerHTML =
+            '<div class="cp-dialog" role="dialog" aria-modal="true">' +
+              '<div class="cp-input-row">' +
+                '<span class="cp-mode-indicator" id="cp-mode"></span>' +
+                '<div class="cp-chip-container" id="cp-chips" role="group" aria-label="Search composition">' +
+                  '<input class="cp-input" id="cp-input" type="text" autocomplete="off" placeholder="' + DEFAULT_PLACEHOLDER + '">' +
+                '</div>' +
+                '<kbd class="cp-shortcut">ESC</kbd>' +
+              '</div>' +
+              '<div class="cp-results" id="cp-results" role="listbox" aria-label="Results"></div>' +
+              '<div class="cp-footer">' +
+                '<span><kbd>\u2191\u2193</kbd> Navigate</span>' +
+                '<span class="cp-footer-action"><kbd>Enter</kbd> Select</span>' +
+                '<span class="cp-footer-tab" style="display:none"></span>' +
+                '<span class="cp-footer-hint-delete" style="display:none"><kbd>Shift+Del</kbd> Remove</span>' +
+                '<span><kbd>?</kbd> Help</span>' +
+                '<span><kbd>Esc</kbd> Close</span>' +
+              '</div>' +
+              '<div class="cp-sr-only" id="cp-chip-announce" aria-live="polite" aria-atomic="true"></div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+
+        var toast = document.createElement('div');
+        toast.className = 'cp-toast';
+        toast.id = 'cp-toast';
+        document.body.appendChild(toast);
+
+        return {
+            overlay:   overlay,
+            dialog:    overlay.firstChild,
+            input:     overlay.querySelector('#cp-input'),
+            chipBox:   overlay.querySelector('#cp-chips'),
+            modeTag:   overlay.querySelector('#cp-mode'),
+            resultsEl: overlay.querySelector('#cp-results'),
+            footer:    overlay.querySelector('.cp-footer'),
+            chipLive:  overlay.querySelector('#cp-chip-announce'),
+            toast:     toast
+        };
+    }
+
+    var DOM = buildDOM();
+    var input     = DOM.input;
+    var resultsEl = DOM.resultsEl;
+    var modeTag   = DOM.modeTag;
+
+    // Click overlay to close (but not clicks inside the dialog).
+    DOM.overlay.addEventListener('click', function (e) {
+        if (e.target === DOM.overlay) closePalette();
+    });
+
+    // ════════════════════════════════════════════════════════════════
+    //  Toast
+    // ════════════════════════════════════════════════════════════════
+
+    function showToast(msg) {
+        DOM.toast.textContent = msg;
+        DOM.toast.classList.add('show');
+        if (S.toastTimer) clearTimeout(S.toastTimer);
+        S.toastTimer = setTimeout(function () { DOM.toast.classList.remove('show'); }, 2000);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Chip manager init + chip helpers
+    // ════════════════════════════════════════════════════════════════
+
+    var chips = null;
+
+    if (chipsAPI && typeof chipsAPI.create === 'function') {
+        chips = chipsAPI.create(DOM.chipBox, input, onChipChange);
+    }
+
+    function onChipChange() {
+        var now = chips ? chips.count() : 0;
+        if (DOM.chipLive) {
+            if (now > S.lastChipCount) {
+                var latest = chips.get(now - 1);
+                DOM.chipLive.textContent = 'Added chip: ' + (latest ? (latest.label || latest.value) : '');
+            } else if (now < S.lastChipCount) {
+                DOM.chipLive.textContent = 'Removed chip';
+            }
+        }
+        S.lastChipCount = now;
+        // Always refresh placeholder (chip add/remove changes context).
+        applyPlaceholder(resolveContext(input.value));
+        // Defer full re-render only when explicitly suppressed (e.g. inside Tab handler).
+        if (!S.suppressChipOnChange) handleInput();
+    }
+
+    function addChipSilent(chip) {
+        if (!chips) return;
+        S.suppressChipOnChange = true;
+        chips.add(chip);
+        S.suppressChipOnChange = false;
+    }
+
+    function lockFilterChip(item) {
+        var c = item._providerCandidate;
+        addChipSilent({
+            type:   'filter',
+            prefix: item._providerPrefix,
+            value:  item._providerPrefix + c.value,
+            label:  item._providerPrefix + (c.label || c.value),
+            icon:   item.icon || 'filter'
+        });
+    }
+
+    function lockCardChip(item) {
+        addChipSilent({
+            type:      'card',
+            value:     '"' + item.cardName + '"',
+            label:     item.cardName,
+            icon:      'search',
+            _cardName: item.cardName
+        });
+        fetchCardMeta(item.cardName);
+    }
+
+    function lockParentNavChip(item) {
+        addChipSilent({
+            type:    'nav',
+            value:   item.navLink || '',
+            label:   item.navName,
+            icon:    'compass',
+            navName: item.navName,
+            navLink: item.navLink
+        });
+    }
+
+    function lockSubViewChip(item) {
+        var pKey = NAV_PARENTS[item._parentChip.navName];
+        var urlParam, isSingleton = false;
+
+        if (pKey === 'newspaper' || pKey === 'sleepers') {
+            urlParam = 'page=' + encodeURIComponent(item._subView.value);
+            isSingleton = true;
+        } else if (isArbitSortValue(pKey, item._subView.value)) {
+            urlParam = 'sort=' + encodeURIComponent(item._subView.value);
+            isSingleton = true;
+        } else {
+            urlParam = encodeURIComponent(item._subView.value) + '=true';
+        }
+
+        // Replace any existing chip that conflicts (same singleton kind, or duplicate filter).
+        var existing = chips.all();
+        for (var i = existing.length - 1; i >= 0; i--) {
+            var ec = existing[i];
+            if (ec.type !== 'nav-sub' || ec._parentKey !== pKey) continue;
+            if (isSingleton) {
+                var ecPrefix  = ec._urlParam ? ec._urlParam.split('=')[0] : '';
+                var newPrefix = urlParam.split('=')[0];
+                if (ecPrefix === newPrefix) chips.remove(i);
+            } else if (ec._urlParam === urlParam) {
+                chips.remove(i);
+            }
+        }
+
+        addChipSilent({
+            type:       'nav-sub',
+            value:      item._subView.value,
+            label:      item._subView.label,
+            icon:       'arrow-right',
+            _parentKey: pKey,
+            _urlParam:  urlParam
+        });
+    }
+
+    function runComposedQuery() {
+        if (!chips) return;
+        var navUrl = chipsNavURL(chips.all());
+        if (navUrl) { window.location.href = navUrl; return; }
+        var q = chips.composedQuery();
+        if (!q) return;
+        recordRecentSearch(q);
+        window.location.href = '/search?q=' + encodeURIComponent(q);
+    }
+
+    // Re-render dropdown when provider data (sets/stores) finishes loading.
+    if (providers && typeof providers.setOnDataReady === 'function') {
+        providers.setOnDataReady(function () {
+            if (S.open) handleInput();
+        });
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Mode prefixes & context resolution
+    // ════════════════════════════════════════════════════════════════
+
+    var MODE_PREFIXES = [
+        {
+            mode:  'help',
+            test:  function (v) { return v.charAt(0) === '?' || /^(help:|syntax:)/i.test(v); },
+            strip: function (v) { return v.replace(/^(\?\s*|help:|syntax:|\?:)/i, '').trim(); }
+        },
+        {
+            mode:  'nav',
+            test:  function (v) { return v.charAt(0) === '>'; },
+            strip: function (v) { return v.substring(1).trim(); }
+        },
+        {
+            mode:  'saved',
+            test:  function (v) { return v.charAt(0) === '*' || /^saved:/i.test(v); },
+            strip: function (v) { return v.replace(/^(\*|saved:)/i, '').trim(); }
+        },
+        {
+            mode:  'recent',
+            test:  function (v) { return v.charAt(0) === '<' || /^recent:/i.test(v); },
+            strip: function (v) { return v.replace(/^(<|recent:)/i, '').trim(); }
+        }
+    ];
+
+    // Returns one of:
+    //   { kind: 'provider', prefix, provider, query }
+    //   { kind: 'subview',  parentChip, targets, query }
+    //   { kind: 'mode',     mode, query }
+    //   { kind: 'search',   query }
+    function resolveContext(raw) {
+        // 1. Provider prefix takes precedence over everything else.
+        if (providers && chips) {
+            var d = providers.detectPrefix(raw);
+            if (d) {
+                var p = providers.getProvider(d.prefix);
+                if (p) return { kind: 'provider', prefix: d.prefix, provider: p, query: d.query };
+            }
+        }
+        // 2. Parent nav chip locked → sub-view mode.
+        if (chips) {
+            var list = chips.all();
+            for (var i = list.length - 1; i >= 0; i--) {
+                if (list[i].type === 'nav' && isParentNav(list[i].navName)) {
+                    var t = getNavTargets(list[i].navName);
+                    if (t) return { kind: 'subview', parentChip: list[i], targets: t, query: raw.trim() };
+                    break;
+                }
+            }
+        }
+        // 3. Mode prefix in input.
+        for (var m = 0; m < MODE_PREFIXES.length; m++) {
+            if (MODE_PREFIXES[m].test(raw)) {
+                return { kind: 'mode', mode: MODE_PREFIXES[m].mode, query: MODE_PREFIXES[m].strip(raw) };
+            }
+        }
+        // 4. Default search.
+        return { kind: 'search', query: raw.trim() };
+    }
+
+    function applyPlaceholder(ctx) {
+        if (ctx.kind === 'provider') {
+            input.placeholder = 'Filter ' + (ctx.provider.name || 'options').toLowerCase() + '...';
+            return;
+        }
+        if (ctx.kind === 'subview') {
+            input.placeholder = 'Filter ' + ctx.parentChip.navName + ' sub-views...';
+            return;
+        }
+        if (ctx.kind === 'mode') {
+            input.placeholder = ({
+                help:   'Search help & syntax...',
+                nav:    'Filter pages...',
+                saved:  'Filter saved searches...',
+                recent: 'Filter recent searches...'
+            })[ctx.mode];
+            return;
+        }
+        if (chips && chips.count() > 0) {
+            input.placeholder = 'Add filters or press Enter to search...';
+            return;
+        }
+        input.placeholder = DEFAULT_PLACEHOLDER;
+    }
+
+    function applyModeIndicator(ctx) {
+        var label = '';
+        if (ctx.kind === 'mode') {
+            label = ({ help: 'HELP', nav: 'NAV', saved: 'SAVED', recent: 'RECENT' })[ctx.mode] || '';
+        }
+        if (label) {
+            modeTag.textContent = label;
+            modeTag.setAttribute('data-mode', ctx.mode);
+            modeTag.className = 'cp-mode-indicator active';
+        } else {
+            modeTag.textContent = '';
+            modeTag.className = 'cp-mode-indicator';
+            modeTag.removeAttribute('data-mode');
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Result builders (per data source)
+    // ════════════════════════════════════════════════════════════════
+
+    function getRecentResults(query, limit) {
+        var recent = getJSON(RECENT_KEY);
+        var out = [];
+        for (var i = 0; i < recent.length && out.length < limit; i++) {
+            var r = recent[i];
+            if (!query || scoreMatch(query, r.q, null) > 0) {
+                out.push({
+                    type: 'recent', title: r.q, subtitle: 'Recent search', icon: 'clock',
+                    recentQuery: r.q,
+                    action: (function (q) { return function () {
+                        recordRecentSearch(q);
+                        window.location.href = '/search?q=' + encodeURIComponent(q);
+                    }; })(r.q)
+                });
+            }
+        }
+        return out;
+    }
+
+    function getNavResults(query) {
+        var nav = palette.nav || [];
+        var out = [];
+        for (var i = 0; i < nav.length; i++) {
+            var n = nav[i];
+            if (!query || scoreMatch(query, n.name, null) > 0) {
+                out.push({
+                    type: 'nav', title: n.name, subtitle: 'Navigate to ' + n.name,
+                    icon: n.icon || 'compass',
+                    navName: n.name, navLink: n.link,
+                    action: (function (link) { return function () { window.location.href = link; }; })(n.link),
+                    score: query ? scoreMatch(query, n.name, null) : 0
+                });
+            }
+        }
+        if (query) out.sort(function (a, b) { return b.score - a.score; });
+        return out;
+    }
+
+    function getStaticCommands(query) {
+        var cmds = [
+            {
+                name: 'Toggle Theme',
+                icon: localStorage.getItem('theme') === 'dark' ? 'sun' : 'moon',
+                keywords: ['dark', 'light', 'night', 'day', 'theme', 'mode'],
+                action: function () {
+                    var t = localStorage.getItem('theme') === 'dark' ? 'light' : 'dark';
+                    document.body.classList.toggle('dark-theme',  t === 'dark');
+                    document.body.classList.toggle('light-theme', t === 'light');
+                    localStorage.setItem('theme', t);
+                    var toggle = document.getElementById('theme-toggle');
+                    if (toggle) toggle.title = t === 'dark' ? 'Nightbound' : 'Daybound';
+                    closePalette();
+                    showToast('Theme: ' + t);
+                }
+            },
+            { name: 'Random Card',   icon: 'dice-5',     keywords: ['random', 'surprise', 'lucky'],
+              action: function () { window.location.href = '/random'; } },
+            { name: 'Random Sealed', icon: 'package',    keywords: ['random', 'sealed', 'booster', 'pack'],
+              action: function () { window.location.href = '/randomsealed'; } },
+            { name: 'Open Guide',    icon: 'book-open',  keywords: ['guide', 'help', 'documentation', 'syntax'],
+              action: function () { window.location.href = '/guide'; } },
+            { name: 'Copy Page URL', icon: 'link',       keywords: ['copy', 'url', 'link', 'share', 'clipboard'],
+              action: function () {
+                  if (navigator.clipboard) {
+                      navigator.clipboard.writeText(window.location.href)
+                          .then(function () { showToast('URL copied to clipboard'); });
+                  } else {
+                      showToast('Clipboard not available');
+                  }
+                  closePalette();
+              } }
+        ];
+
+        // Conditionally add "Save Current Search".
+        var hasComposed   = chips && chips.count() > 0 && chips.composedQuery();
+        var sb            = document.getElementById('searchbox');
+        var hasSearchbox  = sb && sb.value && sb.value.trim();
+        if (hasComposed || hasSearchbox) {
+            cmds.push({
+                name: 'Save Current Search', icon: 'bookmark-plus',
+                keywords: ['save', 'bookmark', 'store', 'command'],
+                action: function () { showSaveModal(); }
+            });
+        }
+
+        var out = [];
+        for (var i = 0; i < cmds.length; i++) {
+            var c = cmds[i];
+            if (!query || scoreMatch(query, c.name, c.keywords) > 0) {
+                out.push({
+                    type: 'command', title: c.name, subtitle: '', icon: c.icon, action: c.action,
+                    score: query ? scoreMatch(query, c.name, c.keywords) : 0
+                });
+            }
+        }
+        if (query) out.sort(function (a, b) { return b.score - a.score; });
+        return out;
+    }
+
+    function getCardResults(query, limit) {
+        if (!S.cardNames || !query || query.length < 2) return [];
+        var out = [];
+        for (var i = 0; i < S.cardNames.length && out.length < limit; i++) {
+            if (matchCardName(query, S.cardNames[i])) {
+                var name = S.cardNames[i];
+                out.push({
+                    type: 'card', title: name, subtitle: 'Search for "' + name + '"',
+                    icon: 'search', cardName: name,
+                    action: (function (n) { return function () {
+                        recordRecentSearch(n);
+                        window.location.href = '/search?q=' + encodeURIComponent(n);
+                    }; })(name)
+                });
+            }
+        }
+        return out;
+    }
+
+    function getHelpResults(query) {
+        var sections = guide.sections || [];
+        var out = [];
+        for (var i = 0; i < sections.length && out.length < 10; i++) {
+            var s = sections[i];
+            if (!isSectionAllowed(s)) continue;
+
+            var match = !query || scoreMatch(query, s.title, s.keywords) > 0;
+            if (!match && s.summary) match = scoreMatch(query, s.summary, null) > 0;
+            if (!match && s.snippets) {
+                for (var j = 0; j < s.snippets.length; j++) {
+                    if (s.snippets[j].toLowerCase().indexOf(query.toLowerCase()) >= 0) {
+                        match = true; break;
+                    }
+                }
+            }
+            if (!match) continue;
+
+            var isSyntax = s.category === 'Search Syntax';
+            var snippetText = (isSyntax && s.snippets && s.snippets.length > 0)
+                ? s.snippets.join('  ') : '';
+
+            out.push({
+                type: 'help',
+                title: s.title,
+                subtitle: s.summary || '',
+                snippets: snippetText,
+                icon: s.icon || 'help-circle',
+                isSyntax: isSyntax,
+                sectionId: s.id,
+                action: isSyntax
+                    ? (function (snip) { return function () {
+                          if (navigator.clipboard && snip) {
+                              navigator.clipboard.writeText(snip)
+                                  .then(function () { showToast('Copied: ' + snip); });
+                          }
+                          closePalette();
+                      }; })(s.snippets && s.snippets[0] ? s.snippets[0] : '')
+                    : (function (id) { return function () { window.location.href = '/guide#' + id; }; })(s.id),
+                altAction: isSyntax
+                    ? (function (id) { return function () { window.location.href = '/guide#' + id; }; })(s.id)
+                    : null,
+                score: query ? scoreMatch(query, s.title, s.keywords) : 0
+            });
+        }
+        if (query) out.sort(function (a, b) { return b.score - a.score; });
+        return out;
+    }
+
+    function getSavedResults(query) {
+        var saved = getJSON(SAVED_KEY);
+        var out = [];
+        for (var i = 0; i < saved.length; i++) {
+            var s = saved[i];
+            if (query && scoreMatch(query, s.name, s.query) === 0) continue;
+
+            out.push({
+                type: 'saved', title: s.name, subtitle: s.query,
+                icon: s.icon || 'bookmark', savedId: s.id,
+                action: (function (cmd) { return function () {
+                    // Update usage tracking
+                    var all = getJSON(SAVED_KEY);
+                    for (var k = 0; k < all.length; k++) {
+                        if (all[k].id === cmd.id) {
+                            all[k].lastUsed = Date.now();
+                            all[k].useCount = (all[k].useCount || 0) + 1;
+                            break;
+                        }
+                    }
+                    setJSON(SAVED_KEY, all);
+                    var navUrl = chipsNavURL(cmd.chips);
+                    if (navUrl) { window.location.href = navUrl; return; }
+                    recordRecentSearch(cmd.query);
+                    window.location.href = '/search?q=' + encodeURIComponent(cmd.query);
+                }; })(s),
+                altAction: (function (cmd) { return function () {
+                    // Shift+Enter: restore chips into the palette input for editing.
+                    if (!chips) {
+                        input.value = cmd.query || '';
+                        input.focus();
+                        handleInput();
+                        return;
+                    }
+                    chips.clear();
+                    if (cmd.chips && cmd.chips.length > 0) {
+                        for (var ci = 0; ci < cmd.chips.length; ci++) {
+                            chips.add(cmd.chips[ci]);
+                        }
+                        // Prefetch card meta for restored card chips so filter narrowing works.
+                        for (var cj = 0; cj < cmd.chips.length; cj++) {
+                            if (cmd.chips[cj].type === 'card' && cmd.chips[cj]._cardName) {
+                                fetchCardMeta(cmd.chips[cj]._cardName);
+                            }
+                        }
+                    } else if (cmd.query) {
+                        // V1 saved command (no chips field) — restore as plain input text.
+                        input.value = cmd.query;
+                    }
+                    input.focus();
+                    handleInput();
+                }; })(s)
+            });
+        }
+        return out;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Item-list builders (per ctx kind)
+    // ════════════════════════════════════════════════════════════════
+
+    function buildProviderItem(prefix, provider, candidate) {
+        var item = {
+            type: 'filter-candidate',
+            title:    candidate.label,
+            subtitle: candidate.sublabel || '',
+            icon:     candidate.icon || provider.icon,
+            disabled: !!candidate.disabled,
+            _providerPrefix:    prefix,
+            _providerCandidate: candidate
+        };
+        if (candidate.keyrune) {
+            var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
+            item.iconHtml = '<i class="ss ss-' + kr + '"></i>';
+        }
+        if (candidate.iconColor) item.iconStyle = 'color: ' + candidate.iconColor;
+        return item;
+    }
+
+    function buildProviderItems(ctx) {
+        var prefix = ctx.prefix, provider = ctx.provider;
+        var ctxArg = { chips: chips ? chips.all() : [], cardMeta: activeCardMeta() };
+        var candidates = (provider.getCandidates(ctx.query, ctxArg) || []).slice(0, DROPDOWN_CAP);
+
+        // Group by candidate.group, falling back to a single "<provider name>" bucket.
+        var grouped = {}, order = [], ungrouped = [];
+        for (var i = 0; i < candidates.length; i++) {
+            var c = candidates[i];
+            if (c.group) {
+                if (!grouped[c.group]) { grouped[c.group] = []; order.push(c.group); }
+                grouped[c.group].push(c);
+            } else {
+                ungrouped.push(c);
+            }
+        }
+
+        var items = [];
+        if (order.length === 0) {
+            items.push({ type: 'header', title: provider.name });
+            for (var j = 0; j < ungrouped.length; j++) {
+                items.push(buildProviderItem(prefix, provider, ungrouped[j]));
+            }
+        } else {
+            for (var g = 0; g < order.length; g++) {
+                items.push({ type: 'header', title: provider.name + ' \u00b7 ' + order[g] });
+                var list = grouped[order[g]];
+                for (var k = 0; k < list.length; k++) {
+                    items.push(buildProviderItem(prefix, provider, list[k]));
+                }
+            }
+            for (var u = 0; u < ungrouped.length; u++) {
+                if (u === 0) items.push({ type: 'header', title: provider.name });
+                items.push(buildProviderItem(prefix, provider, ungrouped[u]));
+            }
+        }
+        if (items.length === 0 || (items.length === 1 && items[0].type === 'header')) {
+            items = [{ type: 'header', title: provider.name + ' - no matches' }];
+        }
+        return items;
+    }
+
+    function buildSubViewItem(parentChip, entry) {
+        return {
+            type: 'nav-sub',
+            title:    entry.label,
+            subtitle: entry.group || '',
+            icon: 'arrow-right',
+            _subView:    entry,
+            _parentChip: parentChip
+        };
+    }
+
+    function buildSubViewItems(ctx) {
+        var parentChip = ctx.parentChip, targets = ctx.targets, q = ctx.query;
+        var items = [];
+
+        function pushEntries(entries, headerLabel) {
+            if (!entries || entries.length === 0) return;
+            var filtered = providers ? providers.filterEntries(entries, q) : entries;
+            if (filtered.length === 0) return;
+            if (headerLabel) items.push({ type: 'header', title: headerLabel });
+            for (var i = 0; i < filtered.length; i++) items.push(buildSubViewItem(parentChip, filtered[i]));
+        }
+
+        if (Array.isArray(targets)) {
+            // Newspaper / Sleepers shape: flat array, optionally grouped by .group
+            var byGroup = {}, orderedGroups = [], hadAnyGroup = false;
+            for (var i = 0; i < targets.length; i++) {
+                var g = targets[i].group || 'Views';
+                if (targets[i].group) hadAnyGroup = true;
+                if (!byGroup[g]) { byGroup[g] = []; orderedGroups.push(g); }
+                byGroup[g].push(targets[i]);
+            }
+            if (hadAnyGroup) {
+                for (var gi = 0; gi < orderedGroups.length; gi++) {
+                    pushEntries(byGroup[orderedGroups[gi]], parentChip.navName + ' \u00b7 ' + orderedGroups[gi]);
+                }
+            } else {
+                pushEntries(targets, parentChip.navName + ' Views');
+            }
+        } else {
+            // Arbit/Reverse/Global shape: { filters: [...], sorts: [...] }
+            pushEntries(targets.sorts,   parentChip.navName + ' \u00b7 Sort');
+            pushEntries(targets.filters, parentChip.navName + ' \u00b7 Filters');
+        }
+
+        if (items.length === 0) {
+            items.push({ type: 'header', title: parentChip.navName + ' - no matching sub-views' });
+        }
+        return items;
+    }
+
+    function buildModeItems(ctx) {
+        var headerTitle = ({
+            help:   'Help',
+            nav:    'Pages',
+            saved:  'Saved Commands',
+            recent: 'Recent Searches'
+        })[ctx.mode];
+        var fetcher = ({
+            help:   getHelpResults,
+            nav:    getNavResults,
+            saved:  getSavedResults,
+            recent: function (q) { return getRecentResults(q, 50); }
+        })[ctx.mode];
+        var list = fetcher(ctx.query);
+        return list.length ? [{ type: 'header', title: headerTitle }].concat(list) : [];
+    }
+
+    function buildSearchItems(query) {
+        var items = [];
+
+        // Always offer the direct-search row (supports inline syntax like s:3ED).
+        var composed = chips ? chips.composedQuery() : query;
+        if (composed) {
+            items.push({
+                type: 'search',
+                title: 'Search: ' + composed,
+                subtitle: 'Run full search with syntax support',
+                icon: 'search',
+                action: function () {
+                    var q = chips ? chips.composedQuery() : composed;
+                    recordRecentSearch(q);
+                    window.location.href = '/search?q=' + encodeURIComponent(q);
+                }
+            });
+        }
+
+        var cmds  = getStaticCommands(query);
+        var cards = getCardResults(query, 5);
+        var navs  = getNavResults(query);
+
+        // Recent and Saved live behind their own gated panels (< and *).
+        if (cmds.length)  items.push({ type: 'header', title: 'Commands' }, cmds[0],  cmds[1]  || null, cmds[2]  || null);
+        if (cards.length) items.push({ type: 'header', title: 'Cards' });
+        for (var i = 0; i < cards.length; i++) items.push(cards[i]);
+        if (navs.length)  items.push({ type: 'header', title: 'Pages' }, navs[0], navs[1] || null, navs[2] || null);
+
+        // Drop the trailing nulls produced above.
+        return items.filter(Boolean);
+    }
+
+    // Enforces the global per-search row cap (excluding headers), preserving headers
+    // only for groups that still have at least one surviving item beneath them.
+    function capItems(items, cap) {
+        var nonHeaders = [], headers = [];
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].type === 'header') {
+                headers.push({ item: items[i], nextIndex: nonHeaders.length });
+            } else {
+                nonHeaders.push(items[i]);
+            }
+        }
+        if (nonHeaders.length > cap) nonHeaders = nonHeaders.slice(0, cap);
+
+        var out = [], hi = 0;
+        for (var y = 0; y < nonHeaders.length; y++) {
+            while (hi < headers.length && headers[hi].nextIndex <= y) {
+                out.push(headers[hi].item);
+                hi++;
+            }
+            out.push(nonHeaders[y]);
+        }
+        return out;
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Row-type registry
+    //
+    //  Each entry may define:
+    //    render(item, idx, active) → HTML  (selectable rows)
+    //    render(item)              → HTML  (headers; selectable: false)
+    //    footer(item)              → { action, tab? }
+    //    onEnter(item)             → void
+    //    onShiftEnter(item)        → void  (optional)
+    //    onTab(item)               → bool  (true = chip locked, clear input)
+    //    onShiftDelete(item)       → void  (optional)
+    // ════════════════════════════════════════════════════════════════
+
+    // Generic row HTML used by most types. `rightHtml` is whatever sits on the
+    // right side of the row (kbd hint, delete button, etc.) — pass '' for none.
+    function rowHTML(item, idx, active, rightHtml) {
+        var cls = 'cp-result' + (active ? ' active' : '') + (item.disabled ? ' disabled' : '');
+        var aria = item.disabled ? ' aria-disabled="true"' : '';
+        var iconBlock;
+        if (item.iconHtml) {
+            iconBlock = '<div class="cp-result-icon">' + item.iconHtml + '</div>';
+        } else {
+            var styleAttr = item.iconStyle ? ' style="' + esc(item.iconStyle) + '"' : '';
+            iconBlock = '<div class="cp-result-icon"' + styleAttr + '>'
+                      + '<i data-lucide="' + esc(item.icon || 'search') + '"></i></div>';
+        }
+        var body;
+        if (item.snippets) {
+            body = '<div class="cp-result-title">'  + esc(item.title) + '</div>'
+                 + '<div class="cp-result-inline">' + esc(item.snippets) + '</div>';
+        } else if (item.subtitle) {
+            body = '<div class="cp-result-title">'    + esc(item.title)    + '</div>'
+                 + '<div class="cp-result-subtitle">' + esc(item.subtitle) + '</div>';
+        } else {
+            body = '<div class="cp-result-title">'    + esc(item.title) + '</div>';
+        }
+        return '<div class="' + cls + '" role="option" data-index="' + idx + '"' + aria + '>'
+             + iconBlock
+             + '<div class="cp-result-body">' + body + '</div>'
+             + '<div class="cp-result-right">' + (rightHtml || '') + '</div>'
+             + '</div>';
+    }
+
+    var ROW_TYPES = {
+        header: {
+            selectable: false,
+            render: function (item) {
+                var key = categoryKeyFor(item.title);
+                var ic  = categoryIconFor(item.title);
+                return '<div class="cp-category-header" data-category="' + esc(key) + '">'
+                     + (ic ? '<i data-lucide="' + ic + '"></i>' : '')
+                     + '<span>' + esc(item.title) + '</span></div>';
+            }
+        },
+
+        shortcut: {
+            render: function (item, idx, active) {
+                var right = '<kbd class="cp-shortcut">' + esc(item.shortcut) + '</kbd>';
+                // Shortcuts row gets an extra utility class.
+                return rowHTML(item, idx, active, right)
+                    .replace('cp-result', 'cp-result cp-shortcut-row');
+            },
+            footer:  function () { return { action: 'Open' }; },
+            onEnter: function (item) { item.action(); }
+        },
+
+        nav: {
+            render: function (item, idx, active) {
+                var right = isParentNav(item.navName)
+                    ? '<kbd class="cp-shortcut cp-tab-hint">Tab</kbd>' : '';
+                return rowHTML(item, idx, active, right);
+            },
+            footer: function (item) {
+                return isParentNav(item.navName)
+                    ? { action: 'Go to page', tab: 'Browse subpages' }
+                    : { action: 'Go to page' };
+            },
+            onEnter: function (item) { window.location.href = item.navLink; },
+            onTab: function (item) {
+                if (!isParentNav(item.navName)) {
+                    // Leaf nav: Tab behaves identically to Enter (avoids the leaky-NAV
+                    // bug where a locked leaf chip would drop into general search).
+                    window.location.href = item.navLink;
+                    return false;
+                }
+                lockParentNavChip(item);
+                return true;
+            }
+        },
+
+        'nav-sub': {
+            render: rowHTML,
+            footer: function (item) {
+                var pKey = item._parentChip && NAV_PARENTS[item._parentChip.navName];
+                var isSingleton = pKey === 'newspaper' || pKey === 'sleepers';
+                var isSort      = pKey && isArbitSortValue(pKey, item._subView.value);
+                return (pKey && !isSingleton && !isSort)
+                    ? { action: 'Open', tab: 'Add filter' }
+                    : { action: 'Open' };
+            },
+            onEnter: function (item) {
+                window.location.href = composeSubViewURL(item._parentChip, item._subView);
+            },
+            onTab: function (item) {
+                lockSubViewChip(item);
+                return true;
+            }
+        },
+
+        card: {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Search', tab: 'Add card chip' }; },
+            onEnter: function (item) {
+                recordRecentSearch(item.cardName);
+                window.location.href = '/search?q=' + encodeURIComponent(item.cardName);
+            },
+            onTab: function (item) { lockCardChip(item); return true; }
+        },
+
+        'filter-candidate': {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Search', tab: 'Lock filter' }; },
+            onEnter: function (item) {
+                if (item.disabled) return;
+                lockFilterChip(item);
+                input.value = '';
+                runComposedQuery();
+            },
+            onTab:   function (item) {
+                if (item.disabled) return false;
+                lockFilterChip(item);
+                return true;
+            }
+        },
+
+        recent: {
+            render:        rowHTML,
+            footer:        function () { return { action: 'Run' }; },
+            onEnter:       function (item) { item.action(); },
+            onShiftDelete: function (item) {
+                deleteRecentSearch(item.recentQuery);
+                handleInput();
+            }
+        },
+
+        saved: {
+            render: function (item, idx, active) {
+                var right = '<button class="cp-result-delete" data-saved-id="' + esc(item.savedId)
+                          + '" title="Delete"><i data-lucide="trash-2"></i></button>';
+                return rowHTML(item, idx, active, right);
+            },
+            footer:        function () { return { action: 'Run', tab: '<kbd>Shift+Enter</kbd> Restore chips' }; },
+            onEnter:       function (item) { item.action(); },
+            onShiftEnter:  function (item) { if (item.altAction) item.altAction(); },
+            onShiftDelete: function (item) {
+                deleteSavedCommandSilent(item.savedId);
+                handleInput();
+            }
+        },
+
+        help: {
+            render: rowHTML,
+            footer: function (item) {
+                return item.isSyntax
+                    ? { action: 'Copy snippet', tab: '<kbd>Shift+Enter</kbd> Open guide' }
+                    : { action: 'Open guide' };
+            },
+            onEnter:      function (item) { item.action(); },
+            onShiftEnter: function (item) { if (item.altAction) item.altAction(); }
+        },
+
+        command: {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Run' }; },
+            onEnter: function (item) { item.action(); }
+        },
+
+        search: {
+            render:  rowHTML,
+            footer:  function () { return { action: 'Search' }; },
+            onEnter: function (item) { item.action(); }
+        }
+    };
+
+    // ════════════════════════════════════════════════════════════════
+    //  Render loop
+    // ════════════════════════════════════════════════════════════════
+
+    function renderDefault() {
+        renderResults([
+            { type: 'header', title: 'Shortcuts' },
+            { type: 'shortcut', title: 'Pages',         subtitle: 'Browse navigation and sub-pages',
+              icon: 'compass',     shortcut: '>', action: function () { input.value = '>'; handleInput(); } },
+            { type: 'shortcut', title: 'Help & syntax', subtitle: 'Search reference and snippets',
+              icon: 'help-circle', shortcut: '?', action: function () { input.value = '?'; handleInput(); } },
+            { type: 'shortcut', title: 'Saved',         subtitle: 'Your saved searches and commands',
+              icon: 'bookmark',    shortcut: '*', action: function () { input.value = '*'; handleInput(); } },
+            { type: 'shortcut', title: 'Recent',        subtitle: 'Your recent searches',
+              icon: 'clock',       shortcut: '<', action: function () { input.value = '<'; handleInput(); } }
+        ]);
+    }
+
     function renderResults(items) {
-        resultItems = [];
-        activeIndex = -1;
+        S.items = [];
+        S.activeIndex = -1;
         var html = '';
-        var idx = 0;
+        var idx  = 0;
+        var firstSelectableIdx = -1;
 
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
-            if (item.type === 'header') {
-                var headerKey = categoryKeyFor(item.title);
-                var headerIcon = categoryIconFor(item.title);
-                var iconHtml = headerIcon ? '<i data-lucide="' + headerIcon + '"></i>' : '';
-                html += '<div class="cp-category-header" data-category="' + escapeHtml(headerKey) + '">' + iconHtml + '<span>' + escapeHtml(item.title) + '</span></div>';
+            var def  = ROW_TYPES[item.type];
+            if (!def) continue;
+
+            if (def.selectable === false) {
+                html += def.render(item);
                 continue;
             }
-
-            if (item.type === 'shortcut') {
-                var sActiveClass = idx === 0 ? ' active' : '';
-                html += '<div class="cp-result cp-shortcut-row' + sActiveClass + '" role="option" data-index="' + idx + '">';
-                html += '<div class="cp-result-icon"><i data-lucide="' + escapeHtml(item.icon) + '"></i></div>';
-                html += '<div class="cp-result-body">';
-                html += '<div class="cp-result-title">' + escapeHtml(item.title) + '</div>';
-                html += '<div class="cp-result-subtitle">' + escapeHtml(item.subtitle) + '</div>';
-                html += '</div>';
-                html += '<div class="cp-result-right">';
-                html += '<kbd class="cp-shortcut">' + escapeHtml(item.shortcut) + '</kbd>';
-                html += '</div>';
-                html += '</div>';
-                resultItems.push(item);
-                idx++;
-                continue;
-            }
-
-            var activeClass = idx === 0 ? ' active' : '';
-            var disabledClass = item.disabled ? ' disabled' : '';
-            html += '<div class="cp-result' + activeClass + disabledClass + '" role="option" data-index="' + idx + '"' + (item.disabled ? ' aria-disabled="true"' : '') + '>';
-            if (item.iconHtml) {
-                html += '<div class="cp-result-icon">' + item.iconHtml + '</div>';
-            } else {
-                var iconStyleAttr = item.iconStyle ? ' style="' + escapeHtml(item.iconStyle) + '"' : '';
-                html += '<div class="cp-result-icon"' + iconStyleAttr + '><i data-lucide="' + escapeHtml(item.icon || 'search') + '"></i></div>';
-            }
-            html += '<div class="cp-result-body">';
-            html += '<div class="cp-result-title">' + escapeHtml(item.title) + '</div>';
-            if (item.snippets) {
-                html += '<div class="cp-result-inline">' + escapeHtml(item.snippets) + '</div>';
-            } else if (item.subtitle) {
-                html += '<div class="cp-result-subtitle">' + escapeHtml(item.subtitle) + '</div>';
-            }
-            html += '</div>';
-            html += '<div class="cp-result-right">';
-            // Parent-nav rows advertise Tab to browse sub-pages
-            if (item.type === 'nav' && item.navName && isParentNav(item.navName)) {
-                html += '<kbd class="cp-shortcut cp-tab-hint">Tab</kbd>';
-            }
-            if (item.type === 'saved') {
-                html += '<button class="cp-result-delete" data-saved-id="' + escapeHtml(item.savedId) + '" title="Delete">';
-                html += '<i data-lucide="trash-2"></i>';
-                html += '</button>';
-            }
-            html += '</div>';
-            html += '</div>';
-
-            resultItems.push(item);
+            var active = idx === 0;
+            html += def.render(item, idx, active);
+            S.items.push(item);
+            if (firstSelectableIdx === -1) firstSelectableIdx = idx;
             idx++;
         }
 
         resultsEl.innerHTML = html;
 
-        // Auto-select the first result UNLESS chips are locked and input is empty.
-        // In that case, Enter should run the chip composition, not a default item.
-        var skipAutoSelect = chips && chips.count() > 0 && input && input.value.trim() === '';
+        // Auto-select first row UNLESS chips are locked and input is empty
+        // (in that case Enter should run the chip composition, not the default item).
+        var skipAutoSelect = chips && chips.count() > 0 && input.value.trim() === '';
         if (idx > 0 && !skipAutoSelect) {
-            activeIndex = 0;
+            S.activeIndex = 0;
         } else {
-            activeIndex = -1;
-            // Clear any lingering .active class on result rows
-            var activeEls = resultsEl.querySelectorAll('.cp-result.active');
-            for (var ai = 0; ai < activeEls.length; ai++) {
-                activeEls[ai].classList.remove('active');
-            }
+            S.activeIndex = -1;
+            // Strip any lingering active class.
+            var actives = resultsEl.querySelectorAll('.cp-result.active');
+            for (var ai = 0; ai < actives.length; ai++) actives[ai].classList.remove('active');
         }
+
         updateDeleteHint();
         updateFooterHints();
 
-        // Render Lucide icons
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
             lucide.createIcons({ nodes: resultsEl.querySelectorAll('[data-lucide]') });
         }
 
-        // Bind click handlers
-        var resultEls = resultsEl.querySelectorAll('.cp-result');
-        for (var r = 0; r < resultEls.length; r++) {
-            (function(index) {
-                resultEls[index].addEventListener('click', function(e) {
-                    // Check if delete button was clicked
-                    var deleteBtn = e.target.closest('.cp-result-delete');
-                    if (deleteBtn) {
+        // Bind click handlers (and the inline saved-row delete button).
+        var rows = resultsEl.querySelectorAll('.cp-result');
+        for (var r = 0; r < rows.length; r++) {
+            (function (rowIdx) {
+                rows[rowIdx].addEventListener('click', function (e) {
+                    var del = e.target.closest('.cp-result-delete');
+                    if (del) {
                         e.stopPropagation();
-                        var savedId = deleteBtn.getAttribute('data-saved-id');
-                        deleteSavedCommand(savedId);
+                        deleteSavedCommand(del.getAttribute('data-saved-id'));
                         return;
                     }
-                    if (resultItems[index] && resultItems[index].disabled) return;
-                    activeIndex = index;
-                    executeResult(false);
+                    var it = S.items[rowIdx];
+                    if (!it || it.disabled) return;
+                    S.activeIndex = rowIdx;
+                    executeActive(false);
                 });
             })(r);
         }
     }
 
-    // ── Navigation helpers ───────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    //  Active-row navigation + footer/hint updates
+    // ════════════════════════════════════════════════════════════════
+
     function setActive(index) {
         var els = resultsEl.querySelectorAll('.cp-result');
-        for (var i = 0; i < els.length; i++) {
-            els[i].classList.remove('active');
-        }
+        for (var i = 0; i < els.length; i++) els[i].classList.remove('active');
         if (index >= 0 && index < els.length) {
             els[index].classList.add('active');
-            // Scroll into view
             els[index].scrollIntoView({ block: 'nearest' });
         }
-        activeIndex = index;
-        // Flag the item as explicitly picked by the user so Enter executes it
-        // rather than the chip-composition fallback.
-        if (index >= 0 && index < resultItems.length && resultItems[index]) {
-            resultItems[index]._userPicked = true;
+        S.activeIndex = index;
+        // Mark explicit user selection so the chips-locked Enter fallback knows
+        // to execute the row instead of running the chip composition.
+        if (index >= 0 && index < S.items.length && S.items[index]) {
+            S.items[index]._userPicked = true;
         }
         updateDeleteHint();
         updateFooterHints();
     }
 
+    function moveActive(delta) {
+        if (S.items.length === 0) return;
+        var next = (S.activeIndex < 0)
+            ? (delta > 0 ? 0 : S.items.length - 1)
+            : (S.activeIndex + delta);
+        if (next >= S.items.length) next = 0;
+        if (next < 0) next = S.items.length - 1;
+        setActive(next);
+    }
+
+    function executeActive(shiftKey) {
+        if (S.activeIndex < 0 || S.activeIndex >= S.items.length) return;
+        var item = S.items[S.activeIndex];
+        if (!item || item.disabled) return;
+        var def = ROW_TYPES[item.type];
+        if (!def) return;
+        if (shiftKey && def.onShiftEnter) def.onShiftEnter(item);
+        else if (def.onEnter)             def.onEnter(item);
+    }
+
     function updateDeleteHint() {
-        var hint = footer && footer.querySelector('.cp-footer-hint-delete');
+        var hint = DOM.footer && DOM.footer.querySelector('.cp-footer-hint-delete');
         if (!hint) return;
-        var item = (activeIndex >= 0 && activeIndex < resultItems.length) ? resultItems[activeIndex] : null;
+        var item = (S.activeIndex >= 0 && S.activeIndex < S.items.length) ? S.items[S.activeIndex] : null;
         var canDelete = item && (item.type === 'recent' || item.type === 'saved');
         hint.style.display = canDelete ? '' : 'none';
     }
 
-    // Update the central footer slot based on the active result type.
-    // Mirrors the row-type - hint table in the spec.
     function updateFooterHints() {
-        var actionEl = footer && footer.querySelector('.cp-footer-action');
-        var tabEl = footer && footer.querySelector('.cp-footer-tab');
+        var actionEl = DOM.footer && DOM.footer.querySelector('.cp-footer-action');
+        var tabEl    = DOM.footer && DOM.footer.querySelector('.cp-footer-tab');
         if (!actionEl || !tabEl) return;
 
-        var item = (activeIndex >= 0 && activeIndex < resultItems.length) ? resultItems[activeIndex] : null;
-        if (!item) {
+        var item = (S.activeIndex >= 0 && S.activeIndex < S.items.length) ? S.items[S.activeIndex] : null;
+        var def  = item && ROW_TYPES[item.type];
+        var hints = (def && def.footer) ? def.footer(item) : null;
+
+        if (!hints) {
             actionEl.innerHTML = '<kbd>Enter</kbd> Select';
             tabEl.style.display = 'none';
             tabEl.innerHTML = '';
             return;
         }
-
-        var actionHtml = '<kbd>Enter</kbd> Select';
-        var tabHtml = '';
-
-        switch (item.type) {
-            case 'shortcut':
-                actionHtml = '<kbd>Enter</kbd> Open';
-                break;
-            case 'nav':
-                actionHtml = '<kbd>Enter</kbd> Go to page';
-                if (item.navName && isParentNav(item.navName)) {
-                    tabHtml = '<kbd>Tab</kbd> Browse subpages';
-                }
-                break;
-            case 'nav-sub':
-                actionHtml = '<kbd>Enter</kbd> Open';
-                // Arbit/reverse/global filters (not sorts, not singletons) accept Tab to lock filter chip
-                if (item._parentChip && item._subView) {
-                    var pKey = navParentKeys[item._parentChip.navName];
-                    if (pKey && pKey !== 'newspaper' && pKey !== 'sleepers'
-                        && !isArbitSortValue(pKey, item._subView.value)) {
-                        tabHtml = '<kbd>Tab</kbd> Add filter';
-                    }
-                }
-                break;
-            case 'card':
-                actionHtml = '<kbd>Enter</kbd> Search';
-                tabHtml = '<kbd>Tab</kbd> Add card chip';
-                break;
-            case 'filter-candidate':
-                actionHtml = '<kbd>Enter</kbd> Search';
-                tabHtml = '<kbd>Tab</kbd> Lock filter';
-                break;
-            case 'recent':
-                actionHtml = '<kbd>Enter</kbd> Run';
-                break;
-            case 'saved':
-                actionHtml = '<kbd>Enter</kbd> Run';
-                tabHtml = '<kbd>Shift+Enter</kbd> Restore chips';
-                break;
-            case 'help':
-                if (item.isSyntax) {
-                    actionHtml = '<kbd>Enter</kbd> Copy snippet';
-                    tabHtml = '<kbd>Shift+Enter</kbd> Open guide';
-                } else {
-                    actionHtml = '<kbd>Enter</kbd> Open guide';
-                }
-                break;
-            case 'command':
-                actionHtml = '<kbd>Enter</kbd> Run';
-                break;
-            case 'search':
-                actionHtml = '<kbd>Enter</kbd> Search';
-                break;
-        }
-
-        actionEl.innerHTML = actionHtml;
-        if (tabHtml) {
-            tabEl.innerHTML = tabHtml;
+        actionEl.innerHTML = '<kbd>Enter</kbd> ' + hints.action;
+        if (hints.tab) {
+            // hints.tab can be a plain label or a full "<kbd>X</kbd> Label" string.
+            tabEl.innerHTML = /<kbd>/i.test(hints.tab) ? hints.tab : '<kbd>Tab</kbd> ' + hints.tab;
             tabEl.style.display = '';
         } else {
             tabEl.style.display = 'none';
@@ -1174,192 +1305,49 @@
         }
     }
 
-    function executeResult(shiftKey) {
-        if (activeIndex < 0 || activeIndex >= resultItems.length) return;
-        var item = resultItems[activeIndex];
-        if (item.disabled) return;
-        if (shiftKey && item.altAction) {
-            item.altAction();
-        } else if (item.action) {
-            item.action();
-        }
-    }
+    // ════════════════════════════════════════════════════════════════
+    //  handleInput — the dispatcher
+    // ════════════════════════════════════════════════════════════════
 
-    // ── Search dispatcher ────────────────────────────────────────────
     function handleInput() {
         var raw = input.value;
-        updatePlaceholder();
+        var ctx = resolveContext(raw);
 
-        // Check for filter prefix first - takes precedence over card/nav/help modes
-        if (window.__palette_providers) {
-            var detected = window.__palette_providers.detectPrefix(raw);
-            if (detected && chips) {
-                var provider = window.__palette_providers.getProvider(detected.prefix);
-                if (provider) {
-                    // Clear mode indicator when in provider mode
-                    modeIndicator.textContent = '';
-                    modeIndicator.className = 'cp-mode-indicator';
-                    modeIndicator.removeAttribute('data-mode');
-                    renderProviderResults(detected.prefix, provider, detected.query);
-                    return;
-                }
-            }
-        }
+        applyPlaceholder(ctx);
+        applyModeIndicator(ctx);
 
-        // Sub-view mode: if the last chip is a parent nav chip (and no provider
-        // prefix took over above), dropdown shows that page's sub-views.
-        if (chips) {
-            var chipsList = chips.all();
-            var parentNavChip = null;
-            for (var ci = chipsList.length - 1; ci >= 0; ci--) {
-                if (chipsList[ci].type === 'nav' && isParentNav(chipsList[ci].navName)) {
-                    parentNavChip = chipsList[ci];
-                    break;
-                }
-            }
-            if (parentNavChip) {
-                var targets = getNavTargets(parentNavChip.navName);
-                if (targets) {
-                    // Clear mode indicator when in sub-view mode
-                    modeIndicator.textContent = '';
-                    modeIndicator.className = 'cp-mode-indicator';
-                    modeIndicator.removeAttribute('data-mode');
-                    renderSubViewResults(parentNavChip, targets, raw.trim());
-                    return;
-                }
-            }
-        }
-
-        var mode = detectMode(raw);
-        var query = stripPrefix(raw).trim();
-
-        // Update mode indicator
-        if (mode === 'help') {
-            modeIndicator.textContent = 'HELP';
-            modeIndicator.setAttribute('data-mode', 'help');
-            modeIndicator.className = 'cp-mode-indicator active';
-        } else if (mode === 'nav') {
-            modeIndicator.textContent = 'NAV';
-            modeIndicator.setAttribute('data-mode', 'nav');
-            modeIndicator.className = 'cp-mode-indicator active';
-        } else if (mode === 'saved') {
-            modeIndicator.textContent = 'SAVED';
-            modeIndicator.setAttribute('data-mode', 'saved');
-            modeIndicator.className = 'cp-mode-indicator active';
-        } else if (mode === 'recent') {
-            modeIndicator.textContent = 'RECENT';
-            modeIndicator.setAttribute('data-mode', 'recent');
-            modeIndicator.className = 'cp-mode-indicator active';
-        } else {
-            modeIndicator.textContent = '';
-            modeIndicator.className = 'cp-mode-indicator';
-            modeIndicator.removeAttribute('data-mode');
-        }
-
-        // Empty input → show defaults
-        if (!raw.trim()) {
+        // Empty input falls through to the default ("Shortcuts") view, EXCEPT in
+        // sub-view mode where we still want to render the parent's sub-views.
+        if (!raw.trim() && ctx.kind !== 'subview') {
             renderDefault();
             return;
         }
 
-        var items = [];
-
-        if (mode === 'help') {
-            var helpItems = getHelpResults(query);
-            if (helpItems.length > 0) {
-                items.push({ type: 'header', title: 'Help' });
-                items = items.concat(helpItems);
-            }
-        } else if (mode === 'nav') {
-            var navItems = getNavResults(query);
-            if (navItems.length > 0) {
-                items.push({ type: 'header', title: 'Pages' });
-                items = items.concat(navItems);
-            }
-        } else if (mode === 'saved') {
-            var savedItems = getSavedResults(query);
-            if (savedItems.length > 0) {
-                items.push({ type: 'header', title: 'Saved Commands' });
-                items = items.concat(savedItems);
-            }
-        } else if (mode === 'recent') {
-            var recentItems = getRecentResults(query, 50);
-            if (recentItems.length > 0) {
-                items.push({ type: 'header', title: 'Recent Searches' });
-                items = items.concat(recentItems);
-            }
-        } else {
-            // Always offer direct search with full query (supports syntax like s:3ED)
-            var composedValue = chips ? chips.composedQuery() : query;
-            if (composedValue) {
-                items.push({
-                    type: 'search',
-                    title: 'Search: ' + composedValue,
-                    subtitle: 'Run full search with syntax support',
-                    icon: 'search',
-                    action: function() {
-                        var q = chips ? chips.composedQuery() : composedValue;
-                        recordRecentSearch(q);
-                        window.location.href = '/search?q=' + encodeURIComponent(q);
-                    }
-                });
-            }
-
-            // General search - combine sources (Recent and Saved live behind their own
-            // gated panels via < and * shortcuts, so omit them from the mixed view)
-            var cmdItems = getStaticCommands(query);
-            var cardItems = getCardResults(query, 5);
-            var navItems2 = getNavResults(query);
-
-            if (cmdItems.length > 0) {
-                items.push({ type: 'header', title: 'Commands' });
-                items = items.concat(cmdItems.slice(0, 3));
-            }
-            if (cardItems.length > 0) {
-                items.push({ type: 'header', title: 'Cards' });
-                items = items.concat(cardItems);
-            }
-            if (navItems2.length > 0) {
-                items.push({ type: 'header', title: 'Pages' });
-                items = items.concat(navItems2.slice(0, 3));
-            }
+        var items;
+        switch (ctx.kind) {
+            case 'provider': items = buildProviderItems(ctx); break;
+            case 'subview':  items = buildSubViewItems(ctx);  break;
+            case 'mode':     items = buildModeItems(ctx);     break;
+            default:         items = buildSearchItems(ctx.query);
         }
-
-        // Enforce global 10-item cap (excluding headers)
-        var nonHeaders = [];
-        var headers = [];
-        for (var x = 0; x < items.length; x++) {
-            if (items[x].type === 'header') {
-                headers.push({ item: items[x], nextIndex: nonHeaders.length });
-            } else {
-                nonHeaders.push(items[x]);
-            }
-        }
-        if (nonHeaders.length > 10) {
-            nonHeaders = nonHeaders.slice(0, 10);
-        }
-        // Rebuild with headers only for items that survived the cap
-        var capped = [];
-        var hi = 0;
-        for (var y = 0; y < nonHeaders.length; y++) {
-            while (hi < headers.length && headers[hi].nextIndex <= y) {
-                capped.push(headers[hi].item);
-                hi++;
-            }
-            capped.push(nonHeaders[y]);
-        }
-        items = capped;
-
-        renderResults(items);
+        // Provider results are already capped at DROPDOWN_CAP (30) inside buildProviderItems;
+        // sub-view results have no internal cap by design (full filter/sort menu). Only the
+        // mode and search branches get the smaller GLOBAL_ITEM_CAP (10).
+        var capped = (ctx.kind === 'provider' || ctx.kind === 'subview')
+            ? items
+            : capItems(items, GLOBAL_ITEM_CAP);
+        renderResults(capped);
     }
 
-    var inputTimer = null;
-    input.addEventListener('input', function() {
-        if (inputTimer) clearTimeout(inputTimer);
-        inputTimer = setTimeout(handleInput, 80);
+    input.addEventListener('input', function () {
+        if (S.inputTimer) clearTimeout(S.inputTimer);
+        S.inputTimer = setTimeout(handleInput, 80);
     });
 
-    // ── Saved commands ───────────────────────────────────────────────
+    // ════════════════════════════════════════════════════════════════
+    //  Save modal
+    // ════════════════════════════════════════════════════════════════
+
     function showSaveModal() {
         removeSaveModal();
 
@@ -1367,172 +1355,130 @@
         if (chips && chips.count() > 0) {
             queryToSave = chips.composedQuery();
         } else {
-            var searchInput = document.getElementById('searchbox');
-            queryToSave = searchInput ? searchInput.value.trim() : '';
+            var sb = document.getElementById('searchbox');
+            queryToSave = sb ? sb.value.trim() : '';
         }
-        if (!queryToSave) {
-            showToast('No search to save');
-            return;
-        }
+        if (!queryToSave) { showToast('No search to save'); return; }
 
-        // Backdrop - scopes to the palette overlay (absolute, not fixed)
         var backdrop = document.createElement('div');
         backdrop.className = 'cp-save-modal-backdrop';
         backdrop.id = 'cp-save-modal-backdrop';
 
-        // Modal card
         var modal = document.createElement('div');
         modal.className = 'cp-save-modal';
         modal.setAttribute('role', 'dialog');
         modal.setAttribute('aria-modal', 'true');
         modal.setAttribute('aria-labelledby', 'cp-save-modal-title');
-
-        var titleEl = document.createElement('div');
-        titleEl.className = 'cp-save-modal-title';
-        titleEl.id = 'cp-save-modal-title';
-
-        var previewEl = document.createElement('div');
-        previewEl.className = 'cp-save-modal-preview';
-
-        var saveInput = document.createElement('input');
-        saveInput.className = 'cp-save-modal-input';
-        saveInput.id = 'cp-save-modal-input';
-        saveInput.type = 'text';
-        saveInput.setAttribute('autocomplete', 'off');
-
-        var hintEl = document.createElement('div');
-        hintEl.className = 'cp-save-modal-hint';
-
-        modal.appendChild(titleEl);
-        modal.appendChild(previewEl);
-        modal.appendChild(saveInput);
-        modal.appendChild(hintEl);
+        modal.innerHTML =
+            '<div class="cp-save-modal-title" id="cp-save-modal-title"></div>' +
+            '<div class="cp-save-modal-preview"></div>' +
+            '<input class="cp-save-modal-input" id="cp-save-modal-input" type="text" autocomplete="off">' +
+            '<div class="cp-save-modal-hint"></div>';
         backdrop.appendChild(modal);
-        overlay.appendChild(backdrop);
+        DOM.overlay.appendChild(backdrop);
 
-        // Trigger opening transition on next frame
-        requestAnimationFrame(function() {
-            backdrop.classList.add('open');
-        });
+        var titleEl   = modal.querySelector('.cp-save-modal-title');
+        var previewEl = modal.querySelector('.cp-save-modal-preview');
+        var saveInput = modal.querySelector('#cp-save-modal-input');
+        var hintEl    = modal.querySelector('.cp-save-modal-hint');
 
-        saveModalOpen = true;
+        requestAnimationFrame(function () { backdrop.classList.add('open'); });
+        S.saveModalOpen = true;
 
         var pendingConflict = null;
 
         function enterNamingState() {
             pendingConflict = null;
-            titleEl.textContent = 'Save search';
+            titleEl.textContent  = 'Save search';
             previewEl.textContent = queryToSave;
-            previewEl.title = queryToSave;
-            saveInput.value = '';
+            previewEl.title       = queryToSave;
+            saveInput.value       = '';
             saveInput.placeholder = 'Enter a name...';
-            saveInput.maxLength = MAX_NAME;
-            hintEl.innerHTML = '<span><kbd>Enter</kbd> Save</span>' +
-                '<span><kbd>Esc</kbd> Cancel</span>';
+            saveInput.maxLength   = MAX_NAME;
+            hintEl.innerHTML = '<span><kbd>Enter</kbd> Save</span><span><kbd>Esc</kbd> Cancel</span>';
         }
 
         function enterConflictState(name, existing) {
             pendingConflict = { name: name, query: queryToSave };
-            titleEl.textContent = 'Overwrite saved search?';
+            titleEl.textContent   = 'Overwrite saved search?';
             previewEl.textContent = '"' + name + '" already exists with: ' + existing.query;
-            previewEl.title = existing.query;
-            saveInput.value = '';
+            previewEl.title       = existing.query;
+            saveInput.value       = '';
             saveInput.placeholder = 'y / n';
-            saveInput.maxLength = 3;
-            hintEl.innerHTML = '<span><kbd>Y</kbd> Overwrite</span>' +
-                '<span><kbd>Esc</kbd> Cancel</span>';
+            saveInput.maxLength   = 3;
+            hintEl.innerHTML = '<span><kbd>Y</kbd> Overwrite</span><span><kbd>Esc</kbd> Cancel</span>';
         }
 
         enterNamingState();
         saveInput.focus();
 
-        // Keep all keyboard handling local to the modal input
-        saveInput.addEventListener('keydown', function(e) {
-            // Stop propagation so the palette's document-level keydown
-            // handlers do not react to typing inside the modal.
+        saveInput.addEventListener('keydown', function (e) {
+            // Stop propagation so the palette's document-level handlers do not
+            // react to typing inside the modal.
             e.stopPropagation();
 
             if (e.key === 'Enter' || e.keyCode === 13) {
                 e.preventDefault();
-
                 if (pendingConflict) {
-                    var answer = saveInput.value.trim().toLowerCase();
-                    if (answer === 'y' || answer === 'yes') {
+                    var ans = saveInput.value.trim().toLowerCase();
+                    if (ans === 'y' || ans === 'yes') {
                         saveCommand(pendingConflict.name, pendingConflict.query, true);
-                        removeSaveModal();
-                        input.focus();
+                        removeSaveModal(); input.focus();
                     } else {
                         enterNamingState();
                     }
                     return;
                 }
-
                 var name = saveInput.value.trim();
-                if (!name) {
-                    showToast('Please enter a name');
-                    return;
-                }
+                if (!name) { showToast('Please enter a name'); return; }
                 var conflict = saveCommand(name, queryToSave, false);
                 if (conflict) {
                     enterConflictState(name, conflict.existing);
                 } else {
-                    removeSaveModal();
-                    input.focus();
+                    removeSaveModal(); input.focus();
                 }
             } else if (e.key === 'Escape' || e.keyCode === 27) {
                 e.preventDefault();
-                removeSaveModal();
-                input.focus();
+                removeSaveModal(); input.focus();
             } else if (e.key === 'Tab' || e.keyCode === 9) {
                 e.preventDefault();
             }
         });
 
-        // Click outside the modal card (on the backdrop) closes the modal
-        backdrop.addEventListener('click', function(e) {
-            if (e.target === backdrop) {
-                removeSaveModal();
-                input.focus();
-            }
+        // Click outside the modal card closes the modal.
+        backdrop.addEventListener('click', function (e) {
+            if (e.target === backdrop) { removeSaveModal(); input.focus(); }
         });
     }
 
     function removeSaveModal() {
-        saveModalOpen = false;
+        S.saveModalOpen = false;
         var bd = document.getElementById('cp-save-modal-backdrop');
         if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
     }
 
-    // Returns null if saved, or a conflict object if confirmation needed
+    // Returns null on success, or { existing } if the user must confirm overwrite.
     function saveCommand(name, query, forceOverwrite) {
         var saved = getJSON(SAVED_KEY);
 
-        // Build chips snapshot from current manager state
         var chipsSnapshot = [];
         if (chips && typeof chips.all === 'function') {
-            var currentChips = chips.all();
-            for (var ci = 0; ci < currentChips.length; ci++) {
-                var c = currentChips[ci];
+            var current = chips.all();
+            for (var ci = 0; ci < current.length; ci++) {
+                var c = current[ci];
                 chipsSnapshot.push({
-                    type: c.type,
-                    prefix: c.prefix,
-                    value: c.value,
-                    label: c.label,
-                    icon: c.icon,
-                    navName: c.navName,
-                    navLink: c.navLink,
-                    _cardName: c._cardName,
-                    _parentKey: c._parentKey,
-                    _urlParam: c._urlParam
+                    type: c.type, prefix: c.prefix, value: c.value, label: c.label, icon: c.icon,
+                    navName: c.navName, navLink: c.navLink,
+                    _cardName: c._cardName, _parentKey: c._parentKey, _urlParam: c._urlParam
                 });
             }
         }
 
-        // Same query already saved - just update the name silently
+        // Same query already saved → silently rename + refresh.
         for (var i = 0; i < saved.length; i++) {
             if (saved[i].query === query) {
-                saved[i].name = name.substring(0, MAX_NAME);
-                saved[i].chips = chipsSnapshot;
+                saved[i].name     = name.substring(0, MAX_NAME);
+                saved[i].chips    = chipsSnapshot;
                 saved[i].lastUsed = Date.now();
                 setJSON(SAVED_KEY, saved);
                 showToast('Updated: ' + name);
@@ -1540,15 +1486,12 @@
             }
         }
 
-        // Same name exists with different query - needs confirmation
+        // Same name with different query → confirm.
         for (var j = 0; j < saved.length; j++) {
             if (saved[j].name.toLowerCase() === name.toLowerCase()) {
-                if (!forceOverwrite) {
-                    return { existing: saved[j] };
-                }
-                // Overwrite confirmed
-                saved[j].query = query;
-                saved[j].chips = chipsSnapshot;
+                if (!forceOverwrite) return { existing: saved[j] };
+                saved[j].query    = query;
+                saved[j].chips    = chipsSnapshot;
                 saved[j].lastUsed = Date.now();
                 setJSON(SAVED_KEY, saved);
                 showToast('Overwritten: ' + name);
@@ -1562,15 +1505,15 @@
         }
 
         saved.push({
-            id: 'cmd_' + Date.now(),
-            name: name.substring(0, MAX_NAME),
-            query: query,
-            chips: chipsSnapshot,
-            icon: 'bookmark',
+            id:        'cmd_' + Date.now(),
+            name:      name.substring(0, MAX_NAME),
+            query:     query,
+            chips:     chipsSnapshot,
+            icon:      'bookmark',
             userEmail: palette.user || '',
-            created: Date.now(),
-            lastUsed: Date.now(),
-            useCount: 0
+            created:   Date.now(),
+            lastUsed:  Date.now(),
+            useCount:  0
         });
         setJSON(SAVED_KEY, saved);
         showToast('Saved: ' + name);
@@ -1581,386 +1524,217 @@
         var saved = getJSON(SAVED_KEY);
         var target = null;
         for (var i = 0; i < saved.length; i++) {
-            if (saved[i].id === savedId) {
-                target = saved[i];
-                break;
-            }
+            if (saved[i].id === savedId) { target = saved[i]; break; }
         }
         if (!target) return;
-
         if (!window.confirm('Delete saved command "' + target.name + '"?')) return;
-
-        saved = saved.filter(function(s) { return s.id !== savedId; });
-        setJSON(SAVED_KEY, saved);
+        setJSON(SAVED_KEY, saved.filter(function (s) { return s.id !== savedId; }));
         showToast('Command deleted');
-
-        // Re-render current results
         handleInput();
     }
 
-    // Delete without confirmation - used by Shift+Delete keyboard shortcut.
+    // Used by Shift+Delete (no confirmation prompt).
     function deleteSavedCommandSilent(savedId) {
         var saved = getJSON(SAVED_KEY);
         var target = null;
         for (var i = 0; i < saved.length; i++) {
-            if (saved[i].id === savedId) {
-                target = saved[i];
-                break;
-            }
+            if (saved[i].id === savedId) { target = saved[i]; break; }
         }
         if (!target) return;
-        saved = saved.filter(function(s) { return s.id !== savedId; });
-        setJSON(SAVED_KEY, saved);
+        setJSON(SAVED_KEY, saved.filter(function (s) { return s.id !== savedId; }));
         showToast('Deleted: ' + target.name);
     }
 
-    function deleteRecentSearch(query) {
-        if (!query) return;
-        var recent = getJSON(RECENT_KEY);
-        recent = recent.filter(function(r) {
-            return (r.q || '').toLowerCase() !== query.toLowerCase();
-        });
-        setJSON(RECENT_KEY, recent);
-        showToast('Removed from recent');
+    // ════════════════════════════════════════════════════════════════
+    //  Open / close
+    // ════════════════════════════════════════════════════════════════
+
+    function openPalette() {
+        if (S.open) return;
+        S.open = true;
+        S.previousFocus = document.activeElement;
+        DOM.overlay.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        input.value = '';
+        modeTag.textContent = '';
+        modeTag.className   = 'cp-mode-indicator';
+        modeTag.removeAttribute('data-mode');
+        S.activeIndex = -1;
+        renderDefault();
+        input.focus();
+
+        // Lazy-load card names on first open (fetchNames is provided externally).
+        if (!S.cardNames && !S.cardNamesLoading && typeof fetchNames === 'function') {
+            S.cardNamesLoading = true;
+            fetchNames('false')
+                .then(function (names) { S.cardNames = names || []; S.cardNamesLoading = false; })
+                .catch(function ()      { S.cardNamesLoading = false; });
+        }
     }
 
-    // ── Keyboard: global ─────────────────────────────────────────────
-    document.addEventListener('keydown', function(e) {
-        if (saveModalOpen) return;
+    function closePalette() {
+        if (!S.open) return;
+        S.open = false;
+        DOM.overlay.classList.remove('open');
+        document.body.style.overflow = '';
+        removeSaveModal();
+        if (S.previousFocus) { S.previousFocus.focus(); S.previousFocus = null; }
+    }
 
-        // Ctrl/Cmd+K to toggle
+    // ════════════════════════════════════════════════════════════════
+    //  Keyboard handling
+    // ════════════════════════════════════════════════════════════════
+
+    // Document-level: open/close shortcut + "/" hotkey.
+    document.addEventListener('keydown', function (e) {
+        if (S.saveModalOpen) return;
+
         if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.keyCode === 75)) {
             e.preventDefault();
-            if (isOpen) {
-                closePalette();
-            } else {
-                openPalette();
-            }
+            S.open ? closePalette() : openPalette();
             return;
         }
-
-        // "/" when no input focused
-        if (e.key === '/' && !isOpen) {
+        if (e.key === '/' && !S.open) {
             var tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
-            var isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
+            var isInput    = tag === 'input' || tag === 'textarea' || tag === 'select';
             var isEditable = document.activeElement && document.activeElement.isContentEditable;
-            if (!isInput && !isEditable) {
-                e.preventDefault();
-                openPalette();
-                return;
-            }
+            if (!isInput && !isEditable) { e.preventDefault(); openPalette(); }
         }
     });
 
-    // ── Focus trap on dialog level ─────────────────────────────────────
-    dialog.addEventListener('keydown', function(e) {
-        if (saveModalOpen) return;
-        if ((e.key === 'Tab' || e.keyCode === 9) && e.target !== input) {
-            e.preventDefault();
+    // Input-level keymap. Each handler receives the keydown event.
+    function handleEnterKey(e) {
+        // Chips locked + empty input + active item not user-picked → run composition.
+        if (chips && chips.count() > 0 && input.value.trim() === '') {
+            var item = S.items[S.activeIndex];
+            if (!item || !item._userPicked) {
+                e.preventDefault();
+                runComposedQuery();
+                return;
+            }
+        }
+        e.preventDefault();
+        executeActive(e.shiftKey);
+    }
+
+    function handleTabKey(e) {
+        // Shift+Tab inside the dialog: keep focus on the input (focus trap).
+        if (e.shiftKey) { e.preventDefault(); input.focus(); return; }
+
+        var item = S.items[S.activeIndex];
+        if (!item || item.disabled || !chips) { e.preventDefault(); input.focus(); return; }
+        var def = ROW_TYPES[item.type];
+        if (!def || !def.onTab) { e.preventDefault(); input.focus(); return; }
+
+        var locked = def.onTab(item);
+        e.preventDefault();
+        if (locked) {
+            input.value = '';
+            handleInput();
+        } else {
             input.focus();
         }
-    });
+    }
 
-    // ── Keyboard: internal (palette open) ────────────────────────────
-    input.addEventListener('keydown', function(e) {
-        if (saveModalOpen) return;
-
-        var key = e.key || '';
-        var code = e.keyCode || 0;
-
-        // Arrow down
-        if (key === 'ArrowDown' || code === 40) {
-            e.preventDefault();
-            if (resultItems.length === 0) return;
-            var next = activeIndex + 1;
-            if (next >= resultItems.length) next = 0;
-            setActive(next);
-            return;
-        }
-
-        // Arrow up
-        if (key === 'ArrowUp' || code === 38) {
-            e.preventDefault();
-            if (resultItems.length === 0) return;
-            var prev = activeIndex - 1;
-            if (prev < 0) prev = resultItems.length - 1;
-            setActive(prev);
-            return;
-        }
-
-        // Shift+Delete → remove active recent/saved entry without confirmation
-        if (e.shiftKey && (key === 'Delete' || code === 46)) {
-            if (activeIndex < 0 || activeIndex >= resultItems.length) return;
-            var delItem = resultItems[activeIndex];
-            if (!delItem) return;
-            if (delItem.type === 'recent' && delItem.recentQuery) {
-                e.preventDefault();
-                deleteRecentSearch(delItem.recentQuery);
-                handleInput();
-                return;
-            }
-            if (delItem.type === 'saved' && delItem.savedId) {
-                e.preventDefault();
-                deleteSavedCommandSilent(delItem.savedId);
-                handleInput();
-                return;
-            }
-            return;
-        }
-
-        // Left arrow at cursor position 0 with no chip active → activate last chip
-        if ((key === 'ArrowLeft' || code === 37) && chips && chips.count() > 0
-            && chips.activeIndex() === -1
-            && input.selectionStart === 0 && input.selectionEnd === 0) {
+    function handleEdgeLeftKey(e) {
+        // ArrowLeft at cursor 0, or Backspace on empty input, with no chip currently
+        // active → activate last chip.
+        if (!chips || chips.count() === 0 || chips.activeIndex() !== -1) return;
+        var atStart = input.selectionStart === 0 && input.selectionEnd === 0;
+        var isLeft  = (e.key === 'ArrowLeft' || e.keyCode === 37) && atStart;
+        var isBack  = (e.key === 'Backspace' || e.keyCode === 8) && input.value === '';
+        if (isLeft || isBack) {
             e.preventDefault();
             chips.activate(chips.count() - 1);
-            return;
         }
+    }
 
-        // Backspace on empty input → activate last chip (rather than doing nothing)
-        if ((key === 'Backspace' || code === 8) && input.value === ''
-            && chips && chips.count() > 0 && chips.activeIndex() === -1) {
-            e.preventDefault();
-            chips.activate(chips.count() - 1);
-            return;
-        }
+    function handleShiftDeleteKey(e) {
+        if (!e.shiftKey) return;
+        var item = S.items[S.activeIndex];
+        if (!item) return;
+        var def = ROW_TYPES[item.type];
+        if (def && def.onShiftDelete) { e.preventDefault(); def.onShiftDelete(item); }
+    }
 
-        // Enter
-        if (key === 'Enter' || code === 13) {
-            // Chips locked + empty input: default to executing the composed query
-            // rather than whatever default-view result happens to be highlighted.
-            // If the user wants to pick a default-view item instead, they can arrow
-            // to it first (that changes activeIndex to a user-selected value, not
-            // the auto-select-first-result).
-            if (chips && chips.count() > 0 && input.value.trim() === '') {
-                var activeItem = (activeIndex >= 0 && activeIndex < resultItems.length)
-                    ? resultItems[activeIndex] : null;
-                // Only fall through to executeResult when the active item was explicitly
-                // arrowed-to (userPickedResult flag), otherwise treat Enter as "run chips".
-                if (!activeItem || !activeItem._userPicked) {
-                    e.preventDefault();
-                    var navUrl = chipsNavURL(chips.all());
-                    if (navUrl) {
-                        window.location.href = navUrl;
-                        return;
-                    }
-                    var composed = chips.composedQuery();
-                    if (composed) {
-                        recordRecentSearch(composed);
-                        window.location.href = '/search?q=' + encodeURIComponent(composed);
-                    }
-                    return;
-                }
-            }
+    input.addEventListener('keydown', function (e) {
+        if (S.saveModalOpen) return;
 
-            e.preventDefault();
-            executeResult(e.shiftKey);
-            return;
-        }
-
-        // Escape
-        if (key === 'Escape' || code === 27) {
-            e.preventDefault();
-            closePalette();
-            return;
-        }
-
-        // Ctrl/Cmd+S - save current search
-        if ((e.ctrlKey || e.metaKey) && (key === 's' || code === 83)) {
+        // Ctrl/Cmd+S → save current search.
+        if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.keyCode === 83)) {
             e.preventDefault();
             showSaveModal();
             return;
         }
 
-        // Tab - lock highlighted dropdown result as a chip (filter / card / nav)
-        if ((key === 'Tab' || code === 9) && !e.shiftKey
-            && activeIndex >= 0 && resultItems[activeIndex]
-            && !resultItems[activeIndex].disabled
-            && chips) {
-            var item = resultItems[activeIndex];
-            var locked = false;
-
-            if (item.type === 'filter-candidate' && item._providerPrefix && item._providerCandidate) {
-                var cand = item._providerCandidate;
-                suppressChipOnChange = true;
-                chips.add({
-                    type: 'filter',
-                    prefix: item._providerPrefix,
-                    value: item._providerPrefix + cand.value,
-                    label: item._providerPrefix + (cand.label || cand.value),
-                    icon: item.icon || 'filter'
-                });
-                suppressChipOnChange = false;
-                locked = true;
-            } else if (item.type === 'card' && item.cardName) {
-                suppressChipOnChange = true;
-                chips.add({
-                    type: 'card',
-                    value: '"' + item.cardName + '"',
-                    label: item.cardName,
-                    icon: 'search',
-                    _cardName: item.cardName
-                });
-                suppressChipOnChange = false;
-                fetchCardMeta(item.cardName);
-                locked = true;
-            } else if (item.type === 'nav' && item.navName) {
-                if (isParentNav(item.navName)) {
-                    // Parent nav (Newspaper, Sleepers, etc.) - lock as chip and reveal sub-views
-                    suppressChipOnChange = true;
-                    chips.add({
-                        type: 'nav',
-                        value: item.navLink || '',
-                        label: item.navName,
-                        icon: 'compass',
-                        navName: item.navName,
-                        navLink: item.navLink
-                    });
-                    suppressChipOnChange = false;
-                    locked = true;
-                } else {
-                    // Leaf nav (Search, Sets, Sealed, Upload, Home...) - no sub-pages.
-                    // Tab navigates immediately, identical to Enter. Avoids the leaky-NAV
-                    // bug where a locked leaf chip drops the user into general search.
-                    e.preventDefault();
-                    if (item.action) item.action();
-                    return;
-                }
-            } else if (item.type === 'nav-sub' && item._subView && item._parentChip) {
-                var pKey = navParentKeys[item._parentChip.navName];
-                var urlParam;
-                var isSingleton = false;
-                if (pKey === 'newspaper' || pKey === 'sleepers') {
-                    urlParam = 'page=' + encodeURIComponent(item._subView.value);
-                    isSingleton = true;
-                } else if (isArbitSortValue(pKey, item._subView.value)) {
-                    urlParam = 'sort=' + encodeURIComponent(item._subView.value);
-                    isSingleton = true;
-                } else {
-                    urlParam = encodeURIComponent(item._subView.value) + '=true';
-                }
-                // Remove duplicates / singletons before adding
-                var existingChips = chips.all();
-                for (var dup = existingChips.length - 1; dup >= 0; dup--) {
-                    var ec = existingChips[dup];
-                    if (ec.type !== 'nav-sub' || ec._parentKey !== pKey) continue;
-                    if (isSingleton) {
-                        // Replace: remove any existing nav-sub for this parent with the same param prefix (sort= or page=)
-                        var ecPrefix = ec._urlParam ? ec._urlParam.split('=')[0] : '';
-                        var newPrefix = urlParam.split('=')[0];
-                        if (ecPrefix === newPrefix) {
-                            chips.remove(dup);
-                        }
-                    } else {
-                        // Filter: dedupe identical urlParam
-                        if (ec._urlParam === urlParam) {
-                            chips.remove(dup);
-                        }
-                    }
-                }
-                suppressChipOnChange = true;
-                chips.add({
-                    type: 'nav-sub',
-                    value: item._subView.value,
-                    label: item._subView.label,
-                    icon: 'arrow-right',
-                    _parentKey: pKey,
-                    _urlParam: urlParam
-                });
-                suppressChipOnChange = false;
-                locked = true;
-            }
-
-            if (locked) {
-                e.preventDefault();
-                input.value = '';
-                handleInput();
-                return;
-            }
-        }
-
-        // Focus trap - Tab cycles within palette
-        if (key === 'Tab' || code === 9) {
-            e.preventDefault();
-            input.focus();
+        var key = e.key, code = e.keyCode;
+        if (key === 'ArrowDown' || code === 40) { e.preventDefault(); moveActive(+1);  return; }
+        if (key === 'ArrowUp'   || code === 38) { e.preventDefault(); moveActive(-1);  return; }
+        if (key === 'Escape'    || code === 27) { e.preventDefault(); closePalette();  return; }
+        if (key === 'Enter'     || code === 13) { handleEnterKey(e);                   return; }
+        if (key === 'Tab'       || code === 9)  { handleTabKey(e);                     return; }
+        if (key === 'Delete'    || code === 46) { handleShiftDeleteKey(e);             return; }
+        if (key === 'ArrowLeft' || code === 37 || key === 'Backspace' || code === 8) {
+            handleEdgeLeftKey(e);
             return;
         }
     });
 
-    // ── Keyboard: chip container (chip is active) ────────────────────
-    chipContainer.addEventListener('keydown', function (e) {
+    // Chip-container keymap (only fires when a chip is active, i.e. focus is on
+    // the chip container rather than the input).
+    DOM.chipBox.addEventListener('keydown', function (e) {
         if (!chips) return;
         var idx = chips.activeIndex();
-        if (idx < 0) return; // input handler owns this
+        if (idx < 0) return;   // input handler owns this case
 
-        // Left arrow - go to previous chip
         if (e.key === 'ArrowLeft' || e.keyCode === 37) {
             e.preventDefault();
             if (idx > 0) chips.activate(idx - 1);
             return;
         }
-        // Right arrow - go to next chip, or back to input if at end
         if (e.key === 'ArrowRight' || e.keyCode === 39) {
             e.preventDefault();
-            if (idx < chips.count() - 1) {
-                chips.activate(idx + 1);
-            } else {
-                chips.activate(-1); // input
-            }
+            if (idx < chips.count() - 1) chips.activate(idx + 1);
+            else                         chips.activate(-1);
             return;
         }
-        // Delete removes current, keeps position (or moves to input if last)
         if (e.key === 'Delete' || e.keyCode === 46) {
             e.preventDefault();
-            var nextIdx = idx; // Delete: current position, but chips shift left
             chips.remove(idx);
-            if (nextIdx >= 0 && nextIdx < chips.count()) {
-                chips.activate(nextIdx);
-            } else {
-                chips.activate(-1);
-            }
+            chips.activate(idx < chips.count() ? idx : -1);
             return;
         }
-        // Backspace removes current, moves focus left (or to input)
         if (e.key === 'Backspace' || e.keyCode === 8) {
             e.preventDefault();
-            var prevIdx = idx - 1;
             chips.remove(idx);
-            if (prevIdx >= 0) {
-                chips.activate(prevIdx);
-            } else {
-                chips.activate(-1);
-            }
+            chips.activate(idx - 1 >= 0 ? idx - 1 : -1);
             return;
         }
-        // Escape returns focus to input
         if (e.key === 'Escape' || e.keyCode === 27) {
             e.preventDefault();
             chips.activate(-1);
             return;
         }
-        // Enter executes composed query (same as Enter from input)
         if (e.key === 'Enter' || e.keyCode === 13) {
             e.preventDefault();
             chips.activate(-1);
-            // Find and execute the highlighted dropdown result, or run composed query
-            if (activeIndex >= 0 && resultItems[activeIndex] && resultItems[activeIndex].action) {
-                resultItems[activeIndex].action();
+            // Execute the highlighted dropdown item, or run the composed query.
+            var item = S.items[S.activeIndex];
+            if (item && ROW_TYPES[item.type] && ROW_TYPES[item.type].onEnter) {
+                ROW_TYPES[item.type].onEnter(item);
             } else if (chips.composedQuery()) {
-                var q = chips.composedQuery();
-                recordRecentSearch(q);
-                window.location.href = '/search?q=' + encodeURIComponent(q);
+                runComposedQuery();
             }
             return;
         }
-        // Tab on active chip → edit: remove chip and put value into input (will reopen dropdown)
         if (e.key === 'Tab' || e.keyCode === 9) {
+            // Tab on active chip → unlock back into input for editing.
             e.preventDefault();
             var chip = chips.get(idx);
             if (!chip) return;
             chips.remove(idx);
-            // For filter chips, put "prefix + first value" back into input so the dropdown
-            // shows that provider. For other chip types, just drop the value into input.
+            // For filter chips, restore "prefix + first value" so the dropdown shows
+            // that provider again. Other chip types just drop their value into input.
             var restored;
             if (chip.type === 'filter' && chip.prefix) {
                 var stripped = chip.value.indexOf(chip.prefix) === 0
@@ -1971,23 +1745,23 @@
                 restored = chip.value;
             }
             input.value = restored;
-            chips.activate(-1); // back to input
+            chips.activate(-1);
             input.setSelectionRange(input.value.length, input.value.length);
-            if (typeof handleInput === 'function') handleInput();
-            return;
+            handleInput();
         }
     });
 
-    // Also handle Escape when save input is focused
-    dialog.addEventListener('keydown', function(e) {
-        if ((e.key === 'Escape' || e.keyCode === 27) && e.target.id !== 'cp-input') {
+    // Dialog-level focus trap + Escape outside the input.
+    DOM.dialog.addEventListener('keydown', function (e) {
+        if (S.saveModalOpen) return;
+        if ((e.key === 'Tab' || e.keyCode === 9) && e.target !== input) {
             e.preventDefault();
-            if (saveModalOpen) {
-                removeSaveModal();
-                input.focus();
-            } else {
-                closePalette();
-            }
+            input.focus();
+            return;
+        }
+        if ((e.key === 'Escape' || e.keyCode === 27) && e.target !== input) {
+            e.preventDefault();
+            closePalette();
         }
     });
 
