@@ -215,9 +215,11 @@
     color: var(--greytext, #888);
 }
 
-.cp-result-icon svg {
+.cp-result-icon svg,
+.cp-result-icon img {
     width: 20px;
     height: 20px;
+    object-fit: contain;
 }
 
 .cp-result.active .cp-result-icon {

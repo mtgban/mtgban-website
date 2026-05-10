@@ -1232,13 +1232,17 @@
             rows.push({ type: 'header', title: 'Export Results' });
             rows.push(
                 { type: 'upload-export', title: 'Get CSV',              subtitle: 'All results as CSV',
-                  icon: 'download',      exportField: 'download',       exportNewWindow: false },
+                  icon: 'download',
+                  exportField: 'download',       exportNewWindow: false },
                 { type: 'upload-export', title: 'CardConduit Estimate', subtitle: 'Send to CardConduit (new tab)',
-                  icon: 'external-link', exportField: 'estimate',       exportNewWindow: true },
+                  iconHtml: '<img src="/img/logo/cardconduit.svg" alt="">',
+                  exportField: 'estimate',       exportNewWindow: true },
                 { type: 'upload-export', title: 'Deckbox CSV',          subtitle: 'Deckbox-format CSV',
-                  icon: 'archive',       exportField: 'deckbox',        exportNewWindow: false },
+                  iconHtml: '<img src="/img/logo/deckbox.webp" alt="">',
+                  exportField: 'deckbox',        exportNewWindow: false },
                 { type: 'upload-export', title: 'TCGplayer CSV',        subtitle: 'TCGplayer-format CSV',
-                  icon: 'shopping-cart', exportField: 'tcgplayer_csv',  exportNewWindow: false }
+                  iconHtml: '<img src="/img/logo/tcgapp.png" alt="">',
+                  exportField: 'tcgplayer_csv',  exportNewWindow: false }
             );
         }
 
