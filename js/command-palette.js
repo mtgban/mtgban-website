@@ -139,6 +139,18 @@
         setJSON(RECENT_KEY, recent);
     }
 
+    function sealedAction(kind, name) {
+        var path = '/sealed?q=';
+        if      (kind === 'contents') path += encodeURIComponent('contents:' + name);
+        else if (kind === 'unpack')   path += encodeURIComponent('unpack:'   + name);
+        else                          path += encodeURIComponent(name);
+        // Note: deliberately NOT calling recordRecentSearch. Recents are scoped to /search
+        // (their action is hard-coded to /search?q=), so a tagged sealed entry would dead-end
+        // on a card search. If sealed-recents persistence is wanted later, it requires a
+        // scope field on the recent record + dispatch in getRecentResults; out of scope for v1.
+        window.location.href = path;
+    }
+
     function deleteRecentSearch(query) {
         if (!query) return;
         var recent = getJSON(RECENT_KEY).filter(function (r) {
@@ -1197,15 +1209,22 @@
         },
 
         'sealed-suggestion': {
-            render:  rowHTML,
-            footer:  function () { return { action: 'Search', tab: 'Lock product' }; },
-            onEnter: function (item) { /* filled in next task */ }
+            render:       rowHTML,
+            footer:       function () {
+                return {
+                    action: 'Search',
+                    tab: '<kbd>Shift+Enter</kbd> Contents <kbd>Ctrl+Enter</kbd> Pack Pull <kbd>Tab</kbd> Lock'
+                };
+            },
+            onEnter:      function (item) { sealedAction('search',   item.sealedName); },
+            onShiftEnter: function (item) { sealedAction('contents', item.sealedName); },
+            onCtrlEnter:  function (item) { sealedAction('unpack',   item.sealedName); }
         },
 
         'sealed-fallback': {
             render:  rowHTML,
             footer:  function () { return { action: 'Search' }; },
-            onEnter: function (item) { /* filled in next task */ }
+            onEnter: function (item) { sealedAction('search', item.sealedQuery); }
         }
     };
 
@@ -1686,6 +1705,15 @@
             if (!item || !item._userPicked) {
                 e.preventDefault();
                 runComposedQuery();
+                return;
+            }
+        }
+        if (e.ctrlKey && S.activeIndex >= 0) {
+            var ci = S.items[S.activeIndex];
+            var cd = ci && ROW_TYPES[ci.type];
+            if (cd && cd.onCtrlEnter) {
+                e.preventDefault();
+                cd.onCtrlEnter(ci);
                 return;
             }
         }
