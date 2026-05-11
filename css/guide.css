@@ -334,6 +334,13 @@
 .guide-example-query:hover {
     text-decoration: underline;
 }
+.guide-example-palette {
+    color: var(--greytext, #888);
+    cursor: default;
+}
+.guide-example-palette:hover {
+    text-decoration: none;
+}
 .guide-example-desc {
     flex: 1;
     font-size: 0.78rem;
