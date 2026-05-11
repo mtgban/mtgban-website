@@ -1168,7 +1168,7 @@
             return [{ type: 'header', title: 'Sealed - loading...' }];
         }
         var matches = [];
-        for (var i = 0; i < S.sealedNames.length && matches.length < 8; i++) {
+        for (var i = 0; i < S.sealedNames.length && matches.length < DROPDOWN_CAP; i++) {
             if (!query || matchCardName(query, S.sealedNames[i])) {
                 matches.push({
                     type:       'sealed-suggestion',
