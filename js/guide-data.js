@@ -24,7 +24,7 @@ window.__BAN_GUIDE = {
                     { query: '>arbit + Tab + "only Yield+" + Tab + "sort: Spread"', desc: 'Compose multi-filter arbitrage URL' },
                     { query: '? rarity', desc: 'Inline rarity syntax help - Enter to copy', palette: true },
                     { query: 'saved:', desc: 'Browse all saved commands', palette: true },
-                    { query: '$Booster Box LCI', desc: 'Find sealed products by name', palette: true },
+                    { query: '$Phyrexia All Will Be One Prerelease Pack', desc: 'Find a sealed product by prefix', palette: true },
                     { query: '+https://docs.google.com/...', desc: 'Send a Sheets URL straight to Upload', palette: true }
                 ]
             }
@@ -138,7 +138,7 @@ window.__BAN_GUIDE = {
             snippets: ['$', '$Booster Box', 'Shift+Enter contents', 'Ctrl+Enter unpack'],
             keywords: ['sealed', 'product', 'booster', 'pack', 'contents', 'unpack', 'pack pull', 'sealed mode', 'box', 'bundle'],
             content: {
-                description: '<p>Type <code>$</code> as the first character to enter <strong>Sealed mode</strong>. The autocomplete dropdown switches to the sealed-product dataset (booster boxes, bundles, packs, decks, cases, displays).</p><p>For any highlighted product the palette offers three actions:</p><ul><li><kbd>Enter</kbd> - search the sealed page for that product (price grid).</li><li><kbd>Shift+Enter</kbd> - <strong>View Contents</strong> - displays the cards inside the product.</li><li><kbd>Ctrl+Enter</kbd> - <strong>Pack Pull</strong> - simulates opening the product (when supported by the data).</li></ul><p><strong>Tab</strong> locks the highlighted product as a chip; the dropdown then morphs into a 3-row action menu where the same actions are reachable via arrow keys + Enter for users who prefer the menu over the modifier keys. Pack Pull is hidden if the product has no picks data.</p><p>If your typed query matches no products, <kbd>Enter</kbd> falls back to a generic <code>/sealed?q=&lt;text&gt;</code> search.</p>',
+                description: '<p>Type <code>$</code> as the first character to enter <strong>Sealed mode</strong>. The autocomplete dropdown switches to the sealed-product dataset (booster boxes, bundles, packs, decks, cases, displays). Matching is <strong>prefix-only on the full product name</strong> - type the start of the actual name (e.g. <code>$Modern Horizons 3</code>), not a set code (<code>$MH3</code> will not match).</p><p>For any highlighted product the palette offers three actions:</p><ul><li><kbd>Enter</kbd> - search the sealed page for that product (price grid).</li><li><kbd>Shift+Enter</kbd> - <strong>View Contents</strong> - displays the cards inside the product.</li><li><kbd>Ctrl+Enter</kbd> - <strong>Pack Pull</strong> - simulates opening the product (when supported by the data).</li></ul><p><strong>Tab</strong> locks the highlighted product as a chip; the dropdown then morphs into a 3-row action menu where the same actions are reachable via arrow keys + Enter for users who prefer the menu over the modifier keys. Pack Pull is hidden if the product has no picks data.</p><p>If your typed query matches no products, <kbd>Enter</kbd> falls back to a generic <code>/sealed?q=&lt;text&gt;</code> search.</p>',
                 table: [
                     { value: '$',                  short: 'Enter sealed mode (autocomplete switches to sealed products)' },
                     { value: 'Enter',              short: 'Search prices for the highlighted product' },
@@ -148,10 +148,10 @@ window.__BAN_GUIDE = {
                     { value: 'Enter on no match',  short: 'Falls back to generic sealed search of typed text' }
                 ],
                 examples: [
-                    { query: '$Booster Box LCI',                desc: 'Find Lost Caverns booster boxes', palette: true },
-                    { query: '$bundle mkm + Tab',                desc: 'Lock Bundle MKM, choose action from menu', palette: true },
-                    { query: '$collector + Shift+Enter',         desc: 'Jump straight to the contents of a collector booster', palette: true },
-                    { query: '$prerelease + Ctrl+Enter',         desc: 'Simulate opening a prerelease pack', palette: true }
+                    { query: '$Phyrexia All Will Be One Prerelease Pack',  desc: 'Find a specific product by full-name prefix', palette: true },
+                    { query: '$Modern Horizons 3 + arrow + Tab',           desc: 'Browse MH3 products, Tab to lock, then pick an action', palette: true },
+                    { query: '$Murders at Karlov Manor Bundle + Shift+Enter', desc: 'Jump straight to the cards inside the bundle', palette: true },
+                    { query: '$Phyrexia All Will Be One Prerelease Pack + Ctrl+Enter', desc: 'Simulate opening a prerelease pack', palette: true }
                 ]
             }
         },
