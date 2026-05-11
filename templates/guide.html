@@ -173,11 +173,17 @@
                 for (var e = 0; e < item.content.examples.length; e++) {
                     var ex = item.content.examples[e];
                     html += '<div class="guide-example">';
-                    html += '<a class="guide-example-query" href="/search?q=' + encodeURIComponent(ex.query) + '">' + escapeHtml(ex.query) + '</a>';
-                    html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
-                    html += '<button class="guide-example-copy" onclick="copySnippet(this, \'' + escapeJs(ex.query) + '\')" title="Copy to clipboard">';
-                    html += '<i data-lucide="copy"></i>';
-                    html += '</button>';
+                    if (ex.palette) {
+                        // Palette-only recipe: render as plain code, not a search link, no copy.
+                        html += '<span class="guide-example-query guide-example-palette">' + escapeHtml(ex.query) + '</span>';
+                        html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
+                    } else {
+                        html += '<a class="guide-example-query" href="/search?q=' + encodeURIComponent(ex.query) + '">' + escapeHtml(ex.query) + '</a>';
+                        html += '<span class="guide-example-desc">' + escapeHtml(ex.desc) + '</span>';
+                        html += '<button class="guide-example-copy" onclick="copySnippet(this, \'' + escapeJs(ex.query) + '\')" title="Copy to clipboard">';
+                        html += '<i data-lucide="copy"></i>';
+                        html += '</button>';
+                    }
                     html += '</div>';
                 }
                 html += '</div>';
