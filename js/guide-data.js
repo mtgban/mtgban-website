@@ -22,10 +22,10 @@ window.__BAN_GUIDE = {
                     { query: '"Birds of Paradise" + Tab + s: + Tab', desc: 'Narrow sets dropdown to BoP printings, pick one' },
                     { query: '>newspaper + Tab + "Archive"', desc: 'Jump directly to Newspaper → Archive view' },
                     { query: '>arbit + Tab + "only Yield+" + Tab + "sort: Spread"', desc: 'Compose multi-filter arbitrage URL' },
-                    { query: '? rarity', desc: 'Inline rarity syntax help - Enter to copy' },
-                    { query: 'saved:', desc: 'Browse all saved commands' },
-                    { query: '$Booster Box LCI', desc: 'Find sealed products by name' },
-                    { query: '+https://docs.google.com/...', desc: 'Send a Sheets URL straight to Upload' }
+                    { query: '? rarity', desc: 'Inline rarity syntax help - Enter to copy', palette: true },
+                    { query: 'saved:', desc: 'Browse all saved commands', palette: true },
+                    { query: '$Booster Box LCI', desc: 'Find sealed products by name', palette: true },
+                    { query: '+https://docs.google.com/...', desc: 'Send a Sheets URL straight to Upload', palette: true }
                 ]
             }
         },
@@ -148,10 +148,10 @@ window.__BAN_GUIDE = {
                     { value: 'Enter on no match',  short: 'Falls back to generic sealed search of typed text' }
                 ],
                 examples: [
-                    { query: '$Booster Box LCI',                desc: 'Find Lost Caverns booster boxes' },
-                    { query: '$bundle mkm + Tab',                desc: 'Lock Bundle MKM, choose action from menu' },
-                    { query: '$collector + Shift+Enter',         desc: 'Jump straight to the contents of a collector booster' },
-                    { query: '$prerelease + Ctrl+Enter',         desc: 'Simulate opening a prerelease pack' }
+                    { query: '$Booster Box LCI',                desc: 'Find Lost Caverns booster boxes', palette: true },
+                    { query: '$bundle mkm + Tab',                desc: 'Lock Bundle MKM, choose action from menu', palette: true },
+                    { query: '$collector + Shift+Enter',         desc: 'Jump straight to the contents of a collector booster', palette: true },
+                    { query: '$prerelease + Ctrl+Enter',         desc: 'Simulate opening a prerelease pack', palette: true }
                 ]
             }
         },
@@ -175,10 +175,10 @@ window.__BAN_GUIDE = {
                     { value: 'Cookies (mode, stores, optimizer)',    short: 'Honored from your last /upload session' }
                 ],
                 examples: [
-                    { query: '+https://docs.google.com/spreadsheets/d/...',         desc: 'Submit a Google Sheets collection' },
-                    { query: '+https://www.moxfield.com/decks/abc',                  desc: 'Submit a Moxfield deck' },
-                    { query: 'On /search?q=lightning bolt -> + -> Send results',     desc: 'Push current results to Uploader' },
-                    { query: '+ -> Browse for file... -> pick collection.csv',       desc: 'Local file path' }
+                    { query: '+https://docs.google.com/spreadsheets/d/...',         desc: 'Submit a Google Sheets collection', palette: true },
+                    { query: '+https://www.moxfield.com/decks/abc',                  desc: 'Submit a Moxfield deck', palette: true },
+                    { query: 'On /search?q=lightning bolt -> + -> Send results',     desc: 'Push current results to Uploader', palette: true },
+                    { query: '+ -> Browse for file... -> pick collection.csv',       desc: 'Local file path', palette: true }
                 ]
             }
         },
