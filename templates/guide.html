@@ -24,7 +24,7 @@
             <h1>MTG<span class="ban">BAN</span> Guide</h1>
             <p class="guide-hero-sub">Search syntax, tools, and power user tips</p>
             <div class="guide-hero-shortcut">
-                Press <kbd>Ctrl+K</kbd> or <kbd>Cmd+K</kbd> to open the command palette from any page
+                Press <kbd>Ctrl+K</kbd>/<kbd>Cmd+K</kbd> or <kbd>/</kbd> to open the command palette from any page
             </div>
         </div>
         <div class="guide-tabs" role="tablist">
@@ -73,7 +73,7 @@
     var sections = [];
     for (var i = 0; i < allSections.length; i++) {
         var s = allSections[i];
-        if (s.requiresNav && !navNames[s.requiresNav]) continue;
+        //if (s.requiresNav && !navNames[s.requiresNav]) continue;
         sections.push(s);
     }
 
