@@ -1,35 +1,52 @@
-/* Guide Data - Shared Content Registry
- * Single source of truth for the command palette and /guide page.
- */
+/* Guide Data - Shared Content Registry for the command palette and /guide page. */
 window.__BAN_GUIDE = {
     sections: [
 
-        // ─── Command Palette ──────────────────────────────────────────────
-
+        // Overview
         {
-            id: 'palette-overview',
-            category: 'Command Palette',
-            title: 'What the Palette Can Do',
+            id: 'welcome',
+            category: 'Overview',
+            title: 'Welcome',
             icon: 'sparkles',
-            summary: 'A tour of what the command palette can do - cards, filters, navigation, and saved commands.',
+            summary: 'What MTGBAN is and where to find things',
             snippets: [],
-            keywords: ['overview', 'capabilities', 'features', 'tour', 'what can', 'palette can', 'guide', 'introduction'],
+            keywords: ['welcome', 'intro', 'overview', 'start', 'getting started', 'about', 'mtgban', 'ban'],
             content: {
-                description: '<p>The command palette is a single keyboard-driven surface for everything on the site. Open it with <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd>, or press <kbd>/</kbd> anywhere no input is focused. Nothing requires memorizing - the palette surfaces what\'s possible as you type.</p><p><strong>Core capabilities:</strong></p><ul><li><strong>Card search</strong> - type a card name, <kbd>Enter</kbd> to search.</li><li><strong>Filter building with chips</strong> - type a prefix like <code>s:</code> or <code>r:</code> and Tab-lock the selection; chain chips to compose complex queries.</li><li><strong>Card-aware narrowing</strong> - lock a card chip first and subsequent filter dropdowns narrow to what exists for that card.</li><li><strong>Multi-stage navigation</strong> - <code>&gt;</code> to find a page, <kbd>Tab</kbd> to reveal sub-views like Newspaper spike scores or Arbitrage filter presets.</li><li><strong>Inline syntax help</strong> - <code>?</code> followed by a keyword returns a syntax snippet you can copy.</li><li><strong>Recent searches and saved commands</strong> - your recent queries and named shortcuts are one keystroke away.</li><li><strong>Round-trip editing</strong> - saved commands can be loaded back as chips (<kbd>Shift+Enter</kbd>) so you can tweak and re-run.</li><li><strong>Sealed product lookup</strong> - <code>$</code> mode searches sealed products with one-keystroke actions for prices, contents, and pack-pull simulation.</li><li><strong>Upload from anywhere</strong> - <code>+</code> mode sends a URL, picks a file, or pushes the current page\'s results to the Uploader (when permitted).</li></ul>',
+                description: '<p>MTG<span class="ban">BAN</span> aggregates retail and buylist prices for Magic: The Gathering singles and sealed products across dozens of vendors. Everything on the site is built around two things: a flexible search syntax, and a keyboard-driven command palette that composes that syntax for you.</p><p>The three things you can reach from anywhere:</p><ul><li><strong>Search</strong> - find prices for a card or sealed product, filter by set, rarity, finish, condition, store, region, or price thresholds. Results split into retail and buylist, with condition breakdowns and index references from aggregators like TCGplayer.</li><li><strong>The Command Palette</strong> - <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd> from any page (or <kbd>/</kbd> when no input is focused) opens a single surface for searching cards, composing filter queries with guided chips, jumping to pages, recalling saved commands, browsing sealed products, and uploading collections.</li><li><strong>Tools</strong> - Newspaper for daily market movement, Sleepers for undervalued cards, Arbitrage for retail/buylist gaps, and Upload &amp; Optimize for splitting a collection across buylists.</li></ul><p>The rest of this guide is organized by tab:</p><ul><li><strong>Overview</strong> (you are here) - the palette at a glance, then a tour of the tools available on your account, then power-user tips.</li><li><strong>Command Palette</strong> - chips, modes, multi-stage navigation, saved commands, walkthroughs, and the full keyboard cheatsheet.</li><li><strong>Syntax</strong> - reference for every search prefix.</li><li><strong>F.A.Q.</strong> - common questions.</li></ul>',
                 table: [],
-                examples: [
-                    { query: 'Lightning Bolt', desc: 'Simple card search - Enter to execute' },
-                    { query: '"Birds of Paradise" + Tab + s: + Tab', desc: 'Narrow sets dropdown to BoP printings, pick one' },
-                    { query: '>newspaper + Tab + "Archive"', desc: 'Jump directly to Newspaper → Archive view' },
-                    { query: '>arbit + Tab + "only Yield+" + Tab + "sort: Spread"', desc: 'Compose multi-filter arbitrage URL' },
-                    { query: '? rarity', desc: 'Inline rarity syntax help - Enter to copy', palette: true },
-                    { query: 'saved:', desc: 'Browse all saved commands', palette: true },
-                    { query: '$Phyrexia All Will Be One Prerelease Pack', desc: 'Find a sealed product by prefix', palette: true },
-                    { query: '+https://docs.google.com/...', desc: 'Send a Sheets URL straight to Upload', palette: true }
-                ]
+                examples: []
             }
         },
 
+        {
+            id: 'palette-modes',
+            category: 'Overview',
+            title: 'The Command Palette at a Glance',
+            icon: 'layout-grid',
+            summary: 'Six modes for navigating, searching, and acting without leaving the keyboard',
+            snippets: ['Ctrl+K', '>', '?', '*', '<', '$', '+'],
+            keywords: ['palette', 'modes', 'shortcuts', 'overview', 'pages', 'help', 'saved', 'recent', 'sealed', 'upload', 'tiles'],
+            content: {
+                description: '<p>Press <kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd> from any page (or <kbd>/</kbd> when no input is focused) to open the palette. The default view shows six shortcut tiles, each backed by a single-character prefix you can type directly into the input. Type a card name with no prefix to search; everything else is one keystroke away.</p><p>The palette also supports guided filter chips - type a prefix like <code>s:</code> or <code>r:</code> and the dropdown shows matching options. <kbd>Tab</kbd> locks the highlighted option as a chip; chain chips to compose complex queries. When a card chip is locked first, subsequent filter dropdowns narrow to what exists for that card. For the full reference, see the <strong>Command Palette</strong> tab.</p>',
+                table: [
+                    { value: '>',  short: 'Pages - navigate to a page or a specific sub-view (Newspaper Archive, Sleepers Bulk, Arbitrage with filter presets, etc.)' },
+                    { value: '?',  short: 'Help & syntax - look up a syntax prefix; Enter copies the snippet, Shift+Enter opens the guide section' },
+                    { value: '*',  short: 'Saved - browse and run your saved searches; Shift+Enter restores chips for editing' },
+                    { value: '<',  short: 'Recent - recall your recent searches' },
+                    { value: '$',  short: 'Sealed - search sealed products; Enter for prices, Shift+Enter for contents, Ctrl+Enter to simulate a pack pull' },
+                    { value: '+',  short: 'Upload - submit a Sheets/Moxfield/TCG URL, pick a CSV/XLS file, or push current page results to the Uploader' }
+                ],
+                examples: [
+                    { query: 'Lightning Bolt', desc: 'Just type a card name - Enter to search' },
+                    { query: 'Birds of Paradise + Tab + s: + Tab', desc: 'Lock the card as a chip; the set dropdown narrows to its printings', palette: true },
+                    { query: '>arbit + Tab + "Yield+" + Tab', desc: 'Compose an Arbitrage URL with filter presets', palette: true },
+                    { query: '? rarity', desc: 'Inline syntax help - Enter copies the snippet', palette: true },
+                    { query: '$Modern Horizons 3 Bundle + Shift+Enter', desc: 'Jump straight to the contents of a sealed product', palette: true },
+                    { query: '+https://docs.google.com/spreadsheets/d/...', desc: 'Submit a Google Sheets collection to the Uploader', palette: true }
+                ]
+            }
+        },
+        // Command Palette
         {
             id: 'palette',
             category: 'Command Palette',
@@ -248,8 +265,7 @@ window.__BAN_GUIDE = {
             }
         },
 
-        // ─── Search Syntax ────────────────────────────────────────────────
-
+        // Search Syntax
         {
             id: 'basic-syntax',
             category: 'Search Syntax',
@@ -715,18 +731,17 @@ window.__BAN_GUIDE = {
             }
         },
 
-        // ─── Features ─────────────────────────────────────────────────────
-
+        // Tools
         {
             id: 'feature-search',
-            category: 'Features',
-            title: 'Card & Sealed Search',
+            category: 'Tools',
+            title: 'Search',
             icon: 'search',
-            summary: 'Search prices across all stores, view historical charts, and follow affiliate links.',
+            summary: 'Search prices across all stores for singles and sealed; historical charts, condition breakdowns, reprint finder.',
             snippets: [],
-            keywords: ['search', 'price', 'retail', 'buylist', 'chart', 'history', 'affiliate', 'store', 'sealed', 'product', 'condition', 'index'],
+            keywords: ['search', 'price', 'retail', 'buylist', 'chart', 'history', 'affiliate', 'store', 'sealed', 'product', 'condition', 'index', 'reprint', 'finder'],
             content: {
-                description: '<p>The main search page lets you find prices across all tracked stores and vendors for both single cards and sealed products. Results are split by retail and buylist, with condition breakdowns and index prices from aggregators like TCGplayer.</p><p>Click the chart icon (📊) on any card to load historical price data from major vendors. Use affiliate links in results to support BAN while making purchases.</p>',
+                description: '<p>The main search page is the entry point for finding prices across every tracked store and vendor. It handles both single cards and sealed products, and accepts the full filter syntax documented in the Syntax tab.</p><p><strong>Results layout:</strong> retail prices and buylist offers are split into separate tables. Each card has condition breakdowns (NM/SP/MP/HP/PO), and index prices from aggregators like TCGplayer Market, TCG Low, and Card Kingdom appear alongside individual vendor prices for reference.</p><p><strong>Per-card actions:</strong></p><ul><li><strong>📊 chart icon</strong> - opens historical price data from major vendors</li><li><strong>📖 book icon</strong> - opens the reprint finder, listing every product containing any reprint of that card</li><li><strong>Buy links</strong> - vendor affiliate links that support BAN at no extra cost</li></ul><p>The command palette\'s default behavior (type a card name, press Enter) lands you here.</p>',
                 table: [],
                 examples: [
                     { query: 'Lightning Bolt s:lea', desc: 'Alpha Lightning Bolt prices' },
@@ -737,89 +752,223 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'feature-sealed',
+            category: 'Tools',
+            requiresNav: 'Sealed',
+            title: 'Sealed Products',
+            icon: 'package',
+            summary: 'Browse sealed products by category, search by name, or open contents and simulated pack pulls.',
+            snippets: [],
+            keywords: ['sealed', 'product', 'booster', 'bundle', 'box', 'deck', 'commander deck', 'expansion', 'reprint', 'draft', 'core set', 'boxed set', 'commander supplement', 'from the vault', 'starter', 'browse', 'category', 'surprise me'],
+            content: {
+                description: '<p>The Sealed page is a structured directory of every sealed product BAN tracks. The left sidebar groups products by category; the main area shows the selected category as a clickable grid with set symbols for orientation.</p><p>Three ways to find a product:</p><ul><li><strong>Browse by category</strong> - pick a category in the sidebar (Commander Decks, Expansions, Boxed Sets, etc.)</li><li><strong>Search</strong> - type into the product search input to filter by name across all categories</li><li><strong>Surprise Me</strong> - opens a random product</li></ul><p>Clicking a product takes you to its price grid (every vendor selling it, plus index references). From the command palette, <code>$&lt;product name&gt;</code> reaches the same destination and adds two shortcuts the page itself doesn\'t expose: <kbd>Shift+Enter</kbd> for the product\'s contents, <kbd>Ctrl+Enter</kbd> for a pack-pull simulation.</p>',
+                table: [
+                    { value: 'Commander Decks',       short: 'Preconstructed Commander products by set' },
+                    { value: 'Expansions',            short: 'Standard-legal set boosters, bundles, and cases' },
+                    { value: 'Reprint Sets',          short: 'Masters, Remastered, and other reprint releases' },
+                    { value: 'Eternal',               short: 'Eternal-format-targeted products' },
+                    { value: 'Draft Experiments',     short: 'Draft-focused experimental products' },
+                    { value: 'Core Sets',             short: 'Core set boosters and ancillary products' },
+                    { value: 'Boxed Sets',            short: 'Premium boxed releases' },
+                    { value: 'Funny Sets',            short: 'Un-sets and Unfinity-style products' },
+                    { value: 'Commander Supplements', short: 'Commander-format anthologies and supplements' },
+                    { value: 'Deck Series',           short: 'Themed deck series releases' },
+                    { value: 'From the Vault Sets',   short: 'From the Vault premium releases' },
+                    { value: 'Standalone Game',       short: 'Self-contained game products' },
+                    { value: 'Starter Sets',          short: 'New-player starter products' }
+                ],
+                examples: [
+                    { query: '$Modern Horizons 3 Bundle', desc: 'Find a sealed product from the palette', palette: true },
+                    { query: '$Phyrexia All Will Be One Prerelease Pack + Ctrl+Enter', desc: 'Simulate opening a prerelease pack', palette: true },
+                    { query: 't:booster s:blb', desc: 'All booster products from Bloomburrow' }
+                ]
+            }
+        },
+
+        {
             id: 'feature-newspaper',
-            category: 'Features',
+            category: 'Tools',
             requiresNav: 'Newspaper',
             title: 'Newspaper',
             icon: 'newspaper',
-            summary: 'Daily Spike scores, buylist changes, seller count trends, SYP list, and archive.',
+            summary: 'Daily snapshot of market movement - spike scores, vendor listings, and buylist offers.',
             snippets: [],
-            keywords: ['newspaper', 'spike', 'score', 'buylist', 'change', 'trend', 'seller', 'count', 'SYP', 'archive', 'daily', 'movement', 'price change'],
+            keywords: ['newspaper', 'spike', 'score', 'buylist', 'change', 'trend', 'seller', 'count', 'SYP', 'archive', 'daily', 'movement', 'price change', 'vendor', 'listings', 'supply', 'demand', 'edition'],
             content: {
-                description: '<p>The Newspaper page tracks daily market movements. It shows Spike scores (sudden price increases), buylist changes (vendors adjusting what they pay), and seller count trends (supply going up or down).</p><p>The SYP (Save Your Points) section lists TCGplayer store credit opportunities. An archive lets you browse historical issues.</p>',
-                table: [],
+                description: '<p>The Newspaper is BAN\'s daily snapshot of meaningful market movement. Each issue is an "edition" - the Early Edition is the in-progress view of the current day, with the previous full day available on a delay.</p><p><strong>Six metric cards make up an issue:</strong></p><p><strong>Spike scores</strong> - cards whose prices have jumped recently:</p><ul><li><em>Top Singles by Combined Spike Score</em> - blends TCGplayer sales velocity with Card Kingdom buylist movement. The strongest signal of "something is happening" because two independent data sources agree.</li><li><em>Top Singles by Spike Score</em> - TCGplayer-only sales-velocity spikes. Useful for catching moves before they propagate.</li></ul><p><strong>Vendor listings (supply signals)</strong> - tracks how many sellers have a card in stock:</p><ul><li><em>Greatest Increase</em> - stock is piling up faster than it sells. <strong>Avoid these</strong> as buys.</li><li><em>Greatest Decrease</em> - stock is drying up. <strong>Seek these out</strong> as buys.</li></ul><p><strong>Buylist offers (demand signals)</strong> - tracks what vendors are willing to pay:</p><ul><li><em>Greatest Increase</em> - higher offers indicate higher sales rates for the vendor. Can be fleeting; not a sole-source signal unless you\'re dropshipping.</li><li><em>Greatest Decrease</em> - declining offers indicate the vendor is moving fewer copies. Same caveat applies.</li></ul><p>The <strong>Archive</strong> view (palette: <code>&gt;newspaper + Tab + Archive</code>) browses historical issues by date.</p>',
+                table: [
+                    { value: 'Early Edition',                           short: 'In-progress view of today\'s data' },
+                    { value: 'Standard Edition',                        short: 'Previous full day' },
+                    { value: 'Top Singles by Combined Spike Score',     short: 'TCG sales + CK buylist movement (strongest signal)' },
+                    { value: 'Top Singles by Spike Score',              short: 'TCG sales velocity only (catches early moves)' },
+                    { value: 'Greatest Increase in Vendor Listings',    short: 'Supply piling up - avoid as buys' },
+                    { value: 'Greatest Decrease in Vendor Listings',    short: 'Supply drying up - seek out as buys' },
+                    { value: 'Greatest Increase in Buylist Offer',      short: 'Demand rising - may be fleeting' },
+                    { value: 'Greatest Decrease in Buylist Offer',      short: 'Demand falling - may be fleeting' },
+                    { value: 'Archive',                                 short: 'Browse historical issues' }
+                ],
                 examples: [
                     { query: 'on:newspaper', desc: 'Cards currently in a Newspaper spike' },
-                    { query: 'on:newspaper r:mythic', desc: 'Spiking mythics' }
+                    { query: 'on:newspaper r:mythic', desc: 'Spiking mythics' },
+                    { query: '>newspaper + Tab + "Archive"', desc: 'Jump to the Archive view', palette: true }
                 ]
             }
         },
 
         {
             id: 'feature-sleepers',
-            category: 'Features',
+            category: 'Tools',
             requiresNav: 'Sleepers',
             title: 'Sleepers',
             icon: 'moon',
-            summary: 'Discover undervalued cards with bulk, reprint, mismatch, and gap analysis across tiers.',
+            summary: 'Find cards the market hasn\'t caught up on - bulk gems, no-reprint plays, mismatches, and seller gaps.',
             snippets: [],
-            keywords: ['sleepers', 'bulk', 'reprint', 'mismatch', 'gap', 'hotlist', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage'],
+            keywords: ['sleepers', 'bulk', 'reprint', 'mismatch', 'gap', 'hotlist', 'analysis', 'tier', 'rank', 'S', 'F', 'undervalued', 'opportunity', 'arbitrage', 'ocean gap', 'custom comparison', 'seller', 'reference', 'target', 'TCGLow', 'MKMLow', 'MKMTrend', 'Manapool'],
             content: {
-                description: '<p>The Sleepers page surfaces cards that may be undervalued or overlooked. Analysis modes include:</p><p><strong>Bulk:</strong> Cards available for low prices across vendors</p><p><strong>Reprint:</strong> Cards with upcoming or recent reprints affecting price</p><p><strong>Mismatch:</strong> Cards priced inconsistently across stores</p><p><strong>Gap:</strong> Cards where buylist and retail prices diverge significantly</p><p><strong>Hotlist:</strong> High-demand cards based on sustained buylist interest</p><p>Cards are tiered S through F based on opportunity score.</p>',
-                table: [],
-                examples: []
+                description: '<p>Sleepers surfaces cards where market pricing hasn\'t kept pace with demand, scarcity, or cross-market differences. Every result is tiered <strong>S through F</strong> - higher tiers mean stronger signals.</p><p><strong>Four analysis modes</strong> (each is its own page; palette: <code>&gt;sleepers + Tab + &lt;mode&gt;</code>):</p><ul><li><strong>Bulk Me Up</strong> - cards deviating from their set\'s average over the last 5 years; unexpected gems hiding in bulk</li><li><strong>Long Time No Reprint</strong> - no reprint in 2+ years; excludes bulk, Reserved List, and non-tournament cards</li><li><strong>Market Mismatch</strong> - buylist exceeds market price, or card is priced below TCG Low; direct arbitrage signal</li><li><strong>Hotlist</strong> - most buylist growth over the past 3 months; emerging trends before they fully break</li></ul><p><strong>Ocean Gap</strong> (BETA) is a fifth, distinct tool on the same page: it compares two sellers head-to-head and surfaces cards where one is cheaper than the other. Preset pairings between common reference indexes are one click each; custom pairings (pick any reference, any target) require a higher tier.</p>',
+                table: [
+                    { value: 'Bulk Me Up',              short: 'Cards deviating from their set\'s 5-year average' },
+                    { value: 'Long Time No Reprint',    short: 'No reprint in 2+ years (excludes bulk / RL / non-tournament)' },
+                    { value: 'Market Mismatch',         short: 'Buylist > market, or priced below TCG Low' },
+                    { value: 'Hotlist',                 short: 'Most buylist growth over past 3 months' },
+                    { value: 'Ocean Gap (BETA)',        short: 'Head-to-head seller comparison' },
+                    { value: 'Ocean Gap presets',       short: 'TCGLow vs MKMLow / MKMTrend; MKMTrend vs CK / SCG / Manapool' },
+                    { value: 'Custom comparison',       short: 'Pick any reference seller and target seller (tier-gated)' }
+                ],
+                examples: [
+                    { query: '>sleepers + Tab + "Bulk Me Up"', desc: 'Jump straight to Bulk analysis', palette: true },
+                    { query: 'on:hotlist sort:buylist', desc: 'Cards on the buylist hot list, sorted by value' }
+                ]
             }
         },
 
         {
             id: 'feature-upload',
-            category: 'Features',
+            category: 'Tools',
             requiresNav: 'Upload',
             title: 'Upload & Optimize',
             icon: 'upload',
-            summary: 'Upload a collection (CSV, Excel, Moxfield, Deckbox) and optimize across buylist vendors.',
+            summary: 'Upload a collection in any common format and compare prices across vendors.',
             snippets: [],
-            keywords: ['upload', 'collection', 'CSV', 'excel', 'google sheets', 'moxfield', 'deckbox', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket'],
+            keywords: ['upload', 'collection', 'CSV', 'excel', 'xls', 'xlsx', 'google sheets', 'moxfield', 'tcgplayer', 'tcg collection', 'deckbox', 'binderpos', 'cardsphere', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket', 'cardconduit', 'retail', 'mtgban', 'sheet'],
             content: {
-                description: '<p>Upload your collection in CSV, Excel, Google Sheets, Moxfield, or Deckbox format. BAN will match your cards against all active buylists and calculate the optimal split across vendors to maximize return.</p><p>Export results in formats compatible with Card Kingdom, StarCityGames, TCGplayer, and Cardmarket.</p>',
-                table: [],
-                examples: []
+                description: '<p>Upload &amp; Compare matches your collection against every active vendor and reports prices side-by-side. The page is a three-step flow.</p><p><strong>Step 1 - Mode &amp; Stores.</strong> Toggle between <strong>Retail</strong> (cheapest places to buy) and <strong>Buylist</strong> (best places to sell), then pick which vendors to include - Card Kingdom, Star City Games, Strike Zone, TCG Direct (net), TCGplayer SYP, and others depending on your tier. Your selection persists as a cookie, so the palette\'s upload mode (<code>+</code>) uses the same set.</p><p><strong>Step 2 - Load data.</strong> Three input paths:</p><ul><li><strong>Local CSV/XLS</strong> - drop or browse for a file (max 5MB)</li><li><strong>Remote URL</strong> - Google Sheets (must be publicly accessible), TCG Collection URLs, or Moxfield deck URLs</li><li><strong>Paste Text</strong> - any tab/comma-separated text, or a plain card-name decklist</li></ul><p><strong>Step 3 - Process.</strong> <em>Upload</em> runs the match and produces an in-browser results page. From there, <em>Get CSV</em> downloads the full results, and three export buttons format the data for specific destinations: <em>CardConduit</em> (estimate), <em>Deckbox CSV</em>, and <em>TCGplayer CSV</em>.</p><p><strong>Format detection.</strong> Exports from TCGplayer, Deckbox, BinderPOS, and Cardsphere are auto-detected. Plain card-name lists also work - the most recent printing is used for ambiguous names. To pin a specific printing of a multi-printing card, include the collector number or variant.</p><p><strong>Sheet quirks:</strong> Excel sheets must contain <code>mtgban</code> somewhere in the sheet name (BAN uses this to find the right tab in multi-sheet workbooks). A Google Sheets URL is remembered as a preference and reused on the next visit.</p><p><strong>Limits:</strong> 350 entries per upload (1000 with Optimizer tier). Rows with quantity 0 are skipped; identical entries with matching condition are merged.</p>',
+                table: [
+                    { value: 'CSV / TSV',                              short: 'Comma or tab separated with sensible headers' },
+                    { value: 'Excel (.xls, .xlsx)',                    short: 'Sheet name must contain "mtgban"' },
+                    { value: 'Google Sheets',                          short: 'Public URL; saved as a preference' },
+                    { value: 'TCG Collection URL',                     short: 'TCGplayer store collection link' },
+                    { value: 'Moxfield URL',                           short: 'Public deck URL' },
+                    { value: 'Plain decklist',                         short: 'One card name per line (most recent printing)' },
+                    { value: 'TCG / Deckbox / BinderPOS / Cardsphere', short: 'Auto-detected exports' }
+                ],
+                examples: [
+                    { query: '+https://docs.google.com/spreadsheets/d/...', desc: 'Submit a Google Sheets collection from the palette', palette: true },
+                    { query: '+https://www.moxfield.com/decks/abc', desc: 'Submit a Moxfield deck', palette: true },
+                    { query: 'On a search results page: + then Send results', desc: 'Push current results to the Uploader', palette: true }
+                ]
+            }
+        },
+
+        {
+            id: 'feature-global',
+            category: 'Tools',
+            requiresNav: 'Global',
+            title: 'Global',
+            icon: 'globe',
+            summary: 'Cross-store arbitrage at the index level - pick a reference index and see where else is cheaper.',
+            snippets: [],
+            keywords: ['global', 'arbitrage', 'index', 'reference', 'card kingdom', 'star city games', 'tcg market', 'CT zero', 'TCG direct', 'TCG low', 'EV', 'sealed', 'spread', 'profit', 'difference', 'yield', 'bucks', 'SYP', 'stocks', 'legit', 'cross-store'],
+            content: {
+                description: '<p>Global is a cross-store arbitrage tool that picks one store as a reference (the <em>index</em>) and surfaces cards where other markets are charging more. Unlike per-card Search, Global operates at the index level: every result is a comparison between the chosen index and one or more target stores.</p><p><strong>Pick an index:</strong></p><ul><li><strong>Singles</strong> - Card Kingdom, Star City Games, TCG Market</li><li><strong>Sealed</strong> - CT Zero EV Sealed, TCG Direct (net) EV Sealed, TCG Low EV Sealed (EV = expected value of pack contents)</li></ul><p>The results page shows each card with the index price, the target store\'s price, the dollar profit, the dollar difference, and a spread percentage. Direct Buy links go to both the source (the cheap index) and the target.</p><p><strong>Filter presets</strong> - toggle one or more to narrow results. The palette\'s <code>&gt;global + Tab</code> menu exposes the same set:</p>',
+                table: [
+                    { value: 'only NM/SP',         short: 'Hide MP/HP/PO conditions' },
+                    { value: 'only non-Foil',      short: 'Hide foils' },
+                    { value: 'only Foil',          short: 'Hide non-foils' },
+                    { value: 'only Rare/Mythic',   short: 'Hide commons and uncommons' },
+                    { value: 'only Bucks+',        short: 'Hide low-dollar results' },
+                    { value: 'only Yield+',        short: 'Minimum profit threshold' },
+                    { value: 'only Difference+',   short: 'Minimum price difference' },
+                    { value: 'only Difference++',  short: 'Higher minimum price difference' },
+                    { value: 'only SYP',           short: 'On the TCGplayer Save Your Points list' },
+                    { value: 'only Stocks',        short: 'Has stock at the target' },
+                    { value: 'only Legit',         short: 'Filter out questionable results' }
+                ],
+                examples: [
+                    { query: '>global + Tab + "Card Kingdom"', desc: 'Open Global with Card Kingdom as the index', palette: true },
+                    { query: '>global + Tab + "Yield+" + Tab + "Bucks+"', desc: 'Compose a filtered Global URL', palette: true }
+                ]
             }
         },
 
         {
             id: 'feature-arbitrage',
-            category: 'Features',
+            category: 'Tools',
             requiresNav: 'Arbitrage',
             title: 'Arbitrage',
             icon: 'trending-up',
-            summary: 'Find price gaps between retail and buylist; filter by condition, foil, rarity, and more.',
+            summary: 'Per-vendor retail-to-buylist gaps; flip opportunities filtered by condition, finish, and rarity.',
             snippets: [],
-            keywords: ['arbitrage', 'arb', 'gap', 'price difference', 'retail', 'buylist', 'profit', 'flip', 'reverse', 'global', 'condition', 'foil', 'rarity', 'filter'],
+            keywords: ['arbitrage', 'arb', 'gap', 'price difference', 'retail', 'buylist', 'profit', 'flip', 'condition', 'foil', 'rarity', 'filter', 'admin'],
             content: {
-                description: '<p>The Arbitrage page identifies cards where there is a meaningful gap between what stores are selling for and what other vendors are buying at - potential flip opportunities.</p><p><strong>Standard mode:</strong> Compare retail prices to buylist prices across all vendors</p><p><strong>Reverse mode:</strong> Find buylists paying more than retail prices</p><p><strong>Global mode:</strong> Cross-store arbitrage including international vendors</p><p>Filter results by condition, foil treatment, rarity, and price thresholds.</p>',
+                description: '<p>Arbitrage identifies cards where a meaningful gap exists between a vendor\'s retail price and another vendor\'s buylist offer - i.e. potential flip opportunities. The same filter preset set used by Global applies here (Yield+, Bucks+, Difference+, SYP, etc.), and the <code>&gt;arbit + Tab</code> palette menu composes filter URLs directly.</p><p>See also the <strong>Reverse</strong> page (buylists paying more than retail) and the <strong>Global</strong> page (cross-store comparison at the index level), which are part of the same toolkit.</p>',
                 table: [],
-                examples: []
+                examples: [
+                    { query: '>arbit + Tab + "Yield+" + Tab + "Bucks+"', desc: 'Compose an Arbitrage URL with profit filters', palette: true }
+                ]
             }
         },
 
-        // ─── Tips & Tricks ────────────────────────────────────────────────
-
         {
-            id: 'tips',
-            category: 'Tips & Tricks',
-            title: 'Power User Tips',
-            icon: 'lightbulb',
-            summary: 'Price refresh timing, historical charts, reprint finder, buylist ratios, and trade credit tooltips.',
+            id: 'feature-reverse',
+            category: 'Tools',
+            requiresNav: 'Reverse',
+            title: 'Reverse',
+            icon: 'trending-down',
+            summary: 'Buylists paying more than retail - reverse arbitrage signals across the vendor list.',
             snippets: [],
-            keywords: ['tips', 'tricks', 'power user', 'refresh', 'timing', 'history', 'chart', 'reprint', 'ratio', 'trade credit', 'tooltip', 'flavor name', 'condition', 'index', 'feedback'],
+            keywords: ['reverse', 'arbitrage', 'arb', 'buylist', 'retail', 'inverted', 'flip', 'admin', 'difference', 'profit'],
             content: {
-                description: '<p>A few things to know to get the most out of BAN:</p><p><strong>Price refresh:</strong> Data is updated periodically throughout the day. The exact delay is randomized to prevent sniping.</p><p><strong>Historical data:</strong> Click the 📊 chart icon on any card to view price history from major vendors.</p><p><strong>Reprint finder:</strong> Click 📖 on a card to see every product containing any reprint of that card. Source products are also accessible via "Found in * products" links.</p><p><strong>Buylist ratios:</strong> The percentage shown on buylist results reflects vendor desirability - higher means they want it more. Only shown when the vendor also has retail stock at matching conditions.</p><p><strong>Trade credit:</strong> Hover over a buylist price to see the corresponding trade credit value, if available.</p><p><strong>Conditions:</strong> Inventory prices reflect stated conditions (accuracy depends on provider). Buylist prices are always NM. Sealed products are always in sealed/unopened condition. The Index condition is for trend data only - no quantities are tracked.</p><p><strong>Flavor names:</strong> Searching a flavor name returns only those specific art versions (unless disabled in preferences). This does not work for complex multi-filter queries.</p><p><strong>Feedback:</strong> Report issues in the #feedback channel on the BAN Discord with a URL or screenshot. Some errors originate from upstream providers.</p>',
+                description: '<p>Reverse is the inverted complement to <strong>Arbitrage</strong>: it surfaces cards where a buylist is paying <em>more</em> than another vendor is selling for retail. These are the most direct flip signals on the site - if a buylist is over retail elsewhere and the source has stock, the gap is real.</p><p>The same filter presets apply (Yield+, Bucks+, Difference+, SYP, etc.) and the palette\'s <code>&gt;reverse + Tab</code> menu builds filtered URLs.</p>',
+                table: [],
+                examples: [
+                    { query: '>reverse + Tab + "Yield+"', desc: 'Reverse arbitrage results with yield filter', palette: true }
+                ]
+            }
+        },
+
+        // Tips & Tricks
+        {
+            id: 'tips-reading-prices',
+            category: 'Tips & Tricks',
+            title: 'Reading Prices',
+            icon: 'eye',
+            summary: 'How to interpret refresh timing, conditions, buylist ratios, and trade credit values.',
+            snippets: [],
+            keywords: ['tips', 'tricks', 'reading', 'prices', 'refresh', 'timing', 'condition', 'buylist', 'ratio', 'trade credit', 'tooltip', 'index', 'NM', 'sealed', 'interpret'],
+            content: {
+                description: '<p>A few things to know when looking at price data:</p><p><strong>Price refresh:</strong> Data is updated periodically throughout the day. The exact delay is randomized to prevent sniping.</p><p><strong>Conditions:</strong> Inventory prices reflect stated conditions (accuracy depends on the provider). Buylist prices are always NM. Sealed products are always in sealed/unopened condition. The Index condition is for trend data only - no quantities are tracked.</p><p><strong>Buylist ratios:</strong> The percentage shown on buylist results reflects vendor desirability - higher means they want it more. Only shown when the vendor also has retail stock at matching conditions.</p><p><strong>Trade credit:</strong> Hover over a buylist price to see the corresponding trade credit value, if available.</p>',
                 table: [],
                 examples: [
                     { query: 'ratio>50 r:rare', desc: 'High-demand rares on buylists' },
-                    { query: 'is:reserved price>50', desc: 'Expensive reserved list cards' },
                     { query: 'on:hotlist sort:buylist', desc: 'Hot list sorted by buylist value' }
+                ]
+            }
+        },
+
+        {
+            id: 'tips-power-features',
+            category: 'Tips & Tricks',
+            title: 'Power Features',
+            icon: 'zap',
+            summary: 'Historical charts, reprint finder, flavor name search, and where to report issues.',
+            snippets: [],
+            keywords: ['tips', 'tricks', 'power user', 'history', 'chart', 'historical', 'reprint', 'finder', 'flavor name', 'feedback', 'discord', '📊', '📖', 'icon'],
+            content: {
+                description: '<p>A handful of features that are easy to miss:</p><p><strong>Historical data:</strong> Click the 📊 chart icon on any card to view price history from major vendors.</p><p><strong>Reprint finder:</strong> Click 📖 on a card to see every product containing any reprint of that card. Source products are also accessible via "Found in * products" links.</p><p><strong>Flavor names:</strong> Searching a flavor name returns only those specific art versions (unless disabled in preferences). This does not work for complex multi-filter queries.</p><p><strong>Feedback:</strong> Report issues in the #feedback channel on the BAN Discord with a URL or screenshot. Some errors originate from upstream providers.</p>',
+                table: [],
+                examples: [
+                    { query: 'is:reserved price>50', desc: 'Expensive reserved list cards' }
                 ]
             }
         }
