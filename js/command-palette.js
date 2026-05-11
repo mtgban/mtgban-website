@@ -1293,7 +1293,7 @@
         }
 
         var cmds  = getStaticCommands(query);
-        var cards = getCardResults(query, 5);
+        var cards = getCardResults(query, DROPDOWN_CAP);
         var navs  = getNavResults(query);
 
         // Recent and Saved live behind their own gated panels (< and *).
@@ -1753,7 +1753,7 @@
     // kinds whose results bypass the GLOBAL_ITEM_CAP. Provider has its own internal
     // cap (DROPDOWN_CAP=30); sub-views and sealed-actions menus self-cap. Per-mode
     // skipCap lives on each MODES entry alongside its other metadata.
-    var KINDS_SKIP_CAP = { provider: true, subview: true, 'sealed-actions': true };
+    var KINDS_SKIP_CAP = { provider: true, subview: true, 'sealed-actions': true, search: true };
 
     function handleInput() {
         var raw = input.value;
