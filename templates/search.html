@@ -39,6 +39,7 @@
     {{if .ChartID}}
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3"></script>
         <script type="text/javascript" src="/js/chartopts.js?hash={{.Hash}}"></script>
     {{end}}
     {{if .IsSealed}}
@@ -427,21 +428,16 @@
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
                                 </p>
+                                {{if .Checkpoints}}
+                                <p class="chart-checkpoint-toggles" style="margin: 6px 0 0;">
+                                    <label><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>
+                                    <label style="margin-left: 12px;"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
+                                    <label style="margin-left: 12px;"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
+                                </p>
+                                {{end}}
                             </div>
                         </div>
                         <script>
-                            var productKeyrunes = {
-                                {{range $key := .EditionSort}}
-                                    {{$editionList := index $.EditionList $key }}
-                                        {{range $editionList}}
-                                            {{if sixMonthsAgo .Date}}
-                                                {{continue}}
-                                            {{end}}
-                                            "{{.FmtDate}}": "{{.Keyrune}}",
-                                        {{end}}
-                                {{end}}
-                            }
-
                             // Set a per-chart-style key
                             var legendStorageKey = 'BANChart{{if $.IsSealed}}Sealed{{end}}';
 
@@ -451,6 +447,16 @@
 
                             // Override legend click function
                             opts = withLegendPersistence(legendStorageKey, opts);
+
+                            // Checkpoint annotations (bans/releases/reprints)
+                            var chartCheckpoints = {{.Checkpoints}};
+                            var checkpointChartRef = { chart: null };
+                            if (chartCheckpoints && chartCheckpoints.length) {
+                                restoreCheckpointTypes();
+                                opts.plugins.annotation = {
+                                    annotations: buildCheckpointAnnotations(chartCheckpoints, checkpointChartRef),
+                                };
+                            }
 
                             // Apply saved or default date range before chart creation
                             var savedRange = localStorage.getItem('chartDateRange');
@@ -480,41 +486,11 @@
                                     ]
                                 },
                                 options: opts,
-                                plugins: [{
-                                    afterDraw: function (chart) {
-                                        var drawCtx = chart.ctx;
-                                        var xTopAxis = chart.scales['x-top'];
-                                        if (!xTopAxis) return;
-
-                                        drawCtx.save();
-                                        drawCtx.textAlign = 'center';
-                                        drawCtx.textBaseline = 'bottom';
-                                        drawCtx.font = '32px Keyrune';
-                                        drawCtx.fillStyle = readVar('--chartjs-text');
-
-                                        xTopAxis.ticks.forEach(function (tick, index) {
-                                            var value = tick.label;
-                                            if (value in productKeyrunes) {
-                                                var padding = 32;
-                                                var x = xTopAxis.getPixelForTick(index);
-                                                if (x + padding / 2 > chart.width) {
-                                                    x = chart.width - padding / 2;
-                                                }
-
-                                                var el = document.createElement('i');
-                                                el.className = 'ss-' + productKeyrunes[value];
-                                                document.body.appendChild(el);
-                                                var content = window.getComputedStyle(el, '::before').content;
-                                                content = content.replace(/^"(.*)"$/, '$1');
-                                                document.body.removeChild(el);
-
-                                                drawCtx.fillText(content, x, xTopAxis.top + 24);
-                                            }
-                                        });
-                                        drawCtx.restore();
-                                    }
-                                }],
                             });
+
+                            // Expose chart so checkpoint toggle handlers can reach it
+                            window.cardChart = cardChart;
+                            checkpointChartRef.chart = cardChart;
 
                             // Load state from local storage
                             applySavedLegendState(cardChart, legendStorageKey);
