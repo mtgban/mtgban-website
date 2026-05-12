@@ -88,6 +88,7 @@ type PageVars struct {
 
 	CanShowAll       bool
 	CleanSearchQuery string
+	CheckpointsText  string
 
 	ScraperShort   string
 	HasAffiliate   bool
@@ -160,6 +161,7 @@ type PageVars struct {
 	MaxLookbackDays int
 	AxisLabels      []string
 	Datasets        []Dataset
+	Checkpoints     []ChartCheckpoint
 	ChartID         string
 	Alternative     string
 	StocksURL       string
@@ -398,6 +400,7 @@ type ConfigType struct {
 		BackupPath      string `json:"backup_path"`
 		BucketAccessKey string `json:"bucket_access_key"`
 		BucketSecretKey string `json:"bucket_access_secret"`
+		CheckpointsPath string `json:"checkpoints_path,omitempty"`
 	} `json:"datastore"`
 	Game                   string             `json:"game"`
 	CardBackImage          string             `json:"card_back_image"`
@@ -838,6 +841,11 @@ func main() {
 	err = openDBs()
 	if err != nil {
 		log.Fatalln("error opening databases:", err)
+	}
+
+	err = reloadCheckpoints()
+	if err != nil {
+		log.Printf("checkpoints: initial load failed: %v", err)
 	}
 
 	// load website up

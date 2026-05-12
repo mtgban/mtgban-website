@@ -208,6 +208,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}
 
+	case "checkpoints":
+		v = url.Values{}
+		doReboot = true
+
+		err := reloadCheckpoints()
+		if err != nil {
+			v.Set("msg", "Failed to reload checkpoints: "+err.Error())
+		} else {
+			v.Set("msg", "Chart checkpoints reloaded")
+		}
+
 	case "snapshot":
 		if Config.OfflineKey != "" {
 			v = url.Values{}
@@ -326,6 +337,28 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		} else {
 			pageVars.CleanSearchQuery = configOut.String()
 		}
+	}
+
+	// -- Checkpoints: handle POST if submitted --
+	newCheckpoints := r.FormValue("checkpointsTextArea")
+	if newCheckpoints != "" {
+		var parsed checkpointsFile
+		if err := json.Unmarshal([]byte(newCheckpoints), &parsed); err != nil {
+			pageVars.WarningMessage = "Checkpoints JSON invalid: " + err.Error()
+		} else if err := saveCheckpoints(r.Context(), parsed.Events); err != nil {
+			pageVars.WarningMessage = "Checkpoints save failed: " + err.Error()
+		} else {
+			pageVars.InfoMessage = "Checkpoints updated"
+		}
+	}
+
+	// -- Checkpoints: always load current text for the editor --
+	if cpText, err := currentCheckpointsJSON(); err != nil {
+		if pageVars.InfoMessage == "" {
+			pageVars.InfoMessage = err.Error()
+		}
+	} else {
+		pageVars.CheckpointsText = cpText
 	}
 
 	// -- Dashboard: Retail Scrapers --
