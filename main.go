@@ -160,6 +160,7 @@ type PageVars struct {
 	MaxLookbackDays int
 	AxisLabels      []string
 	Datasets        []Dataset
+	Checkpoints     []ChartCheckpoint
 	ChartID         string
 	Alternative     string
 	StocksURL       string
@@ -839,6 +840,8 @@ func main() {
 	if err != nil {
 		log.Fatalln("error opening databases:", err)
 	}
+
+	InitCheckpoints()
 
 	// load website up
 	go func() {

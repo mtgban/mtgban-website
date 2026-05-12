@@ -616,6 +616,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
 			pageVars.Datasets = getDatasets(chartId, co.Sealed, pageVars.AxisLabels, userTier)
+			pageVars.Checkpoints = relevantCheckpoints(co.Name, earliest)
 			if len(pageVars.Datasets) == 0 {
 				pageVars.InfoMessage = "No chart data available"
 			}

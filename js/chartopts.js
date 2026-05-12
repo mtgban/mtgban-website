@@ -86,6 +86,37 @@ function externalTooltipHandler(context) {
             '</div>';
     });
 
+    // Append any checkpoints landing on the hovered date so the user sees
+    // price values and event context (bans/releases/reprints) in one popup.
+    var hoveredDate = '';
+    if (tooltip.dataPoints && tooltip.dataPoints.length) {
+        var ms = tooltip.dataPoints[0].parsed.x;
+        if (typeof ms === 'number') {
+            var d = new Date(ms);
+            var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+            hoveredDate = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+        }
+    }
+    if (hoveredDate && currentCheckpoints.length) {
+        var matching = currentCheckpoints.filter(function (cp) {
+            return cp.date === hoveredDate &&
+                   visibleCheckpointTypes.has(checkpointToggleKey(cp.type));
+        });
+        if (matching.length) {
+            html += '<div class="chart-tooltip-checkpoints">';
+            matching.forEach(function (cp) {
+                var dotColor = (checkpointColors[cp.type] || {}).line || '#888';
+                html += '<div class="chart-tooltip-row chart-tooltip-cp">' +
+                    '<span class="chart-tooltip-swatch" style="background:' + dotColor + '"></span>' +
+                    '<span><strong>' + escapeHtml(cp.title) + '</strong>' +
+                    (cp.detail ? '<br><span style="opacity:.75">' + escapeHtml(cp.detail) + '</span>' : '') +
+                    '</span>' +
+                    '</div>';
+            });
+            html += '</div>';
+        }
+    }
+
     el.innerHTML = html;
     el.style.opacity = '1';
 
@@ -309,6 +340,244 @@ function withLegendPersistence(legendStorageKey, opts) {
 
     return opts;
 }
+
+/* ── Checkpoint annotations ── */
+
+// Line and label-background colors per checkpoint type. Release labels are
+// black with a white icon (the Scryfall set glyphs are monochrome and would
+// otherwise render black-on-grey, which disappears).
+const checkpointColors = {
+    ban:     { line: 'rgba(217, 83, 79, 0.9)',  label: 'rgba(217, 83, 79, 0.9)'  },
+    unban:   { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
+    release: { line: 'rgba(108, 117, 125, 0.9)', label: 'rgba(0, 0, 0, 0.9)'    },
+    reprint: { line: 'rgba(240, 173, 78, 0.9)', label: 'rgba(240, 173, 78, 0.9)' },
+};
+
+// Bans + unbans share the "Bans" checkbox.
+function checkpointToggleKey(type) {
+    return type === 'unban' ? 'ban' : type;
+}
+
+const visibleCheckpointTypes = new Set(['ban', 'release', 'reprint']);
+
+// Snapshot of the checkpoints currently rendered on the chart. Used by the
+// external tooltip handler so price + event context render in one popup.
+var currentCheckpoints = [];
+
+// Cache <img> elements so we only fetch each icon once.
+const checkpointIconCache = new Map();
+function getCheckpointIcon(url, onLoad) {
+    if (checkpointIconCache.has(url)) return checkpointIconCache.get(url);
+    var img = new Image(20, 20);
+    img.referrerPolicy = 'no-referrer';
+    img.onload = function () { if (typeof onLoad === 'function') onLoad(); };
+    img.onerror = function () { checkpointIconCache.delete(url); };
+    img.src = url;
+    checkpointIconCache.set(url, img);
+    return img;
+}
+
+// Resolve a Keyrune CSS class ("ss-dsk") to its rendered glyph character. The
+// Keyrune stylesheet is already loaded on the search page (see
+// templates/search.html "extra-css"). We read the ::before content of a hidden
+// element to extract the codepoint, then drop the element. The character is
+// drawn into the chart canvas via `font: { family: 'Keyrune' }`.
+const keyruneCharCache = new Map();
+function getKeyruneChar(code) {
+    if (!code) return '';
+    if (keyruneCharCache.has(code)) return keyruneCharCache.get(code);
+
+    var el = document.createElement('i');
+    el.className = 'ss ss-' + code;
+    el.style.position = 'absolute';
+    el.style.left = '-9999px';
+    el.style.visibility = 'hidden';
+    document.body.appendChild(el);
+    var content = window.getComputedStyle(el, '::before').content || '';
+    document.body.removeChild(el);
+
+    // Computed content is wrapped in quotes (and may be escaped as
+    // "\eXXX"). Strip the wrapper; the codepoint itself renders fine
+    // through the Keyrune font.
+    content = content.replace(/^['"](.*)['"]$/, '$1');
+    if (content === 'none') content = '';
+    keyruneCharCache.set(code, content);
+    return content;
+}
+
+function buildCheckpointAnnotations(checkpoints, chartRef) {
+    currentCheckpoints = Array.isArray(checkpoints) ? checkpoints : [];
+    var annotations = {};
+    if (currentCheckpoints.length === 0) return annotations;
+
+    var redraw = function () {
+        // Once an icon finishes loading, ask the chart to redraw so it
+        // appears without requiring user interaction.
+        var c = chartRef && chartRef.chart;
+        if (c) c.update('none');
+    };
+
+    // Force the Keyrune webfont binary to load. The CSS @font-face is
+    // declared in keyrune.css, but browsers defer the fetch until something
+    // visibly uses the font. Without this nudge, Chart.js draws the glyph's
+    // codepoint with a fallback font (no matching glyph → tofu) and we end up
+    // showing the set name as a text fallback.
+    var anyKeyrune = checkpoints.some(function (cp) { return cp.keyruneCode; });
+    if (anyKeyrune && document.fonts && document.fonts.load) {
+        document.fonts.load('16px Keyrune').then(function () {
+            keyruneCharCache.clear();
+            redraw();
+        }).catch(function () {});
+    }
+
+    // Group same-date checkpoints so we can stack them. Stack position is
+    // computed at draw time (not build time) — when the user toggles a type
+    // off, the remaining visible labels reflow back to the top of the chart
+    // instead of leaving holes where hidden items used to sit.
+    var sameDateGroups = {};
+    checkpoints.forEach(function (cp, i) {
+        if (!sameDateGroups[cp.date]) sameDateGroups[cp.date] = [];
+        sameDateGroups[cp.date].push(i);
+    });
+    var STACK_STEP_PX = 26;
+
+    checkpoints.forEach(function (cp, i) {
+        var palette = checkpointColors[cp.type] || { line: 'rgba(120,120,120,0.9)', label: 'rgba(120,120,120,0.9)' };
+
+        // Stack position within the same-date group, counting only currently
+        // visible siblings that appear before this one in the list. Hiding a
+        // type via its checkbox collapses the empty slot.
+        var yAdjustFn = function () {
+            var group = sameDateGroups[cp.date] || [i];
+            var visibleSlot = 0;
+            for (var j = 0; j < group.length; j++) {
+                if (group[j] === i) break;
+                var prev = checkpoints[group[j]];
+                if (visibleCheckpointTypes.has(checkpointToggleKey(prev.type))) {
+                    visibleSlot++;
+                }
+            }
+            return 2 + visibleSlot * STACK_STEP_PX;
+        };
+
+        // Scriptable so each draw re-evaluates: the first draw may fire
+        // before the Keyrune font is ready; subsequent draws (after font
+        // load triggers redraw above) pick up the real glyph character.
+        var contentFn = function () {
+            if (cp.keyruneCode) {
+                var ch = getKeyruneChar(cp.keyruneCode);
+                if (ch) return ch;
+            }
+            if (cp.iconUrl) return getCheckpointIcon(cp.iconUrl, redraw);
+            return cp.title;
+        };
+        var fontFn = function () {
+            if (cp.keyruneCode && getKeyruneChar(cp.keyruneCode)) {
+                return { family: 'Keyrune', size: 16, weight: 'normal' };
+            }
+            return { size: 10, weight: 'bold' };
+        };
+
+        annotations['cp_' + i] = {
+            type: 'line',
+            xMin: cp.date,
+            xMax: cp.date,
+            xScaleID: 'x',
+            borderColor: palette.line,
+            borderWidth: 1.5,
+            borderDash: [4, 4],
+            display: function () { return visibleCheckpointTypes.has(checkpointToggleKey(cp.type)); },
+            label: {
+                display: true,
+                // Render labels in a later draw phase than the lines so every
+                // line is painted first and the opaque labels cover the line
+                // segments behind them. This is what prevents lines from
+                // visually crossing through icons of same-date siblings.
+                drawTime: 'afterDraw',
+                content: contentFn,
+                position: 'end',
+                backgroundColor: palette.label,
+                color: '#ffffff',
+                borderRadius: 12,
+                padding: 4,
+                font: fontFn,
+                yAdjust: yAdjustFn,
+            },
+            enter: function (ctx) {
+                ctx.chart.canvas.style.cursor = cp.url ? 'pointer' : 'default';
+                return true;
+            },
+            leave: function (ctx) {
+                ctx.chart.canvas.style.cursor = 'default';
+                return true;
+            },
+            click: function () {
+                if (cp.url) window.open(cp.url, '_blank', 'noopener');
+            },
+        };
+    });
+
+    return annotations;
+}
+
+function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+}
+
+// Coalesce rapid toggles into a single update per frame. Without this, rapid
+// clicks racing with Chart.js's responsive ResizeObserver can compound layout
+// changes and grow the canvas continuously until the next idle moment.
+var pendingCheckpointUpdate = false;
+function toggleCheckpointType(type, on) {
+    if (on) visibleCheckpointTypes.add(type);
+    else visibleCheckpointTypes.delete(type);
+    persistCheckpointTypes();
+    if (pendingCheckpointUpdate) return;
+    pendingCheckpointUpdate = true;
+    requestAnimationFrame(function () {
+        pendingCheckpointUpdate = false;
+        if (window.cardChart) window.cardChart.update('none');
+    });
+}
+
+var CHECKPOINT_TYPES_KEY = 'chartCheckpointTypes';
+
+function persistCheckpointTypes() {
+    try {
+        localStorage.setItem(
+            CHECKPOINT_TYPES_KEY,
+            JSON.stringify(Array.from(visibleCheckpointTypes))
+        );
+    } catch (e) { /* localStorage unavailable; non-fatal */ }
+}
+
+// Restore previously-saved checkbox state and apply it to both the in-memory
+// set and the rendered DOM checkboxes. Safe to call before the chart exists
+// or on pages without the toggle UI. Call before buildCheckpointAnnotations so
+// the first draw reflects the saved state.
+function restoreCheckpointTypes() {
+    var raw;
+    try { raw = localStorage.getItem(CHECKPOINT_TYPES_KEY); }
+    catch (e) { return; }
+    if (!raw) return;
+
+    var saved;
+    try { saved = JSON.parse(raw); }
+    catch (e) { return; }
+    if (!Array.isArray(saved)) return;
+
+    visibleCheckpointTypes.clear();
+    saved.forEach(function (t) { visibleCheckpointTypes.add(t); });
+
+    [['ban', 'cpToggleBan'], ['release', 'cpToggleRelease'], ['reprint', 'cpToggleReprint']]
+        .forEach(function (pair) {
+            var el = document.getElementById(pair[1]);
+            if (el) el.checked = visibleCheckpointTypes.has(pair[0]);
+        });
+}
+
 
 function applySavedLegendState(chart, storageKey) {
     var raw = localStorage.getItem(storageKey);

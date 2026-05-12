@@ -14,6 +14,7 @@ type ChartAPIResponse struct {
 	MaxLookbackDays int               `json:"maxLookbackDays"`
 	AxisLabels      []string          `json:"axisLabels"`
 	Datasets        []ChartAPIDataset `json:"datasets"`
+	Checkpoints     []ChartCheckpoint `json:"checkpoints"`
 }
 
 type ChartAPIDataset struct {
@@ -80,6 +81,7 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 		MaxLookbackDays: maxDays,
 		AxisLabels:      axisLabels,
 		Datasets:        apiDatasets,
+		Checkpoints:     relevantCheckpoints(co.Name, earliest),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
