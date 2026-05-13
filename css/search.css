@@ -2314,4 +2314,17 @@
     .rows-index .price-row .price:nth-of-type(1) { grid-column: 2 / 4; }
     .rows-index .price-row .price:nth-of-type(2) { grid-column: 4 / 6; }
     .rows-index .price-row .price:nth-of-type(3) { grid-column: 6 / 8; }
+
+    /* Sealed INDEX header label row: each label spans the cur+amt pair of its column. */
+    .rows-index .price-row > .index-label {
+        text-align: center;
+        font-size: var(--text-xs);
+        font-weight: 700;
+        color: var(--search-text-dim);
+        white-space: nowrap;
+        line-height: 1.2;
+    }
+    .rows-index .price-row > .index-label-1 { grid-column: 2 / 4; }
+    .rows-index .price-row > .index-label-2 { grid-column: 4 / 6; }
+    .rows-index .price-row > .index-label-3 { grid-column: 6 / 8; }
 }
