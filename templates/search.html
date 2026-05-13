@@ -687,85 +687,116 @@
                                     {{if not $condsEntry}}
                                         <div class="no-offers"><i>No offers</i></div>
                                     {{end}}
+                                    {{/* Sealed INDEX rows live in their own grid scope so EV/Median/StdDev columns align among themselves. */}}
+                                    <div class="rows-index">
                                     {{range $conditions := $.CondKeys}}
-                                        {{$entries := (index $condsEntry $conditions)}}
-                                        {{if $entries}}
-                                            {{if and (eq $conditions "INDEX") $.IsSealed}}
-                                                <div class="price-row price-index-header">
-                                                    <span class="store-name" style="visibility:hidden">&nbsp;</span>
-                                                    <span class="price-right index-cols">
-                                                        <span class="price">EV</span>
-                                                        <span class="price">Sim (Median)</span>
-                                                        <span class="price">Sim (StdDev)</span>
-                                                    </span>
-                                                </div>
-                                            {{else if not (eq $conditions "INDEX")}}
-                                                <div class="price-cond-header">{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
-                                            {{end}}
-                                        {{end}}
-                                        {{range $entries}}
-                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
-                                                {{if .Locked}}
-                                                    <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
-                                                    <span class="locked-cta">
-                                                        <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
-                                                        {{range $ref, $id := $.PatreonIds}}
-                                                            <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
-                                                        {{end}}
-                                                    </span>
-                                                {{else if eq .URL ""}}
-                                                    <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
-                                                {{else}}
-                                                    <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                        {{if eq $conditions "INDEX"}}
+                                            {{$entries := (index $condsEntry $conditions)}}
+                                            {{if $entries}}
+                                                {{if $.IsSealed}}
+                                                    <div class="price-row price-index-header">
+                                                        <span class="store-name" style="visibility:hidden">&nbsp;</span>
+                                                        <span class="price-right index-cols">
+                                                            <span class="price">EV</span>
+                                                            <span class="price">Sim (Median)</span>
+                                                            <span class="price">Sim (StdDev)</span>
+                                                        </span>
+                                                    </div>
                                                 {{end}}
-                                                {{if not .Locked}}
-                                                {{if and (eq $conditions "INDEX") $.IsSealed}}
-                                                    <span class="price-right index-cols">
-                                                    <span class="price"><span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span></span>
-                                                    {{$iqr := 0.0}}{{if .Secondary}}{{$iqr = index .ExtraValues "iqr"}}{{end}}
-                                                    <span class="price{{if gt $iqr 150.0}} price-warn{{end}}" {{if gt $iqr 150.0}}title="High Simulation IQR: {{printf "%.2f" $iqr}}"{{end}}>
-                                                        {{if .Secondary}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span>
-                                                        {{else}}n/a{{end}}
-                                                    </span>
-                                                    <span class="price">
-                                                        {{if .Secondary}}
-                                                            {{$stdDev := index .ExtraValues "stdDev"}}
-                                                            {{if $stdDev}}<span class="cur">$</span><span class="amt">{{printf "%.2f" $stdDev}}</span>{{else}}n/a{{end}}
-                                                        {{else}}n/a{{end}}
-                                                    </span>
-                                                    </span>
-                                                {{else}}
-                                                    {{$priceWarn := false}}
-                                                    {{if eq .Shorthand "TCGDirect"}}
-                                                        {{$priceWarn = invalid_direct $cardId .Price}}
-                                                    {{end}}
-                                                    {{if .Secondary}}
-                                                    <span class="price-right has-secondary">
-                                                    {{else}}
-                                                    <span class="price-right">
-                                                    {{end}}
-                                                    <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
-                                                        {{if .Price}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
-                                                        {{else}}n/a
-                                                        {{end}}
-                                                    </span>
-                                                    {{if .Secondary}}
-                                                        <span class="secondary"><span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span></span>
-                                                    {{else}}
-                                                        <span class="qty" {{if eq .Shorthand "TCGDirect"}}id="qty-{{.Shorthand}}-{{$conditions}}-{{$cardId}}"{{end}}>
-                                                            {{if .BundleIcon}}
-                                                                <img style="padding-top:4px;" src="{{.BundleIcon}}">
-                                                            {{else if not .NoQuantity}}
-                                                                {{.Quantity}}
+                                            {{end}}
+                                            {{range $entries}}
+                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                                    {{if .Locked}}
+                                                        <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
+                                                        <span class="locked-cta">
+                                                            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                                            {{range $ref, $id := $.PatreonIds}}
+                                                                <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
                                                             {{end}}
                                                         </span>
+                                                    {{else if eq .URL ""}}
+                                                        <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                    {{else}}
+                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{end}}
-                                                    </span>
-                                                {{end}}
-                                                {{end}}
-                                            </div>
+                                                    {{if not .Locked}}
+                                                    {{if and (eq $conditions "INDEX") $.IsSealed}}
+                                                        <span class="price-right index-cols">
+                                                        <span class="price"><span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span></span>
+                                                        {{$iqr := 0.0}}{{if .Secondary}}{{$iqr = index .ExtraValues "iqr"}}{{end}}
+                                                        <span class="price{{if gt $iqr 150.0}} price-warn{{end}}" {{if gt $iqr 150.0}}title="High Simulation IQR: {{printf "%.2f" $iqr}}"{{end}}>
+                                                            {{if .Secondary}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span>
+                                                            {{else}}n/a{{end}}
+                                                        </span>
+                                                        <span class="price">
+                                                            {{if .Secondary}}
+                                                                {{$stdDev := index .ExtraValues "stdDev"}}
+                                                                {{if $stdDev}}<span class="cur">$</span><span class="amt">{{printf "%.2f" $stdDev}}</span>{{else}}n/a{{end}}
+                                                            {{else}}n/a{{end}}
+                                                        </span>
+                                                        </span>
+                                                    {{end}}
+                                                    {{end}}
+                                                </div>
+                                            {{end}}
                                         {{end}}
                                     {{end}}
+                                    </div>
+                                    <div class="rows-main">
+                                    {{range $conditions := $.CondKeys}}
+                                        {{if ne $conditions "INDEX"}}
+                                            {{$entries := (index $condsEntry $conditions)}}
+                                            {{if $entries}}
+                                                <div class="price-cond-header">{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
+                                            {{end}}
+                                            {{range $entries}}
+                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                                    {{if .Locked}}
+                                                        <span class="store-name dim">{{.ScraperName}} {{.Country}}</span>
+                                                        <span class="locked-cta">
+                                                            <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                                            {{range $ref, $id := $.PatreonIds}}
+                                                                <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                            {{end}}
+                                                        </span>
+                                                    {{else if eq .URL ""}}
+                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>
+                                                    {{else}}
+                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>
+                                                    {{end}}
+                                                    {{if not .Locked}}
+                                                        {{$priceWarn := false}}
+                                                        {{if eq .Shorthand "TCGDirect"}}
+                                                            {{$priceWarn = invalid_direct $cardId .Price}}
+                                                        {{end}}
+                                                        {{if .Secondary}}
+                                                        <span class="price-right has-secondary">
+                                                        {{else}}
+                                                        <span class="price-right">
+                                                        {{end}}
+                                                        <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
+                                                            {{if .Price}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
+                                                            {{else}}n/a
+                                                            {{end}}
+                                                        </span>
+                                                        {{if .Secondary}}
+                                                            <span class="secondary"><span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span></span>
+                                                        {{else}}
+                                                            <span class="qty" {{if eq .Shorthand "TCGDirect"}}id="qty-{{.Shorthand}}-{{$conditions}}-{{$cardId}}"{{end}}>
+                                                                {{if .BundleIcon}}
+                                                                    <img style="padding-top:4px;" src="{{.BundleIcon}}">
+                                                                {{else if not .NoQuantity}}
+                                                                    {{.Quantity}}
+                                                                {{end}}
+                                                            </span>
+                                                        {{end}}
+                                                        </span>
+                                                    {{end}}
+                                                </div>
+                                            {{end}}
+                                        {{end}}
+                                    {{end}}
+                                    </div>
                                 </div>
                                 <!-- Buyers column -->
                                 <div class="result-col">
