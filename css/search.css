@@ -802,6 +802,14 @@
 }
 .price-row:hover { background: var(--search-row-hover); }
 
+/* Alternating row background within each .rows-main / .rows-index scope.
+   :where() wraps drop specificity to a single class so :hover (2 classes)
+   beats it automatically, and :price-row-locked (declared below) wins via
+   cascade order at equal specificity. */
+:where(.rows-main, .rows-index) > .price-row:where(:nth-child(even of .price-row)) {
+    background: var(--row-odd);
+}
+
 .price-row-locked {
     background: var(--search-surface-2);
     opacity: 0.7;
