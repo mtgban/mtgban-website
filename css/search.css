@@ -2271,45 +2271,35 @@
         justify-self: end;
     }
 
-    /* Dissolve the legacy .price-right wrapper so its children flow into the
-       row's subgrid. Keeps the class in the DOM (no template churn) while
-       removing its grid box. */
+    /* .price-right participates in the row's subgrid as a single grid item
+       spanning all remaining tracks, then becomes a subgrid itself so its
+       descendants (.price, .secondary, .buylist-extra, .qty) land in the
+       column tracks shared across all rows in the scope. Avoids
+       display: contents because the subgrid chain through display: contents
+       does not reliably preserve track sharing in current browsers. */
     .price-row > .price-right {
-        display: contents;
-    }
-
-    /* .price spans the 'cur' and 'amt' tracks (columns 2-3). */
-    .price-row .price {
         display: grid;
         grid-template-columns: subgrid;
-        grid-column: 2 / 4;
+        grid-column: 2 / -1;
+        align-items: center;
+        gap: 0 4px;
     }
 
-    /* .secondary (sellers with Low+Market) spans tracks 4-5. */
-    .price-row .secondary {
+    /* .price and .secondary are nested subgrids spanning 2 tracks (cur + amt). */
+    .price-right > .price,
+    .price-right > .secondary {
         display: grid;
         grid-template-columns: subgrid;
-        grid-column: 4 / 6;
+        grid-column: span 2;
     }
 
-    /* When a row has no secondary, qty centers across tracks 4-5 (sellers) or
-       sits in track 5 (buyers, where buylist-extra is in track 4). */
+    /* Sellers without a secondary: qty centers across the trailing 2 tracks. */
     .price-right:not(.has-secondary):not(.has-buylist-extra) > .qty {
-        grid-column: 4 / 6;
-    }
-    .price-right.has-buylist-extra > .buylist-extra {
-        grid-column: 4;
-    }
-    .price-right.has-buylist-extra > .qty {
-        grid-column: 5;
+        grid-column: span 2;
     }
 
-    /* Sealed INDEX: three .price pairs across 7 tracks. Each .price spans 2
-       cells. Use descendant combinator (not >) because .price-right is
-       display: contents above and the child combinator does not pierce it. */
-    .rows-index .price-row .price:nth-of-type(1) { grid-column: 2 / 4; }
-    .rows-index .price-row .price:nth-of-type(2) { grid-column: 4 / 6; }
-    .rows-index .price-row .price:nth-of-type(3) { grid-column: 6 / 8; }
+    /* Buyers (.has-buylist-extra): .price (span 2) + .buylist-extra (1) + .qty (1)
+       auto-place sequentially in 4 sub-tracks; no explicit grid-column needed. */
 
     /* Sealed INDEX header label row: each label spans the cur+amt pair of its column. */
     .rows-index .price-row > .index-label {
