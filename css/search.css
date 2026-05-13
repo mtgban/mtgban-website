@@ -2282,7 +2282,7 @@
         grid-template-columns: subgrid;
         grid-column: 2 / -1;
         align-items: center;
-        gap: 0 0.6em;
+        gap: 0 1.5em;
     }
 
     /* .price and .secondary are nested subgrids spanning 2 tracks (cur + amt). */
