@@ -2235,3 +2235,83 @@
 .fav-sort-pill svg { width: 16px; height: 16px; }
 .fav-sort-pill .fav-sort-dir.asc { color: #22c55e; }
 .fav-sort-pill .fav-sort-dir.desc { color: #ef4444; }
+
+/* -- Subgrid alignment for price columns --
+   Aligns $ glyphs vertically within each .result-col by sharing track widths
+   across all .price-row elements. Older browsers fall through to legacy
+   .price-right rules above. */
+@supports (grid-template-columns: subgrid) {
+
+    /* Two grid scopes per .result-col: sealed INDEX rows above, regular rows below.
+       Each scope sizes its 'cur' and 'amt' tracks to the widest content. */
+    .rows-main {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto auto;
+    }
+    .rows-index {
+        display: grid;
+        grid-template-columns: 1fr auto auto auto auto auto auto;
+    }
+    /* Empty .rows-index (non-sealed cards) collapses to zero height. */
+    .rows-index:empty {
+        display: none;
+    }
+
+    /* Each row participates in the parent grid via subgrid. */
+    .rows-main > .price-row,
+    .rows-index > .price-row {
+        display: grid;
+        grid-template-columns: subgrid;
+        grid-column: 1 / -1;
+        align-items: center;
+    }
+
+    /* Headers and full-width content span all tracks. */
+    .rows-main > .price-cond-header {
+        grid-column: 1 / -1;
+    }
+    .price-row > .locked-cta {
+        grid-column: 2 / -1;
+        justify-self: end;
+    }
+
+    /* Dissolve the legacy .price-right wrapper so its children flow into the
+       row's subgrid. Keeps the class in the DOM (no template churn) while
+       removing its grid box. */
+    .price-row > .price-right {
+        display: contents;
+    }
+
+    /* .price spans the 'cur' and 'amt' tracks (columns 2-3). */
+    .price-row .price {
+        display: grid;
+        grid-template-columns: subgrid;
+        grid-column: 2 / 4;
+    }
+
+    /* .secondary (sellers with Low+Market) spans tracks 4-5. */
+    .price-row .secondary {
+        display: grid;
+        grid-template-columns: subgrid;
+        grid-column: 4 / 6;
+    }
+
+    /* When a row has no secondary, qty centers across tracks 4-5 (sellers) or
+       sits in track 5 (buyers, where buylist-extra is in track 4). */
+    .price-right:not(.has-secondary):not(.has-buylist-extra) > .qty {
+        grid-column: 4 / 6;
+    }
+    .price-right.has-buylist-extra > .buylist-extra {
+        grid-column: 4;
+    }
+    .price-right.has-buylist-extra > .qty {
+        grid-column: 5;
+    }
+
+    /* Sealed INDEX: three .price pairs across 7 tracks. Each .price spans 2
+       cells. Use descendant combinator (not >) because .price-right is
+       display: contents above and the child combinator does not pierce it. */
+    .rows-index .price-row .price:nth-of-type(1) { grid-column: 2 / 4; }
+    .rows-index .price-row .price:nth-of-type(2) { grid-column: 4 / 6; }
+    .rows-index .price-row .price:nth-of-type(3) { grid-column: 6 / 8; }
+}
