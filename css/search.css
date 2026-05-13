@@ -1466,10 +1466,6 @@
     .price-row .price { font-size: var(--text-md); }
     .price-row .qty { font-size: var(--text-sm); }
     .price-row .secondary { font-size: var(--text-md); }
-    .price-right { grid-template-columns: 6em 4em; }
-    .price-right.has-secondary { grid-template-columns: 6em 6em; }
-    .price-right.has-buylist-extra { grid-template-columns: 6em 4em 2.5em; }
-    .price-right.index-cols { grid-template-columns: 5em 5em 5em; }
 
     /* Result headers: tighter */
     .result-card-name { font-size: var(--text-lg); }
