@@ -694,10 +694,10 @@
                                     {{if not $condsEntry}}
                                         <div class="no-offers"><i>No offers</i></div>
                                     {{end}}
-                                    {{/* Sealed INDEX rows live in their own grid scope so EV/Median/StdDev columns align among themselves. */}}
+                                    {{/* Sealed INDEX rows live in their own grid scope so EV/Median/StdDev columns align among themselves. Singles INDEX rows (TCG Direct Low, TCG Low/Market) flow through rows-main with the regular row shape. */}}
                                     <div class="rows-index">
                                     {{range $conditions := $.CondKeys}}
-                                        {{if eq $conditions "INDEX"}}
+                                        {{if and (eq $conditions "INDEX") $.IsSealed}}
                                             {{$entries := (index $condsEntry $conditions)}}
                                             {{if $entries}}
                                                 {{if $.IsSealed}}
@@ -749,15 +749,15 @@
                                     </div>
                                     <div class="rows-main">
                                     {{range $conditions := $.CondKeys}}
-                                        {{if ne $conditions "INDEX"}}
+                                        {{if not (and (eq $conditions "INDEX") $.IsSealed)}}
                                             {{$entries := (index $condsEntry $conditions)}}
-                                            {{if $entries}}
+                                            {{if and $entries (ne $conditions "INDEX")}}
                                                 <div class="price-cond-header">{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
                                             {{end}}
                                             {{range $entries}}
                                                 <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
                                                     {{if .Locked}}
-                                                        <span class="store-name dim">{{.ScraperName}} {{.Country}}</span>
+                                                        <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                         <span class="locked-cta">
                                                             <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                                             {{range $ref, $id := $.PatreonIds}}
@@ -765,9 +765,9 @@
                                                             {{end}}
                                                         </span>
                                                     {{else if eq .URL ""}}
-                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}</a>
+                                                        <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{else}}
-                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}</a>
+                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{end}}
                                                     {{if not .Locked}}
                                                         {{$priceWarn := false}}
