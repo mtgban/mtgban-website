@@ -782,6 +782,7 @@
                                             {{end}}
                                         {{end}}
                                     {{end}}
+                                    <div class="rows-main">
                                     {{range $conditions := $.CondKeys}}
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if ne $conditions "INDEX"}}
@@ -832,6 +833,7 @@
                                             </div>
                                         {{end}}
                                     {{end}}
+                                    </div>
                                 </div>
                             </div>
                             <!-- Last sold placeholder (feature currently disabled) -->
