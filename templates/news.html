@@ -21,6 +21,7 @@
 {{if ne .Subtitle ""}}
 <script src="https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js"></script>
 <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
+<script type="text/javascript" src="/js/edition-combobox.js?hash={{.Hash}}"></script>
 <script>
     var t = document.getElementById('newsTable');
     if (t) new Tablesort(t);
@@ -131,14 +132,16 @@
                     {{end}}
                 </select>
 
-                <select name="filter" onchange="this.form.submit()" style="min-width:180px;">
-                    {{if eq "" $.FilterSet}}
-                        <option value="" disabled selected hidden>Edition...</option>
-                    {{end}}
-                    {{range .Editions}}
-                        <option value="{{.}}" {{if and (not (eq . "")) (eq . $.FilterSet)}}selected{{end}}>{{.}}</option>
-                    {{end}}
-                </select>
+                <div class="edition-combobox autocomplete" role="combobox" aria-haspopup="listbox" aria-expanded="false">
+                    <input type="text" class="edition-combobox-display" data-role="display" placeholder="Edition..." autocomplete="off" value="{{$.FilterSet}}">
+                    <button type="button" class="edition-combobox-clear" data-role="clear" aria-label="Clear edition filter" hidden>&times;</button>
+                    <input type="hidden" name="filter" data-role="hidden" value="{{$.FilterSet}}">
+                    <div class="autocomplete-items" role="listbox">
+                        {{range .Editions}}
+                            <div data-name="{{.}}" role="option">{{.}}</div>
+                        {{end}}
+                    </div>
+                </div>
 
                 <select name="rarity" onchange="this.form.submit()" style="width:52px; text-align:center;">
                     {{if eq "" $.FilterRarity}}
