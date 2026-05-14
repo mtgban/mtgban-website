@@ -608,10 +608,7 @@
     .news-upload-btn { width: 100%; text-align: center; }
 }
 
-/* -- Edition combobox (replaces native <select name="filter">) --
-   The selector intentionally includes .news-filter-bar input.edition-combobox-display
-   to outrank .news-filter-bar input[type="text"] above, which forces width: 58px
-   for the Min %/Max % inputs. */
+/* -- Edition combobox -- */
 .edition-combobox {
     position: relative;
     width: 320px;
