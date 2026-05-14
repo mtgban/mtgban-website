@@ -98,23 +98,23 @@ html { font-size: 17px; }
     --content-padding-top: calc(var(--nav-height) + 2vh);
 
     /* ── Font Size Scale ── */
-    --text-2xs:  0.5625rem; /* 9px  */
-    --text-xs:   0.625rem;  /* 10px */
-    --text-sm:   0.6875rem; /* 11px */
-    --text-base: 0.75rem;   /* 12px */
-    --text-md:   0.8125rem; /* 13px */
-    --text-lg:   0.875rem;  /* 14px */
-    --text-xl:   0.9375rem; /* 15px */
-    --text-2xl:  1rem;      /* 16px */
-    --text-3xl:  1.0625rem; /* 17px */
-    --text-4xl:  1.125rem;  /* 18px */
-    --text-5xl:  1.1875rem; /* 19px */
-    --text-6xl:  1.25rem;   /* 20px */
-    --text-7xl:  1.375rem;  /* 22px */
-    --text-8xl:  1.5rem;    /* 24px */
-    --text-9xl:  1.625rem;  /* 26px */
-    --text-10xl: 1.75rem;   /* 28px */
-    --text-11xl: 2rem;      /* 32px */
+    --text-2xs:  0.625rem;  /* ~10px */
+    --text-xs:   0.6875rem; /* ~11px */
+    --text-sm:   0.75rem;   /* ~12px */
+    --text-base: 0.825rem;  /* ~13px */
+    --text-md:   0.895rem;  /* ~14px */
+    --text-lg:   0.9625rem; /* ~15px */
+    --text-xl:   1.03rem;   /* ~16px */
+    --text-2xl:  1.1rem;    /* ~18px */
+    --text-3xl:  1.17rem;   /* ~19px */
+    --text-4xl:  1.2375rem; /* ~20px */
+    --text-5xl:  1.3rem;    /* ~21px */
+    --text-6xl:  1.375rem;  /* ~22px */
+    --text-7xl:  1.5125rem; /* ~24px */
+    --text-8xl:  1.65rem;   /* ~26px */
+    --text-9xl:  1.7875rem; /* ~29px */
+    --text-10xl: 1.925rem;  /* ~31px */
+    --text-11xl: 2.2rem;    /* ~35px */
 
     --tier-s: #ff7f7f;
     --tier-a: #ffbf7f;
