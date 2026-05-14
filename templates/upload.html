@@ -145,6 +145,7 @@
                             add('margin',         getCookie('UploadMargin')        || '10');
                             add('custompercmax',  getCookie('UploadCustomPercMax') || '100');
                             add('multiplier',     getCookie('UploadMultiplier')    || '1');
+                            add('maxqty',         getCookie('UploadMaxQty')        || '0');
                             add('sorting',        getCookie('UploadSorting')       || '');
                             add('altPrice',       getCookie('UploadAltPrice')      || '');
                             add('pricesource',    getCookie('UploadPriceSource')   || '');
@@ -889,6 +890,7 @@
             margin: 'UploadMargin',
             custompercmax: 'UploadCustomPercMax',
             multiplier: 'UploadMultiplier',
+            maxqty: 'UploadMaxQty',
             sorting: 'UploadSorting',
             altPrice: 'UploadAltPrice',
             pricesource: 'UploadPriceSource',
@@ -981,6 +983,16 @@
         form.target = newWindow ? '_blank' : '';
         form.submit();
     }
+
+    // Re-process results with current settings (called by settings save)
+    window.reprocessUploadResults = function() {
+        ensureHashesLoaded();
+        syncUploadOptionsFromSettings();
+        resExportFields.forEach(function(id) {
+            document.getElementById(id).value = "";
+        });
+        document.getElementById("upload_form").submit();
+    };
     </script>
 
     <!-- Reload button (hidden until a pick or remove is made) -->
@@ -1220,6 +1232,10 @@
             <label class="settings-field-row">
                 <span>Quantity multiplier</span>
                 <input type="text" id="opt-multiplier" value="1" class="settings-inline-num">
+            </label>
+            <label class="settings-field-row">
+                <span>Max quantity per card</span>
+                <input type="text" id="opt-maxqty" value="0" class="settings-inline-num">
             </label>
         </div>
     </div>
