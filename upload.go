@@ -271,6 +271,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		multiplier = customMultiplier
 	}
 
+	// Cap each card's quantity to this maximum (0 = no cap)
+	maxQty := 0
+	customMaxQty, err := strconv.Atoi(r.FormValue("maxqty"))
+	if err == nil && customMaxQty > 0 {
+		maxQty = customMaxQty
+	}
+
 	// Set flags needed to show elements on the page ui
 	pageVars.IsBuylist = blMode
 	pageVars.CanBuylist = canBuylist
@@ -491,7 +498,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
-			qty *= multiplier
+			qty = adjustQty(qty, multiplier, maxQty)
 
 			items = append(items, cardconduit.Item{
 				ScryfallID: scryfallId,
@@ -542,7 +549,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
-			qty *= multiplier
+			qty = adjustQty(qty, multiplier, maxQty)
 
 			ids = append(ids, uploadedData[i].CardId)
 			qtys = append(qtys, fmt.Sprintf("%d", qty))
@@ -738,7 +745,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
-			indexPrice *= float64(qty * multiplier)
+			indexPrice *= float64(adjustQty(qty, multiplier, maxQty))
 			pageVars.TotalEntries[indexKey] += indexPrice
 		}
 
@@ -747,7 +754,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if uploadedData[i].HasQuantity {
 			qty = uploadedData[i].Quantity
 		}
-		pageVars.TotalQuantity += qty * multiplier
+		pageVars.TotalQuantity += adjustQty(qty, multiplier, maxQty)
 
 		// Run summaries for each vendor
 		for shorthand, banPrice := range results[cardId] {
@@ -782,7 +789,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
-			price *= float64(qty * multiplier)
+			price *= float64(adjustQty(qty, multiplier, maxQty))
 
 			// Add to totals (unless it was an index, since it was already added)
 			_, found := indexResults[cardId][shorthand]
@@ -808,7 +815,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			if uploadedData[i].HasQuantity {
 				qty = uploadedData[i].Quantity
 			}
-			qty *= multiplier
+			qty = adjustQty(qty, multiplier, maxQty)
 
 			conds := uploadedData[i].OriginalCondition
 			if skipConds {
@@ -1012,6 +1019,15 @@ func getQuantity(qty string) (int, error) {
 	qty = strings.TrimSuffix(qty, "x")
 	qty = strings.TrimSpace(qty)
 	return strconv.Atoi(qty)
+}
+
+// Apply multiplier and max cap to a quantity
+func adjustQty(qty, multiplier, maxQty int) int {
+	qty *= multiplier
+	if maxQty > 0 && qty > maxQty {
+		qty = maxQty
+	}
+	return qty
 }
 
 func mergeIdenticalEntries(uploadedData []UploadEntry) []UploadEntry {

@@ -52,6 +52,7 @@
                 'opt-margin': 'UploadMargin',
                 'opt-custompercmax': 'UploadCustomPercMax',
                 'opt-multiplier': 'UploadMultiplier',
+                'opt-maxqty': 'UploadMaxQty',
             },
         },
     };
@@ -311,7 +312,12 @@
         if (!hasBindings()) { closeModal(); return; }
         saveAll();
         try { sessionStorage.setItem('settingsSavedToast', '1'); } catch (e) {}
-        window.location.reload();
+        // Re-process upload results with new settings if available
+        if (typeof window.reprocessUploadResults === 'function') {
+            window.reprocessUploadResults();
+        } else {
+            window.location.reload();
+        }
     }
 
     function showSavedToast() {
