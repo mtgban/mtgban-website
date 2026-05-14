@@ -2265,17 +2265,12 @@
 /* -- Subgrid alignment for price columns -- */
 @supports (grid-template-columns: subgrid) {
 
-    .rows-main {
-        display: grid;
-        grid-template-columns: 1fr auto auto auto auto;
-    }
+    .rows-main,
     .rows-index {
         display: grid;
-        grid-template-columns: 1fr auto auto auto auto auto auto;
+        grid-template-columns: 1fr auto auto auto;
     }
-    .rows-index:empty {
-        display: none;
-    }
+    .rows-index:empty { display: none; }
 
     .rows-main > .price-row,
     .rows-index > .price-row {
@@ -2285,13 +2280,8 @@
         align-items: center;
     }
 
-    .rows-main > .price-cond-header {
-        grid-column: 1 / -1;
-    }
-    .price-row > .locked-cta {
-        grid-column: 2 / -1;
-        justify-self: end;
-    }
+    .rows-main > .price-cond-header { grid-column: 1 / -1; }
+    .price-row > .locked-cta { grid-column: 2 / -1; justify-self: end; }
 
     .price-row > .price-right {
         display: grid;
@@ -2301,16 +2291,7 @@
         gap: 0 1.5em;
     }
 
-    .price-right > .price,
-    .price-right > .secondary {
-        display: grid;
-        grid-template-columns: subgrid;
-        grid-column: span 2;
-    }
-
-    .price-right:not(.has-secondary):not(.has-buylist-extra) > .qty {
-        grid-column: span 2;
-    }
+    .price-right > .secondary { justify-self: end; }
 
     /* Sealed INDEX header label row. */
     .rows-index .price-row > .index-label {
@@ -2321,7 +2302,7 @@
         white-space: nowrap;
         line-height: 1.2;
     }
-    .rows-index .price-row > .index-label-1 { grid-column: 2 / 4; }
-    .rows-index .price-row > .index-label-2 { grid-column: 4 / 6; }
-    .rows-index .price-row > .index-label-3 { grid-column: 6 / 8; }
+    .rows-index .price-row > .index-label-1 { grid-column: 2; }
+    .rows-index .price-row > .index-label-2 { grid-column: 3; }
+    .rows-index .price-row > .index-label-3 { grid-column: 4; }
 }
