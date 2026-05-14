@@ -1,9 +1,4 @@
-/*
- * Edition combobox: typeahead replacement for the newspaper page's edition <select>.
- * Substring match (case-insensitive). Open on focus, filter as you type,
- * arrow keys + Enter to pick, Esc to close, x to clear.
- * Selecting an item writes to the hidden input named "filter" and submits the form.
- */
+// Edition combobox: typeahead replacement for the newspaper page's edition select.
 (function () {
     'use strict';
 
