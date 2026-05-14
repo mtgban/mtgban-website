@@ -803,11 +803,13 @@
 .price-row:hover { background: var(--search-row-hover); }
 
 /* Alternating row background within each .rows-main / .rows-index scope.
+   Uses --search-surface-1 (identical to --row-odd in dark theme but more
+   contrasted than --row-odd in light theme).
    :where() wraps drop specificity to a single class so :hover (2 classes)
    beats it automatically, and :price-row-locked (declared below) wins via
    cascade order at equal specificity. */
 :where(.rows-main, .rows-index) > .price-row:where(:nth-child(even of .price-row)) {
-    background: var(--row-odd);
+    background: var(--search-surface-1);
 }
 
 .price-row-locked {
