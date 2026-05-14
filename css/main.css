@@ -315,11 +315,6 @@ td.setValue {
     white-space: nowrap;
 }
 
-td.fullAnchor a {
-    display: block;
-    width: 100%;
-}
-
 td img {
     vertical-align: top;
 }
@@ -340,10 +335,6 @@ p {
     color: var(--normaltext);
     margin-left: 20px;
     margin-bottom: 20px;
-}
-
-.buildcart {
-    float: left;
 }
 
 .btn {
@@ -607,43 +598,6 @@ a.pagination {
   height: 48px;
 }
 
-/* Style the dropdown content (hidden by default) */
-.dropdown-content {
-  display: none;
-  position: absolute;
-  background-color: var(--headerbackground);
-  min-width: 160px;
-  box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-  z-index: 99;
-}
-
-/* Style the links inside the dropdown */
-.dropdown-content a {
-  float: none;
-  color: var(--activetext);
-  padding: 12px 16px;
-  text-decoration: none;
-  display: block;
-  text-align: left;
-}
-
-/* Add a dark background on topnav links and the dropdown button on hover */
-.nav a:hover, .dropdown:hover .dropbtn {
-  background-color: var(--tralternatebase);
-  color: var(--activetext);
-}
-
-/* Add a grey background to dropdown links on hover */
-.dropdown-content a:hover {
-  background-color: #ddd;
-  color: black;
-}
-
-/* Show the dropdown menu when the user moves the mouse over the dropdown button */
-.dropdown:hover .dropdown-content {
-  display: block;
-}
-
 .active {
     background-color: var(--background);
     color: var(--activetext);
@@ -677,10 +631,6 @@ a.selected:hover{
     background-repeat: no-repeat;
     background-color: var(--background);
 }
-.mainbody{
-    padding-top: 75px;
-}
-
 /* ═══ Base template layout ═══ */
 .page-content {
     padding-top: 75px;
@@ -851,51 +801,8 @@ a.selected:hover{
     margin-left: 20px;
 }
 
-/* from https://www.w3schools.com/w3css/4/w3.css */
-.w3-input{
-    padding: 8px;
-    display: block;
-    border: none;
-    border-bottom: 1px solid #ccc;
-    width: 100%;
-}
 .search-input{
     font-size: var(--text-2xl);
-}
-
-.w3-border-0{
-    border: 0!important
-}
-
-.w3-border{
-    border: 1px solid #ccc!important
-}
-.w3-round-small{
-    border-radius: 2px
-}
-.w3-round,
-.w3-round-medium{
-    border-radius: 4px
-}
-.w3-round-large{
-    border-radius: 8px
-}
-.w3-round-xlarge{
-    border-radius: 16px
-}
-.w3-round-xxlarge{
-    border-radius: 32px
-}
-
-.w3-animate-input{
-    transition:width 0.4s ease-in-out
-}
-.w3-animate-input:focus{
-    width: 100%!important
-}
-@media (prefers-reduced-motion: reduce) { .w3-animate-input {
-        transition: none;
-    }
 }
 
 .search {
@@ -910,37 +817,7 @@ a.selected:hover{
     z-index: 2;
 }
 
-th.stickyCategory {
-    position: -webkit-sticky;
-    position: sticky;
-    top: var(--nav-height);
-    background-color: var(--background);
-}
 
-th.stickyHeader {
-    position: -webkit-sticky;
-    position: sticky;
-    top: 84px;
-    background-color: var(--headerbackground);
-    height: 40px;
-    z-index: 1;
-}
-
-th.stickyHeaderTiny {
-    position: -webkit-sticky;
-    position: sticky;
-    top: 72px;
-    background-color: var(--headerbackground);
-    z-index: 1;
-}
-
-th.stickyHeaderShort {
-    position: -webkit-sticky;
-    position: sticky;
-    top: var(--nav-height);
-    background-color: var(--headerbackground);
-    z-index: 1;
-}
 
 th a {
     color: var(--normal);
@@ -1016,10 +893,6 @@ pre {
   white-space: pre;
 }
 
-h3.storename {
-    color: var(--ainfo);
-    display: inline;
-}
 .anchor{
     display: block;
     position: relative;
@@ -1054,52 +927,6 @@ td.tiers {
     margin: auto;
     color: #000000;
 }
-
-.input-css {
-    display: inline;
-    border: 1px solid #aaa;
-    border-radius: .2em;
-    color: var(--headingtext);
-    background-color: var(--tralternate);
-    font-size: var(--text-2xl);
-    font-weight: 700;
-    padding: .6em 0em .5em 1em;
-}
-
-.select-css {
-    display: inline;
-    font-size: var(--text-2xl);
-    font-weight: 700;
-    color: var(--headingtext);
-    line-height: 1.3;
-    padding: .6em 0em .5em 0em;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    border: 1px solid #aaa;
-    border-radius: .2em;
-    -moz-appearance: none;
-    -webkit-appearance: none;
-    appearance: none;
-    background-color: var(--tralternate);
-}
-.select-css::-ms-expand {
-    display: none;
-}
-.select-css:hover {
-    border-color: #888;
-}
-.select-css:focus {
-    border-color: #aaa;
-    color: var(--headingtext);
-
-    outline: none;
-}
-
-.select-css option {
-    font-weight: normal;
-}
-
 
 .arrow {
   border: solid var(--normal);
@@ -1154,15 +981,7 @@ th nobr {
   }
 }
 
-.h6inline {
-  display: inline;
-  font-size: .67em;
-  margin-top: 2.33em;
-  margin-bottom: 2.33em;
-  margin-left: 0;
-  margin-right: 0;
-  font-weight: bold;
-}
+
 
 .small-hidden-text {
   color: transparent;
@@ -1173,16 +992,6 @@ th nobr {
   pointer-events: none;
   width: 146px; /* Size of the small img */
   white-space: normal;
-}
-
-div.stores-select {
-    width: 180px;
-    height: 242px;
-    text-align: left;
-    border: 1px solid var(--normal);
-    padding: 5px;
-    resize: both;
-    overflow: auto;
 }
 
 /* Sortable table headers (tablesort library) */
@@ -1287,127 +1096,6 @@ table.tiers td div {
 }
 
 /* Upload results table */
-.upload-card-cell {
-    text-align: center;
-    vertical-align: middle;
-}
-
-.upload-card-cell img {
-    border-radius: 6px;
-}
-
-.upload-info-table {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.upload-info-table tr {
-    background-color: transparent;
-}
-
-.upload-price-grid {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.upload-price-grid tr {
-    background-color: transparent;
-}
-
-.upload-price-grid td {
-    border: 1px solid var(--line);
-    min-width: 50px;
-}
-
-.upload-price-grid h4 {
-    text-align: center;
-}
-
-.upload-price-grid h6 {
-    text-align: center;
-}
-
-.upload-alias-row td {
-    border: 1px solid var(--line);
-    min-width: 50px;
-}
-
-.upload-index-cell {
-    vertical-align: top;
-}
-
-.upload-totals-row {
-    background-color: var(--tralternatebase);
-}
-
-.upload-totals-cell {
-    text-align: center;
-}
-
-.upload-totals-table {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-}
-
-.upload-totals-table tr {
-    background-color: transparent;
-}
-
-.upload-totals-table td {
-    border: 1px solid var(--line);
-    min-width: 50px;
-}
-
-.data-table-wrap {
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    overflow-x: auto;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: var(--text-md);
-}
-
-.data-table th {
-    padding: 8px 12px;
-    font-size: var(--text-xs);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-dim);
-    background: var(--surface-2);
-    border-bottom: 2px solid var(--border-subtle);
-    text-align: left;
-    white-space: nowrap;
-}
-
-.data-table th.c { text-align: center; }
-.data-table th.r { text-align: right; }
-
-.data-table td {
-    padding: 7px 12px;
-    border-bottom: 1px solid var(--border-subtle);
-    vertical-align: middle;
-}
-
-.data-table tbody tr:nth-child(even) { background: var(--row-even); }
-.data-table tbody tr:nth-child(odd) { background: var(--row-odd); }
-.data-table tbody tr:hover { background: var(--row-hover); }
-
-.data-table a {
-    color: var(--ainfo);
-    text-decoration: none;
-    font-weight: 500;
-}
-
-.data-table a:hover { text-decoration: underline; }
-
 .label-caps {
     font-size: var(--text-xs);
     font-weight: 700;
@@ -1637,7 +1325,6 @@ table.tiers td div {
     }
 
     .page-content { padding-top: 56px; }
-    .mainbody { padding-top: 56px; }
 
     /* Legacy table overflow fixes */
     table.searchResults { float: none; min-width: 0; width: 100%; }
