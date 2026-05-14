@@ -905,8 +905,8 @@
     font-family: var(--font-mono);
     font-size: var(--text-lg);
     color: var(--search-text-dim);
-    text-align: center;
-    justify-self: center;
+    text-align: right;
+    justify-self: end;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
