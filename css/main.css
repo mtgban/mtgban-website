@@ -247,11 +247,18 @@ html { font-size: 17px; }
     --row-hover: #252930;
 }
 
+/* Flag emoji polyfill for Chromium on Windows (no native flag glyphs). */
+@font-face {
+    font-family: 'Twemoji Country Flags';
+    unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E007F;
+    src: url('https://cdn.jsdelivr.net/npm/country-flag-emoji-polyfill@0.1/dist/TwemojiCountryFlags.woff2') format('woff2');
+}
+
 /* reset all margins and padding*/
 * {
     margin: 0;
     padding: 0;
-    font-family: 'Geist', sans-serif;
+    font-family: 'Geist', 'Twemoji Country Flags', sans-serif;
 }
 
 body {
