@@ -246,24 +246,24 @@ func getTreeEditions() ([]string, map[string][]EditionEntry) {
 	}
 
 	// Sort main list by date
-	sort.Slice(sortedEditions, func(i, j int) bool {
+	sort.SliceStable(sortedEditions, func(i, j int) bool {
 		// Sort by name in case date is the same
 		if listEditions[sortedEditions[i]][0].Date == listEditions[sortedEditions[j]][0].Date {
-			return listEditions[sortedEditions[i]][0].Name < listEditions[sortedEditions[j]][0].Name
+			return strings.ToLower(listEditions[sortedEditions[i]][0].Name) < strings.ToLower(listEditions[sortedEditions[j]][0].Name)
 		}
 		return listEditions[sortedEditions[i]][0].Date.After(listEditions[sortedEditions[j]][0].Date)
 	})
 
 	// Sort sublists by date
 	for _, key := range sortedEditions {
-		sort.Slice(listEditions[key], func(i, j int) bool {
+		sort.SliceStable(listEditions[key], func(i, j int) bool {
 			// Keep the first element always first
 			if j == 0 {
 				return false
 			}
 			// Sort by name in case date is the same
 			if listEditions[key][i].Date == listEditions[key][j].Date {
-				return listEditions[key][i].Name < listEditions[key][j].Name
+				return strings.ToLower(listEditions[key][i].Name) < strings.ToLower(listEditions[key][j].Name)
 			}
 			return listEditions[key][i].Date.After(listEditions[key][j].Date)
 		})
