@@ -607,3 +607,48 @@
     /* Upload button full width */
     .news-upload-btn { width: 100%; text-align: center; }
 }
+
+/* -- Edition combobox (replaces native <select name="filter">) --
+   The selector intentionally includes .news-filter-bar input.edition-combobox-display
+   to outrank .news-filter-bar input[type="text"] above, which forces width: 58px
+   for the Min %/Max % inputs. */
+.edition-combobox {
+    position: relative;
+    width: 320px;
+}
+.news-filter-bar input.edition-combobox-display {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 26px 6px 10px;
+    background: var(--surface-2);
+    color: var(--normal);
+    border: 1px solid var(--border-moderate);
+    border-radius: 5px;
+    font-size: var(--text-base);
+    font-family: inherit;
+    text-align: left;
+    line-height: 1.4;
+    outline: none;
+    transition: border-color 0.12s;
+}
+.news-filter-bar input.edition-combobox-display:focus { border-color: var(--ainfo); }
+.news-filter-bar input.edition-combobox-display::placeholder { color: var(--text-dim); }
+.edition-combobox.is-open .edition-combobox-display { border-radius: 5px 5px 0 0; }
+.edition-combobox-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--greytext, #8b9098);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+}
+.edition-combobox-clear:hover { color: var(--normal); }
+.edition-combobox .autocomplete-items { display: none; }
+.edition-combobox.is-open .autocomplete-items { display: block; }
