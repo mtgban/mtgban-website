@@ -338,15 +338,17 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Private call from newspaper
-	hashes := r.Form["hashes"]
-	if len(hashes) != 0 && len(stores) == 0 {
+	// Make sure there are some enabled stores for direct access
+	if len(stores) == 0 && len(enabledStores) == 0 {
 		if blMode {
 			enabledStores = pageVars.EnabledVendors
 		} else {
 			enabledStores = pageVars.EnabledSellers
 		}
 	}
+
+	// Load a list of uuids from newspaper or search
+	hashes := r.Form["hashes"]
 
 	// Load spreadsheet cloud url if present
 	gdocURL := r.FormValue("gdocURL")
