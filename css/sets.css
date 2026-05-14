@@ -310,6 +310,7 @@ tr.child-row td:first-child {
     text-align: right;
     font-family: var(--font-mono);
     font-size: var(--text-base);
+    font-variant-numeric: tabular-nums;
     color: var(--text-dim);
     white-space: nowrap;
 }
