@@ -2,6 +2,31 @@
 :root {
     --radius-lg: 14px;
 }
+
+/* Keep search content at the original (pre-bump) font scale,
+   without affecting the navbar which uses the global scale */
+.search-layout,
+.search-bar-sticky,
+.search-landing,
+.sealed-layout {
+    --text-2xs:  0.5625rem; /* 9px  */
+    --text-xs:   0.625rem;  /* 10px */
+    --text-sm:   0.6875rem; /* 11px */
+    --text-base: 0.75rem;   /* 12px */
+    --text-md:   0.8125rem; /* 13px */
+    --text-lg:   0.875rem;  /* 14px */
+    --text-xl:   0.9375rem; /* 15px */
+    --text-2xl:  1rem;      /* 16px */
+    --text-3xl:  1.0625rem; /* 17px */
+    --text-4xl:  1.125rem;  /* 18px */
+    --text-5xl:  1.1875rem; /* 19px */
+    --text-6xl:  1.25rem;   /* 20px */
+    --text-7xl:  1.375rem;  /* 22px */
+    --text-8xl:  1.5rem;    /* 24px */
+    --text-9xl:  1.625rem;  /* 26px */
+    --text-10xl: 1.75rem;   /* 28px */
+    --text-11xl: 2rem;      /* 32px */
+}
 .light-theme {
     --search-row-even: #f5f5f8;
     --search-row-odd: #ffffff;
