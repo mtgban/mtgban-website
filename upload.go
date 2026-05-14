@@ -48,12 +48,12 @@ const (
 
 // List of ALL index prices to track
 var UploadIndexKeys = []string{
-	"TCGLow", "TCGMarket", "TCGDirect", "TCGDirectLow",
+	"TCGLow", "TCGMarket", "TCGDirect", "TCGDirectLow", "MKMLow", "MKMTrend",
 }
 
 // List of index prices to show by default (must be a subset of UploadIndexKeys)
 var UploadIndexKeysPublic = []string{
-	"TCGLow", "TCGMarket", "TCGDirect",
+	"TCGLow", "TCGMarket", "TCGDirect", "MKMLow", "MKMTrend",
 }
 
 // List of index prices to use for CSVs
