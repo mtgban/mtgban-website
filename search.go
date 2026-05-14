@@ -549,11 +549,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// If the TCG index is missing, but ID is known, we manually add one to get the link
-		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed && pageVars.Metadata[cardId].TCGId != "" {
-			tcgId, _ := strconv.Atoi(pageVars.Metadata[cardId].TCGId)
+		// If the TCG index is missing, we manually add one to get the link
+		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed {
+			var link string
+			if pageVars.Metadata[cardId].TCGId == "" {
+				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardId].Name) + "&utm_medium=" + Config.Affiliate["TCG"] + "&utm_source=" + Config.Affiliate["TCG"]
+			} else {
+				tcgId, _ := strconv.Atoi(pageVars.Metadata[cardId].TCGId)
 
-			link := tcgplayer.GenerateProductURL(tcgId, "", Config.Affiliate["TCG"], "", "", false)
+				link = tcgplayer.GenerateProductURL(tcgId, "", Config.Affiliate["TCG"], "", "", false)
+			}
 			tmp = append(tmp, SearchEntry{
 				ScraperName: "TCGplayer",
 				URL:         link,
