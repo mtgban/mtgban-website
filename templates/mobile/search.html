@@ -324,7 +324,7 @@
             </div>
 
             {{/* Inline card image - hidden in portrait, visible in landscape */}}
-            <img class="m-card-img-landscape" src="{{$card.ImageURL}}" loading="lazy" alt="{{$card.Name}}">
+            <img class="m-card-img-landscape{{if $card.HasContentWarning}} content-warning{{end}}" src="{{$card.ImageURL}}" loading="lazy" alt="{{$card.Name}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
 
             {{/* Sellers panel */}}
             {{if $hasSellers}}

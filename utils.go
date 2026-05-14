@@ -76,8 +76,9 @@ type GenericCard struct {
 	DeckboxURL   string
 	CKRestockURL string
 	SourceSealed []string
-	HotlistStore string
-	Newspaper    bool
+	HotlistStore      string
+	Newspaper         bool
+	HasContentWarning bool
 }
 
 // altFoilChipLabels overrides the default title-cased chip label for
@@ -576,8 +577,9 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		DeckboxURL:   deckboxURL,
 		CKRestockURL: restockURL,
 		SourceSealed: sourceSealed,
-		HotlistStore: hotlistStore,
-		Newspaper:    newspaper,
+		HotlistStore:      hotlistStore,
+		Newspaper:         newspaper,
+		HasContentWarning: co.Card.HasContentWarning,
 	}
 }
 
