@@ -213,16 +213,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			if sortOpt == "name" {
 				namedSort := make([]string, len(TreeEditionsKeys))
 				copy(namedSort, TreeEditionsKeys)
-				sort.Slice(namedSort, func(i, j int) bool {
-					return TreeEditionsMap[namedSort[i]][0].Name < TreeEditionsMap[namedSort[j]][0].Name
+				sort.SliceStable(namedSort, func(i, j int) bool {
+					return strings.ToLower(TreeEditionsMap[namedSort[i]][0].Name) < strings.ToLower(TreeEditionsMap[namedSort[j]][0].Name)
 				})
 				sortedKeys = namedSort
 			} else if sortOpt == "size" {
 				sizeSort := make([]string, len(TreeEditionsKeys))
 				copy(sizeSort, TreeEditionsKeys)
-				sort.Slice(sizeSort, func(i, j int) bool {
+				sort.SliceStable(sizeSort, func(i, j int) bool {
 					if TreeEditionsMap[sizeSort[i]][0].Size == TreeEditionsMap[sizeSort[j]][0].Size {
-						return TreeEditionsMap[sizeSort[i]][0].Name < TreeEditionsMap[sizeSort[j]][0].Name
+						return strings.ToLower(TreeEditionsMap[sizeSort[i]][0].Name) < strings.ToLower(TreeEditionsMap[sizeSort[j]][0].Name)
 					}
 					return TreeEditionsMap[sizeSort[i]][0].Size > TreeEditionsMap[sizeSort[j]][0].Size
 				})
@@ -1192,7 +1192,7 @@ func sortSets(uuidI, uuidJ string) bool {
 					return true
 				}
 
-				return cI.Name < cJ.Name
+				return strings.ToLower(cI.Name) < strings.ToLower(cJ.Name)
 			}
 
 			return sortByNumberAndFinish(uuidI, uuidJ, true)
@@ -1202,7 +1202,7 @@ func sortSets(uuidI, uuidJ string) bool {
 		} else if sortingJ.parentCode == "" && sortingI.parentCode != "" {
 			return false
 		} else {
-			return cI.Edition < cJ.Edition
+			return strings.ToLower(cI.Edition) < strings.ToLower(cJ.Edition)
 		}
 	}
 
@@ -1241,7 +1241,7 @@ func sortSetsAlphabetical(uuidI, uuidJ string, preferFlavor bool) bool {
 		return setDateI.After(setDateJ)
 	}
 
-	return cIname < cJname
+	return strings.ToLower(cIname) < strings.ToLower(cJname)
 }
 
 // Sort card by their names, keeping cards grouped by edition alphabetically
@@ -1261,7 +1261,7 @@ func sortSetsAlphabeticalSet(uuidI, uuidJ string, preferFlavor bool) bool {
 		return sortSetsAlphabetical(uuidI, uuidJ, preferFlavor)
 	}
 
-	return cI.Edition < cJ.Edition
+	return strings.ToLower(cI.Edition) < strings.ToLower(cJ.Edition)
 }
 
 // Sort cards using the highest price among to the sellers in the input slice
