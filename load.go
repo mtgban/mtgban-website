@@ -153,9 +153,9 @@ func updateSellerAtPosition(seller mtgban.Seller, i int) error {
 	inv := seller.Inventory()
 
 	// Do not update in case the new inventory wasn't completely loaded
-	// for example due to API problems
+	// for example due to API problems, unless the old inventory was already sparse
 	old := Sellers[i].Inventory()
-	if len(inv) > 0 && len(inv) < len(old)/2 {
+	if len(inv) > 0 && len(inv) < len(old)/2 && len(old) > 100 {
 		return errors.New("new inventory is missing too many entries")
 	}
 
@@ -211,9 +211,9 @@ func updateVendorAtPosition(vendor mtgban.Vendor, i int) error {
 	bl := vendor.Buylist()
 
 	// Do not update in case the new buylist wasn't completely loaded
-	// for example due to API problems
+	// for example due to API problems, unless the old inventory was already sparse
 	old := Vendors[i].Buylist()
-	if len(bl) > 0 && len(bl) < len(old)/2 {
+	if len(bl) > 0 && len(bl) < len(old)/2 && len(old) > 100 {
 		return errors.New("new buylist is missing too many entries")
 	}
 
