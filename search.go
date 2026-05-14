@@ -17,6 +17,7 @@ import (
 
 	"github.com/BlueMonday/go-scryfall"
 
+	"github.com/mtgban/go-mtgban/cardmarket"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
@@ -564,6 +565,30 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				URL:         link,
 				NoQuantity:  true,
 			})
+		}
+
+		// Same for CM
+		if mkmIndex < 0 && !pageVars.Metadata[cardId].Sealed {
+			co, err := mtgmatcher.GetUUID(cardId)
+			if err == nil {
+				var link string
+
+				id, err := strconv.Atoi(co.Identifiers["mcmId"])
+				if err != nil || id == 0 {
+					link = "https://www.cardmarket.com/en/Products/Search?searchString=" + url.QueryEscape(pageVars.Metadata[cardId].Name)
+				} else {
+					game := cardmarket.GameIdMagic
+					if Config.Game == "lorcana" {
+						game = cardmarket.GameIdLorcana
+					}
+					link = cardmarket.BuildURL(id, game, "", co.Foil || co.Etched)
+				}
+				tmp = append(tmp, SearchEntry{
+					ScraperName: "CardMarket",
+					URL:         link,
+					NoQuantity:  true,
+				})
+			}
 		}
 
 		foundSellers[cardId]["INDEX"] = tmp
