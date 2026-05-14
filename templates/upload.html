@@ -349,6 +349,8 @@
                 if (type === 'text') {
                     enabledButtons();
                 }
+                // Remember the selected source mode
+                try { localStorage.setItem('uploadSourceMode', type); } catch(e) {}
             };
 
             window.pressed = function() {
@@ -383,6 +385,12 @@
                     savedMode = {{if $.IsBuylist}}"buylist"{{else}}"retail"{{end}};
                 }
                 reloadSelect(savedMode);
+
+                // Restore last used source mode (file, url, or text)
+                var savedSource = localStorage.getItem('uploadSourceMode');
+                if (savedSource && ['file', 'url', 'text'].indexOf(savedSource) >= 0) {
+                    selectSource(savedSource);
+                }
 
                 var gdocInput = document.getElementById('gdocURL');
                 if (gdocInput) {
