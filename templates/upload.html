@@ -102,7 +102,7 @@
                         </div>
 
                         <div class="upload-source-area upload-source-hidden" id="source-text">
-                            <textarea id="textArea" name="textArea" rows="10" placeholder="Paste card list or decklist here..." oninput="autoGrowTextArea(this)"></textarea>
+                            <textarea id="textArea" name="textArea" rows="10" placeholder="Paste card list or decklist here..." oninput="autoGrowTextArea(this); try{localStorage.setItem('uploadTextArea',this.value)}catch(e){}"></textarea>
                         </div>
                     {{end}}
                 </div>
@@ -371,7 +371,8 @@
             window.onload = (event) => {
                 var textArea = document.getElementById('textArea');
                 if (textArea) {
-                    textArea.value = "";
+                    var savedText = localStorage.getItem('uploadTextArea') || '';
+                    textArea.value = savedText;
                 }
                 var savedMode = localStorage.getItem("uploadMode");
                 if (savedMode === "buylist" || savedMode === "retail") {
