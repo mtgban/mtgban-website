@@ -37,7 +37,9 @@
 }
 
 .sealed-toc-item {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 7px 16px;
     font-size: var(--text-lg);
     font-weight: 500;
@@ -56,9 +58,10 @@
     background: var(--accent-muted);
 }
 .sealed-toc-item .toc-count {
-    float: right;
     font-size: var(--text-base);
     color: var(--text-dim);
+    flex-shrink: 0;
+    margin-left: 8px;
 }
 
 /* ── Main content ── */
