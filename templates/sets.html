@@ -118,17 +118,32 @@
 
 {{define "extra-scripts"}}
 <script>
-function toggleExpanded() {
+function setExpanded(expanded) {
     const table = document.getElementById('table');
     const btn = document.getElementById('expandBtn');
-    table.classList.toggle('expanded');
-    if (table.classList.contains('expanded')) {
+    if (expanded) {
+        table.classList.add('expanded');
         btn.textContent = 'Hide Colors & Rarities';
         btn.classList.add('active');
     } else {
+        table.classList.remove('expanded');
         btn.textContent = 'Show Colors & Rarities';
         btn.classList.remove('active');
     }
 }
+
+function toggleExpanded() {
+    const table = document.getElementById('table');
+    const expanded = !table.classList.contains('expanded');
+    setExpanded(expanded);
+    try { localStorage.setItem('setsExpanded', expanded ? '1' : '0'); } catch(e) {}
+}
+
+// Restore preference on load
+try {
+    if (localStorage.getItem('setsExpanded') === '1') {
+        setExpanded(true);
+    }
+} catch(e) {}
 </script>
 {{end}}
