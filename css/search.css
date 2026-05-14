@@ -930,7 +930,7 @@
 .price-row .price .cur {
     color: var(--search-text-dim);
 }
-.price-row .price .amt {
+.price-row .amt {
     text-align: right;
 }
 
