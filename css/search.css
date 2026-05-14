@@ -2237,14 +2237,9 @@
 .fav-sort-pill .fav-sort-dir.asc { color: #22c55e; }
 .fav-sort-pill .fav-sort-dir.desc { color: #ef4444; }
 
-/* -- Subgrid alignment for price columns --
-   Aligns $ glyphs vertically within each .result-col by sharing track widths
-   across all .price-row elements. Older browsers fall through to legacy
-   .price-right rules above. */
+/* -- Subgrid alignment for price columns -- */
 @supports (grid-template-columns: subgrid) {
 
-    /* Two grid scopes per .result-col: sealed INDEX rows above, regular rows below.
-       Each scope sizes its 'cur' and 'amt' tracks to the widest content. */
     .rows-main {
         display: grid;
         grid-template-columns: 1fr auto auto auto auto;
@@ -2253,12 +2248,10 @@
         display: grid;
         grid-template-columns: 1fr auto auto auto auto auto auto;
     }
-    /* Empty .rows-index (non-sealed cards) collapses to zero height. */
     .rows-index:empty {
         display: none;
     }
 
-    /* Each row participates in the parent grid via subgrid. */
     .rows-main > .price-row,
     .rows-index > .price-row {
         display: grid;
@@ -2267,7 +2260,6 @@
         align-items: center;
     }
 
-    /* Headers and full-width content span all tracks. */
     .rows-main > .price-cond-header {
         grid-column: 1 / -1;
     }
@@ -2276,12 +2268,6 @@
         justify-self: end;
     }
 
-    /* .price-right participates in the row's subgrid as a single grid item
-       spanning all remaining tracks, then becomes a subgrid itself so its
-       descendants (.price, .secondary, .buylist-extra, .qty) land in the
-       column tracks shared across all rows in the scope. Avoids
-       display: contents because the subgrid chain through display: contents
-       does not reliably preserve track sharing in current browsers. */
     .price-row > .price-right {
         display: grid;
         grid-template-columns: subgrid;
@@ -2290,7 +2276,6 @@
         gap: 0 1.5em;
     }
 
-    /* .price and .secondary are nested subgrids spanning 2 tracks (cur + amt). */
     .price-right > .price,
     .price-right > .secondary {
         display: grid;
@@ -2298,15 +2283,11 @@
         grid-column: span 2;
     }
 
-    /* Sellers without a secondary: qty centers across the trailing 2 tracks. */
     .price-right:not(.has-secondary):not(.has-buylist-extra) > .qty {
         grid-column: span 2;
     }
 
-    /* Buyers (.has-buylist-extra): .price (span 2) + .buylist-extra (1) + .qty (1)
-       auto-place sequentially in 4 sub-tracks; no explicit grid-column needed. */
-
-    /* Sealed INDEX header label row: each label spans the cur+amt pair of its column. */
+    /* Sealed INDEX header label row. */
     .rows-index .price-row > .index-label {
         text-align: center;
         font-size: var(--text-xs);
