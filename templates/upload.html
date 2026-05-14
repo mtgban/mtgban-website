@@ -604,7 +604,7 @@
                             {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                             <td>
                                 <div class="ures-card-cell">
-                                    <div class="foil-wrap" data-foil="{{$card.Foil}}">
+                                    <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
                                         <img src="{{$card.ImageURL}}" loading="lazy">
                                     </div>
                                     <div class="ures-card-info">

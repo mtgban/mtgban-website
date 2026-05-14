@@ -1041,6 +1041,24 @@ img.hoverImage {
     border-radius: 8px;
 }
 
+/* ── Content-warning blur ── */
+/* Applies to wrapper divs (.foil-wrap, .sidebar-img-wrap) and standalone <img> elements */
+.content-warning:not(.cw-revealed) > img,
+img.content-warning:not(.cw-revealed) {
+    filter: blur(14px);
+    transition: filter 0.25s;
+}
+.content-warning:not(.cw-revealed) {
+    cursor: pointer;
+    overflow: hidden;
+}
+/* Revealed state */
+.content-warning.cw-revealed > img,
+img.content-warning.cw-revealed {
+    filter: none;
+    transition: filter 0.25s;
+}
+
 /* Foil card image overlay */
 .foil-wrap {
     position: relative;
