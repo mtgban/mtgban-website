@@ -1386,15 +1386,11 @@ table.tiers td div {
     max-width: 24em;
     width: calc(100% - 3em);
     padding: 1.25em 1.3em 1.15em;
-    background: rgba(24, 26, 34, 0.72);
-    backdrop-filter: blur(16px) saturate(140%);
-    -webkit-backdrop-filter: blur(16px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: var(--surface-2);
+    border: 1px solid var(--border-moderate);
     border-radius: 0.75em;
-    box-shadow:
-        0 18px 52px rgba(0, 0, 0, 0.6),
-        0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-    color: var(--text, currentColor);
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.4);
+    color: var(--normal);
     text-align: center;
 }
 
@@ -1413,9 +1409,9 @@ table.tiers td div {
 .ban-confirm-btn {
     padding: 0.5em 0.95em;
     border-radius: 0.4em;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--text, currentColor);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-3);
+    color: var(--normal);
     font: inherit;
     white-space: nowrap;
     cursor: pointer;
@@ -1423,15 +1419,15 @@ table.tiers td div {
 }
 .ban-confirm-btn:hover {
     border-color: var(--accent-border, rgba(91, 141, 239, 0.45));
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--surface-2);
 }
 
 .ban-confirm-btn-danger {
-    background: #c0392b;
-    border-color: rgba(255, 255, 255, 0.22);
+    background: var(--adanger, #c0392b);
+    border-color: var(--adanger, #c0392b);
     color: #fff;
 }
 .ban-confirm-btn-danger:hover {
-    background: #e74c3c;
-    border-color: rgba(255, 255, 255, 0.32);
+    background: color-mix(in srgb, var(--adanger, #c0392b) 88%, white);
+    border-color: color-mix(in srgb, var(--adanger, #c0392b) 88%, white);
 }
