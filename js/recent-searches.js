@@ -145,28 +145,31 @@
             html += '</div>';
             html += '<div class="landing-pane-body">';
             searches.forEach(function(s) {
-                html += '<a class="landing-item landing-item-recent" href="?q=' + encodeURIComponent(s.q) + '">';
-                // Re-derive thumbnail treatment so legacy entries (with stale set/keyrune
-                // for non-pure-set queries) render correctly.
+                var cropSrc = s.crop || '';
                 var token = parseSetToken(s.q);
-                html += '<div class="landing-item-thumb">';
-                if (token.keyrune) {
-                    html += '<i class="ss ' + escapeAttr(token.keyrune) + ' ss-fw"></i>';
-                } else if (s.img) {
-                    html += thumbHtml(s.img, s.foil, s.cw);
-                } else {
-                    html += '<span class="landing-item-thumb-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>';
+                html += '<a class="landing-item landing-item-recent' + (cropSrc ? ' has-crop' : '') + '"' + (cropSrc ? ' style="background-image:url(\'' + escapeAttr(cropSrc) + '\')"' : '') + ' href="?q=' + encodeURIComponent(s.q) + '">';
+                if (!cropSrc) {
+                    html += '<div class="landing-item-thumb">';
+                    if (token.keyrune) {
+                        html += '<i class="ss ' + escapeAttr(token.keyrune) + ' ss-fw"></i>';
+                    } else if (s.img) {
+                        html += thumbHtml(s.img, s.foil, s.cw);
+                    } else {
+                        html += '<span class="landing-item-thumb-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>';
+                    }
+                    html += '</div>';
                 }
-                html += '</div>';
                 html += '<div class="landing-item-info">';
                 html += '<span class="landing-item-query">' + escapeHtml(s.q) + '</span>';
                 html += '</div>';
+                html += '<div class="landing-item-actions">';
                 html += '<button class="landing-item-pin' + (s.pinned ? ' pinned' : '') + '" data-q="' + escapeAttr(s.q) + '" onclick="window.toggleRecentPin(this.dataset.q, event)" title="' + (s.pinned ? 'Unpin' : 'Pin to top') + '">';
                 html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="' + (s.pinned ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
                 html += '</button>';
                 html += '<button class="landing-item-delete" data-q="' + escapeAttr(s.q) + '" onclick="window.deleteRecentSearch(this.dataset.q, event)" title="Remove from recent searches">';
                 html += '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
                 html += '</button>';
+                html += '</div>';
                 html += '</a>';
             });
             html += '</div>';
@@ -254,6 +257,7 @@
         var finishClass = firstRow.getAttribute('data-finish-class') || '';
         var foil = finishClass === 'foil' || finishClass === 'altfoil';
         var cw = firstRow.getAttribute('data-has-warning') === 'true';
+        var crop = firstRow.getAttribute('data-crop-url') || '';
 
         var searches = getRecentSearches();
         var qLower = q.toLowerCase();
@@ -262,6 +266,10 @@
             if (searches[i].q.toLowerCase() === qLower) {
                 if (!searches[i].img) {
                     searches[i].img = img;
+                    changed = true;
+                }
+                if (crop && searches[i].crop !== crop) {
+                    searches[i].crop = crop;
                     changed = true;
                 }
                 if (searches[i].foil !== foil || searches[i].cw !== cw) {

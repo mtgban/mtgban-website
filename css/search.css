@@ -1658,44 +1658,86 @@
     border-radius: 2px;
 }
 
-/* Recents pane: tighter rows so card names fit in the 260px column */
+/* Recents pane */
 .landing-pane-recent .landing-item {
     gap: 0.6em;
     padding: 0.7em 0.7em;
     position: relative;
 }
-.landing-pane-recent .landing-item-pin,
-.landing-pane-recent .landing-item-delete {
+/* Crop art background */
+.landing-pane-recent .landing-item.has-crop {
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    padding: 1em 0.7em;
+    overflow: hidden;
+    border-bottom: none;
+}
+.landing-pane-recent .landing-item.has-crop::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.4) 80%, transparent 100%);
+    z-index: 0;
+    pointer-events: none;
+}
+.landing-pane-recent .landing-item.has-crop > .landing-item-info,
+.landing-pane-recent .landing-item.has-crop > .landing-item-thumb {
+    position: relative;
+    z-index: 1;
+}
+.landing-pane-recent .landing-item.has-crop .landing-item-info {
+    text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+.landing-pane-recent .landing-item.has-crop .landing-item-query {
+    color: #fff;
+}
+/* Pin/delete buttons */
+.landing-pane-recent .landing-item-actions {
     position: absolute;
     right: 0.7em;
     top: 50%;
     transform: translateY(-50%);
+    z-index: 1;
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 120ms;
 }
-.landing-pane-recent .landing-item-pin {
-    right: 2.3em;
+.landing-pane-recent .landing-item:hover .landing-item-actions {
+    opacity: 1;
+}
+.landing-pane-recent .landing-item-actions {
+    background: var(--surface-2);
 }
 .landing-pane-recent .landing-item-info {
+    flex: 1;
+    min-width: 0;
     transition: margin-right 0ms 50ms;
 }
 .landing-pane-recent .landing-item:hover .landing-item-info {
-    margin-right: 3.2em;
+    margin-right: 3.6em;
     transition: margin-right 0ms;
 }
+/* Fallback thumbnail (no crop) */
 .landing-pane-recent .landing-item-thumb {
-    width: 2.6em;
-    height: 3.6em;
+    width: 4em;
+    height: 2.8em;
+    border-radius: 3px;
 }
 .landing-pane-recent .landing-item-thumb i.ss {
     font-size: 1.8em;
 }
-.landing-pane-recent .landing-item:nth-child(even) {
-    background: var(--row-odd);
+/* Alternating/hover/pinned for non-crop entries */
+.landing-pane-recent .landing-item:nth-child(even):not(.has-crop) {
+    background-color: var(--row-odd);
 }
-.landing-pane-recent .landing-item:hover {
-    background: var(--row-hover);
+.landing-pane-recent .landing-item:not(.has-crop):hover {
+    background-color: var(--row-hover);
 }
-.landing-pane-recent .landing-item:has(.landing-item-pin.pinned) {
-    background: var(--surface-3);
+.landing-pane-recent .landing-item:has(.landing-item-pin.pinned):not(.has-crop) {
+    background-color: var(--surface-3);
 }
 
 /* Favorites pane: 2-column grid of card-style tiles */
@@ -2266,7 +2308,7 @@
 
 /* Pinned row: tinted background instead of always-visible icon */
 .landing-item:has(.landing-item-pin.pinned) {
-    background: var(--surface-2);
+    background-color: var(--surface-2);
 }
 .landing-pane-favorites .landing-item-fav:has(.landing-item-pin.pinned) {
     background: var(--surface-3);

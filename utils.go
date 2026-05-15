@@ -79,6 +79,7 @@ type GenericCard struct {
 	HotlistStore      string
 	Newspaper         bool
 	HasContentWarning bool
+	CropURL           string
 }
 
 // altFoilChipLabels overrides the default title-cased chip label for
@@ -462,6 +463,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	if useThumbs {
 		imgURL = co.Images["thumbnail"]
 	}
+	cropURL := co.Images["crop"]
 
 	printings := ""
 	if genPrints {
@@ -580,6 +582,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		HotlistStore:      hotlistStore,
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
+		CropURL:           cropURL,
 	}
 }
 
