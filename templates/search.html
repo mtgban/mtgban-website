@@ -448,13 +448,16 @@
                             // Override legend click function
                             opts = withLegendPersistence(legendStorageKey, opts);
 
-                            // Checkpoint annotations (bans/releases/reprints)
+                            // Checkpoint annotations (bans/releases/reprints).
+                            // clip: false lets badges render above the plot area in the
+                            // top padding band reserved by buildCheckpointAnnotations.
                             var chartCheckpoints = {{.Checkpoints}};
                             var checkpointChartRef = { chart: null };
                             if (chartCheckpoints && chartCheckpoints.length) {
                                 restoreCheckpointTypes();
                                 opts.plugins.annotation = {
-                                    annotations: buildCheckpointAnnotations(chartCheckpoints, checkpointChartRef),
+                                    clip: false,
+                                    annotations: buildCheckpointAnnotations(chartCheckpoints, checkpointChartRef, opts),
                                 };
                             }
 

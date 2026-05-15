@@ -180,6 +180,19 @@ func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet
 	now := time.Now()
 	seen := map[string]bool{}
 	var out []ChartCheckpoint
+
+	// Collapse release markers to one per date, preferring the "main" set
+	// when multiple sets land on the same day. Ranking is by MTGJSON set type
+	// (expansion/core beats commander/promo/etc.) with set code as a stable
+	// tiebreaker, so the choice is deterministic across requests. Reprints
+	// stay independent so per-set reprint history isn't lost.
+	type releasePick struct {
+		cp       ChartCheckpoint
+		priority int
+		code     string
+	}
+	bestRelease := map[string]releasePick{}
+
 	for _, entries := range SealedEditionsList {
 		for _, e := range entries {
 			if e.Code == "" || seen[e.Code] {
@@ -206,14 +219,47 @@ func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet
 			if isReprint {
 				cp.Type = "reprint"
 				cp.Detail = "Reprinted"
-			} else {
-				cp.Type = "release"
-				cp.Detail = "Set released"
+				out = append(out, cp)
+				continue
 			}
-			out = append(out, cp)
+
+			cp.Type = "release"
+			cp.Detail = "Set released"
+			pri := releasePriority(e.Code)
+			existing, ok := bestRelease[cp.Date]
+			if !ok || pri > existing.priority || (pri == existing.priority && e.Code < existing.code) {
+				bestRelease[cp.Date] = releasePick{cp: cp, priority: pri, code: e.Code}
+			}
 		}
 	}
+	for _, pick := range bestRelease {
+		out = append(out, pick.cp)
+	}
 	return out
+}
+
+// releasePriority ranks a set's release marker so same-day candidates resolve
+// to the "main" product. Higher wins. MTGJSON Set.Type buckets are the most
+// reliable signal: expansion/core are full new-card sets, draft_innovation is
+// a half-step down (Conspiracy/Battlebond/MH-style), and the rest (commander,
+// promo, masters, starter, etc.) are typically companion products.
+func releasePriority(code string) int {
+	set, err := mtgmatcher.GetSet(code)
+	if err != nil {
+		return 0
+	}
+	switch set.Type {
+	case "expansion":
+		return 4
+	case "core":
+		return 3
+	case "draft_innovation":
+		return 2
+	case "masters":
+		return 1
+	default:
+		return 0
+	}
 }
 
 // perCardSetCheckpoints emits a reprint checkpoint at each distinct date the
