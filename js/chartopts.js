@@ -358,6 +358,21 @@ function checkpointToggleKey(type) {
     return type === 'unban' ? 'ban' : type;
 }
 
+// Returns true when the chart's visible x-axis spans at least `days` days.
+// Reads from the laid-out scale, so it works whether the user selected an
+// explicit range (x.min set) or "All" (auto-bounded from data).
+//
+// The +1 makes the range match the dropdown values: "2 Years" sets x.min to
+// the label 730 days back, so (max - min) is 729 days of gap but represents
+// 730 days of inclusive coverage. Without the +1, the 2-year selection
+// would just miss the threshold.
+function chartSpansAtLeastDays(chart, days) {
+    var xScale = chart && chart.scales && chart.scales.x;
+    if (!xScale || typeof xScale.min !== 'number' || typeof xScale.max !== 'number') return false;
+    var rangeDays = (xScale.max - xScale.min) / 86400000 + 1;
+    return rangeDays >= days;
+}
+
 const visibleCheckpointTypes = new Set(['ban', 'release', 'reprint']);
 
 // Snapshot of the checkpoints currently rendered on the chart. Used by the
@@ -484,7 +499,15 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
             xMax: cp.date,
             xScaleID: 'x',
             borderColor: palette.line,
-            borderWidth: 1.5,
+            // Release markers are noisy when the chart spans years — there
+            // can be dozens of set-release lines crowding the canvas. At 2+
+            // years of visible range we drop the dashed line for releases and
+            // keep only the keyrune label at the top. Bans/unbans/reprints
+            // stay dashed regardless since they're per-card and far sparser.
+            borderWidth: function (ctx) {
+                if (cp.type !== 'release') return 1.5;
+                return chartSpansAtLeastDays(ctx.chart, 730) ? 0 : 1.5;
+            },
             borderDash: [4, 4],
             display: function () { return visibleCheckpointTypes.has(checkpointToggleKey(cp.type)); },
             label: {
