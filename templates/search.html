@@ -467,6 +467,7 @@
                             if (initialRange > 0 && initialRange < allLabels.length) {
                                 opts.scales.x.min = allLabels[initialRange - 1];
                             }
+                            setReleasesSuppressedByRange(initialRange);
 
                             // Create the chart
                             var ctx = document.getElementById('cardChart').getContext('2d');
@@ -521,6 +522,7 @@
                                     // Labels are newest-first; element at rangeDays-1 is the cutoff
                                     cardChart.options.scales.x.min = allLabels[rangeDays - 1];
                                 }
+                                setReleasesSuppressedByRange(rangeDays);
                                 cardChart.update();
                                 localStorage.setItem('chartDateRange', rangeDays.toString());
                             }
