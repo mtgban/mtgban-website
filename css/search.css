@@ -2098,6 +2098,7 @@
 .landing-item-arrow {
     flex: 0 0 auto;
     color: var(--greytext);
+    transition: opacity 120ms;
 }
 
 .landing-item-delete {
@@ -2120,7 +2121,7 @@
 }
 
 .landing-item:hover .landing-item-arrow {
-    display: none;
+    opacity: 0;
 }
 
 .landing-item-delete:hover {
