@@ -429,10 +429,10 @@
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
                                 </p>
                                 {{if .Checkpoints}}
-                                <p class="chart-checkpoint-toggles" style="margin: 6px 0 0;">
-                                    <label><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>
-                                    <label style="margin-left: 12px;"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
-                                    <label style="margin-left: 12px;"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
+                                <p class="chart-checkpoint-toggles">
+                                    <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
+                                    <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
+                                    <label class="cp-pill cp-pill-ban"><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>
                                 </p>
                                 {{end}}
                             </div>
