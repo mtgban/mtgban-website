@@ -2101,7 +2101,7 @@
 }
 
 .landing-item-delete {
-    display: none;
+    display: inline-flex;
     background: transparent;
     border: none;
     color: var(--greytext);
@@ -2111,10 +2111,12 @@
     flex: 0 0 auto;
     align-items: center;
     justify-content: center;
+    opacity: 0;
+    transition: opacity 120ms, color 120ms;
 }
 
 .landing-item:hover .landing-item-delete {
-    display: inline-flex;
+    opacity: 1;
 }
 
 .landing-item:hover .landing-item-arrow {
