@@ -106,7 +106,9 @@ function externalTooltipHandler(context) {
             html += '<div class="chart-tooltip-checkpoints">';
             matching.forEach(function (cp) {
                 var dotColor = (checkpointColors[cp.type] || {}).line || '#888';
-                html += '<div class="chart-tooltip-row chart-tooltip-cp">' +
+                // Drive the row's left bar (and a row separator border) from
+                // a CSS custom property so per-row styling stays in CSS.
+                html += '<div class="chart-tooltip-row chart-tooltip-cp" style="--cp-color:' + dotColor + '">' +
                     '<span class="chart-tooltip-swatch" style="background:' + dotColor + '"></span>' +
                     '<span><strong>' + escapeHtml(cp.title) + '</strong>' +
                     (cp.detail ? '<br><span style="opacity:.75">' + escapeHtml(cp.detail) + '</span>' : '') +
