@@ -705,6 +705,9 @@
     font-style: italic;
     line-height: 1;
 }
+.result-flag {
+    font-style: normal;
+}
 
 .result-badges { display: flex; gap: 4px; }
 .result-badge {
