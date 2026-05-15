@@ -415,11 +415,42 @@ function getCheckpointIcon(url, onLoad) {
     return img;
 }
 
+// Keyrune glyphs vary in intrinsic width/height (some sets have a tall skinny
+// icon, others wide squat ones). If we hand the raw character to the
+// annotation plugin it auto-sizes the label box to whatever the glyph
+// measures, so the colored circles around different icons end up noticeably
+// different sizes. Render each glyph centered into a fixed-size off-screen
+// canvas instead — the plugin sizes the label box from canvas.width /
+// canvas.height, so every label box (and therefore every circle) is uniform.
+const KEYRUNE_CANVAS_SIZE = 22;
+const KEYRUNE_FONT_PX = 18;
+const keyruneCanvasCache = new Map();
+function getKeyruneCanvas(code) {
+    if (!code) return null;
+    if (keyruneCanvasCache.has(code)) return keyruneCanvasCache.get(code);
+
+    var ch = getKeyruneChar(code);
+    if (!ch) return null;
+
+    var canvas = document.createElement('canvas');
+    canvas.width = KEYRUNE_CANVAS_SIZE;
+    canvas.height = KEYRUNE_CANVAS_SIZE;
+    var ctx = canvas.getContext('2d');
+    ctx.font = KEYRUNE_FONT_PX + 'px Keyrune';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ch, KEYRUNE_CANVAS_SIZE / 2, KEYRUNE_CANVAS_SIZE / 2);
+
+    keyruneCanvasCache.set(code, canvas);
+    return canvas;
+}
+
 // Resolve a Keyrune CSS class ("ss-dsk") to its rendered glyph character. The
 // Keyrune stylesheet is already loaded on the search page (see
 // templates/search.html "extra-css"). We read the ::before content of a hidden
 // element to extract the codepoint, then drop the element. The character is
-// drawn into the chart canvas via `font: { family: 'Keyrune' }`.
+// drawn into an off-screen canvas via `font: '... Keyrune'`.
 const keyruneCharCache = new Map();
 function getKeyruneChar(code) {
     if (!code) return '';
@@ -462,8 +493,9 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
     // showing the set name as a text fallback.
     var anyKeyrune = checkpoints.some(function (cp) { return cp.keyruneCode; });
     if (anyKeyrune && document.fonts && document.fonts.load) {
-        document.fonts.load('16px Keyrune').then(function () {
+        document.fonts.load(KEYRUNE_FONT_PX + 'px Keyrune').then(function () {
             keyruneCharCache.clear();
+            keyruneCanvasCache.clear();
             redraw();
         }).catch(function () {});
     }
@@ -503,16 +535,15 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
         // load triggers redraw above) pick up the real glyph character.
         var contentFn = function () {
             if (cp.keyruneCode) {
-                var ch = getKeyruneChar(cp.keyruneCode);
-                if (ch) return ch;
+                var canvas = getKeyruneCanvas(cp.keyruneCode);
+                if (canvas) return canvas;
             }
             if (cp.iconUrl) return getCheckpointIcon(cp.iconUrl, redraw);
             return cp.title;
         };
+        // Font only affects the text-fallback path now — canvas content is
+        // pre-rendered and the plugin ignores the font option for it.
         var fontFn = function () {
-            if (cp.keyruneCode && getKeyruneChar(cp.keyruneCode)) {
-                return { family: 'Keyrune', size: 16, weight: 'normal' };
-            }
             return { size: 10, weight: 'bold' };
         };
 
