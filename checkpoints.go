@@ -130,7 +130,7 @@ func relevantCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint 
 	}
 
 	out := curatedCheckpoints(cardName, earliest)
-	out = append(out, setCheckpointsFromEditions(earliest, printingSet)...)
+	out = append(out, setCheckpointsFromEditions(cardName, earliest, printingSet)...)
 
 	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].Date < out[j].Date
@@ -181,7 +181,13 @@ func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 // drove the keyrune-at-top renderer) and emits one checkpoint per set whose
 // release falls inside the chart window. Sets in the card's own printing
 // history become "reprint" markers; all others become "release" markers.
-func setCheckpointsFromEditions(earliest time.Time, printingSet map[string]bool) []ChartCheckpoint {
+//
+// SLD (Secret Lair Drop) and PLST (The List) are perpetually-updated sets
+// where individual cards ship on their own dates, not the set's overall
+// release date. For reprints in those sets we emit one checkpoint per
+// distinct card release date so the marker lands where the card actually
+// appeared, rather than collapsing every drop onto SLD's original 2019 date.
+func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet map[string]bool) []ChartCheckpoint {
 	if SealedEditionsList == nil {
 		return nil
 	}
@@ -193,17 +199,25 @@ func setCheckpointsFromEditions(earliest time.Time, printingSet map[string]bool)
 			if e.Code == "" || seen[e.Code] {
 				continue
 			}
+			seen[e.Code] = true
+
+			isReprint := printingSet[strings.ToUpper(e.Code)]
+
+			if isReprint && (e.Code == "SLD" || e.Code == "PLST") {
+				out = append(out, perCardSetCheckpoints(cardName, e, earliest, now)...)
+				continue
+			}
+
 			if e.Date.IsZero() || e.Date.Before(earliest) || e.Date.After(now) {
 				continue
 			}
-			seen[e.Code] = true
 
 			cp := ChartCheckpoint{
 				Date:        e.Date.Format("2006-01-02"),
 				Title:       e.Name,
 				KeyruneCode: e.Keyrune,
 			}
-			if printingSet[strings.ToUpper(e.Code)] {
+			if isReprint {
 				cp.Type = "reprint"
 				cp.Detail = "Reprinted"
 			} else {
@@ -212,6 +226,46 @@ func setCheckpointsFromEditions(earliest time.Time, printingSet map[string]bool)
 			}
 			out = append(out, cp)
 		}
+	}
+	return out
+}
+
+// perCardSetCheckpoints emits a reprint checkpoint at each distinct date the
+// card was printed in the given set. Falls back to the set's release date for
+// printings that don't carry a per-card date in MTGJSON.
+func perCardSetCheckpoints(cardName string, e EditionEntry, earliest, now time.Time) []ChartCheckpoint {
+	cards := mtgmatcher.MatchInSet(cardName, e.Code)
+	if len(cards) == 0 {
+		return nil
+	}
+
+	setDateStr := ""
+	if !e.Date.IsZero() {
+		setDateStr = e.Date.Format("2006-01-02")
+	}
+
+	emitted := map[string]bool{}
+	var out []ChartCheckpoint
+	for _, card := range cards {
+		dateStr := card.OriginalReleaseDate
+		if dateStr == "" {
+			dateStr = setDateStr
+		}
+		if dateStr == "" || emitted[dateStr] {
+			continue
+		}
+		cardDate, err := time.Parse("2006-01-02", dateStr)
+		if err != nil || cardDate.Before(earliest) || cardDate.After(now) {
+			continue
+		}
+		emitted[dateStr] = true
+		out = append(out, ChartCheckpoint{
+			Type:        "reprint",
+			Date:        dateStr,
+			Title:       e.Name,
+			Detail:      "Reprinted",
+			KeyruneCode: e.Keyrune,
+		})
 	}
 	return out
 }
