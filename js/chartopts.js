@@ -579,7 +579,11 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
         if (!sameDateGroups[cp.date]) sameDateGroups[cp.date] = [];
         sameDateGroups[cp.date].push(i);
     });
-    var STACK_STEP_PX = 26;
+    // Step between stacked same-date badges. The label box is the icon canvas
+    // (max 22px for keyrunes, 20px for iconUrl) plus 4px padding on each side,
+    // so the largest box is 30px tall. Step needs to clear that with a small
+    // gap, otherwise adjacent circles overlap visibly.
+    var STACK_STEP_PX = KEYRUNE_CANVAS_SIZE + 2 * 4 + 2;
 
     checkpoints.forEach(function (cp, i) {
         var palette = checkpointColors[cp.type] || { line: 'rgba(120,120,120,0.9)', label: 'rgba(120,120,120,0.9)' };
