@@ -406,6 +406,26 @@ function chartSpansAtLeastDays(chart, days) {
 // checkpointToggleKey, so the visibility set only needs the canonical keys.
 const visibleCheckpointTypes = new Set(['ban', 'release', 'reprint']);
 
+// When the selected date range is wide enough that release markers crowd
+// every pixel, the Releases checkbox is force-disabled. We track that as a
+// separate flag so the user's saved on/off preference survives a temporary
+// range change — flipping back to a shorter range restores their choice.
+const RELEASE_SUPPRESS_MIN_DAYS = 1825;
+var releasesSuppressedByRange = false;
+
+function setReleasesSuppressedByRange(rangeDays) {
+    var suppressed = typeof rangeDays === 'number' && rangeDays >= RELEASE_SUPPRESS_MIN_DAYS;
+    if (releasesSuppressedByRange === suppressed) return;
+    releasesSuppressedByRange = suppressed;
+    var el = document.getElementById('cpToggleRelease');
+    if (el) {
+        el.disabled = suppressed;
+        var pill = el.closest('.cp-pill');
+        if (pill) pill.classList.toggle('cp-pill-locked', suppressed);
+    }
+    if (window.cardChart) window.cardChart.update('none');
+}
+
 // Snapshot of the checkpoints currently rendered on the chart. Used by the
 // external tooltip handler so price + event context render in one popup.
 var currentCheckpoints = [];
@@ -628,7 +648,11 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
                 return chartSpansAtLeastDays(ctx.chart, 730) ? 0 : 1.5;
             },
             borderDash: [4, 4],
-            display: function () { return visibleCheckpointTypes.has(checkpointToggleKey(cp.type)); },
+            display: function () {
+                var key = checkpointToggleKey(cp.type);
+                if (key === 'release' && releasesSuppressedByRange) return false;
+                return visibleCheckpointTypes.has(key);
+            },
             label: {
                 display: true,
                 // Render labels in a later draw phase than the lines so every
