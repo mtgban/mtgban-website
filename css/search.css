@@ -1164,6 +1164,26 @@
     flex-shrink: 0;
 }
 
+/* Same-date checkpoint events stack inside this container — give each row
+ * a colored left bar (its type color) so a glance identifies the type, and
+ * a hairline divider between siblings so multiple events read as a list
+ * rather than one wall of text. --cp-color is set inline per row. */
+.chart-tooltip-checkpoints {
+    margin-top: 4px;
+}
+.chart-tooltip-cp {
+    border-left: 3px solid var(--cp-color, #888);
+    padding-left: 8px;
+}
+.chart-tooltip-cp + .chart-tooltip-cp {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 4px;
+    padding-top: 4px;
+}
+.dark-theme .chart-tooltip-cp + .chart-tooltip-cp {
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
 /* Box around the chart event toggles so it's visually clear that the three
  * checkboxes belong together and govern what shows up on the chart. */
 .chart-checkpoint-toggles {
