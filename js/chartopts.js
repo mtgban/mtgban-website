@@ -219,6 +219,12 @@ function getChartOpts(xAxisLabels, gaps) {
                     padding: 8,
                     maxRotation: 45,
                     font: { size: 10 },
+                    // Append the year to each tick when the visible range
+                    // crosses a calendar-year boundary (e.g. "Jan 5 '26").
+                    // For ranges that sit inside a single year, the year
+                    // would be redundant on every tick, so we keep the
+                    // shorter "MMM d" form.
+                    callback: xAxisTickFormatter,
                 },
                 border: { display: false },
             },
@@ -356,6 +362,23 @@ const checkpointColors = {
 // Bans + unbans share the "Bans" checkbox.
 function checkpointToggleKey(type) {
     return type === 'unban' ? 'ban' : type;
+}
+
+var TICK_MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// X-axis tick formatter. `this` is the scale instance. Re-runs on every chart
+// update, so changing the date-range dropdown reformats labels automatically.
+function xAxisTickFormatter(value) {
+    var d = new Date(value);
+    var label = TICK_MONTH_NAMES[d.getMonth()] + ' ' + d.getDate();
+    if (typeof this.min === 'number' && typeof this.max === 'number') {
+        var startYear = new Date(this.min).getFullYear();
+        var endYear = new Date(this.max).getFullYear();
+        if (startYear !== endYear) {
+            label += " '" + String(d.getFullYear()).slice(-2);
+        }
+    }
+    return label;
 }
 
 // Returns true when the chart's visible x-axis spans at least `days` days.
