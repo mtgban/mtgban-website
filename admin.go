@@ -208,6 +208,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			v.Set("msg", "Failed to reload config: "+err.Error())
 		}
 
+	case "checkpoints":
+		v = url.Values{}
+		doReboot = true
+
+		err := reloadCheckpoints()
+		if err != nil {
+			v.Set("msg", "Failed to reload checkpoints: "+err.Error())
+		} else {
+			v.Set("msg", "Chart checkpoints reloaded")
+		}
+
 	case "snapshot":
 		if Config.OfflineKey != "" {
 			v = url.Values{}
