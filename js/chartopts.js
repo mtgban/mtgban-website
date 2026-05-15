@@ -402,17 +402,58 @@ const visibleCheckpointTypes = new Set(['ban', 'release', 'reprint']);
 // external tooltip handler so price + event context render in one popup.
 var currentCheckpoints = [];
 
-// Cache <img> elements so we only fetch each icon once.
-const checkpointIconCache = new Map();
-function getCheckpointIcon(url, onLoad) {
-    if (checkpointIconCache.has(url)) return checkpointIconCache.get(url);
-    var img = new Image(20, 20);
-    img.referrerPolicy = 'no-referrer';
-    img.onload = function () { if (typeof onLoad === 'function') onLoad(); };
-    img.onerror = function () { checkpointIconCache.delete(url); };
-    img.src = url;
-    checkpointIconCache.set(url, img);
-    return img;
+function isCheckpointDarkMode() {
+    return document.body && document.body.classList.contains('dark-theme');
+}
+
+// Cache <img> loads and the colorized canvases we generate from them. The
+// raw image is shared across themes (one fetch per URL), but each color
+// variant gets its own canvas under a separate key.
+const CHECKPOINT_ICON_SIZE = 20;
+const checkpointIconRawCache = new Map();   // url -> Image
+const checkpointIconCanvasCache = new Map(); // url|color -> canvas
+
+function getCheckpointIcon(url, glyphColor, onLoad) {
+    var key = url + '|' + glyphColor;
+    if (checkpointIconCanvasCache.has(key)) return checkpointIconCanvasCache.get(key);
+
+    var canvas = document.createElement('canvas');
+    canvas.width = CHECKPOINT_ICON_SIZE;
+    canvas.height = CHECKPOINT_ICON_SIZE;
+    checkpointIconCanvasCache.set(key, canvas);
+
+    function paint(img) {
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, CHECKPOINT_ICON_SIZE, CHECKPOINT_ICON_SIZE);
+        ctx.drawImage(img, 0, 0, CHECKPOINT_ICON_SIZE, CHECKPOINT_ICON_SIZE);
+        // Replace the image's color with glyphColor, preserving its alpha
+        // mask. source-in keeps only the parts that overlap existing pixels.
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.fillStyle = glyphColor;
+        ctx.fillRect(0, 0, CHECKPOINT_ICON_SIZE, CHECKPOINT_ICON_SIZE);
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    var img = checkpointIconRawCache.get(url);
+    if (img && img.complete && img.naturalWidth > 0) {
+        paint(img);
+        return canvas;
+    }
+    if (!img) {
+        img = new Image();
+        img.referrerPolicy = 'no-referrer';
+        img.src = url;
+        checkpointIconRawCache.set(url, img);
+    }
+    img.addEventListener('load', function () {
+        paint(img);
+        if (typeof onLoad === 'function') onLoad();
+    });
+    img.addEventListener('error', function () {
+        checkpointIconRawCache.delete(url);
+        checkpointIconCanvasCache.delete(key);
+    });
+    return canvas;
 }
 
 // Keyrune glyphs vary in intrinsic width/height (some sets have a tall skinny
@@ -425,9 +466,10 @@ function getCheckpointIcon(url, onLoad) {
 const KEYRUNE_CANVAS_SIZE = 22;
 const KEYRUNE_FONT_PX = 18;
 const keyruneCanvasCache = new Map();
-function getKeyruneCanvas(code) {
+function getKeyruneCanvas(code, glyphColor) {
     if (!code) return null;
-    if (keyruneCanvasCache.has(code)) return keyruneCanvasCache.get(code);
+    var key = code + '|' + glyphColor;
+    if (keyruneCanvasCache.has(key)) return keyruneCanvasCache.get(key);
 
     var ch = getKeyruneChar(code);
     if (!ch) return null;
@@ -437,12 +479,12 @@ function getKeyruneCanvas(code) {
     canvas.height = KEYRUNE_CANVAS_SIZE;
     var ctx = canvas.getContext('2d');
     ctx.font = KEYRUNE_FONT_PX + 'px Keyrune';
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = glyphColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(ch, KEYRUNE_CANVAS_SIZE / 2, KEYRUNE_CANVAS_SIZE / 2);
 
-    keyruneCanvasCache.set(code, canvas);
+    keyruneCanvasCache.set(key, canvas);
     return canvas;
 }
 
@@ -533,12 +575,23 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
         // Scriptable so each draw re-evaluates: the first draw may fire
         // before the Keyrune font is ready; subsequent draws (after font
         // load triggers redraw above) pick up the real glyph character.
+        //
+        // Release markers use a black-circle/white-glyph palette in light
+        // mode; in dark mode that flips to a white circle with the glyph
+        // drawn in the (black) palette color so the badge stays visible
+        // against the dark chart background. Bans/unbans/reprints already
+        // use vivid palette colors that read fine in either theme, so we
+        // leave their white glyph alone.
+        var shouldInvert = function () {
+            return cp.type === 'release' && isCheckpointDarkMode();
+        };
         var contentFn = function () {
+            var glyphColor = shouldInvert() ? palette.label : '#ffffff';
             if (cp.keyruneCode) {
-                var canvas = getKeyruneCanvas(cp.keyruneCode);
+                var canvas = getKeyruneCanvas(cp.keyruneCode, glyphColor);
                 if (canvas) return canvas;
             }
-            if (cp.iconUrl) return getCheckpointIcon(cp.iconUrl, redraw);
+            if (cp.iconUrl) return getCheckpointIcon(cp.iconUrl, glyphColor, redraw);
             return cp.title;
         };
         // Font only affects the text-fallback path now — canvas content is
@@ -573,8 +626,14 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
                 drawTime: 'afterDraw',
                 content: contentFn,
                 position: 'end',
-                backgroundColor: palette.label,
-                color: '#ffffff',
+                // Releases invert in dark mode (see shouldInvert above);
+                // every other type keeps its original palette in both themes.
+                backgroundColor: function () {
+                    return shouldInvert() ? '#ffffff' : palette.label;
+                },
+                color: function () {
+                    return shouldInvert() ? palette.label : '#ffffff';
+                },
                 borderRadius: 12,
                 padding: 4,
                 font: fontFn,
