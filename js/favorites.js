@@ -56,6 +56,8 @@
                     av = a.buyPrice == null ? -Infinity : a.buyPrice;
                     bv = b.buyPrice == null ? -Infinity : b.buyPrice;
                     return (av - bv) * dir;
+                case 'manual':
+                    return 0;
                 case 'chrono':
                 default:
                     return ((a.t || 0) - (b.t || 0)) * dir;
@@ -87,7 +89,7 @@
         var html = '';
         pills.forEach(function(p) {
             var active = p.val === key;
-            var arrow = active ? (dir === 'asc' ? '<i data-lucide="arrow-up" class="fav-sort-dir asc"></i>' : '<i data-lucide="arrow-down" class="fav-sort-dir desc"></i>') : '';
+            var arrow = (active && key !== 'manual') ? (dir === 'asc' ? '<i data-lucide="arrow-up" class="fav-sort-dir asc"></i>' : '<i data-lucide="arrow-down" class="fav-sort-dir desc"></i>') : '';
             html += '<button class="fav-sort-pill' + (active ? ' active' : '') + '" data-val="' + p.val + '" onclick="window.cycleFavSort(\'' + p.val + '\')" title="' + p.title + '"><i data-lucide="' + p.icon + '"></i>' + arrow + '</button>';
         });
         return html;
@@ -302,7 +304,7 @@
             html += '</div>';
             html += '<div class="landing-pane-body">';
             slice.forEach(function(f) {
-                html += '<a class="landing-item landing-item-fav" href="?q=' + encodeURIComponent(f.query) + '">';
+                html += '<a class="landing-item landing-item-fav" href="?q=' + encodeURIComponent(f.query) + '"' + (f.pinned ? '' : ' draggable="true"') + ' data-fav-id="' + escapeAttr(f.id) + '">';
                 html += '<div class="landing-item-thumb">';
                 if (f.img) {
                     html += thumbHtml(f.img, f.foil, f.cw);
@@ -352,6 +354,59 @@
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
             lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
         }
+        if (mode === 'desktop') initDragDrop(container);
+    }
+
+    var dragSrcId = null;
+
+    function initDragDrop(container) {
+        var items = container.querySelectorAll('.landing-item-fav[draggable]');
+        items.forEach(function(el) {
+            el.addEventListener('dragstart', function(e) {
+                dragSrcId = el.dataset.favId;
+                el.classList.add('fav-dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', dragSrcId);
+            });
+            el.addEventListener('dragend', function() {
+                dragSrcId = null;
+                el.classList.remove('fav-dragging');
+                container.querySelectorAll('.fav-drag-over').forEach(function(x) {
+                    x.classList.remove('fav-drag-over');
+                });
+            });
+            el.addEventListener('dragover', function(e) {
+                if (!dragSrcId || dragSrcId === el.dataset.favId || el.querySelector('.landing-item-pin.pinned')) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                el.classList.add('fav-drag-over');
+            });
+            el.addEventListener('dragleave', function() {
+                el.classList.remove('fav-drag-over');
+            });
+            el.addEventListener('drop', function(e) {
+                e.preventDefault();
+                el.classList.remove('fav-drag-over');
+                var targetId = el.dataset.favId;
+                if (!dragSrcId || dragSrcId === targetId) return;
+                reorderFavorite(dragSrcId, targetId);
+            });
+        });
+    }
+
+    function reorderFavorite(fromId, toId) {
+        var favs = getFavorites();
+        var fromIdx = -1, toIdx = -1;
+        for (var i = 0; i < favs.length; i++) {
+            if (favs[i].id === fromId) fromIdx = i;
+            if (favs[i].id === toId) toIdx = i;
+        }
+        if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+        var item = favs.splice(fromIdx, 1)[0];
+        favs.splice(toIdx, 0, item);
+        saveFavorites(favs);
+        setSort('manual', 'desc');
+        renderFavorites();
     }
 
     function renderFavEmptyState() {

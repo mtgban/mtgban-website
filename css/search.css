@@ -1720,6 +1720,13 @@
 .landing-pane-favorites .landing-item-fav:hover {
     border-color: var(--accent-border, rgba(91,141,239,0.25));
 }
+.landing-item-fav.fav-dragging {
+    opacity: 0.4;
+}
+.landing-item-fav.fav-drag-over {
+    border-color: var(--ainfo);
+    border-style: dashed;
+}
 
 .landing-pane-favorites .landing-item-fav .landing-item-thumb {
     width: 5.6em;
