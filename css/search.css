@@ -2227,10 +2227,17 @@
     opacity: 0;
     transition: opacity 120ms, color 120ms;
 }
-.landing-item:hover .landing-item-pin,
-.landing-item-pin.pinned { opacity: 1; }
-.landing-item-pin:hover { color: var(--accent, #5b8def); }
-.landing-item-pin.pinned { color: var(--accent, #5b8def); }
+.landing-item:hover .landing-item-pin { opacity: 1; }
+.landing-item-pin:hover,
+.landing-item:hover .landing-item-pin.pinned { color: var(--accent, #5b8def); }
+
+/* Pinned row: tinted background instead of always-visible icon */
+.landing-item:has(.landing-item-pin.pinned) {
+    background: var(--surface-2);
+}
+.landing-pane-favorites .landing-item-fav:has(.landing-item-pin.pinned) {
+    background: var(--surface-3);
+}
 
 /* Pin sits left of the trash button on favorite tiles (both absolutely positioned) */
 .landing-pane-favorites .landing-item-fav .landing-item-pin {
