@@ -544,7 +544,7 @@ function getKeyruneChar(code) {
     return content;
 }
 
-function buildCheckpointAnnotations(checkpoints, chartRef) {
+function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
     currentCheckpoints = Array.isArray(checkpoints) ? checkpoints : [];
     var annotations = {};
     if (currentCheckpoints.length === 0) return annotations;
@@ -581,27 +581,53 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
     });
     // Step between stacked same-date badges. The label box is the icon canvas
     // (max 22px for keyrunes, 20px for iconUrl) plus 4px padding on each side,
-    // so the largest box is 30px tall. Step needs to clear that with a small
-    // gap, otherwise adjacent circles overlap visibly.
-    var STACK_STEP_PX = KEYRUNE_CANVAS_SIZE + 2 * 4 + 2;
+    // so the largest box is 30px tall. Step is 2px wider so adjacent circles
+    // have a small gap rather than touching.
+    var LABEL_PADDING_PX = 4;
+    var LABEL_HALF_PX = KEYRUNE_CANVAS_SIZE / 2 + LABEL_PADDING_PX;  // 15
+    var STACK_STEP_PX = KEYRUNE_CANVAS_SIZE + 2 * LABEL_PADDING_PX + 2;
+
+    // Reserve a band above the plot for ABOVE_CAPACITY badges. Anything
+    // beyond that stacks downward into the chart, keeping a constant step so
+    // the visual spacing stays uniform when the stack crosses the plot edge.
+    // The reference is the lowest above-plot slot: its bottom edge sits flush
+    // with the plot top, then each step up adds STACK_STEP_PX.
+    var ABOVE_CAPACITY = 2;
+    var topPad = 2 * LABEL_HALF_PX + (ABOVE_CAPACITY - 1) * STACK_STEP_PX + 4;
+    if (opts) {
+        opts.layout = opts.layout || {};
+        var pad = opts.layout.padding;
+        if (pad == null) {
+            opts.layout.padding = { top: topPad };
+        } else if (typeof pad === 'number') {
+            opts.layout.padding = { top: Math.max(pad, topPad), right: pad, bottom: pad, left: pad };
+        } else {
+            pad.top = Math.max(pad.top || 0, topPad);
+        }
+    }
 
     checkpoints.forEach(function (cp, i) {
         var palette = checkpointColors[cp.type] || { line: 'rgba(120,120,120,0.9)', label: 'rgba(120,120,120,0.9)' };
 
         // Stack position within the same-date group, counting only currently
         // visible siblings that appear before this one in the list. Hiding a
-        // type via its checkbox collapses the empty slot.
+        // type via its checkbox (or range-suppressing releases) collapses the
+        // empty slot. Slot (ABOVE_CAPACITY - 1) sits flush with the plot top;
+        // earlier slots stack upward into the reserved band, later slots
+        // continue downward into the chart, all with the same step.
         var yAdjustFn = function () {
             var group = sameDateGroups[cp.date] || [i];
             var visibleSlot = 0;
             for (var j = 0; j < group.length; j++) {
                 if (group[j] === i) break;
                 var prev = checkpoints[group[j]];
-                if (visibleCheckpointTypes.has(checkpointToggleKey(prev.type))) {
+                var prevKey = checkpointToggleKey(prev.type);
+                if (prevKey === 'release' && releasesSuppressedByRange) continue;
+                if (visibleCheckpointTypes.has(prevKey)) {
                     visibleSlot++;
                 }
             }
-            return 2 + visibleSlot * STACK_STEP_PX;
+            return -LABEL_HALF_PX + (visibleSlot - (ABOVE_CAPACITY - 1)) * STACK_STEP_PX;
         };
 
         // Scriptable so each draw re-evaluates: the first draw may fire
