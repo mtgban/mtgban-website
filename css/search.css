@@ -1715,11 +1715,10 @@
     border-radius: 0.5em;
     background: var(--surface-2);
     padding: 0.6em;
-    transition: border-color 150ms, box-shadow 150ms;
+    transition: border-color 150ms;
 }
 .landing-pane-favorites .landing-item-fav:hover {
     border-color: var(--accent-border, rgba(91,141,239,0.25));
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
 }
 
 .landing-pane-favorites .landing-item-fav .landing-item-thumb {
