@@ -449,21 +449,21 @@ function getReleasesShortRangePref() {
     }
 }
 
+// Updates in-memory state and the checkbox DOM only. Callers are responsible
+// for triggering a chart redraw — folding the redraw in here would commit any
+// pending axis changes (e.g. an x.min set just before this call) without
+// animation, killing the transition on range changes that also flip release
+// visibility.
 function setReleasesSuppressedByRange(rangeDays) {
     currentRangeDays = rangeDays;
     var longRange = isLongChartRange(rangeDays);
     var shouldShow = longRange ? getReleasesLongRangePref() : getReleasesShortRangePref();
 
-    var wasVisible = visibleCheckpointTypes.has('release');
     if (shouldShow) visibleCheckpointTypes.add('release');
     else visibleCheckpointTypes.delete('release');
 
     var el = document.getElementById('cpToggleRelease');
     if (el) el.checked = shouldShow;
-
-    if (window.cardChart && wasVisible !== shouldShow) {
-        window.cardChart.update('none');
-    }
 }
 
 // Snapshot of the checkpoints currently rendered on the chart. Used by the
