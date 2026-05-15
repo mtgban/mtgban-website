@@ -30,6 +30,8 @@ type ScraperConfig struct {
 
 	Config map[string]map[string][]string `json:"config"`
 
+	ForceReloadAt []string `json:"force_reload_at"`
+
 	Icons        map[string]string `json:"icons"`
 	NameOverride map[string]string `json:"name_override"`
 }
