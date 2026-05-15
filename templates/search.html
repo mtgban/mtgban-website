@@ -621,6 +621,7 @@
                                  data-finish-class="{{$card.FinishClass}}"
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
+                                 data-crop-url="{{$card.CropURL}}"
                                  onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
