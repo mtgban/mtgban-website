@@ -172,24 +172,22 @@
     border-color: var(--settings-amber);
 }
 
-/* Save (primary) - green (confirm / commit) */
+/* Save (primary) - green, mirrors Cancel's outline style */
 .settings-btn.primary {
-    background: var(--settings-green);
-    border-color: var(--settings-green);
-    color: #0a1f12;
+    background: color-mix(in srgb, var(--settings-green) 10%, transparent);
+    border-color: color-mix(in srgb, var(--settings-green) 45%, transparent);
+    color: var(--settings-green);
     font-weight: 600;
-    box-shadow: 0 2px 10px color-mix(in srgb, var(--settings-green) 30%, transparent);
 }
 .settings-btn.primary:hover {
-    background: color-mix(in srgb, var(--settings-green) 88%, white);
-    border-color: color-mix(in srgb, var(--settings-green) 88%, white);
+    background: color-mix(in srgb, var(--settings-green) 18%, transparent);
+    border-color: var(--settings-green);
 }
 .settings-btn.primary:disabled {
     background: var(--surface-3);
     border-color: var(--border-moderate);
     color: var(--text-dim);
     cursor: not-allowed;
-    box-shadow: none;
 }
 
 /* ── Sections ────────────────────────────────────────────── */
