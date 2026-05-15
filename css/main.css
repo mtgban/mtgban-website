@@ -1431,17 +1431,17 @@ table.tiers td div {
 .ban-confirm-btn {
     padding: 0.5em 0.95em;
     border-radius: 0.4em;
-    border: 1px solid var(--border-moderate);
-    background: var(--surface-3);
-    color: var(--normal);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: #4a4f5a;
+    color: #fff;
     font: inherit;
     white-space: nowrap;
     cursor: pointer;
     transition: border-color 0.12s ease, background 0.12s ease;
 }
 .ban-confirm-btn:hover {
-    border-color: var(--accent-border, rgba(91, 141, 239, 0.45));
-    background: var(--surface-2);
+    border-color: rgba(255, 255, 255, 0.3);
+    background: #5a5f6a;
 }
 
 .ban-confirm-btn-danger {
