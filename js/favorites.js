@@ -114,6 +114,7 @@
 
         var isFoil = finishClass === 'foil' || finishClass === 'altfoil';
         var isEtched = finishClass === 'etched';
+        var hasContentWarning = row.getAttribute('data-has-warning') === 'true';
 
         // Locate the surrounding card container to find best-price rows.
         // Mobile: .m-card. Desktop: each card's results sit between .result-header rows; the .result-body follows.
@@ -174,7 +175,8 @@
             buyVendor: buyVendor,
             query: query,
             t: Date.now(),
-            img: imageUrl
+            img: imageUrl,
+            cw: hasContentWarning
         };
     }
 
@@ -261,7 +263,7 @@
             favs.forEach(function(f) {
                 html += '<a class="m-fav-item" href="?q=' + encodeURIComponent(f.query) + '">';
                 if (f.img) {
-                    html += '<img class="m-fav-thumb" src="' + escapeAttr(f.img) + '" loading="lazy" alt="">';
+                    html += '<div class="m-fav-thumb">' + thumbHtml(f.img, f.foil, f.cw) + '</div>';
                 }
                 html += '<div class="m-fav-item-body">';
                 html += '<div class="m-fav-item-top">';
@@ -303,7 +305,7 @@
                 html += '<a class="landing-item landing-item-fav" href="?q=' + encodeURIComponent(f.query) + '">';
                 html += '<div class="landing-item-thumb">';
                 if (f.img) {
-                    html += '<img src="' + escapeAttr(f.img) + '" loading="lazy" alt="">';
+                    html += thumbHtml(f.img, f.foil, f.cw);
                 } else {
                     html += '<span class="landing-item-thumb-placeholder">&#9733;</span>';
                 }
@@ -416,6 +418,14 @@
                     '</div>' +
                 '</div>' +
             '</div>';
+    }
+
+    function thumbHtml(src, foil, cw) {
+        var cls = 'foil-wrap';
+        if (cw) cls += ' content-warning';
+        return '<div class="' + cls + '" data-foil="' + (foil ? 'true' : 'false') + '"' +
+               (cw ? ' onclick="this.classList.add(\'cw-revealed\');event.preventDefault();event.stopPropagation()"' : '') +
+               '><img src="' + escapeAttr(src) + '" loading="lazy" alt=""></div>';
     }
 
     function escapeHtml(str) {

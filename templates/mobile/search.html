@@ -202,6 +202,7 @@
                  data-finish-tag="{{$card.FinishTag}}"
                  data-finish-class="{{$card.FinishClass}}"
                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
+                 data-has-warning="{{$card.HasContentWarning}}"
                  data-setcode="{{$card.SetCode}}"
                  onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
                 <div class="m-card-icon">
