@@ -151,7 +151,7 @@
                 if (token.keyrune) {
                     html += '<i class="ss ' + escapeAttr(token.keyrune) + ' ss-fw"></i>';
                 } else if (s.img) {
-                    html += '<img src="' + escapeAttr(s.img) + '" loading="lazy" alt="">';
+                    html += thumbHtml(s.img, s.foil, s.cw);
                 } else {
                     html += '<span class="landing-item-thumb-placeholder"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>';
                 }
@@ -184,6 +184,14 @@
 
     function escapeAttr(str) {
         return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function thumbHtml(src, foil, cw) {
+        var cls = 'foil-wrap';
+        if (cw) cls += ' content-warning';
+        return '<div class="' + cls + '" data-foil="' + (foil ? 'true' : 'false') + '"' +
+               (cw ? ' onclick="this.classList.add(\'cw-revealed\');event.preventDefault();event.stopPropagation()"' : '') +
+               '><img src="' + escapeAttr(src) + '" loading="lazy" alt=""></div>';
     }
 
     window.deleteRecentSearch = function(query, ev) {
@@ -240,13 +248,24 @@
         var img = firstRow.getAttribute('data-image-url');
         if (!img) return;
 
+        var finishClass = firstRow.getAttribute('data-finish-class') || '';
+        var foil = finishClass === 'foil' || finishClass === 'altfoil';
+        var cw = firstRow.getAttribute('data-has-warning') === 'true';
+
         var searches = getRecentSearches();
         var qLower = q.toLowerCase();
         var changed = false;
         for (var i = 0; i < searches.length; i++) {
-            if (searches[i].q.toLowerCase() === qLower && !searches[i].img) {
-                searches[i].img = img;
-                changed = true;
+            if (searches[i].q.toLowerCase() === qLower) {
+                if (!searches[i].img) {
+                    searches[i].img = img;
+                    changed = true;
+                }
+                if (searches[i].foil !== foil || searches[i].cw !== cw) {
+                    searches[i].foil = foil;
+                    searches[i].cw = cw;
+                    changed = true;
+                }
                 break;
             }
         }

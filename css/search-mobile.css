@@ -1166,8 +1166,17 @@
     flex: 0 0 auto;
     width: 2.5em;
     height: 3.5em;
-    object-fit: cover;
     border-radius: 0.2em;
+    overflow: hidden;
+}
+.m-fav-thumb .foil-wrap {
+    width: 100%;
+    height: 100%;
+}
+.m-fav-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .m-fav-item-body {
