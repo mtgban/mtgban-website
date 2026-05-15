@@ -1224,6 +1224,17 @@
 .chart-checkpoint-toggles .cp-pill:has(input:not(:checked)) {
     opacity: 0.45;
 }
+/* Releases are auto-suppressed at 5+ year ranges — the marker density makes
+ * them illegible. The pill stays visible as a hint, but unclickable. */
+.chart-checkpoint-toggles .cp-pill-locked,
+.chart-checkpoint-toggles .cp-pill:has(input:disabled) {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.chart-checkpoint-toggles .cp-pill-locked input,
+.chart-checkpoint-toggles .cp-pill:has(input:disabled) input {
+    cursor: not-allowed;
+}
 .chart-checkpoint-toggles .cp-pill-ban:has(input:checked) {
     background-color: rgba(217, 83, 79, 0.15);
     border-color: rgba(217, 83, 79, 0.4);
