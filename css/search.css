@@ -1670,6 +1670,15 @@
 .landing-pane-recent .landing-item-thumb i.ss {
     font-size: 1.8em;
 }
+.landing-pane-recent .landing-item:nth-child(even) {
+    background: var(--row-odd);
+}
+.landing-pane-recent .landing-item:hover {
+    background: var(--row-hover);
+}
+.landing-pane-recent .landing-item:has(.landing-item-pin.pinned) {
+    background: var(--surface-3);
+}
 
 /* Favorites pane: 2-column grid of card-style tiles */
 .landing-pane-favorites .landing-pane-body {
