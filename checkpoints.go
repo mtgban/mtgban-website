@@ -4,13 +4,11 @@ import (
 	"encoding/json"
 	"log"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
@@ -57,13 +55,12 @@ var (
 	checkpointsLoaded []CheckpointEvent
 )
 
-// InitCheckpoints loads the JSON file and starts an fsnotify watcher that
-// reloads on change. Safe to call once at server startup.
+// InitCheckpoints loads the JSON file at startup. Subsequent reloads are
+// driven by the admin "Reload Checkpoints" button (see admin.go).
 func InitCheckpoints() {
 	if err := reloadCheckpoints(); err != nil {
 		log.Printf("checkpoints: initial load failed: %v", err)
 	}
-	go watchCheckpoints()
 }
 
 func reloadCheckpoints() error {
@@ -80,37 +77,6 @@ func reloadCheckpoints() error {
 	checkpointsMu.Unlock()
 	log.Printf("checkpoints: loaded %d events from %s", len(parsed.Events), checkpointsPath)
 	return nil
-}
-
-func watchCheckpoints() {
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		log.Printf("checkpoints: watcher unavailable: %v", err)
-		return
-	}
-	defer w.Close()
-
-	// Watch the directory rather than the file directly — editors often
-	// replace files atomically (write → rename), which severs a file-level
-	// watch but is visible on a directory watch as Create.
-	dir := filepath.Dir(checkpointsPath)
-	if err := w.Add(dir); err != nil {
-		log.Printf("checkpoints: cannot watch %s: %v", dir, err)
-		return
-	}
-
-	target := filepath.Base(checkpointsPath)
-	for ev := range w.Events {
-		if filepath.Base(ev.Name) != target {
-			continue
-		}
-		if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
-			continue
-		}
-		if err := reloadCheckpoints(); err != nil {
-			log.Printf("checkpoints: reload failed: %v", err)
-		}
-	}
 }
 
 // relevantCheckpoints returns the checkpoint markers that apply to a chart for
