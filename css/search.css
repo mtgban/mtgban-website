@@ -1164,6 +1164,59 @@
     flex-shrink: 0;
 }
 
+/* Box around the chart event toggles so it's visually clear that the three
+ * checkboxes belong together and govern what shows up on the chart. */
+.chart-checkpoint-toggles {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 10px;
+    margin: 8px 0 0;
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 6px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.03));
+    font-size: 12px;
+}
+.chart-checkpoint-toggles::before {
+    content: 'Chart events:';
+    color: var(--text-secondary, #666);
+    font-weight: 500;
+}
+.chart-checkpoint-toggles label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+    margin: 0;
+}
+
+/* Tinted pill per checkpoint type — acts as a legend tying each toggle to
+ * its badge color on the chart. Unchecked pills lose their tint and dim,
+ * mirroring the corresponding annotations disappearing from the chart. */
+.chart-checkpoint-toggles .cp-pill {
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.chart-checkpoint-toggles .cp-pill:has(input:not(:checked)) {
+    opacity: 0.45;
+}
+.chart-checkpoint-toggles .cp-pill-ban:has(input:checked) {
+    background-color: rgba(217, 83, 79, 0.15);
+    border-color: rgba(217, 83, 79, 0.4);
+}
+.chart-checkpoint-toggles .cp-pill-release:has(input:checked) {
+    background-color: rgba(108, 117, 125, 0.18);
+    border-color: rgba(108, 117, 125, 0.45);
+}
+.chart-checkpoint-toggles .cp-pill-reprint:has(input:checked) {
+    background-color: rgba(240, 173, 78, 0.2);
+    border-color: rgba(240, 173, 78, 0.5);
+}
+
 
 /* ═══ Options page ═══ */
 
