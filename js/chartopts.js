@@ -406,24 +406,64 @@ function chartSpansAtLeastDays(chart, days) {
 // checkpointToggleKey, so the visibility set only needs the canonical keys.
 const visibleCheckpointTypes = new Set(['ban', 'release', 'reprint']);
 
-// When the selected date range is wide enough that release markers crowd
-// every pixel, the Releases checkbox is force-disabled. We track that as a
-// separate flag so the user's saved on/off preference survives a temporary
-// range change — flipping back to a shorter range restores their choice.
-const RELEASE_SUPPRESS_MIN_DAYS = 1825;
+// Legacy flag — kept false so the older `if (key === 'release' &&
+// releasesSuppressedByRange) continue;` checks elsewhere never trip.
+// Release visibility at long ranges is now driven by a separate pref.
 var releasesSuppressedByRange = false;
 
-function setReleasesSuppressedByRange(rangeDays) {
-    var suppressed = typeof rangeDays === 'number' && rangeDays >= RELEASE_SUPPRESS_MIN_DAYS;
-    if (releasesSuppressedByRange === suppressed) return;
-    releasesSuppressedByRange = suppressed;
-    var el = document.getElementById('cpToggleRelease');
-    if (el) {
-        el.disabled = suppressed;
-        var pill = el.closest('.cp-pill');
-        if (pill) pill.classList.toggle('cp-pill-locked', suppressed);
+// Long-range release auto-hide: at 5y/10y the release lines are noisy and
+// laggy, so we default release markers off. The user can opt back in via
+// the Releases checkbox; that choice is stored separately from the short-
+// range preference so flipping ranges doesn't clobber either setting.
+var RELEASE_LONG_RANGE_DAYS = 1825;
+var RELEASES_LONG_RANGE_KEY = 'chartReleasesLongRange';
+var currentRangeDays = 0;
+
+function isLongChartRange(rangeDays) {
+    return typeof rangeDays === 'number' && rangeDays >= RELEASE_LONG_RANGE_DAYS;
+}
+
+function getReleasesLongRangePref() {
+    try {
+        return localStorage.getItem(RELEASES_LONG_RANGE_KEY) === 'true';
+    } catch (e) {
+        return false;
     }
-    if (window.cardChart) window.cardChart.update('none');
+}
+
+function setReleasesLongRangePref(on) {
+    try {
+        localStorage.setItem(RELEASES_LONG_RANGE_KEY, String(on));
+    } catch (e) {}
+}
+
+function getReleasesShortRangePref() {
+    try {
+        var raw = localStorage.getItem(CHECKPOINT_TYPES_KEY);
+        if (!raw) return true;
+        var saved = JSON.parse(raw);
+        if (!Array.isArray(saved)) return true;
+        return saved.indexOf('release') !== -1;
+    } catch (e) {
+        return true;
+    }
+}
+
+function setReleasesSuppressedByRange(rangeDays) {
+    currentRangeDays = rangeDays;
+    var longRange = isLongChartRange(rangeDays);
+    var shouldShow = longRange ? getReleasesLongRangePref() : getReleasesShortRangePref();
+
+    var wasVisible = visibleCheckpointTypes.has('release');
+    if (shouldShow) visibleCheckpointTypes.add('release');
+    else visibleCheckpointTypes.delete('release');
+
+    var el = document.getElementById('cpToggleRelease');
+    if (el) el.checked = shouldShow;
+
+    if (window.cardChart && wasVisible !== shouldShow) {
+        window.cardChart.update('none');
+    }
 }
 
 // Snapshot of the checkpoints currently rendered on the chart. Used by the
@@ -437,7 +477,12 @@ var currentCheckpoints = [];
 // true date, which is usually what the user is looking at. Cached per x-scale
 // signature so we don't redo the sort + sweep per annotation on every draw.
 var CHECKPOINT_BADGE_WIDTH_PX = 32; // matches STACK_STEP_PX
+// Cluster threshold for vertical stacking — checkpoints whose pixel positions
+// fall within this many px of each other stack vertically. Matches the actual
+// label box: KEYRUNE_CANVAS_SIZE (22) + 2 * label padding (2) = 26.
+var CHECKPOINT_CLUSTER_PX = 26;
 var checkpointXLayoutCache = { signature: null, offsets: {} };
+var checkpointYLayoutCache = { signature: null, clusters: {} };
 
 function getCheckpointXAdjust(chart, idx) {
     var xScale = chart && chart.scales && chart.scales.x;
@@ -448,6 +493,128 @@ function getCheckpointXAdjust(chart, idx) {
         checkpointXLayoutCache.offsets = computeCheckpointXLayout(xScale);
     }
     return checkpointXLayoutCache.offsets[idx] || 0;
+}
+
+function getCheckpointYRow(chart, idx) {
+    var xScale = chart && chart.scales && chart.scales.x;
+    if (!xScale) return 0;
+    // Visibility is part of the signature: when the user toggles a type
+    // off, hidden icons drop out of the row-assignment sweep entirely, so
+    // remaining icons may move from bottom to top.
+    var visKey = Array.from(visibleCheckpointTypes).sort().join(',');
+    var sig = xScale.min + '|' + xScale.max + '|' + (xScale.width || 0) + '|' + visKey;
+    if (checkpointYLayoutCache.signature !== sig) {
+        checkpointYLayoutCache.signature = sig;
+        checkpointYLayoutCache.clusters = computeCheckpointYLayout(xScale);
+    }
+    var row = checkpointYLayoutCache.clusters[idx];
+    return typeof row === 'number' ? row : 0;
+}
+
+function computeCheckpointYLayout(xScale) {
+    // Two-pass priority placement. Reprints are demoted relative to
+    // releases/bans/formats so they don't push the main events to the
+    // bottom row when they happen to sit slightly left of one.
+    //
+    // Pass 1: non-reprints in px order — each goes top unless it would
+    // overlap an already-placed top item, in which case it goes bottom.
+    // Pass 2: reprints — same rule, but they check against the full
+    // top-row set populated by pass 1 (and by earlier pass-2 reprints).
+    var items = [];
+    for (var i = 0; i < currentCheckpoints.length; i++) {
+        var cp = currentCheckpoints[i];
+        if (!cp || !cp.date) continue;
+        var key = checkpointToggleKey(cp.type);
+        if (key === 'release' && releasesSuppressedByRange) continue;
+        if (!visibleCheckpointTypes.has(key)) continue;
+        var px = xScale.getPixelForValue(new Date(cp.date).getTime());
+        if (!isFinite(px)) continue;
+        items.push({ idx: i, px: px, type: cp.type });
+    }
+    items.sort(function (a, b) {
+        var pa = a.type === 'reprint' ? 1 : 0;
+        var pb = b.type === 'reprint' ? 1 : 0;
+        if (pa !== pb) return pa - pb;
+        return a.px - b.px;
+    });
+
+    var rows = {};
+    var rowPxs = [[], [], []]; // top, bottom, deep — tried in this order
+    function minDist(pxs, px) {
+        var min = Infinity;
+        for (var k = 0; k < pxs.length; k++) {
+            var d = Math.abs(pxs[k] - px);
+            if (d < min) min = d;
+        }
+        return min;
+    }
+    for (var j = 0; j < items.length; j++) {
+        var it = items[j];
+        var dists = [
+            minDist(rowPxs[0], it.px),
+            minDist(rowPxs[1], it.px),
+            minDist(rowPxs[2], it.px),
+        ];
+        var chosen = -1;
+        // First clear row wins.
+        for (var r = 0; r < 3; r++) {
+            if (dists[r] >= CHECKPOINT_CLUSTER_PX) { chosen = r; break; }
+        }
+        // All three rows blocked — fall back to whichever has the most
+        // clearance so the inevitable overlap is minimised.
+        if (chosen < 0) {
+            var bestDist = -Infinity;
+            for (var r = 0; r < 3; r++) {
+                if (dists[r] > bestDist) { bestDist = dists[r]; chosen = r; }
+            }
+        }
+        rows[it.idx] = chosen;
+        rowPxs[chosen].push(it.px);
+    }
+    return rows;
+}
+
+// When the user hovers a checkpoint icon, snap the tooltip/crosshair to the
+// closest data-point index for that date. The existing crosshair plugin reads
+// from chart.tooltip's active elements, so once those are set the vertical
+// line and price tooltip appear at the picked date automatically.
+function activateCheckpointDate(chart, dateStr) {
+    if (!chart || !chart.data || !chart.data.labels || !chart.tooltip) return;
+    var labels = chart.data.labels;
+    if (labels.length === 0) return;
+
+    var target = new Date(dateStr).getTime();
+    if (!isFinite(target)) return;
+
+    var closestIdx = 0;
+    var minDist = Math.abs(new Date(labels[0]).getTime() - target);
+    for (var k = 1; k < labels.length; k++) {
+        var d = Math.abs(new Date(labels[k]).getTime() - target);
+        if (d < minDist) { minDist = d; closestIdx = k; }
+    }
+
+    var elements = [];
+    chart.data.datasets.forEach(function (_, dsIdx) {
+        if (chart.isDatasetVisible(dsIdx)) {
+            elements.push({ datasetIndex: dsIdx, index: closestIdx });
+        }
+    });
+    if (elements.length === 0) return;
+
+    var xScale = chart.scales && chart.scales.x;
+    var area = chart.chartArea;
+    var caretX = xScale ? xScale.getPixelForValue(target) : (area ? (area.left + area.right) / 2 : 0);
+    var caretY = area ? (area.top + area.bottom) / 2 : 0;
+    chart.tooltip.setActiveElements(elements, { x: caretX, y: caretY });
+    chart.setActiveElements(elements);
+    chart.update('none');
+}
+
+function clearCheckpointActivation(chart) {
+    if (!chart || !chart.tooltip) return;
+    chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+    chart.setActiveElements([]);
+    chart.update('none');
 }
 
 function computeCheckpointXLayout(xScale) {
@@ -490,7 +657,15 @@ function isCheckpointDarkMode() {
 // Cache <img> loads and the colorized canvases we generate from them. The
 // raw image is shared across themes (one fetch per URL), but each color
 // variant gets its own canvas under a separate key.
-const CHECKPOINT_ICON_SIZE = 20;
+//
+// Canvas dimension matches KEYRUNE_CANVAS_SIZE and the actual draw size
+// matches KEYRUNE_FONT_PX (declared later in the file), so hammer/unlock
+// icons render at the same visible size as the keyrune glyphs (centered
+// in the same-sized box). Kept as numeric literals here to dodge the TDZ
+// since this `const` is declared before the keyrune ones.
+const CHECKPOINT_ICON_SIZE = 22;
+const CHECKPOINT_ICON_GLYPH_PX = 18;
+const CHECKPOINT_ICON_INSET = (CHECKPOINT_ICON_SIZE - CHECKPOINT_ICON_GLYPH_PX) / 2;
 const checkpointIconRawCache = new Map();   // url -> Image
 const checkpointIconCanvasCache = new Map(); // url|color -> canvas
 
@@ -506,7 +681,7 @@ function getCheckpointIcon(url, glyphColor, onLoad) {
     function paint(img) {
         var ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, CHECKPOINT_ICON_SIZE, CHECKPOINT_ICON_SIZE);
-        ctx.drawImage(img, 0, 0, CHECKPOINT_ICON_SIZE, CHECKPOINT_ICON_SIZE);
+        ctx.drawImage(img, CHECKPOINT_ICON_INSET, CHECKPOINT_ICON_INSET, CHECKPOINT_ICON_GLYPH_PX, CHECKPOINT_ICON_GLYPH_PX);
         // Replace the image's color with glyphColor, preserving its alpha
         // mask. source-in keeps only the parts that overlap existing pixels.
         ctx.globalCompositeOperation = 'source-in';
@@ -599,8 +774,9 @@ function getKeyruneChar(code) {
 
 function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
     currentCheckpoints = Array.isArray(checkpoints) ? checkpoints : [];
-    // New dataset → previous xAdjust offsets are stale.
+    // New dataset → previous layout caches are stale.
     checkpointXLayoutCache = { signature: null, offsets: {} };
+    checkpointYLayoutCache = { signature: null, clusters: {} };
     var annotations = {};
     if (currentCheckpoints.length === 0) return annotations;
 
@@ -636,17 +812,15 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
     });
     // Step between stacked same-date badges. The label box is the icon canvas
     // (max 22px for keyrunes, 20px for iconUrl) plus 4px padding on each side,
-    // so the largest box is 30px tall. Step is 2px wider so adjacent circles
-    // have a small gap rather than touching.
-    var LABEL_PADDING_PX = 4;
-    var LABEL_HALF_PX = KEYRUNE_CANVAS_SIZE / 2 + LABEL_PADDING_PX;  // 15
-    var STACK_STEP_PX = KEYRUNE_CANVAS_SIZE + 2 * LABEL_PADDING_PX + 2;
+    // Padding matches the label config below (1px). Step is below the font
+    // size, so the visible glyphs slightly overlap each other — keyrune icons
+    // are mostly symmetric/centered, so a 2-3px overlap still reads cleanly.
+    var LABEL_PADDING_PX = 1;
+    var LABEL_HALF_PX = KEYRUNE_CANVAS_SIZE / 2 + LABEL_PADDING_PX;
+    var STACK_STEP_PX = KEYRUNE_FONT_PX - 6;
 
-    // Reserve a band above the plot for ABOVE_CAPACITY badges. Anything
-    // beyond that stacks downward into the chart, keeping a constant step so
-    // the visual spacing stays uniform when the stack crosses the plot edge.
-    // The reference is the lowest above-plot slot: its bottom edge sits flush
-    // with the plot top, then each step up adds STACK_STEP_PX.
+    // Reserve a band above the plot for the single above-plot row. Only one
+    // step up is ever used, so ABOVE_CAPACITY = 2 is enough.
     var ABOVE_CAPACITY = 2;
     var topPad = 2 * LABEL_HALF_PX + (ABOVE_CAPACITY - 1) * STACK_STEP_PX + 4;
     if (opts) {
@@ -664,42 +838,42 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
     checkpoints.forEach(function (cp, i) {
         var palette = checkpointColors[cp.type] || { line: 'rgba(120,120,120,0.9)', label: 'rgba(120,120,120,0.9)' };
 
-        // Stack position within the same-date group, counting only currently
-        // visible siblings that appear before this one in the list. Hiding a
-        // type via its checkbox (or range-suppressing releases) collapses the
-        // empty slot. Slot (ABOVE_CAPACITY - 1) sits flush with the plot top;
-        // earlier slots stack upward into the reserved band, later slots
-        // continue downward into the chart, all with the same step.
-        var yAdjustFn = function () {
-            var group = sameDateGroups[cp.date] || [i];
-            var visibleSlot = 0;
-            for (var j = 0; j < group.length; j++) {
-                if (group[j] === i) break;
-                var prev = checkpoints[group[j]];
-                var prevKey = checkpointToggleKey(prev.type);
-                if (prevKey === 'release' && releasesSuppressedByRange) continue;
-                if (visibleCheckpointTypes.has(prevKey)) {
-                    visibleSlot++;
-                }
-            }
-            return -LABEL_HALF_PX + (visibleSlot - (ABOVE_CAPACITY - 1)) * STACK_STEP_PX;
+        // Stack position within the horizontal cluster (checkpoints whose
+        // pixel positions fall within CHECKPOINT_CLUSTER_PX of each other).
+        // At wide zoom levels, dates a few days apart still collapse to the
+        // same x-cluster and stack vertically instead of overlapping. Hidden
+        // siblings collapse their slot so the stack reflows to the top.
+        // Falls back to the build-time same-date group on first draw before
+        // the chart's x-scale is laid out.
+        //
+        // Three-row placement: row 0 is one step above the plot, row 1
+        // is one step below, row 2 is a deeper-below spillover row used
+        // only when the first two rows are both blocked. Row offsets are
+        // evenly spaced (2 * STACK_STEP_PX between consecutive rows). The
+        // placement sweep runs at draw time so it adapts to zoom and
+        // visibility.
+        var yAdjustFn = function (ctx) {
+            var row = getCheckpointYRow(ctx && ctx.chart, i);
+            var dirs = [-1, 1, 3];
+            return -LABEL_HALF_PX + dirs[row] * STACK_STEP_PX;
         };
 
         // Scriptable so each draw re-evaluates: the first draw may fire
         // before the Keyrune font is ready; subsequent draws (after font
         // load triggers redraw above) pick up the real glyph character.
         //
-        // Release markers use a black-circle/white-glyph palette in light
-        // mode; in dark mode that flips to a white circle with the glyph
-        // drawn in the (black) palette color so the badge stays visible
-        // against the dark chart background. Bans/unbans/reprints already
-        // use vivid palette colors that read fine in either theme, so we
-        // leave their white glyph alone.
-        var shouldInvert = function () {
-            return cp.type === 'release' && isCheckpointDarkMode();
+        // The glyph itself carries the type's color (release = monochrome
+        // theme-text, reprint = orange, ban = red, unban = green). Release
+        // is the only monochrome type, so it flips between black and white
+        // to stay legible against the chart background.
+        var glyphColorFn = function () {
+            if (cp.type === 'release') {
+                return isCheckpointDarkMode() ? '#ffffff' : '#000000';
+            }
+            return palette.label;
         };
         var contentFn = function () {
-            var glyphColor = shouldInvert() ? palette.label : '#ffffff';
+            var glyphColor = glyphColorFn();
             if (cp.keyruneCode) {
                 var canvas = getKeyruneCanvas(cp.keyruneCode, glyphColor);
                 if (canvas) return canvas;
@@ -723,20 +897,28 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
             xMax: cp.date,
             xScaleID: 'x',
             borderColor: palette.line,
-            // Release markers are noisy when the chart spans years — there
-            // can be dozens of set-release lines crowding the canvas. At 2+
-            // years of visible range we drop the dashed line for releases and
-            // keep only the keyrune label at the top. Bans/unbans/reprints
-            // stay dashed regardless since they're per-card and far sparser.
+            // Release lines get noisy at multi-year zooms — drop the dashed
+            // line once the visible range exceeds 2 years (i.e. 5y/10y),
+            // keeping only the keyrune icon at the top. Bans/unbans/
+            // reprints/formats stay dashed regardless.
             borderWidth: function (ctx) {
                 if (cp.type !== 'release') return 1.5;
-                return chartSpansAtLeastDays(ctx.chart, 730) ? 0 : 1.5;
+                return chartSpansAtLeastDays(ctx.chart, 731) ? 0 : 1.5;
             },
             borderDash: [4, 4],
-            display: function () {
+            display: function (ctx) {
                 var key = checkpointToggleKey(cp.type);
                 if (key === 'release' && releasesSuppressedByRange) return false;
-                return visibleCheckpointTypes.has(key);
+                if (!visibleCheckpointTypes.has(key)) return false;
+                // clip: false (set so badges can spill above the plot) also
+                // disables left/right clipping, so out-of-range lines leak
+                // into the axis margin. Filter them out by date here.
+                var xScale = ctx.chart && ctx.chart.scales && ctx.chart.scales.x;
+                if (xScale && typeof xScale.min === 'number' && typeof xScale.max === 'number') {
+                    var t = new Date(cp.date).getTime();
+                    if (t < xScale.min || t > xScale.max) return false;
+                }
+                return true;
             },
             label: {
                 display: true,
@@ -747,28 +929,27 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
                 drawTime: 'afterDraw',
                 content: contentFn,
                 position: 'end',
-                // Releases invert in dark mode (see shouldInvert above);
-                // every other type keeps its original palette in both themes.
-                backgroundColor: function () {
-                    return shouldInvert() ? '#ffffff' : palette.label;
-                },
-                color: function () {
-                    return shouldInvert() ? palette.label : '#ffffff';
-                },
-                borderRadius: 12,
-                padding: 4,
+                // No bubble — the glyph itself carries the type color. The
+                // `color` field only affects the iconText/title text-fallback
+                // path, which we keep tinted to match.
+                backgroundColor: 'transparent',
+                color: glyphColorFn,
+                borderRadius: 0,
+                padding: 1,
                 font: fontFn,
                 yAdjust: yAdjustFn,
-                xAdjust: function (ctx) {
-                    return getCheckpointXAdjust(ctx.chart, i);
-                },
+                xAdjust: 0,
             },
             enter: function (ctx) {
-                ctx.chart.canvas.style.cursor = cp.url ? 'pointer' : 'default';
+                var chart = ctx.chart;
+                chart.canvas.style.cursor = cp.url ? 'pointer' : 'default';
+                activateCheckpointDate(chart, cp.date);
                 return true;
             },
             leave: function (ctx) {
-                ctx.chart.canvas.style.cursor = 'default';
+                var chart = ctx.chart;
+                chart.canvas.style.cursor = 'default';
+                clearCheckpointActivation(chart);
                 return true;
             },
             click: function () {
@@ -793,7 +974,14 @@ var pendingCheckpointUpdate = false;
 function toggleCheckpointType(type, on) {
     if (on) visibleCheckpointTypes.add(type);
     else visibleCheckpointTypes.delete(type);
-    persistCheckpointTypes();
+    if (type === 'release' && isLongChartRange(currentRangeDays)) {
+        // Long-range release toggle stores the user's override separately
+        // from the short-range preference, so navigating ranges respects
+        // both choices independently.
+        setReleasesLongRangePref(on);
+    } else {
+        persistCheckpointTypes();
+    }
     if (pendingCheckpointUpdate) return;
     pendingCheckpointUpdate = true;
     requestAnimationFrame(function () {
@@ -806,9 +994,18 @@ var CHECKPOINT_TYPES_KEY = 'chartCheckpointTypes';
 
 function persistCheckpointTypes() {
     try {
+        var savedSet = new Set(visibleCheckpointTypes);
+        // At long range, the live `release` membership is the auto-hide
+        // state, not the user's short-range preference. Re-apply the saved
+        // short-range value so toggling ban/reprint at long range doesn't
+        // clobber what the user picked for short-range views.
+        if (isLongChartRange(currentRangeDays)) {
+            if (getReleasesShortRangePref()) savedSet.add('release');
+            else savedSet.delete('release');
+        }
         localStorage.setItem(
             CHECKPOINT_TYPES_KEY,
-            JSON.stringify(Array.from(visibleCheckpointTypes))
+            JSON.stringify(Array.from(savedSet))
         );
     } catch (e) { /* localStorage unavailable; non-fatal */ }
 }
