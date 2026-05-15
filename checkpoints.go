@@ -21,14 +21,19 @@ import (
 // CheckpointEvent is one record as authored in checkpoints.json. A single event
 // can fan out into multiple ChartCheckpoint annotations (e.g. a ban announcement
 // affecting several cards or carrying both banned and unbanned lists).
+//
+// AllCards skips the per-card filter so the event lands on every chart — used
+// for game-wide news like a format launch ("Pioneer announced") where the
+// banned/unbanned card lists don't apply. Type "format" is implicitly AllCards.
 type CheckpointEvent struct {
 	ID            string   `json:"id"`
-	Type          string   `json:"type"` // "ban" | "release"
+	Type          string   `json:"type"` // "ban" | "format"
 	Date          string   `json:"date"` // YYYY-MM-DD
 	Format        string   `json:"format,omitempty"`
 	Title         string   `json:"title"`
 	URL           string   `json:"url,omitempty"`
 	SetCode       string   `json:"set_code,omitempty"`
+	AllCards      bool     `json:"all_cards,omitempty"`
 	CardsBanned   []string `json:"cards_banned,omitempty"`
 	CardsUnbanned []string `json:"cards_unbanned,omitempty"`
 }
@@ -44,13 +49,16 @@ type checkpointsFile struct {
 // Releases/reprints carry a KeyruneCode so the frontend can render the set
 // glyph from the Keyrune font (already loaded for the search page) — that
 // avoids fetching and recoloring external SVGs at render time.
+// Format events carry an IconText (the format name, e.g. "Pioneer") which
+// the frontend draws directly as the label content.
 type ChartCheckpoint struct {
-	Type        string `json:"type"`   // "ban" | "unban" | "release" | "reprint"
+	Type        string `json:"type"`   // "ban" | "unban" | "release" | "reprint" | "format"
 	Date        string `json:"date"`   // YYYY-MM-DD
 	Title       string `json:"title"`  // headline, e.g. set name or ban announcement title
 	Detail      string `json:"detail"` // sub-line, e.g. "Banned in Modern"
 	URL         string `json:"url,omitempty"`
 	IconURL     string `json:"iconUrl,omitempty"`
+	IconText    string `json:"iconText,omitempty"`
 	KeyruneCode string `json:"keyruneCode,omitempty"`
 }
 
@@ -208,7 +216,7 @@ func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 		}
 		switch ev.Type {
 		case "ban":
-			if containsFold(ev.CardsBanned, cardName) {
+			if ev.AllCards || containsFold(ev.CardsBanned, cardName) {
 				out = append(out, ChartCheckpoint{
 					Type:    "ban",
 					Date:    ev.Date,
@@ -218,7 +226,7 @@ func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 					IconURL: "/img/checkpoints/hammer.svg",
 				})
 			}
-			if containsFold(ev.CardsUnbanned, cardName) {
+			if ev.AllCards || containsFold(ev.CardsUnbanned, cardName) {
 				out = append(out, ChartCheckpoint{
 					Type:    "unban",
 					Date:    ev.Date,
@@ -228,6 +236,18 @@ func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 					IconURL: "/img/checkpoints/unlock.svg",
 				})
 			}
+		case "format":
+			// Format-launch events are inherently all-cards: every chart
+			// should see "Pioneer announced" regardless of which card the
+			// user is viewing.
+			out = append(out, ChartCheckpoint{
+				Type:     "format",
+				Date:     ev.Date,
+				Title:    ev.Title,
+				Detail:   formatDetail(ev.Format),
+				URL:      ev.URL,
+				IconText: ev.Format,
+			})
 		}
 	}
 	return out
@@ -331,6 +351,13 @@ func banDetail(action, format string) string {
 		return action
 	}
 	return action + " in " + format
+}
+
+func formatDetail(format string) string {
+	if format == "" {
+		return "Format announced"
+	}
+	return format + " format announced"
 }
 
 func containsFold(list []string, target string) bool {

@@ -357,11 +357,15 @@ const checkpointColors = {
     unban:   { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
     release: { line: 'rgba(108, 117, 125, 0.9)', label: 'rgba(0, 0, 0, 0.9)'    },
     reprint: { line: 'rgba(240, 173, 78, 0.9)', label: 'rgba(240, 173, 78, 0.9)' },
+    format:  { line: 'rgba(102, 16, 242, 0.9)', label: 'rgba(102, 16, 242, 0.9)' },
 };
 
-// Bans + unbans share the "Bans" checkbox.
+// Bans + unbans share the "Bans" checkbox; releases + formats share the
+// "Releases" checkbox (both are set/format-launch context).
 function checkpointToggleKey(type) {
-    return type === 'unban' ? 'ban' : type;
+    if (type === 'unban') return 'ban';
+    if (type === 'format') return 'release';
+    return type;
 }
 
 var TICK_MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -396,6 +400,8 @@ function chartSpansAtLeastDays(chart, days) {
     return rangeDays >= days;
 }
 
+// Note: no 'format' entry — formats share the 'release' toggle via
+// checkpointToggleKey, so the visibility set only needs the canonical keys.
 const visibleCheckpointTypes = new Set(['ban', 'release', 'reprint']);
 
 // Snapshot of the checkpoints currently rendered on the chart. Used by the
@@ -592,6 +598,10 @@ function buildCheckpointAnnotations(checkpoints, chartRef) {
                 if (canvas) return canvas;
             }
             if (cp.iconUrl) return getCheckpointIcon(cp.iconUrl, glyphColor, redraw);
+            // Short text label (format name, etc.). The annotation plugin
+            // renders strings inline using the label font, so the badge sizes
+            // to fit the text rather than to the uniform icon canvas.
+            if (cp.iconText) return cp.iconText;
             return cp.title;
         };
         // Font only affects the text-fallback path now — canvas content is
