@@ -44,8 +44,8 @@
 
     window.confirmDialog = function(message, onConfirm, opts) {
         opts = opts || {};
+        if (host && !host.hidden) return; // re-entrant call while open: ignore without moving host
         var h = ensureHost(opts.anchor || null);
-        if (!h.hidden) return; // re-entrant call while open: ignore
         h.querySelector('.ban-confirm-message').textContent = message;
         var confirmBtn = h.querySelector('[data-role="confirm"]');
         confirmBtn.textContent = opts.confirmLabel || 'Clear all';
