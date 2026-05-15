@@ -690,7 +690,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 14px 6px;
+    padding: 6px 14px;
     background: var(--search-surface-1);
     border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     border-right: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
@@ -703,6 +703,7 @@
     font-size: var(--text-md);
     color: var(--search-text-dim);
     font-style: italic;
+    line-height: 1;
 }
 
 .result-badges { display: flex; gap: 4px; }
