@@ -1674,8 +1674,12 @@
 .landing-pane-recent .landing-item-pin {
     right: 2.3em;
 }
+.landing-pane-recent .landing-item-info {
+    transition: margin-right 0ms 50ms;
+}
 .landing-pane-recent .landing-item:hover .landing-item-info {
     margin-right: 3.2em;
+    transition: margin-right 0ms;
 }
 .landing-pane-recent .landing-item-thumb {
     width: 2.6em;

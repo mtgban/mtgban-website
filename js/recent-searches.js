@@ -108,6 +108,8 @@
 
     function renderRecentSearchesInto(container, mode) {
         if (!container) return;
+        var oldBody = container.querySelector('.landing-pane-body');
+        var savedScroll = oldBody ? oldBody.scrollTop : 0;
         var searches = pinnedFirst(getRecentSearches());
 
         if (searches.length === 0) {
@@ -170,6 +172,8 @@
             html += '</div>';
         }
         container.innerHTML = html;
+        var newBody = container.querySelector('.landing-pane-body');
+        if (newBody && savedScroll) newBody.scrollTop = savedScroll;
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
             lucide.createIcons({ nameAttr: 'data-lucide', attrs: {} });
         }
