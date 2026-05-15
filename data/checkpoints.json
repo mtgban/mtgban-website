@@ -53,8 +53,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/feature/march-23-2015-banned-and-restricted-announcement-2015-03-23",
       "cards_banned": [
         "Treasure Cruise"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2015-09-28-legacy",
@@ -94,8 +93,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/january-18-2016-banned-and-restricted-announcement-2016-01-18",
       "cards_banned": [
         "Prophet of Kruphix"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2016-01-18-modern",
@@ -107,8 +105,7 @@
       "cards_banned": [
         "Splinter Twin",
         "Summer Bloom"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2016-01-18-pauper",
@@ -119,8 +116,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/january-18-2016-banned-and-restricted-announcement-2016-01-18",
       "cards_banned": [
         "Cloud of Faeries"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2016-04-04-modern",
@@ -146,8 +142,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/banned-and-restricted-announcement-2016-04-04",
       "cards_banned": [
         "Lodestone Golem"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2016-11-03-pauper",
@@ -158,8 +153,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/magic-online/pauper-banned-list-change-2016-11-03",
       "cards_banned": [
         "Peregrine Drake"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2017-01-09-standard",
@@ -172,8 +166,7 @@
         "Emrakul, the Promised End",
         "Smuggler's Copter",
         "Reflector Mage"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2017-01-09-modern",
@@ -185,8 +178,7 @@
       "cards_banned": [
         "Gitaxian Probe",
         "Golgari Grave-Troll"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2017-04-24-legacy",
@@ -197,8 +189,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/april-24-2017-banned-and-restricted-announcement-2017-04-24",
       "cards_banned": [
         "Sensei's Divining Top"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2017-04-24-vintage",
@@ -210,8 +201,7 @@
       "cards_banned": [
         "Gitaxian Probe",
         "Gush"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2017-04-24-commander",
@@ -236,8 +226,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/addendum-april-24-2017-banned-and-restricted-announcement-2017-04-26",
       "cards_banned": [
         "Felidar Guardian"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2017-06-13-standard",
@@ -248,8 +237,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/feature/june-13-2017-banned-and-restricted-announcement-2017-06-13",
       "cards_banned": [
         "Aetherworks Marvel"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2017-08-28-vintage",
@@ -278,8 +266,7 @@
         "Rogue Refiner",
         "Ramunap Ruins",
         "Rampaging Ferocidon"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2018-02-12-modern",
@@ -288,7 +275,6 @@
       "format": "Modern",
       "title": "Modern B&R Announcement",
       "url": "https://magic.wizards.com/en/articles/archive/news/february-12-2018-banned-and-restricted-announcement-2018-02-12",
-      "cards_banned": [],
       "cards_unbanned": [
         "Jace, the Mind Sculptor",
         "Bloodbraid Elf"
@@ -325,8 +311,7 @@
       "cards_banned": [
         "Deathrite Shaman",
         "Gitaxian Probe"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-01-21-modern",
@@ -337,8 +322,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/january-21-2019-banned-and-restricted-announcement",
       "cards_banned": [
         "Krark-Clan Ironworks"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-05-20-pauper",
@@ -351,8 +335,7 @@
         "Gush",
         "Gitaxian Probe",
         "Daze"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-06-15-pauper",
@@ -365,8 +348,7 @@
         "High Tide",
         "Hymn to Tourach",
         "Sinkhole"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-07-08-modern",
@@ -377,8 +359,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/july-8-2019-banned-and-restricted-announcement-2019-07-08",
       "cards_banned": [
         "Bridge from Below"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-07-08-commander",
@@ -402,7 +383,6 @@
       "format": "Standard",
       "title": "Standard B&R Announcement",
       "url": "https://magic.wizards.com/en/articles/archive/news/august-26-2019-banned-and-restricted-announcement-2019-08-26",
-      "cards_banned": [],
       "cards_unbanned": [
         "Rampaging Ferocidon"
       ]
@@ -448,8 +428,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/october-21-2019-banned-and-restricted-announcement",
       "cards_banned": [
         "Field of the Dead"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-10-21-pauper",
@@ -460,8 +439,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/october-21-2019-banned-and-restricted-announcement",
       "cards_banned": [
         "Arcum's Astrolabe"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-10-21-pioneer",
@@ -476,8 +454,7 @@
         "Polluted Delta",
         "Windswept Heath",
         "Wooded Foothills"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-11-04-pioneer",
@@ -490,8 +467,7 @@
         "Felidar Guardian",
         "Leyline of Abundance",
         "Oath of Nissa"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-11-11-pioneer",
@@ -502,8 +478,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/november-11-2019-pioneer-banned-announcement",
       "cards_banned": [
         "Veil of Summer"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-11-18-brawl",
@@ -514,8 +489,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/november-18-2019-banned-and-restricted-announcement",
       "cards_banned": [
         "Oko, Thief of Crowns"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-11-18-standard",
@@ -528,8 +502,7 @@
         "Oko, Thief of Crowns",
         "Once Upon a Time",
         "Veil of Summer"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-11-18-legacy",
@@ -540,8 +513,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/november-18-2019-banned-and-restricted-announcement",
       "cards_banned": [
         "Wrenn and Six"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-11-18-vintage",
@@ -552,8 +524,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/november-18-2019-banned-and-restricted-announcement",
       "cards_banned": [
         "Narset, Parter of Veils"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-12-02-pioneer",
@@ -566,8 +537,7 @@
         "Field of the Dead",
         "Once Upon a Time",
         "Smuggler's Copter"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2019-12-16-pioneer",
@@ -579,8 +549,7 @@
       "cards_banned": [
         "Oko, Thief of Crowns",
         "Nexus of Fate"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-01-13-modern",
@@ -593,8 +562,7 @@
         "Oko, Thief of Crowns",
         "Mox Opal",
         "Mycosynth Lattice"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-03-09-brawl",
@@ -605,8 +573,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/march-9-2020-banned-and-restricted-announcement",
       "cards_banned": [
         "Golos, Tireless Pilgrim"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-03-09-legacy",
@@ -617,8 +584,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/march-9-2020-banned-and-restricted-announcement",
       "cards_banned": [
         "Underworld Breach"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-03-09-modern",
@@ -629,8 +595,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/march-9-2020-banned-and-restricted-announcement",
       "cards_banned": [
         "Once Upon a Time"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-04-13-brawl",
@@ -641,8 +606,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/april-13-2020-banned-and-restricted-announcement",
       "cards_banned": [
         "Lutri, the Spellchaser"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-04-13-commander",
@@ -654,8 +618,7 @@
       "cards_banned": [
         "Lutri, the Spellchaser",
         "Flash"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-05-18-brawl",
@@ -667,8 +630,7 @@
       "cards_banned": [
         "Drannith Magistrate",
         "Winota, Joiner of Forces"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-05-18-legacy",
@@ -680,8 +642,7 @@
       "cards_banned": [
         "Lurrus of the Dream-Den",
         "Zirda, the Dawnwaker"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-05-18-vintage",
@@ -692,8 +653,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/may-18-2020-banned-and-restricted-announcement",
       "cards_banned": [
         "Lurrus of the Dream-Den"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-06-01-standard",
@@ -705,8 +665,7 @@
       "cards_banned": [
         "Agent of Treachery",
         "Fires of Invention"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-07-13-modern",
@@ -717,8 +676,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/july-13-2020-banned-and-restricted-announcement-2020-07-13",
       "cards_banned": [
         "Arcum's Astrolabe"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-07-13-pauper",
@@ -730,8 +688,7 @@
       "cards_banned": [
         "Expedition Map",
         "Mystic Sanctuary"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-07-13-pioneer",
@@ -740,7 +697,6 @@
       "format": "Pioneer",
       "title": "Pioneer B&R Announcement",
       "url": "https://magic.wizards.com/en/articles/archive/news/july-13-2020-banned-and-restricted-announcement-2020-07-13",
-      "cards_banned": [],
       "cards_unbanned": [
         "Oath of Nissa"
       ]
@@ -757,8 +713,7 @@
         "Growth Spiral",
         "Teferi, Time Raveler",
         "Wilderness Reclamation"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-08-08-brawl",
@@ -769,8 +724,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/august-8-2020-banned-and-restricted-announcement",
       "cards_banned": [
         "Teferi, Time Raveler"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-08-24-brawl",
@@ -781,8 +735,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/august-24-2020-banned-and-restricted-announcement",
       "cards_banned": [
         "Runed Halo"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-08-24-pioneer",
@@ -796,8 +749,7 @@
         "Kethis, the Hidden Hand",
         "Underworld Breach",
         "Walking Ballista"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-09-28-standard",
@@ -808,8 +760,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/september-28-2020-banned-and-restricted-announcement-2020-09-28",
       "cards_banned": [
         "Uro, Titan of Nature's Wrath"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-10-12-standard",
@@ -822,8 +773,7 @@
         "Omnath, Locus of Creation",
         "Lucky Clover",
         "Escape to the Wilds"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2020-10-12-brawl",
@@ -834,8 +784,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/october-12-2020-banned-and-restricted-announcement",
       "cards_banned": [
         "Omnath, Locus of Creation"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2021-01-14-pauper",
@@ -846,8 +795,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/january-14-2021-banned-and-restricted-announcement",
       "cards_banned": [
         "Fall from Favor"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2021-02-15-pioneer",
@@ -862,8 +810,7 @@
         "Undercity Informer",
         "Uro, Titan of Nature's Wrath",
         "Wilderness Reclamation"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2021-02-15-modern",
@@ -878,8 +825,7 @@
         "Simian Spirit Guide",
         "Tibalt's Trickery",
         "Uro, Titan of Nature's Wrath"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2021-02-15-legacy",
@@ -892,8 +838,7 @@
         "Arcum's Astrolabe",
         "Dreadhorde Arcanist",
         "Oko, Thief of Crowns"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2021-02-15-vintage",
@@ -902,7 +847,6 @@
       "format": "Vintage",
       "title": "Vintage B&R Announcement",
       "url": "https://magic.wizards.com/en/articles/archive/news/february-15-2021-banned-and-restricted-announcement",
-      "cards_banned": [],
       "cards_unbanned": [
         "Lurrus of the Dream-Den"
       ]
@@ -916,8 +860,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/july-21-2021-banned-and-restricted-announcement",
       "cards_banned": [
         "Hullbreacher"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2021-09-08-pauper",
@@ -929,8 +872,7 @@
       "cards_banned": [
         "Chatterstorm",
         "Sojourner's Companion"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2021-09-08-commander",
@@ -955,8 +897,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/september-8-2021-banned-and-restricted-announcement",
       "cards_banned": [
         "Pithing Needle"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-01-25-pauper",
@@ -969,8 +910,7 @@
         "Atog",
         "Bonder's Ornament",
         "Prophetic Prism"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-01-25-standard",
@@ -983,8 +923,7 @@
         "Alrund's Epiphany",
         "Divide by Zero",
         "Faceless Haven"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-01-25-legacy",
@@ -995,8 +934,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/january-25-2022-banned-and-restricted-announcement",
       "cards_banned": [
         "Ragavan, Nimble Pilferer"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-03-07-modern",
@@ -1007,8 +945,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/march-7-2022-banned-and-restricted-announcement",
       "cards_banned": [
         "Lurrus of the Dream-Den"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-03-07-pioneer",
@@ -1019,8 +956,7 @@
       "url": "https://magic.wizards.com/en/articles/archive/news/march-7-2022-banned-and-restricted-announcement",
       "cards_banned": [
         "Lurrus of the Dream-Den"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-03-07-pauper",
@@ -1047,8 +983,7 @@
       "cards_banned": [
         "Expressive Iteration",
         "Winota, Joiner of Forces"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-09-19-pauper",
@@ -1062,8 +997,7 @@
         "Stirring Bard",
         "Underdark Explorer",
         "Vicious Battlerager"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-10-10-standard",
@@ -1074,8 +1008,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/october-10-2022-banned-and-restricted-announcement",
       "cards_banned": [
         "The Meathook Massacre"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2022-10-10-modern",
@@ -1086,8 +1019,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/october-10-2022-banned-and-restricted-announcement",
       "cards_banned": [
         "Yorion, Sky Nomad"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2023-03-06-legacy",
@@ -1099,8 +1031,7 @@
       "cards_banned": [
         "Expressive Iteration",
         "White Plume Adventurer"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2023-05-29-standard",
@@ -1113,8 +1044,7 @@
         "Fable of the Mirror-Breaker",
         "Invoke Despair",
         "Reckoner Bankbuster"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2023-08-07-modern",
@@ -1123,7 +1053,6 @@
       "format": "Modern",
       "title": "Modern B&R Announcement",
       "url": "https://magic.wizards.com/en/news/announcements/august-7-2023-banned-and-restricted-announcement",
-      "cards_banned": [],
       "cards_unbanned": [
         "Preordain"
       ]
@@ -1135,7 +1064,6 @@
       "format": "Legacy",
       "title": "Legacy B&R Announcement",
       "url": "https://magic.wizards.com/en/news/announcements/august-7-2023-banned-and-restricted-announcement",
-      "cards_banned": [],
       "cards_unbanned": [
         "Mind's Desire"
       ]
@@ -1165,8 +1093,7 @@
       "cards_banned": [
         "Fury",
         "Up the Beanstalk"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2023-12-04-pauper",
@@ -1177,8 +1104,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/december-4-2023-banned-and-restricted-announcement",
       "cards_banned": [
         "Monastery Swiftspear"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-03-11-modern",
@@ -1189,8 +1115,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/march-11-2024-banned-and-restricted-announcement",
       "cards_banned": [
         "Violent Outburst"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-03-11-vintage",
@@ -1199,7 +1124,6 @@
       "format": "Vintage",
       "title": "Vintage B&R Announcement",
       "url": "https://magic.wizards.com/en/news/announcements/march-11-2024-banned-and-restricted-announcement",
-      "cards_banned": [],
       "cards_unbanned": [
         "Ponder"
       ]
@@ -1295,8 +1219,7 @@
         "_____ _____ _____ Trespasser",
         "_____-o-saurus",
         "________ Goblin"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-05-13-vintage",
@@ -1389,8 +1312,7 @@
         "_____ _____ _____ Trespasser",
         "_____-o-saurus",
         "________ Goblin"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-05-13-pauper",
@@ -1484,8 +1406,7 @@
         "_____ _____ _____ Trespasser",
         "_____-o-saurus",
         "________ Goblin"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-06-07-pauper",
@@ -1496,8 +1417,7 @@
       "url": "",
       "cards_banned": [
         "Cranial Ram"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-08-26-pioneer",
@@ -1509,8 +1429,7 @@
       "cards_banned": [
         "Amalia Benavides Aguirre",
         "Sorin, Imperious Bloodlord"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-08-26-legacy",
@@ -1521,8 +1440,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/august-26-2024-banned-and-restricted-announcement",
       "cards_banned": [
         "Grief"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-08-26-modern",
@@ -1534,8 +1452,7 @@
       "cards_banned": [
         "Grief",
         "Nadu, Winged Wisdom"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-08-26-vintage",
@@ -1547,8 +1464,7 @@
       "cards_banned": [
         "Urza's Saga",
         "Vexing Bauble"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-09-23-commander",
@@ -1562,8 +1478,7 @@
         "Jeweled Lotus",
         "Mana Crypt",
         "Nadu, Winged Wisdom"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-12-16-pioneer",
@@ -1574,8 +1489,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/banned-and-restricted-december-16-2024",
       "cards_banned": [
         "Jegantha, the Wellspring"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2024-12-16-modern",
@@ -1606,8 +1520,7 @@
       "cards_banned": [
         "Psychic Frog",
         "Vexing Bauble"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2025-03-31-modern",
@@ -1618,8 +1531,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/banned-and-restricted-announcement-march-31-2025",
       "cards_banned": [
         "Underworld Breach"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2025-03-31-legacy",
@@ -1631,8 +1543,7 @@
       "cards_banned": [
         "Sowing Mycospawn",
         "Troll of Khazad-dûm"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2025-03-31-pauper",
@@ -1658,7 +1569,6 @@
       "format": "Commander",
       "title": "Commander unbans",
       "url": "",
-      "cards_banned": [],
       "cards_unbanned": [
         "Gifts Ungiven",
         "Sway of the Stars",
@@ -1682,8 +1592,7 @@
         "Monstrous Rage",
         "This Town Ain't Big Enough",
         "Up the Beanstalk"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2025-11-10-standard",
@@ -1696,8 +1605,7 @@
         "Vivi Ornitier",
         "Screaming Nemesis",
         "Proft's Eidetic Memory"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2025-11-10-pioneer",
@@ -1708,8 +1616,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/banned-and-restricted-november-10-2025",
       "cards_banned": [
         "Heartfire Hero"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2025-11-10-legacy",
@@ -1721,8 +1628,7 @@
       "cards_banned": [
         "Entomb",
         "Nadu, Winged Wisdom"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2025-11-10-pauper",
@@ -1733,8 +1639,7 @@
       "url": "https://magic.wizards.com/en/news/announcements/banned-and-restricted-november-10-2025",
       "cards_banned": [
         "High Tide"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2025-11-10-brawl",
@@ -1748,8 +1653,7 @@
         "Mana Drain",
         "Chrome Mox",
         "Ancient Tomb"
-      ],
-      "cards_unbanned": []
+      ]
     },
     {
       "id": "ban-2026-02-09-commander",
@@ -1758,7 +1662,6 @@
       "format": "Commander",
       "title": "Commander B&R",
       "url": "https://magic.wizards.com/en/news/announcements/commander-banned-and-restricted-february-9-2026",
-      "cards_banned": [],
       "cards_unbanned": [
         "Biorhythm",
         "Lutri, the Spellchaser"
