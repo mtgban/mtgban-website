@@ -94,7 +94,9 @@
 
 {{define "arbit-results"}}
 <div class="page-standard arb-page">
-        <img id="hoverImage" class="hoverImage" src=""/>
+        <div id="hoverWrap" class="foil-wrap hoverWrap">
+            <img id="hoverImage" class="hoverImage" src=""/>
+        </div>
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
@@ -351,7 +353,7 @@
             </div>
 
             <div class="arb-table-wrap">
-            <table class="table-data arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+            <table class="table-data arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';document.getElementById('hoverWrap').setAttribute('data-foil','false');">
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
@@ -401,7 +403,7 @@
                 {{$arbitContainer := .}}
                 {{range .Arbit}}
                     {{$card := (index $.Metadata .CardId)}}
-                    <tr onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';">
+                    <tr onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                         <td>
                             <div class="arb-card-cell">
                                 {{$keyrune := $card.Keyrune}}

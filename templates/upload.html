@@ -682,7 +682,9 @@
     <!-- Tab: Optimizer -->
     {{if .Optimized}}
     <div class="res-panel" id="panel-optimizer">
-        <img id="hoverImage" class="hoverImage" src=""/>
+        <div id="hoverWrap" class="foil-wrap hoverWrap">
+            <img id="hoverImage" class="hoverImage" src=""/>
+        </div>
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
 
@@ -829,7 +831,7 @@
                         <span class="opt-count">{{len $entries}} cards</span>
                         <span class="opt-total">$ {{printf "%.2f" $total}}</span>
                     </div>
-                    <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+                    <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';document.getElementById('hoverWrap').setAttribute('data-foil','false');">
                         <thead><tr>
                             <th>Card</th>
                             <th>Set</th>
@@ -840,7 +842,7 @@
                         <tbody>
                         {{range $entries}}
                             {{$card := (index $.Metadata .CardId)}}
-                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
+                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                                 <td class="opt-name">
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
                                     <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>

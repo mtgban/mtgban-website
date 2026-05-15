@@ -1,4 +1,5 @@
 var hoverImage = document.getElementById("hoverImage");
+var hoverWrap = document.getElementById("hoverWrap");
 
 document.addEventListener("mousemove", getMouse);
 
@@ -12,14 +13,17 @@ function getMouse(e){
 }
 
 function followMouse(){
-    if (mouseLoc.x + hoverImage.width > window.innerWidth + window.pageXOffset) {
-        hoverImage.style.left = (mouseLoc.x - hoverImage.width - 20) + "px";
+    var el = hoverWrap || hoverImage;
+    var w = hoverImage.width;
+    var h = hoverImage.height;
+    if (mouseLoc.x + w > window.innerWidth + window.pageXOffset) {
+        el.style.left = (mouseLoc.x - w - 20) + "px";
     } else {
-        hoverImage.style.left = mouseLoc.x + "px";
+        el.style.left = mouseLoc.x + "px";
     }
-    if (mouseLoc.y + hoverImage.height > window.innerHeight + window.pageYOffset) {
-        hoverImage.style.top = (mouseLoc.y - hoverImage.height - 20) + "px";
+    if (mouseLoc.y + h > window.innerHeight + window.pageYOffset) {
+        el.style.top = (mouseLoc.y - h - 20) + "px";
     } else {
-        hoverImage.style.top = mouseLoc.y + "px";
+        el.style.top = mouseLoc.y + "px";
     }
 }

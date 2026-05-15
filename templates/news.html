@@ -89,7 +89,9 @@
         <span class="nav-spacer"></span>
     </div>
 
-    <img id="hoverImage" class="hoverImage" src=""/>
+    <div id="hoverWrap" class="foil-wrap hoverWrap">
+        <img id="hoverImage" class="hoverImage" src=""/>
+    </div>
     <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
 
     <div class="page-wide news-data">
@@ -168,7 +170,7 @@
         </form>
 
         <div class="news-table-wrap">
-            <table class="table-data news-table" id="newsTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';">
+            <table class="table-data news-table" id="newsTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';document.getElementById('hoverWrap').setAttribute('data-foil','false');">
                 <thead>
                     <tr>
                         {{range $i, $head := .Headings}}
@@ -193,7 +195,7 @@
                 <tbody>
                     {{range $j, $row := .Table}}
                         {{$card := (index $.Cards $j)}}
-                        <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};">
+                        <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                             {{range $i, $head := $.Headings}}
                                 {{if $head.IsHidden}}
                                     {{/* skip hidden columns */}}
