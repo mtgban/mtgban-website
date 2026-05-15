@@ -430,6 +430,59 @@ function setReleasesSuppressedByRange(rangeDays) {
 // external tooltip handler so price + event context render in one popup.
 var currentCheckpoints = [];
 
+// Layout cache for the per-badge xAdjust sweep. Badges on different but close
+// dates collide visually because each label is ~30px wide; the sweep nudges
+// the earlier badge leftward until adjacent badges are at least one badge-step
+// apart. Pushing left (rather than right) anchors the most recent badge at its
+// true date, which is usually what the user is looking at. Cached per x-scale
+// signature so we don't redo the sort + sweep per annotation on every draw.
+var CHECKPOINT_BADGE_WIDTH_PX = 32; // matches STACK_STEP_PX
+var checkpointXLayoutCache = { signature: null, offsets: {} };
+
+function getCheckpointXAdjust(chart, idx) {
+    var xScale = chart && chart.scales && chart.scales.x;
+    if (!xScale) return 0;
+    var sig = xScale.min + '|' + xScale.max + '|' + (xScale.width || 0);
+    if (checkpointXLayoutCache.signature !== sig) {
+        checkpointXLayoutCache.signature = sig;
+        checkpointXLayoutCache.offsets = computeCheckpointXLayout(xScale);
+    }
+    return checkpointXLayoutCache.offsets[idx] || 0;
+}
+
+function computeCheckpointXLayout(xScale) {
+    // Group by date — same-date stacks share an xAdjust because they're laid
+    // out vertically by yAdjust, not horizontally.
+    var groups = {};
+    var dateKeys = [];
+    for (var i = 0; i < currentCheckpoints.length; i++) {
+        var cp = currentCheckpoints[i];
+        if (!cp || !cp.date) continue;
+        var key = cp.date;
+        if (!groups[key]) {
+            var px = xScale.getPixelForValue(new Date(cp.date).getTime());
+            if (!isFinite(px)) continue;
+            groups[key] = { px: px, idxs: [] };
+            dateKeys.push(key);
+        }
+        groups[key].idxs.push(i);
+    }
+    dateKeys.sort(function (a, b) { return groups[a].px - groups[b].px; });
+
+    var offsets = {};
+    var nextPx = Infinity;
+    for (var j = dateKeys.length - 1; j >= 0; j--) {
+        var g = groups[dateKeys[j]];
+        var adjusted = Math.min(g.px, nextPx - CHECKPOINT_BADGE_WIDTH_PX);
+        var shift = adjusted - g.px;
+        for (var k = 0; k < g.idxs.length; k++) {
+            offsets[g.idxs[k]] = shift;
+        }
+        nextPx = adjusted;
+    }
+    return offsets;
+}
+
 function isCheckpointDarkMode() {
     return document.body && document.body.classList.contains('dark-theme');
 }
@@ -546,6 +599,8 @@ function getKeyruneChar(code) {
 
 function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
     currentCheckpoints = Array.isArray(checkpoints) ? checkpoints : [];
+    // New dataset → previous xAdjust offsets are stale.
+    checkpointXLayoutCache = { signature: null, offsets: {} };
     var annotations = {};
     if (currentCheckpoints.length === 0) return annotations;
 
@@ -704,6 +759,9 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
                 padding: 4,
                 font: fontFn,
                 yAdjust: yAdjustFn,
+                xAdjust: function (ctx) {
+                    return getCheckpointXAdjust(ctx.chart, i);
+                },
             },
             enter: function (ctx) {
                 ctx.chart.canvas.style.cursor = cp.url ? 'pointer' : 'default';
