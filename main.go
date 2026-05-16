@@ -278,6 +278,7 @@ var OrderNav = []string{
 	"Global",
 	"Arbit",
 	"Reverse",
+	"Info",
 	"Admin",
 }
 
@@ -373,6 +374,13 @@ func init() {
 			Link:   "/reverse",
 			Handle: Reverse,
 			Page:   "arbit.html",
+		},
+		"Info": {
+			Name:   "Info",
+			Short:  "ℹ️",
+			Link:   "/info",
+			Handle: Info,
+			Page:   "info.html",
 		},
 		"Admin": {
 			Name:   "Admin",
