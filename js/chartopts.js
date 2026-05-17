@@ -470,30 +470,11 @@ function setReleasesSuppressedByRange(rangeDays) {
 // external tooltip handler so price + event context render in one popup.
 var currentCheckpoints = [];
 
-// Layout cache for the per-badge xAdjust sweep. Badges on different but close
-// dates collide visually because each label is ~30px wide; the sweep nudges
-// the earlier badge leftward until adjacent badges are at least one badge-step
-// apart. Pushing left (rather than right) anchors the most recent badge at its
-// true date, which is usually what the user is looking at. Cached per x-scale
-// signature so we don't redo the sort + sweep per annotation on every draw.
-var CHECKPOINT_BADGE_WIDTH_PX = 32; // matches STACK_STEP_PX
 // Cluster threshold for vertical stacking — checkpoints whose pixel positions
 // fall within this many px of each other stack vertically. Matches the actual
 // label box: KEYRUNE_CANVAS_SIZE (22) + 2 * label padding (2) = 26.
 var CHECKPOINT_CLUSTER_PX = 26;
-var checkpointXLayoutCache = { signature: null, offsets: {} };
 var checkpointYLayoutCache = { signature: null, clusters: {} };
-
-function getCheckpointXAdjust(chart, idx) {
-    var xScale = chart && chart.scales && chart.scales.x;
-    if (!xScale) return 0;
-    var sig = xScale.min + '|' + xScale.max + '|' + (xScale.width || 0);
-    if (checkpointXLayoutCache.signature !== sig) {
-        checkpointXLayoutCache.signature = sig;
-        checkpointXLayoutCache.offsets = computeCheckpointXLayout(xScale);
-    }
-    return checkpointXLayoutCache.offsets[idx] || 0;
-}
 
 function getCheckpointYRow(chart, idx) {
     var xScale = chart && chart.scales && chart.scales.x;
@@ -617,39 +598,6 @@ function clearCheckpointActivation(chart) {
     chart.update('none');
 }
 
-function computeCheckpointXLayout(xScale) {
-    // Group by date — same-date stacks share an xAdjust because they're laid
-    // out vertically by yAdjust, not horizontally.
-    var groups = {};
-    var dateKeys = [];
-    for (var i = 0; i < currentCheckpoints.length; i++) {
-        var cp = currentCheckpoints[i];
-        if (!cp || !cp.date) continue;
-        var key = cp.date;
-        if (!groups[key]) {
-            var px = xScale.getPixelForValue(new Date(cp.date).getTime());
-            if (!isFinite(px)) continue;
-            groups[key] = { px: px, idxs: [] };
-            dateKeys.push(key);
-        }
-        groups[key].idxs.push(i);
-    }
-    dateKeys.sort(function (a, b) { return groups[a].px - groups[b].px; });
-
-    var offsets = {};
-    var nextPx = Infinity;
-    for (var j = dateKeys.length - 1; j >= 0; j--) {
-        var g = groups[dateKeys[j]];
-        var adjusted = Math.min(g.px, nextPx - CHECKPOINT_BADGE_WIDTH_PX);
-        var shift = adjusted - g.px;
-        for (var k = 0; k < g.idxs.length; k++) {
-            offsets[g.idxs[k]] = shift;
-        }
-        nextPx = adjusted;
-    }
-    return offsets;
-}
-
 function isCheckpointDarkMode() {
     return document.body && document.body.classList.contains('dark-theme');
 }
@@ -669,17 +617,31 @@ const CHECKPOINT_ICON_INSET = (CHECKPOINT_ICON_SIZE - CHECKPOINT_ICON_GLYPH_PX) 
 const checkpointIconRawCache = new Map();   // url -> Image
 const checkpointIconCanvasCache = new Map(); // url|color -> canvas
 
+// HiDPI: chart.js's main canvas is allocated at device pixels (cssW * DPR)
+// with the context scaled by DPR. When the annotation plugin draws our
+// source canvas, it uses our canvas.width as the source bitmap size and
+// the label's `width`/`height` as the CSS destination size. So we allocate
+// the source canvas at SIZE * DPR pixels and pin the label box to SIZE in
+// CSS — that gives a 1:1 source-to-device-pixel mapping and a sharp icon.
+function getDevicePixelRatio() {
+    return (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+}
+
 function getCheckpointIcon(url, glyphColor, onLoad) {
     var key = url + '|' + glyphColor;
     if (checkpointIconCanvasCache.has(key)) return checkpointIconCanvasCache.get(key);
 
+    var dpr = getDevicePixelRatio();
     var canvas = document.createElement('canvas');
-    canvas.width = CHECKPOINT_ICON_SIZE;
-    canvas.height = CHECKPOINT_ICON_SIZE;
+    canvas.width = CHECKPOINT_ICON_SIZE * dpr;
+    canvas.height = CHECKPOINT_ICON_SIZE * dpr;
     checkpointIconCanvasCache.set(key, canvas);
 
     function paint(img) {
         var ctx = canvas.getContext('2d');
+        // setTransform (not scale) so repeat paints don't compound the
+        // DPR factor on the same context.
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, CHECKPOINT_ICON_SIZE, CHECKPOINT_ICON_SIZE);
         ctx.drawImage(img, CHECKPOINT_ICON_INSET, CHECKPOINT_ICON_INSET, CHECKPOINT_ICON_GLYPH_PX, CHECKPOINT_ICON_GLYPH_PX);
         // Replace the image's color with glyphColor, preserving its alpha
@@ -730,10 +692,12 @@ function getKeyruneCanvas(code, glyphColor) {
     var ch = getKeyruneChar(code);
     if (!ch) return null;
 
+    var dpr = getDevicePixelRatio();
     var canvas = document.createElement('canvas');
-    canvas.width = KEYRUNE_CANVAS_SIZE;
-    canvas.height = KEYRUNE_CANVAS_SIZE;
+    canvas.width = KEYRUNE_CANVAS_SIZE * dpr;
+    canvas.height = KEYRUNE_CANVAS_SIZE * dpr;
     var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
     ctx.font = KEYRUNE_FONT_PX + 'px Keyrune';
     ctx.fillStyle = glyphColor;
     ctx.textAlign = 'center';
@@ -774,8 +738,7 @@ function getKeyruneChar(code) {
 
 function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
     currentCheckpoints = Array.isArray(checkpoints) ? checkpoints : [];
-    // New dataset → previous layout caches are stale.
-    checkpointXLayoutCache = { signature: null, offsets: {} };
+    // New dataset → previous layout cache is stale.
     checkpointYLayoutCache = { signature: null, clusters: {} };
     var annotations = {};
     if (currentCheckpoints.length === 0) return annotations;
@@ -939,6 +902,12 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
                 font: fontFn,
                 yAdjust: yAdjustFn,
                 xAdjust: 0,
+                // Pin the label box to CSS pixels. The source canvases are
+                // allocated at SIZE * DPR pixels for sharpness on HiDPI
+                // displays; without these overrides the plugin would draw
+                // the icon at SIZE * DPR CSS pixels (i.e. too big).
+                width: KEYRUNE_CANVAS_SIZE,
+                height: KEYRUNE_CANVAS_SIZE,
             },
             enter: function (ctx) {
                 var chart = ctx.chart;
