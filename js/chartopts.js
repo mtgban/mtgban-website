@@ -362,6 +362,18 @@ const checkpointColors = {
     format:  { line: 'rgba(102, 16, 242, 0.9)', label: 'rgba(102, 16, 242, 0.9)' },
 };
 
+// Line z-order priority for same-date overlaps. Higher z draws later, so
+// the more important line wins the pixel: red ban > green unban > orange
+// reprint > black release. Format isn't called out in the priority but
+// sits below release as a soft default.
+const checkpointZ = {
+    ban: 4,
+    unban: 3,
+    reprint: 2,
+    release: 1,
+    format: 0,
+};
+
 // Bans + unbans share the "Bans" checkbox; releases + formats share the
 // "Releases" checkbox (both are set/format-launch context).
 function checkpointToggleKey(type) {
@@ -879,6 +891,10 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
             xMin: cp.date,
             xMax: cp.date,
             xScaleID: 'x',
+            // z controls draw order within the same drawTime: when two
+            // lines share a date the higher-z line paints last and wins
+            // the pixel. See checkpointZ for the type priority.
+            z: checkpointZ[cp.type] || 0,
             borderColor: palette.line,
             // Release lines get noisy at multi-year zooms — drop the dashed
             // line once the visible range exceeds 2 years (i.e. 5y/10y),
