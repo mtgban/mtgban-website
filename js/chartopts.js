@@ -470,10 +470,15 @@ function setReleasesSuppressedByRange(rangeDays) {
 // external tooltip handler so price + event context render in one popup.
 var currentCheckpoints = [];
 
-// Cluster threshold for vertical stacking — checkpoints whose pixel positions
-// fall within this many px of each other stack vertically. Matches the actual
-// label box: KEYRUNE_CANVAS_SIZE (22) + 2 * label padding (2) = 26.
-var CHECKPOINT_CLUSTER_PX = 26;
+// Cluster threshold for vertical stacking — checkpoints whose pixel
+// positions fall within this many px of each other stack vertically.
+// The full label box is KEYRUNE_CANVAS_SIZE (22) + 2 * label padding (1) =
+// 24, so anything under 24 lets adjacent icons touch or slightly overlap.
+// Keyrune glyphs leave transparent margin inside the canvas, so a few
+// pixels of canvas overlap reads as zero visible overlap. We pick 14 to
+// keep more reprints on row 0 next to nearby releases instead of dropping
+// them to row 1 every time they sit within a label-box of each other.
+var CHECKPOINT_CLUSTER_PX = 14;
 var checkpointYLayoutCache = { signature: null, clusters: {} };
 
 function getCheckpointYRow(chart, idx) {
@@ -520,7 +525,12 @@ function computeCheckpointYLayout(xScale) {
     });
 
     var rows = {};
-    var rowPxs = [[], [], []]; // top, bottom, deep — tried in this order
+    // Tried in order: row 0 first (above plot), then row 1, 2, 3, 4 going
+    // progressively deeper into the plot. Rows 3 and 4 are spillover and
+    // typically only used at very dense zoom levels.
+    var ROW_COUNT = 5;
+    var rowPxs = [];
+    for (var rInit = 0; rInit < ROW_COUNT; rInit++) rowPxs.push([]);
     function minDist(pxs, px) {
         var min = Infinity;
         for (var k = 0; k < pxs.length; k++) {
@@ -531,22 +541,21 @@ function computeCheckpointYLayout(xScale) {
     }
     for (var j = 0; j < items.length; j++) {
         var it = items[j];
-        var dists = [
-            minDist(rowPxs[0], it.px),
-            minDist(rowPxs[1], it.px),
-            minDist(rowPxs[2], it.px),
-        ];
+        var dists = [];
+        for (var rDist = 0; rDist < ROW_COUNT; rDist++) {
+            dists.push(minDist(rowPxs[rDist], it.px));
+        }
         var chosen = -1;
         // First clear row wins.
-        for (var r = 0; r < 3; r++) {
+        for (var r = 0; r < ROW_COUNT; r++) {
             if (dists[r] >= CHECKPOINT_CLUSTER_PX) { chosen = r; break; }
         }
-        // All three rows blocked — fall back to whichever has the most
+        // All rows blocked — fall back to whichever has the most
         // clearance so the inevitable overlap is minimised.
         if (chosen < 0) {
             var bestDist = -Infinity;
-            for (var r = 0; r < 3; r++) {
-                if (dists[r] > bestDist) { bestDist = dists[r]; chosen = r; }
+            for (var r2 = 0; r2 < ROW_COUNT; r2++) {
+                if (dists[r2] > bestDist) { bestDist = dists[r2]; chosen = r2; }
             }
         }
         rows[it.idx] = chosen;
@@ -809,15 +818,14 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
         // Falls back to the build-time same-date group on first draw before
         // the chart's x-scale is laid out.
         //
-        // Three-row placement: row 0 is one step above the plot, row 1
-        // is one step below, row 2 is a deeper-below spillover row used
-        // only when the first two rows are both blocked. Row offsets are
-        // evenly spaced (2 * STACK_STEP_PX between consecutive rows). The
-        // placement sweep runs at draw time so it adapts to zoom and
-        // visibility.
+        // Five-row placement: row 0 sits one step above the plot, rows
+        // 1–4 step progressively deeper into the plot (each 2 *
+        // STACK_STEP_PX below the previous). Rows 3 and 4 are spillover
+        // used only when the upper rows are all blocked. The placement
+        // sweep runs at draw time so it adapts to zoom and visibility.
         var yAdjustFn = function (ctx) {
             var row = getCheckpointYRow(ctx && ctx.chart, i);
-            var dirs = [-1, 1, 3];
+            var dirs = [-1, 1, 3, 5, 7];
             return -LABEL_HALF_PX + dirs[row] * STACK_STEP_PX;
         };
 
