@@ -709,9 +709,21 @@ function getKeyruneCanvas(code, glyphColor) {
     ctx.scale(dpr, dpr);
     ctx.font = KEYRUNE_FONT_PX + 'px Keyrune';
     ctx.fillStyle = glyphColor;
+    // Bottom-align each glyph in its canvas so the row sits on a common
+    // floor. Keyrune icons vary in how they sit inside the em-box; the
+    // 'middle' textBaseline centers each on its own middle, which lets
+    // them drift up and down across the row. Aligning bottoms (using
+    // each glyph's actualBoundingBoxDescent) gives a consistent baseline.
+    // X stays centered on the glyph's *visible* horizontal box.
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(ch, KEYRUNE_CANVAS_SIZE / 2, KEYRUNE_CANVAS_SIZE / 2);
+    ctx.textBaseline = 'alphabetic';
+    var m = ctx.measureText(ch);
+    var descent = m.actualBoundingBoxDescent || 0;
+    var leftExt = m.actualBoundingBoxLeft || 0;
+    var rightExt = m.actualBoundingBoxRight || 0;
+    var drawX = KEYRUNE_CANVAS_SIZE / 2 + (leftExt - rightExt) / 2;
+    var drawY = KEYRUNE_CANVAS_SIZE - descent;
+    ctx.fillText(ch, drawX, drawY);
 
     keyruneCanvasCache.set(key, canvas);
     return canvas;
