@@ -288,7 +288,7 @@ func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 		if db == NewNewspaperDB {
 			uuid, err := mtgmatcher.MatchId(raw[1], raw[6] != "Normal")
 			if err != nil {
-				log.Println("match", raw[1], raw[6], "as", raw[3], raw[4], raw[5], "failed:", err)
+				LogPages["Newspaper"].Println("match", raw[1], raw[6], "as", raw[3], raw[4], raw[5], "failed:", err)
 				continue
 			}
 			co, _ := mtgmatcher.GetUUID(uuid)
