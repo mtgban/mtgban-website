@@ -891,7 +891,7 @@ func main() {
 		c.AddFunc("33 */3 * * *", cacheNewspaper)
 
 		for _, refresh := range Config.ScraperConfig.ForceReloadAt {
-			c.AddFunc(refresh, func() {
+			_, err := c.AddFunc(refresh, func() {
 				log.Println("Reloading ScraperConfig")
 				err := loadScrapersNG(Config.ScraperConfig)
 				if err != nil {
@@ -899,7 +899,11 @@ func main() {
 				}
 				runSealedAnalysis()
 			})
-
+			if err != nil {
+				log.Println("error scheduling ForceReloadAt", refresh, ":", err)
+			} else {
+				log.Println("Scheduled ForceReloadAt:", refresh)
+			}
 		}
 
 		c.Start()
