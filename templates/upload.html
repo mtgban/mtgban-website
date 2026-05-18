@@ -105,6 +105,25 @@
                         <div class="upload-source-area upload-source-hidden" id="source-text">
                             <textarea id="textArea" name="textArea" rows="10" placeholder="Paste card list or decklist here..." oninput="autoGrowTextArea(this); try{localStorage.setItem('uploadTextArea',this.value)}catch(e){}"></textarea>
                         </div>
+                        <script>
+                        (function(){
+                            try {
+                                var s = localStorage.getItem('uploadSourceMode');
+                                if (s && s !== 'file' && ['url','text'].indexOf(s) >= 0) {
+                                    document.querySelectorAll('.upload-source-btn').forEach(function(b){b.classList.remove('active')});
+                                    var btn = document.getElementById('src-btn-'+s);
+                                    if (btn) btn.classList.add('active');
+                                    ['file','url','text'].forEach(function(t){
+                                        var area = document.getElementById('source-'+t);
+                                        if (area) {
+                                            if (t===s) area.classList.remove('upload-source-hidden');
+                                            else area.classList.add('upload-source-hidden');
+                                        }
+                                    });
+                                }
+                            } catch(e){}
+                        })();
+                        </script>
                     {{end}}
                 </div>
 
@@ -406,11 +425,6 @@
                 }
                 reloadSelect(savedMode);
 
-                // Restore last used source mode (file, url, or text)
-                var savedSource = localStorage.getItem('uploadSourceMode');
-                if (savedSource && ['file', 'url', 'text'].indexOf(savedSource) >= 0) {
-                    selectSource(savedSource);
-                }
 
                 var gdocInput = document.getElementById('gdocURL');
                 if (gdocInput) {
