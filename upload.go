@@ -1110,6 +1110,7 @@ func parseHeader(first []string) (map[string]int, error) {
 			}
 		case strings.Contains(field, "comment") ||
 			strings.Contains(field, "number") ||
+			(strings.Contains(field, "col") && strings.Contains(field, "num")) ||
 			strings.Contains(field, "variant") ||
 			strings.Contains(field, "variation") ||
 			strings.Contains(field, "version"):
