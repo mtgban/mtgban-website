@@ -94,6 +94,7 @@
                                 <input type="file" id="file" name="cardListFile" accept=".csv,text/csv,.xls,application/vnd.ms-excel,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="pressed()">
                                 <span id="fileLabel">Drop file here or <span class="upload-browse-link">browse</span>
                                 <span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span></span>
+                                <span class="upload-clear-file" id="clearFileBtn" onclick="event.preventDefault();event.stopPropagation();clearFile();">clear selection</span>
                             </label>
                         </div>
 
@@ -328,6 +329,15 @@
                 }
             };
 
+            (function() {
+                var dropArea = document.getElementById('source-file');
+                if (!dropArea) return;
+                var counter = 0;
+                dropArea.addEventListener('dragenter', function(e) { e.preventDefault(); counter++; dropArea.classList.add('drag-over'); });
+                dropArea.addEventListener('dragleave', function() { counter--; if (counter <= 0) { counter = 0; dropArea.classList.remove('drag-over'); } });
+                dropArea.addEventListener('drop', function() { counter = 0; dropArea.classList.remove('drag-over'); });
+            })();
+
             window.autoGrowTextArea = function(el) {
                 el.style.height = 'auto';
                 el.style.height = el.scrollHeight + 'px';
@@ -365,7 +375,16 @@
                     form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
                     selectSource('file');
                     enabledButtons();
+                    document.getElementById('clearFileBtn').style.display = 'block';
                 }
+            };
+
+            window.clearFile = function() {
+                var input = document.getElementById('file');
+                input.value = '';
+                document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                document.getElementById('clearFileBtn').style.display = 'none';
+                enabledButtons();
             };
 
             window.onload = (event) => {
