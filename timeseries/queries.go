@@ -262,6 +262,89 @@ func (c *Client) GetEarliestDate(ctx context.Context, uuid string, isFoil bool, 
 	return earliest.Time, nil
 }
 
+// AggregatePriceKey identifies a card variant in an aggregate result map.
+// Language and is_alt are intentionally omitted: we aggregate across them,
+// matching the language=nil behavior of HGetAll.
+type AggregatePriceKey struct {
+	MtgjsonUUID string
+	IsFoil      bool
+	IsEtched    bool
+}
+
+// AggregatePriceRange holds the min/max of one price column for a card variant
+// over a date window. Both values are guaranteed non-null because the query
+// filters out null prices before aggregating.
+type AggregatePriceRange struct {
+	Max float64
+	Min float64
+}
+
+// columnForDataset returns the database column name matching a dataset config
+// index. Mirrors PriceRow.PriceForDataset; returns "" for an unknown index.
+func columnForDataset(index int) string {
+	switch index {
+	case 0:
+		return "cardkingdom_retail_price"
+	case 1:
+		return "cardkingdom_buylist_price"
+	case 2:
+		return "tcgplayer_low_price"
+	case 3:
+		return "tcgplayer_market_price"
+	case 4:
+		return "cardmarket_low_price"
+	case 5:
+		return "cardmarket_trend_price"
+	case 6:
+		return "starcitygames_buylist_price"
+	case 7:
+		return "abu_buylist_price"
+	case 8:
+		return "tcgplayer_low_sealed_expected_value"
+	case 9:
+		return "coolstuffinc_buylist_price"
+	default:
+		return ""
+	}
+}
+
+// GetAggregatePriceRange returns per-card max and min of the price column
+// matching datasetIndex, over rows with date >= since. The result is keyed by
+// (uuid, foil, etched) so callers can do O(1) lookups while iterating a
+// buylist or inventory.
+func (c *Client) GetAggregatePriceRange(ctx context.Context, datasetIndex int, since time.Time) (map[AggregatePriceKey]AggregatePriceRange, error) {
+	column := columnForDataset(datasetIndex)
+	if column == "" {
+		return nil, fmt.Errorf("timeseries: unknown dataset index %d", datasetIndex)
+	}
+
+	// column is hard-coded above; safe to interpolate into the query.
+	q := fmt.Sprintf(`
+		SELECT mtgjson_uuid, is_foil, is_etched,
+		       MAX(%[1]s) AS max_price,
+		       MIN(%[1]s) AS min_price
+		  FROM product_prices
+		 WHERE date >= $1 AND %[1]s IS NOT NULL
+		 GROUP BY mtgjson_uuid, is_foil, is_etched`, column)
+
+	rows, err := c.db.QueryContext(ctx, q, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[AggregatePriceKey]AggregatePriceRange)
+	for rows.Next() {
+		var key AggregatePriceKey
+		var agg AggregatePriceRange
+		if err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &agg.Max, &agg.Min); err != nil {
+			return nil, err
+		}
+		result[key] = agg
+	}
+	return result, rows.Err()
+}
+
 // GetLatestPrice returns the most recent price row for a UUID, foil status, and language.
 func (c *Client) GetLatestPrice(ctx context.Context, uuid string, isFoil bool, isEtched bool, language string) (PriceRow, error) {
 	uuid = NormalizeUUID(uuid)
