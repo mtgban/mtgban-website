@@ -650,10 +650,18 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 
 	log.Println("Running hotlist checks for", store)
 
-	highestBuylistInThreeMonths := mtgban.InventoryRecord{}
 	threeMonthsAgo := time.Now().AddDate(0, 0, -90)
-	dates := getDateAxisValues(timeseries.LookbackStandard.Since())
 
+	// One aggregate query for the whole buylist instead of N per-card
+	// HGetAlls. The result is keyed by (uuid, foil, etched); each entry holds
+	// the max and min stored price over the 90-day window.
+	aggregate, err := PricesArchiveDB.GetAggregatePriceRange(context.Background(), datasetIndex, threeMonthsAgo)
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	highestBuylistInThreeMonths := mtgban.InventoryRecord{}
 	for cardId, entries := range bl {
 		// Sanity check
 		buylistPrice := entries[0].BuyPrice
@@ -667,45 +675,29 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 			continue
 		}
 
-		// Query history
 		co, err := mtgmatcher.GetUUID(cardId)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 
-		results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil, co.Etched, nil, timeseries.LookbackStandard)
-		if err != nil {
-			log.Println(err)
-			break
-		}
-
-		// Look for the first date where old price is higher than current
-		var i int
-		var lowestPrice float64
-		for i = range dates {
-			var price float64
-			if row, ok := results[dates[i]]; ok {
-				if p := row.PriceForDataset(datasetIndex); p != nil {
-					price = *p
-				}
-			}
-			if price > 0 && price > buylistPrice {
-				break
-			}
-			// Keep track of the lowest price in the last 3 months, ignoring no prices
-			if lowestPrice == 0 || (i < 90 && price > 0 && price < lowestPrice) {
-				lowestPrice = price
-			}
-		}
-
-		// Skip cards that don't meet the threshold
-		date, err := time.Parse("2006-01-02", dates[i])
-		if err != nil || date.After(threeMonthsAgo) {
+		agg, ok := aggregate[timeseries.AggregatePriceKey{
+			MtgjsonUUID: timeseries.NormalizeUUID(co.UUID),
+			IsFoil:      co.Foil,
+			IsEtched:    co.Etched,
+		}]
+		if !ok {
 			continue
 		}
 
-		highestBuylistInThreeMonths[cardId] = []mtgban.InventoryEntry{{Price: lowestPrice}}
+		// Keep cards whose current buylist price ties or beats every stored
+		// price in the last 3 months. Report the lowest seen price in that
+		// window so the UI can show how far it's climbed.
+		if buylistPrice < agg.Max {
+			continue
+		}
+
+		highestBuylistInThreeMonths[cardId] = []mtgban.InventoryEntry{{Price: agg.Min}}
 	}
 
 	log.Printf("Found %d prices on hotlist", len(highestBuylistInThreeMonths))
