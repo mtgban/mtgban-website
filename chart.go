@@ -122,6 +122,21 @@ var defaultGradeMap = map[string]float64{
 	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
 }
 
+// snapshotDate returns now's date when ts falls on "today" or "tomorrow"
+// relative to now, otherwise ts's own calendar date. Scrapers that straddle
+// midnight (or run slightly ahead of the server clock) get collapsed onto
+// today's row so the COALESCE merge in UpsertRows can fold their columns
+// together, while genuinely stale scrapes keep their true observation date.
+func snapshotDate(ts time.Time, now time.Time) string {
+	today := now.Format("2006-01-02")
+	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
+	tsDay := ts.In(now.Location()).Format("2006-01-02")
+	if tsDay == today || tsDay == tomorrow {
+		return today
+	}
+	return tsDay
+}
+
 // getRow returns the accumulator row for a card variant, creating it if
 // needed. The dedup key must match the Postgres unique index on
 // product_prices: (date, mtgjson_uuid, is_foil, is_etched, language, is_alt).
@@ -168,7 +183,7 @@ func stashInTimeseries() {
 				continue
 			}
 
-			date := seller.Info().InventoryTimestamp.Format("2006-01-02")
+			date := snapshotDate(*seller.Info().InventoryTimestamp, start)
 			log.Println("Stashing", seller.Info().Shorthand, "in", config.PublicName, "timeseries")
 
 			for id, entries := range seller.Inventory() {
@@ -203,7 +218,7 @@ func stashInTimeseries() {
 				continue
 			}
 
-			date := vendor.Info().BuylistTimestamp.Format("2006-01-02")
+			date := snapshotDate(*vendor.Info().BuylistTimestamp, start)
 			log.Println("Stashing", vendor.Info().Shorthand, "in", config.PublicName, "timeseries")
 
 			for id, entries := range vendor.Buylist() {
