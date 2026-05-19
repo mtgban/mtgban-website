@@ -58,41 +58,55 @@ func lookbackForTier(tier string) timeseries.Lookback {
 	}
 }
 
+// getDatasets returns one Dataset per applicable config. All datasets for a
+// given card read different columns from the same (uuid, foil, etched,
+// language=nil, lookback) result set, so we fetch HGetAll exactly once and
+// fan the rows out to every per-dataset render rather than firing N
+// identical SQL queries (and discarding 15/16 of each result).
 func getDatasets(cardId string, sealed bool, keys []string, userTier string) []Dataset {
-	var datasets []Dataset
-	for _, config := range Config.TimeseriesConfig.Datasets {
-		if sealed && !config.HasSealed {
-			continue
-		}
-		if !sealed && config.OnlySealed {
-			continue
-		}
-
-		dataset, err := getDataset(cardId, keys, config, userTier)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		datasets = append(datasets, dataset)
-	}
-	return datasets
-}
-
-func getDataset(cardId string, labels []string, config DatasetConfig, userTier string) (Dataset, error) {
 	if PricesArchiveDB == nil {
-		return Dataset{}, nil
+		return nil
+	}
+
+	// Pre-filter applicable configs so we don't pay for a DB round-trip
+	// or a UUID lookup when nothing will render.
+	var configs []DatasetConfig
+	for _, c := range Config.TimeseriesConfig.Datasets {
+		if sealed && !c.HasSealed {
+			continue
+		}
+		if !sealed && c.OnlySealed {
+			continue
+		}
+		configs = append(configs, c)
+	}
+	if len(configs) == 0 {
+		return nil
 	}
 
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
-		return Dataset{}, err
+		log.Println(err)
+		return nil
 	}
 
 	results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil, co.Etched, nil, lookbackForTier(userTier))
 	if err != nil {
-		return Dataset{}, err
+		log.Println(err)
+		return nil
 	}
 
+	datasets := make([]Dataset, 0, len(configs))
+	for _, config := range configs {
+		datasets = append(datasets, buildDataset(results, keys, config))
+	}
+	return datasets
+}
+
+// buildDataset projects a single column out of the shared HGetAll result
+// map. Missing dates and null prices both render as Number.NaN so the
+// front-end chart leaves a gap rather than drawing a zero.
+func buildDataset(results map[string]timeseries.PriceRow, labels []string, config DatasetConfig) Dataset {
 	var data []string
 	if len(results) > 0 {
 		data = make([]string, len(labels))
@@ -109,12 +123,11 @@ func getDataset(cardId string, labels []string, config DatasetConfig, userTier s
 			}
 		}
 	}
-
 	return Dataset{
 		Name:  config.PublicName,
 		Data:  data,
 		Color: config.Color,
-	}, nil
+	}
 }
 
 // A default scale for converting non-NM prices to NM
