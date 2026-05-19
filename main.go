@@ -400,6 +400,7 @@ type ConfigType struct {
 		BackupPath      string `json:"backup_path"`
 		BucketAccessKey string `json:"bucket_access_key"`
 		BucketSecretKey string `json:"bucket_access_secret"`
+		CheckpointsPath string `json:"checkpoints_path,omitempty"`
 	} `json:"datastore"`
 	Game                   string             `json:"game"`
 	CardBackImage          string             `json:"card_back_image"`
@@ -435,13 +436,6 @@ type ConfigType struct {
 
 	// The location of the configuation file
 	sourcePath string
-
-	// CheckpointsPath is the B2 URL (or local path) of the chart-
-	// checkpoints document, e.g. "b2://mtgban-datastore/magic/checkpoints.json".
-	// For b2:// paths, Config.Datastore.BucketAccessKey/Secret are used —
-	// same credentials as the datastore — so the key must have writeFiles.
-	// Leave empty to disable checkpoints entirely.
-	CheckpointsPath string `json:"checkpoints_path,omitempty"`
 
 	SqlConfig *timeseries.SqlConfig `json:"sql_config"`
 }

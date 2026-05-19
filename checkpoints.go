@@ -74,10 +74,10 @@ var (
 // reload/save are infrequent enough that the extra B2 auth round-trip is
 // not worth a long-lived client.
 func newCheckpointsBucket(ctx context.Context) (simplecloud.ReadWriter, error) {
-	if Config.CheckpointsPath == "" {
+	if Config.Datastore.CheckpointsPath == "" {
 		return nil, errors.New("checkpoints_path not configured")
 	}
-	u, err := url.Parse(Config.CheckpointsPath)
+	u, err := url.Parse(Config.Datastore.CheckpointsPath)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func reloadCheckpoints() error {
 	if err != nil {
 		return err
 	}
-	cpPath := Config.CheckpointsPath
+	cpPath := Config.Datastore.CheckpointsPath
 	reader, err := simplecloud.InitReader(ctx, bucket, cpPath)
 	if err != nil {
 		return err
@@ -143,7 +143,7 @@ func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
 		return err
 	}
 
-	cpPath := Config.CheckpointsPath
+	cpPath := Config.Datastore.CheckpointsPath
 	writer, err := simplecloud.InitWriter(ctx, bucket, cpPath)
 	if err != nil {
 		return err
