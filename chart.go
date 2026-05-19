@@ -63,7 +63,7 @@ func lookbackForTier(tier string) timeseries.Lookback {
 // language=nil, lookback) result set, so we fetch HGetAll exactly once and
 // fan the rows out to every per-dataset render rather than firing N
 // identical SQL queries (and discarding 15/16 of each result).
-func getDatasets(cardId string, sealed bool, keys []string, userTier string) []Dataset {
+func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string, userTier string) []Dataset {
 	if PricesArchiveDB == nil {
 		return nil
 	}
@@ -90,7 +90,7 @@ func getDatasets(cardId string, sealed bool, keys []string, userTier string) []D
 		return nil
 	}
 
-	results, err := PricesArchiveDB.HGetAll(context.Background(), co.UUID, co.Foil, co.Etched, nil, lookbackForTier(userTier))
+	results, err := PricesArchiveDB.HGetAll(ctx, co.UUID, co.Foil, co.Etched, nil, lookbackForTier(userTier))
 	if err != nil {
 		log.Println(err)
 		return nil
