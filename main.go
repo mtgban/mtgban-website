@@ -849,7 +849,10 @@ func main() {
 		log.Fatalln("error opening databases:", err)
 	}
 
-	InitCheckpoints()
+	err = reloadCheckpoints()
+	if err != nil {
+		log.Printf("checkpoints: initial load failed: %v", err)
+	}
 
 	// load website up
 	go func() {

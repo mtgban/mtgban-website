@@ -91,15 +91,6 @@ func newCheckpointsBucket(ctx context.Context) (simplecloud.ReadWriter, error) {
 	}
 }
 
-// InitCheckpoints loads the JSON document at startup. Subsequent reloads are
-// driven by the admin "Reload Checkpoints" button (see admin.go), which pulls
-// the current document from B2.
-func InitCheckpoints() {
-	if err := reloadCheckpoints(); err != nil {
-		log.Printf("checkpoints: initial load failed: %v", err)
-	}
-}
-
 func reloadCheckpoints() error {
 	ctx := context.Background()
 	bucket, err := newCheckpointsBucket(ctx)
