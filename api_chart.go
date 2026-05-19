@@ -63,7 +63,7 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	axisLabels := getDateAxisValues(earliest)
-	datasets := getDatasets(uuid, co.Sealed, axisLabels, userTier)
+	datasets := getDatasets(r.Context(), uuid, co.Sealed, axisLabels, userTier)
 
 	var apiDatasets []ChartAPIDataset
 	for _, ds := range datasets {

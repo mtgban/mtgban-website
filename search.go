@@ -640,7 +640,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
-			pageVars.Datasets = getDatasets(chartId, co.Sealed, pageVars.AxisLabels, userTier)
+			pageVars.Datasets = getDatasets(r.Context(), chartId, co.Sealed, pageVars.AxisLabels, userTier)
 			pageVars.Checkpoints = relevantCheckpoints(co.Name, earliest)
 			if len(pageVars.Datasets) == 0 {
 				pageVars.InfoMessage = "No chart data available"
