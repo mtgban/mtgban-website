@@ -122,8 +122,15 @@ var defaultGradeMap = map[string]float64{
 	"NM": 1, "SP": 1.25, "MP": 1.67, "HP": 2.5, "PO": 4,
 }
 
-func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil bool, isEtched bool, language string, date string) *timeseries.PriceRow {
-	key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil) + "|" + strconv.FormatBool(isEtched) + "|" + language
+// getRow returns the accumulator row for a card variant, creating it if
+// needed. The dedup key must match the Postgres unique index on
+// product_prices: (date, mtgjson_uuid, is_foil, is_etched, language, is_alt).
+// Without NormalizeUUID + isAlt, two distinct mtgmatcher UUIDs (e.g. a base
+// and its "_alt" sibling) collapse into the same conflict bucket on insert
+// and Postgres rejects the whole batch.
+func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil bool, isEtched bool, isAlt bool, language string, date string) *timeseries.PriceRow {
+	uuid = timeseries.NormalizeUUID(uuid)
+	key := date + "|" + uuid + "|" + strconv.FormatBool(isFoil) + "|" + strconv.FormatBool(isEtched) + "|" + strconv.FormatBool(isAlt) + "|" + language
 	row, ok := accumulated[key]
 	if !ok {
 		row = &timeseries.PriceRow{
@@ -131,6 +138,7 @@ func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil boo
 			MtgjsonUUID: uuid,
 			IsFoil:      isFoil,
 			IsEtched:    isEtched,
+			IsAlt:       isAlt,
 			Language:    &language,
 		}
 		accumulated[key] = row
@@ -182,7 +190,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.Language, date)
+				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}
@@ -210,7 +218,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.Language, date)
+				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
 		}

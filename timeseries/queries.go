@@ -3,6 +3,7 @@ package timeseries
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -175,6 +176,7 @@ func (c *Client) UpsertRows(ctx context.Context, rows []PriceRow, batchSize int)
 	}
 
 	var totalUpserted int
+	var errs []error
 	for start := 0; start < len(rows); start += batchSize {
 		end := start + batchSize
 		if end > len(rows) {
@@ -185,10 +187,10 @@ func (c *Client) UpsertRows(ctx context.Context, rows []PriceRow, batchSize int)
 		n, err := c.upsertBatch(ctx, batch)
 		totalUpserted += n
 		if err != nil {
-			return totalUpserted, fmt.Errorf("batch starting at row %d: %w", start, err)
+			errs = append(errs, fmt.Errorf("batch starting at row %d: %w", start, err))
 		}
 	}
-	return totalUpserted, nil
+	return totalUpserted, errors.Join(errs...)
 }
 
 func (c *Client) upsertBatch(ctx context.Context, batch []PriceRow) (int, error) {
