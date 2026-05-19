@@ -323,15 +323,20 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// -- Config: always load current config text --
-	var configOut bytes.Buffer
-	err := writeConfigFile(Config, &configOut)
-	if err != nil {
-		if pageVars.InfoMessage == "" {
-			pageVars.InfoMessage = err.Error()
-		}
+	// -- Config: load editor text --
+	// If the POST failed, keep the submitted text so the user can fix it
+	if newConfig != "" && pageVars.WarningMessage != "" {
+		pageVars.CleanSearchQuery = newConfig
 	} else {
-		pageVars.CleanSearchQuery = configOut.String()
+		var configOut bytes.Buffer
+		err := writeConfigFile(Config, &configOut)
+		if err != nil {
+			if pageVars.InfoMessage == "" {
+				pageVars.InfoMessage = err.Error()
+			}
+		} else {
+			pageVars.CleanSearchQuery = configOut.String()
+		}
 	}
 
 	// -- Checkpoints: handle POST if submitted --
