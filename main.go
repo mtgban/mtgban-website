@@ -908,7 +908,6 @@ func main() {
 				if err != nil {
 					ServerNotify("Reload", "Unable to reload ScraperConfig: "+err.Error())
 				}
-				runSealedAnalysis()
 			})
 			log.Println("Scheduled ForceReloadAt:", refresh)
 		}
