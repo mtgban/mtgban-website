@@ -88,6 +88,7 @@ type PageVars struct {
 
 	CanShowAll       bool
 	CleanSearchQuery string
+	CheckpointsText  string
 
 	ScraperShort   string
 	HasAffiliate   bool
@@ -434,6 +435,13 @@ type ConfigType struct {
 
 	// The location of the configuation file
 	sourcePath string
+
+	// CheckpointsPath is the B2 URL (or local path) of the chart-
+	// checkpoints document, e.g. "b2://mtgban-datastore/magic/checkpoints.json".
+	// For b2:// paths, Config.Datastore.BucketAccessKey/Secret are used —
+	// same credentials as the datastore — so the key must have writeFiles.
+	// Leave empty to disable checkpoints entirely.
+	CheckpointsPath string `json:"checkpoints_path,omitempty"`
 
 	SqlConfig *timeseries.SqlConfig `json:"sql_config"`
 }

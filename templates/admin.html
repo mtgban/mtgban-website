@@ -43,6 +43,7 @@
         <button class="admin-tab{{if or (eq .Page "") (eq .Page "dashboard")}} active{{end}}" onclick="switchTab(this,'dashboard')">Dashboard</button>
         <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="switchTab(this,'people')">People</button>
         <button class="admin-tab{{if eq .Page "config"}} active{{end}}" onclick="switchTab(this,'config')">Config</button>
+        <button class="admin-tab{{if eq .Page "checkpoints"}} active{{end}}" onclick="switchTab(this,'checkpoints')">Checkpoints</button>
         <button class="admin-tab{{if eq .Page "tools"}} active{{end}}" onclick="switchTab(this,'tools')">Tools</button>
     </div>
 
@@ -191,24 +192,27 @@
         </div>
     </div>
 
+    <!-- CodeMirror — shared by Config and Checkpoints editors -->
+    {{if or .CleanSearchQuery .CheckpointsText}}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
+    {{end}}
+
     <!-- ═══════════════════════
          CONFIG
          ═══════════════════════ -->
     <div class="admin-panel{{if eq .Page "config"}} active{{end}}" id="panel-config">
         {{if .CleanSearchQuery}}
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/dracula.min.css">
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/mode/javascript/javascript.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/matchbrackets.min.js"></script>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/addon/edit/closebrackets.min.js"></script>
-
         <div class="admin-config-wrap">
             <div class="admin-config-header">
                 <h2>Configuration Editor</h2>
                 <span class="warn-tag">Caution</span>
                 <div class="config-actions">
-                    <button class="cfg-btn cfg-format" onclick="formatJSON()">Format JSON</button>
+                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('config')">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
                     <button class="cfg-btn cfg-primary" onclick="document.getElementById('configForm').requestSubmit()">Update</button>
                 </div>
@@ -216,6 +220,29 @@
             <form id="configForm" action="/admin?page=config" method="post">
                 <textarea id="textArea" name="textArea" style="display:none;">{{.CleanSearchQuery}}</textarea>
                 <div id="configEditor"></div>
+            </form>
+        </div>
+        {{end}}
+    </div>
+
+    <!-- ═══════════════════════
+         CHECKPOINTS
+         ═══════════════════════ -->
+    <div class="admin-panel{{if eq .Page "checkpoints"}} active{{end}}" id="panel-checkpoints">
+        {{if .CheckpointsText}}
+        <div class="admin-config-wrap">
+            <div class="admin-config-header">
+                <h2>Chart Checkpoints Editor</h2>
+                <span class="warn-tag">B2-backed</span>
+                <div class="config-actions">
+                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('checkpoints')">Format JSON</button>
+                    <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
+                    <button class="cfg-btn cfg-primary" onclick="document.getElementById('checkpointsForm').requestSubmit()">Update</button>
+                </div>
+            </div>
+            <form id="checkpointsForm" action="/admin?page=checkpoints" method="post">
+                <textarea id="checkpointsTextArea" name="checkpointsTextArea" style="display:none;">{{.CheckpointsText}}</textarea>
+                <div id="checkpointsEditor"></div>
             </form>
         </div>
         {{end}}
@@ -251,7 +278,7 @@
                     <a class="admin-action" href="?reboot=config" onclick="return confirm('Reload config?')">
                         <span class="act-icon">⚙️</span> Reload Config
                     </a>
-                    <a class="admin-action" href="?reboot=checkpoints" onclick="return confirm('Reload chart checkpoints?')">
+                    <a class="admin-action" href="?reboot=checkpoints" onclick="return confirm('Pull chart checkpoints from B2?')">
                         <span class="act-icon">📌</span> Reload Checkpoints
                     </a>
                     <a class="admin-action" href="?reboot=snapshot" onclick="return confirm('Take a data snapshot?')">
@@ -315,27 +342,42 @@
 
 {{define "extra-scripts"}}
 <script>
+window.__jsonEditors = window.__jsonEditors || {};
+
 function switchTab(btn, panelId) {
     document.querySelectorAll('.admin-tab').forEach(function(t) { t.classList.remove('active'); });
     document.querySelectorAll('.admin-panel').forEach(function(p) { p.classList.remove('active'); });
     btn.classList.add('active');
     document.getElementById('panel-' + panelId).classList.add('active');
     history.replaceState(null, '', '?page=' + panelId);
-    if (panelId === 'config' && window.refreshConfigEditor) {
-        window.refreshConfigEditor();
+    var editor = window.__jsonEditors[panelId];
+    if (editor) {
+        setTimeout(function() { editor.refresh(); }, 0);
     }
 }
-</script>
 
-{{if .CleanSearchQuery}}
-<script>
-(function() {
-    var textarea = document.getElementById("textArea");
-    if (!textarea) return;
+function formatEditorByName(name) {
+    var editor = window.__jsonEditors[name];
+    if (!editor) return;
+    try {
+        var obj = JSON.parse(editor.getValue());
+        editor.setValue(JSON.stringify(obj, null, 4));
+    } catch(e) {
+        alert("Invalid JSON: " + e.message);
+    }
+}
+
+function initJSONEditor(opts) {
+    var textarea = document.getElementById(opts.textareaId);
+    var host = document.getElementById(opts.editorId);
+    var form = document.getElementById(opts.formId);
+    if (!textarea || !host || !form) return null;
+
     var isDark = document.body.classList.contains("dark-theme");
     var initialValue = textarea.value;
     try { initialValue = JSON.stringify(JSON.parse(initialValue), null, 4); } catch(e) {}
-    var editor = CodeMirror(document.getElementById("configEditor"), {
+
+    var editor = CodeMirror(host, {
         value: initialValue,
         mode: "application/json",
         theme: isDark ? "dracula" : "default",
@@ -348,7 +390,7 @@ function switchTab(btn, panelId) {
     });
     editor.setSize("100%", "600px");
 
-    document.getElementById("configForm").addEventListener("submit", function() {
+    form.addEventListener("submit", function() {
         textarea.value = editor.getValue();
     });
 
@@ -357,18 +399,18 @@ function switchTab(btn, panelId) {
         editor.setOption("theme", dark ? "dracula" : "default");
     }).observe(document.body, {attributes: true, attributeFilter: ["class"]});
 
-    window.formatJSON = function() {
-        try {
-            var obj = JSON.parse(editor.getValue());
-            editor.setValue(JSON.stringify(obj, null, 4));
-        } catch(e) {
-            alert("Invalid JSON: " + e.message);
-        }
-    };
+    return editor;
+}
+</script>
 
-    window.refreshConfigEditor = function() {
-        setTimeout(function() { editor.refresh(); }, 0);
-    };
+{{if or .CleanSearchQuery .CheckpointsText}}
+<script>
+(function() {
+    var cfg = initJSONEditor({ textareaId: "textArea", editorId: "configEditor", formId: "configForm" });
+    if (cfg) window.__jsonEditors["config"] = cfg;
+
+    var ckpt = initJSONEditor({ textareaId: "checkpointsTextArea", editorId: "checkpointsEditor", formId: "checkpointsForm" });
+    if (ckpt) window.__jsonEditors["checkpoints"] = ckpt;
 })();
 </script>
 {{end}}
