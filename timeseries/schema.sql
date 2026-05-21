@@ -30,3 +30,6 @@ create index idx_uuid_date on
     public.product_prices
     using btree (mtgjson_uuid,
     date);
+
+-- The job_runs and log_lines tables live with the joblog package; see
+-- joblog/schema.sql for their DDL.

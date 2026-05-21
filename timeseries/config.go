@@ -84,3 +84,11 @@ func (c *Client) Close() error {
 	}
 	return nil
 }
+
+// DB exposes the underlying connection pool so adjacent packages
+// (e.g. joblog) can share it instead of opening a second pool to the same
+// database.
+func (c *Client) DB() *sql.DB { return c.db }
+
+// ReadOnly reports whether the client was constructed against a read replica.
+func (c *Client) ReadOnly() bool { return c.readOnly }

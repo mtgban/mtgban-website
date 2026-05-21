@@ -26,6 +26,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
+	"github.com/mtgban/mtgban-website/joblog"
 	"github.com/mtgban/mtgban-website/timeseries"
 
 	"github.com/leemcloughlin/logfile"
@@ -456,6 +457,11 @@ var NewNewspaperDB *sql.DB
 
 var PricesArchiveDB *timeseries.Client
 
+// JobLog records cron/background job runs and pipes stdout/stderr into
+// Postgres so a process death doesn't take the diagnostic trail with it.
+// nil when no SQL database is configured.
+var JobLog *joblog.Runner
+
 var GoogleDocsClient *http.Client
 
 var ConfigBucket simplecloud.ReadWriter
@@ -673,6 +679,13 @@ func loadVars(port, datastorePath, offlineKey string) error {
 }
 
 func openDBs() (err error) {
+	// Build the joblog runner unconditionally so RunJob/RunJobErr work even
+	// without a database — they fall back to local logging only.
+	jobLogCfg := joblog.Config{
+		BuildCommit: BuildCommit,
+		Notify:      func(kind, msg string, alert bool) { ServerNotify(kind, msg, alert) },
+	}
+
 	if Config.SqlConfig == nil {
 		log.Println("no SQL configuration set, Charts won't be available")
 	} else {
@@ -681,6 +694,13 @@ func openDBs() (err error) {
 			log.Println("error creating a SQL client:", err)
 			return err
 		}
+		jobLogCfg.DB = PricesArchiveDB.DB()
+		jobLogCfg.ReadOnly = PricesArchiveDB.ReadOnly()
+	}
+
+	JobLog = joblog.New(jobLogCfg)
+	if err := JobLog.EnsureSchemas(context.Background()); err != nil {
+		log.Println("warning: joblog ensure schemas:", err)
 	}
 
 	if Config.DBAddress == "" {
@@ -782,10 +802,10 @@ func loadDatastore(ds string) error {
 	}
 
 	LastDatastoreUpdate = time.Now()
-	go updateStaticData()
-	go cacheNewspaper()
+	go JobLog.RunJob("post-datastore.updateStaticData", updateStaticData)
+	go JobLog.RunJob("post-datastore.cacheNewspaper", cacheNewspaper)
 	ServerNotify("init", "Datastore installed")
-	go buildPaletteSetsCache()
+	go JobLog.RunJob("post-datastore.buildPaletteSetsCache", buildPaletteSetsCache)
 
 	return nil
 }
@@ -843,23 +863,34 @@ func main() {
 		log.Fatalln("error opening databases:", err)
 	}
 
+	// Tee stdout/stderr (and therefore everything written through Go's
+	// default logger) into log_lines, with a daily prune. Capture is a
+	// no-op on Windows and when no DB is configured.
+	if PricesArchiveDB != nil {
+		if !JobLog.StartCapture() {
+			log.Println("joblog: stdout/stderr capture unavailable on this platform")
+		}
+		JobLog.StartLogPruner(14*24*time.Hour, 24*time.Hour)
+	}
+
 	err = reloadCheckpoints()
 	if err != nil {
 		log.Printf("checkpoints: initial load failed: %v", err)
 	}
 
 	// load website up
-	go func() {
+	go JobLog.RunJobErr("startup.loadDatastore", func() error {
 		err := loadDatastore(Config.DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
-	}()
+		return nil
+	})
 
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
 	} else if Config.OfflineKey != "" {
-		go func() {
+		go JobLog.RunJobErr("startup.loadScrapersAPI", func() error {
 			log.Println("Loading scrapers from API")
 			err := loadScrapersAPI(context.Background(), Config.OfflineKey)
 			if err != nil {
@@ -868,9 +899,10 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
-		}()
+			return nil
+		})
 	} else {
-		go func() {
+		go JobLog.RunJobErr("startup.loadScrapersNG", func() error {
 			log.Println("Loading", len(Config.ScraperConfig.Config), "Scrapers")
 			err := loadScrapersNG(Config.ScraperConfig)
 			if err != nil {
@@ -879,29 +911,37 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
-		}()
+			return nil
+		})
 	}
+
+	// Periodic memory/goroutine snapshots into job_runs so we have data
+	// points between cron firings to spot creeping resource use.
+	JobLog.StartHeartbeat(5 * time.Minute)
 
 	if !DevMode {
 		// Set up new refreshes as needed
 		c := cron.New()
 
 		// Take a snapshot twice a day
-		c.AddFunc("0 */12 * * *", stashInTimeseries)
+		c.AddFunc("0 */12 * * *", func() { JobLog.RunJob("cron.stashInTimeseries", stashInTimeseries) })
 
 		// Update set values with new prices
-		c.AddFunc("30 */12 * * *", runSealedAnalysis)
+		c.AddFunc("30 */12 * * *", func() { JobLog.RunJob("cron.runSealedAnalysis", runSealedAnalysis) })
 
 		// Reload DB Newspaper every 3 hours
-		c.AddFunc("33 */3 * * *", cacheNewspaper)
+		c.AddFunc("33 */3 * * *", func() { JobLog.RunJob("cron.cacheNewspaper", cacheNewspaper) })
 
 		for _, refresh := range Config.ScraperConfig.ForceReloadAt {
 			c.AddFunc(refresh, func() {
-				log.Println("Reloading ScraperConfig")
-				err := loadScrapersNG(Config.ScraperConfig)
-				if err != nil {
-					ServerNotify("Reload", "Unable to reload ScraperConfig: "+err.Error())
-				}
+				JobLog.RunJobErr("cron.loadScrapersNG", func() error {
+					log.Println("Reloading ScraperConfig")
+					err := loadScrapersNG(Config.ScraperConfig)
+					if err != nil {
+						ServerNotify("Reload", "Unable to reload ScraperConfig: "+err.Error())
+					}
+					return err
+				})
 			})
 			log.Println("Scheduled ForceReloadAt:", refresh)
 		}
@@ -948,7 +988,10 @@ func main() {
 			continue
 		}
 
-		// Set up logging
+		// Set up logging. Per-page loggers write to a rotating file
+		// under LogDir and tee into the DB log sink so events visible
+		// only in logs/ also survive a box death.
+		pageDBWriter := JobLog.PageLogWriter(nav.Name)
 		logFile, err := logfile.New(&logfile.LogFile{
 			FileName:    path.Join(LogDir, nav.Name+".log"),
 			MaxSize:     500 * 1024,
@@ -957,9 +1000,9 @@ func main() {
 		})
 		if err != nil {
 			log.Printf("Failed to create logFile for %s: %s", nav.Name, err)
-			LogPages[nav.Name] = log.New(os.Stderr, "", log.LstdFlags)
+			LogPages[nav.Name] = log.New(io.MultiWriter(os.Stderr, pageDBWriter), "", log.LstdFlags)
 		} else {
-			LogPages[nav.Name] = log.New(logFile, "", log.LstdFlags)
+			LogPages[nav.Name] = log.New(io.MultiWriter(logFile, pageDBWriter), "", log.LstdFlags)
 		}
 
 		// Set up the handler
