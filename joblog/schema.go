@@ -1,7 +1,10 @@
-package timeseries
+package joblog
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 )
 
@@ -35,6 +38,14 @@ type JobRun struct {
 	SysMemTotalBytes *int64
 }
 
+// LogLine is one captured line of stdout/stderr (or a synthetic source).
+type LogLine struct {
+	Timestamp time.Time
+	Host      string
+	Source    string // "stdout" | "stderr" | other
+	Message   string
+}
+
 const jobRunsSchema = `
 CREATE TABLE IF NOT EXISTS job_runs (
     id                       BIGSERIAL PRIMARY KEY,
@@ -65,19 +76,37 @@ CREATE INDEX IF NOT EXISTS idx_job_runs_started_at ON job_runs (started_at DESC)
 CREATE INDEX IF NOT EXISTS idx_job_runs_job_name_started_at ON job_runs (job_name, started_at DESC);
 `
 
-// EnsureJobRunsSchema creates the job_runs table and its indexes if they do
-// not already exist. No-op on read-only clients.
-func (c *Client) EnsureJobRunsSchema(ctx context.Context) error {
-	if c.readOnly {
+const logLinesSchema = `
+CREATE TABLE IF NOT EXISTS log_lines (
+    id      BIGSERIAL PRIMARY KEY,
+    ts      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    host    TEXT NOT NULL,
+    source  TEXT NOT NULL,
+    message TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_log_lines_ts ON log_lines (ts DESC);
+CREATE INDEX IF NOT EXISTS idx_log_lines_host_ts ON log_lines (host, ts DESC);
+`
+
+// EnsureSchemas creates the job_runs and log_lines tables (and their indexes)
+// if they don't already exist. No-op when the runner has no DB or is in
+// read-only mode.
+func (r *Runner) EnsureSchemas(ctx context.Context) error {
+	if !r.canWrite() {
 		return nil
 	}
-	_, err := c.db.ExecContext(ctx, jobRunsSchema)
-	return err
+	if _, err := r.db.ExecContext(ctx, jobRunsSchema); err != nil {
+		return fmt.Errorf("joblog: ensure job_runs schema: %w", err)
+	}
+	if _, err := r.db.ExecContext(ctx, logLinesSchema); err != nil {
+		return fmt.Errorf("joblog: ensure log_lines schema: %w", err)
+	}
+	return nil
 }
 
-// InsertJobRun writes a single job_runs row. No-op on read-only clients.
-func (c *Client) InsertJobRun(ctx context.Context, run JobRun) error {
-	if c.readOnly {
+// insertJobRun writes a single job_runs row.
+func (r *Runner) insertJobRun(ctx context.Context, run JobRun) error {
+	if !r.canWrite() {
 		return nil
 	}
 	const q = `
@@ -102,7 +131,7 @@ func (c *Client) InsertJobRun(ctx context.Context, run JobRun) error {
 			$19,$20,
 			$21,$22
 		)`
-	_, err := c.db.ExecContext(ctx, q,
+	_, err := r.db.ExecContext(ctx, q,
 		run.Host, nullStr(run.BuildCommit), run.JobName, run.Kind, run.Status,
 		run.StartedAt, nullTime(run.FinishedAt), nullInt64Ptr(run.DurationMs),
 		nullStrPtr(run.ErrorMsg), nullStrPtr(run.PanicStack),
@@ -115,6 +144,61 @@ func (c *Client) InsertJobRun(ctx context.Context, run JobRun) error {
 	)
 	return err
 }
+
+// insertLogLines writes a batch of log lines in a single multi-value INSERT.
+// Recurses to keep parameter count under Postgres's 65535 cap.
+func (r *Runner) insertLogLines(ctx context.Context, lines []LogLine) error {
+	if !r.canWrite() || len(lines) == 0 {
+		return nil
+	}
+
+	const colsPerLine = 4
+	maxBatch := 65535 / colsPerLine
+	if len(lines) > maxBatch {
+		mid := len(lines) / 2
+		if err := r.insertLogLines(ctx, lines[:mid]); err != nil {
+			return err
+		}
+		return r.insertLogLines(ctx, lines[mid:])
+	}
+
+	var sb strings.Builder
+	sb.WriteString(`INSERT INTO log_lines (ts, host, source, message) VALUES `)
+	args := make([]any, 0, len(lines)*colsPerLine)
+	for i, l := range lines {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		offset := i * colsPerLine
+		fmt.Fprintf(&sb, "($%d,$%d,$%d,$%d)", offset+1, offset+2, offset+3, offset+4)
+		args = append(args, l.Timestamp, l.Host, l.Source, l.Message)
+	}
+
+	_, err := r.db.ExecContext(ctx, sb.String(), args...)
+	return err
+}
+
+// pruneLogLines deletes log_lines older than the given cutoff.
+func (r *Runner) pruneLogLines(ctx context.Context, olderThan time.Time) (int64, error) {
+	if !r.canWrite() {
+		return 0, nil
+	}
+	res, err := r.db.ExecContext(ctx, `DELETE FROM log_lines WHERE ts < $1`, olderThan)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
+// canWrite reports whether the runner has a writable DB. Sink-only operations
+// (timing, local logging) still work when this is false.
+func (r *Runner) canWrite() bool {
+	return r != nil && r.db != nil && !r.readOnly
+}
+
+// Compile-time guard that we accept any *sql.DB-shaped handle.
+var _ = (*sql.DB)(nil)
 
 func nullStr(s string) any {
 	if s == "" {

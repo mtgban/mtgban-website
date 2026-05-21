@@ -225,7 +225,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			v.Set("msg", "Updating prices in the background...")
 			doReboot = true
 
-			go runJobErr("admin.loadScrapersAPI", func() error {
+			go JobLog.RunJobErr("admin.loadScrapersAPI", func() error {
 				err := loadScrapersAPI(context.Background(), Config.OfflineKey)
 				if err != nil {
 					log.Println("error loading scrapers:", err)
@@ -242,7 +242,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		if StashingInProgress {
 			v.Set("msg", "Stashing is already in progress")
 		} else {
-			go runJob("admin.stashInTimeseries", stashInTimeseries)
+			go JobLog.RunJob("admin.stashInTimeseries", stashInTimeseries)
 		}
 
 	case "server":
