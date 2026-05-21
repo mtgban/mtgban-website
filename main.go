@@ -681,6 +681,9 @@ func openDBs() (err error) {
 			log.Println("error creating a SQL client:", err)
 			return err
 		}
+		if err := PricesArchiveDB.EnsureJobRunsSchema(context.Background()); err != nil {
+			log.Println("warning: ensure job_runs schema:", err)
+		}
 	}
 
 	if Config.DBAddress == "" {
@@ -782,10 +785,10 @@ func loadDatastore(ds string) error {
 	}
 
 	LastDatastoreUpdate = time.Now()
-	go updateStaticData()
-	go cacheNewspaper()
+	go runJob("post-datastore.updateStaticData", updateStaticData)
+	go runJob("post-datastore.cacheNewspaper", cacheNewspaper)
 	ServerNotify("init", "Datastore installed")
-	go buildPaletteSetsCache()
+	go runJob("post-datastore.buildPaletteSetsCache", buildPaletteSetsCache)
 
 	return nil
 }
@@ -843,23 +846,39 @@ func main() {
 		log.Fatalln("error opening databases:", err)
 	}
 
+	// Mirror stdout/stderr (and therefore everything written through Go's
+	// default logger) into log_lines, with a daily prune. Started after
+	// openDBs so PricesArchiveDB exists by the time the drainer fires.
+	if PricesArchiveDB != nil {
+		if err := PricesArchiveDB.EnsureLogLinesSchema(context.Background()); err != nil {
+			log.Println("warning: ensure log_lines schema:", err)
+		}
+		logSink = newDBLogSink()
+		go logSink.drain()
+		if !startStdLogCapture(logSink) {
+			log.Println("loglines: stdout/stderr capture unavailable on this platform")
+		}
+		startLogPruner()
+	}
+
 	err = reloadCheckpoints()
 	if err != nil {
 		log.Printf("checkpoints: initial load failed: %v", err)
 	}
 
 	// load website up
-	go func() {
+	go runJobErr("startup.loadDatastore", func() error {
 		err := loadDatastore(Config.DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
-	}()
+		return nil
+	})
 
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
 	} else if Config.OfflineKey != "" {
-		go func() {
+		go runJobErr("startup.loadScrapersAPI", func() error {
 			log.Println("Loading scrapers from API")
 			err := loadScrapersAPI(context.Background(), Config.OfflineKey)
 			if err != nil {
@@ -868,9 +887,10 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
-		}()
+			return nil
+		})
 	} else {
-		go func() {
+		go runJobErr("startup.loadScrapersNG", func() error {
 			log.Println("Loading", len(Config.ScraperConfig.Config), "Scrapers")
 			err := loadScrapersNG(Config.ScraperConfig)
 			if err != nil {
@@ -879,29 +899,37 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
-		}()
+			return nil
+		})
 	}
+
+	// Periodic memory/goroutine snapshots into job_runs so we have data
+	// points between cron firings to spot creeping resource use.
+	startHeartbeat(5 * time.Minute)
 
 	if !DevMode {
 		// Set up new refreshes as needed
 		c := cron.New()
 
 		// Take a snapshot twice a day
-		c.AddFunc("0 */12 * * *", stashInTimeseries)
+		c.AddFunc("0 */12 * * *", func() { runJob("cron.stashInTimeseries", stashInTimeseries) })
 
 		// Update set values with new prices
-		c.AddFunc("30 */12 * * *", runSealedAnalysis)
+		c.AddFunc("30 */12 * * *", func() { runJob("cron.runSealedAnalysis", runSealedAnalysis) })
 
 		// Reload DB Newspaper every 3 hours
-		c.AddFunc("33 */3 * * *", cacheNewspaper)
+		c.AddFunc("33 */3 * * *", func() { runJob("cron.cacheNewspaper", cacheNewspaper) })
 
 		for _, refresh := range Config.ScraperConfig.ForceReloadAt {
 			c.AddFunc(refresh, func() {
-				log.Println("Reloading ScraperConfig")
-				err := loadScrapersNG(Config.ScraperConfig)
-				if err != nil {
-					ServerNotify("Reload", "Unable to reload ScraperConfig: "+err.Error())
-				}
+				runJobErr("cron.loadScrapersNG", func() error {
+					log.Println("Reloading ScraperConfig")
+					err := loadScrapersNG(Config.ScraperConfig)
+					if err != nil {
+						ServerNotify("Reload", "Unable to reload ScraperConfig: "+err.Error())
+					}
+					return err
+				})
 			})
 			log.Println("Scheduled ForceReloadAt:", refresh)
 		}
@@ -948,7 +976,10 @@ func main() {
 			continue
 		}
 
-		// Set up logging
+		// Set up logging. Per-page loggers write to a rotating file
+		// under LogDir and tee into the DB log sink so events visible
+		// only in logs/ also survive a box death.
+		pageDBWriter := newPageLogWriter(nav.Name)
 		logFile, err := logfile.New(&logfile.LogFile{
 			FileName:    path.Join(LogDir, nav.Name+".log"),
 			MaxSize:     500 * 1024,
@@ -957,9 +988,9 @@ func main() {
 		})
 		if err != nil {
 			log.Printf("Failed to create logFile for %s: %s", nav.Name, err)
-			LogPages[nav.Name] = log.New(os.Stderr, "", log.LstdFlags)
+			LogPages[nav.Name] = log.New(io.MultiWriter(os.Stderr, pageDBWriter), "", log.LstdFlags)
 		} else {
-			LogPages[nav.Name] = log.New(logFile, "", log.LstdFlags)
+			LogPages[nav.Name] = log.New(io.MultiWriter(logFile, pageDBWriter), "", log.LstdFlags)
 		}
 
 		// Set up the handler
