@@ -38,6 +38,7 @@ type Item struct {
 	Quantity  int
 	Condition string
 	IsFoil    bool
+	IsSealed  bool
 	Price     float64
 }
 
@@ -123,55 +124,65 @@ func Load(ctx context.Context, link string, game string, maxRows int) ([]Item, e
 		return nil, fmt.Errorf("cloudscraper init: %w", err)
 	}
 
-	// Strip any existing category/cardType params and set the correct ones
+	// Strip any existing query params
 	if i := strings.Index(link, "?"); i >= 0 {
 		link = link[:i]
 	}
-	link += "?category=" + catID + "&cardType=cards"
+
+	// Fetch both cards and sealed products
+	cardTypes := []string{"cards", "sealed"}
 
 	seen := map[string]bool{}
 	var allItems []Item
 
-	for _, variant := range sortVariants {
-		if ctx.Err() != nil {
-			break
-		}
+	for _, cardType := range cardTypes {
+		baseURL := link + "?category=" + catID + "&cardType=" + cardType
 
-		pageURL := link + variant
-		resp, err := scraper.Get(pageURL, map[string]string{
-			"Accept": "text/html,application/xhtml+xml",
-		}, "")
-		if err != nil || resp.Status != 200 {
-			continue
-		}
+		for _, variant := range sortVariants {
+			if ctx.Err() != nil {
+				break
+			}
 
-		items, err := parseProducts(resp.Body, catName, 0)
-		if err != nil {
-			continue
-		}
-
-		for _, item := range items {
-			key := item.Name + "|" + item.SetName + "|" + item.Number + "|" + fmt.Sprintf("%v", item.IsFoil)
-			if seen[key] {
+			pageURL := baseURL + variant
+			resp, err := scraper.Get(pageURL, map[string]string{
+				"Accept": "text/html,application/xhtml+xml",
+			}, "")
+			if err != nil || resp.Status != 200 {
 				continue
 			}
-			seen[key] = true
-			allItems = append(allItems, item)
 
-			if maxRows > 0 && len(allItems) >= maxRows {
-				return allItems, nil
+			items, err := parseProducts(resp.Body, catName, 0)
+			if err != nil {
+				continue
 			}
-		}
 
-		// Stop early if we're not finding new items
-		if len(allItems) > 0 && len(items) > 0 {
-			newRatio := float64(len(allItems)) / float64(len(allItems)+len(items)-len(allItems))
-			_ = newRatio // could use to decide early termination
+			newFound := false
+			for _, item := range items {
+				key := item.ProductID
+				if key == "" {
+					key = item.Name + "|" + item.SetName + "|" + item.Number + "|" + fmt.Sprintf("%v|%v", item.IsFoil, item.IsSealed)
+				}
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				newFound = true
+				allItems = append(allItems, item)
+
+				if maxRows > 0 && len(allItems) >= maxRows {
+					return allItems, nil
+				}
+			}
+
+			// Skip remaining sort variants if this one found nothing new
+			if !newFound {
+				break
+			}
 		}
 	}
 
 	if len(allItems) == 0 {
-		return nil, fmt.Errorf("no MTG cards found in showcase")
+		return nil, fmt.Errorf("no products found in showcase")
 	}
 
 	return allItems, nil
@@ -231,7 +242,7 @@ func parseProducts(html string, categoryName string, maxRows int) ([]Item, error
 		}
 
 		for _, p := range products {
-			if !p.IsCard || p.CategoryName != categoryName {
+			if p.CategoryName != categoryName {
 				continue
 			}
 
@@ -258,6 +269,7 @@ func parseProducts(html string, categoryName string, maxRows int) ([]Item, error
 				Quantity:  qty,
 				Condition: mapCondition(p.CardCondition),
 				IsFoil:    p.ProductSubType == "Foil",
+				IsSealed:  !p.IsCard,
 				Price:     price,
 			})
 

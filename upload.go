@@ -1441,15 +1441,29 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 			cardId, matchErr = mtgmatcher.MatchId(uuid, item.IsFoil)
 		}
 
-		// Fall back to name/set matching
+		// Fall back to name-based matching
 		if cardId == "" {
-			card := mtgmatcher.InputCard{
-				Name:      item.Name,
-				Edition:   item.SetName,
-				Variation: item.Number,
-				Foil:      item.IsFoil,
+			if item.IsSealed {
+				// Search sealed products by name
+				results, err := mtgmatcher.SearchSealedEquals(item.Name)
+				if err != nil {
+					// Try a looser search
+					results, err = mtgmatcher.SearchSealedContains(item.Name)
+				}
+				if err != nil {
+					matchErr = err
+				} else if len(results) > 0 {
+					cardId = results[0]
+				}
+			} else {
+				card := mtgmatcher.InputCard{
+					Name:      item.Name,
+					Edition:   item.SetName,
+					Variation: item.Number,
+					Foil:      item.IsFoil,
+				}
+				cardId, matchErr = mtgmatcher.Match(&card)
 			}
-			cardId, matchErr = mtgmatcher.Match(&card)
 		}
 
 		entry := UploadEntry{
