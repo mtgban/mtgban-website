@@ -26,6 +26,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/cardconduit"
+	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/moxfield"
 )
 
@@ -1464,6 +1465,53 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 			Quantity:          item.Quantity,
 			CardId:            cardId,
 			MismatchError:     err,
+			OriginalPrice:     item.Price,
+			OriginalCondition: item.Condition,
+		}
+		uploadEntries = append(uploadEntries, entry)
+	}
+
+	return uploadEntries, nil
+}
+
+func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
+	items, err := collectr.Load(ctx, link, Config.Game, maxRows)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Collectr showcase: %w", err)
+	}
+
+	var uploadEntries []UploadEntry
+	for _, item := range items {
+		var cardId string
+		var matchErr error
+
+		// Try matching via TCGplayer product ID first
+		uuid := mtgmatcher.ExternalUUID(item.ProductID)
+		if uuid != "" {
+			cardId, matchErr = mtgmatcher.MatchId(uuid, item.IsFoil)
+		}
+
+		// Fall back to name/set matching
+		if cardId == "" {
+			card := mtgmatcher.InputCard{
+				Name:      item.Name,
+				Edition:   item.SetName,
+				Variation: item.Number,
+				Foil:      item.IsFoil,
+			}
+			cardId, matchErr = mtgmatcher.Match(&card)
+		}
+
+		entry := UploadEntry{
+			Card: mtgmatcher.InputCard{
+				Name:    item.Name,
+				Edition: item.SetName,
+				Foil:    item.IsFoil,
+			},
+			HasQuantity:       true,
+			Quantity:          item.Quantity,
+			CardId:            cardId,
+			MismatchError:     matchErr,
 			OriginalPrice:     item.Price,
 			OriginalCondition: item.Condition,
 		}
