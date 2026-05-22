@@ -9,6 +9,8 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/simplecloud"
@@ -16,11 +18,38 @@ import (
 
 var DataBucket simplecloud.Reader
 
-// Slice containing all the loaded retail data
-var Sellers []mtgban.Seller
+// Snapshots of the loaded retail and buylist data. Held behind atomic.Pointer
+// so readers always observe a fully-constructed, immutable slice and writers
+// publish via a single atomic store. Mutating the slice returned by
+// GetSellers/GetVendors is a bug — treat it as read-only.
+var (
+	sellersPtr atomic.Pointer[[]mtgban.Seller]
+	vendorsPtr atomic.Pointer[[]mtgban.Vendor]
 
-// Slice containing all the loaded buylist data
-var Vendors []mtgban.Vendor
+	// Serializes writers so concurrent updateSellers/updateVendors calls
+	// don't lose each other's changes during the read-modify-publish cycle.
+	scrapersWriteMu sync.Mutex
+)
+
+// GetSellers returns the current sellers snapshot. The returned slice is
+// shared and MUST NOT be modified by callers.
+func GetSellers() []mtgban.Seller {
+	p := sellersPtr.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+// GetVendors returns the current vendors snapshot. The returned slice is
+// shared and MUST NOT be modified by callers.
+func GetVendors() []mtgban.Vendor {
+	p := vendorsPtr.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
+}
 
 type ScraperConfig struct {
 	BucketAccessKey  string `json:"bucket_access_key"`
@@ -109,117 +138,121 @@ func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, f
 }
 
 func updateSellers(scraper mtgban.Scraper) {
+	seller := scraper.(mtgban.Seller)
+
+	scrapersWriteMu.Lock()
+	defer scrapersWriteMu.Unlock()
+
+	current := GetSellers()
+
 	sellerIndex := -1
-	for i, seller := range Sellers {
-		if seller.Info().Shorthand == scraper.Info().Shorthand {
+	for i, s := range current {
+		if s.Info().Shorthand == seller.Info().Shorthand {
 			sellerIndex = i
 			break
 		}
 	}
 
-	err := updateSellerAtPosition(scraper.(mtgban.Seller), sellerIndex)
+	next, err := buildNextSellers(current, seller, sellerIndex)
 	if err != nil {
 		msg := fmt.Sprintf("seller %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
 		ServerNotify("refresh", msg, true)
 		return
 	}
+	sellersPtr.Store(&next)
 
 	msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
 	ServerNotify("refresh", msg)
-
-	return
 }
 
-func updateSellerAtPosition(seller mtgban.Seller, i int) error {
-	// Save seller in global array
+func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]mtgban.Seller, error) {
 	if i < 0 {
-		Sellers = append(Sellers, seller)
+		next := make([]mtgban.Seller, len(current)+1)
+		copy(next, current)
+		next[len(current)] = seller
 
-		// Keep slices sorted
-		slices.SortFunc(Sellers, func(a, b mtgban.Seller) int {
+		slices.SortFunc(next, func(a, b mtgban.Seller) int {
 			ret := strings.Compare(a.Info().Name, b.Info().Name)
 			if ret == 0 {
 				ret = strings.Compare(a.Info().Shorthand, b.Info().Shorthand)
 			}
 			return ret
 		})
-		return nil
+		return next, nil
 	}
 
-	// Check timestamp
-	if seller.Info().InventoryTimestamp.Before(*Sellers[i].Info().InventoryTimestamp) {
-		return errors.New("new inventory is older than current one")
+	if seller.Info().InventoryTimestamp.Before(*current[i].Info().InventoryTimestamp) {
+		return nil, errors.New("new inventory is older than current one")
 	}
 
-	// Load inventory
 	inv := seller.Inventory()
-
-	// Do not update in case the new inventory wasn't completely loaded
-	// for example due to API problems, unless the old inventory was already sparse
-	old := Sellers[i].Inventory()
+	old := current[i].Inventory()
 	if len(inv) > 0 && len(inv) < len(old)/2 && len(old) > 100 {
-		return errors.New("new inventory is missing too many entries")
+		return nil, errors.New("new inventory is missing too many entries")
 	}
 
-	Sellers[i] = seller
-
-	return nil
+	next := make([]mtgban.Seller, len(current))
+	copy(next, current)
+	next[i] = seller
+	return next, nil
 }
 
 func updateVendors(scraper mtgban.Scraper) {
+	vendor := scraper.(mtgban.Vendor)
+
+	scrapersWriteMu.Lock()
+	defer scrapersWriteMu.Unlock()
+
+	current := GetVendors()
+
 	vendorIndex := -1
-	for i, vendor := range Vendors {
-		if vendor.Info().Shorthand == scraper.Info().Shorthand {
+	for i, v := range current {
+		if v.Info().Shorthand == vendor.Info().Shorthand {
 			vendorIndex = i
 			break
 		}
 	}
 
-	err := updateVendorAtPosition(scraper.(mtgban.Vendor), vendorIndex)
+	next, err := buildNextVendors(current, vendor, vendorIndex)
 	if err != nil {
 		msg := fmt.Sprintf("vendor %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
 		ServerNotify("refresh", msg, true)
 		return
 	}
+	vendorsPtr.Store(&next)
 
 	msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
 	ServerNotify("refresh", msg)
-
-	return
 }
 
-func updateVendorAtPosition(vendor mtgban.Vendor, i int) error {
-	// Save vendor in global array
+func buildNextVendors(current []mtgban.Vendor, vendor mtgban.Vendor, i int) ([]mtgban.Vendor, error) {
 	if i < 0 {
-		Vendors = append(Vendors, vendor)
+		next := make([]mtgban.Vendor, len(current)+1)
+		copy(next, current)
+		next[len(current)] = vendor
 
-		// Keep slices sorted
-		slices.SortFunc(Vendors, func(a, b mtgban.Vendor) int {
+		slices.SortFunc(next, func(a, b mtgban.Vendor) int {
 			ret := strings.Compare(a.Info().Name, b.Info().Name)
 			if ret == 0 {
 				ret = strings.Compare(a.Info().Shorthand, b.Info().Shorthand)
 			}
 			return ret
 		})
-		return nil
+		return next, nil
 	}
 
-	// Check timestamp
-	if vendor.Info().BuylistTimestamp.Before(*Vendors[i].Info().BuylistTimestamp) {
-		return errors.New("new buylist is older than current one")
+	if vendor.Info().BuylistTimestamp.Before(*current[i].Info().BuylistTimestamp) {
+		return nil, errors.New("new buylist is older than current one")
 	}
 
-	// Load buylist
 	bl := vendor.Buylist()
-
-	// Do not update in case the new buylist wasn't completely loaded
-	// for example due to API problems, unless the old inventory was already sparse
-	old := Vendors[i].Buylist()
+	old := current[i].Buylist()
 	if len(bl) > 0 && len(bl) < len(old)/2 && len(old) > 100 {
-		return errors.New("new buylist is missing too many entries")
+		return nil, errors.New("new buylist is missing too many entries")
 	}
 
-	Vendors[i] = vendor
-
-	return nil
+	next := make([]mtgban.Vendor, len(current))
+	copy(next, current)
+	next[i] = vendor
+	return next, nil
 }

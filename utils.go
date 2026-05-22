@@ -218,7 +218,7 @@ const (
 
 // Return the CreditMultiplier for any given vendor
 func findCredit(shorthand string) float64 {
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		if strings.EqualFold(vendor.Info().Shorthand, shorthand) {
 			return vendor.Info().CreditMultiplier
 		}
@@ -228,7 +228,7 @@ func findCredit(shorthand string) float64 {
 
 // Look up a seller and return its inventory
 func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if strings.EqualFold(seller.Info().Shorthand, shorthand) {
 			return seller.Inventory(), nil
 		}
@@ -238,7 +238,7 @@ func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
 
 // Look up a vendor and return its buylist
 func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		if strings.EqualFold(vendor.Info().Shorthand, shorthand) {
 			return vendor.Buylist(), nil
 		}
@@ -248,7 +248,7 @@ func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
 
 // Look up a seller with its name and return its inventory
 func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord, error) {
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if seller.Info().SealedMode == sealed && strings.EqualFold(seller.Info().Name, name) {
 			return seller.Inventory(), nil
 		}
@@ -258,7 +258,7 @@ func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord
 
 // Look up a vendor with its name and return its inventory
 func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, error) {
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		if vendor.Info().SealedMode == sealed && strings.EqualFold(vendor.Info().Name, name) {
 			return vendor.Buylist(), nil
 		}
@@ -358,8 +358,8 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	}
 
 	var newspaper bool
-	if NewspaperUUIDs != nil {
-		_, newspaper = NewspaperUUIDs[cardId]
+	if uuids := GetNewspaperUUIDs(); uuids != nil {
+		_, newspaper = uuids[cardId]
 	}
 
 	variant := ""
@@ -537,7 +537,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	}
 
 	var hotlistStore string
-	_, found = Infos["hotlist"][cardId]
+	_, found = GetInfos()["hotlist"][cardId]
 	if found {
 		hotlistStore = "CK"
 	}
@@ -636,8 +636,9 @@ func genSealedPrintings(co *mtgmatcher.CardObject) string {
 	// The first chunk is always present, even for foil-only sets
 	b.WriteString("<h6>Set Value</h6><table class='setValue'>")
 
+	infos := GetInfos()
 	for i, title := range ProductTitles {
-		entries, found := Infos[ProductKeys[i]][co.SetCode]
+		entries, found := infos[ProductKeys[i]][co.SetCode]
 		if found {
 			fmt.Fprintf(&b, "<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
 		}
@@ -645,12 +646,12 @@ func genSealedPrintings(co *mtgmatcher.CardObject) string {
 	b.WriteString("</table>")
 
 	// The second chunk is optional, check for the first key
-	if len(Infos[ProductFoilKeys[0]][co.SetCode]) > 0 {
+	if len(infos[ProductFoilKeys[0]][co.SetCode]) > 0 {
 		b.WriteString("<br>")
 		b.WriteString("<h6>Foil Set Value</h6><table class='setValue'>")
 
 		for i, title := range ProductTitles {
-			entries, found := Infos[ProductFoilKeys[i]][co.SetCode]
+			entries, found := infos[ProductFoilKeys[i]][co.SetCode]
 			if found {
 				fmt.Fprintf(&b, "<tr class='setValue'><td class='setValue'><h5>%s</h5></td><td>$ %.02f</td></tr>", title, entries[0].Price)
 			}
@@ -903,12 +904,12 @@ func getTCGSimulationIQR(productId string) float64 {
 
 // Return the full display name displayed from the input shorthand
 func scraperName(shorthand string) string {
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if shorthand == seller.Info().Shorthand {
 			return seller.Info().Name
 		}
 	}
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		if shorthand == vendor.Info().Shorthand {
 			return vendor.Info().Name
 		}
