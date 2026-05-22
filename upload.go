@@ -1425,7 +1425,7 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 }
 
 func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
-	items, err := collectr.Load(ctx, link, maxRows)
+	items, err := collectr.Load(ctx, link, Config.Game, maxRows)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch Collectr showcase: %w", err)
 	}

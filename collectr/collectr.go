@@ -17,6 +17,18 @@ const (
 	pageBase = "https://app.getcollectr.com"
 )
 
+// CategoryID maps game names to Collectr category IDs.
+var CategoryID = map[string]string{
+	"magic":   "1",
+	"lorcana": "71",
+}
+
+// CategoryFilter maps game names to the catalog_category_name used by the API.
+var CategoryFilter = map[string]string{
+	"magic":   "Magic: The Gathering",
+	"lorcana": "Lorcana",
+}
+
 type Item struct {
 	ProductID string
 	Name      string
@@ -89,30 +101,33 @@ var sortVariants = []string{
 	"&sortType=date_added&sortOrder=ASC",
 }
 
-// Load fetches all MTG cards from a public Collectr showcase.
+// Load fetches cards from a public Collectr showcase for the given game.
 // It fetches the showcase page HTML via cloudscraper (to bypass Cloudflare)
 // and extracts the pre-rendered product data embedded by Next.js.
 // Multiple page fetches with different sort orders are combined to
 // maximize coverage of the full collection.
-func Load(ctx context.Context, link string, maxRows int) ([]Item, error) {
+func Load(ctx context.Context, link string, game string, maxRows int) ([]Item, error) {
 	_, err := ParseShowcaseURL(link)
 	if err != nil {
 		return nil, err
 	}
+
+	catID, ok := CategoryID[game]
+	if !ok {
+		return nil, fmt.Errorf("unsupported game: %s", game)
+	}
+	catName := CategoryFilter[game]
 
 	scraper, err := cloudscraper.Init(false, false)
 	if err != nil {
 		return nil, fmt.Errorf("cloudscraper init: %w", err)
 	}
 
-	// Ensure the link has the MTG cards filter
-	if !strings.Contains(link, "category=") {
-		if strings.Contains(link, "?") {
-			link += "&category=1&cardType=cards"
-		} else {
-			link += "?category=1&cardType=cards"
-		}
+	// Strip any existing category/cardType params and set the correct ones
+	if i := strings.Index(link, "?"); i >= 0 {
+		link = link[:i]
 	}
+	link += "?category=" + catID + "&cardType=cards"
 
 	seen := map[string]bool{}
 	var allItems []Item
@@ -130,7 +145,7 @@ func Load(ctx context.Context, link string, maxRows int) ([]Item, error) {
 			continue
 		}
 
-		items, err := parseProducts(resp.Body, 0)
+		items, err := parseProducts(resp.Body, catName, 0)
 		if err != nil {
 			continue
 		}
@@ -165,7 +180,7 @@ func Load(ctx context.Context, link string, maxRows int) ([]Item, error) {
 // parseProducts extracts product data from page HTML.
 // The data is embedded in Next.js RSC script chunks as escaped JSON.
 // Multiple product arrays may exist (e.g. unfiltered + filtered views).
-func parseProducts(html string, maxRows int) ([]Item, error) {
+func parseProducts(html string, categoryName string, maxRows int) ([]Item, error) {
 	const marker = `\"products\":[{`
 
 	seen := map[string]bool{}
@@ -216,7 +231,7 @@ func parseProducts(html string, maxRows int) ([]Item, error) {
 		}
 
 		for _, p := range products {
-			if !p.IsCard || p.CategoryName != "Magic: The Gathering" {
+			if !p.IsCard || p.CategoryName != categoryName {
 				continue
 			}
 
@@ -262,12 +277,16 @@ func parseProducts(html string, maxRows int) ([]Item, error) {
 }
 
 // LoadReader parses product data from a pre-fetched page HTML body.
-func LoadReader(r io.Reader, maxRows int) ([]Item, error) {
+func LoadReader(r io.Reader, game string, maxRows int) ([]Item, error) {
+	catName, ok := CategoryFilter[game]
+	if !ok {
+		return nil, fmt.Errorf("unsupported game: %s", game)
+	}
 	buf, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	return parseProducts(string(buf), maxRows)
+	return parseProducts(string(buf), catName, maxRows)
 }
 
 func mapCondition(cond string) string {
