@@ -9,7 +9,7 @@ create table if not exists job_runs (
     build_commit             text,
     job_name                 text not null,
     kind                     text not null,            -- 'job' | 'heartbeat'
-    status                   text not null,            -- 'success' | 'error' | 'panic' | 'tick'
+    status                   text not null,            -- 'running' | 'success' | 'error' | 'panic' | 'tick'
     started_at               timestamptz not null,
     finished_at              timestamptz,
     duration_ms              bigint,

@@ -149,11 +149,18 @@ func (r *Runner) RunJob(name string, fn func()) {
 
 // RunJobErr is the error-returning sibling of RunJob; the returned error
 // (if any) is recorded as the run's status/error_msg.
+//
+// A row is inserted with status="running" before fn executes and updated to
+// its terminal status when fn returns. If the process dies mid-run the row
+// stays as "running", which is the breadcrumb that distinguishes "never
+// started" from "started but never finished".
 func (r *Runner) RunJobErr(name string, fn func() error) {
 	start := time.Now()
 	before := takeMemSnapshot()
 	log.Printf("job %q: start (heap=%dMB goroutines=%d numgc=%d)",
 		name, before.HeapAlloc>>20, before.Goroutines, before.NumGC)
+
+	runID := r.recordJobStart(name, "job", start, before)
 
 	var (
 		runErr     error
@@ -193,7 +200,7 @@ func (r *Runner) RunJobErr(name string, fn func() error) {
 		after.NumGC-before.NumGC,
 	)
 
-	r.recordJobRun(name, "job", status, start, &dur, before, after, runErr, panicMsg, panicStack)
+	r.recordJobFinish(runID, name, "job", status, start, dur, before, after, runErr, panicMsg, panicStack)
 }
 
 // StartHeartbeat spawns a goroutine that records a periodic snapshot of
@@ -214,19 +221,96 @@ func (r *Runner) StartHeartbeat(interval time.Duration) {
 		defer ticker.Stop()
 		for range ticker.C {
 			snap := takeMemSnapshot()
-			r.recordJobRun("heartbeat", "heartbeat", "tick", time.Now(), nil, snap, snap, nil, "", "")
+			r.recordHeartbeat(snap)
 		}
 	}()
 }
 
-// recordJobRun is the single funnel for both job and heartbeat inserts. It
-// swallows its own errors (a logging-system failure must not kill the caller)
-// and always emits a local log line so we keep a breadcrumb even if the DB
-// write fails.
-func (r *Runner) recordJobRun(name, kind, status string, start time.Time, dur *time.Duration, before, after memSnapshot, runErr error, panicMsg, panicStack string) {
+// recordJobStart inserts a job_runs row with status="running" and only the
+// "before" snapshot populated. Returns the row id (0 when no DB or on error)
+// so the matching recordJobFinish can update the same row. Errors are logged
+// but never surfaced — a logging-system failure must not kill the caller.
+func (r *Runner) recordJobStart(name, kind string, start time.Time, before memSnapshot) int64 {
+	if !r.canWrite() {
+		return 0
+	}
 	run := JobRun{
 		Host:        r.host,
 		BuildCommit: r.buildCommit,
+		JobName:     name,
+		Kind:        kind,
+		Status:      "running",
+		StartedAt:   start,
+	}
+	heapBefore := before.HeapAlloc
+	heapSysBefore := before.HeapSys
+	gorBefore := before.Goroutines
+	gcBefore := before.NumGC
+	pauseBefore := before.PauseTotalNs
+	run.HeapAllocBefore = &heapBefore
+	run.HeapSysBefore = &heapSysBefore
+	run.GoroutinesBefore = &gorBefore
+	run.NumGCBefore = &gcBefore
+	run.PauseTotalNsBefore = &pauseBefore
+	if before.SysMemKnown {
+		used := before.SysMemUsed
+		total := before.SysMemTotal
+		run.SysMemUsedBytes = &used
+		run.SysMemTotalBytes = &total
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	id, err := r.insertJobRunReturningID(ctx, run)
+	if err != nil {
+		log.Printf("job %q: failed to record start: %v", name, err)
+		return 0
+	}
+	return id
+}
+
+// recordJobFinish closes out a job. When runID > 0 it updates the row
+// previously inserted by recordJobStart; otherwise it falls back to a fresh
+// INSERT so the run is still recorded if the start write failed.
+func (r *Runner) recordJobFinish(runID int64, name, kind, status string, start time.Time, dur time.Duration, before, after memSnapshot, runErr error, panicMsg, panicStack string) {
+	if !r.canWrite() {
+		return
+	}
+	run := buildJobRun(r.host, r.buildCommit, name, kind, status, start, &dur, before, after, runErr, panicMsg, panicStack)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if runID > 0 {
+		if err := r.updateJobRun(ctx, runID, run); err != nil {
+			log.Printf("job %q: failed to record finish: %v", name, err)
+		}
+		return
+	}
+	if err := r.insertJobRun(ctx, run); err != nil {
+		log.Printf("job %q: failed to record run: %v", name, err)
+	}
+}
+
+// recordHeartbeat writes a single self-contained tick row. Heartbeats don't
+// have a start/finish pairing so they use a plain insert.
+func (r *Runner) recordHeartbeat(snap memSnapshot) {
+	if !r.canWrite() {
+		return
+	}
+	run := buildJobRun(r.host, r.buildCommit, "heartbeat", "heartbeat", "tick", time.Now(), nil, snap, snap, nil, "", "")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := r.insertJobRun(ctx, run); err != nil {
+		log.Printf("heartbeat: failed to record: %v", err)
+	}
+}
+
+// buildJobRun assembles a JobRun from snapshots and outcome fields. Shared by
+// the finish and heartbeat paths.
+func buildJobRun(host, buildCommit, name, kind, status string, start time.Time, dur *time.Duration, before, after memSnapshot, runErr error, panicMsg, panicStack string) JobRun {
+	run := JobRun{
+		Host:        host,
+		BuildCommit: buildCommit,
 		JobName:     name,
 		Kind:        kind,
 		Status:      status,
@@ -282,15 +366,7 @@ func (r *Runner) recordJobRun(name, kind, status string, start time.Time, dur *t
 			run.PanicStack = &panicStack
 		}
 	}
-
-	if !r.canWrite() {
-		return
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := r.insertJobRun(ctx, run); err != nil {
-		log.Printf("job %q: failed to record run: %v", name, err)
-	}
+	return run
 }
 
 func toErrorString(v any) string {

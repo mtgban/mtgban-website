@@ -917,7 +917,7 @@ func main() {
 
 	// Periodic memory/goroutine snapshots into job_runs so we have data
 	// points between cron firings to spot creeping resource use.
-	JobLog.StartHeartbeat(5 * time.Minute)
+	JobLog.StartHeartbeat(10 * time.Second)
 
 	if !DevMode {
 		// Set up new refreshes as needed

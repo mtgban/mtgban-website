@@ -16,7 +16,7 @@ type JobRun struct {
 	BuildCommit string
 	JobName     string
 	Kind        string // "job" or "heartbeat"
-	Status      string // "success", "error", "panic", "tick"
+	Status      string // "running", "success", "error", "panic", "tick"
 	StartedAt   time.Time
 	FinishedAt  *time.Time
 	DurationMs  *int64
@@ -109,29 +109,80 @@ func (r *Runner) insertJobRun(ctx context.Context, run JobRun) error {
 	if !r.canWrite() {
 		return nil
 	}
+	_, err := r.db.ExecContext(ctx, insertJobRunSQL, jobRunArgs(run)...)
+	return err
+}
+
+// insertJobRunReturningID writes a job_runs row and returns the new id, so a
+// "running" row can later be updated in place by recordJobFinish.
+func (r *Runner) insertJobRunReturningID(ctx context.Context, run JobRun) (int64, error) {
+	if !r.canWrite() {
+		return 0, nil
+	}
+	var id int64
+	err := r.db.QueryRowContext(ctx, insertJobRunSQL+" RETURNING id", jobRunArgs(run)...).Scan(&id)
+	return id, err
+}
+
+// updateJobRun rewrites the terminal-state fields on an existing job_runs row.
+// Used to close out a row previously inserted with status="running".
+func (r *Runner) updateJobRun(ctx context.Context, id int64, run JobRun) error {
+	if !r.canWrite() {
+		return nil
+	}
 	const q = `
-		INSERT INTO job_runs (
-			host, build_commit, job_name, kind, status,
-			started_at, finished_at, duration_ms,
-			error_msg, panic_stack,
-			heap_alloc_before, heap_alloc_after,
-			heap_sys_before, heap_sys_after,
-			goroutines_before, goroutines_after,
-			num_gc_before, num_gc_after,
-			pause_total_ns_before, pause_total_ns_after,
-			sys_mem_used_bytes, sys_mem_total_bytes
-		) VALUES (
-			$1,$2,$3,$4,$5,
-			$6,$7,$8,
-			$9,$10,
-			$11,$12,
-			$13,$14,
-			$15,$16,
-			$17,$18,
-			$19,$20,
-			$21,$22
-		)`
+		UPDATE job_runs SET
+			status = $1,
+			finished_at = $2,
+			duration_ms = $3,
+			error_msg = $4,
+			panic_stack = $5,
+			heap_alloc_after = $6,
+			heap_sys_after = $7,
+			goroutines_after = $8,
+			num_gc_after = $9,
+			pause_total_ns_after = $10,
+			sys_mem_used_bytes = COALESCE($11, sys_mem_used_bytes),
+			sys_mem_total_bytes = COALESCE($12, sys_mem_total_bytes)
+		WHERE id = $13`
 	_, err := r.db.ExecContext(ctx, q,
+		run.Status,
+		nullTime(run.FinishedAt), nullInt64Ptr(run.DurationMs),
+		nullStrPtr(run.ErrorMsg), nullStrPtr(run.PanicStack),
+		nullInt64Ptr(run.HeapAllocAfter), nullInt64Ptr(run.HeapSysAfter),
+		nullIntPtr(run.GoroutinesAfter), nullInt64Ptr(run.NumGCAfter),
+		nullInt64Ptr(run.PauseTotalNsAfter),
+		nullInt64Ptr(run.SysMemUsedBytes), nullInt64Ptr(run.SysMemTotalBytes),
+		id,
+	)
+	return err
+}
+
+const insertJobRunSQL = `
+	INSERT INTO job_runs (
+		host, build_commit, job_name, kind, status,
+		started_at, finished_at, duration_ms,
+		error_msg, panic_stack,
+		heap_alloc_before, heap_alloc_after,
+		heap_sys_before, heap_sys_after,
+		goroutines_before, goroutines_after,
+		num_gc_before, num_gc_after,
+		pause_total_ns_before, pause_total_ns_after,
+		sys_mem_used_bytes, sys_mem_total_bytes
+	) VALUES (
+		$1,$2,$3,$4,$5,
+		$6,$7,$8,
+		$9,$10,
+		$11,$12,
+		$13,$14,
+		$15,$16,
+		$17,$18,
+		$19,$20,
+		$21,$22
+	)`
+
+func jobRunArgs(run JobRun) []any {
+	return []any{
 		run.Host, nullStr(run.BuildCommit), run.JobName, run.Kind, run.Status,
 		run.StartedAt, nullTime(run.FinishedAt), nullInt64Ptr(run.DurationMs),
 		nullStrPtr(run.ErrorMsg), nullStrPtr(run.PanicStack),
@@ -141,8 +192,7 @@ func (r *Runner) insertJobRun(ctx context.Context, run JobRun) error {
 		nullInt64Ptr(run.NumGCBefore), nullInt64Ptr(run.NumGCAfter),
 		nullInt64Ptr(run.PauseTotalNsBefore), nullInt64Ptr(run.PauseTotalNsAfter),
 		nullInt64Ptr(run.SysMemUsedBytes), nullInt64Ptr(run.SysMemTotalBytes),
-	)
-	return err
+	}
 }
 
 // insertLogLines writes a batch of log lines in a single multi-value INSERT.
