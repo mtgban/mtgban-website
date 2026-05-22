@@ -45,7 +45,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		// Find best NM sell price (lowest)
 		var bestSellPrice float64
 		var bestSellName string
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			if slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 				continue
 			}
@@ -79,7 +79,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		// Find best NM buy price (highest buylist)
 		var bestBuyPrice float64
 		var bestBuyName string
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			if slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
 				continue
 			}

@@ -124,13 +124,13 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	var enabledStores []string
 	switch storesOpt {
 	case "ALL_ACCESS":
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			shorthand := seller.Info().Shorthand
 			if !slices.Contains(Config.SearchRetailBlockList, shorthand) && !slices.Contains(enabledStores, shorthand) {
 				enabledStores = append(enabledStores, shorthand)
 			}
 		}
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			shorthand := vendor.Info().Shorthand
 			if !slices.Contains(Config.SearchBuylistBlockList, shorthand) &&
 				!slices.Contains(enabledStores, shorthand) {
@@ -138,13 +138,13 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	case "DEV_ACCESS":
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			shorthand := seller.Info().Shorthand
 			if !slices.Contains(enabledStores, shorthand) {
 				enabledStores = append(enabledStores, shorthand)
 			}
 		}
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			shorthand := vendor.Info().Shorthand
 			if !slices.Contains(enabledStores, shorthand) {
 				enabledStores = append(enabledStores, shorthand)
@@ -160,7 +160,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		filter := r.FormValue("filter")
 		if filter == "singles" {
 			var filtered []string
-			for _, seller := range Sellers {
+			for _, seller := range GetSellers() {
 				if (seller.Info().SealedMode && filter == "singles") || (!seller.Info().SealedMode && filter == "sealed") {
 					continue
 				}
@@ -169,7 +169,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 					filtered = append(filtered, shorthand)
 				}
 			}
-			for _, vendor := range Vendors {
+			for _, vendor := range GetVendors() {
 				if (vendor.Info().SealedMode && filter == "singles") || (!vendor.Info().SealedMode && filter == "sealed") {
 					continue
 				}
@@ -407,7 +407,7 @@ func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
 
 func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		// Only keep the right product type
 		if (!sealed && seller.Info().SealedMode) ||
 			(sealed && !seller.Info().SealedMode) {
@@ -558,7 +558,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 
 func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		// Only keep the right product type
 		if (!sealed && vendor.Info().SealedMode) ||
 			(sealed && !vendor.Info().SealedMode) {
@@ -778,7 +778,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			}
 
 			// Determine whether scraper is an index and should appear regardless of conditions
-			for _, scraper := range Sellers {
+			for _, scraper := range GetSellers() {
 				if scraper.Info().Shorthand != scraperKey {
 					continue
 				}
@@ -786,7 +786,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 					isIndex = append(isIndex, scraperKey)
 				}
 			}
-			for _, scraper := range Vendors {
+			for _, scraper := range GetVendors() {
 				if scraper.Info().Shorthand != scraperKey {
 					continue
 				}

@@ -337,7 +337,7 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	allowlistSellersOpt := GetParamFromSig(sig, "ArbitEnabled")
 
 	if allowlistSellersOpt == "ALL" || (DevMode && !SigCheck) {
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			if seller.Info().MetadataOnly {
 				continue
 			}
@@ -362,14 +362,14 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	// Populate vendor keys for the settings modal (shown on every page load)
 	var vendorKeys []string
 	if reverse {
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			if slices.Contains(blocklistVendors, seller.Info().Shorthand) {
 				continue
 			}
 			vendorKeys = append(vendorKeys, seller.Info().Shorthand)
 		}
 	} else {
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
 				continue
 			}
@@ -425,7 +425,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	// The "menu" section, the reference
 	var allowlistSellers []string
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if anyEnabled {
 			// This is the list of allowed global sellers, minus the ones blocked from search
 			if slices.Contains(Config.GlobalAllowList, seller.Info().Shorthand) {
@@ -445,7 +445,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	// The "Jump to" section, the probe
 	var blocklistVendors []string
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if slices.Contains(Config.GlobalProbeList, seller.Info().Shorthand) {
 			continue
 		}
@@ -454,7 +454,7 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	// Populate vendor keys for the settings modal (shown on every page load)
 	var globalVendorKeys []string
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
 			continue
 		}
@@ -518,7 +518,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 					break
 				}
 
-				for _, vendor := range Vendors {
+				for _, vendor := range GetVendors() {
 					if vendor.Info().Shorthand == v[0] {
 						source = vendor
 						break
@@ -531,7 +531,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 					break
 				}
 
-				for _, seller := range Sellers {
+				for _, seller := range GetSellers() {
 					if seller.Info().Shorthand == v[0] {
 						source = seller
 						break
@@ -577,14 +577,14 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	// Set up menu bar, by selecting which scrapers should be selectable as source
 	var menuScrapers []mtgban.Scraper
 	if pageVars.ReverseMode {
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
 				continue
 			}
 			menuScrapers = append(menuScrapers, vendor)
 		}
 	} else {
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			if !slices.Contains(allowlistSellers, seller.Info().Shorthand) {
 				continue
 			}
@@ -718,7 +718,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	// The pool of scrapers that source will be compared against
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			// Skip unactionable sellers
 			if seller.Info().SealedMode && seller.Info().MetadataOnly {
 				continue
@@ -732,7 +732,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			scrapers = append(scrapers, seller)
 		}
 	} else {
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			if source.Info().SealedMode != vendor.Info().SealedMode {
 				continue
 			}

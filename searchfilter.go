@@ -157,7 +157,7 @@ func fixupStoreCodeNG(code string) []string {
 		filters[i] = strings.Trim(filters[i], "\"")
 
 		// Validate the input against the registered scrapers
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			if filters[i] != strings.ToLower(seller.Info().Name) &&
 				filters[i] != strings.ToLower(seller.Info().Shorthand) {
 				continue
@@ -165,7 +165,7 @@ func fixupStoreCodeNG(code string) []string {
 			filters[i] = strings.ToLower(seller.Info().Shorthand)
 			break
 		}
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			if filters[i] != strings.ToLower(vendor.Info().Name) &&
 				filters[i] != strings.ToLower(vendor.Info().Shorthand) {
 				continue
@@ -1619,13 +1619,13 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 					return false
 				}
 			case "hotlist":
-				_, found := Infos["hotlist"][co.UUID]
+				_, found := GetInfos()["hotlist"][co.UUID]
 				if found {
 					return false
 				}
 			case "newspaper":
-				if NewspaperUUIDs != nil {
-					if _, found := NewspaperUUIDs[co.UUID]; found {
+				if uuids := GetNewspaperUUIDs(); uuids != nil {
+					if _, found := uuids[co.UUID]; found {
 						return false
 					}
 				}

@@ -730,7 +730,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	// Retrieve prices
 	if isRetail && canRetail {
 		var enabledStores []string
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 				enabledStores = append(enabledStores, seller.Info().Shorthand)
 			}
@@ -745,7 +745,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	if isBuylist && canBuylist {
 		var enabledStores []string
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
 				enabledStores = append(enabledStores, vendor.Info().Shorthand)
 			}

@@ -289,12 +289,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var allVendors []string
 
 	// Load all possible sellers, and vendors according to user permissions
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) && !seller.Info().SealedMode && !seller.Info().MetadataOnly {
 			allSellers = append(allSellers, seller.Info().Shorthand)
 		}
 	}
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) && !vendor.Info().SealedMode {
 			allVendors = append(allVendors, vendor.Info().Shorthand)
 		}
@@ -908,8 +908,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.Optimized = optimizedResults
 		pageVars.OptimizedTotals = optimizedTotals
 		pageVars.HighestTotal = highestTotal
-		pageVars.Editions = AllEditionsKeys
-		pageVars.EditionsMap = AllEditionsMap
+		uploadEditions := GetEditions()
+		pageVars.Editions = uploadEditions.AllEditionsKeys
+		pageVars.EditionsMap = uploadEditions.AllEditionsMap
 	}
 
 	// Logs

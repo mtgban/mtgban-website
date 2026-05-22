@@ -18,6 +18,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -447,9 +448,35 @@ var SkipPrices bool
 var SkipNewspaper bool
 var LogDir string
 
-var LastDatastoreUpdate time.Time
-var LastStashUpdate time.Time
-var LastNewspaperUpdate time.Time
+// Timestamps written by background goroutines (datastore reload, stash
+// cron, newspaper cron) and read by the admin dashboard. Held behind
+// atomic.Pointer so concurrent reads can't observe a torn time.Time
+// (it's a 24-byte struct, not a single word).
+var (
+	lastDatastoreUpdatePtr atomic.Pointer[time.Time]
+	lastStashUpdatePtr     atomic.Pointer[time.Time]
+	lastNewspaperUpdatePtr atomic.Pointer[time.Time]
+)
+
+// SetLastDatastoreUpdate / SetLastStashUpdate / SetLastNewspaperUpdate
+// publish a new timestamp atomically.
+func SetLastDatastoreUpdate(t time.Time) { lastDatastoreUpdatePtr.Store(&t) }
+func SetLastStashUpdate(t time.Time)     { lastStashUpdatePtr.Store(&t) }
+func SetLastNewspaperUpdate(t time.Time) { lastNewspaperUpdatePtr.Store(&t) }
+
+// GetLastDatastoreUpdate / GetLastStashUpdate / GetLastNewspaperUpdate
+// return the most recent timestamp, or the zero time if none has been
+// published yet.
+func GetLastDatastoreUpdate() time.Time { return loadTime(lastDatastoreUpdatePtr.Load()) }
+func GetLastStashUpdate() time.Time     { return loadTime(lastStashUpdatePtr.Load()) }
+func GetLastNewspaperUpdate() time.Time { return loadTime(lastNewspaperUpdatePtr.Load()) }
+
+func loadTime(p *time.Time) time.Time {
+	if p == nil {
+		return time.Time{}
+	}
+	return *p
+}
 
 var Newspaper3dayDB *sql.DB
 var Newspaper1dayDB *sql.DB
@@ -801,7 +828,7 @@ func loadDatastore(ds string) error {
 		return err
 	}
 
-	LastDatastoreUpdate = time.Now()
+	SetLastDatastoreUpdate(time.Now())
 	go JobLog.RunJob("post-datastore.updateStaticData", updateStaticData)
 	go JobLog.RunJob("post-datastore.cacheNewspaper", cacheNewspaper)
 	ServerNotify("init", "Datastore installed")
@@ -1036,7 +1063,7 @@ func main() {
 
 	// /healthz: returns 200 only if dependencies are OK.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		if len(Sellers) == 0 || len(Vendors) == 0 {
+		if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
 			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 			return
 		}
@@ -1144,12 +1171,12 @@ var funcMap = template.FuncMap{
 		return strings.Contains(s, p)
 	},
 	"is_sealed_scraper": func(shorthand string) bool {
-		for _, seller := range Sellers {
+		for _, seller := range GetSellers() {
 			if seller != nil && seller.Info().Shorthand == shorthand {
 				return seller.Info().SealedMode
 			}
 		}
-		for _, vendor := range Vendors {
+		for _, vendor := range GetVendors() {
 			if vendor != nil && vendor.Info().Shorthand == shorthand {
 				return vendor.Info().SealedMode
 			}
