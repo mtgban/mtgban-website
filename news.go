@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -392,8 +393,21 @@ var gameMap = map[string]string{
 	"pokemon":   "Pokemon",
 }
 
-// Cache of card UUIDs that appear in the newspaper spike score pages
-var NewspaperUUIDs map[string]struct{}
+// Cache of card UUIDs that appear in the newspaper spike score pages.
+// Published atomically alongside newspaperPagesPtr so readers always see a
+// fully-built map.
+var newspaperUUIDsPtr atomic.Pointer[map[string]struct{}]
+
+// GetNewspaperUUIDs returns the current set of UUIDs that appear in the
+// newspaper spike-score pages. The returned map is shared and MUST NOT be
+// modified by callers. Returns nil before the first successful cache run.
+func GetNewspaperUUIDs() map[string]struct{} {
+	p := newspaperUUIDsPtr.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
+}
 
 func cacheNewspaper() {
 	if Config.OfflineKey != "" || SkipNewspaper {
@@ -414,18 +428,24 @@ func cacheNewspaper() {
 		return
 	}
 
-	for i := range NewspaperPages {
-		if !NewspaperPages[i].NewNewspaper {
+	// Build a fresh slice from the current snapshot so readers never observe
+	// torn struct fields (slice headers, in particular) while we update them.
+	current := GetNewspaperPages()
+	next := make([]NewspaperPage, len(current))
+	copy(next, current)
+
+	for i := range next {
+		if !next[i].NewNewspaper {
 			continue
 		}
-		if NewspaperPages[i].Query == "" {
+		if next[i].Query == "" {
 			continue
 		}
-		if NewspaperPages[i].NeedsBuylist && Config.Game != DefaultGame {
+		if next[i].NeedsBuylist && Config.Game != DefaultGame {
 			continue
 		}
 
-		query := NewspaperPages[i].Query + " AND game_name = '" + game + "' ORDER BY ranking ASC;"
+		query := next[i].Query + " AND game_name = '" + game + "' ORDER BY ranking ASC;"
 
 		results, err := getResults(NewNewspaperDB, query)
 		if err != nil {
@@ -433,11 +453,11 @@ func cacheNewspaper() {
 			continue
 		}
 		if len(results) == 0 {
-			ServerNotify("newspaper", NewspaperPages[i].Option+" results are empty", true)
+			ServerNotify("newspaper", next[i].Option+" results are empty", true)
 			continue
 		}
-		if NewspaperPages[i].Results != nil && len(results) < len(NewspaperPages[i].Results)/2 {
-			ServerNotify("newspaper", NewspaperPages[i].Option+" too few results "+fmt.Sprint(len(results)), true)
+		if next[i].Results != nil && len(results) < len(next[i].Results)/2 {
+			ServerNotify("newspaper", next[i].Option+" too few results "+fmt.Sprint(len(results)), true)
 			continue
 		}
 
@@ -454,13 +474,13 @@ func cacheNewspaper() {
 		sort.Strings(editions)
 		sort.Strings(variants)
 
-		log.Println(NewspaperPages[i].Option, "has", len(results), "elements")
-		NewspaperPages[i].Results = results
-		NewspaperPages[i].AvailableEditions = editions
-		NewspaperPages[i].PossibleFinish = variants
+		log.Println(next[i].Option, "has", len(results), "elements")
+		next[i].Results = results
+		next[i].AvailableEditions = editions
+		next[i].PossibleFinish = variants
 
 		// Cache UUIDs from spike score pages for the "on:newspaper" search filter
-		if NewspaperPages[i].Option == "combined_spike_score" || NewspaperPages[i].Option == "spike_score" {
+		if next[i].Option == "combined_spike_score" || next[i].Option == "spike_score" {
 			for _, result := range results {
 				newspaperUUIDs[result.UUID] = struct{}{}
 			}
@@ -486,20 +506,44 @@ func cacheNewspaper() {
 		sort.Strings(editions3day)
 		sort.Strings(variants3day)
 
-		log.Println(NewspaperPages[i].Option, "(3day) has", len(results3day), "elements")
-		NewspaperPages[i].Results3Day = results3day
-		NewspaperPages[i].AvailableEditions3Day = editions3day
-		NewspaperPages[i].PossibleFinish3Day = variants3day
+		log.Println(next[i].Option, "(3day) has", len(results3day), "elements")
+		next[i].Results3Day = results3day
+		next[i].AvailableEditions3Day = editions3day
+		next[i].PossibleFinish3Day = variants3day
 	}
 
-	NewspaperUUIDs = newspaperUUIDs
+	newspaperPagesPtr.Store(&next)
+	newspaperUUIDsPtr.Store(&newspaperUUIDs)
 	log.Println("Newspaper UUIDs cached:", len(newspaperUUIDs))
 
-	LastNewspaperUpdate = time.Now()
+	SetLastNewspaperUpdate(time.Now())
 	log.Println("Newspaper All Ready")
 }
 
-var NewspaperPages = []NewspaperPage{
+// newspaperPagesPtr holds the current cached newspaper data. cacheNewspaper
+// builds a fresh slice from the previous snapshot and publishes it with a
+// single Store so readers always see a fully-constructed slice.
+var newspaperPagesPtr atomic.Pointer[[]NewspaperPage]
+
+// GetNewspaperPages returns the current newspaper-pages snapshot. The
+// returned slice and the structs it contains are shared and MUST NOT be
+// modified by callers.
+func GetNewspaperPages() []NewspaperPage {
+	p := newspaperPagesPtr.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+func init() {
+	// Seed the atomic pointer with the static literal so readers see the
+	// configured pages even before the first cacheNewspaper run completes.
+	initial := newspaperPagesInitial
+	newspaperPagesPtr.Store(&initial)
+}
+
+var newspaperPagesInitial = []NewspaperPage{
 	{
 		Title:  "Top Singles by Combined Spike Score",
 		Desc:   "Best cards to buy, combining TCGplayer sales data and Card Kingdom pricing changes",
@@ -1442,8 +1486,9 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
-	pageVars.EditionsCategories = AllEditionsCategoriesSorted
-	pageVars.EditionsByCategory = AllEditionsByCategory
+	editions := GetEditions()
+	pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
+	pageVars.EditionsByCategory = editions.AllEditionsByCategory
 	pageVars.PickerID = "news-editions-picker"
 
 	// Check if any DB connection was made
@@ -1498,15 +1543,16 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
+	newspaperPages := GetNewspaperPages()
 	oldMode := page == "old"
-	for _, newspage := range NewspaperPages {
+	for _, newspage := range newspaperPages {
 		if page == newspage.Option {
 			oldMode = !newspage.NewNewspaper
 			break
 		}
 	}
 
-	for _, newspage := range NewspaperPages {
+	for _, newspage := range newspaperPages {
 		if (oldMode && newspage.NewNewspaper) || (!oldMode && !newspage.NewNewspaper) {
 			continue
 		}
@@ -1519,7 +1565,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		pageVars.ToC = append(pageVars.ToC, newspage)
 	}
 
-	pageVars.LastUpdate = LastNewspaperUpdate
+	pageVars.LastUpdate = GetLastNewspaperUpdate()
 	if oldMode {
 		var err error
 		pageVars.LastUpdate, err = getLastDBUpdate(db)

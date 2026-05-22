@@ -59,7 +59,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	// Built before merging the user's cookie hide-list so hidden vendors still
 	// appear in the picker (rendered as pre-checked by js/settings.js bindList).
 	var modalSellerKeys, modalVendorKeys []string
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if seller.Info().CountryFlag != "" ||
 			seller.Info().SealedMode ||
 			seller.Info().MetadataOnly ||
@@ -68,7 +68,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		}
 		modalSellerKeys = append(modalSellerKeys, seller.Info().Shorthand)
 	}
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		if vendor.Info().CountryFlag != "" ||
 			vendor.Info().SealedMode ||
 			vendor.Info().MetadataOnly ||
@@ -95,7 +95,7 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 		skipEditions = strings.Split(skipEditionsOpt, ",")
 	}
 
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if seller.Info().SealedMode ||
 			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 			continue
@@ -107,8 +107,9 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	cyoa, _ := strconv.ParseBool(GetParamFromSig(sig, "SleepersCYOA"))
 	pageVars.CanShowAll = cyoa || (DevMode && !SigCheck)
 
-	pageVars.EditionsCategories = AllEditionsCategoriesSorted
-	pageVars.EditionsByCategory = AllEditionsByCategory
+	editions := GetEditions()
+	pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
+	pageVars.EditionsByCategory = editions.AllEditionsByCategory
 	pageVars.PickerID = "sleep-editions-picker"
 
 	var tiers map[string]int
@@ -290,7 +291,7 @@ func getHotlist(skipEditions []string) map[string]int {
 	// Skip bad editions
 	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI", "CMB1", "CMB2")
 
-	for cardId, hotlistEntries := range Infos["hotlist"] {
+	for cardId, hotlistEntries := range GetInfos()["hotlist"] {
 		// Make sure the older price is set, otherwise a lot of cards that were
 		// previously not being bought will show up and pollute results
 		oldPrice := hotlistEntries[0].Price
@@ -323,8 +324,9 @@ func getReprints(skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
 	// Filter results
-	for _, key := range ReprintsKeys {
-		reprints, found := ReprintsMap[key]
+	reprintsKeys, reprintsMap := GetReprints()
+	for _, key := range reprintsKeys {
+		reprints, found := reprintsMap[key]
 		if !found {
 			continue
 		}
@@ -360,8 +362,11 @@ func getReprints(skipEditions []string) map[string]int {
 func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[string]int {
 	tiers := map[string]int{}
 
+	sellersSnapshot := GetSellers()
+	vendorsSnapshot := GetVendors()
+
 	var tcgSeller mtgban.Seller
-	for _, seller := range Sellers {
+	for _, seller := range sellersSnapshot {
 		if seller != nil && seller.Info().Shorthand == "TCGLow" {
 			tcgSeller = seller
 			break
@@ -378,7 +383,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 		CustomCardFilter: noOversize,
 	}
 
-	for _, seller := range Sellers {
+	for _, seller := range sellersSnapshot {
 		if seller.Info().MetadataOnly {
 			continue
 		}
@@ -394,7 +399,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 			continue
 		}
 
-		for _, vendor := range Vendors {
+		for _, vendor := range vendorsSnapshot {
 			if vendor.Info().Shorthand == seller.Info().Shorthand {
 				continue
 			}
@@ -435,7 +440,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 
 	var referenceSeller mtgban.Seller
 	var targetSeller mtgban.Seller
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if seller.Info().SealedMode ||
 			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
 			continue

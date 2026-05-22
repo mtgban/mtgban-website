@@ -183,7 +183,7 @@ func PaletteStores(w http.ResponseWriter, r *http.Request) {
 		Vendors: []PaletteStore{},
 	}
 	seen := map[string]bool{}
-	for _, s := range Sellers {
+	for _, s := range GetSellers() {
 		if s == nil {
 			continue
 		}
@@ -200,7 +200,7 @@ func PaletteStores(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	seen = map[string]bool{}
-	for _, v := range Vendors {
+	for _, v := range GetVendors() {
 		if v == nil {
 			continue
 		}
@@ -239,14 +239,15 @@ func paletteNewspaperTargetsJSON() template.JS {
 	titleCounts := map[string]int{}
 
 	// First pass: count title occurrences so we know which need disambiguation.
-	for _, p := range NewspaperPages {
+	newspaperPages := GetNewspaperPages()
+	for _, p := range newspaperPages {
 		if p.Option == "" || p.Option == "options" {
 			continue
 		}
 		titleCounts[p.Title]++
 	}
 
-	for _, p := range NewspaperPages {
+	for _, p := range newspaperPages {
 		if p.Option == "" || p.Option == "options" {
 			continue
 		}

@@ -6,6 +6,7 @@ import (
 	"log"
 	"slices"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -174,9 +175,25 @@ func getRow(accumulated map[string]*timeseries.PriceRow, uuid string, isFoil boo
 	return row
 }
 
-var StashingInProgress bool
+// stashingInProgress gates concurrent invocations of stashInTimeseries
+// (cron + admin button). Use IsStashingInProgress to read.
+var stashingInProgress atomic.Bool
+
+// IsStashingInProgress reports whether a timeseries stash is currently
+// running. Safe to call from any goroutine.
+func IsStashingInProgress() bool {
+	return stashingInProgress.Load()
+}
 
 func stashInTimeseries() {
+	// Only one stash may run at a time. The cron fires every 12h and the
+	// admin button can fire at any moment; CompareAndSwap is the real gate.
+	if !stashingInProgress.CompareAndSwap(false, true) {
+		log.Println("stashInTimeseries: another stash is already running, skipping")
+		return
+	}
+	defer stashingInProgress.Store(false)
+
 	if PricesArchiveDB == nil {
 		log.Println("PricesArchiveDB not initialized, skipping stash")
 		return
@@ -184,13 +201,12 @@ func stashInTimeseries() {
 
 	start := time.Now()
 	ServerNotify("timeseries", "Taking snapshot...")
-	StashingInProgress = true
 
 	// Accumulate all prices into a single row per (date, uuid, foil, etched).
 	accumulated := map[string]*timeseries.PriceRow{}
 
 	// Collect retail prices from sellers
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		for _, config := range Config.TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Retail, seller.Info().Shorthand) {
 				continue
@@ -225,7 +241,7 @@ func stashInTimeseries() {
 	}
 
 	// Collect buylist prices from vendors
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		for _, config := range Config.TimeseriesConfig.Datasets {
 			if !slices.Contains(config.Buylist, vendor.Info().Shorthand) {
 				continue
@@ -265,8 +281,7 @@ func stashInTimeseries() {
 		ServerNotify("timeseries", fmt.Sprintf("batch upsert error: %s", err))
 	}
 
-	LastStashUpdate = time.Now()
-	StashingInProgress = false
+	SetLastStashUpdate(time.Now())
 	msg := fmt.Sprintf("Snapshot completed in %s: %d upserted, %d errors", time.Since(start), upserted, errCount)
 	ServerNotify("timeseries", msg)
 }

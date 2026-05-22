@@ -119,10 +119,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.HasAvailable = len(mtgmatcher.GetSealedUUIDs()) > 0
 
 	// Populate all seller/vendor keys (for settings drawer and options page)
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
 	}
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		pageVars.VendorKeys = append(pageVars.VendorKeys, vendor.Info().Shorthand)
 	}
 	pageVars.SellerKeys = sortKeysByScraperName(pageVars.SellerKeys)
@@ -192,44 +192,45 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// If query is empty there is nothing to do
 	if query == "" {
+		editions := GetEditions()
 		// Hijack sealed list
 		if pageVars.IsSealed {
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Sealed Search", 1)
 
-			pageVars.EditionSort = SealedEditionsSorted
-			pageVars.EditionList = SealedEditionsList
+			pageVars.EditionSort = editions.SealedEditionsSorted
+			pageVars.EditionList = editions.SealedEditionsList
 			render(w, "search.html", pageVars)
 			return
 		} else if isSetsPage {
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Editions", 1)
 
-			pageVars.TotalSets = TotalSets
-			pageVars.TotalCards = TotalCards
-			pageVars.TotalUnique = TotalUnique
+			pageVars.TotalSets = editions.TotalSets
+			pageVars.TotalCards = editions.TotalCards
+			pageVars.TotalUnique = editions.TotalUnique
 
 			sortOpt := r.FormValue("sort")
-			sortedKeys := TreeEditionsKeys
+			sortedKeys := editions.TreeEditionsKeys
 
 			if sortOpt == "name" {
-				namedSort := make([]string, len(TreeEditionsKeys))
-				copy(namedSort, TreeEditionsKeys)
+				namedSort := make([]string, len(editions.TreeEditionsKeys))
+				copy(namedSort, editions.TreeEditionsKeys)
 				sort.SliceStable(namedSort, func(i, j int) bool {
-					return strings.ToLower(TreeEditionsMap[namedSort[i]][0].Name) < strings.ToLower(TreeEditionsMap[namedSort[j]][0].Name)
+					return strings.ToLower(editions.TreeEditionsMap[namedSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[namedSort[j]][0].Name)
 				})
 				sortedKeys = namedSort
 			} else if sortOpt == "size" {
-				sizeSort := make([]string, len(TreeEditionsKeys))
-				copy(sizeSort, TreeEditionsKeys)
+				sizeSort := make([]string, len(editions.TreeEditionsKeys))
+				copy(sizeSort, editions.TreeEditionsKeys)
 				sort.SliceStable(sizeSort, func(i, j int) bool {
-					if TreeEditionsMap[sizeSort[i]][0].Size == TreeEditionsMap[sizeSort[j]][0].Size {
-						return strings.ToLower(TreeEditionsMap[sizeSort[i]][0].Name) < strings.ToLower(TreeEditionsMap[sizeSort[j]][0].Name)
+					if editions.TreeEditionsMap[sizeSort[i]][0].Size == editions.TreeEditionsMap[sizeSort[j]][0].Size {
+						return strings.ToLower(editions.TreeEditionsMap[sizeSort[i]][0].Name) < strings.ToLower(editions.TreeEditionsMap[sizeSort[j]][0].Name)
 					}
-					return TreeEditionsMap[sizeSort[i]][0].Size > TreeEditionsMap[sizeSort[j]][0].Size
+					return editions.TreeEditionsMap[sizeSort[i]][0].Size > editions.TreeEditionsMap[sizeSort[j]][0].Size
 				})
 				sortedKeys = sizeSort
 			}
 
-			pageVars.FlatEditions = flattenEditions(sortedKeys, TreeEditionsMap)
+			pageVars.FlatEditions = flattenEditions(sortedKeys, editions.TreeEditionsMap)
 			pageVars.SortOption = sortOpt
 
 			render(w, "sets.html", pageVars)
@@ -615,8 +616,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// CHART ALL THE THINGS
 	if chartId != "" {
-		pageVars.EditionSort = SealedEditionsSorted
-		pageVars.EditionList = SealedEditionsList
+		chartEditions := GetEditions()
+		pageVars.EditionSort = chartEditions.SealedEditionsSorted
+		pageVars.EditionList = chartEditions.SealedEditionsList
 
 		// Rebuild the search query by faking a uuid lookup
 		cfg := parseSearchOptionsNG(chartId, nil, nil, nil)
@@ -717,7 +719,7 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 	entryFilters := config.EntryFilters
 
 	// Search sellers
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		if shouldSkipStoreNG(seller, storeFilters) {
 			continue
 		}
@@ -811,7 +813,7 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 	priceFilters := config.PriceFilters
 	entryFilters := config.EntryFilters
 
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		if shouldSkipStoreNG(vendor, storeFilters) {
 			continue
 		}

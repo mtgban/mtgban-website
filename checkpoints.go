@@ -264,7 +264,8 @@ func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 // distinct card release date so the marker lands where the card actually
 // appeared, rather than collapsing every drop onto SLD's original 2019 date.
 func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet map[string]bool) []ChartCheckpoint {
-	if SealedEditionsList == nil {
+	sealedList := GetEditions().SealedEditionsList
+	if sealedList == nil {
 		return nil
 	}
 	now := time.Now()
@@ -283,7 +284,7 @@ func setCheckpointsFromEditions(cardName string, earliest time.Time, printingSet
 	}
 	bestRelease := map[string]releasePick{}
 
-	for _, entries := range SealedEditionsList {
+	for _, entries := range sealedList {
 		for _, e := range entries {
 			if e.Code == "" || seen[e.Code] {
 				continue

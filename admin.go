@@ -62,9 +62,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
-	pageVars.LastUpdate = LastDatastoreUpdate
-	pageVars.LastNews = LastNewspaperUpdate
-	pageVars.LastStash = LastStashUpdate
+	pageVars.LastUpdate = GetLastDatastoreUpdate()
+	pageVars.LastNews = GetLastNewspaperUpdate()
+	pageVars.LastStash = GetLastStashUpdate()
 
 	var gaScrapers []string
 	for _, state := range []string{"in_progress", "queued"} {
@@ -238,7 +238,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "Moving data to timeseries in the background...")
 		doReboot = true
 
-		if StashingInProgress {
+		if IsStashingInProgress() {
 			v.Set("msg", "Stashing is already in progress")
 		} else {
 			go stashInTimeseries()
@@ -363,7 +363,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	// -- Dashboard: Retail Scrapers --
 	var sellerTable [][]string
-	for _, seller := range Sellers {
+	for _, seller := range GetSellers() {
 		key := "UNKNOWN"
 		for name, scrapersConfig := range Config.ScraperConfig.Config {
 			if slices.Contains(scrapersConfig["retail"], seller.Info().Shorthand) {
@@ -414,7 +414,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	// -- Dashboard: Buylist Scrapers --
 	var vendorTable [][]string
-	for _, vendor := range Vendors {
+	for _, vendor := range GetVendors() {
 		key := "UNKNOWN"
 		for name, scrapersConfig := range Config.ScraperConfig.Config {
 			if slices.Contains(scrapersConfig["buylist"], vendor.Info().Shorthand) {
@@ -533,7 +533,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.LatestHash = BuildCommit
 	pageVars.CurrentTime = time.Now()
 
-	pageVars.DisableChart = StashingInProgress
+	pageVars.DisableChart = IsStashingInProgress()
 
 	render(w, "admin.html", pageVars)
 }

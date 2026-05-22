@@ -294,7 +294,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			return
 		}
 
-		if len(Sellers) == 0 || len(Vendors) == 0 {
+		if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
 			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 			return
 		}

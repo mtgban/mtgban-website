@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -48,30 +49,84 @@ type FlatEditionEntry struct {
 	ColorHex []ColorEntry
 }
 
-// Contains all the set value computations shown on sealed products
-var Infos map[string]mtgban.InventoryRecord
+// Snapshot of set-value computations shown on sealed products. Held behind
+// atomic.Pointer so readers always see a fully-constructed map. The map is
+// rebuilt from scratch in runSealedAnalysis and published in a single Store;
+// callers must treat the returned map as read-only.
+var infosPtr atomic.Pointer[map[string]mtgban.InventoryRecord]
 
-// All editions containing sealed products
-var SealedEditionsSorted []string
-var SealedEditionsList map[string][]EditionEntry
+// GetInfos returns the current Infos snapshot. The returned map is shared
+// and MUST NOT be modified by callers.
+func GetInfos() map[string]mtgban.InventoryRecord {
+	p := infosPtr.Load()
+	if p == nil {
+		return nil
+	}
+	return *p
+}
 
-// All different editions
-var AllEditionsKeys []string
-var AllEditionsKeysNoFoilOrPromos []string
-var AllEditionsMap map[string]EditionEntry
-var AllEditionsByCategory map[string][]EditionEntry
-var AllEditionsCategoriesSorted []string
+// EditionsSnapshot bundles every piece of edition-derived state produced by
+// updateStaticData. Publishing them together under a single atomic.Pointer
+// guarantees readers always see a fully-consistent view — previously the 12
+// individual stores could be observed out of sync, e.g. AllEditionsKeys
+// updated while AllEditionsMap was still the previous version, producing
+// nil-map lookups in search.
+type EditionsSnapshot struct {
+	// All editions containing sealed products
+	SealedEditionsSorted []string
+	SealedEditionsList   map[string][]EditionEntry
 
-// Editions with parent sets
-var TreeEditionsKeys []string
-var TreeEditionsMap map[string][]EditionEntry
+	// All different editions
+	AllEditionsKeys               []string
+	AllEditionsKeysNoFoilOrPromos []string
+	AllEditionsMap                map[string]EditionEntry
+	AllEditionsByCategory         map[string][]EditionEntry
+	AllEditionsCategoriesSorted   []string
 
-// Long time no reprint data
-var ReprintsKeys []string
-var ReprintsMap map[string][]ReprintEntry
+	// Editions with parent sets
+	TreeEditionsKeys []string
+	TreeEditionsMap  map[string][]EditionEntry
 
-// The number of editions, cards, and printings
-var TotalSets, TotalCards, TotalUnique int
+	// The number of editions, cards, and printings
+	TotalSets   int
+	TotalCards  int
+	TotalUnique int
+}
+
+var editionsPtr atomic.Pointer[EditionsSnapshot]
+
+func init() {
+	// Seed an empty snapshot so accessors return a usable value before
+	// updateStaticData first runs.
+	editionsPtr.Store(&EditionsSnapshot{})
+}
+
+// GetEditions returns the current editions snapshot. The returned struct's
+// fields are shared and MUST NOT be modified by callers.
+func GetEditions() *EditionsSnapshot {
+	return editionsPtr.Load()
+}
+
+// Long time no reprint data. ReprintsKeys is the ordered list of section
+// titles; ReprintsMap holds the entries per section. They are published
+// together as a single immutable snapshot so readers can never observe new
+// keys against a stale map (or vice versa).
+type reprintsSnapshot struct {
+	Keys []string
+	Map  map[string][]ReprintEntry
+}
+
+var reprintsPtr atomic.Pointer[reprintsSnapshot]
+
+// GetReprints returns the current reprints snapshot. The returned slice and
+// map are shared and MUST NOT be modified by callers.
+func GetReprints() ([]string, map[string][]ReprintEntry) {
+	p := reprintsPtr.Load()
+	if p == nil {
+		return nil, nil
+	}
+	return p.Keys, p.Map
+}
 
 var categoryEdition = map[string]string{
 	"archenemy":        "Boxed Sets",
@@ -615,14 +670,15 @@ func runSealedAnalysis() {
 	ckBuylist, _ := findVendorBuylist("CK")
 	directNetBuylist, _ := findVendorBuylist("TCGDirectNet")
 
-	ReprintsKeys, ReprintsMap = getReprintsGlobal(tcgInventory, tcgMarket)
+	reprintsKeys, reprintsMap := getReprintsGlobal(tcgInventory, tcgMarket)
+	reprintsPtr.Store(&reprintsSnapshot{Keys: reprintsKeys, Map: reprintsMap})
 
 	infos := map[string]mtgban.InventoryRecord{}
 
 	runRawSetValue(infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
 	infos["hotlist"] = checkHighestBuylists("CK")
 
-	Infos = infos
+	infosPtr.Store(&infos)
 }
 
 func checkHighestBuylists(store string) mtgban.InventoryRecord {
@@ -809,13 +865,14 @@ func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDi
 }
 
 func updateStaticData() {
-	SealedEditionsSorted, SealedEditionsList = getSealedEditions()
-	AllEditionsKeys, AllEditionsMap = getAllEditions()
-	AllEditionsCategoriesSorted, AllEditionsByCategory = getAllEditionsByCategory()
-	TreeEditionsKeys, TreeEditionsMap = getTreeEditions()
+	snap := &EditionsSnapshot{}
+	snap.SealedEditionsSorted, snap.SealedEditionsList = getSealedEditions()
+	snap.AllEditionsKeys, snap.AllEditionsMap = getAllEditions()
+	snap.AllEditionsCategoriesSorted, snap.AllEditionsByCategory = getAllEditionsByCategory()
+	snap.TreeEditionsKeys, snap.TreeEditionsMap = getTreeEditions()
 
 	var filteredEditions []string
-	for _, code := range AllEditionsKeys {
+	for _, code := range snap.AllEditionsKeys {
 		set, err := mtgmatcher.GetSet(code)
 		if err != nil {
 			continue
@@ -828,17 +885,19 @@ func updateStaticData() {
 		}
 		filteredEditions = append(filteredEditions, code)
 	}
-	AllEditionsKeysNoFoilOrPromos = filteredEditions
+	snap.AllEditionsKeysNoFoilOrPromos = filteredEditions
 
-	TotalSets = len(AllEditionsKeys)
-	TotalUnique = len(mtgmatcher.GetUUIDs())
+	snap.TotalSets = len(snap.AllEditionsKeys)
+	snap.TotalUnique = len(mtgmatcher.GetUUIDs())
 	var totalCards int
-	for _, key := range AllEditionsKeys {
-		totalCards += AllEditionsMap[key].Size
+	for _, key := range snap.AllEditionsKeys {
+		totalCards += snap.AllEditionsMap[key].Size
 	}
-	TotalCards = totalCards
+	snap.TotalCards = totalCards
 
-	if other := AllEditionsByCategory["Other"]; len(other) > 0 {
+	if other := snap.AllEditionsByCategory["Other"]; len(other) > 0 {
 		log.Printf("AllEditionsByCategory: %d uncategorized sets", len(other))
 	}
+
+	editionsPtr.Store(snap)
 }
