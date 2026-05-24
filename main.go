@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -777,6 +778,12 @@ func main() {
 		log.Fatalln("error opening databases:", err)
 	}
 
+	// Parse templates once in production
+	templateCache, err = buildTemplateCache()
+	if err != nil {
+		log.Fatalln("template cache:", err)
+	}
+
 	// load website up
 	go func() {
 		err := loadDatastore(Config.DatastorePath)
@@ -1016,26 +1023,67 @@ var funcMap = template.FuncMap{
 	},
 }
 
+// templateCache holds pre-parsed templates keyed by their base name.
+// Populated at startup in production; nil in DevMode (re-parsed per request).
+var templateCache map[string]*template.Template
+
+func buildTemplateCache() (map[string]*template.Template, error) {
+	// Skip if in dev
+	if DevMode {
+		return nil, nil
+	}
+
+	// Collect all the available templates
+	pages, err := filepath.Glob("templates/*.html")
+	if err != nil {
+		return nil, fmt.Errorf("glob error: %w", err)
+	}
+
+	// Collect all partials to include with every template
+	partials, _ := filepath.Glob("templates/partials/*.html")
+
+	cache := make(map[string]*template.Template, len(pages))
+	for _, page := range pages {
+		name := filepath.Base(page)
+		files := append([]string{page}, partials...)
+		t, err := template.New(name).Funcs(funcMap).ParseFiles(files...)
+		if err != nil {
+			return nil, fmt.Errorf("parsing %s: %w", name, err)
+		}
+		cache[name] = t
+	}
+	return cache, nil
+}
+
 func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
-	// Give each template a name
 	name := path.Base(tmpl)
 
-	// Prefix the name passed in with templates/
-	templates := []string{fmt.Sprintf("templates/%s", tmpl)}
-
-	// Add partials if needed
-	if name == "search.html" {
-		templates = append(templates, "templates/partials/syntax.html")
-	}
-
-	// Parse the template file held in the templates folder, add any Funcs to parsing
-	t, err := template.New(name).Funcs(funcMap).ParseFiles(templates...)
-	if err != nil {
-		log.Print("template parsing error: ", err)
+	// Dev: re-parse templates from disk every request
+	if DevMode {
+		partials, _ := filepath.Glob("templates/partials/*.html")
+		files := append([]string{fmt.Sprintf("templates/%s", tmpl)}, partials...)
+		t, err := template.New(name).Funcs(funcMap).ParseFiles(files...)
+		if err != nil {
+			log.Print("template parsing error: ", err)
+			return
+		}
+		err = t.ExecuteTemplate(w, name, pageVars)
+		if err != nil {
+			log.Print("template executing error: ", err)
+		}
 		return
 	}
+
+	// Production: use cached templates
+	t, found := templateCache[name]
+	if !found {
+		log.Printf("template cache: %q not found", name)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	// Execute the template and pass in the variables to fill the gaps
-	err = t.ExecuteTemplate(w, name, pageVars)
+	err := t.ExecuteTemplate(w, name, pageVars)
 	if err != nil {
 		log.Print("template executing error: ", err)
 	}
