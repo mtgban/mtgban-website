@@ -1073,7 +1073,9 @@ func main() {
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if !everReady.Load() {
 			// First boot: behave as a readiness gate
-			if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
+			sellers, vendors := len(GetSellers()), len(GetVendors())
+			if sellers == 0 || vendors == 0 {
+				log.Printf("healthz: not ready (sellers=%d, vendors=%d)", sellers, vendors)
 				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 				return
 			}
@@ -1097,7 +1099,9 @@ func main() {
 	// monitoring or upstream load balancer when you need to know
 	// whether the app can actually serve price data.
 	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
-		if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
+		sellers, vendors := len(GetSellers()), len(GetVendors())
+		if sellers == 0 || vendors == 0 {
+			log.Printf("readyz: not ready (sellers=%d, vendors=%d)", sellers, vendors)
 			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 			return
 		}
