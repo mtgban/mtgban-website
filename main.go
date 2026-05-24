@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -875,6 +876,12 @@ func main() {
 		log.Printf("checkpoints: initial load failed: %v", err)
 	}
 
+	// Parse templates once in production
+	templateCache, err = buildTemplateCache()
+	if err != nil {
+		log.Fatalln("template cache:", err)
+	}
+
 	// load website up
 	go func() {
 		err := loadDatastore(Config.DatastorePath)
@@ -1229,11 +1236,15 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
+// templateCache holds pre-parsed templates keyed by their base name.
+// Populated at startup in production; nil in DevMode (re-parsed per request).
+var templateCache map[string]*template.Template
+
+func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []string) {
 	name := path.Base(tmpl)
 
 	// Check for mobile-specific template override
-	if pageVars.IsMobile {
+	if isMobile {
 		mobileTmpl := fmt.Sprintf("mobile/%s", tmpl)
 		mobilePath := fmt.Sprintf("templates/%s", mobileTmpl)
 		if _, err := os.Stat(mobilePath); err == nil {
@@ -1244,41 +1255,39 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 
 	// Select base template
 	base := "templates/base.html"
-	if name == "home.html" && !pageVars.IsMobile {
+	if name == "home.html" && !isMobile {
 		base = "templates/base-landing.html"
-	} else if pageVars.IsMobile {
+	} else if isMobile {
 		mobileBase := "templates/mobile/base-mobile.html"
 		if _, err := os.Stat(mobileBase); err == nil {
 			base = mobileBase
 		}
 	}
 
-	templates := []string{base, fmt.Sprintf("templates/%s", tmpl)}
+	files = []string{base, fmt.Sprintf("templates/%s", tmpl)}
 
 	// Always include the navbar partial
 	navbarPartial := "templates/partials/navbar.html"
-	if pageVars.IsMobile {
+	if isMobile {
 		mobileNavbar := "templates/mobile/partials/navbar.html"
 		if _, err := os.Stat(mobileNavbar); err == nil {
 			navbarPartial = mobileNavbar
 		}
 	}
-	templates = append(templates, navbarPartial)
+	files = append(files, navbarPartial)
 
 	// Include settings-modal partial only for desktop pages that define a "settings-content" block.
-	// Including it unconditionally would cause template parse errors on pages without that block,
-	// and mobile pages use a separate settings sheet rather than this modal.
-	if !pageVars.IsMobile {
+	if !isMobile {
 		switch name {
 		case "search.html", "arbit.html":
-			templates = append(templates,
+			files = append(files,
 				"templates/partials/settings-modal.html",
 				"templates/partials/settings-stores-grouped.html",
 			)
 		case "upload.html":
-			templates = append(templates, "templates/partials/settings-modal.html")
+			files = append(files, "templates/partials/settings-modal.html")
 		case "sleep.html", "news.html":
-			templates = append(templates,
+			files = append(files,
 				"templates/partials/settings-modal.html",
 				"templates/partials/editions-picker.html",
 			)
@@ -1287,20 +1296,76 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 
 	// Add other partials as needed
 	if name == "search.html" {
-		templates = append(templates, "templates/partials/search-landing.html")
+		files = append(files, "templates/partials/search-landing.html")
 	}
 	if name == "guide.html" {
-		templates = append(templates, "templates/partials/guide-faq.html")
+		files = append(files, "templates/partials/guide-faq.html")
 	}
 
-	// Parse and execute via the base template
-	baseName := path.Base(base)
-	t, err := template.New(baseName).Funcs(funcMap).ParseFiles(templates...)
+	return path.Base(base), files
+}
+
+func buildTemplateCache() (map[string]*template.Template, error) {
+	if DevMode {
+		return nil, nil
+	}
+
+	pages, err := filepath.Glob("templates/*.html")
 	if err != nil {
-		log.Print("template parsing error: ", err)
+		return nil, fmt.Errorf("glob error: %w", err)
+	}
+
+	cache := make(map[string]*template.Template, len(pages)*2)
+	for _, page := range pages {
+		name := filepath.Base(page)
+		for _, mobile := range []bool{false, true} {
+			key := name
+			if mobile {
+				key = "mobile/" + name
+			}
+			baseName, files := renderTemplateFiles(name, mobile)
+			t, err := template.New(baseName).Funcs(funcMap).ParseFiles(files...)
+			if err != nil {
+				return nil, fmt.Errorf("parsing %s (mobile=%v): %w", name, mobile, err)
+			}
+			cache[key] = t
+		}
+	}
+	return cache, nil
+}
+
+func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
+	name := path.Base(tmpl)
+
+	if DevMode {
+		// Hot-reload: re-parse from disk every request
+		baseName, files := renderTemplateFiles(tmpl, pageVars.IsMobile)
+		t, err := template.New(baseName).Funcs(funcMap).ParseFiles(files...)
+		if err != nil {
+			log.Print("template parsing error: ", err)
+			return
+		}
+		err = t.ExecuteTemplate(w, baseName, pageVars)
+		if err != nil {
+			log.Print("template executing error: ", err)
+		}
 		return
 	}
-	err = t.ExecuteTemplate(w, baseName, pageVars)
+
+	// Production: use cached templates
+	key := name
+	if pageVars.IsMobile {
+		key = "mobile/" + name
+	}
+	t, found := templateCache[key]
+	if !found {
+		log.Printf("template cache: %q not found", key)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	baseName := t.Name()
+	err := t.ExecuteTemplate(w, baseName, pageVars)
 	if err != nil {
 		log.Print("template executing error: ", err)
 	}
