@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"runtime"
 	"path"
 	"slices"
 	"strconv"
@@ -1061,13 +1062,45 @@ func main() {
 
 	http.HandleFunc("/auth", Auth)
 
-	// /healthz: returns 200 only if dependencies are OK.
+	// Track whether the app has been fully ready at least once.
+	// Before that point /healthz gates on sellers/vendors so that
+	// App Platform won't route traffic to an instance that has never
+	// finished loading (preserving zero-downtime deploys). After the
+	// first successful load, /healthz becomes a pure liveness check
+	// so transient CPU/memory spikes don't cascade into 503s.
+	var everReady atomic.Bool
+
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if !everReady.Load() {
+			// First boot: behave as a readiness gate
+			if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
+				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+				return
+			}
+			// Data loaded for the first time — latch open
+			everReady.Store(true)
+		}
+
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "ok goroutines=%d heap=%dMB sys=%dMB gc=%d",
+			runtime.NumGoroutine(),
+			m.HeapAlloc/1024/1024,
+			m.Sys/1024/1024,
+			m.NumGC,
+		)
+	})
+
+	// /readyz: readiness probe — returns 503 until scrapers have loaded
+	// at least one seller and one vendor. Use this from your own
+	// monitoring or upstream load balancer when you need to know
+	// whether the app can actually serve price data.
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 		if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
 			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 			return
 		}
-
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
