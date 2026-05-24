@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"runtime"
 	"path"
 	"path/filepath"
 	"slices"
@@ -1090,15 +1089,8 @@ func main() {
 			everReady.Store(true)
 		}
 
-		var m runtime.MemStats
-		runtime.ReadMemStats(&m)
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "ok goroutines=%d heap=%dMB sys=%dMB gc=%d",
-			runtime.NumGoroutine(),
-			m.HeapAlloc/1024/1024,
-			m.Sys/1024/1024,
-			m.NumGC,
-		)
+		w.Write([]byte("ok"))
 	})
 
 	// /readyz: readiness probe — returns 503 until scrapers have loaded
