@@ -134,6 +134,7 @@ func Load(ctx context.Context, link string, game string, maxRows int) ([]Item, e
 
 	seen := map[string]bool{}
 	var allItems []Item
+	var lastErr error
 
 	for _, cardType := range cardTypes {
 		baseURL := link + "?category=" + catID + "&cardType=" + cardType
@@ -147,12 +148,18 @@ func Load(ctx context.Context, link string, game string, maxRows int) ([]Item, e
 			resp, err := scraper.Get(pageURL, map[string]string{
 				"Accept": "text/html,application/xhtml+xml",
 			}, "")
-			if err != nil || resp.Status != 200 {
+			if err != nil {
+				lastErr = fmt.Errorf("fetch %s: %w", cardType, err)
+				continue
+			}
+			if resp.Status != 200 {
+				lastErr = fmt.Errorf("fetch %s: status %d", cardType, resp.Status)
 				continue
 			}
 
 			items, err := parseProducts(resp.Body, catName, 0)
 			if err != nil {
+				lastErr = fmt.Errorf("parse %s: %w", cardType, err)
 				continue
 			}
 
@@ -182,6 +189,9 @@ func Load(ctx context.Context, link string, game string, maxRows int) ([]Item, e
 	}
 
 	if len(allItems) == 0 {
+		if lastErr != nil {
+			return nil, fmt.Errorf("no products found in showcase: %w", lastErr)
+		}
 		return nil, fmt.Errorf("no products found in showcase")
 	}
 
