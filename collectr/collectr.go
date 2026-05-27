@@ -151,71 +151,132 @@ func Load(ctx context.Context, link string, game string, maxRows int) ([]Item, e
 	var allItems []Item
 	var lastErr error
 
-	for _, cardType := range cardTypes {
-		baseURL := link + "?category=" + catID + "&cardType=" + cardType
+	// Two request modes:
+	//
+	//   - "html": plain GET. Carries the products as JS-escaped chunks inside
+	//     <script> tags. This is the path the page itself uses on first paint.
+	//   - "rsc":  same URL but with the RSC: 1 header, which makes Next.js
+	//     return the React Server Components stream directly. The products are
+	//     plain unescaped JSON. This is the fallback when html scrapes return
+	//     200 with no embedded chunks (which we see from some datacenter IPs).
+	//
+	// Cloudflare on Collectr is sensitive to the RSC headers from low-reputation
+	// IPs — sometimes serving 403 — so we always prefer html first and only
+	// switch to rsc when the html parse turned up nothing.
+	type fetchMode struct {
+		name    string
+		headers map[string]string
+	}
+	modes := []fetchMode{
+		{
+			name: "html",
+			headers: map[string]string{
+				"Accept": "text/html,application/xhtml+xml",
+			},
+		},
+		{
+			name: "rsc",
+			headers: map[string]string{
+				"Accept": "text/x-component,text/html",
+				"RSC":    "1",
+			},
+		},
+	}
 
-		for _, variant := range sortVariants {
-			if ctx.Err() != nil {
-				break
-			}
+	// Track the last response body we saw without any parseable products so
+	// the eventual error can carry a useful hint about what we got.
+	var lastBodyHint string
 
-			pageURL := baseURL + variant
-			// Request the React Server Components stream — it carries the
-			// products array as plain JSON instead of JS-escaped HTML chunks,
-			// which is materially more reliable from datacenter IPs.
-			resp, err := scraper.Get(pageURL, map[string]string{
-				"Accept":   "text/x-component,text/html,application/xhtml+xml",
-				"RSC":      "1",
-				"Next-Url": "/showcase/profile/",
-			}, "")
-			if err != nil {
-				lastErr = fmt.Errorf("fetch %s: %w", cardType, err)
-				continue
-			}
-			if resp.Status != 200 {
-				lastErr = fmt.Errorf("fetch %s: status %d", cardType, resp.Status)
-				continue
-			}
+	for _, mode := range modes {
+		modeFoundAny := false
 
-			items, err := parseProducts(resp.Body, catName, 0)
-			if err != nil {
-				lastErr = fmt.Errorf("parse %s: %w", cardType, err)
-				continue
-			}
+		for _, cardType := range cardTypes {
+			baseURL := link + "?category=" + catID + "&cardType=" + cardType
 
-			newFound := false
-			for _, item := range items {
-				key := item.ProductID
-				if key == "" {
-					key = item.Name + "|" + item.SetName + "|" + item.Number + "|" + fmt.Sprintf("%v|%v", item.IsFoil, item.IsSealed)
+			for _, variant := range sortVariants {
+				if ctx.Err() != nil {
+					break
 				}
-				if seen[key] {
+
+				pageURL := baseURL + variant
+				resp, err := scraper.Get(pageURL, mode.headers, "")
+				if err != nil {
+					lastErr = fmt.Errorf("fetch %s/%s: %w", mode.name, cardType, err)
 					continue
 				}
-				seen[key] = true
-				newFound = true
-				allItems = append(allItems, item)
+				if resp.Status != 200 {
+					lastErr = fmt.Errorf("fetch %s/%s: status %d", mode.name, cardType, resp.Status)
+					continue
+				}
 
-				if maxRows > 0 && len(allItems) >= maxRows {
-					return allItems, nil
+				items, err := parseProducts(resp.Body, catName, 0)
+				if err != nil {
+					lastErr = fmt.Errorf("parse %s/%s: %w", mode.name, cardType, err)
+					lastBodyHint = bodyHint(resp.Body)
+					continue
+				}
+
+				newFound := false
+				for _, item := range items {
+					key := item.ProductID
+					if key == "" {
+						key = item.Name + "|" + item.SetName + "|" + item.Number + "|" + fmt.Sprintf("%v|%v", item.IsFoil, item.IsSealed)
+					}
+					if seen[key] {
+						continue
+					}
+					seen[key] = true
+					newFound = true
+					modeFoundAny = true
+					allItems = append(allItems, item)
+
+					if maxRows > 0 && len(allItems) >= maxRows {
+						return allItems, nil
+					}
+				}
+
+				// Skip remaining sort variants if this one found nothing new
+				if !newFound {
+					break
 				}
 			}
+		}
 
-			// Skip remaining sort variants if this one found nothing new
-			if !newFound {
-				break
-			}
+		// If html mode produced anything, don't risk the rsc fallback (which
+		// is more likely to trip Cloudflare on a marginal IP).
+		if modeFoundAny {
+			break
 		}
 	}
 
+
 	if len(allItems) == 0 {
-		if lastErr != nil {
+		switch {
+		case lastErr != nil && lastBodyHint != "":
+			return nil, fmt.Errorf("no products found in showcase: %w (response: %s)", lastErr, lastBodyHint)
+		case lastErr != nil:
 			return nil, fmt.Errorf("no products found in showcase: %w", lastErr)
+		case lastBodyHint != "":
+			return nil, fmt.Errorf("no products found in showcase (response: %s)", lastBodyHint)
+		default:
+			return nil, fmt.Errorf("no products found in showcase")
 		}
-		return nil, fmt.Errorf("no products found in showcase")
 	}
 
 	return allItems, nil
+}
+
+// bodyHint distills a response body down to a short, log-safe excerpt: the
+// first 240 bytes with newlines and runs of whitespace collapsed. Used so a
+// "no products found" error can carry a clue about what we actually received
+// (e.g. a Cloudflare interstitial, an empty shell, or a login page).
+func bodyHint(body string) string {
+	const max = 240
+	cleaned := strings.Join(strings.Fields(body), " ")
+	if len(cleaned) > max {
+		cleaned = cleaned[:max] + "…"
+	}
+	return cleaned
 }
 
 // parseProducts extracts product data from a Collectr showcase response.
