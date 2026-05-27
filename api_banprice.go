@@ -667,7 +667,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 
 	hasUploadData := len(uploadedData) > 0
 
-	header := []string{"UUID", "Card Name", "Set Code", "Number", "Finish"}
+	header := []string{"UUID", "Card Name", "Set Code", "Edition", "Number", "Finish"}
 	header = append(header, allScraperNames...)
 	if hasUploadData {
 		header = append(header, "Loaded Price", "Loaded Condition", "Loaded Quantity", "Notes")
@@ -784,7 +784,7 @@ func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, a
 		finish = "sealed"
 	}
 
-	record := []string{displayID, cardName, co.SetCode, co.Number, finish}
+	record := []string{displayID, cardName, co.SetCode, co.Edition, co.Number, finish}
 	record = append(record, prices...)
 	return record, nil
 }
