@@ -1733,6 +1733,7 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 
 	// Enabled for maximum compatibility
 	csvReader.LazyQuotes = true
+	csvReader.FieldsPerRecord = -1
 
 	// Load header
 	first, err := csvReader.Read()
