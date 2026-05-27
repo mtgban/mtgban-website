@@ -709,7 +709,6 @@ Sims are not required for pre-constructed decks and other products where the sam
                                 </center>
                             </td>
                         </tr>
-                        {{if not .IsSealed}}
                             <tr>
                                 <td>
                                     <center>
@@ -728,13 +727,12 @@ Sims are not required for pre-constructed decks and other products where the sam
                                     </center>
                                 </td>
                             </tr>
-                        {{end}}
                     {{else if $.ShowUpsell}}
                         <tr>
                             <td>
                                 <center>
                                     <i>
-                                        Increase your tier to be able to download any search results as CSVs{{if not .IsSealed}} or to transfer them to the Upload optimizer!{{end}}
+                                        Increase your tier to be able to download any search results as CSVs or to transfer them to the Upload optimizer!
                                     </i>
                                 </center>
                             </td>
