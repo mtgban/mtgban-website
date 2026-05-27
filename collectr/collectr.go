@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -85,9 +84,25 @@ func ParseShowcaseURL(link string) (handle string, err error) {
 	return handle, nil
 }
 
-// productsPattern matches the escaped JSON products array embedded in Next.js RSC data.
-// The products are in the format: \"products\":[{...},{...}]
-var productsPattern = regexp.MustCompile(`\\"products\\":\[(\{.*?\})\]`)
+// productsMarkers describes the two encodings of the products array we know how to handle:
+//
+//   - HTML payload: the RSC chunks are embedded as JS-escaped strings, so we
+//     see literal backslash-quote sequences ( \"products\":[{ ).
+//   - RSC payload: requesting the same URL with `RSC: 1` returns the streamed
+//     React Server Components body directly. There's no JS-string wrapping,
+//     so it's plain JSON ( "products":[{ ).
+//
+// Hitting the page over an IP that Cloudflare considers low-reputation
+// (e.g. a DigitalOcean datacenter address) sometimes causes the HTML form to
+// be served without the RSC chunks embedded. The plain RSC fetch is the
+// reliable path; we keep the escaped form as a fallback.
+var productsMarkers = []struct {
+	marker   string
+	unescape bool
+}{
+	{marker: `"products":[{`, unescape: false},
+	{marker: `\"products\":[{`, unescape: true},
+}
 
 // sortVariants are URL suffixes appended to maximize product coverage.
 // Each sort order causes the server to pre-render a different slice of
@@ -145,8 +160,13 @@ func Load(ctx context.Context, link string, game string, maxRows int) ([]Item, e
 			}
 
 			pageURL := baseURL + variant
+			// Request the React Server Components stream — it carries the
+			// products array as plain JSON instead of JS-escaped HTML chunks,
+			// which is materially more reliable from datacenter IPs.
 			resp, err := scraper.Get(pageURL, map[string]string{
-				"Accept": "text/html,application/xhtml+xml",
+				"Accept":   "text/x-component,text/html,application/xhtml+xml",
+				"RSC":      "1",
+				"Next-Url": "/showcase/profile/",
 			}, "")
 			if err != nil {
 				lastErr = fmt.Errorf("fetch %s: %w", cardType, err)
@@ -198,52 +218,55 @@ func Load(ctx context.Context, link string, game string, maxRows int) ([]Item, e
 	return allItems, nil
 }
 
-// parseProducts extracts product data from page HTML.
-// The data is embedded in Next.js RSC script chunks as escaped JSON.
+// parseProducts extracts product data from a Collectr showcase response.
+// The same products array can appear in either of two encodings depending on
+// whether the response is the SSR HTML or the RSC stream (see productsMarkers).
 // Multiple product arrays may exist (e.g. unfiltered + filtered views).
-func parseProducts(html string, categoryName string, maxRows int) ([]Item, error) {
-	const marker = `\"products\":[{`
-
+func parseProducts(body string, categoryName string, maxRows int) ([]Item, error) {
 	seen := map[string]bool{}
 	var items []Item
-	searchStart := 0
 
-	for {
-		idx := strings.Index(html[searchStart:], marker)
-		if idx == -1 {
+	for _, m := range productsMarkers {
+		extractWithMarker(body, m.marker, m.unescape, categoryName, seen, &items, maxRows)
+		if maxRows > 0 && len(items) >= maxRows {
 			break
+		}
+	}
+
+	if len(items) == 0 {
+		return nil, fmt.Errorf("no product data found in page")
+	}
+
+	return items, nil
+}
+
+// extractWithMarker scans body for arrays preceded by marker (e.g. `"products":[{`
+// or its JS-escaped form) and appends every new product matching categoryName
+// to items. Each unique entry (keyed by name+set+number+subtype) is added once.
+func extractWithMarker(body, marker string, unescape bool, categoryName string, seen map[string]bool, items *[]Item, maxRows int) {
+	searchStart := 0
+	for {
+		idx := strings.Index(body[searchStart:], marker)
+		if idx < 0 {
+			return
 		}
 		idx += searchStart
 
-		// Move to the start of the array
-		arrayStart := idx + len(`\"products\":`)
+		// The marker ends just past `[`, so locate the array start exactly.
+		arrayStart := idx + strings.Index(marker, "[")
 
-		// Find the matching closing bracket, accounting for nesting
-		depth := 0
-		arrayEnd := -1
-		for i := arrayStart; i < len(html); i++ {
-			switch html[i] {
-			case '[':
-				depth++
-			case ']':
-				depth--
-				if depth == 0 {
-					arrayEnd = i + 1
-				}
-			}
-			if arrayEnd > 0 {
-				break
-			}
-		}
+		arrayEnd := findArrayEnd(body, arrayStart)
 		if arrayEnd < 0 {
 			searchStart = idx + len(marker)
 			continue
 		}
 
-		// Unescape the JSON (\" -> ", \\ -> \)
-		raw := html[arrayStart:arrayEnd]
-		raw = strings.ReplaceAll(raw, `\"`, `"`)
-		raw = strings.ReplaceAll(raw, `\\`, `\`)
+		raw := body[arrayStart:arrayEnd]
+		if unescape {
+			// JS-escaped form: \" -> "  and  \\ -> \
+			raw = strings.ReplaceAll(raw, `\"`, `"`)
+			raw = strings.ReplaceAll(raw, `\\`, `\`)
+		}
 
 		var products []showcaseProduct
 		if err := json.Unmarshal([]byte(raw), &products); err != nil {
@@ -256,7 +279,6 @@ func parseProducts(html string, categoryName string, maxRows int) ([]Item, error
 				continue
 			}
 
-			// Deduplicate by product_id-like key
 			key := p.ProductName + "|" + p.CatalogGroup + "|" + p.CardNumber + "|" + p.ProductSubType
 			if seen[key] {
 				continue
@@ -270,7 +292,7 @@ func parseProducts(html string, categoryName string, maxRows int) ([]Item, error
 
 			price, _ := strconv.ParseFloat(p.MarketPrice, 64)
 
-			items = append(items, Item{
+			*items = append(*items, Item{
 				ProductID: p.ProductID,
 				Name:      strings.TrimSpace(p.ProductName),
 				SetName:   p.CatalogGroup,
@@ -283,19 +305,34 @@ func parseProducts(html string, categoryName string, maxRows int) ([]Item, error
 				Price:     price,
 			})
 
-			if maxRows > 0 && len(items) >= maxRows {
-				return items, nil
+			if maxRows > 0 && len(*items) >= maxRows {
+				return
 			}
 		}
 
 		searchStart = arrayEnd
 	}
+}
 
-	if len(items) == 0 {
-		return nil, fmt.Errorf("no product data found in page")
+// findArrayEnd returns the index just past the closing `]` of the JSON array
+// whose opening `[` is at start. Returns -1 if no balanced match is found.
+func findArrayEnd(body string, start int) int {
+	if start >= len(body) || body[start] != '[' {
+		return -1
 	}
-
-	return items, nil
+	depth := 0
+	for i := start; i < len(body); i++ {
+		switch body[i] {
+		case '[':
+			depth++
+		case ']':
+			depth--
+			if depth == 0 {
+				return i + 1
+			}
+		}
+	}
+	return -1
 }
 
 // LoadReader parses product data from a pre-fetched page HTML body.
