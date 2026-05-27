@@ -345,9 +345,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	} else if strings.HasSuffix(urlPath, ".csv") {
 		var err error
 		if out.Retail != nil {
-			err = BanPrice2CSV(w, out.Retail, nil, qty, conds, isSealed, false)
+			err = BanPrice2CSV(w, out.Retail, nil)
 		} else if out.Buylist != nil {
-			err = BanPrice2CSV(w, out.Buylist, nil, qty, conds, isSealed, false)
+			err = BanPrice2CSV(w, out.Buylist, nil)
 		}
 		if err != nil {
 			log.Println(err)
@@ -612,285 +612,179 @@ func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
 	return false
 }
 
-func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string, shouldQty, shouldCond, sealed, decklist bool) error {
+// BanPrice2CSV is a convenience wrapper around SimplePrice2CSV that
+// writes directly to an http.ResponseWriter.
+func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanPrice, sorted []string) error {
 	httpWriter.Header().Set("Content-Type", "text/csv")
 	w := csv.NewWriter(httpWriter)
-
-	header := []string{"UUID", "TCG Product Id"}
-	if !decklist {
-		header = append(header, "Store")
-	}
-	header = append(header, "Name", "Edition")
-	if !sealed {
-		header = append(header, "Number", "Finish", "Rarity")
-	}
-
-	if !decklist {
-		header = append(header, "Price")
-		if shouldCond && !sealed {
-			header = append(header, "Condition")
-		}
-		if shouldQty {
-			header = append(header, "Quantity")
-		}
-	}
-
-	err := w.Write(header)
-	if err != nil {
-		return err
-	}
-
-	// If sorting does not need to be preserved, we retrieve the list at random
-	if sorted == nil {
-		for id := range pm {
-			sorted = append(sorted, id)
-		}
-	}
-
-	for _, id := range sorted {
-		co, err := mtgmatcher.GetUUID(id)
-		if err != nil {
-			co, err = mtgmatcher.GetUUID(mtgmatcher.ExternalUUID(id))
-			if err != nil {
-				continue
-			}
-		}
-
-		tcgId := findTCGproductId(co.UUID)
-
-		if decklist {
-			record := []string{
-				co.UUID, tcgId, co.Name, co.Edition,
-			}
-
-			finish := "nonfoil"
-			if co.Etched {
-				finish = "etched"
-			} else if co.Foil {
-				finish = "foil"
-			} else if co.Sealed {
-				finish = "sealed"
-			}
-			if !sealed {
-				record = append(record, co.Number, finish, co.Rarity)
-			}
-
-			err = w.Write(record)
-			if err != nil {
-				return err
-			}
-
-			w.Flush()
-			continue
-		}
-
-		for scraper, entry := range pm[id] {
-			prices := []float64{entry.Regular, entry.Foil, entry.Etched, entry.Sealed}
-			qtys := []int{entry.Qty, entry.QtyFoil, entry.QtyEtched, entry.QtySealed}
-			finishes := []string{"nonfoil", "foil", "etched", "sealed"}
-
-			for i, price := range prices {
-				if price == 0 {
-					continue
-				}
-
-				cardData := []string{co.Name, co.SetCode}
-				if !sealed {
-					cardData = append(cardData, co.Number, finishes[i], co.Rarity)
-				}
-
-				priceStr := fmt.Sprintf("%0.2f", price)
-
-				var qtyStr string
-				if shouldQty && qtys[i] != 0 {
-					qtyStr = fmt.Sprintf("%d", qtys[i])
-				}
-
-				if shouldCond && !sealed {
-					for _, tag := range mtgban.FullGradeTags {
-						record := []string{co.UUID, tcgId, scraper}
-						record = append(record, cardData...)
-
-						subtag := tag
-						if finishes[i] == "foil" || finishes[i] == "etched" {
-							subtag += "_" + finishes[i]
-						}
-
-						subPrice := entry.Conditions[subtag]
-						if subPrice == 0 {
-							continue
-						}
-
-						condPriceStr := fmt.Sprintf("%0.2f", subPrice)
-						record = append(record, condPriceStr, tag)
-						if shouldQty {
-							var subQtyStr string
-
-							qty := entry.Quantities[subtag]
-							if qty != 0 {
-								subQtyStr = fmt.Sprintf("%d", qty)
-							}
-
-							record = append(record, subQtyStr)
-						}
-
-						err = w.Write(record)
-						if err != nil {
-							return err
-						}
-					}
-				} else {
-					var cond string
-					if !sealed {
-						cond = entry.Cond
-					}
-					var qty string
-					if shouldQty {
-						qty = qtyStr
-					}
-
-					record := []string{co.UUID, tcgId, scraper}
-					record = append(record, cardData...)
-					record = append(record, priceStr, cond, qty)
-
-					err = w.Write(record)
-					if err != nil {
-						return err
-					}
-
-				}
-			}
-		}
-		w.Flush()
-	}
-	return nil
+	return SimplePrice2CSV(w, pm, nil, sorted, false)
 }
 
-// Convert uploadedData to CSV, using the associated map of uuid->keys->prices
-func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, preferFlavor bool) error {
+// SimplePrice2CSV converts price data to CSV. When uploadedData is provided,
+// each row corresponds to an uploaded entry and includes Loaded columns.
+// When uploadedData is nil, rows are derived from the price map keys (using
+// sorted for ordering if non-nil).
+func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, sorted []string, preferFlavor bool) error {
 	var allScrapers []string
-	var isIndex []string
+	var allIndexes []string
 	for id := range pm {
 		for scraperKey := range pm[id] {
-			// If this scraper is already known, continue
 			if slices.Contains(allScrapers, scraperKey) {
 				continue
 			}
 
-			// Determine whether scraper is an index and should appear regardless of conditions
+			// Determine whether scraper is an index
 			for _, scraper := range Sellers {
-				if scraper.Info().Shorthand != scraperKey {
-					continue
-				}
-				if !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
-					isIndex = append(isIndex, scraperKey)
+				if scraper.Info().Shorthand == scraperKey && scraper.Info().MetadataOnly {
+					if !slices.Contains(allIndexes, scraperKey) {
+						allIndexes = append(allIndexes, scraperKey)
+					}
 				}
 			}
 			for _, scraper := range Vendors {
-				if scraper.Info().Shorthand != scraperKey {
-					continue
-				}
-				if !slices.Contains(isIndex, scraperKey) && scraper.Info().MetadataOnly {
-					isIndex = append(isIndex, scraperKey)
+				if scraper.Info().Shorthand == scraperKey && scraper.Info().MetadataOnly {
+					if !slices.Contains(allIndexes, scraperKey) {
+						allIndexes = append(allIndexes, scraperKey)
+					}
 				}
 			}
 
-			// Add to the arrays
 			allScrapers = append(allScrapers, scraperKey)
 		}
 	}
 
-	// Keep alphabetical order
 	sort.Strings(allScrapers)
 
-	// Derive names in the same order as the sorted scrapers
 	allScraperNames := make([]string, len(allScrapers))
 	for i, key := range allScrapers {
-		allScraperNames[i] = scraperName(key)
+		name := scraperName(key)
+		if name == "" {
+			// Key is already a display name
+			name = key
+		}
+		allScraperNames[i] = name
 	}
+
+	hasUploadData := len(uploadedData) > 0
 
 	header := []string{"Scryfall ID", "Card Name", "Set Code", "Number", "Finish"}
 	header = append(header, allScraperNames...)
-	header = append(header, "Loaded Price", "Loaded Condition", "Loaded Quantity", "Notes")
+	if hasUploadData {
+		header = append(header, "Loaded Price", "Loaded Condition", "Loaded Quantity", "Notes")
+	}
 	err := w.Write(header)
 	if err != nil {
 		return err
 	}
 
-	for j := range uploadedData {
-		if uploadedData[j].MismatchError != nil {
-			continue
-		}
+	// Build the list of IDs to iterate
+	if hasUploadData {
+		// Use upload order
+		for j := range uploadedData {
+			if uploadedData[j].MismatchError != nil {
+				continue
+			}
 
-		id := uploadedData[j].CardId
-		_, found := pm[id]
+			id := uploadedData[j].CardId
+			if _, found := pm[id]; !found {
+				continue
+			}
+
+			condition := uploadedData[j].OriginalCondition
+
+			record, err := priceRowToCSV(pm, id, allScrapers, allIndexes, condition, preferFlavor)
+			if err != nil {
+				continue
+			}
+
+			// Append upload-specific columns
+			ogPrice := ""
+			if uploadedData[j].OriginalPrice != 0 {
+				ogPrice = fmt.Sprintf("%0.2f", uploadedData[j].OriginalPrice)
+			}
+			record = append(record, ogPrice, condition)
+
+			qty := ""
+			if uploadedData[j].HasQuantity {
+				qty = fmt.Sprint(uploadedData[j].Quantity)
+			}
+			record = append(record, qty, uploadedData[j].Notes)
+
+			if err := w.Write(record); err != nil {
+				return err
+			}
+			w.Flush()
+		}
+	} else {
+		// Use sorted order or random map order
+		if sorted == nil {
+			for id := range pm {
+				sorted = append(sorted, id)
+			}
+		}
+		for _, id := range sorted {
+			record, err := priceRowToCSV(pm, id, allScrapers, allIndexes, "", preferFlavor)
+			if err != nil {
+				continue
+			}
+			if err := w.Write(record); err != nil {
+				return err
+			}
+			w.Flush()
+		}
+	}
+
+	return nil
+}
+
+func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition string, preferFlavor bool) ([]string, error) {
+	co, err := mtgmatcher.GetUUID(id)
+	if err != nil {
+		// Try resolving as an external ID (scryfall, tcg, mtgjson)
+		uuid := mtgmatcher.ExternalUUID(id)
+		if uuid != "" {
+			co, err = mtgmatcher.GetUUID(uuid)
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	cardName := co.Name
+	if preferFlavor && co.FlavorName != "" && allLanguageFlags[co.Language] != "" {
+		cardName = co.FlavorName
+	}
+
+	prices := make([]string, len(allScrapers))
+	for i, scraper := range allScrapers {
+		entry, found := pm[id][scraper]
 		if !found {
 			continue
 		}
-
-		var cardName, code, number string
-		co, err := mtgmatcher.GetUUID(id)
-		if err != nil {
-			continue
+		cond := condition
+		if slices.Contains(allIndexes, scraper) {
+			cond = ""
 		}
-		cardName = co.Name
-		if preferFlavor && co.FlavorName != "" && allLanguageFlags[co.Language] != "" {
-			cardName = co.FlavorName
-		}
-		code = co.SetCode
-		number = co.Number
-
-		prices := make([]string, len(allScrapers))
-
-		for i, scraper := range allScrapers {
-			entry, found := pm[id][scraper]
-			if !found {
-				continue
-			}
-			condition := uploadedData[j].OriginalCondition
-			if slices.Contains(isIndex, scraper) {
-				condition = ""
-			}
-			price := getPrice(entry, condition)
-			prices[i] = fmt.Sprintf("%0.2f", price)
-		}
-		ogPrice := ""
-		if uploadedData[j].OriginalPrice != 0 {
-			ogPrice = fmt.Sprintf("%0.2f", uploadedData[j].OriginalPrice)
-		}
-		prices = append(prices, ogPrice)
-
-		prices = append(prices, uploadedData[j].OriginalCondition)
-
-		qty := ""
-		if uploadedData[j].HasQuantity {
-			qty = fmt.Sprint(uploadedData[j].Quantity)
-		}
-		prices = append(prices, qty)
-
-		prices = append(prices, uploadedData[j].Notes)
-
-		scryfallID, found := co.Identifiers["scryfallId"]
-		if found {
-			id = scryfallID
-		}
-
-		record := []string{id, cardName, code, number}
-		if co.Etched {
-			record = append(record, "etched")
-		} else if co.Foil {
-			record = append(record, "foil")
-		} else {
-			record = append(record, "nonfoil")
-		}
-		record = append(record, prices...)
-
-		err = w.Write(record)
-		if err != nil {
-			return err
-		}
-
-		w.Flush()
+		price := getPrice(entry, cond)
+		prices[i] = fmt.Sprintf("%0.2f", price)
 	}
-	return nil
+
+	scryfallID, found := co.Identifiers["scryfallId"]
+	displayID := id
+	if found {
+		displayID = scryfallID
+	}
+
+	finish := "nonfoil"
+	if co.Etched {
+		finish = "etched"
+	} else if co.Foil {
+		finish = "foil"
+	} else if co.Sealed {
+		finish = "sealed"
+	}
+
+	record := []string{displayID, cardName, co.SetCode, co.Number, finish}
+	record = append(record, prices...)
+	return record, nil
 }

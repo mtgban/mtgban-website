@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -686,7 +687,6 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		blocklistBuylist = append(blocklistBuylist, strings.Split(skipVendorsOpt, ",")...)
 	}
 
-	isList := strings.Contains(r.URL.Path, "/list/")
 	isRetail := strings.Contains(r.URL.Path, "/retail/")
 	isBuylist := strings.Contains(r.URL.Path, "/buylist/")
 	isSealed := strings.Contains(r.URL.Path, "/sealed/")
@@ -719,6 +719,29 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	// Perform search
 	allKeys, _ := searchAndFilter(config)
 
+	// Sort results to match the search page order
+	sortOpt := r.FormValue("sort")
+	switch sortOpt {
+	case "alpha":
+		sort.Slice(allKeys, func(i, j int) bool {
+			return sortSetsAlphabetical(allKeys[i], allKeys[j], false)
+		})
+	case "number":
+		sort.Slice(allKeys, func(i, j int) bool {
+			return sortByNumberAndFinish(allKeys[i], allKeys[j], false)
+		})
+	default:
+		sort.Slice(allKeys, func(i, j int) bool {
+			return sortSets(allKeys[i], allKeys[j])
+		})
+	}
+	reverseSort, _ := strconv.ParseBool(r.FormValue("reverse"))
+	if reverseSort {
+		for i, j := 0, len(allKeys)-1; i < j; i, j = i+1, j-1 {
+			allKeys[i], allKeys[j] = allKeys[j], allKeys[i]
+		}
+	}
+
 	// Limit results to be processed
 	if len(allKeys) > MaxSearchTotalResults {
 		allKeys = allKeys[:MaxSearchTotalResults]
@@ -727,35 +750,34 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	canRetail := slices.Contains(enabledModes, "retail") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
 	canBuylist := slices.Contains(enabledModes, "buylist") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
 
+	// Build store lists
+	var enabledRetailStores []string
+	for _, seller := range Sellers {
+		if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
+			enabledRetailStores = append(enabledRetailStores, seller.Info().Shorthand)
+		}
+	}
+	var enabledBuylistStores []string
+	for _, vendor := range Vendors {
+		if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
+			enabledBuylistStores = append(enabledBuylistStores, vendor.Info().Shorthand)
+		}
+	}
+
 	// Retrieve prices
 	if isRetail && canRetail {
-		var enabledStores []string
-		for _, seller := range Sellers {
-			if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-				enabledStores = append(enabledStores, seller.Info().Shorthand)
-			}
-		}
-
-		// Override for the public endpoint
+		stores := enabledRetailStores
 		if sig == "" && isJSON {
-			enabledStores = Config.ApiDemoStores
+			stores = Config.ApiDemoStores
 		}
-
-		out.Retail = getSellerPrices(idOpt, enabledStores, "", allKeys, "", true, true, isSealed, tagName)
+		out.Retail = getSellerPrices(idOpt, stores, "", allKeys, "", true, true, isSealed, tagName)
 	}
 	if isBuylist && canBuylist {
-		var enabledStores []string
-		for _, vendor := range Vendors {
-			if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-				enabledStores = append(enabledStores, vendor.Info().Shorthand)
-			}
-		}
-
+		stores := enabledBuylistStores
 		if sig == "" && isJSON {
-			enabledStores = Config.ApiDemoStores
+			stores = Config.ApiDemoStores
 		}
-
-		out.Buylist = getVendorPrices(idOpt, enabledStores, "", allKeys, "", true, true, isSealed, tagName)
+		out.Buylist = getVendorPrices(idOpt, stores, "", allKeys, "", true, true, isSealed, tagName)
 	}
 
 	if isJSON {
@@ -766,33 +788,16 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	if isCSV {
 		w.Header().Set("Content-Type", "text/csv")
-		results := out.Retail
-		if isBuylist {
-			results = out.Buylist
+
+		// Re-fetch prices keyed by BAN UUID so foil/nonfoil stay separate
+		var results map[string]map[string]*BanPrice
+		if isRetail && canRetail {
+			results = getSellerPrices("", enabledRetailStores, "", allKeys, "", true, true, isSealed, tagName)
+		} else if isBuylist && canBuylist {
+			results = getVendorPrices("", enabledBuylistStores, "", allKeys, "", true, true, isSealed, tagName)
 		}
 
-		// Convert to keep the same order of the search results, but convert to
-		// scryfall ids since it's what we performed the search with
-		sorted := allKeys
-		if !isSealed {
-			sorted = make([]string, 0, len(allKeys))
-			for _, key := range allKeys {
-				co, err := mtgmatcher.GetUUID(key)
-				if err != nil {
-					continue
-				}
-				id, found := co.Identifiers["scryfallId"]
-				if !found {
-					continue
-				}
-				if slices.Contains(sorted, id) {
-					continue
-				}
-				sorted = append(sorted, id)
-			}
-		}
-
-		err := BanPrice2CSV(w, results, sorted, true, true, isSealed, isList)
+		err := BanPrice2CSV(w, results, allKeys)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
