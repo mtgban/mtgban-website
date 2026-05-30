@@ -701,7 +701,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		err = SimplePrice2CSV(csvWriter, results, uploadedData, preferFlavor)
+		err = SimplePrice2CSV(csvWriter, results, uploadedData, nil, preferFlavor)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			UserNotify("upload", err.Error())
