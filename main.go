@@ -176,8 +176,17 @@ type PageVars struct {
 	TotalCards  int
 	TotalUnique int
 
-	ScraperKeys     []string
-	IndexKeys       []string
+	// UPLOAD
+	// All the scrapers in singles/sealed mode
+	AllScraperKeys []string
+	// All the singles scrapers
+	ScraperKeys []string
+	IndexKeys   []string
+	// All the sealed scrapers
+	SealedScraperKeys []string
+	SealedIndexKeys   []string
+
+	// Additional sources for index keys if needed
 	AltKeys         []string
 	SellerKeys      []string
 	VendorKeys      []string
@@ -425,6 +434,7 @@ type ConfigType struct {
 	SearchRetailBlockList  []string           `json:"search_block_list"`
 	SearchBuylistBlockList []string           `json:"search_buylist_block_list"`
 	SleepersBlockList      []string           `json:"sleepers_block_list"`
+	UploadSealedBlockList  []string           `json:"upload_sealed_block_list"`
 	GlobalAllowList        []string           `json:"global_allow_list"`
 	GlobalProbeList        []string           `json:"global_probe_list"`
 	Patreon                PatreonConfig      `json:"patreon"`
