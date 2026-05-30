@@ -430,7 +430,7 @@
                 if (gdocInput) {
                     gdocInput.addEventListener('input', function() {
                         var url = this.value.trim();
-                        if (url && (url.includes("docs.google.com") || url.includes("store.tcgplayer.com") || url.includes("moxfield.com"))) {
+                        if (url && (url.includes("docs.google.com") || url.includes("store.tcgplayer.com") || url.includes("moxfield.com") || url.includes("app.getcollectr.com"))) {
                             var fileInput = document.getElementById('file');
                             if (fileInput) fileInput.value = "";
                             document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';

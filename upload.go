@@ -456,6 +456,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				uploadedData, err = loadCollection(r.Context(), gdocURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
 				uploadedData, err = loadMoxfield(r.Context(), u.Path, maxRows)
+			case "app.getcollectr.com":
+				uploadedData, err = loadCollectr(r.Context(), gdocURL, maxRows)
 			case "docs.google.com":
 				uploadedData, err = loadSpreadsheet(u.Path, maxRows)
 			default:
