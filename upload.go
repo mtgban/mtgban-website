@@ -1238,7 +1238,7 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 
 	// Decklist mode
 	if len(record) == 1 {
-		line := record[indexMap["cardName"]]
+		line := record[0]
 
 		// Try setting the card finish
 		res.Card.Foil = strings.HasSuffix(line, "*F*")
@@ -1292,7 +1292,8 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 		line = strings.Replace(line, "<", "(", 1)
 		line = strings.Replace(line, ">", ")", 1)
 
-		record[indexMap["cardName"]] = line
+		record[0] = line
+		indexMap["cardName"] = 0
 	}
 
 	// Load quantity, and skip it if it's present and zero
@@ -1747,6 +1748,7 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 
 	// Enabled for maximum compatibility
 	csvReader.LazyQuotes = true
+	csvReader.FieldsPerRecord = -1 // allow variable number of fields per row
 
 	// Load header
 	first, err := csvReader.Read()
