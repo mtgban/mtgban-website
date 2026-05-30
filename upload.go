@@ -67,6 +67,11 @@ var UploadIndexComparePriceList = []string{
 	"TCGLow", "TCGMarket", "TCGDirect", "CT", "CT0", "MKMLow", "MKMTrend",
 }
 
+// List of sealed index prices to show by default
+var UploadSealedIndexKeysPublic = []string{
+	"TCGLowEV", "TCGDirectNetEV", "TCGLowSim", "TCGDirectNetSim",
+}
+
 var ErrUploadDecklist = errors.New("decklist")
 var ErrReloadFirstRow = errors.New("firstrow")
 
@@ -288,16 +293,34 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var enabledStores []string
 	var allSellers []string
 	var allVendors []string
+	var sealedSellers []string
+	var sealedVendors []string
 
 	// Load all possible sellers, and vendors according to user permissions
 	for _, seller := range GetSellers() {
-		if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) && !seller.Info().SealedMode && !seller.Info().MetadataOnly {
-			allSellers = append(allSellers, seller.Info().Shorthand)
+		if seller == nil || seller.Info().MetadataOnly {
+			continue
+		}
+		short := seller.Info().Shorthand
+		if seller.Info().SealedMode {
+			if !slices.Contains(Config.UploadSealedBlockList, short) {
+				sealedSellers = append(sealedSellers, short)
+			}
+		} else if !slices.Contains(blocklistRetail, short) {
+			allSellers = append(allSellers, short)
 		}
 	}
 	for _, vendor := range GetVendors() {
-		if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) && !vendor.Info().SealedMode {
-			allVendors = append(allVendors, vendor.Info().Shorthand)
+		if vendor == nil {
+			continue
+		}
+		short := vendor.Info().Shorthand
+		if vendor.Info().SealedMode {
+			if !slices.Contains(Config.UploadSealedBlockList, short) {
+				sealedVendors = append(sealedVendors, short)
+			}
+		} else if !slices.Contains(blocklistBuylist, short) {
+			allVendors = append(allVendors, short)
 		}
 	}
 
@@ -393,6 +416,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Buylist mode: %+v", blMode)
 	log.Printf("Enabled stores: %+v", enabledStores)
+	if blMode {
+		log.Printf("Sealed vendors: %+v", sealedVendors)
+	} else {
+		log.Printf("Sealed sellers: %+v", sealedSellers)
+	}
 
 	// Reset the cookie for this preference
 	if len(hashes) == 0 && cachedGdocURL != gdocURL {
@@ -573,14 +601,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	var shouldCheckForConditions bool
 
-	// Extract card Ids
-	cardIds := make([]string, 0, len(uploadedData))
+	// Extract card Ids, separating sealed from singles
+	var cardIds, sealedProductIds []string
 	for i := range uploadedData {
 		// Filter out empty ids
 		if uploadedData[i].CardId == "" {
 			continue
 		}
-		cardIds = append(cardIds, uploadedData[i].CardId)
+
+		co, err := mtgmatcher.GetUUID(uploadedData[i].CardId)
+		if err == nil && co.Sealed {
+			sealedProductIds = append(sealedProductIds, uploadedData[i].CardId)
+		} else {
+			cardIds = append(cardIds, uploadedData[i].CardId)
+		}
 
 		// Check if conditions should be retrieved
 		if uploadedData[i].OriginalCondition != "" {
@@ -591,6 +625,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	log.Printf("Card IDs: %d, Sealed product IDs: %d", len(cardIds), len(sealedProductIds))
 
 	// Check not too many entries got uploaded
 	if len(cardIds) >= maxRows {
@@ -602,20 +637,49 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 	priceSource := r.FormValue("pricesource")
 
-	// Search
+	// Search — fetch card and sealed prices separately then merge
 	var results map[string]map[string]*BanPrice
 	var credits map[string]float64
+	enabledSealedStores := sealedSellers
 	if blMode {
 		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		enabledSealedStores = sealedVendors
+
+		// Fetch sealed vendor prices and merge
+		if len(sealedProductIds) > 0 && len(sealedVendors) > 0 {
+			sealedResults := getVendorPrices("", sealedVendors, "", sealedProductIds, "", false, false, true, tagPref)
+			for cardId, stores := range sealedResults {
+				if results[cardId] == nil {
+					results[cardId] = map[string]*BanPrice{}
+				}
+				for store, price := range stores {
+					results[cardId][store] = price
+				}
+			}
+		}
 
 		if priceSource != "" {
 			credits = map[string]float64{}
-			for _, store := range enabledStores {
+			allStores := append(enabledStores, enabledSealedStores...)
+			for _, store := range allStores {
 				credits[store] = findCredit(store)
 			}
 		}
 	} else {
 		results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+
+		// Fetch sealed seller prices and merge
+		if len(sealedProductIds) > 0 && len(sealedSellers) > 0 {
+			sealedResults := getSellerPrices("", sealedSellers, "", sealedProductIds, "", false, false, true, tagPref)
+			for cardId, stores := range sealedResults {
+				if results[cardId] == nil {
+					results[cardId] = map[string]*BanPrice{}
+				}
+				for store, price := range stores {
+					results[cardId][store] = price
+				}
+			}
+		}
 	}
 
 	// Allow downloading data as CSV
@@ -647,19 +711,58 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indexKeys := UploadIndexKeys
+	var indexKeys []string
+	indexResults := map[string]map[string]*BanPrice{}
 
 	// Choose the alternative reference pricing source when one is not loaded in
 	altPriceSource := r.FormValue("altPrice")
 	if !slices.Contains(UploadIndexComparePriceList, altPriceSource) {
 		altPriceSource = UploadIndexKeys[0]
 	}
-	if !slices.Contains(indexKeys, altPriceSource) {
-		indexKeys = append(indexKeys, altPriceSource)
+
+	if len(cardIds) > 0 {
+		indexKeys = UploadIndexKeys
+		if !slices.Contains(indexKeys, altPriceSource) {
+			indexKeys = append(indexKeys, altPriceSource)
+		}
+		indexResults = getSellerPrices("", indexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	}
 
-	indexResults := getSellerPrices("", indexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+	// Build sealed index keys from MetadataOnly sealed sellers
+	var sealedIndexKeys []string
+	for _, seller := range GetSellers() {
+		if seller == nil || !seller.Info().SealedMode || !seller.Info().MetadataOnly {
+			continue
+		}
+		short := seller.Info().Shorthand
+		if !slices.Contains(UploadSealedIndexKeysPublic, short) {
+			continue
+		}
+		sealedIndexKeys = append(sealedIndexKeys, short)
+	}
+
+	// Fetch sealed index prices
+	if len(sealedProductIds) > 0 && len(sealedIndexKeys) > 0 {
+		sealedIndexResults := getSellerPrices("", sealedIndexKeys, "", sealedProductIds, "", false, false, true, tagPref)
+		for cardId, stores := range sealedIndexResults {
+			if indexResults[cardId] == nil {
+				indexResults[cardId] = map[string]*BanPrice{}
+			}
+			for store, price := range stores {
+				indexResults[cardId][store] = price
+			}
+		}
+	}
+
+	// Set card and sealed keys separately — the template picks per entry
 	pageVars.IndexKeys = UploadIndexKeysPublic
+	pageVars.ScraperKeys = enabledStores
+	pageVars.AllScraperKeys = enabledStores
+	if len(sealedProductIds) > 0 {
+		pageVars.SealedIndexKeys = sealedIndexKeys
+		pageVars.SealedScraperKeys = enabledSealedStores
+		pageVars.AllScraperKeys = append(append([]string{}, enabledStores...), enabledSealedStores...)
+	}
 
 	// Orders implies priority of argument search
 	pageVars.Metadata = map[string]GenericCard{}
@@ -672,7 +775,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else {
 		pageVars.SearchQuery = handler.Filename
 	}
-	pageVars.ScraperKeys = enabledStores
 	pageVars.TotalEntries = map[string]float64{}
 
 	skipResults := r.FormValue("noresults") != ""
@@ -720,8 +822,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		cardId := uploadedData[i].CardId
 
+		// Pick the right store list for this entry
+		isSealed := slices.Contains(sealedProductIds, cardId)
+		entryStores := enabledStores
+		if isSealed {
+			entryStores = enabledSealedStores
+		}
+
 		// Search for any missing entries (ie cards not sold or bought by a vendor)
-		for _, shorthand := range enabledStores {
+		for _, shorthand := range entryStores {
 			_, found := results[cardId][shorthand]
 			if !found {
 				missingCounts[shorthand]++
@@ -906,6 +1015,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.MissingPrices = missingPrices
 	pageVars.ResultPrices = resultPrices
 
+	// For the totals row: show all enabled card stores (even with "-"),
+	// but only include sealed stores that actually returned prices.
+	activeTotalStores := append([]string{}, enabledStores...)
+	for _, key := range enabledSealedStores {
+		if pageVars.TotalEntries[key] != 0 {
+			activeTotalStores = append(activeTotalStores, key)
+		}
+	}
+	pageVars.AllScraperKeys = activeTotalStores
+
 	// Assign the resulting optimized data to the page variables
 	if len(optimizedResults) > 0 {
 		pageVars.Optimized = optimizedResults
@@ -998,6 +1117,11 @@ func getPrice(banPrice *BanPrice, conds string) float64 {
 	}
 
 	var price float64
+
+	// Check sealed price first
+	if banPrice.Sealed > 0 {
+		return banPrice.Sealed
+	}
 
 	// Grab the correct Price
 	if conds == "" {

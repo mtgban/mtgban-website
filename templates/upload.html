@@ -633,6 +633,10 @@
                         {{else}}
                         {{$card := (index $.Metadata .CardId)}}
                         {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
+                        {{$entryStoreKeys := $.ScraperKeys}}
+                        {{if $card.Sealed}}{{$entryStoreKeys = $.SealedScraperKeys}}{{end}}
+                        {{$entryIndexKeys := $.IndexKeys}}
+                        {{if $card.Sealed}}{{$entryIndexKeys = $.SealedIndexKeys}}{{end}}
                         <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
                             {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                             <td>
@@ -659,9 +663,9 @@
                             <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
                             <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
                             <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
-                            {{range $.ScraperKeys}}
+                            {{range $entryStoreKeys}}
                                 {{$price := (index $scraperEntries .)}}
-                                <td class="ures-price {{if and (ne $price 0.0) (is_best_price $scraperEntries . $.ScraperKeys $.IsBuylist)}}best{{end}}">
+                                <td class="ures-price {{if and (ne $price 0.0) (is_best_price $scraperEntries . $entryStoreKeys $.IsBuylist)}}best{{end}}">
                                     {{if ne $price 0.0}}
                                         <a href="https://mtgban.com/go/{{if $.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
                                     {{else}}
@@ -671,10 +675,20 @@
                             {{end}}
                             <td>
                                 <div class="ures-index">
-                                    {{range $.IndexKeys}}
-                                        {{$idxPrice := (index $scraperEntries .)}}
-                                        {{if $idxPrice}}
-                                        <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">$ {{printf "%.2f" $idxPrice}}</span></span>
+                                    {{range $entryIndexKeys}}
+                                        {{$indexName := .}}
+                                        {{$idxPrice := (index $scraperEntries $indexName)}}
+                                        {{/* Skip *Sim if its price matches the corresponding *EV */}}
+                                        {{$skipSim := false}}
+                                        {{if has_suffix $indexName "Sim"}}
+                                            {{$evName := (replace $indexName "Sim" "EV")}}
+                                            {{$evPrice := (index $scraperEntries $evName)}}
+                                            {{if and $idxPrice $evPrice (eq (printf "%.2f" $idxPrice) (printf "%.2f" $evPrice))}}
+                                                {{$skipSim = true}}
+                                            {{end}}
+                                        {{end}}
+                                        {{if and $idxPrice (not $skipSim)}}
+                                        <span><span class="idx-label">{{scraper_name $indexName}}</span><span class="idx-val">$ {{printf "%.2f" $idxPrice}}</span></span>
                                         {{end}}
                                     {{end}}
                                 </div>
@@ -687,7 +701,7 @@
                         <td></td>
                         <td></td>
                         <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.TotalQuantity}}</td>
-                        {{range .ScraperKeys}}
+                        {{range .AllScraperKeys}}
                             <td class="ures-price" style="font-weight:700">
                                 $ {{printf "%.2f" (index $.TotalEntries .)}}
                                 {{$missing := (index $.MissingCounts .)}}
@@ -724,7 +738,7 @@
         <p class="opt-intro">{{len .Optimized}} store splits for a theoretical maximum of <strong>$ {{printf "%.2f" .HighestTotal}}</strong></p>
 
         <div class="opt-toc">
-            {{range .ScraperKeys}}
+            {{range .AllScraperKeys}}
                 {{$entries := index $.Optimized .}}
                 {{if $entries}}
                     {{$total := index $.OptimizedTotals .}}
@@ -737,7 +751,7 @@
             {{end}}
         </div>
 
-        {{range .ScraperKeys}}
+        {{range .AllScraperKeys}}
             {{$scraperKey := .}}
             {{$sourceKey := .}}
             {{$entries := index $.Optimized .}}
