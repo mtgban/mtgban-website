@@ -371,9 +371,9 @@
                         <div class="sidebar-actions-compact">
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Export</span>
-                                <a class="sidebar-action success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
-                                <a class="sidebar-action warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
-                                <a class="sidebar-action default" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">List</a>
+                                <a class="sidebar-action success" href="/api/search/retail{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_retail_prices{{if .IsSealed}}_sealed{{end}}.csv">Retail</a>
+                                <a class="sidebar-action warning" href="/api/search/buylist{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_buylist_prices{{if .IsSealed}}_sealed{{end}}.csv">Buylist</a>
+                                <a class="sidebar-action default" href="/api/search/list{{if .IsSealed}}/sealed{{end}}/{{.SearchQuery}}.csv?sort={{.SearchSort}}{{if .ReverseMode}}&reverse=true{{end}}" download="mtgban_decklist{{if .IsSealed}}_sealed{{end}}.csv">List</a>
                             </div>
                             <div class="sidebar-compact-row">
                                 <span class="sidebar-compact-label">Upload</span>

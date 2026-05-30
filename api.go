@@ -17,6 +17,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -717,6 +718,29 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Perform search
 	allKeys, _ := searchAndFilter(config)
+
+	// Sort results to match the search page order
+	sortOpt := r.FormValue("sort")
+	switch sortOpt {
+	case "alpha":
+		sort.Slice(allKeys, func(i, j int) bool {
+			return sortSetsAlphabetical(allKeys[i], allKeys[j], false)
+		})
+	case "number":
+		sort.Slice(allKeys, func(i, j int) bool {
+			return sortByNumberAndFinish(allKeys[i], allKeys[j], false)
+		})
+	default:
+		sort.Slice(allKeys, func(i, j int) bool {
+			return sortSets(allKeys[i], allKeys[j])
+		})
+	}
+	reverseSort, _ := strconv.ParseBool(r.FormValue("reverse"))
+	if reverseSort {
+		for i, j := 0, len(allKeys)-1; i < j; i, j = i+1, j-1 {
+			allKeys[i], allKeys[j] = allKeys[j], allKeys[i]
+		}
+	}
 
 	// Limit results to be processed
 	if len(allKeys) > MaxSearchTotalResults {
