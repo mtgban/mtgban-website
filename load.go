@@ -154,23 +154,35 @@ func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, f
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+
+	// Force-close reader when context deadline expires, unblocking any
+	// in-progress Read() that the context alone cannot interrupt.
+	go func() {
+		<-ctx.Done()
+		reader.Close()
+	}()
 
 	switch kind {
 	case "retail":
 		scraper, err := mtgban.ReadSellerFromJSON(reader)
 		if err != nil {
+			cancel()
+			reader.Close()
 			return err
 		}
 		updateSellers(scraper)
 	case "buylist":
 		scraper, err := mtgban.ReadVendorFromJSON(reader)
 		if err != nil {
+			cancel()
+			reader.Close()
 			return err
 		}
 		updateVendors(scraper)
 	}
 
+	cancel()
+	reader.Close()
 	return nil
 }
 
