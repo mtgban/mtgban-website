@@ -1079,23 +1079,27 @@ func main() {
 	http.HandleFunc("/auth", Auth)
 
 	// Track whether the app has been fully ready at least once.
-	// Before that point /healthz gates on sellers/vendors so that
-	// App Platform won't route traffic to an instance that has never
-	// finished loading (preserving zero-downtime deploys). After the
-	// first successful load, /healthz becomes a pure liveness check
-	// so transient CPU/memory spikes don't cascade into 503s.
+	// Before that point /healthz gates on the mtgmatcher datastore plus at
+	// least one seller and vendor, so App Platform won't route traffic to an
+	// instance that can't yet answer a search (the datastore loads ~40s after
+	// boot, well after the first scraper registers). This preserves
+	// zero-downtime deploys. After the first successful load, /healthz becomes
+	// a pure liveness check so transient CPU/memory spikes don't cascade into
+	// 503s.
 	var everReady atomic.Bool
 
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		if !everReady.Load() {
 			// First boot: behave as a readiness gate
+			uuids := len(mtgmatcher.GetUUIDs())
 			sellers, vendors := len(GetSellers()), len(GetVendors())
-			if sellers == 0 || vendors == 0 {
-				log.Printf("healthz: not ready (sellers=%d, vendors=%d)", sellers, vendors)
+			if uuids == 0 || sellers == 0 || vendors == 0 {
+				log.Printf("healthz: not ready (uuids=%d, sellers=%d, vendors=%d)", uuids, sellers, vendors)
 				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 				return
 			}
 			// Data loaded for the first time — latch open
+			log.Printf("healthz: ready (uuids=%d, sellers=%d, vendors=%d)", uuids, sellers, vendors)
 			everReady.Store(true)
 		}
 
@@ -1103,17 +1107,11 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
-	// /readyz: readiness probe — returns 503 until scrapers have loaded
-	// at least one seller and one vendor. Use this from your own
-	// monitoring or upstream load balancer when you need to know
-	// whether the app can actually serve price data.
+	// /readyz: liveness probe — wired to App Platform's liveness_health_check.
+	// It only reports that the process is up and the HTTP server can answer; it
+	// deliberately does NOT gate on scraper data, so a slow first load can't
+	// trigger a counterproductive restart. Readiness/deploy gating is /healthz.
 	http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
-		sellers, vendors := len(GetSellers()), len(GetVendors())
-		if sellers == 0 || vendors == 0 {
-			log.Printf("readyz: not ready (sellers=%d, vendors=%d)", sellers, vendors)
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
-			return
-		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
 	})
