@@ -11,9 +11,21 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/simplecloud"
+)
+
+const (
+	// Maximum time allowed for a single scraper file download+parse.
+	// Normal loads complete in <2s; this guards against hung B2 connections
+	// that would otherwise block the reload goroutine indefinitely and
+	// cause the GC to stall (pinning CPU).
+	scraperLoadTimeout = 2 * time.Minute
+
+	// Number of retry attempts for a failed/timed-out scraper load.
+	scraperLoadRetries = 3
 )
 
 var DataBucket simplecloud.Reader
@@ -89,9 +101,11 @@ func loadScrapersNG(config ScraperConfig) error {
 	for name, scrapersConfig := range config.Config {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
-				err := loadScraper(DataBucket, config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
+				err := loadScraperWithRetry(DataBucket, config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
 				if err != nil {
-					log.Println(err)
+					msg := fmt.Sprintf("failed to load %s/%s/%s after %d attempts: %s",
+						name, kind, shorthand, scraperLoadRetries, err)
+					ServerNotify("reload", msg, true)
 					continue
 				}
 			}
@@ -101,6 +115,26 @@ func loadScrapersNG(config ScraperConfig) error {
 	ServerNotify("reload", "Server loaded")
 
 	return nil
+}
+
+func loadScraperWithRetry(bucket simplecloud.Reader, base, game, name, kind, shorthand, format string) error {
+	var lastErr error
+	for attempt := range scraperLoadRetries {
+		if attempt > 0 {
+			delay := time.Duration(attempt) * 5 * time.Second
+			log.Printf("retrying %s/%s/%s (attempt %d/%d) after %v",
+				name, kind, shorthand, attempt+1, scraperLoadRetries, delay)
+			time.Sleep(delay)
+		}
+
+		lastErr = loadScraper(bucket, base, game, name, kind, shorthand, format)
+		if lastErr == nil {
+			return nil
+		}
+
+		log.Printf("load %s/%s/%s failed: %v", name, kind, shorthand, lastErr)
+	}
+	return lastErr
 }
 
 func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, format string) error {
@@ -113,27 +147,42 @@ func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, f
 
 	log.Println("loading", u.String())
 
-	reader, err := simplecloud.InitReader(context.Background(), bucket, u.String())
+	ctx, cancel := context.WithTimeout(context.Background(), scraperLoadTimeout)
+	defer cancel()
+
+	reader, err := simplecloud.InitReader(ctx, bucket, u.String())
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+
+	// Force-close reader when context deadline expires, unblocking any
+	// in-progress Read() that the context alone cannot interrupt.
+	go func() {
+		<-ctx.Done()
+		reader.Close()
+	}()
 
 	switch kind {
 	case "retail":
 		scraper, err := mtgban.ReadSellerFromJSON(reader)
 		if err != nil {
+			cancel()
+			reader.Close()
 			return err
 		}
 		updateSellers(scraper)
 	case "buylist":
 		scraper, err := mtgban.ReadVendorFromJSON(reader)
 		if err != nil {
+			cancel()
+			reader.Close()
 			return err
 		}
 		updateVendors(scraper)
 	}
 
+	cancel()
+	reader.Close()
 	return nil
 }
 
