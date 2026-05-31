@@ -426,7 +426,7 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 	var names []string
 	listReprints := map[string][]ReprintEntry{}
 
-	var dupes []string
+	dupes := map[string]struct{}{}
 	for _, uuid := range uuids {
 		co, _ := mtgmatcher.GetUUID(uuid)
 
@@ -458,10 +458,12 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 		}
 
 		// Skip processed cards (using scryfallId to catch foil/nonfoil)
-		if slices.Contains(dupes, co.Identifiers["scryfallId"]) {
+		scryfallId := co.Identifiers["scryfallId"]
+		_, found := dupes[scryfallId]
+		if found {
 			continue
 		}
-		dupes = append(dupes, co.Identifiers["scryfallId"])
+		dupes[scryfallId] = struct{}{}
 
 		// Load the date for the card
 		printDate, err := mtgmatcher.CardReleaseDate(co.UUID)
