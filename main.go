@@ -1306,6 +1306,7 @@ var funcMap = template.FuncMap{
 	"palette_arbit_targets":     func() template.JS { return paletteArbitTargetsJSON("arbit") },
 	"palette_reverse_targets":   func() template.JS { return paletteArbitTargetsJSON("reverse") },
 	"palette_global_targets":    func() template.JS { return paletteArbitTargetsJSON("global") },
+	"guide_stores":              guideStoresJSON,
 	"dict": func(values ...interface{}) (map[string]interface{}, error) {
 		if len(values)%2 != 0 {
 			return nil, errors.New("dict requires even number of args")
