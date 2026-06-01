@@ -4,6 +4,7 @@
 
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}"></script>
+    <script>window.__BAN_STORES = {{guide_stores}};</script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 {{end}}
 
@@ -190,6 +191,11 @@
                 html += '</div>';
             }
 
+            // Live store-shorthand reference, injected from the registered scrapers.
+            if (item.id === 'stores') {
+                html += buildStoresTable(window.__BAN_STORES);
+            }
+
             section.innerHTML = html;
             sectionsContainer.appendChild(section);
         }
@@ -361,6 +367,30 @@
 
     function escapeJs(str) {
         return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+
+    // Render the live store-shorthand reference from the registered scrapers.
+    function buildStoresTable(stores) {
+        if (!stores || !stores.length) return '';
+        var html = '<h4 class="guide-examples-heading">All store shorthands</h4>';
+        html += '<div class="guide-section-desc"><p>Every shorthand below is valid after ' +
+            '<code>store:</code>, <code>seller:</code>, and <code>vendor:</code> (the full store name in quotes works too). ' +
+            'This list is generated live from the stores BAN currently tracks. Which stores return data depends on ' +
+            'your membership tier, but the syntax is always accepted.</p></div>';
+        html += '<table class="guide-table"><thead><tr><th>Store</th><th>Shorthand</th><th>Available for</th></tr></thead><tbody>';
+        for (var i = 0; i < stores.length; i++) {
+            var s = stores[i];
+            var roles = [];
+            if (s.retail) roles.push('retail');
+            if (s.buylist) roles.push('buylist');
+            if (s.index) roles.push('index');
+            if (s.sealed) roles.push('sealed');
+            html += '<tr><td>' + escapeHtml(s.name) + '</td>' +
+                '<td><code>' + escapeHtml(s.code) + '</code></td>' +
+                '<td>' + escapeHtml(roles.join(', ')) + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        return html;
     }
 })();
 
