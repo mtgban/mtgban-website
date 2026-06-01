@@ -1037,7 +1037,10 @@ func main() {
 
 	// /healthz: returns 200 only if dependencies are OK.
 	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		if len(GetSellers()) == 0 || len(GetVendors()) == 0 {
+		uuids := len(mtgmatcher.GetUUIDs())
+		sellers, vendors := len(GetSellers()), len(GetVendors())
+		if uuids == 0 || sellers == 0 || vendors == 0 {
+			log.Printf("healthz: not ready (uuids=%d, sellers=%d, vendors=%d)", uuids, sellers, vendors)
 			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 			return
 		}
