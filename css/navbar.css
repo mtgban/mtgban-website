@@ -231,16 +231,18 @@
 .tools-quick-btn {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    width: 36px; height: 36px;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px;
     border-radius: var(--radius-sm, 6px);
     background: var(--surface-2);
     border: 1px solid var(--border-subtle);
-    color: var(--greytext);
+    color: var(--activetext);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
     text-decoration: none;
     cursor: pointer;
     transition: all 0.12s;
-    padding: 0;
 }
 .tools-quick-btn:hover {
     background: var(--surface-3);
@@ -254,6 +256,12 @@
     opacity: 0.85;
 }
 .tools-quick-btn:hover img { opacity: 1; }
+/* The theme toggle stays a square icon button, not a labeled pill. */
+.tools-quick-btn.ban-theme-toggle {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+}
 .tools-quick-spacer { flex: 1; }
 .tools-tile {
     display: flex;
