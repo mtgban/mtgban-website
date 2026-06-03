@@ -374,6 +374,8 @@
 }
 .nav2-search.autocomplete:has(.autocomplete-items) input {
     border-radius: 18px 18px 0 0;
+    /* Snap the corners with the menu instead of the shared 0.15s morph. */
+    transition: border-radius 0.06s ease, border-color 0.12s, background 0.12s;
 }
 
 /* ── Narrow-width: fall back to the existing hamburger menu ── */
