@@ -1369,6 +1369,22 @@ body.modal-embed .cp-overlay { display: none !important; }
 (function() {
     var chartCtx = {{.ChartIDsCSV}};
 
+    // Mirror localStorage.theme into the iframe body. The 'storage' event fires
+    // in other same-origin documents when the parent's nightmode.js writes a
+    // new value, so toggling the navbar moon button while the modal is open
+    // flips the iframe content with it.
+    function applyTheme() {
+        var t = localStorage.getItem('theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var dark = t ? (t === 'dark') : prefersDark;
+        document.body.classList.toggle('dark-theme', dark);
+        document.body.classList.toggle('light-theme', !dark);
+    }
+    applyTheme();
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'theme' || e.key === null) applyTheme();
+    });
+
     // Tag every same-origin link to /search or /sealed (including bare ?q=...)
     // with modal=1 and the active chart roster, so clicking around inside the
     // modal keeps the iframe in modal mode instead of escaping to a full page.
