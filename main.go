@@ -225,6 +225,9 @@ type NavElem struct {
 	// Icon or seller shorthand
 	Short string
 
+	// One-line subtitle shown on the Tools dropdown tile
+	Description string
+
 	// Response handler
 	Handle func(w http.ResponseWriter, r *http.Request)
 
@@ -303,21 +306,24 @@ var ExtraNavs map[string]*NavElem
 func init() {
 	ExtraNavs = map[string]*NavElem{
 		"Search": {
-			Name:   "Search",
-			Short:  "🔍",
-			Link:   "/search",
-			Handle: Search,
-			Page:   "search.html",
+			Name:        "Search",
+			Short:       "🔍",
+			Description: "Find a card by name",
+			Link:        "/search",
+			Handle:      Search,
+			Page:        "search.html",
 			SubPages: []NavElem{
 				{
-					Name:  "Sets",
-					Short: "📦",
-					Link:  "/sets",
+					Name:        "Sets",
+					Short:       "📦",
+					Description: "Browse every set on file",
+					Link:        "/sets",
 				},
 				{
-					Name:  "Sealed",
-					Short: "🧱",
-					Link:  "/sealed",
+					Name:        "Sealed",
+					Short:       "🧱",
+					Description: "Sealed product search",
+					Link:        "/sealed",
 					ShouldHide: func() bool {
 						return len(mtgmatcher.GetSealedUUIDs()) == 0
 					},
@@ -326,24 +332,27 @@ func init() {
 			AllowOffline: true,
 		},
 		"Newspaper": {
-			Name:   "Newspaper",
-			Short:  "🗞️",
-			Link:   "/newspaper",
-			Handle: Newspaper,
-			Page:   "news.html",
+			Name:        "Newspaper",
+			Short:       "🗞️",
+			Description: "Market movers & recent activity",
+			Link:        "/newspaper",
+			Handle:      Newspaper,
+			Page:        "news.html",
 			SubPages: []NavElem{
 				{
-					Name:  "Archive",
-					Short: "📰",
-					Link:  "/newspaper?page=old",
+					Name:        "Archive",
+					Short:       "📰",
+					Description: "Past newspaper issues",
+					Link:        "/newspaper?page=old",
 					ShouldHide: func() bool {
 						return Config.Game != DefaultGame
 					},
 				},
 				{
-					Name:  "TCG Syp List",
-					Short: "📋",
-					Link:  "/newspaper?page=syp",
+					Name:        "TCG Syp List",
+					Short:       "📋",
+					Description: "Cards TCGplayer wants now",
+					Link:        "/newspaper?page=syp",
 					ShouldHide: func() bool {
 						_, err := findVendorBuylist("SYP")
 						return err != nil
@@ -352,47 +361,53 @@ func init() {
 			},
 		},
 		"Sleepers": {
-			Name:   "Sleepers",
-			Short:  "💤",
-			Link:   "/sleepers",
-			Handle: Sleepers,
-			Page:   "sleep.html",
+			Name:        "Sleepers",
+			Short:       "💤",
+			Description: "Under-the-radar picks",
+			Link:        "/sleepers",
+			Handle:      Sleepers,
+			Page:        "sleep.html",
 		},
 		"Upload": {
-			Name:    "Upload",
-			Short:   "🚢",
-			Link:    "/upload",
-			Handle:  Upload,
-			Page:    "upload.html",
-			CanPOST: true,
+			Name:        "Upload",
+			Short:       "🚢",
+			Description: "Bulk price your collection",
+			Link:        "/upload",
+			Handle:      Upload,
+			Page:        "upload.html",
+			CanPOST:     true,
 		},
 		"Global": {
-			Name:   "Global",
-			Short:  "🌍",
-			Link:   "/global",
-			Handle: Global,
-			Page:   "arbit.html",
+			Name:        "Global",
+			Short:       "🌍",
+			Description: "Cross-region price view",
+			Link:        "/global",
+			Handle:      Global,
+			Page:        "arbit.html",
 		},
 		"Arbit": {
-			Name:   "Arbitrage",
-			Short:  "📈",
-			Link:   "/arbit",
-			Handle: Arbit,
-			Page:   "arbit.html",
+			Name:        "Arbitrage",
+			Short:       "📈",
+			Description: "Buy low, sell high spreads",
+			Link:        "/arbit",
+			Handle:      Arbit,
+			Page:        "arbit.html",
 		},
 		"Reverse": {
-			Name:   "Reverse",
-			Short:  "📉",
-			Link:   "/reverse",
-			Handle: Reverse,
-			Page:   "arbit.html",
+			Name:        "Reverse",
+			Short:       "📉",
+			Description: "Reverse-direction arbitrage",
+			Link:        "/reverse",
+			Handle:      Reverse,
+			Page:        "arbit.html",
 		},
 		"Admin": {
-			Name:   "Admin",
-			Short:  "❌",
-			Link:   "/admin",
-			Handle: Admin,
-			Page:   "admin.html",
+			Name:        "Admin",
+			Short:       "❌",
+			Description: "Restricted control panel",
+			Link:        "/admin",
+			Handle:      Admin,
+			Page:        "admin.html",
 
 			CanPOST:        true,
 			AlwaysOnForDev: true,
