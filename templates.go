@@ -16,6 +16,9 @@ var funcMap = template.FuncMap{
 	"inc": func(i, j int) int {
 		return i + j
 	},
+	"in_list": func(haystack []string, needle string) bool {
+		return slices.Contains(haystack, needle)
+	},
 	"dec": func(i, j int) int {
 		return i - j
 	},
