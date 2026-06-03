@@ -153,17 +153,55 @@ func buildDataset(results map[string]timeseries.PriceRow, labels []string, confi
 	}
 }
 
-// getDatasetsForMulti returns one dataset per (card × reference) pair for a
-// multi-card chart, plus the list of distinct reference names that have at
-// least one non-empty dataset. Each card is assigned a stable color from
-// multiCardPalette so its line keeps the same color across reference switches.
-// Datasets with no data (e.g. references the card doesn't support) are skipped.
-func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
+// multiCardInput is one card's contribution to a multi-card chart: the
+// display name to render in the legend, and the raw datasets returned by
+// getDatasets for that card.
+type multiCardInput struct {
+	Name     string
+	Datasets []Dataset
+}
+
+// mergeMultiCardDatasets flattens per-card datasets into the (card × reference)
+// list a multi-card chart renders. Each card's datasets get a palette color
+// (round-robin, wrap-around past multiCardPalette's length) and the supplied
+// card Name, replacing whatever getDatasets put there. Datasets with no data
+// are dropped so reference names that a card doesn't support don't pollute the
+// reference picker. The returned reference order is the first-seen order
+// across all cards — a card later in the list that introduces a new reference
+// appends; one that repeats a reference already seen does not.
+func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 	var datasets []Dataset
 	refSeen := map[string]bool{}
 	var refOrder []string
 
-	for i, cardId := range cardIds {
+	for i, card := range cards {
+		color := multiCardPalette[i%len(multiCardPalette)]
+		for _, ds := range card.Datasets {
+			if len(ds.Data) == 0 {
+				continue
+			}
+
+			ds.Name = card.Name
+			ds.Color = color
+			datasets = append(datasets, ds)
+
+			if !refSeen[ds.Reference] {
+				refSeen[ds.Reference] = true
+				refOrder = append(refOrder, ds.Reference)
+			}
+		}
+	}
+
+	return datasets, refOrder
+}
+
+// getDatasetsForMulti returns one dataset per (card × reference) pair for a
+// multi-card chart, plus the list of distinct reference names that have at
+// least one non-empty dataset. UUIDs that fail to resolve are skipped so a
+// single bad input doesn't take the whole chart down.
+func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
+	cards := make([]multiCardInput, 0, len(cardIds))
+	for _, cardId := range cardIds {
 		co, err := mtgmatcher.GetUUID(cardId)
 		if err != nil {
 			log.Println(err)
@@ -179,25 +217,14 @@ func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string,
 				cardName += " Etched"
 			}
 		}
-		color := multiCardPalette[i%len(multiCardPalette)]
 
-		for _, ds := range getDatasets(ctx, cardId, co.Sealed, labels, lb) {
-			if len(ds.Data) == 0 {
-				continue
-			}
-
-			ds.Name = cardName
-			ds.Color = color
-			datasets = append(datasets, ds)
-
-			if !refSeen[ds.Reference] {
-				refSeen[ds.Reference] = true
-				refOrder = append(refOrder, ds.Reference)
-			}
-		}
+		cards = append(cards, multiCardInput{
+			Name:     cardName,
+			Datasets: getDatasets(ctx, cardId, co.Sealed, labels, lb),
+		})
 	}
 
-	return datasets, refOrder
+	return mergeMultiCardDatasets(cards)
 }
 
 // A default scale for converting non-NM prices to NM
