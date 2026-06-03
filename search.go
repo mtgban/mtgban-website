@@ -186,6 +186,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chartParam := r.FormValue("chart")
+	pageVars.ModalMode = r.FormValue("modal") == "1"
 
 	// Chart param can be a single UUID (single-card chart) or comma-separated
 	// UUIDs (multi-card chart). Validate each piece; ignore unknown IDs.
@@ -217,7 +218,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// Only enter chart-render mode when chart= is alone (no q=). With both
 		// present the user is searching for cards to add to the chart, so we
 		// keep the chart roster as context but render the search results page.
-		if query == "" {
+		// In modal mode the iframe is the add-to-chart picker, so never render
+		// a chart inside it even when no query is set yet.
+		if query == "" && !pageVars.ModalMode {
 			chartId = chartIds[0]
 			query = chartParam
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)

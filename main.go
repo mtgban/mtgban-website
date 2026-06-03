@@ -182,6 +182,7 @@ type PageVars struct {
 	ChartIDsCSV     string
 	IsMultiChart    bool
 	ChartReferences []string
+	ModalMode       bool
 	Alternative     string
 	StocksURL       string
 	AltEtchedId     string

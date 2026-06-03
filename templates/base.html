@@ -38,8 +38,8 @@
     {{block "extra-head" .}}{{end}}
 </head>
 
-<body class="light-theme">
-{{template "navbar" .}}
+<body class="light-theme{{if .ModalMode}} modal-embed{{end}}">
+{{if not .ModalMode}}{{template "navbar" .}}{{end}}
 
 <div class="page-content">
     {{if ne .ErrorMessage ""}}

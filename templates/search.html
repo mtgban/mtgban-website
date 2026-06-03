@@ -459,6 +459,7 @@
                                     </select>
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
+                                    <a class="btn default chart-add-btn" href="javascript:openChartAddModal()" title="Add another card to this chart">&#10133; Add card</a>
                                 </p>
                                 {{if .IsMultiChart}}
                                 {{if .ChartReferences}}
@@ -694,7 +695,91 @@
                                 chartImg.href = exportCanvas.toDataURL("image/png");
                                 chartImg.click();
                             }
+
+                            // Hoist the overlay to <body> so no ancestor's
+                            // transform/filter/backdrop-filter can trap its
+                            // position: fixed inside a containing block, and
+                            // apply the critical positioning styles inline so
+                            // the modal renders correctly even if css/search.css
+                            // is serving a stale browser-cached copy.
+                            (function() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                if (!overlay || overlay.parentNode === document.body) return;
+                                document.body.appendChild(overlay);
+                            })();
+
+                            function openChartAddModal() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                var frame = document.getElementById('chartAddFrame');
+                                if (!overlay || !frame) return;
+                                var base = '/search?chart={{.ChartIDsCSV}}&modal=1';
+                                {{if .IsSealed}}base = '/sealed?chart={{.ChartIDsCSV}}&modal=1';{{end}}
+                                // Always reload on open so the iframe picks up
+                                // the latest localStorage theme (and any other
+                                // parent-side state) instead of reusing the
+                                // body class it was first rendered with.
+                                frame.src = base;
+                                overlay.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;justify-content:center;align-items:center;padding:4vh 4vw;';
+                                overlay.classList.add('open');
+                                document.body.classList.add('chart-add-open');
+                                document.body.style.overflow = 'hidden';
+                            }
+                            function closeChartAddModal() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                if (!overlay) return;
+                                overlay.style.display = 'none';
+                                overlay.classList.remove('open');
+                                document.body.classList.remove('chart-add-open');
+                                document.body.style.overflow = '';
+                            }
+                            document.addEventListener('keydown', function(e) {
+                                if (e.key === 'Escape') {
+                                    var overlay = document.getElementById('chartAddOverlay');
+                                    if (overlay && overlay.classList.contains('open')) {
+                                        closeChartAddModal();
+                                    }
+                                }
+                            });
+                            window.addEventListener('message', function(e) {
+                                if (e.origin !== window.location.origin) return;
+                                if (!e.data) return;
+                                var t = e.data.type;
+                                if (t !== 'mtgban-add-to-chart' && t !== 'mtgban-remove-from-chart') return;
+                                var cardId = e.data.cardId;
+                                if (!cardId) return;
+                                var existing = '{{.ChartIDsCSV}}'.split(',').filter(Boolean);
+                                var idx = existing.indexOf(cardId);
+                                if (t === 'mtgban-add-to-chart') {
+                                    if (idx !== -1) { closeChartAddModal(); return; }
+                                    existing.push(cardId);
+                                } else {
+                                    if (idx === -1) { closeChartAddModal(); return; }
+                                    existing.splice(idx, 1);
+                                }
+                                var url = new URL(window.location.href);
+                                if (existing.length) {
+                                    url.searchParams.set('chart', existing.join(','));
+                                } else {
+                                    url.searchParams.delete('chart');
+                                }
+                                url.searchParams.delete('q');
+                                window.location = url.toString();
+                            });
                         </script>
+
+                        <div id="chartAddOverlay" class="chart-add-overlay" style="display:none;" onclick="if(event.target===this)closeChartAddModal()">
+                            <div class="chart-add-dialog" role="dialog" aria-label="Add card to chart"
+                                 style="width:92vw;max-width:1400px;height:92vh;background:var(--background,#fff);border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:14px;box-shadow:0 24px 72px rgba(0,0,0,0.45);display:flex;flex-direction:column;overflow:hidden;">
+                                <div class="chart-add-header"
+                                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-subtle,rgba(0,0,0,0.08));flex-shrink:0;background:var(--navbackground,var(--background,#fff));">
+                                    <span class="chart-add-title" style="font-size:14px;font-weight:600;color:var(--normal);">&#10133; Add a card to this chart</span>
+                                    <button class="chart-add-close" type="button" onclick="closeChartAddModal()" aria-label="Close"
+                                            style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:var(--normal);padding:0 6px;">&times;</button>
+                                </div>
+                                <iframe id="chartAddFrame" class="chart-add-frame" title="Search for a card to add"
+                                        style="flex:1;width:100%;border:0;background:var(--background,#fff);"></iframe>
+                            </div>
+                        </div>
                     {{end}}
 
                     <svg height="0" width="0" xmlns="http://www.w3.org/2000/svg">
@@ -802,9 +887,9 @@
                                         {{if eq $.ChartIDsCSV ""}}
                                             <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
                                         {{else if in_list $.ChartIDs $cardId}}
-                                            <span class="result-chart-added" title="Already on this chart">&#128200;&#10003;</span>
+                                            <a class="chart-remove-link" data-card-id="{{$cardId}}" href="?chart={{csv_without $.ChartIDsCSV $cardId}}" title="Remove from this chart">&#128200;&#10134;</a>
                                         {{else}}
-                                            <a href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
+                                            <a class="chart-add-link" data-card-id="{{$cardId}}" href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
                                         {{end}}
                                     {{end}}
                                     {{/* Shown only when the screen is narrow enough that the sidebar
@@ -1269,6 +1354,60 @@
         if (e.key === 'Escape') hideCardImage();
     });
 </script>
+{{if .ModalMode}}
+<style>
+/* Inline so the iframe content sheds page chrome even when css/search.css is
+ * serving a stale browser-cached copy without the body.modal-embed rules. */
+body.modal-embed { margin: 0 !important; }
+body.modal-embed .page-content { padding-top: 0 !important; min-height: auto !important; }
+body.modal-embed .search-bar-sticky { top: 0 !important; }
+body.modal-embed .search-layout { margin-top: 0 !important; min-height: auto !important; }
+body.modal-embed .ban-confirm-dialog-host,
+body.modal-embed .cp-overlay { display: none !important; }
+</style>
+<script>
+(function() {
+    var chartCtx = {{.ChartIDsCSV}};
+
+    // Tag every same-origin link to /search or /sealed (including bare ?q=...)
+    // with modal=1 and the active chart roster, so clicking around inside the
+    // modal keeps the iframe in modal mode instead of escaping to a full page.
+    function decorate() {
+        document.querySelectorAll('a[href]').forEach(function(a) {
+            if (a.dataset.modalDecorated === '1') return;
+            var raw = a.getAttribute('href');
+            if (!raw) return;
+            if (raw.charAt(0) === '#' || raw.indexOf('javascript:') === 0) return;
+            if (a.target === '_blank') return;
+            var url;
+            try { url = new URL(raw, window.location.href); } catch (e) { return; }
+            if (url.origin !== window.location.origin) return;
+            if (!/^\/(search|sealed)\/?$/.test(url.pathname)) return;
+            if (chartCtx && !url.searchParams.has('chart')) {
+                url.searchParams.set('chart', chartCtx);
+            }
+            url.searchParams.set('modal', '1');
+            a.href = url.toString();
+            a.dataset.modalDecorated = '1';
+        });
+    }
+    decorate();
+    new MutationObserver(decorate).observe(document.body, { childList: true, subtree: true });
+
+    document.addEventListener('click', function(e) {
+        var add = e.target.closest('a.chart-add-link');
+        var rm = e.target.closest('a.chart-remove-link');
+        var a = add || rm;
+        if (!a) return;
+        var cardId = a.getAttribute('data-card-id');
+        if (!cardId || !window.parent || window.parent === window) return;
+        e.preventDefault();
+        var type = add ? 'mtgban-add-to-chart' : 'mtgban-remove-from-chart';
+        window.parent.postMessage({ type: type, cardId: cardId }, window.location.origin);
+    });
+})();
+</script>
+{{end}}
 {{end}}
 
 {{define "settings-content"}}
