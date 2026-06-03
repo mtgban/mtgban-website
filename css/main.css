@@ -92,7 +92,7 @@ html { font-size: 17px; }
     --font-mono: 'Geist', sans-serif;
 
     /* ── Layout tokens ── */
-    --nav-height: 48px;
+    --nav-height: 56px;
     --page-gutter: 3vw;
     --page-max-width: min(80vw, 1600px);
     --content-padding-top: calc(var(--nav-height) + 2vh);
@@ -640,7 +640,7 @@ a.selected:hover{
 }
 /* ═══ Base template layout ═══ */
 .page-content {
-    padding-top: 75px;
+    padding-top: 83px;
     min-height: 100vh;
 }
 
