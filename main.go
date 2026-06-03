@@ -165,6 +165,10 @@ type PageVars struct {
 	Datasets        []Dataset
 	Checkpoints     []ChartCheckpoint
 	ChartID         string
+	ChartIDs        []string
+	ChartIDsCSV     string
+	IsMultiChart    bool
+	ChartReferences []string
 	Alternative     string
 	StocksURL       string
 	AltEtchedId     string
@@ -1083,6 +1087,9 @@ func main() {
 var funcMap = template.FuncMap{
 	"inc": func(i, j int) int {
 		return i + j
+	},
+	"in_list": func(haystack []string, needle string) bool {
+		return slices.Contains(haystack, needle)
 	},
 	"dec": func(i, j int) int {
 		return i - j

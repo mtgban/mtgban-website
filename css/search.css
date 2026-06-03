@@ -1283,6 +1283,54 @@
 }
 
 
+/* Multi-card chart reference picker: one button per price source (TCG Low,
+ * Card Kingdom Buy, etc.) — clicking switches which reference all charted
+ * cards display. Mirrors the chart-event toggle box for visual consistency. */
+.chart-ref-picker {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 10px;
+    margin: 8px 0 0;
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 6px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.03));
+    font-size: 12px;
+}
+.chart-ref-picker::before {
+    content: 'Price source:';
+    color: var(--text-secondary, #666);
+    font-weight: 500;
+}
+.chart-ref-picker .ref-picker-btn {
+    padding: 2px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.2));
+    background: transparent;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.chart-ref-picker .ref-picker-btn:hover {
+    background-color: rgba(54, 162, 235, 0.1);
+}
+.chart-ref-picker .ref-picker-btn.active {
+    background-color: rgba(54, 162, 235, 0.2);
+    border-color: rgba(54, 162, 235, 0.6);
+    font-weight: 500;
+}
+
+
+/* Inline marker on a result row whose card is already in the multi-card chart.
+ * Dimmed to read as a passive status, not a clickable action. */
+.result-chart-added {
+    opacity: 0.45;
+    cursor: default;
+}
+
+
 /* ═══ Options page ═══ */
 
 .opts-page {
