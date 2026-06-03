@@ -81,6 +81,30 @@ func isSame(a, b SearchEntry) bool {
 
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 
+// parseChartIDs splits a chart=... param (comma-separated UUIDs) into a
+// validated, de-duplicated list. Pieces that don't resolve via mtgmatcher are
+// dropped silently, mirroring how single-UUID chart= used to be handled.
+func parseChartIDs(chartParam string) []string {
+	if chartParam == "" {
+		return nil
+	}
+	var ids []string
+	for _, part := range strings.Split(chartParam, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if _, err := mtgmatcher.GetUUID(part); err != nil {
+			continue
+		}
+		if slices.Contains(ids, part) {
+			continue
+		}
+		ids = append(ids, part)
+	}
+	return ids
+}
+
 func Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
@@ -188,24 +212,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	chartParam := r.FormValue("chart")
 	pageVars.ModalMode = r.FormValue("modal") == "1"
 
-	// Chart param can be a single UUID (single-card chart) or comma-separated
-	// UUIDs (multi-card chart). Validate each piece; ignore unknown IDs.
-	var chartIds []string
-	if chartParam != "" {
-		for _, part := range strings.Split(chartParam, ",") {
-			part = strings.TrimSpace(part)
-			if part == "" {
-				continue
-			}
-			if _, gerr := mtgmatcher.GetUUID(part); gerr != nil {
-				continue
-			}
-			if slices.Contains(chartIds, part) {
-				continue
-			}
-			chartIds = append(chartIds, part)
-		}
-	}
+	chartIds := parseChartIDs(chartParam)
 
 	chartId := ""
 	if len(chartIds) > 0 && !pageVars.DisableChart {
