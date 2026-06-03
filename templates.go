@@ -19,6 +19,16 @@ var funcMap = template.FuncMap{
 	"in_list": func(haystack []string, needle string) bool {
 		return slices.Contains(haystack, needle)
 	},
+	"csv_without": func(csv, drop string) string {
+		parts := strings.Split(csv, ",")
+		out := parts[:0]
+		for _, p := range parts {
+			if p != "" && p != drop {
+				out = append(out, p)
+			}
+		}
+		return strings.Join(out, ",")
+	},
 	"dec": func(i, j int) int {
 		return i - j
 	},
