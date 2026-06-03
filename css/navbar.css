@@ -57,14 +57,15 @@
     flex: 0 1 520px;
     min-width: 160px;
     max-width: 520px;
-    margin-right: 8px;
+    /* Guaranteed gap so a full section cluster never crowds the search bar. */
+    margin-right: 16px;
 }
 .nav2-divider {
     width: 1px;
     height: 22px;
     background: var(--border-subtle, rgba(0,0,0,0.10));
     /* Left auto pushes the divider + sections + utility flush to the right. */
-    margin: 0 4px 0 auto;
+    margin: 0 8px 0 auto;
     flex-shrink: 0;
 }
 .nav2-search-icon {

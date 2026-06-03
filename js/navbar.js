@@ -32,7 +32,7 @@
     var navSections = document.querySelector('.nav2-sections');
     if (!grid || !navSections) return;
 
-    var MAX_SECTION_BUTTONS = 4;
+    var MAX_SECTION_BUTTONS = 5;
 
     // Build the entry registry from the server-provided, auth-gated nav list.
     // Home is excluded (the brand logo covers it).
