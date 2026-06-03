@@ -1368,11 +1368,95 @@ html.admin-fix-mode .store-fix { display: inline-block; }
 }
 
 
-/* Inline marker on a result row whose card is already in the multi-card chart.
- * Dimmed to read as a passive status, not a clickable action. */
-.result-chart-added {
-    opacity: 0.45;
-    cursor: default;
+/* Remove-from-chart anchor on rows whose card is already in the chart roster.
+ * Tinted so the minus glyph reads as a destructive action rather than the
+ * neutral "view chart" icon used in plain search results. */
+.chart-remove-link {
+    filter: hue-rotate(180deg) saturate(1.3);
+    opacity: 0.85;
+}
+.chart-remove-link:hover {
+    opacity: 1;
+}
+
+/* Add-to-chart modal: overlay + dialog containing an iframe of /search?modal=1.
+ * The iframe reuses the full search UI; clicks on result-row chart-add icons
+ * postMessage back to the parent so the chart roster updates in place. */
+.chart-add-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 600;
+    justify-content: center;
+    align-items: center;
+    padding: 4vh 4vw;
+}
+.chart-add-overlay.open {
+    display: flex;
+}
+body.chart-add-open {
+    overflow: hidden;
+}
+.chart-add-dialog {
+    width: 100%;
+    max-width: 1100px;
+    height: 100%;
+    max-height: 92vh;
+    background: var(--background, #fff);
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.chart-add-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    flex-shrink: 0;
+}
+.chart-add-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--normal);
+}
+.chart-add-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--normal);
+    padding: 0 6px;
+}
+.chart-add-close:hover {
+    color: var(--awarning, #d97706);
+}
+.chart-add-frame {
+    flex: 1;
+    width: 100%;
+    border: 0;
+    background: var(--background, #fff);
+}
+
+/* Embed mode: the search page is loaded inside the modal iframe. Hide the
+ * site nav and drop the page padding so the search UI feels like a native
+ * modal panel instead of a full webpage stuffed into a frame. */
+body.modal-embed .page-content {
+    padding-top: 0;
+}
+body.modal-embed .search-bar-sticky {
+    top: 0;
+}
+body.modal-embed .ban-confirm-dialog-host,
+body.modal-embed .cp-overlay {
+    display: none !important;
 }
 
 
