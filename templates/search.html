@@ -460,7 +460,15 @@
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
                                 </p>
-                                {{if .Checkpoints}}
+                                {{if .IsMultiChart}}
+                                {{if .ChartReferences}}
+                                <p class="chart-ref-picker" style="margin: 0.25em 0 0 0;">
+                                    {{range .ChartReferences}}
+                                        <a class="btn default ref-picker-btn" data-ref="{{.}}" href="javascript:void(0)" onclick="selectReference({{.}}); return false;">{{.}}</a>
+                                    {{end}}
+                                </p>
+                                {{end}}
+                                {{else if .Checkpoints}}
                                 <p class="chart-checkpoint-toggles">
                                     <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
                                     <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
@@ -513,6 +521,7 @@
                                                 label: {{.Name}},
                                                 data: {{.Data}},
                                                 borderColor: {{.Color}},
+                                                referenceKey: {{.Reference}},
                                                 fill: 'origin',
                                             },
                                         {{end}}
@@ -525,8 +534,97 @@
                             window.cardChart = cardChart;
                             checkpointChartRef.chart = cardChart;
 
+                            {{if .IsMultiChart}}
+                            // Multi-card mode: keep one persistent line per card and swap its
+                            // data array when the reference changes. Chart.js then animates the
+                            // value transition (TCG Low → TCG Market morphs in place) instead
+                            // of fading datasets in/out, which feels choppy and makes the Y
+                            // axis snap.
+                            var chartReferences = {{.ChartReferences}};
+                            var savedRef = localStorage.getItem('chartMultiRef');
+                            var currentReference = (savedRef && chartReferences.indexOf(savedRef) >= 0)
+                                ? savedRef : chartReferences[0];
+
+                            // Reshape the server-rendered (card × reference) datasets into a
+                            // cardName -> { color, references: { ref: data } } lookup, then
+                            // collapse the chart down to one dataset per card.
+                            var cardLines = {};
+                            var cardOrder = [];
+                            cardChart.data.datasets.forEach(function(ds) {
+                                if (!cardLines[ds.label]) {
+                                    cardLines[ds.label] = { color: ds.borderColor, references: {} };
+                                    cardOrder.push(ds.label);
+                                }
+                                cardLines[ds.label].references[ds.referenceKey] = ds.data;
+                            });
+                            cardChart.data.datasets = cardOrder.map(function(name) {
+                                var cl = cardLines[name];
+                                return {
+                                    label: name,
+                                    data: cl.references[currentReference] || [],
+                                    borderColor: cl.color,
+                                    fill: 'origin',
+                                };
+                            });
+                            cardChart.update('none');
+
+                            function selectReference(ref) {
+                                currentReference = ref;
+
+                                var newByLabel = {};
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    var cl = cardLines[ds.label];
+                                    newByLabel[ds.label] = cl ? (cl.references[ref] || []) : [];
+                                });
+
+                                // Pre-bridge: for positions that are NaN in current data but
+                                // have a value in the new reference, plant the nearest valid
+                                // neighbor's value as the starting point. update('none') commits
+                                // that state instantly, then the second update() animates from
+                                // it to the real new data — newly-appearing points slide out of
+                                // the existing line instead of popping in at their final spot.
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    var newData = newByLabel[ds.label];
+                                    var oldData = ds.data;
+                                    var bridged = oldData.map(function(v, i) {
+                                        var oldNum = parseFloat(v);
+                                        if (!isNaN(oldNum)) return oldNum;
+                                        var newNum = parseFloat(newData[i]);
+                                        if (isNaN(newNum)) return NaN;
+                                        for (var k = 1; k < oldData.length; k++) {
+                                            if (i - k >= 0) {
+                                                var leftVal = parseFloat(oldData[i - k]);
+                                                if (!isNaN(leftVal)) return leftVal;
+                                            }
+                                            if (i + k < oldData.length) {
+                                                var rightVal = parseFloat(oldData[i + k]);
+                                                if (!isNaN(rightVal)) return rightVal;
+                                            }
+                                        }
+                                        return newNum;
+                                    });
+                                    ds.data = bridged;
+                                });
+                                cardChart.update('none');
+
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    ds.data = newByLabel[ds.label];
+                                });
+                                cardChart.update();
+
+                                renderChartLegend(cardChart, 'chartLegend');
+                                document.querySelectorAll('.ref-picker-btn').forEach(function(btn) {
+                                    btn.classList.toggle('active', btn.getAttribute('data-ref') === ref);
+                                });
+                                localStorage.setItem('chartMultiRef', ref);
+                            }
+                            document.querySelectorAll('.ref-picker-btn').forEach(function(btn) {
+                                btn.classList.toggle('active', btn.getAttribute('data-ref') === currentReference);
+                            });
+                            {{else}}
                             // Load state from local storage
                             applySavedLegendState(cardChart, legendStorageKey);
+                            {{end}}
 
                             // Build custom HTML legend (clicks persist via legendStorageKey)
                             renderChartLegend(cardChart, 'chartLegend', legendStorageKey);
@@ -574,8 +672,12 @@
                             }
                             function downloadAsImg() {
                                 var chartImg = document.createElement('a');
+                                {{if .IsMultiChart}}
+                                chartImg.download = 'mtgban-chart.png';
+                                {{else}}
                                 {{$card := (index $.Metadata .ChartID)}}
                                 chartImg.download = '{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png';
+                                {{end}}
 
                                 var scaleFactor = 2;
                                 var border = 10;
@@ -696,8 +798,14 @@
                                     {{if $card.TCGId}}
                                         <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 src="/img/logo/tcgapp.png"></a>
                                     {{end}}
-                                    {{if and (not $.DisableChart) (eq $.ChartID "")}}
-                                        <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
+                                    {{if not $.DisableChart}}
+                                        {{if eq $.ChartIDsCSV ""}}
+                                            <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
+                                        {{else if in_list $.ChartIDs $cardId}}
+                                            <span class="result-chart-added" title="Already on this chart">&#128200;&#10003;</span>
+                                        {{else}}
+                                            <a href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
+                                        {{end}}
                                     {{end}}
                                     {{/* Shown only when the screen is narrow enough that the sidebar
                                          preview is hidden; opens the card art in a lightbox. */}}

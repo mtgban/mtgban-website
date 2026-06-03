@@ -33,6 +33,27 @@ type Dataset struct {
 	Color  string
 	AxisID string
 	Sealed bool
+
+	// Reference identifies which price source this dataset belongs to
+	// (e.g. "TCG Low", "Card Kingdom Buy"). In single-card charts it equals
+	// Name; in multi-card charts it's the grouping key the reference picker
+	// switches on while Name carries the card name for the legend.
+	Reference string
+}
+
+// multiCardPalette assigns a distinct color per card when several cards share
+// one chart. Picked to be distinguishable in both light and dark themes.
+var multiCardPalette = []string{
+	"rgb(54, 162, 235)",
+	"rgb(255, 99, 132)",
+	"rgb(75, 192, 192)",
+	"rgb(255, 159, 64)",
+	"rgb(153, 102, 255)",
+	"rgb(40, 167, 69)",
+	"rgb(220, 53, 69)",
+	"rgb(23, 162, 184)",
+	"rgb(255, 205, 86)",
+	"rgb(108, 117, 125)",
 }
 
 // getDateAxisValues generates daily date labels from today back to earliest.
@@ -125,10 +146,58 @@ func buildDataset(results map[string]timeseries.PriceRow, labels []string, confi
 		}
 	}
 	return Dataset{
-		Name:  config.PublicName,
-		Data:  data,
-		Color: config.Color,
+		Name:      config.PublicName,
+		Data:      data,
+		Color:     config.Color,
+		Reference: config.PublicName,
 	}
+}
+
+// getDatasetsForMulti returns one dataset per (card × reference) pair for a
+// multi-card chart, plus the list of distinct reference names that have at
+// least one non-empty dataset. Each card is assigned a stable color from
+// multiCardPalette so its line keeps the same color across reference switches.
+// Datasets with no data (e.g. references the card doesn't support) are skipped.
+func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
+	var datasets []Dataset
+	refSeen := map[string]bool{}
+	var refOrder []string
+
+	for i, cardId := range cardIds {
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		cardName := co.Name
+		if !co.Sealed {
+			cardName = fmt.Sprintf("%s (%s)", co.Name, co.SetCode)
+			if co.Foil {
+				cardName += " Foil"
+			} else if co.Etched {
+				cardName += " Etched"
+			}
+		}
+		color := multiCardPalette[i%len(multiCardPalette)]
+
+		for _, ds := range getDatasets(ctx, cardId, co.Sealed, labels, lb) {
+			if len(ds.Data) == 0 {
+				continue
+			}
+
+			ds.Name = cardName
+			ds.Color = color
+			datasets = append(datasets, ds)
+
+			if !refSeen[ds.Reference] {
+				refSeen[ds.Reference] = true
+				refOrder = append(refOrder, ds.Reference)
+			}
+		}
+	}
+
+	return datasets, refOrder
 }
 
 // A default scale for converting non-NM prices to NM
