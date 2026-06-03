@@ -366,13 +366,14 @@
 }
 
 /* ── Nav search autocomplete dropdown ─────────────────────── */
-/* On open, square the pill's bottom corners so the menu attaches
-   seamlessly, matching the landing-page search. */
+/* On open, square only the bottom corners so the menu attaches seamlessly.
+   18px (half the 36px height) keeps the top ends at their unfocused pill
+   radius; using 999px here would clamp the top corners larger. */
 .nav2-search .autocomplete-items {
     z-index: 260;
 }
 .nav2-search.autocomplete:has(.autocomplete-items) input {
-    border-radius: 999px 999px 0 0;
+    border-radius: 18px 18px 0 0;
 }
 
 /* ── Narrow-width: fall back to the existing hamburger menu ── */
