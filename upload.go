@@ -1630,6 +1630,28 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 			record = append(record, se.Text())
 		})
 
+		// Look for the tcgplayer Id
+		var tcgId string
+		trId, _ := s.Attr("id")
+		fields := strings.Split(trId, "_")
+		if len(fields) > 1 {
+			tcgId = fields[1]
+		}
+
+		// Override header map and save relevant fields
+		if mtgmatcher.ExternalUUID(tcgId) != "" {
+			record[5] = tcgId
+
+			record[2] = "Normal"
+			if strings.Contains(s.Find("td").Text(), "[Foil]") {
+				record[2] = "Foil"
+			}
+
+			// Update map header
+			indexMap["id"] = 5
+			indexMap["printing"] = 2
+		}
+
 		res, err := parseRow(indexMap, record)
 		if err != nil {
 			return true
