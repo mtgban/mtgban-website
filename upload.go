@@ -1636,34 +1636,30 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 
 		record := make([]string, len(header))
 		s.Find("td").Each(func(i int, se *goquery.Selection) {
-			if i == 4 {
-				return
-			}
 			record[i] = se.Text()
-
-			// Override the Game category with the id found in the URL
-			// Example: https://www.tcgplayer.com/product/614282/optional-card-name
-			if i == 3 {
-				tcgURL, found := se.Find("a").Attr("href")
-				if !found {
-					return
-				}
-				fields := strings.Split(tcgURL, "/")
-				for _, field := range fields {
-					if mtgmatcher.ExternalUUID(field) != "" {
-						record[4] = field
-						if strings.Contains(record[i], "[Foil]") {
-							record[2] = "Foil"
-						}
-
-						// Update map header
-						indexMap["id"] = 4
-						indexMap["printing"] = 2
-						break
-					}
-				}
-			}
 		})
+
+		// Look for the tcgplayer Id
+		var tcgId string
+		trId, _ := s.Attr("id")
+		fields := strings.Split(trId, "_")
+		if len(fields) > 1 {
+			tcgId = fields[1]
+		}
+
+		// Override header map and save relevant fields
+		if mtgmatcher.ExternalUUID(tcgId) != "" {
+			record[5] = tcgId
+
+			record[2] = "Normal"
+			if strings.Contains(s.Find("td").Text(), "[Foil]") {
+				record[2] = "Foil"
+			}
+
+			// Update map header
+			indexMap["id"] = 5
+			indexMap["printing"] = 2
+		}
 
 		res, err := parseRow(indexMap, record)
 		if err != nil {
