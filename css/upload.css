@@ -124,6 +124,53 @@
     color: var(--text-dim);
 }
 
+/* ── Singles / Sealed Tabs ── */
+.upload-tabs {
+    display: flex;
+    gap: 0.25em;
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: 1em;
+}
+
+.upload-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.6em 1.2em;
+    font-size: var(--text-md);
+    font-weight: 500;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.upload-tab:hover {
+    color: var(--activetext);
+}
+
+.upload-tab.active {
+    color: var(--activetext);
+    border-bottom-color: var(--dodgerblue);
+    font-weight: 600;
+}
+
+.upload-store-area {
+    flex: 1;
+    min-width: 0;
+}
+
+.upload-store-hidden {
+    display: none;
+}
+
+.upload-sealed-note {
+    display: block;
+    font-size: var(--text-base);
+    color: var(--text-dim);
+    margin-top: 0.6em;
+}
+
 /* ── Store Selector Grid ── */
 .upload-store-grid {
     display: grid;
