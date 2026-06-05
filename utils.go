@@ -919,12 +919,22 @@ func getTCGSimulationIQR(productId string) float64 {
 func scraperName(shorthand string) string {
 	for _, seller := range GetSellers() {
 		if shorthand == seller.Info().Shorthand {
-			return seller.Info().Name
+			name := seller.Info().Name
+			override, found := Config.ScraperConfig.NameOverride[seller.Info().Name]
+			if found {
+				name = override
+			}
+			return name
 		}
 	}
 	for _, vendor := range GetVendors() {
 		if shorthand == vendor.Info().Shorthand {
-			return vendor.Info().Name
+			name := vendor.Info().Name
+			override, found := Config.ScraperConfig.NameOverride[vendor.Info().Name]
+			if found {
+				name = override
+			}
+			return name
 		}
 	}
 	return ""
