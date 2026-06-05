@@ -111,16 +111,6 @@
             <div class="sealed-main" id="sealed-main">
                 <h1>Sealed Products</h1>
 
-                <div class="sealed-toolbar">
-                    <form class="sealed-search-form autocomplete" id="searchform" action="/sealed" method="get" autocomplete="off" spellcheck="false">
-                        <input id="searchbox" class="sealed-search" type="text" name="q" placeholder="Search for a product..." autocomplete="off" autocapitalize="none" maxlength="1000">
-                    </form>
-                    <a id="sealed-surprise" href="#">Surprise Me</a>
-                </div>
-                <script type="text/javascript">
-                    autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
-                </script>
-
                 {{range $key := .EditionSort}}
                     {{$editionList := index $.EditionList $key}}
                     <div class="sealed-section" id="sealed-{{slug $key}}">
