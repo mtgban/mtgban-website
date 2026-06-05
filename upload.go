@@ -671,14 +671,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Search — fetch card and sealed prices separately then merge
 	var results map[string]map[string]*BanPrice
 	var credits map[string]float64
-	enabledSealedStores := sealedSellers
+	sealedStores := r.Form["sealed_stores"]
+	enabledSealedStores := filterEnabledStores(sealedStores, sealedSellers, canChangeStores)
 	if blMode {
 		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
-		enabledSealedStores = sealedVendors
+		enabledSealedStores = filterEnabledStores(sealedStores, sealedVendors, canChangeStores)
 
 		// Fetch sealed vendor prices and merge
-		if len(sealedProductIds) > 0 && len(sealedVendors) > 0 {
-			sealedResults := getVendorPrices("", sealedVendors, "", sealedProductIds, "", false, false, true, tagPref)
+		if len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
+			sealedResults := getVendorPrices("", enabledSealedStores, "", sealedProductIds, "", false, false, true, tagPref)
 			for cardId, stores := range sealedResults {
 				if results[cardId] == nil {
 					results[cardId] = map[string]*BanPrice{}
@@ -700,8 +701,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 
 		// Fetch sealed seller prices and merge
-		if len(sealedProductIds) > 0 && len(sealedSellers) > 0 {
-			sealedResults := getSellerPrices("", sealedSellers, "", sealedProductIds, "", false, false, true, tagPref)
+		if len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
+			sealedResults := getSellerPrices("", enabledSealedStores, "", sealedProductIds, "", false, false, true, tagPref)
 			for cardId, stores := range sealedResults {
 				if results[cardId] == nil {
 					results[cardId] = map[string]*BanPrice{}
@@ -711,6 +712,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+	}
+
+	// Save user preferred sealed stores in cookies, mirroring singles above
+	if blMode {
+		setForeverCookie(w, "enabledSealedVendors", strings.Join(enabledSealedStores, "|"))
+		pageVars.EnabledSealedVendors = enabledSealedStores
+	} else {
+		setForeverCookie(w, "enabledSealedSellers", strings.Join(enabledSealedStores, "|"))
+		pageVars.EnabledSealedSellers = enabledSealedStores
 	}
 
 	// Allow downloading data as CSV
