@@ -726,10 +726,6 @@ a.selected:hover{
     margin-left: 20px;
 }
 
-.search-input{
-    font-size: var(--text-2xl);
-}
-
 .search {
     padding: 8px 8px;
     display: inline-block;
