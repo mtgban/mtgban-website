@@ -71,11 +71,11 @@ type GenericCard struct {
 	Flag         string
 	LangTag      string
 
-	RarityColor  string
-	ScryfallURL  string
-	DeckboxURL   string
-	CKRestockURL string
-	SourceSealed []string
+	RarityColor       string
+	ScryfallURL       string
+	DeckboxURL        string
+	CKRestockURL      string
+	SourceSealed      []string
 	HotlistStore      string
 	Newspaper         bool
 	HasContentWarning bool
@@ -574,11 +574,11 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		Flag:         allLanguageFlags[co.Language],
 		LangTag:      mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
-		RarityColor:  rarityColor,
-		ScryfallURL:  scryfallURL,
-		DeckboxURL:   deckboxURL,
-		CKRestockURL: restockURL,
-		SourceSealed: sourceSealed,
+		RarityColor:       rarityColor,
+		ScryfallURL:       scryfallURL,
+		DeckboxURL:        deckboxURL,
+		CKRestockURL:      restockURL,
+		SourceSealed:      sourceSealed,
 		HotlistStore:      hotlistStore,
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
