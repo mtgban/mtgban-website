@@ -161,7 +161,7 @@
 }
 
 .upload-store-hidden {
-    display: none;
+    display: none !important;
 }
 
 .upload-sealed-note {
