@@ -141,6 +141,14 @@
         setJSON(RECENT_KEY, recent);
     }
 
+    // Current query: page box, navbar box, then the URL's q param.
+    function currentPageQuery() {
+        var sb = document.getElementById('searchbox') || document.getElementById('nav-searchbox');
+        if (sb && sb.value.trim()) return sb.value.trim();
+        try { return (new URLSearchParams(location.search).get('q') || '').trim(); }
+        catch (e) { return ''; }
+    }
+
     function parseUploadURL(s) {
         try {
             var u = new URL(s);
@@ -878,9 +886,7 @@
 
         // Conditionally add "Save Current Search".
         var hasComposed   = chips && chips.count() > 0 && chips.composedQuery();
-        var sb            = document.getElementById('searchbox');
-        var hasSearchbox  = sb && sb.value && sb.value.trim();
-        if (hasComposed || hasSearchbox) {
+        if (hasComposed || currentPageQuery()) {
             cmds.push({
                 name: 'Save Current Search', icon: 'bookmark-plus',
                 keywords: ['save', 'bookmark', 'store', 'command'],
@@ -1806,8 +1812,7 @@
         if (chips && chips.count() > 0) {
             queryToSave = chips.composedQuery();
         } else {
-            var sb = document.getElementById('searchbox');
-            queryToSave = sb ? sb.value.trim() : '';
+            queryToSave = currentPageQuery();
         }
         if (!queryToSave) { showToast('No search to save'); return; }
 

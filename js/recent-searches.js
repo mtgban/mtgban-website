@@ -230,16 +230,18 @@
         }
     };
 
-    // Record search on form submit
+    // Record search on form submit (page bars and navbar share this store)
     function hookFormSubmit() {
-        var form = document.getElementById('searchform');
-        if (!form) return;
-
-        form.addEventListener('submit', function() {
-            var input = document.getElementById('searchbox');
-            if (input && input.value.trim()) {
-                addSearch(input.value);
-            }
+        var pairs = [['searchform', 'searchbox'], ['nav-searchform', 'nav-searchbox']];
+        pairs.forEach(function(ids) {
+            var form = document.getElementById(ids[0]);
+            if (!form) return;
+            form.addEventListener('submit', function() {
+                var input = document.getElementById(ids[1]);
+                if (input && input.value.trim()) {
+                    addSearch(input.value);
+                }
+            });
         });
     }
 
