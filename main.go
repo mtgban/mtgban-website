@@ -165,6 +165,11 @@ type PageVars struct {
 	Datasets        []Dataset
 	Checkpoints     []ChartCheckpoint
 	ChartID         string
+	ChartIDs        []string
+	ChartIDsCSV     string
+	IsMultiChart    bool
+	ChartReferences []string
+	ModalMode       bool
 	Alternative     string
 	StocksURL       string
 	AltEtchedId     string
@@ -1095,10 +1100,30 @@ func main() {
 	ServerNotify("shutdown", "Server shutdown correctly")
 }
 
+func inList(haystack []string, needle string) bool {
+	return slices.Contains(haystack, needle)
+}
+
+// csvWithout returns csv with `drop` and any empty entries removed. Used by
+// the templates to build "remove this card" URLs that strip one entry from the
+// chart roster while keeping the rest in order.
+func csvWithout(csv, drop string) string {
+	parts := strings.Split(csv, ",")
+	out := parts[:0]
+	for _, p := range parts {
+		if p != "" && p != drop {
+			out = append(out, p)
+		}
+	}
+	return strings.Join(out, ",")
+}
+
 var funcMap = template.FuncMap{
 	"inc": func(i, j int) int {
 		return i + j
 	},
+	"in_list":     inList,
+	"csv_without": csvWithout,
 	"dec": func(i, j int) int {
 		return i - j
 	},
