@@ -69,9 +69,6 @@
 
 {{define "sidebar-search"}}
 <div class="sidebar-search">
-    <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
-        <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
-    </form>
     <div class="search-sort-row">
         {{if .NoSort}}
             <span class="search-sort-label">Sort from syntax</span>
@@ -99,9 +96,6 @@
             </span>
         </div>
     {{end}}
-    <script type="text/javascript">
-        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
-    </script>
 </div>
 {{end}}
 
@@ -339,7 +333,7 @@
                 <div class="search-sidebar">
                     {{template "sidebar-search" .}}
                     <div class="sidebar-body">
-                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox');input.focus();input.setSelectionRange(0,input.value.length);">
+                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
                             <img class="sidebar-card-img" id="cardImage" src=""/>
                         </div>
                         <div class="sidebar-printings" id="printings"></div>
@@ -931,7 +925,7 @@
         var headers = document.querySelectorAll('.result-header');
         if (headers.length === 0) return;
 
-        var searchbox = document.getElementById('searchbox');
+        var searchbox = document.getElementById('searchbox') || document.getElementById('nav-searchbox');
 
         var STICKY_OFFSET = 77; // nav-height(56) + cover(21)
         var currentIdx = 0;
