@@ -34,6 +34,10 @@
                         <h2>Select Mode &amp; Stores</h2>
                     </div>
 
+                    <div class="upload-tabs" id="uploadTabs">
+                        <button type="button" class="upload-tab active" id="tab-singles" onclick="selectTab('singles')">Singles</button>
+                        <button type="button" class="upload-tab" id="tab-sealed" onclick="selectTab('sealed')">Sealed</button>
+                    </div>
                     <div class="upload-mode-stores-row">
                         <div class="upload-mode-col">
                             <div class="upload-mode-toggle">
@@ -52,7 +56,10 @@
                                 <span class="upload-mode-hint">Buylist access requires Legacy tier</span>
                             {{end}}
                         </div>
-                        <div class="upload-store-grid" id="storesBox">
+                        <div class="upload-store-area">
+                            <div class="upload-store-grid" id="singlesBox"></div>
+                            <div class="upload-store-grid upload-store-hidden" id="sealedBox"></div>
+                            <span class="upload-sealed-note upload-store-hidden" id="sealedNote">Sealed products in your upload are priced with these stores.</span>
                         </div>
                     </div>
                     {{if not .CanChangeStores}}
