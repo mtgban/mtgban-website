@@ -1147,8 +1147,8 @@ func parseHeader(first []string) (map[string]int, error) {
 	for i, field := range first {
 		field = strings.ToLower(field)
 		switch {
-		// Skip "tcgplayer id" because it could mean SKU or Product, and the two systems often overlap
-		case field == "id" || strings.Contains(field, "uuid") || (strings.Contains(field, "id") && field != "tcgplayer id" && (strings.Contains(field, "tcg") || strings.Contains(field, "scryfall"))):
+		// This should cover "uuid", "identifier", and so on
+		case strings.Contains(field, "id"):
 			_, found := indexMap["id"]
 			if !found {
 				indexMap["id"] = i
@@ -1444,7 +1444,24 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 		res.Notes = notes
 	}
 
-	cardId, err := mtgmatcher.Match(&res.Card)
+	var cardId string
+	var err error
+
+	// Try looking up using the TCGSkuId if we found an id and it's not among
+	// the supported ones - this needs to happen before the normal Match
+	// or name matching might interfere with actual results
+	if res.Card.Id != "" && mtgmatcher.ExternalUUID(res.Card.Id) == "" {
+		for _, store := range []string{"TCGSealed", "TCGPlayer"} {
+			cardId = instanceId2UUID(store, res.Card.Id)
+			if cardId != "" {
+				break
+			}
+		}
+	}
+
+	if cardId == "" {
+		cardId, err = mtgmatcher.Match(&res.Card)
+	}
 
 	var alias *mtgmatcher.AliasingError
 	if errors.As(err, &alias) {

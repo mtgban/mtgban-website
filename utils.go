@@ -292,6 +292,19 @@ func findInstanceId(sellerName, cardId, cond string) string {
 	return ""
 }
 
+// Convert instance id (sku) to card id for a given store
+func instanceId2UUID(sellerName, instanceId string) string {
+	store, _ := findSellerInventory(sellerName)
+	for uuid, entries := range store {
+		for _, entry := range entries {
+			if entry.InstanceId == instanceId {
+				return uuid
+			}
+		}
+	}
+	return ""
+}
+
 // Look for the original id (product id) of a card in a given inventory
 func findOriginalId(sellerName, cardId string) string {
 	tcgplayer, _ := findSellerInventory(sellerName)
