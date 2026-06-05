@@ -4,6 +4,41 @@
 {{end}}
 
 {{define "content"}}
+    <!-- Shared by input and results pages: inject optimizer settings (cookies) as hidden upload_form inputs -->
+    <script type="text/javascript">
+    function syncUploadOptionsFromSettings() {
+        var form = document.getElementById('upload_form');
+        if (!form) return;
+        // Remove any previously-injected hidden inputs
+        form.querySelectorAll('[data-injected-opt]').forEach(function (el) { el.remove(); });
+        function add(name, val) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = name;
+            inp.value = val == null ? '' : val;
+            inp.dataset.injectedOpt = '1';
+            form.appendChild(inp);
+        }
+        var optsRaw = getCookie('UploadOptimizerOpts');
+        var opts = (optsRaw === null || optsRaw === '')
+            ? ['lowval', 'lowvalabs', 'minmargin', 'customperc']
+            : optsRaw.split(',').filter(Boolean);
+        ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
+            if (opts.indexOf(k) >= 0) add(k, 'true');
+        });
+        add('percspread',     getCookie('UploadPercSpread')    || '60');
+        add('percspreadmax',  getCookie('UploadPercSpreadMax') || '0');
+        add('minval',         getCookie('UploadMinVal')        || '1');
+        add('maxval',         getCookie('UploadMaxVal')        || '0');
+        add('margin',         getCookie('UploadMargin')        || '10');
+        add('custompercmax',  getCookie('UploadCustomPercMax') || '100');
+        add('multiplier',     getCookie('UploadMultiplier')    || '1');
+        add('maxqty',         getCookie('UploadMaxQty')        || '0');
+        add('sorting',        getCookie('UploadSorting')       || '');
+        add('altPrice',       getCookie('UploadAltPrice')      || '');
+        add('pricesource',    getCookie('UploadPriceSource')   || '');
+    }
+    </script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
@@ -138,38 +173,6 @@
                         const hiddenBools = [
                             "upload", "download", "estimate", "deckbox", "tcgplayer_csv"
                         ];
-                        function syncUploadOptionsFromSettings() {
-                            var form = document.getElementById('upload_form');
-                            if (!form) return;
-                            // Remove any previously-injected hidden inputs
-                            form.querySelectorAll('[data-injected-opt]').forEach(function (el) { el.remove(); });
-                            function add(name, val) {
-                                var inp = document.createElement('input');
-                                inp.type = 'hidden';
-                                inp.name = name;
-                                inp.value = val == null ? '' : val;
-                                inp.dataset.injectedOpt = '1';
-                                form.appendChild(inp);
-                            }
-                            var optsRaw = getCookie('UploadOptimizerOpts');
-                            var opts = (optsRaw === null || optsRaw === '')
-                                ? ['lowval', 'lowvalabs', 'minmargin', 'customperc']
-                                : optsRaw.split(',').filter(Boolean);
-                            ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
-                                if (opts.indexOf(k) >= 0) add(k, 'true');
-                            });
-                            add('percspread',     getCookie('UploadPercSpread')    || '60');
-                            add('percspreadmax',  getCookie('UploadPercSpreadMax') || '0');
-                            add('minval',         getCookie('UploadMinVal')        || '1');
-                            add('maxval',         getCookie('UploadMaxVal')        || '0');
-                            add('margin',         getCookie('UploadMargin')        || '10');
-                            add('custompercmax',  getCookie('UploadCustomPercMax') || '100');
-                            add('multiplier',     getCookie('UploadMultiplier')    || '1');
-                            add('maxqty',         getCookie('UploadMaxQty')        || '0');
-                            add('sorting',        getCookie('UploadSorting')       || '');
-                            add('altPrice',       getCookie('UploadAltPrice')      || '');
-                            add('pricesource',    getCookie('UploadPriceSource')   || '');
-                        }
                         function submitForm(field, newWindow) {
                             hiddenBools.forEach(element => {
                                 let formField = document.getElementById(element);
