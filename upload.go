@@ -137,6 +137,24 @@ type OptimizedUploadEntry struct {
 	Profitability float64
 }
 
+// filterEnabledStores intersects submitted stores with the allowed list.
+// A locked user, or a submission that resolves to nothing, gets the full list.
+func filterEnabledStores(submitted, allowed []string, canChange bool) []string {
+	if !canChange {
+		return allowed
+	}
+	var out []string
+	for _, store := range submitted {
+		if slices.Contains(allowed, store) {
+			out = append(out, store)
+		}
+	}
+	if len(out) == 0 {
+		return allowed
+	}
+	return out
+}
+
 func Upload(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
