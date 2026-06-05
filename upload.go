@@ -673,9 +673,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var credits map[string]float64
 	sealedStores := r.Form["sealed_stores"]
 	enabledSealedStores := filterEnabledStores(sealedStores, sealedSellers, canChangeStores)
+	if len(sealedStores) == 0 && canChangeStores {
+		enabledSealedStores = pageVars.EnabledSealedSellers
+	}
 	if blMode {
 		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 		enabledSealedStores = filterEnabledStores(sealedStores, sealedVendors, canChangeStores)
+		if len(sealedStores) == 0 && canChangeStores {
+			enabledSealedStores = pageVars.EnabledSealedVendors
+		}
 
 		// Fetch sealed vendor prices and merge
 		if len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
