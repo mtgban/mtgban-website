@@ -6,7 +6,6 @@
 /* Keep search content at the original (pre-bump) font scale,
    without affecting the navbar which uses the global scale */
 .search-layout,
-.search-bar-sticky,
 .search-landing,
 .sealed-layout {
     --text-2xs:  0.5625rem; /* 9px  */
@@ -63,88 +62,6 @@
     padding-right: 16px;
 }
 
-
-/* ═══ Search bar (spans full width above grid) ═══ */
-/* --search-bar-h is used by the sidebar to clear the sticky bar */
-.search-bar-sticky {
-    position: sticky;
-    top: var(--nav-height, 48px);
-    z-index: 50;
-    background: var(--background);
-    padding-top: 6px;
-    padding-bottom: 4px;
-}
-
-.search-input-row {
-    display: flex;
-    align-items: center;
-    position: relative;
-    margin-bottom: 10px;
-}
-
-.search-bar-wrap form,
-.search-bar-wrap form.autocomplete {
-    flex: 1;
-    display: flex;
-    min-width: 0;
-    width: auto;
-    position: relative;
-}
-.search-bar-wrap .search-input,
-.search-bar-wrap input.search-input {
-    flex: 1;
-    padding: 14px 14px 14px 14px;
-    border-radius: var(--radius-lg, 10px);
-    border: 1px solid var(--border-moderate, rgba(255,255,255,0.12));
-    background: var(--search-surface-1);
-    color: var(--normal);
-    font-size: var(--text-xl);
-    outline: none;
-    font-family: inherit;
-    transition: border-color 0.12s;
-    width: 100%;
-    box-sizing: border-box;
-}
-.search-bar-wrap .search-input:focus {
-    border-color: var(--search-link);
-}
-.search-bar-wrap .autocomplete:has(.autocomplete-items) .search-input {
-    border-radius: var(--radius-lg, 10px) var(--radius-lg, 10px) 0 0;
-    transition: border-radius 0.15s;
-}
-.search-bar-wrap .search-input::placeholder {
-    color: var(--search-text-dim);
-}
-
-.search-actions {
-    position: absolute;
-    right: 6px; top: 50%; transform: translateY(-50%);
-    display: flex;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid var(--border-subtle);
-    background: var(--surface-3);
-    z-index: 1;
-}
-.search-action-btn {
-    padding: 8px 12px;
-    background: transparent; border: none;
-    color: var(--activetext);
-    cursor: pointer; text-decoration: none;
-    transition: all 0.15s;
-    display: flex; align-items: center; justify-content: center;
-}
-.search-action-btn svg {
-    width: 20px; height: 20px;
-}
-.search-action-btn + .search-action-btn {
-    border-left: 1px solid var(--border-subtle);
-}
-.search-action-btn:hover {
-    background: var(--accent-muted);
-    color: var(--ainfo);
-    text-decoration: none;
-}
 
 .search-sort-row {
     display: flex;
@@ -268,27 +185,6 @@
     top: -20px;
     background: var(--background);
     z-index: 1;
-}
-.sidebar-search form.autocomplete {
-    position: relative;
-    display: block;
-    width: 100%;
-    margin-bottom: 8px;
-}
-.sidebar-search .search-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 8px 12px;
-    border-radius: var(--radius-md, 10px);
-    border: 1px solid var(--border-moderate);
-    background: var(--search-surface-1);
-    font-size: var(--text-lg);
-    color: var(--normal);
-    outline: none;
-}
-.sidebar-search .search-input:focus {
-    border-color: var(--accent-border, rgba(91,141,239,0.4));
-    box-shadow: 0 0 0 3px var(--accent-muted, rgba(91,141,239,0.12));
 }
 .sidebar-search .search-sort-row {
     padding-bottom: 8px;
@@ -1542,7 +1438,6 @@
         border-left: none;
         border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     }
-    .search-bar-wrap { padding: 12px 16px 0; }
     .search-results { padding: 16px 16px 60px; }
     .result-header { padding: 8px 10px; gap: 6px; }
     .price-row { --price-row-h: 34px; padding: 0 10px; }
@@ -1597,8 +1492,6 @@
 }
 
 @media (max-width: 600px) {
-    .search-input-row { flex-wrap: wrap; }
-    .search-actions { width: 100%; justify-content: center; }
     .result-quick-icons { width: 100%; justify-content: flex-start; }
     .result-set-title { margin-left: 0; width: 100%; }
 }
