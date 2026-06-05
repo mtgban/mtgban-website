@@ -187,26 +187,30 @@ type PageVars struct {
 	SealedIndexKeys   []string
 
 	// Additional sources for index keys if needed
-	AltKeys         []string
-	SellerKeys      []string
-	VendorKeys      []string
-	ModalSellerKeys []string
-	ModalVendorKeys []string
-	UploadEntries   []UploadEntry
-	IsBuylist       bool
-	TotalEntries    map[string]float64
-	EnabledSellers  []string
-	EnabledVendors  []string
-	CanBuylist      bool
-	CanChangeStores bool
-	RemoteLinkURL   string
-	TotalQuantity   int
-	Optimized       map[string][]OptimizedUploadEntry
-	OptimizedTotals map[string]float64
-	HighestTotal    float64
-	MissingCounts   map[string]int
-	MissingPrices   map[string]float64
-	ResultPrices    map[string]map[string]float64
+	AltKeys              []string
+	SellerKeys           []string
+	VendorKeys           []string
+	SealedSellerKeys     []string
+	SealedVendorKeys     []string
+	ModalSellerKeys      []string
+	ModalVendorKeys      []string
+	UploadEntries        []UploadEntry
+	IsBuylist            bool
+	TotalEntries         map[string]float64
+	EnabledSellers       []string
+	EnabledVendors       []string
+	EnabledSealedSellers []string
+	EnabledSealedVendors []string
+	CanBuylist           bool
+	CanChangeStores      bool
+	RemoteLinkURL        string
+	TotalQuantity        int
+	Optimized            map[string][]OptimizedUploadEntry
+	OptimizedTotals      map[string]float64
+	HighestTotal         float64
+	MissingCounts        map[string]int
+	MissingPrices        map[string]float64
+	ResultPrices         map[string]map[string]float64
 }
 
 type NavElem struct {
