@@ -270,8 +270,40 @@
         saveLayout();
     });
 
+    // Dropping a section button onto the Tools button itself demotes it
+    // into the dropdown grid — no need to open the dropdown first. The
+    // Tools button is highlighted while it's a valid drop target.
+    var toolsBtn = document.getElementById('tools-btn');
+    if (toolsBtn) {
+        toolsBtn.addEventListener('dragover', function(e) {
+            if (!dragged || !isNavBtn(dragged)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            clearIndicators();
+            toolsBtn.classList.add('swap-target');
+        });
+        toolsBtn.addEventListener('dragleave', function(e) {
+            if (e.target === toolsBtn) toolsBtn.classList.remove('swap-target');
+        });
+        toolsBtn.addEventListener('drop', function(e) {
+            if (!dragged || !isNavBtn(dragged)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var tool = dragged.getAttribute('data-tool');
+            grid.appendChild(createTile(tool));
+            dragged.remove();
+            clearIndicators();
+            saveLayout();
+        });
+    }
+
     Array.from(document.querySelectorAll('.tools-tile, .nav2-section-btn:not(.is-tools)')).forEach(attachSlotHandlers);
-    restoreLayout();
+    // Inline script in templates/partials/navbar.html now runs the
+    // initial restore synchronously before the browser paints, so we
+    // only fall through here if that flag was never set (e.g., page
+    // doesn't include the navbar partial, or running in an old cached
+    // template). Keeps behavior backward-compatible.
+    if (!window.__BAN_NAV_RESTORED) restoreLayout();
 })();
 
 // ── Context-aware nav search autocomplete ───────────────────

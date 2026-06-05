@@ -16,12 +16,10 @@
         </form>
     </div>
 
-    <div class="nav2-divider" aria-hidden="true"></div>
-
     <div class="nav2-sections">
         {{range .Nav}}
             {{if or (eq .Name "Search") (eq .Name "Sealed")}}
-                <a class="nav2-section-btn" href="{{.Link}}" data-tool="{{slug .Name}}">{{.Name}}</a>
+                <a class="nav2-section-btn" href="{{.Link}}" data-tool="{{slug .Name}}" data-icon="{{.Short}}" data-desc="{{.Description}}">{{.Name}}</a>
             {{end}}
         {{end}}
         <div class="nav2-tools-wrap">
@@ -100,4 +98,127 @@
     <hr class="ban-nav-mobile-divider">
     <a style="padding: 8px 12px; font-size: 0.85rem; color: var(--greytext); text-decoration: none;" href="#" onclick="window.location='/toggle-mobile?redirect='+encodeURIComponent(window.location.pathname+window.location.search); return false;">Switch to Mobile View</a>
 </div>
+
+<script>
+/*
+ * Synchronous, inline layout restoration. Runs IMMEDIATELY after the
+ * navbar DOM is parsed and BEFORE the browser paints — so the user
+ * never sees the server's default Search/Sealed layout flash before
+ * the user's customised section group renders. Pulls saved state from
+ * the same localStorage key the drag system writes (`mtgban_nav_layout_v1`).
+ *
+ * The deferred navbar.js still attaches drag handlers later in the
+ * load — this script only handles initial restoration.
+ */
+(function() {
+    var saved;
+    try { saved = JSON.parse(localStorage.getItem('mtgban_nav_layout_v1') || 'null'); } catch (e) { return; }
+    if (!saved || !Array.isArray(saved.sections) || !Array.isArray(saved.grid)) return;
+
+    var navSections = document.querySelector('.nav2-sections');
+    var grid = document.getElementById('tools-grid');
+    var toolsWrap = navSections && navSections.querySelector('.nav2-tools-wrap');
+    if (!navSections || !grid || !toolsWrap) return;
+
+    // Go's html/template percent-encodes non-ASCII attribute values
+    // for safety, so the emoji icons on Search/Sealed nav buttons
+    // arrive as e.g. "%f0%9f%a7%b1" instead of "🧱". Decode before
+    // using them as text content. The try/catch keeps things safe
+    // if a value somehow contains a stray '%'.
+    function decode(s) {
+        try { return s ? decodeURIComponent(s) : ''; } catch (e) { return s || ''; }
+    }
+
+    // Build a lookup of every navigable entry by reading whatever
+    // version of it the server happened to render (nav button for
+    // Search/Sealed via data-attrs, tile for everything else via
+    // children). Skip when we've already harvested an entry.
+    var info = {};
+    function read(el) {
+        var tool = el.getAttribute('data-tool');
+        if (!tool || info[tool]) return;
+        if (el.classList.contains('tools-tile')) {
+            info[tool] = {
+                name: (el.querySelector('.tools-tile-name') || {}).textContent || '',
+                icon: (el.querySelector('.tools-tile-icon') || {}).textContent || '',
+                desc: (el.querySelector('.tools-tile-desc') || {}).textContent || '',
+                href: el.getAttribute('href') || '#',
+                admin: el.classList.contains('is-admin')
+            };
+        } else {
+            info[tool] = {
+                name: el.textContent.trim(),
+                icon: decode(el.getAttribute('data-icon')),
+                desc: decode(el.getAttribute('data-desc')),
+                href: el.getAttribute('href') || '#',
+                admin: false
+            };
+        }
+    }
+    document.querySelectorAll('.nav2-sections .nav2-section-btn:not(.is-tools), #tools-grid .tools-tile').forEach(read);
+
+    function mkSection(tool) {
+        var e = info[tool]; if (!e) return null;
+        var a = document.createElement('a');
+        a.className = 'nav2-section-btn';
+        a.setAttribute('data-tool', tool);
+        a.setAttribute('data-icon', e.icon);
+        a.setAttribute('data-desc', e.desc);
+        a.setAttribute('href', e.href);
+        a.textContent = e.name;
+        return a;
+    }
+    function mkTile(tool) {
+        var e = info[tool]; if (!e) return null;
+        var a = document.createElement('a');
+        a.className = 'tools-tile' + (e.admin ? ' is-admin' : '');
+        a.setAttribute('data-tool', tool);
+        a.setAttribute('href', e.href);
+        a.innerHTML =
+            '<span class="tools-tile-icon">' + e.icon + '</span>' +
+            '<span class="tools-tile-text">' +
+                '<span class="tools-tile-name">' + e.name + '</span>' +
+                '<span class="tools-tile-desc">' + e.desc + '</span>' +
+            '</span>';
+        return a;
+    }
+
+    // Wipe and rebuild — this is a single synchronous DOM mutation
+    // before paint, so no intermediate state is visible.
+    navSections.querySelectorAll('.nav2-section-btn:not(.is-tools)').forEach(function(el) { el.remove(); });
+    grid.querySelectorAll('.tools-tile').forEach(function(el) { el.remove(); });
+
+    saved.sections.forEach(function(tool) {
+        var el = mkSection(tool); if (el) navSections.insertBefore(el, toolsWrap);
+    });
+    saved.grid.forEach(function(tool) {
+        var el = mkTile(tool); if (el) grid.appendChild(el);
+    });
+
+    // Flag for navbar.js so it skips its own restoreLayout pass —
+    // otherwise it would wipe and re-create everything we just placed.
+    window.__BAN_NAV_RESTORED = true;
+})();
+
+/*
+ * Pre-resolve the settings gear's enabled/disabled state synchronously
+ * so it doesn't transition from "is-disabled" → enabled when settings.js
+ * runs at end-of-body. The list mirrors PAGE_BINDINGS in settings.js —
+ * paths whose handlers wire up bindings should appear here.
+ */
+(function() {
+    var SETTINGS_PATHS = ['/search', '/sealed', '/arbit', '/global', '/reverse', '/sleepers', '/newspaper', '/upload'];
+    var p = location.pathname;
+    var hasSettings = SETTINGS_PATHS.some(function(prefix) {
+        return p === prefix || p.indexOf(prefix + '/') === 0;
+    });
+    if (!hasSettings) return;
+    var btn = document.getElementById('nav-settings-btn');
+    if (!btn) return;
+    btn.classList.remove('is-disabled');
+    btn.removeAttribute('aria-disabled');
+    btn.removeAttribute('tabindex');
+    btn.title = 'Settings (Ctrl+,)';
+})();
+</script>
 {{end}}

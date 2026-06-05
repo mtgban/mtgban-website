@@ -18,12 +18,16 @@
     position: relative;
     box-sizing: border-box;
     width: 100%;
-    /* Match the page content band so the bar aligns with the body. */
-    max-width: var(--page-max-width);
+    /* Fixed 1000px band, centered on the page regardless of viewport
+       width. At narrower viewports the band shrinks too, but always
+       keeps 16px of breathing room on each side so it never glues to
+       the edge. Search bar absorbs leftover space; when too many
+       section buttons are present it shrinks down (see .nav2-search). */
+    max-width: min(1000px, calc(100% - 32px));
     height: 100%;
     display: flex; align-items: center;
     padding: 0;
-    gap: 22px;
+    gap: 10px;
 }
 
 /* ── Brand / logo ─────────────────────────────────────────── */
@@ -35,15 +39,36 @@
     padding: 4px 6px;
     border-radius: var(--radius-sm, 6px);
     transition: background 0.12s;
+    /* Pair with margin-right: auto on .nav2-utility to split any
+       slack equally between the left of brand and the right of utility
+       — keeps the navbar visually centered as section buttons are
+       added or removed. Auto margins only consume slack; if the search
+       bar has absorbed it all, these collapse to zero. */
+    margin-left: auto;
 }
 .nav2-brand:hover { background: var(--surface-3, var(--navbackground)); }
 .nav2-brand img { width: 28px; height: 28px; }
 .nav2-brand-text {
-    font-family: var(--font-mono);
+    /* font-family inherited from .navbar-v2 system stack below so the
+       brand width doesn't change when Geist eventually loads — that
+       width change rippled through flex to the search bar on Firefox. */
     font-weight: 700;
     font-size: var(--text-4xl);
     letter-spacing: -0.01em;
     color: var(--normal);
+}
+
+/* Use a system font stack for the navbar text so no async font load
+   can swap mid-render and ripple through the flex layout to the
+   search bar. Geist still applies to the rest of the page; only
+   navbar labels and the search input are pinned to the system stack.
+   This eliminates the Firefox first-paint search-bar jump caused by
+   late font-metric adoption.
+   !important is needed because main.css sets `* { font-family: Geist }`
+   and several navbar elements have their own Geist declarations. */
+.navbar-v2,
+.navbar-v2 * {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
 }
 .nav2-brand-text .ban {
     color: #ff5e5e;
@@ -53,20 +78,17 @@
 /* ── Search bar ───────────────────────────────────────────── */
 .nav2-search {
     position: relative;
-    /* Bounded width after the brand; the right cluster is pushed to the edge. */
-    flex: 0 1 520px;
-    min-width: 160px;
-    max-width: 520px;
-    /* Guaranteed gap so a full section cluster never crowds the search bar. */
-    margin-right: 16px;
-}
-.nav2-divider {
-    width: 1px;
-    height: 22px;
-    background: var(--border-subtle, rgba(0,0,0,0.10));
-    /* Left auto pushes the divider + sections + utility flush to the right. */
-    margin: 0 8px 0 auto;
-    flex-shrink: 0;
+    /* Grow to fill leftover space, but shrink hard when sections grow
+       (more promoted buttons → narrower search). 80px floor keeps the
+       icon + a couple chars visible even at the 5-button cap. Section
+       buttons keep priority: search is capped at 480px so any further
+       slack sits between the cluster and utility (auto-margin) rather
+       than ballooning the input. The narrow-viewport media query below
+       drops this cap when sections are hidden, so the search bar fills
+       the bar end-to-end. */
+    flex: 1 1 240px;
+    min-width: 80px;
+    max-width: 480px;
 }
 .nav2-search-icon {
     position: absolute;
@@ -135,13 +157,21 @@
 
 /* ── Utility icon group (right side) ─────────────────────── */
 .nav2-spacer { display: none; }
-/* Pulled toward the section buttons with a negative margin so the
-   gap between Tools and the first utility icon is tighter than the
-   default 22px inner-flex gap. */
 .nav2-utility {
     display: flex; align-items: center; gap: 4px;
     flex-shrink: 0;
-    margin-left: -14px;
+    /* margin-left: -10 cancels the 10px inner-flex gap so the Guide ?
+       icon sits flush against the Tools button. margin-right: auto
+       pairs with .nav2-brand's margin-left: auto to split any slack
+       evenly between the two ends — keeps the bar centered when the
+       section group shrinks (items dragged out). At narrow viewport
+       sections are hidden and search has no max-width, so all slack is
+       absorbed by the search bar before any auto-margin sees it. */
+    margin-left: -10px;
+    margin-right: auto;
+}
+@media (max-width: 900px) {
+    .nav2-utility { margin-left: 0; }
 }
 .nav2-icon-btn {
     display: inline-flex; align-items: center; justify-content: center;
@@ -158,6 +188,28 @@
     background: var(--surface-3, var(--navbackground));
     color: var(--normal);
 }
+/* Match the hamburger button's footprint and hover state to the
+   Guide ? and Settings gear icons — main.css gives it a visible
+   border and accent hover, which clashes with the borderless,
+   tinted-background look of the other utility icons. */
+.nav2-utility .ban-nav-hamburger {
+    border: none;
+    background: transparent;
+    color: var(--greytext);
+    font-size: var(--text-5xl);
+}
+.nav2-utility .ban-nav-hamburger:hover {
+    background: var(--surface-3, var(--navbackground));
+    border: none;
+    color: var(--normal);
+}
+/* Settings button uses the .ban-settings-btn class from settings-modal.css,
+   which adds padding: 7px AND a blue-accent (--ainfo) hover color. Inside
+   the navbar that padding blows the hit/hover box up to 50×50, and the
+   accent color makes the gear's hover state diverge from the other utility
+   icons. Override both so the gear matches the Guide ? icon exactly. */
+.nav2-utility .ban-settings-btn { padding: 0; }
+.nav2-utility .ban-settings-btn:hover { color: var(--normal); }
 
 /* ── Tools dropdown (mega menu) ───────────────────────────── */
 .nav2-tools-wrap {
@@ -248,7 +300,6 @@
     background: var(--surface-3);
     border-color: var(--accent-border, rgba(91,141,239,0.3));
     color: var(--normal);
-    transform: translateY(-1px);
 }
 .tools-quick-btn img {
     width: 18px; height: 18px;
@@ -278,7 +329,6 @@
 .tools-tile:hover {
     background: var(--surface-3);
     border-color: var(--accent-border, rgba(91,141,239,0.3));
-    transform: translateY(-1px);
 }
 .tools-tile-icon {
     font-size: 1.45rem;
@@ -300,10 +350,20 @@
     color: var(--greytext);
     line-height: 1.3;
 }
+/* The --greytext var resolves to a deep blue-grey that's fine on a
+   light background but reads too dim against the dark-theme tile
+   surface. Brighten both name and description for dark mode. */
+.dark-theme .tools-tile-name {
+    color: #f0f3fa;
+}
+.dark-theme .tools-tile-desc {
+    color: #b6bccc;
+}
 .tools-tile.is-admin {
     border-style: dashed;
 }
 .tools-tile.is-admin .tools-tile-name { color: #ff8855; }
+.dark-theme .tools-tile.is-admin .tools-tile-name { color: #ff8855; }
 
 /* ── Drag & drop reorder + swap ───────────────────────────── */
 .tools-tile,
@@ -369,6 +429,15 @@
     .nav2-section-btn { padding: 7px 10px; font-size: var(--text-sm); }
     .nav2-brand-text { display: none; }
 }
+
+/* When the section group fills with 4+ promoted buttons the search bar
+   shrinks below ~150px and starts to feel cramped — drop the brand
+   wordmark so the icon stands alone and the search bar reclaims ~90px.
+   :nth-child(4) on .nav2-sections matches the 4th non-Tools button
+   (the Tools wrap is always the last child so the math holds). */
+.nav2-inner:has(.nav2-sections > .nav2-section-btn:not(.is-tools):nth-child(4)) .nav2-brand-text {
+    display: none;
+}
 @media (max-width: 700px) {
     .nav2-sections .nav2-section-btn:not(.is-tools) { display: none; }
 }
@@ -387,10 +456,12 @@
 }
 
 /* ── Narrow-width: fall back to the existing hamburger menu ── */
-@media (max-width: 1000px) {
+@media (max-width: 900px) {
     .nav2-sections { display: none; }
-    .nav2-divider { display: none; }
     .ban-nav-hamburger { display: flex; }
+    /* No section buttons here, so let search absorb the full bar width
+       between brand and utility — no max-width, no trailing slack. */
+    .nav2-search { max-width: none; }
 }
 
 /* ── User badge in the Tools "Links" strip ────────────────── */

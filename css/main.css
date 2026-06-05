@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=optional');
 
 /* Ubuntu-ish Colour theme
    Dark brown - #332532
@@ -428,26 +428,48 @@ a.pagination {
 }
 .ban-nav-hamburger:hover { border-color: var(--accent-border, rgba(91,141,239,0.25)); color: var(--normal); }
 
-/* Mobile slide-out menu */
+/* Mobile slide-out menu.
+   Overlay and menu use the same 0.25s timing so they fade/slide off
+   in lock-step. Using visibility (rather than display: none) lets the
+   overlay's opacity transition actually play to completion on close,
+   and the visibility transition is delayed to the end of the duration
+   so the element stays interactive (and visually present) until the
+   menu has finished sliding off-screen. */
 .ban-nav-mobile-overlay {
-    display: none;
     position: fixed; inset: 0; z-index: 250;
     background: rgba(0,0,0,0.5);
-    opacity: 0; transition: opacity 0.2s;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.25s ease, visibility 0s linear 0.25s;
 }
-.ban-nav-mobile-overlay.open { display: block; opacity: 1; }
+.ban-nav-mobile-overlay.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    /* Inverse on open: flip visibility immediately so the fade-in plays. */
+    transition: opacity 0.25s ease, visibility 0s linear 0s;
+}
 
 .ban-nav-mobile-menu {
-    position: fixed; top: 0; right: -280px; z-index: 260;
+    position: fixed; top: 0; right: 0; z-index: 260;
     width: 280px; height: 100vh;
     background: var(--navbackground);
     border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     padding: 20px;
-    transition: right 0.25s ease;
     overflow-y: auto;
     visibility: hidden;
+    /* Slide via transform (GPU-composited, no layout thrash) — much
+       smoother than animating `right`, which was producing a final-
+       frame snap when the visibility flip landed. */
+    transform: translateX(100%);
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
 }
-.ban-nav-mobile-menu.open { right: 0; visibility: visible; }
+.ban-nav-mobile-menu.open {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.25s ease, visibility 0s linear 0s;
+}
 
 .ban-nav-mobile-close {
     display: flex; align-items: center; justify-content: center;
@@ -487,7 +509,7 @@ a.pagination {
 .ban-nav-mobile-ext a img { width: 22px; height: 22px; opacity: 0.7; }
 
 /* Responsive: collapse to hamburger */
-@media (max-width: 1000px) {
+@media (max-width: 900px) {
     .ban-nav-hamburger { display: flex; }
 }
 
