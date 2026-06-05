@@ -316,43 +316,69 @@
 
             window.reloadSelect = function(mode) {
                 localStorage.setItem("uploadMode", mode);
-                var selectBox = document.getElementById('storesBox');
-                if (selectBox) {
-                    const fields = [
-                        'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
-                    ];
+                const fields = [
+                    'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
+                ];
+                var singlesBox = document.getElementById('singlesBox');
+                if (singlesBox) {
                     if (mode == "buylist") {
-                        selectBox.innerHTML = " \
+                        singlesBox.innerHTML = " \
                             {{range .VendorKeys}} \
                                 <label class='upload-store-item'> \
                                     <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
                                 </label> \
                             {{end}} \
                         ";
-
-                        fields.forEach(element => {
-                            var btn = document.getElementById(element);
-                            if (btn) {
-                                btn.style.display = "inline"
-                            }
-                        })
-                    } else if (mode == "retail") {
-                        selectBox.innerHTML = " \
+                    } else {
+                        singlesBox.innerHTML = " \
                             {{range .SellerKeys}} \
                                 <label class='upload-store-item'> \
                                     <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
                                 </label> \
                             {{end}} \
                         ";
-
-                        fields.forEach(element => {
-                            var btn = document.getElementById(element);
-                            if (btn) {
-                                btn.style.display = "inline"
-                            }
-                        })
+                    }
+                    fields.forEach(element => {
+                        var btn = document.getElementById(element);
+                        if (btn) { btn.style.display = "inline"; }
+                    });
+                }
+                var sealedBox = document.getElementById('sealedBox');
+                if (sealedBox) {
+                    if (mode == "buylist") {
+                        sealedBox.innerHTML = " \
+                            {{range .SealedVendorKeys}} \
+                                <label class='upload-store-item'> \
+                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
+                                </label> \
+                            {{end}} \
+                        ";
+                    } else {
+                        sealedBox.innerHTML = " \
+                            {{range .SealedSellerKeys}} \
+                                <label class='upload-store-item'> \
+                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
+                                </label> \
+                            {{end}} \
+                        ";
+                    }
+                    if (!sealedBox.querySelector('input')) {
+                        sealedBox.innerHTML = "<span class='upload-mode-hint'>No sealed stores available for this mode.</span>";
                     }
                 }
+            };
+
+            window.selectTab = function(tab) {
+                var isSealed = (tab === 'sealed');
+                document.getElementById('tab-singles').classList.toggle('active', !isSealed);
+                document.getElementById('tab-sealed').classList.toggle('active', isSealed);
+                var singlesBox = document.getElementById('singlesBox');
+                var sealedBox = document.getElementById('sealedBox');
+                var sealedNote = document.getElementById('sealedNote');
+                if (singlesBox) singlesBox.classList.toggle('upload-store-hidden', isSealed);
+                if (sealedBox) sealedBox.classList.toggle('upload-store-hidden', !isSealed);
+                if (sealedNote) sealedNote.classList.toggle('upload-store-hidden', !isSealed);
+                try { localStorage.setItem('uploadTab', tab); } catch(e) {}
             };
 
             (function() {
@@ -432,6 +458,8 @@
                 }
                 reloadSelect(savedMode);
 
+                var savedTab = localStorage.getItem("uploadTab");
+                selectTab(savedTab === "sealed" ? "sealed" : "singles");
 
                 var gdocInput = document.getElementById('gdocURL');
                 if (gdocInput) {
