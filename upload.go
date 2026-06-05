@@ -344,6 +344,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Set the store names for the <select> box
 	pageVars.SellerKeys = allSellers
 	pageVars.VendorKeys = allVendors
+	pageVars.SealedSellerKeys = sealedSellers
+	pageVars.SealedVendorKeys = sealedVendors
 	pageVars.AltKeys = UploadIndexComparePriceList
 
 	// Load the preferred list of enabled stores for the <select> box
@@ -361,6 +363,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.EnabledVendors = allVendors
 	} else {
 		pageVars.EnabledVendors = strings.Split(enabledVendors, "|")
+	}
+
+	enabledSealedSellers := readCookie(r, "enabledSealedSellers")
+	if len(enabledSealedSellers) == 0 || !canChangeStores {
+		pageVars.EnabledSealedSellers = sealedSellers
+	} else {
+		pageVars.EnabledSealedSellers = strings.Split(enabledSealedSellers, "|")
+	}
+
+	enabledSealedVendors := readCookie(r, "enabledSealedVendors")
+	if len(enabledSealedVendors) == 0 || !canChangeStores {
+		pageVars.EnabledSealedVendors = sealedVendors
+	} else {
+		pageVars.EnabledSealedVendors = strings.Split(enabledSealedVendors, "|")
 	}
 
 	cachedGdocURL := readCookie(r, "gdocURL")
