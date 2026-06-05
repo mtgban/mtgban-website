@@ -751,15 +751,10 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 				}
 
 				icon := Config.ScraperConfig.Icons[seller.Info().Shorthand]
-				name := seller.Info().Name
-				override, found := Config.ScraperConfig.NameOverride[seller.Info().Name]
-				if found {
-					name = override
-				}
 
 				// Prepare all the deets
 				res := SearchEntry{
-					ScraperName: name,
+					ScraperName: scraperName(seller.Info().Shorthand),
 					Shorthand:   seller.Info().Shorthand,
 					Price:       entry.Price,
 					Quantity:    entry.Quantity,
@@ -833,14 +828,9 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 				}
 
 				icon := Config.ScraperConfig.Icons[vendor.Info().Shorthand]
-				name := vendor.Info().Name
-				override, found := Config.ScraperConfig.NameOverride[vendor.Info().Name]
-				if found {
-					name = override
-				}
 
 				res := SearchEntry{
-					ScraperName:  name,
+					ScraperName:  scraperName(vendor.Info().Shorthand),
 					Shorthand:    vendor.Info().Shorthand,
 					Price:        entry.BuyPrice,
 					Credit:       entry.BuyPrice * vendor.Info().CreditMultiplier,
