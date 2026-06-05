@@ -57,7 +57,6 @@
         {{template "search-sealed" .}}
     {{else}}
         {{if eq .SearchQuery ""}}
-            {{template "search-bar" .}}
             {{template "search-landing-panes" .}}
         {{else}}
             {{template "search-results" .}}
@@ -96,25 +95,6 @@
             </span>
         </div>
     {{end}}
-</div>
-{{end}}
-
-{{define "search-bar"}}
-<div class="page-standard search-bar-sticky">
-    <div class="search-bar-wrap">
-        <div class="search-input-row">
-            <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
-                <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
-            </form>
-            <div class="search-actions">
-                <button class="search-action-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
-                <a class="search-action-btn" href="/random{{if .IsSealed}}sealed{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
-            </div>
-        </div>
-    </div>
-    <script type="text/javascript">
-        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
-    </script>
 </div>
 {{end}}
 
@@ -165,7 +145,6 @@
 
 {{define "search-results"}}
     {{if not .AllKeys}}
-        {{template "search-bar" .}}
         <div class="page-standard" style="padding-top: 2em;">
             <p style="color: var(--activetext); font-size: var(--text-3xl);"><em>{{.InfoMessage}}</em></p>
         </div>
