@@ -425,6 +425,7 @@
                     document.getElementById('gdocURL').value = "";
                     var textArea = document.getElementById('textArea');
                     if (textArea) { textArea.value = ""; }
+                    try { localStorage.removeItem('uploadTextArea'); } catch(e) {}
                     const form = document.getElementById("upload_form");
                     form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
                     selectSource('file');
@@ -465,27 +466,48 @@
 
                 var gdocInput = document.getElementById('gdocURL');
                 if (gdocInput) {
+                    // Fires on any change (paste OR typing). Clearing
+                    // already-empty fields is a no-op, so it's safe to
+                    // run on every keystroke after the first.
                     gdocInput.addEventListener('input', function() {
-                        var url = this.value.trim();
-                        if (url && (url.includes("docs.google.com") || url.includes("store.tcgplayer.com") || url.includes("moxfield.com"))) {
-                            var fileInput = document.getElementById('file');
-                            if (fileInput) fileInput.value = "";
-                            document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
-                            var ta = document.getElementById('textArea');
-                            if (ta) ta.value = "";
-                            const form = document.getElementById("upload_form");
-                            form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
-                            enabledButtons();
-                        }
+                        if (!this.value.trim()) return;
+                        var fileInput = document.getElementById('file');
+                        if (fileInput) fileInput.value = "";
+                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                        document.getElementById('clearFileBtn').style.display = 'none';
+                        var ta = document.getElementById('textArea');
+                        if (ta) ta.value = "";
+                        try { localStorage.removeItem('uploadTextArea'); } catch(e) {}
+                        const form = document.getElementById("upload_form");
+                        form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
+                        selectSource('url');
+                        enabledButtons();
                     });
                 }
 
                 var textAreaEl = document.getElementById('textArea');
                 if (textAreaEl) {
                     textAreaEl.addEventListener('input', function() {
-                        if (this.value.trim()) {
+                        if (!this.value.trim()) {
                             enabledButtons();
+                            return;
                         }
+                        // Symmetric with the URL/file handlers: any
+                        // content here means text is the active source,
+                        // so clear URL + file. localStorage stays
+                        // populated via the inline oninput attribute on
+                        // the textarea — the user's typed text is the
+                        // payload we want to remember.
+                        var urlInput = document.getElementById('gdocURL');
+                        if (urlInput) urlInput.value = "";
+                        var fileInput = document.getElementById('file');
+                        if (fileInput) fileInput.value = "";
+                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                        document.getElementById('clearFileBtn').style.display = 'none';
+                        const form = document.getElementById("upload_form");
+                        form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
+                        selectSource('text');
+                        enabledButtons();
                     });
                 }
             };
