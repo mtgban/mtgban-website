@@ -445,7 +445,7 @@ func cacheNewspaper() {
 			continue
 		}
 
-		query := next[i].Query + " AND game_name = '" + game + "' ORDER BY ranking ASC;"
+		query := strings.ReplaceAll(next[i].Query, "__GAME__", game) + " ORDER BY ranking ASC;"
 
 		results, err := getResults(NewNewspaperDB, query)
 		if err != nil {
@@ -555,8 +555,13 @@ var newspaperPagesInitial = []NewspaperPage{
                        bucket_name, bucket_rank,
                        ck_retail_price, tcg_market_price, ck_buy_price
                   FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards
-                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
-                                      FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards)`,
+                 WHERE game_name = '__GAME__'
+                   AND calc_date = (SELECT MAX(calc_date)
+                                      FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards
+                                     WHERE game_name = '__GAME__'
+                                       AND calc_date <= (SELECT MAX(calc_date)
+                                                           FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards
+                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')`,
 		Sort: "ranking ASC",
 		Head: []Heading{
 			{
@@ -636,8 +641,13 @@ var newspaperPagesInitial = []NewspaperPage{
                        bucket_name, bucket_rank,
                        current_price
                   FROM scripts__tcgplayersalesdata_spike_score_cards
-                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
-                                      FROM scripts__tcgplayersalesdata_spike_score_cards)`,
+                 WHERE game_name = '__GAME__'
+                   AND calc_date = (SELECT MAX(calc_date)
+                                      FROM scripts__tcgplayersalesdata_spike_score_cards
+                                     WHERE game_name = '__GAME__'
+                                       AND calc_date <= (SELECT MAX(calc_date)
+                                                           FROM scripts__tcgplayersalesdata_spike_score_cards
+                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')`,
 		Sort: "ranking ASC",
 		Head: []Heading{
 			{
@@ -703,8 +713,13 @@ var newspaperPagesInitial = []NewspaperPage{
                        product_name, set_name, product_number, variant,
                        sellers_Today, sellers_d7, sellers_d30, pct_gain_7d
                   FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
-                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
-                                      FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards)
+                 WHERE game_name = '__GAME__'
+                   AND calc_date = (SELECT MAX(calc_date)
+                                      FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
+                                     WHERE game_name = '__GAME__'
+                                       AND calc_date <= (SELECT MAX(calc_date)
+                                                           FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
+                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')
                    AND pct_gain_7d <> 0`,
 		Sort: "ranking ASC",
 		Head: []Heading{
@@ -777,8 +792,13 @@ var newspaperPagesInitial = []NewspaperPage{
                        product_name, set_name, product_number, variant,
                        sellers_Today, sellers_d7, sellers_d30, pct_drop_7d
                   FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
-                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
-                                      FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards)
+                 WHERE game_name = '__GAME__'
+                   AND calc_date = (SELECT MAX(calc_date)
+                                      FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
+                                     WHERE game_name = '__GAME__'
+                                       AND calc_date <= (SELECT MAX(calc_date)
+                                                           FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
+                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')
                    AND pct_drop_7d <> 0`,
 		Sort: "ranking ASC",
 		Head: []Heading{
@@ -851,8 +871,13 @@ var newspaperPagesInitial = []NewspaperPage{
                        product_name, set_name, product_number, variant,
                        ck_buy_price, ck_buy_1d, ck_buy_7d, ck_buy_30d, pct_increase_7d
                   FROM scripts__cardkingdom_buylist_increase_score_cards
-                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
-                                      FROM scripts__cardkingdom_buylist_increase_score_cards)
+                 WHERE game_name = '__GAME__'
+                   AND calc_date = (SELECT MAX(calc_date)
+                                      FROM scripts__cardkingdom_buylist_increase_score_cards
+                                     WHERE game_name = '__GAME__'
+                                       AND calc_date <= (SELECT MAX(calc_date)
+                                                           FROM scripts__cardkingdom_buylist_increase_score_cards
+                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')
                    AND pct_increase_7d <> 0`,
 		Sort: "ranking ASC",
 		Head: []Heading{
@@ -932,8 +957,13 @@ var newspaperPagesInitial = []NewspaperPage{
                        product_name, set_name, product_number, variant,
                        ck_buy_price, ck_buy_1d, ck_buy_7d, ck_buy_30d, pct_decrease_7d
                   FROM scripts__cardkingdom_buylist_decrease_score_cards
-                 WHERE calc_date = (SELECT MAX(calc_date) - INTERVAL '0 DAY'
-                                      FROM scripts__cardkingdom_buylist_decrease_score_cards)
+                 WHERE game_name = '__GAME__'
+                   AND calc_date = (SELECT MAX(calc_date)
+                                      FROM scripts__cardkingdom_buylist_decrease_score_cards
+                                     WHERE game_name = '__GAME__'
+                                       AND calc_date <= (SELECT MAX(calc_date)
+                                                           FROM scripts__cardkingdom_buylist_decrease_score_cards
+                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')
                    AND pct_decrease_7d <> 0`,
 		Sort: "ranking ASC",
 		Head: []Heading{
