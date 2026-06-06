@@ -84,6 +84,7 @@ type PageVars struct {
 	SetKeyrunes  map[string]string
 	NoSort       bool
 	NoSettings   bool
+	HasSettings  bool
 	HasAvailable bool
 	CardBackURL  string
 	ShowUpsell   bool
@@ -252,6 +253,12 @@ type NavElem struct {
 
 	// Condition upon which the page should not be made visible
 	ShouldHide func() bool
+
+	// True for pages whose settings modal has bindings (mirrors
+	// PAGE_BINDINGS in js/settings.js). Used by the navbar inline
+	// script to pre-resolve the gear button's enabled state so it
+	// doesn't transition from is-disabled → enabled at load time.
+	HasSettings bool
 }
 
 var DefaultNav = []NavElem{
@@ -316,6 +323,7 @@ func init() {
 			Link:        "/search",
 			Handle:      Search,
 			Page:        "search.html",
+			HasSettings: true,
 			SubPages: []NavElem{
 				{
 					Name:        "Sets",
@@ -328,6 +336,7 @@ func init() {
 					Short:       "🧱",
 					Description: "Sealed product search",
 					Link:        "/sealed",
+					HasSettings: true,
 					ShouldHide: func() bool {
 						return len(mtgmatcher.GetSealedUUIDs()) == 0
 					},
@@ -342,12 +351,14 @@ func init() {
 			Link:        "/newspaper",
 			Handle:      Newspaper,
 			Page:        "news.html",
+			HasSettings: true,
 			SubPages: []NavElem{
 				{
 					Name:        "Archive",
 					Short:       "📰",
 					Description: "Past newspaper issues",
 					Link:        "/newspaper?page=old",
+					HasSettings: true,
 					ShouldHide: func() bool {
 						return Config.Game != DefaultGame
 					},
@@ -357,6 +368,7 @@ func init() {
 					Short:       "📋",
 					Description: "Cards TCGplayer wants now",
 					Link:        "/newspaper?page=syp",
+					HasSettings: true,
 					ShouldHide: func() bool {
 						_, err := findVendorBuylist("SYP")
 						return err != nil
@@ -371,6 +383,7 @@ func init() {
 			Link:        "/sleepers",
 			Handle:      Sleepers,
 			Page:        "sleep.html",
+			HasSettings: true,
 		},
 		"Upload": {
 			Name:        "Upload",
@@ -379,6 +392,7 @@ func init() {
 			Link:        "/upload",
 			Handle:      Upload,
 			Page:        "upload.html",
+			HasSettings: true,
 			CanPOST:     true,
 		},
 		"Global": {
@@ -388,6 +402,7 @@ func init() {
 			Link:        "/global",
 			Handle:      Global,
 			Page:        "arbit.html",
+			HasSettings: true,
 		},
 		"Arbit": {
 			Name:        "Arbitrage",
@@ -396,6 +411,7 @@ func init() {
 			Link:        "/arbit",
 			Handle:      Arbit,
 			Page:        "arbit.html",
+			HasSettings: true,
 		},
 		"Reverse": {
 			Name:        "Reverse",
@@ -404,6 +420,7 @@ func init() {
 			Link:        "/reverse",
 			Handle:      Reverse,
 			Page:        "arbit.html",
+			HasSettings: true,
 		},
 		"Admin": {
 			Name:        "Admin",
@@ -625,6 +642,10 @@ func genPageNav(activeTab, sig string) PageVars {
 	}
 	pageVars.Nav[mainNavIndex].Active = true
 	pageVars.Nav[mainNavIndex].Class = "active"
+	// Surface the active page's HasSettings on PageVars so the navbar
+	// template can pre-resolve the gear button's state without the
+	// inline script having to maintain a duplicate list of paths.
+	pageVars.HasSettings = pageVars.Nav[mainNavIndex].HasSettings
 
 	// Add user information if needed, or public
 	user := GetParamFromSig(sig, "UserEmail")

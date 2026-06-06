@@ -69,7 +69,7 @@
         <a class="nav2-icon-btn" href="/guide" title="Guide">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </a>
-        <a class="nav2-icon-btn ban-settings-btn is-disabled" id="nav-settings-btn" href="?settings=1" title="No settings on this page" aria-disabled="true" tabindex="-1" onclick="if(window.openSettings && !this.classList.contains('is-disabled')){event.preventDefault();window.openSettings();return false;}return false;">
+        <a class="nav2-icon-btn ban-settings-btn{{if not .HasSettings}} is-disabled{{end}}" id="nav-settings-btn" href="?settings=1"{{if .HasSettings}} title="Settings (Ctrl+,)"{{else}} title="No settings on this page" aria-disabled="true" tabindex="-1"{{end}} onclick="if(window.openSettings && !this.classList.contains('is-disabled')){event.preventDefault();window.openSettings();return false;}return false;">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </a>
         <button class="ban-nav-hamburger" onclick="document.getElementById('mobile-menu').classList.add('open'); document.getElementById('mobile-overlay').classList.add('open');">&#9776;</button>
@@ -200,25 +200,5 @@
     window.__BAN_NAV_RESTORED = true;
 })();
 
-/*
- * Pre-resolve the settings gear's enabled/disabled state synchronously
- * so it doesn't transition from "is-disabled" → enabled when settings.js
- * runs at end-of-body. The list mirrors PAGE_BINDINGS in settings.js —
- * paths whose handlers wire up bindings should appear here.
- */
-(function() {
-    var SETTINGS_PATHS = ['/search', '/sealed', '/arbit', '/global', '/reverse', '/sleepers', '/newspaper', '/upload'];
-    var p = location.pathname;
-    var hasSettings = SETTINGS_PATHS.some(function(prefix) {
-        return p === prefix || p.indexOf(prefix + '/') === 0;
-    });
-    if (!hasSettings) return;
-    var btn = document.getElementById('nav-settings-btn');
-    if (!btn) return;
-    btn.classList.remove('is-disabled');
-    btn.removeAttribute('aria-disabled');
-    btn.removeAttribute('tabindex');
-    btn.title = 'Settings (Ctrl+,)';
-})();
 </script>
 {{end}}
