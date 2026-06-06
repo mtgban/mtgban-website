@@ -169,6 +169,7 @@
 .upload-store-grid {
     grid-row: 1;
     grid-column: 1;
+    align-self: start;
 }
 .upload-sealed-note {
     grid-row: 2;
@@ -223,7 +224,7 @@
     background: var(--surface-2);
     border: 1px solid var(--border-subtle);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: border-color 0.15s;
     font-size: var(--text-md);
     margin: 0;
 }
