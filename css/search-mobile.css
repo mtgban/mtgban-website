@@ -2374,5 +2374,5 @@
 }
 .m-fav-sort .fav-sort-pill i,
 .m-fav-sort .fav-sort-pill svg { width: 16px; height: 16px; }
-.m-fav-sort .fav-sort-pill .fav-sort-dir.asc { color: #22c55e; }
-.m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: #ef4444; }
+.m-fav-sort .fav-sort-pill .fav-sort-dir.asc,
+.m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
