@@ -353,7 +353,7 @@
             </div>
 
             <div class="arb-table-wrap">
-            <table class="table-data arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';document.getElementById('hoverWrap').setAttribute('data-foil','false');">
+            <table class="table-data arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
@@ -403,7 +403,7 @@
                 {{$arbitContainer := .}}
                 {{range .Arbit}}
                     {{$card := (index $.Metadata .CardId)}}
-                    <tr onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                    <tr onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                         <td>
                             <div class="arb-card-cell">
                                 {{$keyrune := $card.Keyrune}}

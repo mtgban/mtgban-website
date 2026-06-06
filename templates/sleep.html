@@ -192,7 +192,7 @@ function checkSleepersCompare() {
                             <a href="{{$card.SearchURL}}">
                                 <nobr>
                                     <span class="small-hidden-text" aria-hidden="true">{{$card.Name}}</span>
-                                    <div class="foil-wrap sleep-card-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-set="{{$card.SetCode}}" style="margin: 5px;"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed');event.preventDefault()"{{end}}>
+                                    <div class="foil-wrap sleep-card-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}" data-set="{{$card.SetCode}}" style="margin: 5px;"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed');event.preventDefault()"{{end}}>
                                         <img loading="lazy" src="{{$card.ImageURL}}" width=146 height=204 title="{{$card.Name}} [{{$card.Title}}]">
                                     </div>
                                 </nobr>

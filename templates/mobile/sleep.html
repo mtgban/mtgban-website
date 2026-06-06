@@ -219,7 +219,7 @@
                 {{range $cardIds}}
                     {{$card := index $.Metadata .}}
                     <a class="m-sleep-card" href="{{$card.SearchURL}}">
-                        <div class="foil-wrap" data-foil="{{$card.Foil}}">
+                        <div class="foil-wrap" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}">
                             <img loading="lazy" src="{{$card.ImageURL}}" width="110" height="154" alt="{{$card.Name}}" title="{{$card.Name}}" style="border-radius: 8px; display: block;">
                         </div>
                     </a>

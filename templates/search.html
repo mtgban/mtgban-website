@@ -219,11 +219,12 @@
                     container.appendChild(dropdown);
                 }
 
-                function updateSidebar(src, printings, products, isFoil, setCode, hasWarning) {
+                function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning) {
                     document.getElementById('cardImage').src=src;
                     var wrapper = document.getElementById('cardImageWrapper');
                     if (wrapper) {
                         wrapper.setAttribute('data-foil', isFoil ? 'true' : 'false');
+                        wrapper.setAttribute('data-etched', isEtched ? 'true' : 'false');
                         wrapper.setAttribute('data-set', setCode);
                         if (hasWarning) {
                             wrapper.classList.add('content-warning');
@@ -368,6 +369,7 @@
                     {{$firstPrint := ""}}
                     {{$firstProduct := ""}}
                     {{$firstFoil := false}}
+                    {{$firstEtched := false}}
                     {{$firstSetCode := ""}}
                     {{$firstWarning := false}}
 
@@ -546,6 +548,7 @@
                             {{$firstPrint = $card.Printings}}
                             {{$firstProduct = $card.Products}}
                             {{$firstFoil = $card.Foil}}
+                            {{$firstEtched = $card.Etched}}
                             {{$firstSetCode = $card.SetCode}}
                             {{$firstWarning = $card.HasContentWarning}}
                         {{end}}
@@ -564,7 +567,7 @@
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
-                                 onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                                 onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -637,7 +640,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
@@ -854,7 +857,7 @@
                     {{$firstImg = $.CardBackURL}}
                 {{end}}
                 <script type="text/javascript">
-                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstSetCode}}, {{$firstWarning}});
+                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}});
                 </script>
             </div>{{/* Close .search-layout */}}
     <br>

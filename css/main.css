@@ -1008,7 +1008,8 @@ img.content-warning.cw-revealed {
 .foil-wrap > img {
     display: block;
 }
-.foil-wrap[data-foil="true"]::after {
+.foil-wrap[data-foil="true"]::after,
+.foil-wrap[data-etched="true"]::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -1026,6 +1027,19 @@ img.content-warning.cw-revealed {
     );
     mix-blend-mode: screen;
     pointer-events: none;
+}
+.foil-wrap[data-etched="true"]::after {
+    background: linear-gradient(
+        105deg,
+        rgba(235, 66, 137, 0.20) 0%,
+        rgba(166, 68, 253, 0.22) 15%,
+        rgba(47, 107, 236, 0.22) 30%,
+        rgba(63, 218, 216, 0.25) 45%,
+        rgba(79, 220, 74, 0.25) 55%,
+        rgba(208, 222, 33, 0.25) 70%,
+        rgba(255, 154, 0, 0.22) 85%,
+        rgba(255, 0, 0, 0.22) 100%
+    );
 }
 
 @font-face {

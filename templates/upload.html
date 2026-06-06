@@ -678,7 +678,7 @@
                             {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                             <td>
                                 <div class="ures-card-cell">
-                                    <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
+                                    <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
                                         <img src="{{$card.ImageURL}}" loading="lazy">
                                     </div>
                                     <div class="ures-card-info">
@@ -906,7 +906,7 @@
                         <span class="opt-count">{{len $entries}} cards</span>
                         <span class="opt-total">$ {{printf "%.2f" $total}}</span>
                     </div>
-                    <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';document.getElementById('hoverWrap').setAttribute('data-foil','false');">
+                    <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
                         <thead><tr>
                             <th>Card</th>
                             <th>Set</th>
@@ -917,7 +917,7 @@
                         <tbody>
                         {{range $entries}}
                             {{$card := (index $.Metadata .CardId)}}
-                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                                 <td class="opt-name">
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
                                     <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>
