@@ -1524,6 +1524,7 @@
     border-radius: 0.5em;
     overflow: hidden;
     min-height: 50vh;
+    container-type: inline-size;
 }
 
 .landing-pane-header {
@@ -1977,6 +1978,7 @@
     color: var(--search-link);
     opacity: 0.55;
     margin-top: 1.5em;
+    font-size: 1.5em;
     animation: landing-empty-fade 0.5s ease both;
     animation-delay: 0.3s;
 }
@@ -2016,14 +2018,18 @@
     50%      { transform: scale(1.18); }
 }
 
-@media (max-width: 520px) {
+@container (max-width: 420px) {
     .landing-empty-flow {
         grid-template-columns: 1fr;
         gap: 0.5em;
     }
     .landing-empty-arrow {
-        transform: rotate(90deg);
         margin-top: 0;
+        font-size: 0;
+    }
+    .landing-empty-arrow::after {
+        content: '↓';
+        font-size: 1.5rem;
     }
 }
 
