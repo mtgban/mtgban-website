@@ -158,10 +158,32 @@
 .upload-store-area {
     flex: 1;
     min-width: 0;
+    /* Stack the two store grids in the same grid cell so the area's
+       height is max(singlesGrid, sealedGrid). Whichever tab is active,
+       the panel is the size of the larger group — neither grid has
+       its own size touched. */
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+}
+.upload-store-grid {
+    grid-row: 1;
+    grid-column: 1;
+}
+.upload-sealed-note {
+    grid-row: 2;
+    grid-column: 1;
 }
 
 .upload-store-hidden {
     display: none !important;
+}
+/* Keep the inactive grid in layout (invisible but still occupying its
+   cell) so it contributes to the area height. Without this the area
+   collapses to the active grid's natural height when switching tabs. */
+.upload-store-grid.upload-store-hidden {
+    display: grid !important;
+    visibility: hidden;
 }
 
 .upload-sealed-note {
