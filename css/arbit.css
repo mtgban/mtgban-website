@@ -484,3 +484,10 @@
     /* Edition filter full width */
     .arb-edition-filter { width: 100%; margin-left: 0; }
 }
+
+/* ── Row removal ── */
+tr.arb-removed td { opacity: 0.45; }
+tr.arb-removed td:last-child { opacity: 1; }
+tr.arb-removed .card-name-line a { text-decoration: line-through; }
+tr.arb-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
+.arb-row-check { cursor: pointer; }

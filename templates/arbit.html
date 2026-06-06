@@ -397,13 +397,14 @@
                         {{end}}
                     {{end}}
                     <th class="c">Links</th>
+                    <th class="c"><input type="checkbox" checked title="Toggle all" onchange="toggleAllArbitRows(this)"></th>
                 </tr>
                 </thead>
                 <tbody>
                 {{$arbitContainer := .}}
                 {{range .Arbit}}
                     {{$card := (index $.Metadata .CardId)}}
-                    <tr onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                    <tr data-arb-id="{{.CardId}}" data-arb-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-arb-name="{{$card.Name}}" data-arb-cond="{{.InventoryEntry.Conditions}}" data-arb-ckid="{{uuid2ckid .CardId}}" data-arb-tcgid="{{uuid2tcgid .CardId}}" onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                         <td>
                             <div class="arb-card-cell">
                                 {{$keyrune := $card.Keyrune}}
@@ -513,6 +514,7 @@
                                 {{end}}
                             </div>
                         </td>
+                        <td class="c"><input type="checkbox" checked class="arb-row-check" onchange="toggleArbitRow(this)"></td>
                     </tr>
                 {{end}}
 
@@ -552,6 +554,110 @@
         </p>
         <br>
 </div>
+
+<script>
+function toggleArbitRow(checkbox) {
+    var row = checkbox.closest('tr');
+    if (!row) return;
+    if (checkbox.checked) {
+        row.classList.remove('arb-removed');
+    } else {
+        row.classList.add('arb-removed');
+    }
+}
+
+function toggleAllArbitRows(masterCheckbox) {
+    var table = masterCheckbox.closest('table');
+    if (!table) return;
+    var checkboxes = table.querySelectorAll('.arb-row-check');
+    checkboxes.forEach(function(cb) {
+        cb.checked = masterCheckbox.checked;
+        toggleArbitRow(cb);
+    });
+}
+
+// Collect active (non-removed) rows from the arbit table in the same section
+function getActiveArbRows(section) {
+    var rows = [];
+    section.querySelectorAll('tr[data-arb-id]:not(.arb-removed)').forEach(function(row) {
+        rows.push({
+            id: row.dataset.arbId,
+            qty: row.dataset.arbQty || '1',
+            name: row.dataset.arbName || '',
+            cond: row.dataset.arbCond || '',
+            ckid: row.dataset.arbCkid || '',
+            tcgid: row.dataset.arbTcgid || ''
+        });
+    });
+    return rows;
+}
+
+function filterArbForm(form) {
+    var section = form.closest('.arb-page');
+    if (!section) return;
+    var active = getActiveArbRows(section);
+    var allRows = section.querySelectorAll('tr[data-arb-id]');
+    if (active.length === allRows.length) return;
+
+    // CK buylist JSON
+    var jsonInput = form.querySelector('input[name="json"]');
+    if (jsonInput) {
+        var contents = active.map(function(r) {
+            return '{"id":' + r.ckid + ',"qty":' + r.qty + '}';
+        });
+        jsonInput.value = '{"contents":[' + contents.join(',') + ',{}]}';
+        return;
+    }
+
+    // CK/CSI deckbuilder (name="c" or name="sList")
+    var cInput = form.querySelector('input[name="c"]');
+    if (cInput) {
+        // Check if TCG format (qty-tcgid||) or CK format (qty name||)
+        if (cInput.value.match(/\d+-\d+\|\|/)) {
+            cInput.value = active.map(function(r) { return r.qty + '-' + r.tcgid + '||'; }).join('');
+        } else {
+            cInput.value = active.map(function(r) { return r.qty + ' ' + r.name + '||'; }).join('');
+        }
+        return;
+    }
+    var sListInput = form.querySelector('input[name="sList"]');
+    if (sListInput) {
+        sListInput.value = active.map(function(r) { return r.qty + ' ' + r.name + '|'; }).join('');
+        return;
+    }
+
+    // Manapool deck (base64 encoded)
+    var deckInput = form.querySelector('input[name="deck"]');
+    if (deckInput) {
+        var deck = active.map(function(r) { return r.qty + ' ' + r.name; }).join('\n');
+        deckInput.value = btoa(deck);
+        return;
+    }
+
+    // Per-entry forms (hashes) — disable removed input groups
+    var removed = {};
+    section.querySelectorAll('tr.arb-removed').forEach(function(row) {
+        if (row.dataset.arbId) removed[row.dataset.arbId] = true;
+    });
+    var inputs = form.querySelectorAll('input[type="hidden"]');
+    var skip = false;
+    for (var i = 0; i < inputs.length; i++) {
+        var inp = inputs[i];
+        if (inp.name && inp.name.match(/hashes$/)) {
+            skip = removed[inp.value] || false;
+        }
+        if (skip) inp.disabled = true;
+    }
+}
+
+// Intercept clicks on arbit action buttons
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.arb-load-btn');
+    if (!btn) return;
+    var form = btn.closest('form');
+    if (form) filterArbForm(form);
+}, true);
+</script>
 {{end}}
 
 {{define "settings-content"}}

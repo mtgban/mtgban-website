@@ -824,10 +824,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	pageVars.TotalEntries = map[string]float64{}
 
-	skipResults := r.FormValue("noresults") != ""
-	if !(blMode && skipResults) {
-		pageVars.UploadEntries = uploadedData
-	}
+	pageVars.UploadEntries = uploadedData
 
 	// Load up image links
 	for _, data := range uploadedData {

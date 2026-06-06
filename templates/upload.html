@@ -913,11 +913,12 @@
                             <th class="c">Offer</th>
                             <th class="c">Loaded</th>
                             <th>Spread</th>
+                            <th class="c" data-sort-method="none"><input type="checkbox" checked title="Toggle all" onchange="toggleAllOptRows(this)"></th>
                         </tr></thead>
                         <tbody>
                         {{range $entries}}
                             {{$card := (index $.Metadata .CardId)}}
-                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                            <tr data-opt-id="{{.CardId}}" data-opt-qty="{{.Quantity}}" data-opt-cond="{{.Condition}}" data-opt-name="{{(index $.Metadata .CardId).Name}}" data-opt-ckid="{{uuid2ckid .CardId}}" onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                                 <td class="opt-name">
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
                                     <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>
@@ -948,6 +949,7 @@
                                         {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}&#10071;{{end}}
                                     {{end}}
                                 </td>
+                                <td class="c"><input type="checkbox" checked class="opt-row-check" onchange="toggleOptRow(this)"></td>
                             </tr>
                         {{end}}
                         </tbody>
@@ -1013,6 +1015,91 @@
     <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
     <script>
         document.querySelectorAll('.opt-table').forEach(function(t) { new Tablesort(t); });
+
+        function toggleOptRow(checkbox) {
+            var row = checkbox.closest('tr');
+            if (!row) return;
+            if (checkbox.checked) {
+                row.classList.remove('opt-removed');
+            } else {
+                row.classList.add('opt-removed');
+            }
+        }
+
+        function toggleAllOptRows(masterCheckbox) {
+            var table = masterCheckbox.closest('table');
+            if (!table) return;
+            table.querySelectorAll('.opt-row-check').forEach(function(cb) {
+                cb.checked = masterCheckbox.checked;
+                toggleOptRow(cb);
+            });
+        }
+
+        // Collect active (non-removed) rows from the optimizer table
+        function getActiveOptRows(section) {
+            var rows = [];
+            section.querySelectorAll('tr[data-opt-id]:not(.opt-removed)').forEach(function(row) {
+                rows.push({
+                    id: row.dataset.optId,
+                    qty: row.dataset.optQty || '1',
+                    cond: row.dataset.optCond || '',
+                    name: row.dataset.optName || '',
+                    ckid: row.dataset.optCkid || ''
+                });
+            });
+            return rows;
+        }
+
+        // Rebuild form inputs/values from active rows before submission
+        function filterOptForm(form) {
+            var section = form.closest('.opt-store');
+            if (!section) return;
+            var active = getActiveOptRows(section);
+            var allRows = section.querySelectorAll('tr[data-opt-id]');
+            // If nothing was removed, skip
+            if (active.length === allRows.length) return;
+
+            // For forms with a "json" input (CK buylist), rebuild the JSON
+            var jsonInput = form.querySelector('input[name="json"]');
+            if (jsonInput) {
+                var contents = active.map(function(r) {
+                    return '{"id":' + r.ckid + ',"qty":' + r.qty + '}';
+                });
+                jsonInput.value = '{"contents":[' + contents.join(',') + ',{}]}';
+                return;
+            }
+
+            // For forms with a "c" input (CK deckbuilder, TCG massentry), rebuild
+            var cInput = form.querySelector('input[name="c"]');
+            if (cInput) {
+                var val = active.map(function(r) { return r.qty + ' ' + r.name + '||'; }).join('');
+                cInput.value = val;
+                return;
+            }
+
+            // For per-entry forms (hashes), disable removed inputs
+            var removed = {};
+            section.querySelectorAll('tr.opt-removed').forEach(function(row) {
+                if (row.dataset.optId) removed[row.dataset.optId] = true;
+            });
+            var inputs = form.querySelectorAll('input[type="hidden"]');
+            var skip = false;
+            for (var i = 0; i < inputs.length; i++) {
+                var inp = inputs[i];
+                if (inp.name && inp.name.match(/hashes$/)) {
+                    skip = removed[inp.value] || false;
+                }
+                if (skip) inp.disabled = true;
+            }
+        }
+
+        // Intercept clicks on optimizer action buttons
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            var form = btn.closest('form');
+            if (form) filterOptForm(form);
+        }, true);
     </script>
     {{end}}
 
