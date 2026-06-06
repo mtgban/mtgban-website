@@ -1505,12 +1505,12 @@
 
 .search-landing-grid {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: minmax(240px, 320px) 1fr;
     gap: 1rem;
     align-items: stretch;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 540px) {
     .search-landing-grid {
         grid-template-columns: 1fr;
     }
