@@ -1939,6 +1939,15 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 	if err == io.EOF {
 		return nil, errors.New("empty input file")
 	}
+	// Support non-standard separator metadata IN the file
+	if len(first) == 1 && strings.Contains(first[0], "sep") {
+		fields := strings.Split(first[0], "=")
+		if len(fields) > 1 {
+			csvReader.Comma = rune(fields[1][0])
+		}
+		// Re-read the header
+		first, err = csvReader.Read()
+	}
 	if err != nil {
 		LogPages["Upload"].Println("Error reading header:", err)
 		return nil, errors.New("error reading file header")
