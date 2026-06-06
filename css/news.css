@@ -90,7 +90,12 @@
    INDEX VIEW
    ═══════════════════════════════════ */
 .news-index {
-    padding: calc(48px + 28px) 0 40px;
+    /* padding-top / -bottom only — the shorthand was wiping out the
+       horizontal gutter inherited from the parent .page-compact rule
+       (padding: 0 var(--page-gutter)), leaving the page flush to the
+       viewport edges. */
+    padding-top: calc(48px + 28px);
+    padding-bottom: 40px;
 }
 
 .news-index-header {
@@ -263,7 +268,10 @@
    DATA TABLE VIEW
    ═══════════════════════════════════ */
 .news-data {
-    padding: 65px 0 80px;
+    /* Same long-form split as .news-index so the .page-wide gutter is
+       preserved instead of being clobbered by the shorthand. */
+    padding-top: 65px;
+    padding-bottom: 80px;
 }
 
 .news-data-header {
