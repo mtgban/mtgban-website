@@ -295,6 +295,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if hidePromos {
 			pageVars.InfoMessage = NoPromosMessage
 		}
+		pageVars.CleanSearchQuery = config.CleanQuery
 		render(w, "search.html", pageVars)
 		return
 	}
