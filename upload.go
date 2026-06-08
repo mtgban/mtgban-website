@@ -1265,7 +1265,7 @@ func parseHeader(first []string) (map[string]int, error) {
 		field = strings.ToLower(field)
 		switch {
 		// This should cover "uuid", "identifier", and so on
-		case strings.Contains(field, "id"):
+		case field == "uuid" || field == "id" || (strings.Contains(field, "id") && (strings.Contains(field, "scryfall") || strings.Contains(field, "tcgplayer") || strings.Contains(field, "mtgjson"))):
 			_, found := indexMap["id"]
 			if !found {
 				indexMap["id"] = i
