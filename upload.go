@@ -818,7 +818,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else if textArea != "" {
 		pageVars.SearchQuery = "pasted text"
 	} else if gdocURL != "" {
-		pageVars.SearchQuery = gdocURL
+		pageVars.SearchQuery = "remote URL"
 	} else {
 		pageVars.SearchQuery = handler.Filename
 	}
