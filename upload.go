@@ -2028,3 +2028,20 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 
 	return uploadEntries, nil
 }
+
+// Redirect external URLs to the uploader (e.g. /https://store.tcgplayer.com/...)
+// Go's ServeMux cleans // to / before the handler runs, so
+// /https://host/path arrives as /https:/host/path
+func UploadURLRedirect(w http.ResponseWriter, r *http.Request) {
+	raw := strings.TrimPrefix(r.URL.RequestURI(), "/")
+	log.Println(raw)
+	// Restore the double slash that ServeMux cleaned
+	raw = strings.Replace(raw, "https:/", "https://", 1)
+	raw = strings.Replace(raw, "http:/", "http://", 1)
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		http.Redirect(w, r, "/upload", http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, "/upload?gdocURL="+url.QueryEscape(u.String()), http.StatusFound)
+}

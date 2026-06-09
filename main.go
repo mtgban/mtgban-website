@@ -1006,12 +1006,8 @@ func main() {
 
 	// custom redirector
 	http.HandleFunc("/go/", Redirect)
-
-	// Redirect external URLs to the uploader (e.g. /https://store.tcgplayer.com/...)
-	http.HandleFunc("/http", func(w http.ResponseWriter, r *http.Request) {
-		extURL := strings.TrimPrefix(r.URL.Path, "/")
-		http.Redirect(w, r, "/upload?gdocURL="+url.QueryEscape(extURL), http.StatusFound)
-	})
+	http.HandleFunc("/http:/", UploadURLRedirect)
+	http.HandleFunc("/https:/", UploadURLRedirect)
 	http.HandleFunc("/random", RandomSearch)
 	http.HandleFunc("/randomsealed", RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
