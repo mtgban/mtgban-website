@@ -687,6 +687,15 @@
     margin: 0;
     white-space: nowrap;
 }
+.upload-share-link {
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: 500;
+}
+.upload-share-link:hover {
+    text-decoration: underline;
+}
 
 /* -- Results header: two-row stack -- */
 .res-header {
