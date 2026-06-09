@@ -814,13 +814,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Orders implies priority of argument search
 	pageVars.Metadata = map[string]GenericCard{}
 	if len(hashes) != 0 {
-		pageVars.SearchQuery = "hashes"
+		pageVars.UploadQuery = "hashes"
 	} else if textArea != "" {
-		pageVars.SearchQuery = "pasted text"
+		pageVars.UploadQuery = "pasted text"
 	} else if gdocURL != "" {
-		pageVars.SearchQuery = "remote URL"
+		pageVars.UploadQuery = "remote URL"
 	} else {
-		pageVars.SearchQuery = handler.Filename
+		pageVars.UploadQuery = handler.Filename
 	}
 	pageVars.TotalEntries = map[string]float64{}
 
@@ -1085,7 +1085,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if blMode {
 		msgMode = "buylist"
 	}
-	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(cardIds), msgMode, pageVars.SearchQuery, time.Since(start))
+	msg := fmt.Sprintf("%s uploaded %d %s entries from %s, took %v", user, len(cardIds), msgMode, pageVars.UploadQuery, time.Since(start))
 	UserNotify("upload", msg)
 	LogPages["Upload"].Println(msg)
 

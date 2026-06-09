@@ -212,6 +212,7 @@ type PageVars struct {
 	MissingCounts        map[string]int
 	MissingPrices        map[string]float64
 	ResultPrices         map[string]map[string]float64
+	UploadQuery          string
 }
 
 type NavElem struct {

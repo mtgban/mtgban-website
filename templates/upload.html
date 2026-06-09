@@ -43,7 +43,7 @@
         <div class="page-standard">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
             <div class="page-header">
-                <h1>Results{{if and .SearchQuery (not (eq .SearchQuery "hashes"))}} from {{.SearchQuery}}{{end}}</h1>
+                <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{.UploadQuery}}{{end}}</h1>
                 <p class="page-subtitle">
                     {{if .UploadEntries}}{{len .UploadEntries}} cards matched &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
                 </p>
@@ -513,7 +513,7 @@
             };
         </script>
 
-        {{if ne .SearchQuery ""}}
+        {{if ne .UploadQuery ""}}
             <script>
                 function getCardHashes() {
                     return Array.from(document.querySelectorAll('.searchResults tr[data-hash]')).map(row => row.dataset.hash);
