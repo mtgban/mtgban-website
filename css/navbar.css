@@ -468,6 +468,7 @@
 .tools-quick-user {
     font-family: var(--font-mono);
     font-size: var(--text-sm);
+    line-height: 1.6;
     color: var(--greytext);
     padding: 0 8px;
     white-space: nowrap;
