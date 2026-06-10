@@ -449,7 +449,7 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 	return out
 }
 
-func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, mode, cardId, filterByEdition, filterByFinish, sellerTag string, qty, conds, shouldBaseCond bool) {
+func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, mode, cardId, filterByEdition, filterByFinish, scraperTag string, qty, conds, shouldBaseCond bool) {
 	if len(entries) == 0 {
 		return
 	}
@@ -477,79 +477,79 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 	if !found {
 		out[id] = map[string]*BanPrice{}
 	}
-	if out[id][sellerTag] == nil {
-		out[id][sellerTag] = &BanPrice{}
+	if out[id][scraperTag] == nil {
+		out[id][scraperTag] = &BanPrice{}
 	}
 
 	if shouldBaseCond {
-		out[id][sellerTag].Cond = entries[0].Condition()
+		out[id][scraperTag].Cond = entries[0].Condition()
 	}
 
-	if conds && out[id][sellerTag].Conditions == nil {
-		out[id][sellerTag].Conditions = map[string]float64{}
+	if conds && out[id][scraperTag].Conditions == nil {
+		out[id][scraperTag].Conditions = map[string]float64{}
 	}
 
 	if co.Sealed {
-		out[id][sellerTag].Sealed = basePrice
+		out[id][scraperTag].Sealed = basePrice
 		if qty {
 			for i := range entries {
-				out[id][sellerTag].QtySealed += entries[i].Qty()
+				out[id][scraperTag].QtySealed += entries[i].Qty()
 			}
 		}
 	} else if co.Etched {
-		out[id][sellerTag].Etched = basePrice
+		out[id][scraperTag].Etched = basePrice
 		if qty {
 			for i := range entries {
-				out[id][sellerTag].QtyEtched += entries[i].Qty()
+				out[id][scraperTag].QtyEtched += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition() + "_etched"
-				out[id][sellerTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing()
 				if qty && entries[i].Qty() > 0 {
-					if out[id][sellerTag].Quantities == nil {
-						out[id][sellerTag].Quantities = map[string]int{}
+					if out[id][scraperTag].Quantities == nil {
+						out[id][scraperTag].Quantities = map[string]int{}
 					}
-					out[id][sellerTag].Quantities[condTag] = entries[i].Qty()
+					out[id][scraperTag].Quantities[condTag] = entries[i].Qty()
 				}
 			}
 		}
 	} else if co.Foil {
-		out[id][sellerTag].Foil = basePrice
+		out[id][scraperTag].Foil = basePrice
 		if qty {
 			for i := range entries {
-				out[id][sellerTag].QtyFoil += entries[i].Qty()
+				out[id][scraperTag].QtyFoil += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition() + "_foil"
-				out[id][sellerTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing()
 				if qty && entries[i].Qty() > 0 {
-					if out[id][sellerTag].Quantities == nil {
-						out[id][sellerTag].Quantities = map[string]int{}
+					if out[id][scraperTag].Quantities == nil {
+						out[id][scraperTag].Quantities = map[string]int{}
 					}
-					out[id][sellerTag].Quantities[condTag] = entries[i].Qty()
+					out[id][scraperTag].Quantities[condTag] = entries[i].Qty()
 				}
 			}
 		}
 	} else {
-		out[id][sellerTag].Regular = basePrice
+		out[id][scraperTag].Regular = basePrice
 		if qty {
 			for i := range entries {
-				out[id][sellerTag].Qty += entries[i].Qty()
+				out[id][scraperTag].Qty += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition()
-				out[id][sellerTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing()
 				if qty && entries[i].Qty() > 0 {
-					if out[id][sellerTag].Quantities == nil {
-						out[id][sellerTag].Quantities = map[string]int{}
+					if out[id][scraperTag].Quantities == nil {
+						out[id][scraperTag].Quantities = map[string]int{}
 					}
-					out[id][sellerTag].Quantities[condTag] = entries[i].Qty()
+					out[id][scraperTag].Quantities[condTag] = entries[i].Qty()
 				}
 			}
 		}
@@ -619,7 +619,6 @@ func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanP
 	w := csv.NewWriter(httpWriter)
 	return SimplePrice2CSV(w, pm, nil, sorted, false)
 }
-
 
 // SimplePrice2CSV converts price data to CSV. When uploadedData is provided,
 // each row corresponds to an uploaded entry and includes Loaded columns.
