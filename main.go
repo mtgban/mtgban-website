@@ -170,12 +170,13 @@ type PageVars struct {
 	StocksURL       string
 	AltEtchedId     string
 
-	EditionSort []string
-	EditionList map[string][]EditionEntry
-	IsSealed    bool
-	TotalSets   int
-	TotalCards  int
-	TotalUnique int
+	EditionSort       []string
+	EditionList       map[string][]EditionEntry
+	EditionFilterList []EditionEntry
+	IsSealed          bool
+	TotalSets         int
+	TotalCards        int
+	TotalUnique       int
 
 	// UPLOAD
 	// All the scrapers in singles/sealed mode

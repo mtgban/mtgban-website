@@ -317,6 +317,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Needed to load search in Upload
 	pageVars.CardHashes = allKeys
 
+	if pageVars.IsMobile && !pageVars.IsSealed {
+		pageVars.EditionFilterList = editionsForSearch(allKeys)
+	}
+
 	// Sort sets as requested, default to chronological
 	switch pageVars.SearchSort {
 	case "alpha":
@@ -929,6 +933,40 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		selectedUUIDs = append(selectedUUIDs, uuid)
 	}
 	return selectedUUIDs, nil
+}
+
+func editionsForSearch(allKeys []string) []EditionEntry {
+	codes := map[string]bool{}
+	seenNames := map[string]bool{}
+	for _, cardId := range allKeys {
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil || seenNames[co.Name] {
+			continue
+		}
+		seenNames[co.Name] = true
+		printings, err := mtgmatcher.Printings4Card(co.Name)
+		if err != nil {
+			continue
+		}
+		for _, code := range printings {
+			codes[code] = true
+		}
+	}
+	if len(codes) == 0 {
+		return nil
+	}
+
+	editions := GetEditions()
+	out := make([]EditionEntry, 0, len(codes))
+	for code := range codes {
+		if entry, ok := editions.AllEditionsMap[code]; ok {
+			out = append(out, entry)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
+	return out
 }
 
 func searchScryfall(query string) ([]string, error) {
