@@ -308,8 +308,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 	var enabledStores []string
-	var allSellers []string
-	var allVendors []string
+	var singlesSellers []string
+	var singlesVendors []string
 	var sealedSellers []string
 	var sealedVendors []string
 
@@ -324,7 +324,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				sealedSellers = append(sealedSellers, short)
 			}
 		} else if !slices.Contains(blocklistRetail, short) {
-			allSellers = append(allSellers, short)
+			singlesSellers = append(singlesSellers, short)
 		}
 	}
 	for _, vendor := range GetVendors() {
@@ -337,13 +337,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				sealedVendors = append(sealedVendors, short)
 			}
 		} else if !slices.Contains(blocklistBuylist, short) {
-			allVendors = append(allVendors, short)
+			singlesVendors = append(singlesVendors, short)
 		}
 	}
 
 	// Set the store names for the <select> box
-	pageVars.SellerKeys = allSellers
-	pageVars.VendorKeys = allVendors
+	pageVars.SellerKeys = singlesSellers
+	pageVars.VendorKeys = singlesVendors
 	pageVars.SealedSellerKeys = sealedSellers
 	pageVars.SealedVendorKeys = sealedVendors
 	pageVars.AltKeys = UploadIndexComparePriceList
@@ -360,7 +360,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	enabledVendors := readCookie(r, "enabledVendors")
 	if len(enabledVendors) == 0 || !canChangeStores {
-		pageVars.EnabledVendors = allVendors
+		pageVars.EnabledVendors = singlesVendors
 	} else {
 		pageVars.EnabledVendors = strings.Split(enabledVendors, "|")
 	}
@@ -387,10 +387,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if blMode {
 		// Override in case not allowed to change list
 		if !canChangeStores {
-			stores = allVendors
+			stores = singlesVendors
 		}
 		for _, store := range stores {
-			if slices.Contains(allVendors, store) {
+			if slices.Contains(singlesVendors, store) {
 				enabledStores = append(enabledStores, store)
 			}
 		}
@@ -400,7 +400,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			stores = Config.AffiliatesList
 		}
 		for _, store := range stores {
-			if slices.Contains(allSellers, store) {
+			if slices.Contains(singlesSellers, store) {
 				enabledStores = append(enabledStores, store)
 			}
 		}
