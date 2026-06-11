@@ -803,9 +803,9 @@
     <div class="res-panel active" id="panel-results">
         {{if .HasMixed}}
             <div class="ures-subtabs">
-                <button class="ures-subtab on" data-view="all" onclick="showUresView('all', this)">All</button>
-                <button class="ures-subtab" data-view="singles" onclick="showUresView('singles', this)">Singles</button>
-                <button class="ures-subtab" data-view="sealed" onclick="showUresView('sealed', this)">Sealed</button>
+                <button class="ures-subtab on" onclick="showUresView('all', this)">All</button>
+                <button class="ures-subtab" onclick="showUresView('singles', this)">Singles</button>
+                <button class="ures-subtab" onclick="showUresView('sealed', this)">Sealed</button>
             </div>
             <div class="ures-views" data-ures-view="all">
                 <div class="ures-strip ures-strip-all">
