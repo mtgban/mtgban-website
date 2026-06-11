@@ -819,12 +819,13 @@
     font-size: var(--text-lg);
     color: var(--text-dim);
 }
+.ures-views { margin-bottom: 6em; }
 .ures-views .ures-strip { margin-bottom: 1em; }
 .ures-views .ures-block .ures-wrap { margin-bottom: 1.5em; }
 
-/* View toggling: strips, blocks, and the grand bar are hidden by default
+/* View toggling: strips and blocks are hidden by default
    and revealed per the active data-ures-view. */
-.ures-strip, .ures-grand { display: none; }
+.ures-strip { display: none; }
 .ures-block { display: none; }
 .ures-views[data-ures-view="all"] .ures-strip-all,
 .ures-views[data-ures-view="singles"] .ures-strip-singles,
@@ -833,22 +834,6 @@
 .ures-views[data-ures-view="all"] .ures-block-sealed,
 .ures-views[data-ures-view="singles"] .ures-block-singles,
 .ures-views[data-ures-view="sealed"] .ures-block-sealed { display: block; }
-.ures-views[data-ures-view="all"] .ures-grand {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    margin-bottom: 6em;
-    background: var(--surface-2);
-    border: 1px solid var(--border-moderate);
-    border-radius: var(--radius-md);
-    font-weight: 700;
-}
-.ures-grand .val {
-    color: var(--asuccess);
-    font-family: var(--font-mono);
-    font-size: var(--text-xl);
-}
 
 /* ── Results table ── */
 .ures-wrap {
