@@ -797,161 +797,69 @@
             {{end}}
         </div>
 
-        <!-- Row 2: Summary stats -->
-        <div class="res-summary">
-            <div class="res-summary-stat">
-                <span class="label">Cards</span>
-                <span class="val">{{.TotalQuantity}}</span>
-            </div>
-            {{range .ScraperKeys}}
-                <div class="res-summary-stat">
-                    <span class="label">{{scraper_name .}}</span>
-                    <span class="val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
-                    {{$missing := (index $.MissingCounts .)}}
-                    {{if ne $missing 0}}
-                        <span class="label">{{$missing}} missing</span>
-                    {{end}}
-                </div>
-            {{end}}
-            {{range .IndexKeys}}
-                {{$total := (index $.TotalEntries .)}}
-                {{if $total}}
-                <div class="res-summary-stat">
-                    <span class="label">{{scraper_name .}}</span>
-                    <span class="val blue">$ {{printf "%.2f" $total}}</span>
-                </div>
-                {{end}}
-            {{end}}
-            {{if .Optimized}}
-            <div class="res-summary-stat">
-                <span class="label">Optimizer Max</span>
-                <span class="val green">$ {{printf "%.2f" .HighestTotal}}</span>
-            </div>
-            {{end}}
-        </div>
     </div>
 
     <!-- Tab: Results -->
     <div class="res-panel active" id="panel-results">
-        <div class="ures-wrap">
-            <table class="ures-table">
-                <thead>
-                    <tr>
-                        <th style="width:380px;">Card</th>
-                        <th class="r">Your Price</th>
-                        <th class="c">Cond</th>
-                        <th class="c">Qty</th>
-                        {{range .ScraperKeys}}
-                            <th class="r">{{scraper_name .}}</th>
-                        {{end}}
-                        <th>Index</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .UploadEntries}}
-                        {{$cardId := .CardId}}
-                        {{if .MismatchError}}
-                        <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}">
-                            <td>
-                                <div class="ures-card-cell">
-                                    <img src="https://cards.scryfall.io/back.png" loading="lazy">
-                                    <div class="ures-card-info">
-                                        <span class="ures-card-name"><a href="/search?q={{.Card.Name}}" target="_blank">{{.Card.Name}}</a></span>
-                                        <span class="ures-card-set ures-not-found">Not found</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
-                            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
-                            <td style="text-align:center">{{.Quantity}}</td>
-                            {{range $.ScraperKeys}}<td class="ures-price no-data">&mdash;</td>{{end}}
-                            <td></td>
-                        </tr>
-                        {{else}}
-                        {{$card := (index $.Metadata .CardId)}}
-                        {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
-                        {{$entryStoreKeys := $.ScraperKeys}}
-                        {{if $card.Sealed}}{{$entryStoreKeys = $.SealedScraperKeys}}{{end}}
-                        {{$entryIndexKeys := $.IndexKeys}}
-                        {{if $card.Sealed}}{{$entryIndexKeys = $.SealedIndexKeys}}{{end}}
-                        <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
-                            {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
-                            <td>
-                                <div class="ures-card-cell">
-                                    <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
-                                        <img src="{{$card.ImageURL}}" loading="lazy">
-                                    </div>
-                                    <div class="ures-card-info">
-                                        <span class="ures-card-name">
-                                            <a href="{{$card.SearchURL}}">{{$card.Name}}</a>
-                                            {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
-                                        </span>
-                                        <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
-                                        {{if .MismatchAlias}}
-                                        <button type="button" class="ures-pick-btn"
-                                            data-hash="{{.CardId}}"
-                                            data-aliases="{{range $i, $a := .PossibleAliases}}{{if $i}},{{end}}{{$a}}{{end}}"
-                                            onclick="openPrintingPicker(this)">Select printing</button>
-                                        {{end}}
-                                    </div>
-                                    <button type="button" class="ures-remove-btn" onclick="toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>
-                                </div>
-                            </td>
-                            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
-                            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
-                            <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
-                            {{range $entryStoreKeys}}
-                                {{$price := (index $scraperEntries .)}}
-                                <td class="ures-price {{if and (ne $price 0.0) (is_best_price $scraperEntries . $entryStoreKeys $.IsBuylist)}}best{{end}}">
-                                    {{if ne $price 0.0}}
-                                        <a href="https://mtgban.com/go/{{if $.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
-                                    {{else}}
-                                        &mdash;
-                                    {{end}}
-                                </td>
-                            {{end}}
-                            <td>
-                                <div class="ures-index">
-                                    {{range $entryIndexKeys}}
-                                        {{$indexName := .}}
-                                        {{$idxPrice := (index $scraperEntries $indexName)}}
-                                        {{if $idxPrice}}
-                                        <span><span class="idx-label">{{scraper_name $indexName}}</span><span class="idx-val">$ {{printf "%.2f" $idxPrice}}</span></span>
-                                        {{end}}
-                                    {{end}}
-                                </div>
-                            </td>
-                        </tr>
-                        {{end}}{{/* closes {{else}} for MismatchError */}}
-                    {{end}}
-                    <tr class="ures-totals-row">
-                        <td><span class="ures-totals-label">Totals ({{.TotalQuantity}} cards)</span></td>
-                        <td></td>
-                        <td></td>
-                        <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.TotalQuantity}}</td>
-                        {{range .AllScraperKeys}}
-                            <td class="ures-price" style="font-weight:700">
-                                $ {{printf "%.2f" (index $.TotalEntries .)}}
-                                {{$missing := (index $.MissingCounts .)}}
-                                {{if ne $missing 0}}
-                                    <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $.MissingPrices .)}}</div>
-                                {{end}}
-                            </td>
-                        {{end}}
-                        <td>
-                            <div class="ures-index" style="font-weight:600">
-                                {{range .IndexKeys}}
-                                    {{$total := (index $.TotalEntries .)}}
-                                    {{if $total}}
-                                    <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">$ {{printf "%.2f" $total}}</span></span>
-                                    {{end}}
-                                {{end}}
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        {{if .HasMixed}}
+            <div class="ures-subtabs">
+                <button class="ures-subtab on" data-view="all" onclick="showUresView('all', this)">All</button>
+                <button class="ures-subtab" data-view="singles" onclick="showUresView('singles', this)">Singles</button>
+                <button class="ures-subtab" data-view="sealed" onclick="showUresView('sealed', this)">Sealed</button>
+            </div>
+            <div class="ures-views" data-ures-view="all">
+                <div class="ures-strip ures-strip-all">
+                    <div class="res-summary">
+                        <div class="res-summary-stat">
+                            <span class="label">Cards</span>
+                            <span class="val">{{.TotalQuantity}}</span>
+                        </div>
+                        <div class="res-summary-stat">
+                            <span class="label">Singles</span>
+                            <span class="val">$ {{printf "%.2f" .SinglesHighest}}</span>
+                        </div>
+                        <div class="res-summary-stat">
+                            <span class="label">Sealed</span>
+                            <span class="val green">$ {{printf "%.2f" .SealedHighest}}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="ures-strip ures-strip-singles">
+                    {{template "ures-cat-strip" (dict "Quantity" .SinglesQuantity "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Highest" .SinglesHighest "Root" .)}}
+                </div>
+                <div class="ures-strip ures-strip-sealed">
+                    {{template "ures-cat-strip" (dict "Quantity" .SealedQuantity "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Highest" .SealedHighest "Root" .)}}
+                </div>
+
+                <div class="ures-block ures-block-singles">
+                    <h3 class="ures-block-title">Singles</h3>
+                    <div class="ures-wrap">
+                        {{template "ures-results-table" (dict "Entries" .SinglesEntries "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Quantity" .SinglesQuantity "Root" .)}}
+                    </div>
+                </div>
+                <div class="ures-block ures-block-sealed">
+                    <h3 class="ures-block-title">Sealed</h3>
+                    <div class="ures-wrap">
+                        {{template "ures-results-table" (dict "Entries" .SealedEntries "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Quantity" .SealedQuantity "Root" .)}}
+                    </div>
+                </div>
+
+                <div class="ures-grand">
+                    <span>Grand total (best price per item)</span>
+                    <span class="val">$ {{printf "%.2f" .HighestTotal}}</span>
+                </div>
+            </div>
+        {{else if .SealedEntries}}
+            {{template "ures-cat-strip" (dict "Quantity" .SealedQuantity "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Highest" .SealedHighest "Root" .)}}
+            <div class="ures-wrap">
+                {{template "ures-results-table" (dict "Entries" .SealedEntries "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Quantity" .SealedQuantity "Root" .)}}
+            </div>
+        {{else}}
+            {{template "ures-cat-strip" (dict "Quantity" .SinglesQuantity "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Highest" .SinglesHighest "Root" .)}}
+            <div class="ures-wrap">
+                {{template "ures-results-table" (dict "Entries" .SinglesEntries "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Quantity" .SinglesQuantity "Root" .)}}
+            </div>
+        {{end}}
     </div>
 
     <!-- Tab: Optimizer -->
@@ -1166,6 +1074,15 @@
         document.querySelectorAll('.res-panel').forEach(function(p) { p.classList.remove('active'); });
         document.getElementById('panel-' + panel).classList.add('active');
         document.querySelectorAll('.res-tab').forEach(function(t) { t.classList.remove('on'); });
+        btn.classList.add('on');
+    }
+    function showUresView(view, btn) {
+        var views = document.querySelector('.ures-views');
+        if (views) { views.setAttribute('data-ures-view', view); }
+        var bar = btn.closest('.ures-subtabs');
+        if (bar) {
+            bar.querySelectorAll('.ures-subtab').forEach(function(b) { b.classList.remove('on'); });
+        }
         btn.classList.add('on');
     }
     // One-time localStorage → cookie migration for the upload optimizer
