@@ -731,8 +731,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Allow downloading data as CSV
 	if download && canBuylist {
+		csvName := "mtgban_prices"
+		if scope := r.FormValue("csvscope"); scope == "singles" || scope == "sealed" {
+			csvName += "_" + scope
+		}
 		w.Header().Set("Content-Type", "text/csv")
-		w.Header().Set("Content-Disposition", "attachment; filename=\"mtgban_prices.csv\"")
+		w.Header().Set("Content-Disposition", "attachment; filename=\""+csvName+".csv\"")
 		csvWriter := csv.NewWriter(w)
 
 		// Search for all csv-specific indexes
