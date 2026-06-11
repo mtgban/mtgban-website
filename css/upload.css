@@ -946,6 +946,7 @@
 .ures-price {
     text-align: right;
     font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: var(--text-md);
     white-space: nowrap;
 }
@@ -1016,7 +1017,7 @@
 .opt-toc-item:hover { border-color: var(--accent-border); text-decoration: none; }
 .opt-toc-item .toc-store { font-size: var(--text-md); font-weight: 700; color: var(--normal); }
 .opt-toc-item .toc-stats { font-size: var(--text-sm); color: var(--text-dim); }
-.opt-toc-item .toc-total { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 700; color: var(--asuccess); }
+.opt-toc-item .toc-total { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-lg); font-weight: 700; color: var(--asuccess); }
 
 .opt-store {
     background: var(--surface-1);
@@ -1037,7 +1038,7 @@
 }
 .opt-store-header h3 { font-size: var(--text-lg); font-weight: 700; white-space: nowrap; align-self: end; }
 .opt-header-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; flex: 1; }
-.opt-store-header .opt-total { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 600; color: var(--asuccess); }
+.opt-store-header .opt-total { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-lg); font-weight: 600; color: var(--asuccess); }
 .opt-store-header .opt-count { font-size: var(--text-sm); color: var(--text-dim); padding: 2px 8px; background: var(--surface-3); border-radius: 10px; }
 .opt-btn {
     padding: 6px 14px;
@@ -1095,12 +1096,12 @@
 .opt-name { font-weight: 500; }
 .opt-name a { color: var(--normal); }
 .opt-set { color: var(--text-dim); font-size: var(--text-sm); }
-.opt-offer, .opt-loaded { font-family: var(--font-mono); font-size: var(--text-base); text-align: center; white-space: nowrap; }
+.opt-offer, .opt-loaded { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-base); text-align: center; white-space: nowrap; }
 .opt-offer .offer { display: inline-block; min-width: 5em; text-align: right; color: var(--asuccess); }
 .opt-loaded .loaded-wrap { display: inline-block; text-align: right; }
 .opt-loaded .loaded { display: inline-block; min-width: 5em; text-align: right; color: var(--activetext); }
 .opt-loaded .opt-icons { display: inline-block; width: 2em; text-align: left; padding-left: 6px; }
-.opt-spread { font-family: var(--font-mono); font-size: var(--text-base); font-weight: 600; text-align: right; white-space: nowrap; }
+.opt-spread { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-base); font-weight: 600; text-align: right; white-space: nowrap; }
 .opt-spread.hot { color: var(--awarning); }
 .opt-spread.ok { color: var(--activetext); }
 
@@ -1108,7 +1109,7 @@
 .sum-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .sum-card { background: var(--surface-1); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; }
 .sum-card h3 { font-size: var(--text-md); font-weight: 700; margin-bottom: 8px; }
-.sum-card .s-total { font-family: var(--font-mono); font-size: var(--text-7xl); font-weight: 700; color: var(--asuccess); margin-bottom: 4px; }
+.sum-card .s-total { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-7xl); font-weight: 700; color: var(--asuccess); margin-bottom: 4px; }
 .sum-card .s-total.idx { color: var(--ainfo); }
 .sum-card .s-detail { font-size: var(--text-sm); color: var(--text-dim); }
 
