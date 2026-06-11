@@ -1148,10 +1148,15 @@ func parseHeader(first []string) (map[string]int, error) {
 		field = strings.ToLower(field)
 		switch {
 		// This should cover "uuid", "identifier", and so on
-		case field == "uuid" || field == "id" || (strings.Contains(field, "id") && (strings.Contains(field, "scryfall") || strings.Contains(field, "tcgplayer") || strings.Contains(field, "mtgjson"))):
+		case field == "uuid" || field == "id" || (strings.Contains(field, "id") && (strings.Contains(field, "scryfall") || strings.Contains(field, "tcgplayer product") || strings.Contains(field, "mtgjson"))):
 			_, found := indexMap["id"]
 			if !found {
 				indexMap["id"] = i
+			}
+		case field == "tcgplayer id":
+			_, found := indexMap["tcgSku"]
+			if !found {
+				indexMap["tcgSku"] = i
 			}
 		case (strings.Contains(field, "name") && !strings.Contains(field, "edition") && !strings.Contains(field, "set") && !strings.Contains(field, "expansion") && !strings.Contains(field, "folder")) || field == "card":
 			_, found := indexMap["cardName"]
@@ -1243,10 +1248,11 @@ func parseHeader(first []string) (map[string]int, error) {
 
 	// If this field is present we don't need safe defaults
 	_, foundId := indexMap["id"]
+	_, foundTcgId := indexMap["tcgSku"]
 
 	// Set some default values for the mandatory fields
 	_, foundName := indexMap["cardName"]
-	if !foundName && !foundId {
+	if !foundName && !foundId && !foundTcgId {
 		indexMap["cardName"] = 0
 		// Used by some formats that do not set a card name
 		i, found := indexMap["title"]
@@ -1375,6 +1381,20 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 		res.Card.Id = record[idx]
 	}
 
+	// Try looking up using the TCGSkuId if we found an id and it's not among
+	// the supported ones - this needs to happen before the normal Match
+	// or name matching might interfere with actual results
+	idx, found = indexMap["tcgSku"]
+	if found && idx < len(record) {
+		skuId := record[idx]
+		for _, store := range []string{"TCGSealed", "TCGPlayer"} {
+			res.Card.Id = instanceId2UUID(store, skuId)
+			if res.Card.Id != "" {
+				break
+			}
+		}
+	}
+
 	res.Card.Name = record[indexMap["cardName"]]
 	idx, found = indexMap["edition"]
 	if found && idx < len(record) {
@@ -1446,18 +1466,6 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 
 	var cardId string
 	var err error
-
-	// Try looking up using the TCGSkuId if we found an id and it's not among
-	// the supported ones - this needs to happen before the normal Match
-	// or name matching might interfere with actual results
-	if res.Card.Id != "" && mtgmatcher.ExternalUUID(res.Card.Id) == "" {
-		for _, store := range []string{"TCGSealed", "TCGPlayer"} {
-			cardId = instanceId2UUID(store, res.Card.Id)
-			if cardId != "" {
-				break
-			}
-		}
-	}
 
 	if cardId == "" {
 		cardId, err = mtgmatcher.Match(&res.Card)
