@@ -829,11 +829,13 @@
 .ures-block { display: none; }
 .ures-views[data-ures-view="all"] .ures-strip-all,
 .ures-views[data-ures-view="singles"] .ures-strip-singles,
-.ures-views[data-ures-view="sealed"] .ures-strip-sealed { display: block; }
+.ures-views[data-ures-view="sealed"] .ures-strip-sealed,
+.ures-views[data-ures-view="notfound"] .ures-strip-notfound { display: block; }
 .ures-views[data-ures-view="all"] .ures-block-singles,
 .ures-views[data-ures-view="all"] .ures-block-sealed,
 .ures-views[data-ures-view="singles"] .ures-block-singles,
-.ures-views[data-ures-view="sealed"] .ures-block-sealed { display: block; }
+.ures-views[data-ures-view="sealed"] .ures-block-sealed,
+.ures-views[data-ures-view="notfound"] .ures-block-notfound { display: block; }
 
 /* ── Results table ── */
 .ures-wrap {

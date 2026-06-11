@@ -646,24 +646,6 @@
     <tbody>
         {{range .Entries}}
             {{$cardId := .CardId}}
-            {{if .MismatchError}}
-            <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}">
-                <td>
-                    <div class="ures-card-cell">
-                        <img src="https://cards.scryfall.io/back.png" loading="lazy">
-                        <div class="ures-card-info">
-                            <span class="ures-card-name"><a href="/search?q={{.Card.Name}}" target="_blank">{{.Card.Name}}</a></span>
-                            <span class="ures-card-set ures-not-found">Not found</span>
-                        </div>
-                    </div>
-                </td>
-                <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
-                <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
-                <td style="text-align:center">{{.Quantity}}</td>
-                {{range $storeKeys}}<td class="ures-price no-data">&mdash;</td>{{end}}
-                <td></td>
-            </tr>
-            {{else}}
             {{$card := (index $root.Metadata .CardId)}}
             {{$scraperEntries := (index $root.ResultPrices (print .CardId .OriginalCondition))}}
             <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
@@ -714,7 +696,6 @@
                     </div>
                 </td>
             </tr>
-            {{end}}
         {{end}}
         <tr class="ures-totals-row">
             <td><span class="ures-totals-label">Totals ({{.Quantity}} {{.Noun}})</span></td>
@@ -780,6 +761,37 @@
 </div>
 {{end}}
 
+{{define "ures-notfound-table"}}
+<table class="ures-table">
+    <thead>
+        <tr>
+            <th style="width:380px;">Card</th>
+            <th class="r">Your Price</th>
+            <th class="c">Cond</th>
+            <th class="c">Qty</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Entries}}
+        <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}">
+            <td>
+                <div class="ures-card-cell">
+                    <img src="https://cards.scryfall.io/back.png" loading="lazy">
+                    <div class="ures-card-info">
+                        <span class="ures-card-name"><a href="/search?q={{.Card.Name}}" target="_blank">{{.Card.Name}}</a></span>
+                        <span class="ures-card-set ures-not-found">Not found</span>
+                    </div>
+                </div>
+            </td>
+            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
+            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
+            <td style="text-align:center">{{.Quantity}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}
+
 {{define "upload-results"}}
     <div class="res-header">
         <!-- Row 1: View tabs + Export buttons -->
@@ -801,13 +813,15 @@
 
     <!-- Tab: Results -->
     <div class="res-panel active" id="panel-results">
-        {{if .HasMixed}}
+        {{if .ShowResultTabs}}
             <div class="ures-subtabs">
-                <button class="ures-subtab on" onclick="showUresView('all', this)">All</button>
-                <button class="ures-subtab" onclick="showUresView('singles', this)">Singles</button>
-                <button class="ures-subtab" onclick="showUresView('sealed', this)">Sealed</button>
+                {{if .ShowAllTab}}<button class="ures-subtab{{if eq .DefaultResultView "all"}} on{{end}}" onclick="showUresView('all', this)">All</button>{{end}}
+                {{if .SinglesEntries}}<button class="ures-subtab{{if eq .DefaultResultView "singles"}} on{{end}}" onclick="showUresView('singles', this)">Singles</button>{{end}}
+                {{if .SealedEntries}}<button class="ures-subtab{{if eq .DefaultResultView "sealed"}} on{{end}}" onclick="showUresView('sealed', this)">Sealed</button>{{end}}
+                {{if .NotFoundEntries}}<button class="ures-subtab{{if eq .DefaultResultView "notfound"}} on{{end}}" onclick="showUresView('notfound', this)">Not Found</button>{{end}}
             </div>
-            <div class="ures-views" data-ures-view="all">
+            <div class="ures-views" data-ures-view="{{.DefaultResultView}}">
+                {{if .ShowAllTab}}
                 <div class="ures-strip ures-strip-all">
                     <div class="res-summary">
                         <div class="res-summary-stat">
@@ -824,25 +838,57 @@
                         </div>
                     </div>
                 </div>
+                {{end}}
+                {{if .SinglesEntries}}
                 <div class="ures-strip ures-strip-singles">
                     {{template "ures-cat-strip" (dict "CountLabel" "Cards" "Quantity" .SinglesQuantity "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Highest" .SinglesHighest "Root" .)}}
                 </div>
+                {{end}}
+                {{if .SealedEntries}}
                 <div class="ures-strip ures-strip-sealed">
                     {{template "ures-cat-strip" (dict "CountLabel" "Products" "Quantity" .SealedQuantity "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Highest" .SealedHighest "Root" .)}}
                 </div>
+                {{end}}
+                {{if .NotFoundEntries}}
+                <div class="ures-strip ures-strip-notfound">
+                    <div class="res-summary">
+                        <div class="res-summary-stat">
+                            <span class="label">Not Found</span>
+                            <span class="val">{{len .NotFoundEntries}}</span>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
 
+                {{if .SinglesEntries}}
                 <div class="ures-block ures-block-singles">
                     <h3 class="ures-block-title">Singles</h3>
                     <div class="ures-wrap">
                         {{template "ures-results-table" (dict "Entries" .SinglesEntries "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Quantity" .SinglesQuantity "Noun" "cards" "Root" .)}}
                     </div>
                 </div>
+                {{end}}
+                {{if .SealedEntries}}
                 <div class="ures-block ures-block-sealed">
                     <h3 class="ures-block-title">Sealed</h3>
                     <div class="ures-wrap">
                         {{template "ures-results-table" (dict "Entries" .SealedEntries "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Quantity" .SealedQuantity "Noun" "products" "Root" .)}}
                     </div>
                 </div>
+                {{end}}
+                {{if .NotFoundEntries}}
+                <div class="ures-block ures-block-notfound">
+                    <h3 class="ures-block-title">Not Found</h3>
+                    <div class="ures-wrap">
+                        {{template "ures-notfound-table" (dict "Entries" .NotFoundEntries)}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        {{else if .SinglesEntries}}
+            {{template "ures-cat-strip" (dict "CountLabel" "Cards" "Quantity" .SinglesQuantity "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Highest" .SinglesHighest "Root" .)}}
+            <div class="ures-wrap">
+                {{template "ures-results-table" (dict "Entries" .SinglesEntries "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Quantity" .SinglesQuantity "Noun" "cards" "Root" .)}}
             </div>
         {{else if .SealedEntries}}
             {{template "ures-cat-strip" (dict "CountLabel" "Products" "Quantity" .SealedQuantity "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Highest" .SealedHighest "Root" .)}}
@@ -850,9 +896,14 @@
                 {{template "ures-results-table" (dict "Entries" .SealedEntries "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Quantity" .SealedQuantity "Noun" "products" "Root" .)}}
             </div>
         {{else}}
-            {{template "ures-cat-strip" (dict "CountLabel" "Cards" "Quantity" .SinglesQuantity "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Highest" .SinglesHighest "Root" .)}}
+            <div class="res-summary">
+                <div class="res-summary-stat">
+                    <span class="label">Not Found</span>
+                    <span class="val">{{len .NotFoundEntries}}</span>
+                </div>
+            </div>
             <div class="ures-wrap">
-                {{template "ures-results-table" (dict "Entries" .SinglesEntries "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Quantity" .SinglesQuantity "Noun" "cards" "Root" .)}}
+                {{template "ures-notfound-table" (dict "Entries" .NotFoundEntries)}}
             </div>
         {{end}}
     </div>

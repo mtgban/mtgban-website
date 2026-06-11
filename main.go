@@ -214,14 +214,17 @@ type PageVars struct {
 	MissingPrices        map[string]float64
 	ResultPrices         map[string]map[string]float64
 	UploadQuery          string
-	// Upload singles/sealed split
-	SinglesEntries  []UploadEntry
-	SealedEntries   []UploadEntry
-	SinglesQuantity int
-	SealedQuantity  int
-	SinglesHighest  float64
-	SealedHighest   float64
-	HasMixed        bool
+	// Upload singles/sealed/not-found split
+	SinglesEntries    []UploadEntry
+	SealedEntries     []UploadEntry
+	NotFoundEntries   []UploadEntry
+	SinglesQuantity   int
+	SealedQuantity    int
+	SinglesHighest    float64
+	SealedHighest     float64
+	ShowResultTabs    bool
+	ShowAllTab        bool
+	DefaultResultView string
 }
 
 type NavElem struct {
