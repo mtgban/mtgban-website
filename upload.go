@@ -137,24 +137,6 @@ type OptimizedUploadEntry struct {
 	Profitability float64
 }
 
-// filterEnabledStores intersects submitted stores with the allowed list.
-// A locked user, or a submission that resolves to nothing, gets the full list.
-func filterEnabledStores(submitted, allowed []string, canChange bool) []string {
-	if !canChange {
-		return allowed
-	}
-	var out []string
-	for _, store := range submitted {
-		if slices.Contains(allowed, store) {
-			out = append(out, store)
-		}
-	}
-	if len(out) == 0 {
-		return allowed
-	}
-	return out
-}
-
 func Upload(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
@@ -308,6 +290,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 	var enabledStores []string
+	var enabledSealedStores []string
 	var singlesSellers []string
 	var singlesVendors []string
 	var sealedSellers []string
@@ -319,11 +302,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		short := seller.Info().Shorthand
-		if seller.Info().SealedMode {
-			if !slices.Contains(Config.UploadSealedBlockList, short) {
-				sealedSellers = append(sealedSellers, short)
-			}
-		} else if !slices.Contains(blocklistRetail, short) {
+		if seller.Info().SealedMode && !slices.Contains(Config.UploadSealedBlockList, short) {
+			sealedSellers = append(sealedSellers, short)
+		} else if !seller.Info().SealedMode && !slices.Contains(blocklistRetail, short) {
 			singlesSellers = append(singlesSellers, short)
 		}
 	}
@@ -332,11 +313,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		short := vendor.Info().Shorthand
-		if vendor.Info().SealedMode {
-			if !slices.Contains(Config.UploadSealedBlockList, short) {
-				sealedVendors = append(sealedVendors, short)
-			}
-		} else if !slices.Contains(blocklistBuylist, short) {
+		if vendor.Info().SealedMode && !slices.Contains(Config.UploadSealedBlockList, short) {
+			sealedVendors = append(sealedVendors, short)
+		} else if !vendor.Info().SealedMode && !slices.Contains(blocklistBuylist, short) {
 			singlesVendors = append(singlesVendors, short)
 		}
 	}
@@ -384,24 +363,38 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Filter out any unselected store from the full list
 	stores := r.Form["stores"]
+	sealedStores := r.Form["sealed_stores"]
 	if blMode {
 		// Override in case not allowed to change list
 		if !canChangeStores {
 			stores = singlesVendors
+			sealedStores = sealedVendors
 		}
 		for _, store := range stores {
 			if slices.Contains(singlesVendors, store) {
 				enabledStores = append(enabledStores, store)
 			}
 		}
+		for _, store := range sealedStores {
+			if slices.Contains(sealedVendors, store) {
+				enabledSealedStores = append(enabledSealedStores, store)
+			}
+		}
+
 	} else {
 		// Override in case not allowed to change list
 		if !canChangeStores {
 			stores = Config.AffiliatesList
+			sealedStores = sealedSellers
 		}
 		for _, store := range stores {
 			if slices.Contains(singlesSellers, store) {
 				enabledStores = append(enabledStores, store)
+			}
+		}
+		for _, store := range sealedStores {
+			if slices.Contains(sealedSellers, store) {
+				enabledSealedStores = append(enabledSealedStores, store)
 			}
 		}
 	}
@@ -412,6 +405,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			enabledStores = pageVars.EnabledVendors
 		} else {
 			enabledStores = pageVars.EnabledSellers
+		}
+	}
+	// Same as above, covering requests that carry no sealed_stores field
+	// at all (hash transfers from search, gdocURL links)
+	if len(sealedStores) == 0 && len(enabledSealedStores) == 0 {
+		if blMode {
+			enabledSealedStores = pageVars.EnabledSealedVendors
+		} else {
+			enabledSealedStores = pageVars.EnabledSealedSellers
 		}
 	}
 
@@ -464,10 +466,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Save user preferred stores in cookies and make sure the page is updated with those
 	if blMode {
 		setForeverCookie(w, "enabledVendors", strings.Join(enabledStores, "|"))
+		setForeverCookie(w, "enabledSealedVendors", strings.Join(enabledSealedStores, "|"))
 		pageVars.EnabledVendors = enabledStores
+		pageVars.EnabledSealedVendors = enabledSealedStores
 	} else {
 		setForeverCookie(w, "enabledSellers", strings.Join(enabledStores, "|"))
+		setForeverCookie(w, "enabledSealedSellers", strings.Join(enabledSealedStores, "|"))
 		pageVars.EnabledSellers = enabledStores
+		pageVars.EnabledSealedSellers = enabledSealedStores
 	}
 
 	// Set upload limit
@@ -671,17 +677,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Search — fetch card and sealed prices separately then merge
 	var results map[string]map[string]*BanPrice
 	var credits map[string]float64
-	sealedStores := r.Form["sealed_stores"]
-	enabledSealedStores := filterEnabledStores(sealedStores, sealedSellers, canChangeStores)
-	if len(sealedStores) == 0 && canChangeStores {
-		enabledSealedStores = pageVars.EnabledSealedSellers
-	}
+
 	if blMode {
 		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
-		enabledSealedStores = filterEnabledStores(sealedStores, sealedVendors, canChangeStores)
-		if len(sealedStores) == 0 && canChangeStores {
-			enabledSealedStores = pageVars.EnabledSealedVendors
-		}
 
 		// Fetch sealed vendor prices and merge
 		if len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
@@ -718,15 +716,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	}
-
-	// Save user preferred sealed stores in cookies, mirroring singles above
-	if blMode {
-		setForeverCookie(w, "enabledSealedVendors", strings.Join(enabledSealedStores, "|"))
-		pageVars.EnabledSealedVendors = enabledSealedStores
-	} else {
-		setForeverCookie(w, "enabledSealedSellers", strings.Join(enabledSealedStores, "|"))
-		pageVars.EnabledSealedSellers = enabledSealedStores
 	}
 
 	// Allow downloading data as CSV
