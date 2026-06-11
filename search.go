@@ -286,6 +286,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	foundSellers, foundVendors := searchParallelNG(allKeys, config)
 
+	// Append the virtual custom buylist when enabled in the upload settings
+	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
+	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
+	if canUploadCustom && !config.SkipBuylist {
+		searchCustomBuylist(r, allKeys, foundVendors)
+	}
+
 	// Filter away any empty result
 	allKeys = PostSearchFilter(config, allKeys, foundSellers, foundVendors)
 
@@ -876,6 +883,73 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 	}
 
 	return
+}
+
+// Append a virtual buylist to search results, priced off the reference
+// seller inventories according to the custom buylist rule settings
+func searchCustomBuylist(r *http.Request, cardIds []string, foundVendors map[string]map[string][]SearchEntry) {
+	customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
+	if !slices.Contains(customOpts, "enabled") {
+		return
+	}
+
+	rate, _ := strconv.ParseFloat(readCookie(r, "UploadCustomRate"), 64)
+	if rate <= 0 {
+		return
+	}
+	minPrice, _ := strconv.ParseFloat(readCookie(r, "UploadCustomMinPrice"), 64)
+
+	customSeller := readCookie(r, "UploadCustomBuyer")
+	customSealedSeller := readCookie(r, "UploadCustomSealedBuyer")
+	singles, _ := findSellerInventory(customSeller)
+	sealed, _ := findSellerInventory(customSealedSeller)
+
+	// Index price sources have a single meaningful price, while regular
+	// retailers list one price per condition
+	isIndex := slices.Contains(UploadIndexComparePriceList, customSeller)
+
+	for _, cardId := range cardIds {
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			continue
+		}
+
+		ref := singles
+		if co.Sealed {
+			ref = sealed
+		}
+		if ref == nil {
+			continue
+		}
+		entries, found := ref[cardId]
+		if !found || len(entries) == 0 {
+			continue
+		}
+
+		// The rule applies to the best available price
+		if entries[0].Price == 0 || entries[0].Price < minPrice {
+			continue
+		}
+
+		if foundVendors[cardId] == nil {
+			foundVendors[cardId] = map[string][]SearchEntry{}
+		}
+
+		for _, entry := range entries {
+			if entry.Price == 0 {
+				continue
+			}
+			condition := "INDEX"
+			if !isIndex {
+				condition = entry.Conditions
+			}
+			foundVendors[cardId][condition] = append(foundVendors[cardId][condition], SearchEntry{
+				ScraperName: "Custom Buylist",
+				Shorthand:   "CUSTOM",
+				Price:       entry.Price * rate,
+			})
+		}
+	}
 }
 
 func searchAndFilter(config SearchConfig) ([]string, error) {
