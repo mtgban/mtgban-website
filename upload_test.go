@@ -1,9 +1,68 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
+
+func TestPartitionEntries(t *testing.T) {
+	errEntry := UploadEntry{MismatchError: errors.New("not found")}
+	s1 := UploadEntry{CardId: "single1"}
+	s2 := UploadEntry{CardId: "single2"}
+	sealed1 := UploadEntry{CardId: "sealed1"}
+	sealedIds := []string{"sealed1", "sealed2"}
+
+	tests := []struct {
+		name        string
+		entries     []UploadEntry
+		wantSingles []UploadEntry
+		wantSealed  []UploadEntry
+	}{
+		{
+			name:        "mixed splits by membership",
+			entries:     []UploadEntry{s1, sealed1},
+			wantSingles: []UploadEntry{s1},
+			wantSealed:  []UploadEntry{sealed1},
+		},
+		{
+			name:        "singles only",
+			entries:     []UploadEntry{s1, s2},
+			wantSingles: []UploadEntry{s1, s2},
+			wantSealed:  nil,
+		},
+		{
+			name:        "errors join sealed when no matched singles",
+			entries:     []UploadEntry{sealed1, errEntry},
+			wantSingles: nil,
+			wantSealed:  []UploadEntry{sealed1, errEntry},
+		},
+		{
+			name:        "errors stay with singles when singles present",
+			entries:     []UploadEntry{s1, errEntry},
+			wantSingles: []UploadEntry{s1, errEntry},
+			wantSealed:  nil,
+		},
+		{
+			name:        "only errors go to singles",
+			entries:     []UploadEntry{errEntry},
+			wantSingles: []UploadEntry{errEntry},
+			wantSealed:  nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotSingles, gotSealed := partitionEntries(tc.entries, sealedIds)
+			if !reflect.DeepEqual(gotSingles, tc.wantSingles) {
+				t.Errorf("singles = %v, want %v", gotSingles, tc.wantSingles)
+			}
+			if !reflect.DeepEqual(gotSealed, tc.wantSealed) {
+				t.Errorf("sealed = %v, want %v", gotSealed, tc.wantSealed)
+			}
+		})
+	}
+}
 
 func TestFilterEnabledStores(t *testing.T) {
 	allowed := []string{"a", "b", "c"}

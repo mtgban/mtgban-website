@@ -1204,6 +1204,43 @@ func adjustQty(qty, multiplier, maxQty int) int {
 	return qty
 }
 
+// partitionEntries splits entries into singles and sealed by membership in
+// sealedIds. Unmatched entries follow the singles side, unless every matched
+// entry is sealed (then errors join the sealed side so a sealed-only upload
+// does not produce a singles table of only "not found" rows).
+func partitionEntries(entries []UploadEntry, sealedIds []string) (singles, sealed []UploadEntry) {
+	sealedSet := make(map[string]bool, len(sealedIds))
+	for _, id := range sealedIds {
+		sealedSet[id] = true
+	}
+
+	var matchedSingles, matchedSealed int
+	for _, e := range entries {
+		if e.MismatchError != nil {
+			continue
+		}
+		if sealedSet[e.CardId] {
+			matchedSealed++
+		} else {
+			matchedSingles++
+		}
+	}
+	errorsToSealed := matchedSealed > 0 && matchedSingles == 0
+
+	for _, e := range entries {
+		isSealed := e.MismatchError == nil && sealedSet[e.CardId]
+		if e.MismatchError != nil && errorsToSealed {
+			isSealed = true
+		}
+		if isSealed {
+			sealed = append(sealed, e)
+		} else {
+			singles = append(singles, e)
+		}
+	}
+	return singles, sealed
+}
+
 func mergeIdenticalEntries(uploadedData []UploadEntry) []UploadEntry {
 	var uploadedDataClean []UploadEntry
 	duplicatedHashes := map[string]bool{}
