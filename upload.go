@@ -1067,13 +1067,38 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	sortResults(uploadedData, optimizedResults, sorting, preferFlavor)
 
-	// Split sorted entries into singles and sealed for the tabbed results view
-	singlesEntries, sealedEntries := partitionEntries(uploadedData, sealedProductIds)
+	// Split sorted entries into singles, sealed, and not-found for the tabbed view
+	singlesEntries, sealedEntries, notFoundEntries := partitionEntries(uploadedData, sealedProductIds)
 	pageVars.SinglesEntries = singlesEntries
 	pageVars.SealedEntries = sealedEntries
-	pageVars.HasMixed = len(singlesEntries) > 0 && len(sealedEntries) > 0
+	pageVars.NotFoundEntries = notFoundEntries
 	pageVars.SinglesHighest = singlesHighest
 	pageVars.SealedHighest = sealedHighest
+
+	// Decide which result sub-tabs to show. The All tab appears only when both
+	// actionable categories are present; the bar appears when more than one
+	// section (singles, sealed, not-found) exists.
+	hasSingles := len(singlesEntries) > 0
+	hasSealed := len(sealedEntries) > 0
+	hasNotFound := len(notFoundEntries) > 0
+	sections := 0
+	for _, present := range []bool{hasSingles, hasSealed, hasNotFound} {
+		if present {
+			sections++
+		}
+	}
+	pageVars.ShowResultTabs = sections > 1
+	pageVars.ShowAllTab = hasSingles && hasSealed
+	switch {
+	case pageVars.ShowAllTab:
+		pageVars.DefaultResultView = "all"
+	case hasSingles:
+		pageVars.DefaultResultView = "singles"
+	case hasSealed:
+		pageVars.DefaultResultView = "sealed"
+	default:
+		pageVars.DefaultResultView = "notfound"
+	}
 
 	pageVars.MissingCounts = missingCounts
 	pageVars.MissingPrices = missingPrices
@@ -1224,41 +1249,26 @@ func adjustQty(qty, multiplier, maxQty int) int {
 	return qty
 }
 
-// partitionEntries splits entries into singles and sealed by membership in
-// sealedIds. Unmatched entries follow the singles side, unless every matched
-// entry is sealed (then errors join the sealed side so a sealed-only upload
-// does not produce a singles table of only "not found" rows).
-func partitionEntries(entries []UploadEntry, sealedIds []string) (singles, sealed []UploadEntry) {
+// partitionEntries splits entries into singles, sealed, and notFound. Entries
+// with a match error go to notFound; matched entries split by membership in
+// sealedIds.
+func partitionEntries(entries []UploadEntry, sealedIds []string) (singles, sealed, notFound []UploadEntry) {
 	sealedSet := make(map[string]bool, len(sealedIds))
 	for _, id := range sealedIds {
 		sealedSet[id] = true
 	}
 
-	var matchedSingles, matchedSealed int
 	for _, e := range entries {
-		if e.MismatchError != nil {
-			continue
-		}
-		if sealedSet[e.CardId] {
-			matchedSealed++
-		} else {
-			matchedSingles++
-		}
-	}
-	errorsToSealed := matchedSealed > 0 && matchedSingles == 0
-
-	for _, e := range entries {
-		isSealed := e.MismatchError == nil && sealedSet[e.CardId]
-		if e.MismatchError != nil && errorsToSealed {
-			isSealed = true
-		}
-		if isSealed {
+		switch {
+		case e.MismatchError != nil:
+			notFound = append(notFound, e)
+		case sealedSet[e.CardId]:
 			sealed = append(sealed, e)
-		} else {
+		default:
 			singles = append(singles, e)
 		}
 	}
-	return singles, sealed
+	return singles, sealed, notFound
 }
 
 func mergeIdenticalEntries(uploadedData []UploadEntry) []UploadEntry {
