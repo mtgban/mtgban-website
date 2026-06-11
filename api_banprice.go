@@ -449,7 +449,7 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 	return out
 }
 
-func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, mode, cardId, filterByEdition, filterByFinish, scraperTag string, qty, conds, shouldBaseCond bool) {
+func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, idMode, cardId, scraperTag string, qty, conds, shouldBaseCond bool) {
 	if len(entries) == 0 {
 		return
 	}
@@ -463,7 +463,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 	if filterByFinish != "" && checkFinish(co, filterByFinish) {
 		return
 	}
-	id := getIdFunc(mode)(co)
+	id := getIdFunc(idMode)(co)
 	if id == "" {
 		return
 	}
