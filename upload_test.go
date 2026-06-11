@@ -49,6 +49,12 @@ func TestPartitionEntries(t *testing.T) {
 			wantSingles: []UploadEntry{errEntry},
 			wantSealed:  nil,
 		},
+		{
+			name:        "errors stay with singles in mixed upload",
+			entries:     []UploadEntry{s1, sealed1, errEntry},
+			wantSingles: []UploadEntry{s1, errEntry},
+			wantSealed:  []UploadEntry{sealed1},
+		},
 	}
 
 	for _, tc := range tests {
