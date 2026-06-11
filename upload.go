@@ -214,6 +214,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		canChangeStores = true
 	}
 
+	// Allow setting up a custom buylist
+	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
+	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
+
 	// Enable optimizer customization
 	var skipLowValue, skipLowValueAbs, skipHighValue, skipHighValueAbs bool
 	var skipConds, skipPrices bool
@@ -497,7 +501,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
 	}
-
 	start := time.Now()
 
 	// Load data
@@ -680,6 +683,25 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	if blMode {
 		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+
+		// Build the custom buylist if requested
+		if canUploadCustom {
+			rule := EntryRule{MinPrice: 7, Rate: 0.8}
+
+			ref, _ := findSellerInventory("TCGLow")
+			for _, cardId := range cardIds {
+				processEntry(results, ref[cardId], "", cardId, "CUSTOM", false, shouldCheckForConditions, false, rule)
+			}
+			enabledStores = append(enabledStores, "CUSTOM")
+
+			if len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
+				ref, _ := findSellerInventory("TCGSealed")
+				for _, productId := range sealedProductIds {
+					processEntry(results, ref[productId], "", productId, "CUSTOM_SEALED", false, false, false, rule)
+				}
+				enabledSealedStores = append(enabledSealedStores, "CUSTOM_SEALED")
+			}
+		}
 
 		// Fetch sealed vendor prices and merge
 		if len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {

@@ -456,6 +456,9 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 type EntryRule struct {
 	Edition string
 	Finish  string
+
+	MinPrice float64
+	Rate     float64
 }
 
 func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, idMode, cardId, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
@@ -471,6 +474,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		return
 	}
 
+	rate := 1.0
 	for _, rule := range rules {
 		if rule.Edition != "" && co.SetCode != rule.Edition {
 			return
@@ -478,9 +482,15 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		if rule.Finish != "" && checkFinish(co, rule.Finish) {
 			return
 		}
+		if entries[0].Pricing() < rule.MinPrice {
+			return
+		}
+		if rule.Rate != 0 {
+			rate = rule.Rate
+		}
 	}
 
-	basePrice := entries[0].Pricing()
+	basePrice := entries[0].Pricing() * rate
 	if basePrice == 0 {
 		return
 	}
@@ -518,7 +528,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition() + "_etched"
-				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing() * rate
 				if qty && entries[i].Qty() > 0 {
 					if out[id][scraperTag].Quantities == nil {
 						out[id][scraperTag].Quantities = map[string]int{}
@@ -537,7 +547,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition() + "_foil"
-				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing() * rate
 				if qty && entries[i].Qty() > 0 {
 					if out[id][scraperTag].Quantities == nil {
 						out[id][scraperTag].Quantities = map[string]int{}
@@ -556,7 +566,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition()
-				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing() * rate
 				if qty && entries[i].Qty() > 0 {
 					if out[id][scraperTag].Quantities == nil {
 						out[id][scraperTag].Quantities = map[string]int{}

@@ -937,7 +937,9 @@ func scraperName(shorthand string) string {
 			return name
 		}
 	}
-	return ""
+
+	// If nothing is found, check if there is a custom override for the shorthand itself
+	return Config.ScraperConfig.NameOverride[shorthand]
 }
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
