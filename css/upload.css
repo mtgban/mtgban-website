@@ -788,6 +788,68 @@
 .res-panel { display: none; }
 .res-panel.active { display: block; }
 
+/* ── Results sub-tabs (singles / sealed / all) ── */
+.ures-subtabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 1em;
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 4px;
+    width: fit-content;
+}
+.ures-subtab {
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    font-size: var(--text-md);
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--activetext);
+    border: none;
+    background: none;
+    font-family: inherit;
+    transition: all 0.12s;
+}
+.ures-subtab:hover { color: var(--normal); }
+.ures-subtab.on { background: var(--accent-muted); color: var(--ainfo); }
+
+.ures-block-title {
+    margin: 0.25em 0 0.5em;
+    font-size: var(--text-lg);
+    color: var(--text-dim);
+}
+.ures-views .ures-strip { margin-bottom: 1em; }
+.ures-views .ures-block .ures-wrap { margin-bottom: 1.5em; }
+
+/* View toggling: strips, blocks, and the grand bar are hidden by default
+   and revealed per the active data-ures-view. */
+.ures-strip, .ures-grand { display: none; }
+.ures-block { display: none; }
+.ures-views[data-ures-view="all"] .ures-strip-all,
+.ures-views[data-ures-view="singles"] .ures-strip-singles,
+.ures-views[data-ures-view="sealed"] .ures-strip-sealed { display: block; }
+.ures-views[data-ures-view="all"] .ures-block-singles,
+.ures-views[data-ures-view="all"] .ures-block-sealed,
+.ures-views[data-ures-view="singles"] .ures-block-singles,
+.ures-views[data-ures-view="sealed"] .ures-block-sealed { display: block; }
+.ures-views[data-ures-view="all"] .ures-grand {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 6em;
+    background: var(--surface-2);
+    border: 1px solid var(--border-moderate);
+    border-radius: var(--radius-md);
+    font-weight: 700;
+}
+.ures-grand .val {
+    color: var(--asuccess);
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+}
+
 /* ── Results table ── */
 .ures-wrap {
     background: var(--surface-1);
