@@ -291,6 +291,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.IsBuylist = blMode
 	pageVars.CanBuylist = canBuylist
 	pageVars.CanChangeStores = canChangeStores
+	pageVars.CanUploadCustom = canUploadCustom
 
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 	var enabledStores []string
@@ -685,17 +686,30 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 
 		// Build the custom buylist if requested
-		if canUploadCustom {
-			rule := EntryRule{MinPrice: 7, Rate: 0.8}
-
-			ref, _ := findSellerInventory("TCGLow")
-			for _, cardId := range cardIds {
-				processEntry(results, ref[cardId], "", cardId, "CUSTOM", false, shouldCheckForConditions, false, rule)
+		customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
+		if canUploadCustom && customBuylist {
+			var rule EntryRule
+			customMinPrice, err := strconv.ParseFloat(r.FormValue("customminprice"), 64)
+			if err == nil && customMinPrice > 0 {
+				rule.MinPrice = customMinPrice
 			}
-			enabledStores = append(enabledStores, "CUSTOM")
+			customRate, err := strconv.ParseFloat(r.FormValue("customrate"), 64)
+			if err == nil && customRate > 0 {
+				rule.Rate = customRate
+			}
 
-			if len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
-				ref, _ := findSellerInventory("TCGSealed")
+			customSeller := r.FormValue("customseller")
+			if customSeller != "" {
+				ref, _ := findSellerInventory(customSeller)
+				for _, cardId := range cardIds {
+					processEntry(results, ref[cardId], "", cardId, "CUSTOM", false, shouldCheckForConditions, false, rule)
+				}
+				enabledStores = append(enabledStores, "CUSTOM")
+			}
+
+			customSealedSeller := r.FormValue("customsealedseller")
+			if customSealedSeller != "" && len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
+				ref, _ := findSellerInventory(customSealedSeller)
 				for _, productId := range sealedProductIds {
 					processEntry(results, ref[productId], "", productId, "CUSTOM_SEALED", false, false, false, rule)
 				}

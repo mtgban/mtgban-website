@@ -37,6 +37,14 @@
         add('sorting',        getCookie('UploadSorting')       || '');
         add('altPrice',       getCookie('UploadAltPrice')      || '');
         add('pricesource',    getCookie('UploadPriceSource')   || '');
+        var customOpts = (getCookie('UploadCustomOpts') || '').split(',').filter(Boolean);
+        if (customOpts.indexOf('enabled') >= 0) {
+            add('custombuylist',      'true');
+            add('customseller',       getCookie('UploadCustomBuyer')       || 'TCGLow');
+            add('customsealedseller', getCookie('UploadCustomSealedBuyer') || 'TCGSealed');
+            add('customminprice',     getCookie('UploadCustomMinPrice')    || '7');
+            add('customrate',         getCookie('UploadCustomRate')        || '0.8');
+        }
     }
     </script>
     {{if or .UploadEntries .Optimized}}
@@ -1640,6 +1648,63 @@
                 <input type="text" id="opt-maxqty" value="0" class="settings-inline-num">
             </label>
         </div>
+    </div>
+</section>
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Custom Buylist Rule</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body" id="settings-upload-custom" data-cookie="UploadCustomOpts">
+        {{if .CanUploadCustom}}
+        <p class="section-desc">Include a series of rules for your own buylist to populate the optimizer results.</p>
+        <div class="settings-toggles-grid">
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="enabled">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Enable the custom buylist</span>
+            </label>
+        </div>
+        <div class="settings-upload-fields">
+            <label class="settings-field-row">
+                <span>Reference seller (singles)</span>
+                <select id="opt-customseller" data-cookie="UploadCustomBuyer">
+                    <optgroup label="Index">
+                        {{range $.AltKeys}}{{$name := scraper_name .}}{{if $name}}
+                        <option value="{{.}}" {{if eq . "TCGLow"}}selected{{end}}>{{$name}}</option>
+                        {{end}}{{end}}
+                    </optgroup>
+                    <optgroup label="Retailers">
+                        {{range $.SellerKeys}}{{$name := scraper_name .}}{{if $name}}
+                        <option value="{{.}}">{{$name}}</option>
+                        {{end}}{{end}}
+                    </optgroup>
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Reference seller (sealed)</span>
+                <select id="opt-customsealedseller" data-cookie="UploadCustomSealedBuyer">
+                    {{range $.SealedSellerKeys}}{{$name := scraper_name .}}{{if $name}}
+                    <option value="{{.}}" {{if eq . "TCGSealed"}}selected{{end}}>{{$name}}</option>
+                    {{end}}{{end}}
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Minimum price ($)</span>
+                <input type="text" id="opt-customminprice" value="7" class="settings-inline-num">
+            </label>
+            <label class="settings-field-row">
+                <span>Buy rate</span>
+                <input type="text" id="opt-customrate" value="0.8" class="settings-inline-num">
+            </label>
+        </div>
+        {{else}}
+        <p class="section-desc">
+            <i style="font-size: var(--text-sm); color: var(--greytext);">
+                Increase your tier to define a custom buylist and populate the optimizer results with your own offers!
+            </i>
+        </p>
+        {{end}}
     </div>
 </section>
 {{end}}

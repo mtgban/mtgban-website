@@ -205,6 +205,7 @@ type PageVars struct {
 	EnabledSealedVendors []string
 	CanBuylist           bool
 	CanChangeStores      bool
+	CanUploadCustom      bool
 	RemoteLinkURL        string
 	TotalQuantity        int
 	Optimized            map[string][]OptimizedUploadEntry

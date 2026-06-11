@@ -38,12 +38,14 @@
             'SearchSellersPriority', 'SearchVendorsPriority',
             // upload
             'UploadSorting', 'UploadAltPrice', 'UploadPriceSource',
+            'UploadCustomBuyer', 'UploadCustomSealedBuyer',
         ],
         misc: {
             // search
             'settings-search-misc': 'SearchMiscOpts',
             // upload
             'settings-upload-checks': 'UploadOptimizerOpts',
+            'settings-upload-custom': 'UploadCustomOpts',
         },
         miscDefaults: {
             // upload
@@ -59,6 +61,8 @@
             'opt-custompercmax': 'UploadCustomPercMax',
             'opt-multiplier': 'UploadMultiplier',
             'opt-maxqty': 'UploadMaxQty',
+            'opt-customminprice': 'UploadCustomMinPrice',
+            'opt-customrate': 'UploadCustomRate',
         },
         // arbit — cookie name varies by route (ArbitVendorsList /
         // GlobalVendorsList / ReverseVendorsList) and is read from the
@@ -180,7 +184,11 @@
         const sel = document.querySelector('#settings-modal select[data-cookie="' + cookieName + '"]');
         if (!sel) return;
         addBinding({
-            load: function () { sel.value = getCookie(cookieName); },
+            // Keep the markup's default selection when the cookie is not set
+            load: function () {
+                const val = getCookie(cookieName);
+                if (val) sel.value = val;
+            },
             save: function () { setCookie(cookieName, sel.value, 1000); },
             serialize: function () { return cookieName + '=' + sel.value; },
         });
