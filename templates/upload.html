@@ -45,7 +45,7 @@
             <div class="page-header">
                 <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{.UploadQuery}}{{end}}</h1>
                 <p class="page-subtitle">
-                    {{if .UploadEntries}}{{len .UploadEntries}} cards matched &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
+                    {{if .UploadEntries}}{{len .UploadEntries}} rows &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
                     {{if .RemoteLinkURL}}
                         &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="copyShareLink(this)" title="Copy shareable link">
                             <i data-lucide="share-2" style="width:14px;height:14px;vertical-align:-2px"></i> Share
