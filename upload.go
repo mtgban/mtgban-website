@@ -847,6 +847,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var highestTotal float64
+	var singlesHighest, sealedHighest float64
 
 	optimizedResults := map[string][]OptimizedUploadEntry{}
 	optimizedTotals := map[string]float64{}
@@ -912,7 +913,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if uploadedData[i].HasQuantity {
 			qty = uploadedData[i].Quantity
 		}
-		pageVars.TotalQuantity += adjustQty(qty, multiplier, maxQty)
+		adjusted := adjustQty(qty, multiplier, maxQty)
+		pageVars.TotalQuantity += adjusted
+		if isSealed {
+			pageVars.SealedQuantity += adjusted
+		} else {
+			pageVars.SinglesQuantity += adjusted
+		}
 
 		// Run summaries for each vendor
 		for shorthand, banPrice := range results[cardId] {
@@ -1046,6 +1053,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			optimizedTotals[bestStore] += bestPrice
 			if j == 0 {
 				highestTotal += bestPrice
+				if isSealed {
+					sealedHighest += bestPrice
+				} else {
+					singlesHighest += bestPrice
+				}
 			}
 		}
 
@@ -1054,6 +1066,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sortResults(uploadedData, optimizedResults, sorting, preferFlavor)
+
+	// Split sorted entries into singles and sealed for the tabbed results view
+	singlesEntries, sealedEntries := partitionEntries(uploadedData, sealedProductIds)
+	pageVars.SinglesEntries = singlesEntries
+	pageVars.SealedEntries = sealedEntries
+	pageVars.HasMixed = len(singlesEntries) > 0 && len(sealedEntries) > 0
+	pageVars.SinglesHighest = singlesHighest
+	pageVars.SealedHighest = sealedHighest
 
 	pageVars.MissingCounts = missingCounts
 	pageVars.MissingPrices = missingPrices
