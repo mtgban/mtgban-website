@@ -843,13 +843,6 @@
                         {{template "ures-results-table" (dict "Entries" .SealedEntries "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Quantity" .SealedQuantity "Root" .)}}
                     </div>
                 </div>
-
-                {{if .HighestTotal}}
-                <div class="ures-grand">
-                    <span>Grand total (best price per item)</span>
-                    <span class="val">$ {{printf "%.2f" .HighestTotal}}</span>
-                </div>
-                {{end}}
             </div>
         {{else if .SealedEntries}}
             {{template "ures-cat-strip" (dict "Quantity" .SealedQuantity "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Highest" .SealedHighest "Root" .)}}
