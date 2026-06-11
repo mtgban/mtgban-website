@@ -137,6 +137,34 @@ type OptimizedUploadEntry struct {
 	Profitability float64
 }
 
+// Checkbox options enabled by default in the settings UI when the
+// preference cookie was never saved
+var defaultUploadOpts = []string{"lowval", "lowvalabs", "minmargin", "customperc"}
+
+// getUploadSetting returns the form value for field when it was submitted,
+// otherwise the value of the cookie the upload settings are saved to, so
+// that requests bypassing the upload form entirely (search transfers,
+// shared remote links) behave the same way
+func getUploadSetting(r *http.Request, field, cookieName string) string {
+	if r.Form.Has(field) {
+		return r.FormValue(field)
+	}
+	return readCookie(r, cookieName)
+}
+
+// hasUploadOpt reports whether a checkbox option was submitted with the
+// form or, when absent, whether it is enabled in the preference cookie
+func hasUploadOpt(r *http.Request, field string) bool {
+	if r.Form.Has(field) {
+		return r.FormValue(field) != ""
+	}
+	uploadOpts := defaultUploadOpts
+	if optsRaw := readCookie(r, "UploadOptimizerOpts"); optsRaw != "" {
+		uploadOpts = strings.Split(optsRaw, ",")
+	}
+	return slices.Contains(uploadOpts, field)
+}
+
 func Upload(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
@@ -224,65 +252,65 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var useMargin bool
 	var visualIndicator bool
 	if blMode {
-		skipLowValue = r.FormValue("lowval") != ""
-		skipLowValueAbs = r.FormValue("lowvalabs") != ""
-		skipHighValue = r.FormValue("highval") != ""
-		skipHighValueAbs = r.FormValue("highvalabs") != ""
-		useMargin = r.FormValue("minmargin") != ""
-		skipConds = r.FormValue("nocond") != ""
-		skipPrices = r.FormValue("noprice") != ""
-		visualIndicator = r.FormValue("customperc") != ""
+		skipLowValue = hasUploadOpt(r, "lowval")
+		skipLowValueAbs = hasUploadOpt(r, "lowvalabs")
+		skipHighValue = hasUploadOpt(r, "highval")
+		skipHighValueAbs = hasUploadOpt(r, "highvalabs")
+		useMargin = hasUploadOpt(r, "minmargin")
+		skipConds = hasUploadOpt(r, "nocond")
+		skipPrices = hasUploadOpt(r, "noprice")
+		visualIndicator = hasUploadOpt(r, "customperc")
 	}
-	sorting := r.FormValue("sorting")
+	sorting := getUploadSetting(r, "sorting", "UploadSorting")
 
 	percSpread := MinLowValueSpread
-	customSpread, err := strconv.ParseFloat(r.FormValue("percspread"), 64)
+	customSpread, err := strconv.ParseFloat(getUploadSetting(r, "percspread", "UploadPercSpread"), 64)
 	if err == nil && customSpread > 0 {
 		percSpread = customSpread
 	}
 
 	percSpreadMax := MaxHighValueSpread
-	customSpreadMax, err := strconv.ParseFloat(r.FormValue("percspreadmax"), 64)
+	customSpreadMax, err := strconv.ParseFloat(getUploadSetting(r, "percspreadmax", "UploadPercSpreadMax"), 64)
 	if err == nil && customSpreadMax > percSpread {
 		percSpreadMax = customSpreadMax
 	}
 
 	minLowVal := MinLowValueAbs
-	customMin, err := strconv.ParseFloat(r.FormValue("minval"), 64)
+	customMin, err := strconv.ParseFloat(getUploadSetting(r, "minval", "UploadMinVal"), 64)
 	if err == nil && customMin > 0 {
 		minLowVal = customMin
 	}
 
 	maxHighVal := MaxHighValueAbs
-	customMax, err := strconv.ParseFloat(r.FormValue("maxval"), 64)
+	customMax, err := strconv.ParseFloat(getUploadSetting(r, "maxval", "UploadMaxVal"), 64)
 	if err == nil && customMax > minLowVal {
 		maxHighVal = customMax
 	}
 
 	percMargin := 1.0
 	if useMargin {
-		customMargin, err := strconv.ParseFloat(r.FormValue("margin"), 64)
+		customMargin, err := strconv.ParseFloat(getUploadSetting(r, "margin", "UploadMargin"), 64)
 		if err == nil && customMargin >= 0 {
 			percMargin = 1 - customMargin/100.0
 		}
 	}
 
 	visualPerc := VisualPercSpread
-	customVisual, err := strconv.ParseFloat(r.FormValue("custompercmax"), 64)
+	customVisual, err := strconv.ParseFloat(getUploadSetting(r, "custompercmax", "UploadCustomPercMax"), 64)
 	if err == nil && customVisual > 0 {
 		visualPerc = customVisual
 	}
 	pageVars.CanFilterByPrice = visualIndicator
 
 	multiplier := 1
-	customMultiplier, err := strconv.Atoi(r.FormValue("multiplier"))
+	customMultiplier, err := strconv.Atoi(getUploadSetting(r, "multiplier", "UploadMultiplier"))
 	if err == nil && customMultiplier > 1 {
 		multiplier = customMultiplier
 	}
 
 	// Cap each card's quantity to this maximum (0 = no cap)
 	maxQty := 0
-	customMaxQty, err := strconv.Atoi(r.FormValue("maxqty"))
+	customMaxQty, err := strconv.Atoi(getUploadSetting(r, "maxqty", "UploadMaxQty"))
 	if err == nil && customMaxQty > 0 {
 		maxQty = customMaxQty
 	}
@@ -676,7 +704,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	tagPref := "tags"
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
-	priceSource := r.FormValue("pricesource")
+	priceSource := getUploadSetting(r, "pricesource", "UploadPriceSource")
 
 	// Search — fetch card and sealed prices separately then merge
 	var results map[string]map[string]*BanPrice
@@ -687,18 +715,22 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Build the custom buylist if requested
 		customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
+		if !r.Form.Has("custombuylist") {
+			customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
+			customBuylist = slices.Contains(customOpts, "enabled")
+		}
 		if canUploadCustom && customBuylist {
 			var rule EntryRule
-			customMinPrice, err := strconv.ParseFloat(r.FormValue("customminprice"), 64)
+			customMinPrice, err := strconv.ParseFloat(getUploadSetting(r, "customminprice", "UploadCustomMinPrice"), 64)
 			if err == nil && customMinPrice > 0 {
 				rule.MinPrice = customMinPrice
 			}
-			customRate, err := strconv.ParseFloat(r.FormValue("customrate"), 64)
+			customRate, err := strconv.ParseFloat(getUploadSetting(r, "customrate", "UploadCustomRate"), 64)
 			if err == nil && customRate > 0 {
 				rule.Rate = customRate
 			}
 
-			customSeller := r.FormValue("customseller")
+			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
 			if customSeller != "" {
 				ref, _ := findSellerInventory(customSeller)
 				for _, cardId := range cardIds {
@@ -707,7 +739,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				enabledStores = append(enabledStores, "CUSTOM")
 			}
 
-			customSealedSeller := r.FormValue("customsealedseller")
+			customSealedSeller := getUploadSetting(r, "customsealedseller", "UploadCustomSealedBuyer")
 			if customSealedSeller != "" && len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
 				ref, _ := findSellerInventory(customSealedSeller)
 				for _, productId := range sealedProductIds {
@@ -791,7 +823,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	indexResults := map[string]map[string]*BanPrice{}
 
 	// Choose the alternative reference pricing source when one is not loaded in
-	altPriceSource := r.FormValue("altPrice")
+	altPriceSource := getUploadSetting(r, "altPrice", "UploadAltPrice")
 	if !slices.Contains(UploadIndexComparePriceList, altPriceSource) {
 		altPriceSource = UploadIndexKeys[0]
 	}
