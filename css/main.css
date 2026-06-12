@@ -829,6 +829,27 @@ th a {
     background: var(--accent-muted) !important;
     color: var(--ainfo) !important;
 }
+.autocomplete-items .ac-sub {
+    color: var(--greytext);
+    font-size: var(--text-sm);
+    margin-left: 0.5em;
+}
+.autocomplete-items .ac-swatch {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    border-radius: 50%;
+    vertical-align: middle;
+    margin-right: 0.15em;
+}
+.autocomplete-items .autocomplete-disabled {
+    cursor: default;
+    color: var(--greytext);
+    font-style: italic;
+}
+.autocomplete-items .autocomplete-disabled:hover {
+    background: transparent;
+}
 
 pre {
   display: inline-block;
