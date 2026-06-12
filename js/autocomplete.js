@@ -36,6 +36,7 @@ function __acFetchCardMeta(name, onReady) {
 async function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
+    var providerMode = false;
     const arr = await fetchNames(sealed);
 
     // Track viewport listeners so we can detach them when the dropdown closes
@@ -76,14 +77,112 @@ async function autocomplete(form, inp, sealed) {
         }
     }
 
+    /* Render the active token's provider candidates. Returns true if a known
+     * prefix was detected (so the caller skips card-name suggestions). */
+    function renderProviderDropdown() {
+        var providers = window.__palette_providers;
+        if (!providers) return false;
+
+        var caret = inp.selectionStart;
+        if (typeof caret !== 'number') caret = inp.value.length;
+        var head = inp.value.slice(0, caret);
+        var tokenStart = head.lastIndexOf(' ') + 1;
+        var token = head.slice(tokenStart);
+
+        var detected = providers.detectPrefix(token);
+        if (!detected) return false;
+        var provider = providers.getProvider(detected.prefix);
+        if (!provider) return false;
+
+        /* Split the remainder on the last comma for multi-value lists. */
+        var remainder = detected.query;
+        var lastComma = remainder.lastIndexOf(',');
+        var committed = lastComma >= 0 ? remainder.slice(0, lastComma + 1) : '';
+        var filterQuery = lastComma >= 0 ? remainder.slice(lastComma + 1) : remainder;
+
+        /* Card-context narrowing from a quoted name before the active token. */
+        var cardMeta = null;
+        var match = inp.value.slice(0, tokenStart).match(/"([^"]+)"/);
+        if (match) {
+            cardMeta = __acFetchCardMeta(match[1], function () {
+                if (currentItemsDiv && document.activeElement === inp) {
+                    inp.dispatchEvent(new InputEvent('input'));
+                }
+            });
+        }
+
+        var candidates = (provider.getCandidates(filterQuery, { chips: [], cardMeta: cardMeta }) || []).slice(0, 30);
+
+        providerMode = true;
+        currentFocus = -1;
+
+        var valueBefore = inp.value.slice(0, tokenStart);
+        var tail = inp.value.slice(caret);
+
+        var list = document.createElement("DIV");
+        list.setAttribute("id", inp.id + "autocomplete-list");
+        list.setAttribute("class", "autocomplete-items");
+
+        for (var i = 0; i < candidates.length; i++) {
+            list.appendChild(buildProviderRow(candidates[i], detected.prefix, committed, valueBefore, tail));
+        }
+
+        if (list.hasChildNodes()) {
+            inp.parentNode.appendChild(list);
+            currentItemsDiv = list;
+            fitToViewport();
+            attachViewportListeners();
+        }
+        return true;
+    }
+
+    function buildProviderRow(candidate, prefix, committed, valueBefore, tail) {
+        var row = document.createElement("DIV");
+
+        if (candidate.disabled) {
+            row.className = "autocomplete-disabled";
+            row.textContent = candidate.label || '';
+            return row;
+        }
+
+        var iconHtml = '';
+        if (candidate.keyrune) {
+            var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
+            iconHtml = '<i class="ss ss-' + kr + '"></i> ';
+        } else if (candidate.iconColor) {
+            iconHtml = '<span class="ac-swatch" style="background:' + __acEsc(candidate.iconColor) + '"></span> ';
+        }
+
+        var label = candidate.label || candidate.value || '';
+        var sub = candidate.sublabel ? '<span class="ac-sub">' + __acEsc(candidate.sublabel) + '</span>' : '';
+        row.innerHTML = iconHtml + '<span class="ac-label">' + __acEsc(label) + '</span> ' + sub;
+
+        var newToken = prefix + committed + candidate.value;
+        row.addEventListener("click", function () {
+            inp.value = valueBefore + newToken + tail;
+            var pos = (valueBefore + newToken).length;
+            closeAllLists();
+            inp.focus();
+            try { inp.setSelectionRange(pos, pos); } catch (e) {}
+        });
+        return row;
+    }
+
     /* Execute a function when someone writes in the text field: */
     inp.addEventListener("input", function(e) {
         var a, b, i, val = this.value;
         /* Close any already open lists of autocompleted values */
         closeAllLists();
+        providerMode = false;
         if (!val) {
             return false;
         }
+
+        /* Prefix-driven sub-option suggestions take precedence over names. */
+        if (renderProviderDropdown()) {
+            return;
+        }
+
         /* Clean up input string */
         val = val.trim();
 
@@ -246,4 +345,13 @@ async function autocomplete(form, inp, sealed) {
     document.addEventListener("click", function(e) {
         closeAllLists(e.target);
     });
+
+    /* Refresh an open provider dropdown when sets/stores JSON finishes loading. */
+    if (window.__palette_providers && typeof window.__palette_providers.setOnDataReady === 'function') {
+        window.__palette_providers.setOnDataReady(function () {
+            if (providerMode && currentItemsDiv && document.activeElement === inp) {
+                inp.dispatchEvent(new InputEvent('input'));
+            }
+        });
+    }
 };
