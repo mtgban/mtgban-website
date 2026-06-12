@@ -5,6 +5,34 @@
  * If a user scrolls up and down, selects an entry and presses Enter, or
  * clicks on a field, they will be submitting the form automatically.
  */
+
+/* Shared across all autocomplete instances on a page. */
+var __acCardMetaCache = {};
+var __acCardMetaInflight = {};
+
+function __acEsc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+}
+
+/* Returns cached card meta, or null while a fetch is in flight. */
+function __acFetchCardMeta(name, onReady) {
+    if (!name) return null;
+    if (__acCardMetaCache[name]) return __acCardMetaCache[name];
+    if (__acCardMetaInflight[name]) return null;
+    __acCardMetaInflight[name] = fetch('/api/palette/card/' + encodeURIComponent(name))
+        .then(function (r) { return r.ok ? r.json() : { found: false }; })
+        .then(function (data) {
+            if (data && data.found) __acCardMetaCache[name] = data;
+            delete __acCardMetaInflight[name];
+            if (typeof onReady === 'function') onReady();
+            return data;
+        })
+        .catch(function () { delete __acCardMetaInflight[name]; });
+    return null;
+}
+
 async function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
