@@ -104,6 +104,7 @@ async function autocomplete(form, inp, sealed) {
         var cardMeta = null;
         var match = inp.value.slice(0, tokenStart).match(/"([^"]+)"/);
         if (match) {
+            /* On resolve the cache is populated, so the re-dispatch hits cache and stops. */
             cardMeta = __acFetchCardMeta(match[1], function () {
                 if (currentItemsDiv && document.activeElement === inp) {
                     inp.dispatchEvent(new InputEvent('input'));
@@ -113,7 +114,6 @@ async function autocomplete(form, inp, sealed) {
 
         var candidates = (provider.getCandidates(filterQuery, { chips: [], cardMeta: cardMeta }) || []).slice(0, 30);
 
-        providerMode = true;
         currentFocus = -1;
 
         var valueBefore = inp.value.slice(0, tokenStart);
@@ -130,9 +130,11 @@ async function autocomplete(form, inp, sealed) {
         if (list.hasChildNodes()) {
             inp.parentNode.appendChild(list);
             currentItemsDiv = list;
+            providerMode = true;
             fitToViewport();
             attachViewportListeners();
         }
+        /* Return true even with no matches: a known prefix suppresses name suggestions. */
         return true;
     }
 
@@ -150,7 +152,9 @@ async function autocomplete(form, inp, sealed) {
             var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
             iconHtml = '<i class="ss ss-' + kr + '"></i> ';
         } else if (candidate.iconColor) {
-            iconHtml = '<span class="ac-swatch" style="background:' + __acEsc(candidate.iconColor) + '"></span> ';
+            /* Whitelist CSS color chars; HTML-escaping alone does not stop CSS injection. */
+            var safeColor = /^[a-zA-Z0-9#(),%. +-]+$/.test(candidate.iconColor) ? candidate.iconColor : '';
+            iconHtml = '<span class="ac-swatch" style="background:' + safeColor + '"></span> ';
         }
 
         var label = candidate.label || candidate.value || '';
@@ -352,7 +356,9 @@ async function autocomplete(form, inp, sealed) {
     });
 
     /* Refresh an open provider dropdown when sets/stores JSON finishes loading. */
-    if (window.__palette_providers && typeof window.__palette_providers.setOnDataReady === 'function') {
+    /* Guard against double-registering if autocomplete() runs twice for this input. */
+    if (window.__palette_providers && typeof window.__palette_providers.setOnDataReady === 'function' && !inp._acDataReadyRegistered) {
+        inp._acDataReadyRegistered = true;
         window.__palette_providers.setOnDataReady(function () {
             if (providerMode && currentItemsDiv && document.activeElement === inp) {
                 inp.dispatchEvent(new InputEvent('input'));
