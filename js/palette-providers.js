@@ -15,7 +15,7 @@
     function setOnDataReady(cb) { if (typeof cb === 'function') onDataReadyCbs.push(cb); }
     function fireOnDataReady() {
         for (var i = 0; i < onDataReadyCbs.length; i++) {
-            try { onDataReadyCbs[i](); } catch (e) {}
+            try { onDataReadyCbs[i](); } catch (e) { console.error('onDataReady cb error', e); }
         }
     }
 
