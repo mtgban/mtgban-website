@@ -294,8 +294,13 @@ async function autocomplete(form, inp, sealed) {
             /* If the TAB or RIGHT ARROW keys are pressed, and if the selector
              * is open, do not move focus */
             e.preventDefault();
-            /* initialize the input field with what is selected */
-            this.value = x[currentFocus].textContent;
+            if (providerMode) {
+                /* Provider rows splice a value, so select rather than copy text. */
+                if (x) x[currentFocus].click();
+            } else {
+                /* initialize the input field with what is selected */
+                this.value = x[currentFocus].textContent;
+            }
         }
     });
 
