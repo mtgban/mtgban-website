@@ -11,8 +11,13 @@
 
     var providers = {};
 
-    var onDataReady = null;
-    function setOnDataReady(cb) { onDataReady = cb; }
+    var onDataReadyCbs = [];
+    function setOnDataReady(cb) { if (typeof cb === 'function') onDataReadyCbs.push(cb); }
+    function fireOnDataReady() {
+        for (var i = 0; i < onDataReadyCbs.length; i++) {
+            try { onDataReadyCbs[i](); } catch (e) {}
+        }
+    }
 
     function register(p) {
         if (!p || !p.prefix) return;
@@ -346,13 +351,13 @@
             .then(function (data) {
                 setsCache = data || [];
                 setsCacheFetching = null;
-                if (typeof onDataReady === 'function') onDataReady();
+                fireOnDataReady();
                 return setsCache;
             })
             .catch(function () {
                 setsCache = [];
                 setsCacheFetching = null;
-                if (typeof onDataReady === 'function') onDataReady();
+                fireOnDataReady();
                 return setsCache;
             });
         return setsCacheFetching;
@@ -412,13 +417,13 @@
             .then(function (data) {
                 storesCache = data || { sellers: [], vendors: [] };
                 storesCacheFetching = null;
-                if (typeof onDataReady === 'function') onDataReady();
+                fireOnDataReady();
                 return storesCache;
             })
             .catch(function () {
                 storesCache = { sellers: [], vendors: [] };
                 storesCacheFetching = null;
-                if (typeof onDataReady === 'function') onDataReady();
+                fireOnDataReady();
                 return storesCache;
             });
         return storesCacheFetching;
