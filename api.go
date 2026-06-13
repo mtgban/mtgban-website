@@ -747,8 +747,8 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		allKeys = allKeys[:MaxSearchTotalResults]
 	}
 
-	canRetail := slices.Contains(enabledModes, "retail") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
-	canBuylist := slices.Contains(enabledModes, "buylist") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
+	canRetail := canAccessMode(enabledModes, "retail")
+	canBuylist := canAccessMode(enabledModes, "buylist")
 
 	// Build store lists
 	var enabledRetailStores []string

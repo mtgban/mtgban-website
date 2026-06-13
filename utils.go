@@ -216,6 +216,16 @@ const (
 	MaxRuneSymbols = 57
 )
 
+// canAccessMode reports whether the caller is allowed to read the given
+// API mode (retail/buylist/sealed). Access is granted if the mode is in
+// the signed enabledModes list, the list contains "all", or signature
+// checks are disabled in dev mode.
+func canAccessMode(enabledModes []string, target string) bool {
+	return slices.Contains(enabledModes, target) ||
+		slices.Contains(enabledModes, "all") ||
+		(DevMode && !SigCheck)
+}
+
 // Return the CreditMultiplier for any given vendor
 func findCredit(shorthand string) float64 {
 	for _, vendor := range GetVendors() {

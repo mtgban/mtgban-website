@@ -298,9 +298,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	dumpType := ""
-	canRetail := slices.Contains(enabledModes, "retail") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
-	canBuylist := slices.Contains(enabledModes, "buylist") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
-	canSealed := slices.Contains(enabledModes, "sealed") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
+	canRetail := canAccessMode(enabledModes, "retail")
+	canBuylist := canAccessMode(enabledModes, "buylist")
+	canSealed := canAccessMode(enabledModes, "sealed")
 	isSealed := strings.HasPrefix(urlPath, "sealed") && canSealed
 	if isSealed {
 		dumpType += "sealed"
