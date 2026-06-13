@@ -444,7 +444,10 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	start := time.Now()
 
-	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, true, anyOptionEnabled)
+	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+		AllResults:       true,
+		AnyOptionEnabled: anyOptionEnabled,
+	})
 
 	user := GetParamFromSig(sig, "UserEmail")
 	msg := fmt.Sprintf("Request by %s took %v", user, time.Since(start))
@@ -526,7 +529,10 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, anyEnabled, false, anySpread)
+	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+		AllResults: anyEnabled,
+		AnySpread:  anySpread,
+	})
 
 	user := GetParamFromSig(sig, "UserEmail")
 	msg := fmt.Sprintf("Request by %s took %v", user, time.Since(start))
@@ -534,7 +540,17 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	LogPages["Global"].Println(msg)
 }
 
-func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, flags ...bool) {
+// scraperCompareOpts gates the behavior of scraperCompare for its three
+// callers (Arbit, Reverse, Global). Replaces the previous positional
+// `flags ...bool` whose meaning was decoded from flags[0]/[1]/[2] inside
+// the function and required reading the body to understand each call.
+type scraperCompareOpts struct {
+	AllResults       bool // false caps the result list (MaxArbitResults, or MaxResultsGlobalLimit in global mode)
+	AnyOptionEnabled bool // show options gated by FilterOpt.BetaFlag
+	AnySpread        bool // use the higher spread/profitability thresholds (global mode only)
+}
+
+func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
 	r.ParseForm()
 
 	var source mtgban.Scraper
@@ -542,9 +558,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	var sorting string
 	arbitFilters := map[string]bool{}
 
-	limitedResults := len(flags) > 0 && !flags[0]
-	anyOptionEnabled := len(flags) > 1 && flags[1]
-	anySpread := len(flags) > 2 && flags[2]
+	limitedResults := !cmp.AllResults
+	anyOptionEnabled := cmp.AnyOptionEnabled
+	anySpread := cmp.AnySpread
 
 	pageVars.CanShowAll = anyOptionEnabled
 
