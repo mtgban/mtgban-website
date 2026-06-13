@@ -108,8 +108,11 @@
     }
 
     // Merge server state into local, push the merged result back up, adopt the
-    // server's version. Used on 409 and on first-login hydrate.
-    function reconcile(serverState) {
+    // server's version. Used on 409 and on first-login hydrate. attempt bounds
+    // the 409 retry loop so a peer writing concurrently can't spin it forever.
+    var MAX_RECONCILE_ATTEMPTS = 5;
+    function reconcile(serverState, attempt) {
+        attempt = attempt || 0;
         if (!serverState) return Promise.resolve();
         var mergedFavs = mergeList(localFavorites(), serverState.favorites || [], function(f) { return f.id; }, 50);
         var mergedRecents = mergeList(localRecents(), serverState.recents || [], function(s) { return (s.q || '').toLowerCase(); }, 15);
@@ -136,7 +139,11 @@
             headers: { 'Content-Type': 'application/json' },
             body: body
         }).then(function(r) {
-            if (r.status === 409) return r.json().then(reconcile); // someone else wrote; merge again
+            if (r.status === 409) {
+                // Someone else wrote; merge again, up to the retry budget.
+                if (attempt >= MAX_RECONCILE_ATTEMPTS) return null;
+                return r.json().then(function(s) { return reconcile(s, attempt + 1); });
+            }
             if (!r.ok) return null;
             return r.json().then(function(res) { if (res && typeof res.version === 'number') version = res.version; });
         }).catch(function() {});
@@ -166,7 +173,12 @@
         var merged = order.map(function(id) { return byId[id]; });
         // Newest-first by timestamp, matching how unshift-based adds behave.
         merged.sort(function(a, b) { return (b.t || 0) - (a.t || 0); });
-        if (cap && merged.length > cap) merged = merged.slice(0, cap);
+        if (cap && merged.length > cap) {
+            // Keep pinned items even when old; fill the rest with newest unpinned.
+            var pinned = merged.filter(function(x) { return x.pinned; });
+            var unpinned = merged.filter(function(x) { return !x.pinned; });
+            merged = pinned.concat(unpinned).slice(0, cap);
+        }
         return merged;
     }
 
