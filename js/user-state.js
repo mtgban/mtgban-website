@@ -76,8 +76,8 @@
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
     }
 
-    // Send one PATCH for a section. Returns a promise. 409 handling is added in
-    // the next task by the reconcile function.
+    // Send one PATCH for a section. On a version conflict, reconcile merges and
+    // retries.
     function patchSection(section) {
         var body = JSON.stringify({ data: payloadForSection(section), version: version });
         return fetch(BASE + section, {
@@ -209,21 +209,6 @@
             }
         }).catch(function() {});
     }
-
-    // Expose internals the next task (merge/reconcile) will build on.
-    window.__userState = {
-        applyState: applyState,
-        rerender: rerender,
-        readLocal: readLocal,
-        buildPreferences: buildPreferences,
-        getVersion: function() { return version; },
-        setVersion: function(v) { version = v; },
-        rawSetItem: rawSetItem,
-        FAVORITES_KEY: FAVORITES_KEY,
-        RECENTS_KEY: RECENTS_KEY,
-        PREF_KEYS: PREF_KEYS,
-        base: BASE
-    };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', hydrate);
