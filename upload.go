@@ -24,6 +24,7 @@ import (
 	"github.com/xuri/excelize/v2"
 	"gopkg.in/Iwark/spreadsheet.v2"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/cardconduit"
 	"github.com/mtgban/mtgban-website/moxfield"
@@ -324,34 +325,26 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 	var enabledStores []string
 	var enabledSealedStores []string
-	var singlesSellers []string
-	var singlesVendors []string
-	var sealedSellers []string
-	var sealedVendors []string
 
-	// Load all possible sellers, and vendors according to user permissions
-	for _, seller := range GetSellers() {
-		if seller == nil || seller.Info().MetadataOnly {
-			continue
-		}
-		short := seller.Info().Shorthand
-		if seller.Info().SealedMode && !slices.Contains(Config.UploadSealedBlockList, short) {
-			sealedSellers = append(sealedSellers, short)
-		} else if !seller.Info().SealedMode && !slices.Contains(blocklistRetail, short) {
-			singlesSellers = append(singlesSellers, short)
-		}
-	}
-	for _, vendor := range GetVendors() {
-		if vendor == nil {
-			continue
-		}
-		short := vendor.Info().Shorthand
-		if vendor.Info().SealedMode && !slices.Contains(Config.UploadSealedBlockList, short) {
-			sealedVendors = append(sealedVendors, short)
-		} else if !vendor.Info().SealedMode && !slices.Contains(blocklistBuylist, short) {
-			singlesVendors = append(singlesVendors, short)
-		}
-	}
+	// Load all possible sellers and vendors according to user permissions.
+	// Sellers skip MetadataOnly entries (no quantity/condition data to
+	// optimize against); vendors don't apply that filter.
+	singlesSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
+		return !info.MetadataOnly && !info.SealedMode &&
+			!slices.Contains(blocklistRetail, info.Shorthand)
+	})
+	sealedSellers := filterSellers(func(info mtgban.ScraperInfo) bool {
+		return !info.MetadataOnly && info.SealedMode &&
+			!slices.Contains(Config.UploadSealedBlockList, info.Shorthand)
+	})
+	singlesVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
+		return !info.SealedMode &&
+			!slices.Contains(blocklistBuylist, info.Shorthand)
+	})
+	sealedVendors := filterVendors(func(info mtgban.ScraperInfo) bool {
+		return info.SealedMode &&
+			!slices.Contains(Config.UploadSealedBlockList, info.Shorthand)
+	})
 
 	// Set the store names for the <select> box
 	pageVars.SellerKeys = singlesSellers

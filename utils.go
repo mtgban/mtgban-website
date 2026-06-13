@@ -216,6 +216,31 @@ const (
 	MaxRuneSymbols = 57
 )
 
+// filterSellers returns the shorthand of every loaded seller for which
+// predicate(info) is true.
+func filterSellers(predicate func(mtgban.ScraperInfo) bool) []string {
+	var out []string
+	for _, s := range GetSellers() {
+		info := s.Info()
+		if predicate(info) {
+			out = append(out, info.Shorthand)
+		}
+	}
+	return out
+}
+
+// filterVendors is the vendor analog of filterSellers.
+func filterVendors(predicate func(mtgban.ScraperInfo) bool) []string {
+	var out []string
+	for _, v := range GetVendors() {
+		info := v.Info()
+		if predicate(info) {
+			out = append(out, info.Shorthand)
+		}
+	}
+	return out
+}
+
 // canAccessMode reports whether the caller is allowed to read the given
 // API mode (retail/buylist/sealed). Access is granted if the mode is in
 // the signed enabledModes list, the list contains "all", or signature

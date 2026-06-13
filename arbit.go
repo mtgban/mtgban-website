@@ -337,12 +337,9 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	allowlistSellersOpt := GetParamFromSig(sig, "ArbitEnabled")
 
 	if allowlistSellersOpt == "ALL" || (DevMode && !SigCheck) {
-		for _, seller := range GetSellers() {
-			if seller.Info().MetadataOnly {
-				continue
-			}
-			allowlistSellers = append(allowlistSellers, seller.Info().Shorthand)
-		}
+		allowlistSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
+			return !info.MetadataOnly
+		})
 		// Enable any option with BetaFlag
 		anyOptionEnabled = true
 	} else if allowlistSellersOpt == "" {
@@ -359,22 +356,16 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 		blocklistVendors = strings.Split(blocklistVendorsOpt, ",")
 	}
 
-	// Populate vendor keys for the settings modal (shown on every page load)
+	// Populate vendor keys for the settings modal (shown on every page load).
+	// In reverse mode the "vendor" column is actually a seller; same blocklist.
+	notBlocked := func(info mtgban.ScraperInfo) bool {
+		return !slices.Contains(blocklistVendors, info.Shorthand)
+	}
 	var vendorKeys []string
 	if reverse {
-		for _, seller := range GetSellers() {
-			if slices.Contains(blocklistVendors, seller.Info().Shorthand) {
-				continue
-			}
-			vendorKeys = append(vendorKeys, seller.Info().Shorthand)
-		}
+		vendorKeys = filterSellers(notBlocked)
 	} else {
-		for _, vendor := range GetVendors() {
-			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
-				continue
-			}
-			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
-		}
+		vendorKeys = filterVendors(notBlocked)
 	}
 	pageVars.VendorKeys = sortKeysByScraperName(vendorKeys)
 

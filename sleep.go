@@ -58,27 +58,14 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 
 	// Built before merging the user's cookie hide-list so hidden vendors still
 	// appear in the picker (rendered as pre-checked by js/settings.js bindList).
-	var modalSellerKeys, modalVendorKeys []string
-	for _, seller := range GetSellers() {
-		if seller.Info().CountryFlag != "" ||
-			seller.Info().SealedMode ||
-			seller.Info().MetadataOnly ||
-			slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-			continue
-		}
-		modalSellerKeys = append(modalSellerKeys, seller.Info().Shorthand)
-	}
-	for _, vendor := range GetVendors() {
-		if vendor.Info().CountryFlag != "" ||
-			vendor.Info().SealedMode ||
-			vendor.Info().MetadataOnly ||
-			slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-			continue
-		}
-		modalVendorKeys = append(modalVendorKeys, vendor.Info().Shorthand)
-	}
-	pageVars.ModalSellerKeys = modalSellerKeys
-	pageVars.ModalVendorKeys = modalVendorKeys
+	pageVars.ModalSellerKeys = filterSellers(func(info mtgban.ScraperInfo) bool {
+		return info.CountryFlag == "" && !info.SealedMode && !info.MetadataOnly &&
+			!slices.Contains(blocklistRetail, info.Shorthand)
+	})
+	pageVars.ModalVendorKeys = filterVendors(func(info mtgban.ScraperInfo) bool {
+		return info.CountryFlag == "" && !info.SealedMode && !info.MetadataOnly &&
+			!slices.Contains(blocklistBuylist, info.Shorthand)
+	})
 
 	skipSellersOpt := readCookie(r, "SleepersSellersList")
 	if skipSellersOpt != "" {
