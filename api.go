@@ -107,7 +107,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Println(err)
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -119,8 +119,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 		csvWriter := csv.NewWriter(w)
 		err = UUID2TCGCSV(csvWriter, data.([]string), nil, nil)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		return
@@ -129,7 +128,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	err = json.NewEncoder(w).Encode(data)
 	if err != nil {
 		log.Println(err)
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 }
@@ -405,7 +404,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Println(err)
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -417,8 +416,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 		csvWriter := csv.NewWriter(w)
 		err = UUID2MKMCSV(csvWriter, data.([]string), nil, nil)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		return
@@ -427,7 +425,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 	err = json.NewEncoder(w).Encode(data)
 	if err != nil {
 		log.Println(err)
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 }
@@ -817,14 +815,14 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	name = strings.TrimPrefix(name, "/api/load/")
 
 	if GetParamFromSig(r.FormValue("sig"), "API") != name {
-		w.Write([]byte(`{"error": "not found"}`))
+		errorResponse(w, http.StatusNotFound, "not found")
 		return
 	}
 
 	config := Config.ScraperConfig
 	scrapersConfig, found := config.Config[name]
 	if !found {
-		w.Write([]byte(`{"error": "not found"}`))
+		errorResponse(w, http.StatusNotFound, "not found")
 		return
 	}
 
@@ -847,13 +845,13 @@ func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 
 	err := verify(r)
 	if err != nil {
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	err = loadDatastore(Config.DatastorePath)
 	if err != nil {
-		w.Write([]byte(`{"error": "Failed to reload datastore: ` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, "Failed to reload datastore: "+err.Error())
 		return
 	}
 

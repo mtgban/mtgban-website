@@ -23,7 +23,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 
 	idsParam := r.FormValue("ids")
 	if idsParam == "" {
-		http.Error(w, "missing ids parameter", http.StatusBadRequest)
+		errorResponse(w, http.StatusBadRequest, "missing ids parameter")
 		return
 	}
 

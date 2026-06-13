@@ -226,6 +226,17 @@ func canAccessMode(enabledModes []string, target string) bool {
 		(DevMode && !SigCheck)
 }
 
+// errorResponse writes a JSON error body with the given status code and
+// the Content-Type header set to application/json. The message is encoded
+// via json.NewEncoder so embedded quotes/backslashes are escaped properly.
+func errorResponse(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(struct {
+		Error string `json:"error"`
+	}{Error: msg})
+}
+
 // Return the CreditMultiplier for any given vendor
 func findCredit(shorthand string) float64 {
 	for _, vendor := range GetVendors() {
