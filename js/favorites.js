@@ -240,6 +240,7 @@
         renderFavoritesInto(document.getElementById('m-favorites'), 'mobile');
         renderFavoritesInto(document.getElementById('desktop-favorites'), 'desktop');
     }
+    window.renderFavorites = renderFavorites;
 
     var paginationState = {}; // { containerId: { page: 0 } }
 
