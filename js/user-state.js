@@ -107,12 +107,80 @@
         timer = setTimeout(flush, DEBOUNCE_MS);
     }
 
-    // Stub reconcile - replaced by the real merge in the next task. For now it
-    // just adopts server state so the core works standalone.
+    // Merge server state into local, push the merged result back up, adopt the
+    // server's version. Used on 409 and on first-login hydrate.
     function reconcile(serverState) {
-        applyState(serverState);
+        if (!serverState) return Promise.resolve();
+        var mergedFavs = mergeList(localFavorites(), serverState.favorites || [], function(f) { return f.id; }, 50);
+        var mergedRecents = mergeList(localRecents(), serverState.recents || [], function(s) { return (s.q || '').toLowerCase(); }, 15);
+        var mergedPrefs = mergePrefs(buildPreferences(), serverState.preferences || {});
+
+        try {
+            rawSetItem(FAVORITES_KEY, JSON.stringify(mergedFavs));
+            rawSetItem(RECENTS_KEY, JSON.stringify(mergedRecents));
+            Object.keys(mergedPrefs).forEach(function(k) {
+                if (PREF_KEYS.indexOf(k) >= 0) rawSetItem(k, String(mergedPrefs[k]));
+            });
+        } catch (e) {}
+
+        version = typeof serverState.version === 'number' ? serverState.version : version;
         rerender();
+
+        // Push merged full state up at the adopted version.
+        var body = JSON.stringify({
+            favorites: mergedFavs, recents: mergedRecents,
+            preferences: mergedPrefs, version: version
+        });
+        return fetch(BASE, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: body
+        }).then(function(r) {
+            if (r.status === 409) return r.json().then(reconcile); // someone else wrote; merge again
+            if (!r.ok) return null;
+            return r.json().then(function(res) { if (res && typeof res.version === 'number') version = res.version; });
+        }).catch(function() {});
     }
+
+    // Union two lists by an identity function, keeping the entry with the newer
+    // timestamp on collision. Pinned-first ordering is reapplied by the render
+    // modules, so here we only dedupe and cap.
+    function mergeList(local, server, idOf, cap) {
+        var byId = {};
+        var order = [];
+        function add(item) {
+            var id = idOf(item);
+            if (id == null) return;
+            if (byId[id]) {
+                var existing = byId[id];
+                var et = existing.t || 0, it = item.t || 0;
+                if (it >= et) byId[id] = item; // newer wins
+                if (existing.pinned && !byId[id].pinned) byId[id].pinned = existing.pinned;
+            } else {
+                byId[id] = item;
+                order.push(id);
+            }
+        }
+        (local || []).forEach(add);
+        (server || []).forEach(add);
+        var merged = order.map(function(id) { return byId[id]; });
+        // Newest-first by timestamp, matching how unshift-based adds behave.
+        merged.sort(function(a, b) { return (b.t || 0) - (a.t || 0); });
+        if (cap && merged.length > cap) merged = merged.slice(0, cap);
+        return merged;
+    }
+
+    // Preferences: last-write-wins per key. Local already reflects the most
+    // recent device action, so local keys win over server on first merge.
+    function mergePrefs(localPrefs, serverPrefs) {
+        var out = {};
+        Object.keys(serverPrefs || {}).forEach(function(k) { out[k] = serverPrefs[k]; });
+        Object.keys(localPrefs || {}).forEach(function(k) { out[k] = localPrefs[k]; });
+        return out;
+    }
+
+    function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }
+    function localRecents() { try { return JSON.parse(readLocal(RECENTS_KEY, '[]')); } catch (e) { return []; } }
 
     // The setItem shim: pass through, then schedule a sync for allowlisted keys.
     localStorage.setItem = function(key, value) {
@@ -130,9 +198,15 @@
             return r.json();
         }).then(function(state) {
             if (!state) return;
-            // First-sync merge is added in the next task; for now adopt server state.
-            applyState(state);
-            rerender();
+            var hasLocal = localFavorites().length > 0 || localRecents().length > 0;
+            // Merge when this device has local data the server may not have;
+            // otherwise just adopt the server state.
+            if (hasLocal) {
+                reconcile(state);
+            } else {
+                applyState(state);
+                rerender();
+            }
         }).catch(function() {});
     }
 
