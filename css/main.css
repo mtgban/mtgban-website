@@ -834,6 +834,7 @@ th a {
     width: 1.5em;
     text-align: center;
     vertical-align: middle;
+    margin-right: 0.5em;
 }
 .autocomplete-items .ac-sub {
     color: var(--greytext);
