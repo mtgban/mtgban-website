@@ -65,9 +65,11 @@
    This eliminates the Firefox first-paint search-bar jump caused by
    late font-metric adoption.
    !important is needed because main.css sets `* { font-family: Geist }`
-   and several navbar elements have their own Geist declarations. */
+   and several navbar elements have their own Geist declarations.
+   .ss is exempted so keyrune set symbols in the search autocomplete keep
+   their icon font instead of rendering as tofu. */
 .navbar-v2,
-.navbar-v2 * {
+.navbar-v2 *:not(.ss) {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
 }
 .nav2-brand-text .ban {
