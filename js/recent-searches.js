@@ -182,23 +182,6 @@
         }
     }
 
-    function escapeHtml(str) {
-        var div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function escapeAttr(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    }
-
-    function thumbHtml(src, foil, cw) {
-        var cls = 'foil-wrap';
-        if (cw) cls += ' content-warning';
-        return '<div class="' + cls + '" data-foil="' + (foil ? 'true' : 'false') + '"' +
-               (cw ? ' onclick="this.classList.add(\'cw-revealed\');event.preventDefault();event.stopPropagation()"' : '') +
-               '><img src="' + escapeAttr(src) + '" loading="lazy" alt=""></div>';
-    }
 
     window.deleteRecentSearch = function(query, ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }

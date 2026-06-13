@@ -466,24 +466,6 @@
             '</div>';
     }
 
-    function thumbHtml(src, foil, cw) {
-        var cls = 'foil-wrap';
-        if (cw) cls += ' content-warning';
-        return '<div class="' + cls + '" data-foil="' + (foil ? 'true' : 'false') + '"' +
-               (cw ? ' onclick="this.classList.add(\'cw-revealed\');event.preventDefault();event.stopPropagation()"' : '') +
-               '><img src="' + escapeAttr(src) + '" loading="lazy" alt=""></div>';
-    }
-
-    function escapeHtml(str) {
-        var div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function escapeAttr(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    }
-
     window.favPage = function(containerId, delta) {
         if (!paginationState[containerId]) paginationState[containerId] = { page: 0 };
         paginationState[containerId].page += delta;

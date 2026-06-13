@@ -966,11 +966,6 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
     return annotations;
 }
 
-function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
-    });
-}
 
 // Coalesce rapid toggles into a single update per frame. Without this, rapid
 // clicks racing with Chart.js's responsive ResizeObserver can compound layout
