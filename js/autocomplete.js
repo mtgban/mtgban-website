@@ -147,19 +147,20 @@ async function autocomplete(form, inp, sealed) {
             return row;
         }
 
-        var iconHtml = '';
+        var iconInner = '';
         if (candidate.keyrune) {
             var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
-            iconHtml = '<i class="ss ss-' + kr + '"></i> ';
+            iconInner = '<i class="ss ss-fw ss-' + kr + '"></i>';
         } else if (candidate.iconColor) {
             /* Whitelist CSS color chars; HTML-escaping alone does not stop CSS injection. */
             var safeColor = /^[a-zA-Z0-9#(),%. +-]+$/.test(candidate.iconColor) ? candidate.iconColor : '';
-            iconHtml = '<span class="ac-swatch" style="background:' + safeColor + '"></span> ';
+            iconInner = '<span class="ac-swatch" style="background:' + safeColor + '"></span>';
         }
 
+        /* Fixed-width icon column so labels left-align regardless of symbol width. */
         var label = candidate.label || candidate.value || '';
         var sub = candidate.sublabel ? '<span class="ac-sub">' + __acEsc(candidate.sublabel) + '</span>' : '';
-        row.innerHTML = iconHtml + '<span class="ac-label">' + __acEsc(label) + '</span> ' + sub;
+        row.innerHTML = '<span class="ac-icon">' + iconInner + '</span><span class="ac-label">' + __acEsc(label) + '</span>' + sub;
 
         var newToken = prefix + committed + candidate.value;
         row.addEventListener("click", function () {

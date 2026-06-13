@@ -829,6 +829,12 @@ th a {
     background: var(--accent-muted) !important;
     color: var(--ainfo) !important;
 }
+.autocomplete-items .ac-icon {
+    display: inline-block;
+    width: 1.5em;
+    text-align: center;
+    vertical-align: middle;
+}
 .autocomplete-items .ac-sub {
     color: var(--greytext);
     font-size: var(--text-sm);
@@ -840,7 +846,6 @@ th a {
     height: 0.8em;
     border-radius: 50%;
     vertical-align: middle;
-    margin-right: 0.15em;
 }
 .autocomplete-items .autocomplete-disabled {
     cursor: default;
