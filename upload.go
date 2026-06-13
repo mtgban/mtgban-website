@@ -153,6 +153,21 @@ func getUploadSetting(r *http.Request, field, cookieName string) string {
 	return readCookie(r, cookieName)
 }
 
+// uploadFloatSetting returns the form field (or cookie fallback) parsed as
+// float64; 0 if missing or unparseable. Callers apply their own threshold
+// guards (e.g. `if v := uploadFloatSetting(...); v > 0 { ... }`).
+func uploadFloatSetting(r *http.Request, field, cookieName string) float64 {
+	v, _ := strconv.ParseFloat(getUploadSetting(r, field, cookieName), 64)
+	return v
+}
+
+// uploadIntSetting returns the form field (or cookie fallback) parsed as
+// int; 0 if missing or unparseable.
+func uploadIntSetting(r *http.Request, field, cookieName string) int {
+	v, _ := strconv.Atoi(getUploadSetting(r, field, cookieName))
+	return v
+}
+
 // hasUploadOpt reports whether a checkbox option was submitted with the
 // form or, when absent, whether it is enabled in the preference cookie
 func hasUploadOpt(r *http.Request, field string) bool {
@@ -265,55 +280,47 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	sorting := getUploadSetting(r, "sorting", "UploadSorting")
 
 	percSpread := MinLowValueSpread
-	customSpread, err := strconv.ParseFloat(getUploadSetting(r, "percspread", "UploadPercSpread"), 64)
-	if err == nil && customSpread > 0 {
-		percSpread = customSpread
+	if v := uploadFloatSetting(r, "percspread", "UploadPercSpread"); v > 0 {
+		percSpread = v
 	}
 
 	percSpreadMax := MaxHighValueSpread
-	customSpreadMax, err := strconv.ParseFloat(getUploadSetting(r, "percspreadmax", "UploadPercSpreadMax"), 64)
-	if err == nil && customSpreadMax > percSpread {
-		percSpreadMax = customSpreadMax
+	if v := uploadFloatSetting(r, "percspreadmax", "UploadPercSpreadMax"); v > percSpread {
+		percSpreadMax = v
 	}
 
 	minLowVal := MinLowValueAbs
-	customMin, err := strconv.ParseFloat(getUploadSetting(r, "minval", "UploadMinVal"), 64)
-	if err == nil && customMin > 0 {
-		minLowVal = customMin
+	if v := uploadFloatSetting(r, "minval", "UploadMinVal"); v > 0 {
+		minLowVal = v
 	}
 
 	maxHighVal := MaxHighValueAbs
-	customMax, err := strconv.ParseFloat(getUploadSetting(r, "maxval", "UploadMaxVal"), 64)
-	if err == nil && customMax > minLowVal {
-		maxHighVal = customMax
+	if v := uploadFloatSetting(r, "maxval", "UploadMaxVal"); v > minLowVal {
+		maxHighVal = v
 	}
 
 	percMargin := 1.0
 	if useMargin {
-		customMargin, err := strconv.ParseFloat(getUploadSetting(r, "margin", "UploadMargin"), 64)
-		if err == nil && customMargin >= 0 {
-			percMargin = 1 - customMargin/100.0
+		if v := uploadFloatSetting(r, "margin", "UploadMargin"); v >= 0 {
+			percMargin = 1 - v/100.0
 		}
 	}
 
 	visualPerc := VisualPercSpread
-	customVisual, err := strconv.ParseFloat(getUploadSetting(r, "custompercmax", "UploadCustomPercMax"), 64)
-	if err == nil && customVisual > 0 {
-		visualPerc = customVisual
+	if v := uploadFloatSetting(r, "custompercmax", "UploadCustomPercMax"); v > 0 {
+		visualPerc = v
 	}
 	pageVars.CanFilterByPrice = visualIndicator
 
 	multiplier := 1
-	customMultiplier, err := strconv.Atoi(getUploadSetting(r, "multiplier", "UploadMultiplier"))
-	if err == nil && customMultiplier > 1 {
-		multiplier = customMultiplier
+	if v := uploadIntSetting(r, "multiplier", "UploadMultiplier"); v > 1 {
+		multiplier = v
 	}
 
 	// Cap each card's quantity to this maximum (0 = no cap)
 	maxQty := 0
-	customMaxQty, err := strconv.Atoi(getUploadSetting(r, "maxqty", "UploadMaxQty"))
-	if err == nil && customMaxQty > 0 {
-		maxQty = customMaxQty
+	if v := uploadIntSetting(r, "maxqty", "UploadMaxQty"); v > 0 {
+		maxQty = v
 	}
 
 	// Set flags needed to show elements on the page ui
@@ -714,13 +721,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 		if canUploadCustom && customBuylist {
 			var rule EntryRule
-			customMinPrice, err := strconv.ParseFloat(getUploadSetting(r, "customminprice", "UploadCustomMinPrice"), 64)
-			if err == nil && customMinPrice > 0 {
-				rule.MinPrice = customMinPrice
+			if v := uploadFloatSetting(r, "customminprice", "UploadCustomMinPrice"); v > 0 {
+				rule.MinPrice = v
 			}
-			customRate, err := strconv.ParseFloat(getUploadSetting(r, "customrate", "UploadCustomRate"), 64)
-			if err == nil && customRate > 0 {
-				rule.Rate = customRate
+			if v := uploadFloatSetting(r, "customrate", "UploadCustomRate"); v > 0 {
+				rule.Rate = v
 			}
 
 			customSeller := getUploadSetting(r, "customseller", "UploadCustomBuyer")
