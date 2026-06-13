@@ -240,6 +240,54 @@ type NewspaperPage struct {
 	NeedsBuylist bool
 }
 
+// newspaperColumnSetters maps a SQL column name (everything past the
+// seven-column positional header read by getResults) to a function that
+// parses the raw cell value and writes it to the NewspaperResult. Several
+// SQL column names alias to the same target field (e.g. "sellers_Today" and
+// "Todays_Sellers" both feed SellersToday) — those appear as separate
+// adjacent entries pointing at the same setter shape.
+var newspaperColumnSetters = map[string]func(*NewspaperResult, string){
+	"bucket_name":           func(r *NewspaperResult, s string) { r.BucketName = s },
+	"bucket_rank":           func(r *NewspaperResult, s string) { r.BucketRank, _ = strconv.Atoi(s) },
+	"ck_retail_price":       func(r *NewspaperResult, s string) { r.CKRetailPrice, _ = strconv.ParseFloat(s, 64) },
+	"tcg_market_price":      func(r *NewspaperResult, s string) { r.TCGMarketPrice, _ = strconv.ParseFloat(s, 64) },
+	"ck_buy_price":          func(r *NewspaperResult, s string) { r.CKBuyPrice, _ = strconv.ParseFloat(s, 64) },
+	"current_price":         func(r *NewspaperResult, s string) { r.CurrentPrice, _ = strconv.ParseFloat(s, 64) },
+	"Retail":                func(r *NewspaperResult, s string) { r.Retail, _ = strconv.ParseFloat(s, 64) },
+	"Buylist":               func(r *NewspaperResult, s string) { r.Buylist, _ = strconv.ParseFloat(s, 64) },
+	"sellers_Today":         func(r *NewspaperResult, s string) { r.SellersToday, _ = strconv.Atoi(s) },
+	"Todays_Sellers":        func(r *NewspaperResult, s string) { r.SellersToday, _ = strconv.Atoi(s) },
+	"sellers_d7":            func(r *NewspaperResult, s string) { r.SellersLastWeek, _ = strconv.Atoi(s) },
+	"Week_Ago_Sellers":      func(r *NewspaperResult, s string) { r.SellersLastWeek, _ = strconv.Atoi(s) },
+	"sellers_d30":           func(r *NewspaperResult, s string) { r.SellersMonthAgo, _ = strconv.Atoi(s) },
+	"Month_Ago_Sellers":     func(r *NewspaperResult, s string) { r.SellersMonthAgo, _ = strconv.Atoi(s) },
+	"Todays_BL":             func(r *NewspaperResult, s string) { r.TodaysBuylist, _ = strconv.ParseFloat(s, 64) },
+	"Yesterday_BL":          func(r *NewspaperResult, s string) { r.YesterdayBuylist, _ = strconv.ParseFloat(s, 64) },
+	"ck_buy_1d":             func(r *NewspaperResult, s string) { r.YesterdayBuylist, _ = strconv.ParseFloat(s, 64) },
+	"Week_Ago_BL":           func(r *NewspaperResult, s string) { r.LastWeekBuylist, _ = strconv.ParseFloat(s, 64) },
+	"ck_buy_7d":             func(r *NewspaperResult, s string) { r.LastWeekBuylist, _ = strconv.ParseFloat(s, 64) },
+	"Month_Ago_BL":          func(r *NewspaperResult, s string) { r.LastMonthBuylist, _ = strconv.ParseFloat(s, 64) },
+	"ck_buy_30d":            func(r *NewspaperResult, s string) { r.LastMonthBuylist, _ = strconv.ParseFloat(s, 64) },
+	"pct_gain_7d":           func(r *NewspaperResult, s string) { r.WeeklyPctChange, _ = strconv.ParseFloat(s, 64) },
+	"pct_drop_7d":           func(r *NewspaperResult, s string) { r.WeeklyPctChange, _ = strconv.ParseFloat(s, 64) },
+	"pct_increase_7d":       func(r *NewspaperResult, s string) { r.WeeklyPctChange, _ = strconv.ParseFloat(s, 64) },
+	"pct_decrease_7d":       func(r *NewspaperResult, s string) { r.WeeklyPctChange, _ = strconv.ParseFloat(s, 64) },
+	"Week_Ago_Sellers_Chg":  func(r *NewspaperResult, s string) { r.WeeklyPctChange, _ = strconv.ParseFloat(s, 64) },
+	"Week_Ago_BL_Chg":       func(r *NewspaperResult, s string) { r.WeeklyPctChange, _ = strconv.ParseFloat(s, 64) },
+	"Vendors":               func(r *NewspaperResult, s string) { r.Vendors, _ = strconv.Atoi(s) },
+	"Recent_BL":             func(r *NewspaperResult, s string) { r.RecentBL, _ = strconv.ParseFloat(s, 64) },
+	"Historical_plus_minus": func(r *NewspaperResult, s string) { r.HistoricalPlusMinus, _ = strconv.ParseFloat(s, 64) },
+	"Historical_Median":     func(r *NewspaperResult, s string) { r.HistoricalMedian, _ = strconv.ParseFloat(s, 64) },
+	"Historical_Max":        func(r *NewspaperResult, s string) { r.HistoricalMax, _ = strconv.ParseFloat(s, 64) },
+	"Forecasted_BL":         func(r *NewspaperResult, s string) { r.ForecastedBL, _ = strconv.ParseFloat(s, 64) },
+	"Forecast_plus_minus":   func(r *NewspaperResult, s string) { r.ForecastPlusMinus, _ = strconv.ParseFloat(s, 64) },
+	"Target_Date":           func(r *NewspaperResult, s string) { r.TargetDate = s },
+	"Tier":                  func(r *NewspaperResult, s string) { r.Tier = s },
+	"Trending":              func(r *NewspaperResult, s string) { r.Tier = s },
+	"Behavior":              func(r *NewspaperResult, s string) { r.Behavior = s },
+	"custom_sort":           func(r *NewspaperResult, s string) { r.CustomSort = s },
+}
+
 func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 	rows, err := db.Query(query)
 	if err != nil {
@@ -313,67 +361,14 @@ func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 			result.Ranking, _ = strconv.Atoi(raw[2])
 		}
 
-		// Map remaining columns by SQL column name
+		// Map remaining columns by SQL column name; unknown columns are
+		// ignored, matching the original switch's lack of a default case.
 		for j := 7; j < len(cols); j++ {
 			if raw[j] == "" {
 				continue
 			}
-			switch cols[j] {
-			case "bucket_name":
-				result.BucketName = raw[j]
-			case "bucket_rank":
-				result.BucketRank, _ = strconv.Atoi(raw[j])
-			case "ck_retail_price":
-				result.CKRetailPrice, _ = strconv.ParseFloat(raw[j], 64)
-			case "tcg_market_price":
-				result.TCGMarketPrice, _ = strconv.ParseFloat(raw[j], 64)
-			case "ck_buy_price":
-				result.CKBuyPrice, _ = strconv.ParseFloat(raw[j], 64)
-			case "current_price":
-				result.CurrentPrice, _ = strconv.ParseFloat(raw[j], 64)
-			case "Retail":
-				result.Retail, _ = strconv.ParseFloat(raw[j], 64)
-			case "Buylist":
-				result.Buylist, _ = strconv.ParseFloat(raw[j], 64)
-			case "sellers_Today", "Todays_Sellers":
-				result.SellersToday, _ = strconv.Atoi(raw[j])
-			case "sellers_d7", "Week_Ago_Sellers":
-				result.SellersLastWeek, _ = strconv.Atoi(raw[j])
-			case "sellers_d30", "Month_Ago_Sellers":
-				result.SellersMonthAgo, _ = strconv.Atoi(raw[j])
-			case "Todays_BL":
-				result.TodaysBuylist, _ = strconv.ParseFloat(raw[j], 64)
-			case "Yesterday_BL", "ck_buy_1d":
-				result.YesterdayBuylist, _ = strconv.ParseFloat(raw[j], 64)
-			case "Week_Ago_BL", "ck_buy_7d":
-				result.LastWeekBuylist, _ = strconv.ParseFloat(raw[j], 64)
-			case "Month_Ago_BL", "ck_buy_30d":
-				result.LastMonthBuylist, _ = strconv.ParseFloat(raw[j], 64)
-			case "pct_gain_7d", "pct_drop_7d", "pct_increase_7d", "pct_decrease_7d",
-				"Week_Ago_Sellers_Chg", "Week_Ago_BL_Chg":
-				result.WeeklyPctChange, _ = strconv.ParseFloat(raw[j], 64)
-			case "Vendors":
-				result.Vendors, _ = strconv.Atoi(raw[j])
-			case "Recent_BL":
-				result.RecentBL, _ = strconv.ParseFloat(raw[j], 64)
-			case "Historical_plus_minus":
-				result.HistoricalPlusMinus, _ = strconv.ParseFloat(raw[j], 64)
-			case "Historical_Median":
-				result.HistoricalMedian, _ = strconv.ParseFloat(raw[j], 64)
-			case "Historical_Max":
-				result.HistoricalMax, _ = strconv.ParseFloat(raw[j], 64)
-			case "Forecasted_BL":
-				result.ForecastedBL, _ = strconv.ParseFloat(raw[j], 64)
-			case "Forecast_plus_minus":
-				result.ForecastPlusMinus, _ = strconv.ParseFloat(raw[j], 64)
-			case "Target_Date":
-				result.TargetDate = raw[j]
-			case "Tier", "Trending":
-				result.Tier = raw[j]
-			case "Behavior":
-				result.Behavior = raw[j]
-			case "custom_sort":
-				result.CustomSort = raw[j]
+			if set := newspaperColumnSetters[cols[j]]; set != nil {
+				set(&result, raw[j])
 			}
 		}
 
