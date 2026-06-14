@@ -36,13 +36,16 @@ func NewClient(cfg SqlConfig) (*Client, error) {
 		return nil, fmt.Errorf("userstate: open: %w", err)
 	}
 
+	// user_state sees near-zero write volume and only PK lookups, so a small
+	// pool is plenty and keeps the total connection count (shared with the
+	// timeseries pool) well under a managed Postgres connection cap.
 	maxOpen := cfg.MaxOpenConns
 	if maxOpen <= 0 {
-		maxOpen = 25
+		maxOpen = 5
 	}
 	maxIdle := cfg.MaxIdleConns
 	if maxIdle <= 0 {
-		maxIdle = maxOpen
+		maxIdle = 2
 	}
 	lifetime := time.Duration(cfg.ConnMaxLifetimeSeconds) * time.Second
 	if lifetime <= 0 {
