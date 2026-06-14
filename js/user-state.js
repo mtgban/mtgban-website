@@ -22,10 +22,20 @@
         return /(?:^|;\s*)MTGBAN=/.test(document.cookie);
     }
 
+    // Local bookkeeping keys (never synced; written via rawSetItem):
+    //  dirty  - local changes not yet confirmed pushed to the server
+    //  synced - this device has completed its one-time first-login merge
+    var DIRTY_KEY = 'mtgban_userstate_dirty';
+    var SYNCED_KEY = 'mtgban_userstate_synced';
+
     var version = 0;
     var rawSetItem = localStorage.setItem.bind(localStorage);
     var pending = {}; // section -> true
     var timer = null;
+
+    function isDirty() { return readLocal(DIRTY_KEY, '0') === '1'; }
+    function markDirty() { try { rawSetItem(DIRTY_KEY, '1'); } catch (e) {} }
+    function markClean() { try { rawSetItem(DIRTY_KEY, '0'); } catch (e) {} }
 
     function readLocal(key, fallback) {
         try {
@@ -77,13 +87,14 @@
     }
 
     // Send one PATCH for a section. On a version conflict, reconcile merges and
-    // retries.
-    function patchSection(section) {
+    // retries. keepalive lets the request outlive a page navigation (pagehide).
+    function patchSection(section, keepalive) {
         var body = JSON.stringify({ data: payloadForSection(section), version: version });
         return fetch(BASE + section, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: body
+            body: body,
+            keepalive: keepalive === true
         }).then(function(r) {
             if (r.status === 409) return r.json().then(function(cur) { return reconcile(cur); });
             if (!r.ok) return null;
@@ -98,7 +109,20 @@
         // Chain sequentially so version stays consistent across sections.
         sections.reduce(function(p, section) {
             return p.then(function() { return patchSection(section); });
-        }, Promise.resolve());
+        }, Promise.resolve()).then(function() {
+            // Clear dirty only if no new writes were scheduled while flushing.
+            if (!timer && Object.keys(pending).length === 0) markClean();
+        });
+    }
+
+    // Flush queued writes immediately, e.g. when the page is hidden or unloading.
+    // Uses keepalive so the request survives navigation; coalesced per section.
+    function flushPending() {
+        if (timer) { clearTimeout(timer); timer = null; }
+        var sections = Object.keys(pending);
+        if (!sections.length) return;
+        pending = {};
+        sections.forEach(function(section) { patchSection(section, true); });
     }
 
     function schedule(section) {
@@ -129,6 +153,13 @@
         version = typeof serverState.version === 'number' ? serverState.version : version;
         rerender();
 
+        // Nothing local that the server lacks: adopt the server's version and
+        // skip the write. This keeps passive page loads to a single GET.
+        if (!localHasNew(mergedFavs, mergedRecents, mergedPrefs, serverState)) {
+            markClean();
+            return Promise.resolve();
+        }
+
         // Push merged full state up at the adopted version.
         var body = JSON.stringify({
             favorites: mergedFavs, recents: mergedRecents,
@@ -145,8 +176,26 @@
                 return r.json().then(function(s) { return reconcile(s, attempt + 1); });
             }
             if (!r.ok) return null;
-            return r.json().then(function(res) { if (res && typeof res.version === 'number') version = res.version; });
+            return r.json().then(function(res) {
+                if (res && typeof res.version === 'number') version = res.version;
+                markClean();
+            });
         }).catch(function() {});
+    }
+
+    // True when merged local state contains a favorite/recent/preference the
+    // server copy does not, i.e. there is something worth pushing.
+    function localHasNew(favs, recents, prefs, server) {
+        var sf = {};
+        (server.favorites || []).forEach(function(f) { if (f && f.id != null) sf[f.id] = true; });
+        for (var i = 0; i < favs.length; i++) { if (!sf[favs[i].id]) return true; }
+        var sr = {};
+        (server.recents || []).forEach(function(s) { if (s && s.q != null) sr[('' + s.q).toLowerCase()] = true; });
+        for (var j = 0; j < recents.length; j++) { if (!sr[('' + recents[j].q).toLowerCase()]) return true; }
+        var sp = server.preferences || {};
+        var keys = Object.keys(prefs);
+        for (var k = 0; k < keys.length; k++) { if (String(sp[keys[k]]) !== String(prefs[keys[k]])) return true; }
+        return false;
     }
 
     // Union two lists by an identity function, keeping the entry with the newer
@@ -194,12 +243,13 @@
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }
     function localRecents() { try { return JSON.parse(readLocal(RECENTS_KEY, '[]')); } catch (e) { return []; } }
 
-    // The setItem shim: pass through, then schedule a sync for allowlisted keys.
+    // The setItem shim: pass through, mark dirty, and schedule a debounced sync
+    // for allowlisted keys.
     localStorage.setItem = function(key, value) {
         rawSetItem(key, value);
         if (!isSignedIn()) return;
         var section = sectionForKey(key);
-        if (section) schedule(section);
+        if (section) { markDirty(); schedule(section); }
     };
 
     function hydrate() {
@@ -210,10 +260,13 @@
             return r.json();
         }).then(function(state) {
             if (!state) return;
+            var firstSync = readLocal(SYNCED_KEY, null) === null;
             var hasLocal = localFavorites().length > 0 || localRecents().length > 0;
-            // Merge when this device has local data the server may not have;
-            // otherwise just adopt the server state.
-            if (hasLocal) {
+            rawSetItem(SYNCED_KEY, '1');
+            // Reconcile (merge + conditional push) only when there may be local
+            // changes to send: a pending dirty write, or this device's one-time
+            // first-login merge. Otherwise just adopt the server state (GET only).
+            if (isDirty() || (firstSync && hasLocal)) {
                 reconcile(state);
             } else {
                 applyState(state);
@@ -221,6 +274,15 @@
             }
         }).catch(function() {});
     }
+
+    // Push queued writes before the page goes away so a change made just before
+    // navigating still reaches the server (the debounce would otherwise be cut
+    // off). visibilitychange covers mobile tab-switch/close; pagehide covers
+    // desktop navigation.
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'hidden') flushPending();
+    });
+    window.addEventListener('pagehide', flushPending);
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', hydrate);
