@@ -46,92 +46,129 @@ func (c *Client) Get(ctx context.Context, emailHash string) (State, error) {
 	return st, nil
 }
 
-// Put fully replaces all sections, version-checked. expectedVersion 0 inserts a
-// new row (version 1). A nonzero expectedVersion updates only if the stored
-// version matches. Returns (newVersion, conflict, error); conflict is true when
-// the version did not match.
-func (c *Client) Put(ctx context.Context, emailHash string, st State, expectedVersion int64) (int64, bool, error) {
-	if expectedVersion == 0 {
-		var newVersion int64
-		err := c.db.QueryRowContext(ctx, `
-			INSERT INTO user_state (email_hash, favorites, recents, preferences, version)
-			VALUES ($1, $2, $3, $4, 1)
-			ON CONFLICT (email_hash) DO NOTHING
-			RETURNING version`,
-			emailHash, jsonOrEmpty(st.Favorites, "[]"), jsonOrEmpty(st.Recents, "[]"), jsonOrEmpty(st.Preferences, "{}"),
-		).Scan(&newVersion)
-		if errors.Is(err, sql.ErrNoRows) {
-			// Row already existed; caller passed 0 but should have a version.
-			return 0, true, nil
-		}
-		if err != nil {
-			return 0, false, err
-		}
-		return newVersion, false, nil
-	}
-
-	var newVersion int64
-	err := c.db.QueryRowContext(ctx, `
-		UPDATE user_state
-		   SET favorites = $2, recents = $3, preferences = $4,
-		       version = version + 1, updated_at = now()
-		 WHERE email_hash = $1 AND version = $5
-		 RETURNING version`,
-		emailHash, jsonOrEmpty(st.Favorites, "[]"), jsonOrEmpty(st.Recents, "[]"), jsonOrEmpty(st.Preferences, "{}"), expectedVersion,
-	).Scan(&newVersion)
+// GetVersion returns the row's version, or 0 if no row exists. Used for cheap
+// ETag revalidation without reading the JSONB columns.
+func (c *Client) GetVersion(ctx context.Context, emailHash string) (int64, error) {
+	var version int64
+	err := c.db.QueryRowContext(ctx,
+		`SELECT version FROM user_state WHERE email_hash = $1`, emailHash,
+	).Scan(&version)
 	if errors.Is(err, sql.ErrNoRows) {
-		return 0, true, nil
+		return 0, nil
 	}
 	if err != nil {
-		return 0, false, err
+		return 0, err
 	}
-	return newVersion, false, nil
+	return version, nil
 }
 
-// Patch replaces a single section column, version-checked. Creates the row if
-// it does not exist when expectedVersion is 0.
-func (c *Client) Patch(ctx context.Context, emailHash, section string, payload json.RawMessage, expectedVersion int64) (int64, bool, error) {
+// writeWithConflict runs a CTE query that either performs the write and returns
+// the new state (updated=true) or, when the version did not match, returns the
+// current row (updated=false) in a single round trip. Zero rows means the row
+// does not exist at all, which is treated as a conflict with the zero state.
+func (c *Client) writeWithConflict(ctx context.Context, query string, args ...any) (State, bool, error) {
+	var updated bool
+	var version int64
+	var fav, rec, pref []byte
+	err := c.db.QueryRowContext(ctx, query, args...).Scan(&updated, &version, &fav, &rec, &pref)
+	if errors.Is(err, sql.ErrNoRows) {
+		return State{
+			Favorites:   json.RawMessage("[]"),
+			Recents:     json.RawMessage("[]"),
+			Preferences: json.RawMessage("{}"),
+		}, true, nil
+	}
+	if err != nil {
+		return State{}, false, err
+	}
+	return State{
+		Favorites:   json.RawMessage(fav),
+		Recents:     json.RawMessage(rec),
+		Preferences: json.RawMessage(pref),
+		Version:     version,
+	}, !updated, nil
+}
+
+// Put fully replaces all sections, version-checked. On success the returned
+// State carries the new version. On conflict (version mismatch or missing row)
+// conflict is true and the returned State is the current server state.
+func (c *Client) Put(ctx context.Context, emailHash string, st State, expectedVersion int64) (State, bool, error) {
+	if expectedVersion == 0 {
+		return c.writeWithConflict(ctx, `
+			WITH ins AS (
+				INSERT INTO user_state (email_hash, favorites, recents, preferences, version)
+				VALUES ($1, $2, $3, $4, 1)
+				ON CONFLICT (email_hash) DO NOTHING
+				RETURNING version, favorites, recents, preferences
+			)
+			SELECT TRUE AS updated, version, favorites, recents, preferences FROM ins
+			UNION ALL
+			SELECT FALSE AS updated, version, favorites, recents, preferences
+			  FROM user_state
+			 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM ins)`,
+			emailHash,
+			jsonOrEmpty(st.Favorites, "[]"), jsonOrEmpty(st.Recents, "[]"), jsonOrEmpty(st.Preferences, "{}"),
+		)
+	}
+	return c.writeWithConflict(ctx, `
+		WITH upd AS (
+			UPDATE user_state
+			   SET favorites = $2, recents = $3, preferences = $4,
+			       version = version + 1, updated_at = now()
+			 WHERE email_hash = $1 AND version = $5
+			 RETURNING version, favorites, recents, preferences
+		)
+		SELECT TRUE AS updated, version, favorites, recents, preferences FROM upd
+		UNION ALL
+		SELECT FALSE AS updated, version, favorites, recents, preferences
+		  FROM user_state
+		 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM upd)`,
+		emailHash,
+		jsonOrEmpty(st.Favorites, "[]"), jsonOrEmpty(st.Recents, "[]"), jsonOrEmpty(st.Preferences, "{}"),
+		expectedVersion,
+	)
+}
+
+// Patch replaces a single section column, version-checked, with the same
+// success/conflict return shape as Put.
+func (c *Client) Patch(ctx context.Context, emailHash, section string, payload json.RawMessage, expectedVersion int64) (State, bool, error) {
 	if !validSections[section] {
-		return 0, false, fmt.Errorf("userstate: unknown section %q", section)
+		return State{}, false, fmt.Errorf("userstate: unknown section %q", section)
 	}
 
 	if expectedVersion == 0 {
-		// Insert a fresh row with this section populated, others defaulted.
-		cols := map[string]any{"favorites": []byte("[]"), "recents": []byte("[]"), "preferences": []byte("{}")}
+		cols := map[string][]byte{"favorites": []byte("[]"), "recents": []byte("[]"), "preferences": []byte("{}")}
 		cols[section] = []byte(jsonOrEmpty(payload, defaultFor(section)))
-		var newVersion int64
-		err := c.db.QueryRowContext(ctx, `
-			INSERT INTO user_state (email_hash, favorites, recents, preferences, version)
-			VALUES ($1, $2, $3, $4, 1)
-			ON CONFLICT (email_hash) DO NOTHING
-			RETURNING version`,
+		return c.writeWithConflict(ctx, `
+			WITH ins AS (
+				INSERT INTO user_state (email_hash, favorites, recents, preferences, version)
+				VALUES ($1, $2, $3, $4, 1)
+				ON CONFLICT (email_hash) DO NOTHING
+				RETURNING version, favorites, recents, preferences
+			)
+			SELECT TRUE AS updated, version, favorites, recents, preferences FROM ins
+			UNION ALL
+			SELECT FALSE AS updated, version, favorites, recents, preferences
+			  FROM user_state
+			 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM ins)`,
 			emailHash, cols["favorites"], cols["recents"], cols["preferences"],
-		).Scan(&newVersion)
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, true, nil
-		}
-		if err != nil {
-			return 0, false, err
-		}
-		return newVersion, false, nil
+		)
 	}
 
-	// Section name is validated against an allowlist above, so interpolating it
-	// into the column position is safe.
+	// section is validated against validSections above; safe to interpolate.
 	q := fmt.Sprintf(`
-		UPDATE user_state
-		   SET %s = $2, version = version + 1, updated_at = now()
-		 WHERE email_hash = $1 AND version = $3
-		 RETURNING version`, section)
-	var newVersion int64
-	err := c.db.QueryRowContext(ctx, q, emailHash, []byte(jsonOrEmpty(payload, defaultFor(section))), expectedVersion).Scan(&newVersion)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, true, nil
-	}
-	if err != nil {
-		return 0, false, err
-	}
-	return newVersion, false, nil
+		WITH upd AS (
+			UPDATE user_state
+			   SET %s = $2, version = version + 1, updated_at = now()
+			 WHERE email_hash = $1 AND version = $3
+			 RETURNING version, favorites, recents, preferences
+		)
+		SELECT TRUE AS updated, version, favorites, recents, preferences FROM upd
+		UNION ALL
+		SELECT FALSE AS updated, version, favorites, recents, preferences
+		  FROM user_state
+		 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM upd)`, section)
+	return c.writeWithConflict(ctx, q, emailHash, []byte(jsonOrEmpty(payload, defaultFor(section))), expectedVersion)
 }
 
 func defaultFor(section string) string {
