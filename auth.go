@@ -38,6 +38,14 @@ var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
 var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
 
+// signedFieldOrder is the fixed set of fields covered by a signature, computed
+// once to avoid an allocation per request in signedUserEmail.
+var signedFieldOrder = append(append([]string{}, OrderNav...), OptionalFields...)
+
+// SyncRateLimiter throttles /api/userstate/ independently of page rendering so
+// a pagehide flush plus the next page's GET don't collide on the shared limiter.
+var SyncRateLimiter = ratelimit.NewLimiter(10, 5) // 10 req/s, burst 5
+
 type PatreonConfig struct {
 	Source string            `json:"source"`
 	Client map[string]string `json:"client"`
@@ -279,7 +287,7 @@ func signedUserEmail(r *http.Request) string {
 	}
 
 	q := url.Values{}
-	for _, optional := range append(OrderNav, OptionalFields...) {
+	for _, optional := range signedFieldOrder {
 		if val := v.Get(optional); val != "" {
 			q.Set(optional, val)
 		}
