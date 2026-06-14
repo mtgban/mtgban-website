@@ -567,6 +567,9 @@
 
         doRefresh();
     }
+    // Exposed so the sync layer can backfill prices on favorites arriving
+    // price-less from another device. Self-gating: only fetches when needed.
+    window.refreshFavorites = refreshFavorites;
 
     function showToast(msg) {
         var toast = document.getElementById('m-fav-toast') || document.getElementById('desktop-fav-toast');

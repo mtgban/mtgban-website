@@ -100,6 +100,9 @@
     function rerender() {
         if (typeof window.renderFavorites === 'function') window.renderFavorites();
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
+        // Favorites synced from another device arrive price-less (trimmed on the
+        // wire); backfill their prices. Self-gating, so a no-op when not needed.
+        if (typeof window.refreshFavorites === 'function') window.refreshFavorites();
     }
 
     // Send one PATCH for a section. On a version conflict, reconcile merges and
