@@ -5,6 +5,8 @@
 (function() {
     var BASE = '/api/userstate/';
     var DEBOUNCE_MS = 1500;
+    var FETCH_KEY = 'mtgban_userstate_fetch'; // sessionStorage: {v, ts}
+    var TTL_MS = 90 * 1000;
 
     // Keys that map to dedicated server columns.
     var FAVORITES_KEY = 'mtgban_favorites';
@@ -45,6 +47,15 @@
             var v = localStorage.getItem(key);
             return v == null ? fallback : v;
         } catch (e) { return fallback; }
+    }
+
+    function readMarker() {
+        try { var s = sessionStorage.getItem(FETCH_KEY); return s ? JSON.parse(s) : null; }
+        catch (e) { return null; }
+    }
+    function writeMarker(v) {
+        try { sessionStorage.setItem(FETCH_KEY, JSON.stringify({ v: v, ts: Date.now() })); }
+        catch (e) {}
     }
 
     function buildPreferences() {
@@ -103,7 +114,9 @@
         }).then(function(r) {
             if (r.status === 409) return r.json().then(function(cur) { return reconcile(cur); });
             if (!r.ok) return null;
-            return r.json().then(function(res) { if (res && typeof res.version === 'number') version = res.version; });
+            return r.json().then(function(res) {
+                if (res && typeof res.version === 'number') { version = res.version; writeMarker(version); }
+            });
         }).catch(function() {});
     }
 
@@ -183,6 +196,7 @@
             if (!r.ok) return null;
             return r.json().then(function(res) {
                 if (res && typeof res.version === 'number') version = res.version;
+                writeMarker(version);
                 markClean();
             });
         }).catch(function() {});
@@ -270,7 +284,22 @@
     }
 
     function hydrate() {
-        fetch(BASE, { method: 'GET' }).then(function(r) {
+        var marker = readMarker();
+        // Within the freshness window and nothing pending: local is current and
+        // the page modules already rendered it. No request at all.
+        if (!isDirty() && marker && typeof marker.ts === 'number' && (Date.now() - marker.ts) < TTL_MS) {
+            if (typeof marker.v === 'number') version = marker.v;
+            return;
+        }
+
+        var headers = {};
+        if (marker && typeof marker.v === 'number') {
+            version = marker.v;
+            headers['If-None-Match'] = '"' + marker.v + '"';
+        }
+
+        fetch(BASE, { method: 'GET', headers: headers }).then(function(r) {
+            if (r.status === 304) { writeMarker(version); return null; } // unchanged
             if (r.status === 401 || r.status === 503) return null; // anon / unavailable
             if (!r.ok) return null;
             return r.json();
@@ -279,15 +308,13 @@
             var firstSync = readLocal(SYNCED_KEY, null) === null;
             var hasLocal = localFavorites().length > 0 || localRecents().length > 0;
             rawSetItem(SYNCED_KEY, '1');
-            // Reconcile (merge + conditional push) only when there may be local
-            // changes to send: a pending dirty write, or this device's one-time
-            // first-login merge. Otherwise just adopt the server state (GET only).
             if (isDirty() || (firstSync && hasLocal)) {
                 reconcile(state);
             } else {
                 applyState(state);
                 rerender();
             }
+            writeMarker(typeof state.version === 'number' ? state.version : version);
         }).catch(function() {});
     }
 
