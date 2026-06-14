@@ -25,10 +25,12 @@ import (
 
 	"database/sql"
 
+	"github.com/NYTimes/gziphandler"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/timeseries"
+	"github.com/mtgban/mtgban-website/userstate"
 
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/oauth2/google"
@@ -500,7 +502,8 @@ type ConfigType struct {
 	// The location of the configuation file
 	sourcePath string
 
-	SqlConfig *timeseries.SqlConfig `json:"sql_config"`
+	SqlConfig       *timeseries.SqlConfig `json:"sql_config"`
+	UserStateConfig *userstate.SqlConfig  `json:"user_state_config"`
 }
 
 var DevMode bool
@@ -544,6 +547,8 @@ var Newspaper1dayDB *sql.DB
 var NewNewspaperDB *sql.DB
 
 var PricesArchiveDB *timeseries.Client
+
+var UserStateDB *userstate.Client
 
 var GoogleDocsClient *http.Client
 
@@ -772,6 +777,16 @@ func openDBs() (err error) {
 		PricesArchiveDB, err = timeseries.NewClient(*Config.SqlConfig)
 		if err != nil {
 			log.Println("error creating a SQL client:", err)
+			return err
+		}
+	}
+
+	if Config.UserStateConfig == nil {
+		log.Println("no user_state configuration set, cross-device sync won't be available")
+	} else {
+		UserStateDB, err = userstate.NewClient(*Config.UserStateConfig)
+		if err != nil {
+			log.Println("error creating a user_state SQL client:", err)
 			return err
 		}
 	}
@@ -1076,6 +1091,7 @@ func main() {
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(http.HandlerFunc(BatchPricesAPI)))
+	http.Handle("/api/userstate/", noSigning(gziphandler.GzipHandler(http.HandlerFunc(UserStateAPI))))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))

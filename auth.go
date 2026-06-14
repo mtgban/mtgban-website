@@ -38,6 +38,12 @@ var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
 var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
 
+// signedFieldOrder is the fixed signature field set, precomputed once.
+var signedFieldOrder = append(append([]string{}, OrderNav...), OptionalFields...)
+
+// SyncRateLimiter throttles /api/userstate/ separately from page rendering.
+var SyncRateLimiter = ratelimit.NewLimiter(10, 5) // 10 req/s, burst 5
+
 type PatreonConfig struct {
 	Source string            `json:"source"`
 	Client map[string]string `json:"client"`
@@ -248,6 +254,50 @@ func getSignatureFromCookies(r *http.Request) string {
 	}
 
 	return sig
+}
+
+// signedUserEmail returns the UserEmail from a validly-signed, unexpired cookie/sig, else "". Mirrors enforceSigning's HMAC check but allows any method.
+func signedUserEmail(r *http.Request) string {
+	sig := getSignatureFromCookies(r)
+	if querySig := r.FormValue("sig"); querySig != "" {
+		sig = querySig
+	}
+	if sig == "" {
+		return ""
+	}
+
+	raw, err := base64.StdEncoding.DecodeString(sig)
+	if err != nil {
+		return ""
+	}
+	v, err := url.ParseQuery(string(raw))
+	if err != nil {
+		return ""
+	}
+
+	if !SigCheck {
+		return v.Get("UserEmail")
+	}
+
+	q := url.Values{}
+	for _, optional := range signedFieldOrder {
+		if val := v.Get(optional); val != "" {
+			q.Set(optional, val)
+		}
+	}
+
+	link := DefaultServerURL
+	if !strings.HasSuffix(ServerURL, "mtgban.com") {
+		link = "http://localhost:" + fmt.Sprint(Config.Port)
+	}
+	exp := v.Get("Expires")
+	data := fmt.Sprintf("GET%s%s%s", exp, link, q.Encode())
+	valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+	expires, err := strconv.ParseInt(exp, 10, 64)
+	if err != nil || valid != v.Get("Signature") || expires < time.Now().Unix() {
+		return ""
+	}
+	return v.Get("UserEmail")
 }
 
 // Put signature in cookies for one month, all domains can access this

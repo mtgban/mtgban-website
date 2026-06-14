@@ -227,6 +227,7 @@
         renderFavoritesInto(document.getElementById('m-favorites'), 'mobile');
         renderFavoritesInto(document.getElementById('desktop-favorites'), 'desktop');
     }
+    window.renderFavorites = renderFavorites;
 
     var paginationState = {}; // { containerId: { page: 0 } }
 
@@ -571,6 +572,9 @@
 
         doRefresh();
     }
+    // Exposed so the sync layer can backfill prices on favorites arriving
+    // price-less from another device. Self-gating: only fetches when needed.
+    window.refreshFavorites = refreshFavorites;
 
     function showToast(msg) {
         var toast = document.getElementById('m-fav-toast') || document.getElementById('desktop-fav-toast');
