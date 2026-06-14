@@ -13,12 +13,10 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// SqlConfig is the connection configuration. It reuses the timeseries shape so
-// the user_state_config JSON block matches sql_config field-for-field.
+// SqlConfig reuses the timeseries shape so user_state_config matches sql_config.
 type SqlConfig = timeseries.SqlConfig
 
-// HashEmail returns the hex sha256 of the lowercased email. Plaintext email is
-// never stored; this hash is the table primary key.
+// HashEmail returns the hex sha256 of the lowercased email (the table PK).
 func HashEmail(email string) string {
 	sum := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(email))))
 	return hex.EncodeToString(sum[:])
@@ -36,9 +34,7 @@ func NewClient(cfg SqlConfig) (*Client, error) {
 		return nil, fmt.Errorf("userstate: open: %w", err)
 	}
 
-	// user_state sees near-zero write volume and only PK lookups, so a small
-	// pool is plenty and keeps the total connection count (shared with the
-	// timeseries pool) well under a managed Postgres connection cap.
+	// Small pool: user_state is low-volume, PK-only, and shares the server cap.
 	maxOpen := cfg.MaxOpenConns
 	if maxOpen <= 0 {
 		maxOpen = 5

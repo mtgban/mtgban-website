@@ -31,8 +31,7 @@ func NewLimiter(r rate.Limit, burst int) *Limiter {
 		burst:    burst,
 		visitors: map[string]*visitor{},
 	}
-	// Evict visitors idle longer than 30 minutes, checked every 10 minutes,
-	// so the visitors map can't grow without bound.
+	// Bound the visitors map: evict entries idle past 30m, checked every 10m.
 	go l.janitor(10*time.Minute, 30*time.Minute)
 	return l
 }
