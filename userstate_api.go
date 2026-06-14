@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/mtgban/mtgban-website/userstate"
@@ -30,7 +31,7 @@ func UserStateAPI(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "not signed in"})
 		return
 	}
-	if !UserRateLimiter.Allow(email) {
+	if !SyncRateLimiter.Allow(email) {
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "too many requests"})
 		return
 	}
@@ -51,11 +52,22 @@ func UserStateAPI(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "404 not found", http.StatusNotFound)
 			return
 		}
+		w.Header().Set("Cache-Control", "private, no-store")
+		// Conditional GET: when the client's version matches, skip reading the
+		// JSONB columns and return 304.
+		if inm := strings.Trim(r.Header.Get("If-None-Match"), `"`); inm != "" {
+			if v, verr := UserStateDB.GetVersion(ctx, hash); verr == nil && strconv.FormatInt(v, 10) == inm {
+				w.Header().Set("ETag", `"`+inm+`"`)
+				w.WriteHeader(http.StatusNotModified)
+				return
+			}
+		}
 		st, err := UserStateDB.Get(ctx, hash)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "read failed"})
 			return
 		}
+		w.Header().Set("ETag", `"`+strconv.FormatInt(st.Version, 10)+`"`)
 		writeJSON(w, http.StatusOK, st)
 
 	case http.MethodPut:
@@ -68,17 +80,16 @@ func UserStateAPI(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
 			return
 		}
-		newVersion, conflict, err := UserStateDB.Put(ctx, hash, body, body.Version)
+		result, conflict, err := UserStateDB.Put(ctx, hash, body, body.Version)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "write failed"})
 			return
 		}
 		if conflict {
-			current, _ := UserStateDB.Get(ctx, hash)
-			writeJSON(w, http.StatusConflict, current)
+			writeJSON(w, http.StatusConflict, result)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]int64{"version": newVersion})
+		writeJSON(w, http.StatusOK, map[string]int64{"version": result.Version})
 
 	case http.MethodPatch:
 		if section == "" {
@@ -93,17 +104,16 @@ func UserStateAPI(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad body"})
 			return
 		}
-		newVersion, conflict, err := UserStateDB.Patch(ctx, hash, section, body.Data, body.Version)
+		result, conflict, err := UserStateDB.Patch(ctx, hash, section, body.Data, body.Version)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
 		if conflict {
-			current, _ := UserStateDB.Get(ctx, hash)
-			writeJSON(w, http.StatusConflict, current)
+			writeJSON(w, http.StatusConflict, result)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]int64{"version": newVersion})
+		writeJSON(w, http.StatusOK, map[string]int64{"version": result.Version})
 
 	default:
 		http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)

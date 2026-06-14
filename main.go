@@ -26,6 +26,7 @@ import (
 	"database/sql"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/NYTimes/gziphandler"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -1090,7 +1091,7 @@ func main() {
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(http.HandlerFunc(BatchPricesAPI)))
-	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))
+	http.Handle("/api/userstate/", noSigning(gziphandler.GzipHandler(http.HandlerFunc(UserStateAPI))))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
