@@ -25,8 +25,8 @@ import (
 
 	"database/sql"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/NYTimes/gziphandler"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/timeseries"
