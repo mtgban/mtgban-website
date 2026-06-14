@@ -9,9 +9,7 @@ import (
 	"github.com/mtgban/mtgban-website/userstate"
 )
 
-// maxUserStateBody caps a single sync payload. Section caps (50 favorites / 15
-// recents) are client-side; this is the server-side guard against oversized or
-// malicious bodies bloating the JSONB row.
+// maxUserStateBody is the server-side cap on a sync payload.
 const maxUserStateBody = 512 * 1024
 
 // writeJSON is a small helper for JSON responses.
@@ -21,10 +19,7 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
-// UserStateAPI dispatches GET/PUT for /api/userstate/ and PATCH for
-// /api/userstate/{section}. All paths require an authenticated user; anonymous
-// requests get 401 and the client falls back to localStorage. When the DB is
-// not configured, 503 signals "sync unavailable".
+// UserStateAPI serves GET/PUT on /api/userstate/ and PATCH on /{section}; anonymous is 401, unconfigured DB is 503.
 func UserStateAPI(w http.ResponseWriter, r *http.Request) {
 	email := signedUserEmail(r)
 	if email == "" {
@@ -53,8 +48,7 @@ func UserStateAPI(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Cache-Control", "private, no-store")
-		// Conditional GET: when the client's version matches, skip reading the
-		// JSONB columns and return 304.
+		// Conditional GET: matching version returns 304 without reading the row.
 		if inm := strings.Trim(r.Header.Get("If-None-Match"), `"`); inm != "" {
 			if v, verr := UserStateDB.GetVersion(ctx, hash); verr == nil && strconv.FormatInt(v, 10) == inm {
 				w.Header().Set("ETag", `"`+inm+`"`)

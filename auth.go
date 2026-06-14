@@ -38,12 +38,10 @@ var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
 var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
 
-// signedFieldOrder is the fixed set of fields covered by a signature, computed
-// once to avoid an allocation per request in signedUserEmail.
+// signedFieldOrder is the fixed signature field set, precomputed once.
 var signedFieldOrder = append(append([]string{}, OrderNav...), OptionalFields...)
 
-// SyncRateLimiter throttles /api/userstate/ independently of page rendering so
-// a pagehide flush plus the next page's GET don't collide on the shared limiter.
+// SyncRateLimiter throttles /api/userstate/ separately from page rendering.
 var SyncRateLimiter = ratelimit.NewLimiter(10, 5) // 10 req/s, burst 5
 
 type PatreonConfig struct {
@@ -258,12 +256,7 @@ func getSignatureFromCookies(r *http.Request) string {
 	return sig
 }
 
-// signedUserEmail validates the HMAC signature and expiry of the request's
-// MTGBAN cookie (or ?sig= override) and returns the UserEmail only when valid.
-// It mirrors the verification in enforceSigning, but permits any HTTP method so
-// the userstate handler can authenticate PUT/PATCH callers (enforceSigning
-// rejects those). Returns "" for a missing, forged, or expired signature, which
-// callers treat as unauthenticated.
+// signedUserEmail returns the UserEmail from a validly-signed, unexpired cookie/sig, else "". Mirrors enforceSigning's HMAC check but allows any method.
 func signedUserEmail(r *http.Request) string {
 	sig := getSignatureFromCookies(r)
 	if querySig := r.FormValue("sig"); querySig != "" {

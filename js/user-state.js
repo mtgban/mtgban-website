@@ -1,7 +1,4 @@
-// User State Sync - background sync of favorites, recent searches, and UI
-// preferences for signed-in users. localStorage stays the synchronous local
-// cache; this layer hydrates from and writes through to the server. All server
-// interaction is best-effort: failures leave localStorage authoritative.
+// Best-effort cross-device sync of favorites, recents, and prefs for signed-in users.
 (function() {
     var BASE = '/api/userstate/';
     var DEBOUNCE_MS = 1500;
@@ -18,18 +15,14 @@
         'chartReleasesLongRange', 'chartCheckpointTypes'
     ];
 
-    // Signed-in detection: the MTGBAN auth cookie is not HttpOnly, so its mere
-    // presence is a cheap gate. The server still authoritatively authorizes.
+    // MTGBAN auth cookie is not HttpOnly; presence is a cheap signed-in gate.
     function isSignedIn() {
         return /(?:^|;\s*)MTGBAN=/.test(document.cookie);
     }
 
-    // Compute once: the cookie does not change within a page session.
     var signedIn = isSignedIn();
 
-    // Local bookkeeping keys (never synced; written via rawSetItem):
-    //  dirty  - local changes not yet confirmed pushed to the server
-    //  synced - this device has completed its one-time first-login merge
+    // Local-only bookkeeping keys (never synced).
     var DIRTY_KEY = 'mtgban_userstate_dirty';
     var SYNCED_KEY = 'mtgban_userstate_synced';
 
@@ -82,7 +75,7 @@
         return buildPreferences();
     }
 
-    // Apply a server state into localStorage (used on hydrate / reconcile).
+    // Apply server state into localStorage.
     function applyState(state) {
         if (!state) return;
         try {
@@ -100,13 +93,11 @@
     function rerender() {
         if (typeof window.renderFavorites === 'function') window.renderFavorites();
         if (typeof window.renderRecentSearches === 'function') window.renderRecentSearches();
-        // Favorites synced from another device arrive price-less (trimmed on the
-        // wire); backfill their prices. Self-gating, so a no-op when not needed.
+        // Synced favorites arrive price-less; backfill (self-gating).
         if (typeof window.refreshFavorites === 'function') window.refreshFavorites();
     }
 
-    // Send one PATCH for a section. On a version conflict, reconcile merges and
-    // retries. keepalive lets the request outlive a page navigation (pagehide).
+    // PATCH one section; keepalive lets it outlive navigation.
     function patchSection(section, keepalive) {
         var body = JSON.stringify({ data: payloadForSection(section), version: version });
         return fetch(BASE + section, {
@@ -136,8 +127,7 @@
         });
     }
 
-    // Flush queued writes immediately, e.g. when the page is hidden or unloading.
-    // Uses keepalive so the request survives navigation; coalesced per section.
+    // Flush queued writes now (page hidden/unloading), via keepalive.
     function flushPending() {
         if (timer) { clearTimeout(timer); timer = null; }
         var sections = Object.keys(pending);
@@ -152,9 +142,7 @@
         timer = setTimeout(flush, DEBOUNCE_MS);
     }
 
-    // Merge server state into local, push the merged result back up, adopt the
-    // server's version. Used on 409 and on first-login hydrate. attempt bounds
-    // the 409 retry loop so a peer writing concurrently can't spin it forever.
+    // Merge server+local, push back, adopt version; attempt bounds 409 retries.
     var MAX_RECONCILE_ATTEMPTS = 5;
     function reconcile(serverState, attempt) {
         attempt = attempt || 0;
@@ -174,14 +162,12 @@
         version = typeof serverState.version === 'number' ? serverState.version : version;
         rerender();
 
-        // Nothing local that the server lacks: adopt the server's version and
-        // skip the write. This keeps passive page loads to a single GET.
+        // Nothing new to push: adopt version, skip the write.
         if (!localHasNew(mergedFavs, mergedRecents, mergedPrefs, serverState)) {
             markClean();
             return Promise.resolve();
         }
 
-        // Push merged full state up at the adopted version.
         var body = JSON.stringify({
             favorites: mergedFavs.map(trimFavorite), recents: mergedRecents,
             preferences: mergedPrefs, version: version
@@ -205,8 +191,7 @@
         }).catch(function() {});
     }
 
-    // True when merged local state contains a favorite/recent/preference the
-    // server copy does not, i.e. there is something worth pushing.
+    // True when local has a favorite/recent/pref the server lacks.
     function localHasNew(favs, recents, prefs, server) {
         var sf = {};
         (server.favorites || []).forEach(function(f) { if (f && f.id != null) sf[f.id] = true; });
@@ -220,9 +205,7 @@
         return false;
     }
 
-    // Union two lists by an identity function, keeping the entry with the newer
-    // timestamp on collision. Pinned-first ordering is reapplied by the render
-    // modules, so here we only dedupe and cap.
+    // Union by id, newer timestamp wins; dedupe and cap (render reapplies pin order).
     function mergeList(local, server, idOf, cap) {
         var byId = {};
         var order = [];
@@ -242,10 +225,9 @@
         (local || []).forEach(add);
         (server || []).forEach(add);
         var merged = order.map(function(id) { return byId[id]; });
-        // Newest-first by timestamp, matching how unshift-based adds behave.
         merged.sort(function(a, b) { return (b.t || 0) - (a.t || 0); });
         if (cap && merged.length > cap) {
-            // Keep pinned items even when old; fill the rest with newest unpinned.
+            // Keep pinned even when old; fill the rest with newest unpinned.
             var pinned = merged.filter(function(x) { return x.pinned; });
             var unpinned = merged.filter(function(x) { return !x.pinned; });
             merged = pinned.concat(unpinned).slice(0, cap);
@@ -253,8 +235,7 @@
         return merged;
     }
 
-    // Preferences: last-write-wins per key. Local already reflects the most
-    // recent device action, so local keys win over server on first merge.
+    // Preferences: last-write-wins per key (local wins on first merge).
     function mergePrefs(localPrefs, serverPrefs) {
         var out = {};
         Object.keys(serverPrefs || {}).forEach(function(k) { out[k] = serverPrefs[k]; });
@@ -265,7 +246,7 @@
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }
     function localRecents() { try { return JSON.parse(readLocal(RECENTS_KEY, '[]')); } catch (e) { return []; } }
 
-    // Sync only identity/intent fields; derived prices are refetched per device.
+    // Sync only identity/intent fields; prices are refetched per device.
     function trimFavorite(f) {
         return {
             id: f.id, query: f.query, t: f.t, pinned: f.pinned,
@@ -276,8 +257,7 @@
         };
     }
 
-    // The setItem shim: pass through, mark dirty, and schedule a debounced sync
-    // for allowlisted keys. Installed only for signed-in users (see bottom).
+    // setItem shim: write through, mark dirty, schedule a debounced sync.
     function installSetItemShim() {
         localStorage.setItem = function(key, value) {
             rawSetItem(key, value);
@@ -288,8 +268,7 @@
 
     function hydrate() {
         var marker = readMarker();
-        // Within the freshness window and nothing pending: local is current and
-        // the page modules already rendered it. No request at all.
+        // Fresh and clean: local is current and already rendered; no request.
         if (!isDirty() && marker && typeof marker.ts === 'number' && (Date.now() - marker.ts) < TTL_MS) {
             if (typeof marker.v === 'number') version = marker.v;
             return;
@@ -321,16 +300,11 @@
         }).catch(function() {});
     }
 
-    // Anonymous visitors get no sync layer at all: no setItem wrapper, no
-    // listeners, no hydrate. This keeps every localStorage write on every page
-    // free of sync overhead for logged-out users.
+    // Anonymous visitors get no sync layer (no shim, listeners, or hydrate).
     if (signedIn) {
         installSetItemShim();
 
-        // Push queued writes before the page goes away so a change made just
-        // before navigating still reaches the server (the debounce would
-        // otherwise be cut off). visibilitychange covers mobile tab-switch/close;
-        // pagehide covers desktop navigation.
+        // Flush before the page goes away so a just-made change still syncs.
         document.addEventListener('visibilitychange', function() {
             if (document.visibilityState === 'hidden') flushPending();
         });

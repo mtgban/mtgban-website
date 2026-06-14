@@ -8,8 +8,7 @@ import (
 	"fmt"
 )
 
-// State is the full per-user payload. Section columns are passed through as raw
-// JSON so the server stays agnostic to their shape (JSONB schema evolution).
+// State is the full per-user payload; section columns pass through as raw JSON.
 type State struct {
 	Favorites   json.RawMessage `json:"favorites"`
 	Recents     json.RawMessage `json:"recents"`
@@ -21,8 +20,7 @@ var validSections = map[string]bool{
 	"favorites": true, "recents": true, "preferences": true,
 }
 
-// Get returns the row for emailHash. A missing row yields the zero state
-// (empty arrays / object, version 0) without erroring.
+// Get returns the row for emailHash, or the zero state if missing.
 func (c *Client) Get(ctx context.Context, emailHash string) (State, error) {
 	st := State{
 		Favorites:   json.RawMessage("[]"),
@@ -46,8 +44,7 @@ func (c *Client) Get(ctx context.Context, emailHash string) (State, error) {
 	return st, nil
 }
 
-// GetVersion returns the row's version, or 0 if no row exists. Used for cheap
-// ETag revalidation without reading the JSONB columns.
+// GetVersion returns the row's version, or 0 if missing.
 func (c *Client) GetVersion(ctx context.Context, emailHash string) (int64, error) {
 	var version int64
 	err := c.db.QueryRowContext(ctx,
@@ -62,10 +59,7 @@ func (c *Client) GetVersion(ctx context.Context, emailHash string) (int64, error
 	return version, nil
 }
 
-// writeWithConflict runs a CTE query that either performs the write and returns
-// the new state (updated=true) or, when the version did not match, returns the
-// current row (updated=false) in a single round trip. Zero rows means the row
-// does not exist at all, which is treated as a conflict with the zero state.
+// writeWithConflict runs a write-or-read CTE; on version mismatch it returns the current row (conflict). Zero rows is a conflict with the zero state.
 func (c *Client) writeWithConflict(ctx context.Context, query string, args ...any) (State, bool, error) {
 	var updated bool
 	var version int64
@@ -89,9 +83,7 @@ func (c *Client) writeWithConflict(ctx context.Context, query string, args ...an
 	}, !updated, nil
 }
 
-// Put fully replaces all sections, version-checked. On success the returned
-// State carries the new version. On conflict (version mismatch or missing row)
-// conflict is true and the returned State is the current server state.
+// Put fully replaces all sections, version-checked; on conflict returns the current state.
 func (c *Client) Put(ctx context.Context, emailHash string, st State, expectedVersion int64) (State, bool, error) {
 	if expectedVersion == 0 {
 		return c.writeWithConflict(ctx, `
@@ -129,8 +121,7 @@ func (c *Client) Put(ctx context.Context, emailHash string, st State, expectedVe
 	)
 }
 
-// Patch replaces a single section column, version-checked, with the same
-// success/conflict return shape as Put.
+// Patch replaces one section column, version-checked, with Put's return shape.
 func (c *Client) Patch(ctx context.Context, emailHash, section string, payload json.RawMessage, expectedVersion int64) (State, bool, error) {
 	if !validSections[section] {
 		return State{}, false, fmt.Errorf("userstate: unknown section %q", section)
