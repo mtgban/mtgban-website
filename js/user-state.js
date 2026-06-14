@@ -22,6 +22,9 @@
         return /(?:^|;\s*)MTGBAN=/.test(document.cookie);
     }
 
+    // Compute once: the cookie does not change within a page session.
+    var signedIn = isSignedIn();
+
     // Local bookkeeping keys (never synced; written via rawSetItem):
     //  dirty  - local changes not yet confirmed pushed to the server
     //  synced - this device has completed its one-time first-login merge
@@ -53,15 +56,17 @@
         return prefs;
     }
 
-    function sectionForKey(key) {
-        if (key === FAVORITES_KEY) return 'favorites';
-        if (key === RECENTS_KEY) return 'recents';
-        if (PREF_KEYS.indexOf(key) >= 0) return 'preferences';
-        return null;
-    }
+    var KEY_TO_SECTION = (function() {
+        var m = {};
+        m[FAVORITES_KEY] = 'favorites';
+        m[RECENTS_KEY] = 'recents';
+        PREF_KEYS.forEach(function(k) { m[k] = 'preferences'; });
+        return m;
+    })();
+    function sectionForKey(key) { return KEY_TO_SECTION[key] || null; }
 
     function payloadForSection(section) {
-        if (section === 'favorites') return JSON.parse(readLocal(FAVORITES_KEY, '[]'));
+        if (section === 'favorites') return JSON.parse(readLocal(FAVORITES_KEY, '[]')).map(trimFavorite);
         if (section === 'recents') return JSON.parse(readLocal(RECENTS_KEY, '[]'));
         return buildPreferences();
     }
@@ -162,7 +167,7 @@
 
         // Push merged full state up at the adopted version.
         var body = JSON.stringify({
-            favorites: mergedFavs, recents: mergedRecents,
+            favorites: mergedFavs.map(trimFavorite), recents: mergedRecents,
             preferences: mergedPrefs, version: version
         });
         return fetch(BASE, {
@@ -243,17 +248,28 @@
     function localFavorites() { try { return JSON.parse(readLocal(FAVORITES_KEY, '[]')); } catch (e) { return []; } }
     function localRecents() { try { return JSON.parse(readLocal(RECENTS_KEY, '[]')); } catch (e) { return []; } }
 
+    // Sync only identity/intent fields; derived prices are refetched per device.
+    function trimFavorite(f) {
+        return {
+            id: f.id, query: f.query, t: f.t, pinned: f.pinned,
+            name: f.name, set: f.set, edition: f.edition, number: f.number,
+            foil: f.foil, etched: f.etched,
+            finishTag: f.finishTag, finishClass: f.finishClass,
+            treatments: f.treatments, img: f.img, cw: f.cw
+        };
+    }
+
     // The setItem shim: pass through, mark dirty, and schedule a debounced sync
-    // for allowlisted keys.
-    localStorage.setItem = function(key, value) {
-        rawSetItem(key, value);
-        if (!isSignedIn()) return;
-        var section = sectionForKey(key);
-        if (section) { markDirty(); schedule(section); }
-    };
+    // for allowlisted keys. Installed only for signed-in users (see bottom).
+    function installSetItemShim() {
+        localStorage.setItem = function(key, value) {
+            rawSetItem(key, value);
+            var section = sectionForKey(key);
+            if (section) { markDirty(); schedule(section); }
+        };
+    }
 
     function hydrate() {
-        if (!isSignedIn()) return;
         fetch(BASE, { method: 'GET' }).then(function(r) {
             if (r.status === 401 || r.status === 503) return null; // anon / unavailable
             if (!r.ok) return null;
@@ -275,18 +291,25 @@
         }).catch(function() {});
     }
 
-    // Push queued writes before the page goes away so a change made just before
-    // navigating still reaches the server (the debounce would otherwise be cut
-    // off). visibilitychange covers mobile tab-switch/close; pagehide covers
-    // desktop navigation.
-    document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'hidden') flushPending();
-    });
-    window.addEventListener('pagehide', flushPending);
+    // Anonymous visitors get no sync layer at all: no setItem wrapper, no
+    // listeners, no hydrate. This keeps every localStorage write on every page
+    // free of sync overhead for logged-out users.
+    if (signedIn) {
+        installSetItemShim();
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', hydrate);
-    } else {
-        hydrate();
+        // Push queued writes before the page goes away so a change made just
+        // before navigating still reaches the server (the debounce would
+        // otherwise be cut off). visibilitychange covers mobile tab-switch/close;
+        // pagehide covers desktop navigation.
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') flushPending();
+        });
+        window.addEventListener('pagehide', flushPending);
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', hydrate);
+        } else {
+            hydrate();
+        }
     }
 })();
