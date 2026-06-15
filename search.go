@@ -273,6 +273,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	allKeys, err := searchAndFilter(config)
 	if err != nil {
 		pageVars.InfoMessage = NoCardsMessage
+		pageVars.CleanSearchQuery = config.CleanQuery
+		pageVars.DidYouMean, pageVars.AltSearches = buildSearchSuggestions(query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -303,6 +305,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			pageVars.InfoMessage = NoPromosMessage
 		}
 		pageVars.CleanSearchQuery = config.CleanQuery
+		pageVars.DidYouMean, pageVars.AltSearches = buildSearchSuggestions(query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}

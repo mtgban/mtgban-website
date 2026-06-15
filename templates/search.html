@@ -137,6 +137,24 @@
     {{if not .AllKeys}}
         <div class="page-standard" style="padding-top: 2em;">
             <p style="color: var(--activetext); font-size: var(--text-3xl);"><em>{{.InfoMessage}}</em></p>
+            {{if or .DidYouMean .AltSearches}}
+                {{$base := "search"}}{{if .IsSealed}}{{$base = "sealed"}}{{end}}
+                <div class="search-suggestions">
+                    {{if .DidYouMean}}
+                        <p class="search-suggestion-didyoumean">
+                            Did you mean <a href="{{$base}}?q={{.DidYouMean}}">{{.DidYouMean}}</a>?
+                        </p>
+                    {{end}}
+                    {{if .AltSearches}}
+                        <p class="search-suggestion-label">Try a broader search:</p>
+                        <ul class="search-suggestion-list">
+                            {{range .AltSearches}}
+                                <li><a href="{{$base}}?q={{.Query}}">{{.Label}}</a></li>
+                            {{end}}
+                        </ul>
+                    {{end}}
+                </div>
+            {{end}}
         </div>
     {{else}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>

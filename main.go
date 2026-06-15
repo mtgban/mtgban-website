@@ -90,6 +90,10 @@ type PageVars struct {
 	CleanSearchQuery string
 	CheckpointsText  string
 
+	// Suggestions shown when a search returns no results
+	DidYouMean  string
+	AltSearches []AltSearch
+
 	ScraperShort   string
 	HasAffiliate   bool
 	CanDownloadCSV bool

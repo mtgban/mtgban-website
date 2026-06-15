@@ -2394,3 +2394,35 @@
     .rows-index .price-row > .index-label-2 { grid-column: 3; }
     .rows-index .price-row > .index-label-3 { grid-column: 4; }
 }
+
+/* ── No-results suggestions (did you mean / broader searches) ── */
+.search-suggestions {
+    margin-top: 1.5em;
+    font-size: var(--text-xl);
+    color: var(--activetext);
+}
+.search-suggestion-didyoumean {
+    margin: 0 0 0.75em;
+}
+.search-suggestion-didyoumean a {
+    color: var(--ainfo);
+    font-weight: 600;
+}
+.search-suggestion-label {
+    margin: 0 0 0.4em;
+    color: var(--text-dim);
+}
+.search-suggestion-list {
+    margin: 0;
+    padding-left: 1.2em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+.search-suggestion-list a {
+    color: var(--ainfo);
+}
+.search-suggestion-list a:hover,
+.search-suggestion-didyoumean a:hover {
+    text-decoration: underline;
+}
