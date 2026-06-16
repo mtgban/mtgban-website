@@ -359,8 +359,8 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 
 		record = append(record, tcgSkuId)
 		record = append(record, "Magic")
-		record = append(record, co.Edition)
-		record = append(record, co.Name)
+		record = append(record, "") // Needs to be the tcgplayer edition name
+		record = append(record, "") // Needs to be the tcgplayer display name
 		record = append(record, "")
 		record = append(record, co.Number)
 		record = append(record, strings.ToUpper(co.Rarity[:1]))
