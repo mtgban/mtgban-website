@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/mtgban-website/internal/diskusage"
 	"github.com/mtgban/simplecloud"
 
 	"github.com/mackerelio/go-osstat/memory"
@@ -716,6 +717,18 @@ func mem() string {
 		return "N/A"
 	}
 	return fmt.Sprintf("%.2f%% of %.2fGB", float64(memData.Used)/float64(memData.Total)*100, float64(memData.Total)/1024/1024/1024)
+}
+
+func disk() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "N/A"
+	}
+	used, total, err := diskusage.Stats(wd)
+	if err != nil || total == 0 {
+		return "N/A"
+	}
+	return fmt.Sprintf("%.2f%% of %.2fGB", float64(used)/float64(total)*100, float64(total)/1024/1024/1024)
 }
 
 const (
