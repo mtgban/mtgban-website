@@ -1,0 +1,22 @@
+[Unit]
+Description=mtgban website (port %i)
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5s
+User=koda
+Group=koda
+# Each port runs from its own checkout so a deploy never mutates the live
+# instance's on-disk templates / static assets.
+WorkingDirectory=/home/koda/src/mtgban-website-%i
+# Secrets (BAN_SECRET, BAN_CONFIG_KEY, BAN_CONFIG_SECRET) live here on the
+# droplet only — never committed. Create it once, chmod 600. See deploy/README.md.
+EnvironmentFile=/etc/mtgban.env
+ExecStart=/home/koda/src/mtgban-website-%i/mtgban-website -port %i -cfg b2://mtgban-config/magic/config-beta.json -log logs
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+
+[Install]
+WantedBy=multi-user.target
