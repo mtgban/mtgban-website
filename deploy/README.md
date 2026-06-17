@@ -126,14 +126,14 @@ usually `/usr/bin/systemctl`), then:
 
 ```bash
 sudo tee /etc/sudoers.d/mtgban-deploy >/dev/null <<'EOF'
-koda ALL=(root) NOPASSWD: /usr/bin/systemctl restart mtgban@8081.service, \
-    /usr/bin/systemctl restart mtgban@8082.service, \
-    /usr/bin/systemctl stop mtgban@8081.service, \
-    /usr/bin/systemctl stop mtgban@8082.service, \
-    /usr/bin/systemctl enable mtgban@8081.service, \
-    /usr/bin/systemctl enable mtgban@8082.service, \
-    /usr/bin/systemctl disable mtgban@8081.service, \
-    /usr/bin/systemctl disable mtgban@8082.service, \
+koda ALL=(root) NOPASSWD: /usr/bin/systemctl restart mtgban@8081, \
+    /usr/bin/systemctl restart mtgban@8082, \
+    /usr/bin/systemctl stop mtgban@8081, \
+    /usr/bin/systemctl stop mtgban@8082, \
+    /usr/bin/systemctl enable mtgban@8081, \
+    /usr/bin/systemctl enable mtgban@8082, \
+    /usr/bin/systemctl disable mtgban@8081, \
+    /usr/bin/systemctl disable mtgban@8082, \
     /usr/bin/systemctl reload nginx, \
     /usr/sbin/nginx -t
 EOF

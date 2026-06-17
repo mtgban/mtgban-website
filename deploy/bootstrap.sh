@@ -84,7 +84,8 @@ echo "==> writing sudoers -> $SUDOERS_FILE"
 cmds=""
 for verb in restart stop enable disable; do
     for port in "${PORTS[@]}"; do
-        cmds+="${cmds:+, }$SYSTEMCTL $verb mtgban@${port}.service"
+        # No .service suffix — must match exactly how deploy.sh invokes sudo.
+        cmds+="${cmds:+, }$SYSTEMCTL $verb mtgban@${port}"
     done
 done
 cmds+=", $SYSTEMCTL reload nginx, $NGINX -t"
