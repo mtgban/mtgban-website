@@ -17,7 +17,6 @@ set -euo pipefail
 # --- config (override via env if needed) -----------------------------------
 PORTS=(8081 8082)
 BOOT_PORT=8081                                   # the instance enabled at boot
-CFG=${CFG:-b2://mtgban-config/magic/config-beta.json}
 ENV_FILE=${ENV_FILE:-/etc/mtgban.env}
 UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}
 SUDOERS_FILE=${SUDOERS_FILE:-/etc/sudoers.d/mtgban-deploy}
