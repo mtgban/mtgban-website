@@ -725,9 +725,7 @@ func preloadConfig(configPath string) error {
 
 func loadVars(port, datastorePath, offlineKey string) error {
 	// Preload
-	Config.Port = port
 	Config.Game = DefaultGame
-	Config.DatastorePath = DefaultDatastorePath
 	Config.OfflineKey = offlineKey
 
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
@@ -740,6 +738,17 @@ func loadVars(port, datastorePath, offlineKey string) error {
 	err = json.NewDecoder(reader).Decode(&Config)
 	if err != nil && !DevMode {
 		return err
+	}
+
+	// The -port and -ds flags, when provided, override whatever the config
+	// file set. This must happen after the decode above, which would otherwise
+	// clobber the flag values with the config's fields (breaking blue-green
+	// deploys that run instances on distinct ports).
+	if port != "" {
+		Config.Port = port
+	}
+	if datastorePath != "" {
+		Config.DatastorePath = datastorePath
 	}
 
 	// Ensure needed defaults
@@ -886,8 +895,8 @@ func loadDatastore(ds string) error {
 
 func main() {
 	configFilePath := flag.String("cfg", "", "Load configuration file")
-	port := flag.String("port", DefaultServerPort, "Override server port")
-	datastore := flag.String("ds", DefaultDatastorePath, "Override datastore path")
+	port := flag.String("port", "", "Override server port")
+	datastore := flag.String("ds", "", "Override datastore path")
 
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
