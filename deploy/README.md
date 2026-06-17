@@ -25,7 +25,13 @@ datastore + logs persist across deploys.
 
 ## One-time droplet setup
 
-Run these once on the droplet.
+The quick path: run **`./deploy/bootstrap.sh`** from the control repo (as the
+deploy user, not root). It's idempotent and handles the checkouts, systemd unit,
+placeholder secrets file, sudoers rule, nginx upstream include, and the boot
+instance — then prints the manual follow-ups (real secrets, the nginx server
+block edit, retiring any old unit, GitHub deploy key/secrets).
+
+The steps below document what it does, for reference or manual setup.
 
 ### 1. Install the template unit, remove the old single unit
 
