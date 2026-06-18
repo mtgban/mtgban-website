@@ -3,8 +3,7 @@ name: droplet-deploy
 on:
   push:
     tags:
-      - 'v*.*.*'
-      - 'beta-*.*.*'
+      - 'v*'
   workflow_dispatch:
     inputs:
       ref:
@@ -31,7 +30,7 @@ jobs:
             # Update the control repo so we run this ref's deploy.sh. Nothing
             # serves from this dir — it's just the orchestrator; the script
             # checks out and builds the per-port runtime checkouts itself.
-            cd /home/koda/src/mtgban-website
+            cd /home/${{ secrets.DROPLET_SSH_USER }}/src/mtgban-website
             git fetch --force --prune --tags origin "$REF"
             git checkout --force FETCH_HEAD
             deploy/deploy.sh "$REF"
