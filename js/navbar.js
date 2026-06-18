@@ -315,4 +315,11 @@
     var sealed = location.pathname.indexOf('/sealed') === 0;
     form.action = sealed ? '/sealed' : '/search';
     autocomplete(form, input, sealed ? 'true' : 'false');
+
+    // Keep the search bar focused on every page load so typing starts a
+    // search immediately. The `autofocus` attribute covers fresh loads;
+    // this also handles back/forward (bfcache) restores where it won't fire.
+    function focusSearch() { input.focus(); }
+    focusSearch();
+    window.addEventListener('pageshow', function (e) { if (e.persisted) focusSearch(); });
 })();

@@ -12,7 +12,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         </span>
         <form id="nav-searchform" action="{{if .IsSealed}}/sealed{{else}}/search{{end}}" autocomplete="off" spellcheck="false">
-            <input id="nav-searchbox" type="text" name="q" placeholder="Search cards, sets, products…" value="{{.SearchQuery}}" maxlength="1000" autocapitalize="none" {{if .SearchQuery}}autofocus{{end}} onFocus="this.setSelectionRange(0, this.value.length)">
+            <input id="nav-searchbox" type="text" name="q" placeholder="Search cards, sets, products…" value="{{.SearchQuery}}" maxlength="1000" autocapitalize="none" autofocus onFocus="this.setSelectionRange(0, this.value.length)">
         </form>
     </div>
 
