@@ -31,11 +31,11 @@
         <span class="admin-sep"></span>
         <div class="admin-stat"><span class="sl">Hash</span><a target="_blank" href="https://github.com/mtgban/mtgban-website/commit/{{.LatestHash}}">{{.LatestHash}}</a></div>
         <span class="admin-sep"></span>
-        <div class="admin-stat"><span class="sl">Datastore</span><span class="sv">{{.LastUpdate.Format "Jan 02 15:04"}}</span></div>
+        <div class="admin-stat"><span class="sl">Datastore</span><span class="sv"><time class="admin-localtime" datetime="{{.LastUpdate.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastUpdate.Format "Jan 02 15:04"}}</time></span></div>
         <span class="admin-sep"></span>
-        <div class="admin-stat"><span class="sl">Newspaper</span><span class="sv">{{if .LastNews.IsZero}}not set{{else}}{{.LastNews.Format "Jan 02 15:04"}}{{end}}</span></div>
+        <div class="admin-stat"><span class="sl">Newspaper</span><span class="sv">{{if .LastNews.IsZero}}not set{{else}}<time class="admin-localtime" datetime="{{.LastNews.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastNews.Format "Jan 02 15:04"}}</time>{{end}}</span></div>
         <span class="admin-sep"></span>
-        <div class="admin-stat"><span class="sl">Stash</span><span class="sv">{{if .LastStash.IsZero}}not set{{else}}{{.LastStash.Format "Jan 02 15:04"}}{{end}}</span></div>
+        <div class="admin-stat"><span class="sl">Stash</span><span class="sv">{{if .LastStash.IsZero}}not set{{else}}<time class="admin-localtime" datetime="{{.LastStash.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastStash.Format "Jan 02 15:04"}}</time>{{end}}</span></div>
     </div>
 
     <!-- Tabs -->
@@ -71,7 +71,7 @@
                         <td><a href="?refresh={{index $row 2}}" onclick="return confirm('Are you sure you want to refresh {{index $row 0}}?')">{{index $row 0}}</a></td>
                         <td class="admin-mono">{{index $row 1}}</td>
                         <td class="admin-mono"><a href="?logs={{index $row 2}}">{{index $row 2}}</a></td>
-                        <td class="admin-mono">{{index $row 3}}</td>
+                        <td class="admin-mono"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
                         <td class="c">{{index $row 5}}</td>
                         <td class="c">{{index $row 6}}</td>
@@ -102,7 +102,7 @@
                         <td><a href="?refresh={{index $row 2}}" onclick="return confirm('Are you sure you want to refresh {{index $row 0}}?')">{{index $row 0}}</a></td>
                         <td class="admin-mono">{{index $row 1}}</td>
                         <td class="admin-mono"><a href="?logs={{index $row 2}}">{{index $row 2}}</a></td>
-                        <td class="admin-mono">{{index $row 3}}</td>
+                        <td class="admin-mono"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
                         <td class="c">{{index $row 5}}</td>
                         <td class="c">{{index $row 6}}</td>
@@ -401,6 +401,60 @@ function initJSONEditor(opts) {
 
     return editor;
 }
+
+// Render UTC timestamps in the browser's local time; click toggles to UTC.
+(function() {
+    var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function p(n) { return n < 10 ? '0' + n : '' + n; }
+    function fmt(d, utc, withSeconds) {
+        var mo = utc ? d.getUTCMonth() : d.getMonth();
+        var day = utc ? d.getUTCDate() : d.getDate();
+        var h = utc ? d.getUTCHours() : d.getHours();
+        var mi = utc ? d.getUTCMinutes() : d.getMinutes();
+        var se = utc ? d.getUTCSeconds() : d.getSeconds();
+        var s = MONTHS[mo] + ' ' + p(day) + ' ' + p(h) + ':' + p(mi);
+        if (withSeconds) s += ':' + p(se);
+        return s;
+    }
+    document.querySelectorAll('time.admin-localtime').forEach(function(el) {
+        var iso = el.getAttribute('datetime');
+        if (!iso) return;
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return;
+        // Table cells use a seconds-precise stamp; the status banner does not.
+        var withSeconds = el.closest('td') !== null;
+        var local = fmt(d, false, withSeconds);
+        var utc = fmt(d, true, withSeconds) + ' UTC';
+
+        // Stack both labels in the same grid cell so the element always sizes
+        // to the wider (UTC) text. Toggling visibility never reflows the layout
+        // — no width measurement, so web-font load timing can't throw it off.
+        el.textContent = '';
+        el.style.display = 'inline-grid';
+        el.style.cursor = 'pointer';
+        var localSpan = document.createElement('span');
+        var utcSpan = document.createElement('span');
+        [localSpan, utcSpan].forEach(function(s) {
+            s.style.gridArea = '1 / 1';
+            s.style.whiteSpace = 'nowrap';
+        });
+        localSpan.textContent = local;
+        utcSpan.textContent = utc;
+        utcSpan.style.visibility = 'hidden';
+        el.appendChild(localSpan);
+        el.appendChild(utcSpan);
+
+        el.dataset.showing = 'local';
+        el.title = 'Click to show UTC';
+        el.addEventListener('click', function() {
+            var toUtc = el.dataset.showing === 'local';
+            localSpan.style.visibility = toUtc ? 'hidden' : 'visible';
+            utcSpan.style.visibility = toUtc ? 'visible' : 'hidden';
+            el.title = toUtc ? 'Click to show local time' : 'Click to show UTC';
+            el.dataset.showing = toUtc ? 'utc' : 'local';
+        });
+    });
+})();
 </script>
 
 {{if or .CleanSearchQuery .CheckpointsText}}

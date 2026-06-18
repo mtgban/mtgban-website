@@ -373,7 +373,10 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		lastUpdate := seller.Info().InventoryTimestamp.Format(time.Stamp)
+		lastUpdate := ""
+		if ts := seller.Info().InventoryTimestamp; !ts.IsZero() {
+			lastUpdate = ts.UTC().Format(time.RFC3339)
+		}
 		inv := seller.Inventory()
 
 		status := "✅"
@@ -424,7 +427,10 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		lastUpdate := vendor.Info().BuylistTimestamp.Format(time.Stamp)
+		lastUpdate := ""
+		if ts := vendor.Info().BuylistTimestamp; !ts.IsZero() {
+			lastUpdate = ts.UTC().Format(time.RFC3339)
+		}
 		bl := vendor.Buylist()
 
 		status := "✅"
