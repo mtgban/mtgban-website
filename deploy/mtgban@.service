@@ -14,7 +14,7 @@ WorkingDirectory=/home/koda/src/mtgban-website-%i
 # Secrets (BAN_SECRET, BAN_CONFIG_KEY, BAN_CONFIG_SECRET) live here on the
 # droplet only — never committed. Create it once, chmod 600. See deploy/README.md.
 EnvironmentFile=/etc/mtgban.env
-ExecStart=/home/koda/src/mtgban-website-%i/mtgban-website -port %i -cfg b2://mtgban-config/magic/config-beta.json -log logs
+ExecStart=/home/koda/src/mtgban-website-%i/mtgban-website -port %i -cfg b2://mtgban-config/magic/config.json -log logs
 KillSignal=SIGTERM
 TimeoutStopSec=15s
 
