@@ -463,7 +463,7 @@ type ConfigType struct {
 		BackupPath      string `json:"backup_path"`
 		BucketAccessKey string `json:"bucket_access_key"`
 		BucketSecretKey string `json:"bucket_access_secret"`
-		CheckpointsPath string `json:"checkpoints_path,omitempty"`
+		CheckpointsPath string `json:"checkpoints_path"`
 	} `json:"datastore"`
 	Game                   string             `json:"game"`
 	CardBackImage          string             `json:"card_back_image"`
