@@ -304,37 +304,6 @@
 .arb-load-btn.csv { background: var(--surface-2); color: var(--activetext); border: 1px solid var(--border-subtle); }
 .arb-load-btn.csv:hover { border-color: var(--accent-border); color: var(--normal); }
 
-.arb-jump-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-bottom: 14px;
-}
-
-.arb-jump-label { font-size: var(--text-base); font-weight: 600; color: var(--text-dim); }
-
-.arb-jump-chip {
-    padding: 5px 12px;
-    border-radius: var(--radius-sm);
-    background: var(--surface-1);
-    border: 1px solid var(--border-subtle);
-    color: var(--activetext);
-    font-size: var(--text-md);
-    font-weight: 500;
-    text-decoration: none;
-    transition: all 0.12s;
-}
-
-.arb-jump-chip:hover { border-color: var(--accent-border); color: var(--ainfo); }
-
-.arb-jump-count {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-    color: var(--text-dim);
-    margin-left: 3px;
-}
-
 .arb-table-wrap {
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
@@ -461,7 +430,6 @@
 
     /* Touch-friendly filter chips */
     .arb-filter-chip { padding: 8px 14px; }
-    .arb-jump-chip { padding: 8px 14px; }
     .arb-alt-pill { padding: 8px 14px; }
 }
 

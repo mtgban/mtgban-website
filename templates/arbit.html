@@ -138,6 +138,17 @@
                     {{end}}
                 </select>
             </div>
+            {{if and (not .LargeTable) .Arb}}
+            <div class="arb-current-store">
+                <span class="store-type">{{if .ReverseMode}}Buying from{{else}}Selling to{{end}}</span>
+                <select class="arb-store-select" onchange="if(this.value) location.hash = this.value">
+                    <option value="" disabled selected>Jump to…</option>
+                    {{range .Arb}}
+                        <option value="{{.Name}}">{{.Name}} ({{len .Arbit}})</option>
+                    {{end}}
+                </select>
+            </div>
+            {{end}}
         </div>
         {{end}}
 
@@ -161,16 +172,6 @@
                     {{end}}
                 {{end}}
                 <input class="arb-edition-filter" type="text" id="filterInput" onkeyup="filterTableByEdition()" placeholder="Filter edition...">
-            </div>
-
-            <!-- Jump-to bar -->
-            <div class="arb-jump-bar">
-                {{if .Arb}}
-                    <span class="arb-jump-label">Jump to</span>
-                    {{range .Arb}}
-                        <a class="arb-jump-chip" href="#{{.Name}}">{{.Name}} <span class="arb-jump-count">({{len .Arbit}})</span></a>
-                    {{end}}
-                {{end}}
             </div>
         {{else}}
             <br>
