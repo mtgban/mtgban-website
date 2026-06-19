@@ -368,6 +368,7 @@
     border-bottom: 1px solid var(--border-subtle);
     vertical-align: middle;
     text-align: center;
+    white-space: nowrap;
 }
 .arb-table td:first-child { text-align: left; }
 
