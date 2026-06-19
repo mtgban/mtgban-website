@@ -2,10 +2,17 @@
     padding: 28px 28px 80px;
 }
 
-/* Results span the full viewport width so the table can show every
-   column without hiding or scrolling */
+/* The results page is full-width so the tables (and their section
+   headers) can use the whole space, while the top controls stay
+   centered at the normal page width */
 .page-standard.arb-wide {
     max-width: none;
+}
+.arb-wide .arb-selector-bar,
+.arb-wide .arb-filter-bar {
+    max-width: var(--page-max-width);
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .arb-landing h1 {
