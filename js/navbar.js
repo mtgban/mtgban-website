@@ -102,32 +102,6 @@
     function saveLayout() {
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(currentLayout())); } catch (e) {}
     }
-    function restoreLayout() {
-        var saved;
-        try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) { return; }
-        if (!saved || !Array.isArray(saved.sections) || !Array.isArray(saved.grid)) return;
-
-        var toolsWrap = navSections.querySelector('.nav2-tools-wrap');
-        navSections.querySelectorAll('.nav2-section-btn:not(.is-tools)').forEach(function(b) { b.remove(); });
-        grid.querySelectorAll('.tools-tile').forEach(function(t) { t.remove(); });
-
-        var placed = {};
-        saved.sections.forEach(function(tool) {
-            if (ENTRIES[tool]) { navSections.insertBefore(createSectionBtn(tool), toolsWrap); placed[tool] = true; }
-        });
-        saved.grid.forEach(function(tool) {
-            if (ENTRIES[tool]) { grid.appendChild(createTile(tool)); placed[tool] = true; }
-        });
-
-        // Append any auth-gated tools missing from the saved layout — e.g. a
-        // tool added to the nav, or newly granted to this user, after the
-        // layout was last saved. Without this they'd be silently dropped, since
-        // the server-rendered tiles were cleared above.
-        Object.keys(ENTRIES).forEach(function(tool) {
-            if (!placed[tool]) grid.appendChild(createTile(tool));
-        });
-    }
-
     function clearIndicators() {
         document.querySelectorAll('.drop-before, .drop-after, .swap-target, .promote-target, .cap-reached, .demote-target').forEach(function(t) {
             t.classList.remove('drop-before', 'drop-after', 'swap-target', 'promote-target', 'cap-reached', 'demote-target');
@@ -306,13 +280,12 @@
         });
     }
 
+    // Layout restoration lives entirely in the synchronous inline script in
+    // templates/partials/navbar.html — it must run before the browser paints
+    // to avoid flashing the default layout, which a deferred external script
+    // can't do. Here we just attach drag handlers to whatever tiles/buttons it
+    // produced (or the server's defaults, if there's no saved layout).
     Array.from(document.querySelectorAll('.tools-tile, .nav2-section-btn:not(.is-tools)')).forEach(attachSlotHandlers);
-    // Inline script in templates/partials/navbar.html now runs the
-    // initial restore synchronously before the browser paints, so we
-    // only fall through here if that flag was never set (e.g., page
-    // doesn't include the navbar partial, or running in an old cached
-    // template). Keeps behavior backward-compatible.
-    if (!window.__BAN_NAV_RESTORED) restoreLayout();
 })();
 
 // ── Context-aware nav search autocomplete ───────────────────

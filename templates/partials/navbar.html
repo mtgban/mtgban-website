@@ -203,10 +203,6 @@
     Object.keys(info).forEach(function(tool) {
         if (!placed[tool]) { var el = mkTile(tool); if (el) grid.appendChild(el); }
     });
-
-    // Flag for navbar.js so it skips its own restoreLayout pass —
-    // otherwise it would wipe and re-create everything we just placed.
-    window.__BAN_NAV_RESTORED = true;
 })();
 
 </script>
