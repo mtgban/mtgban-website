@@ -111,11 +111,20 @@
         navSections.querySelectorAll('.nav2-section-btn:not(.is-tools)').forEach(function(b) { b.remove(); });
         grid.querySelectorAll('.tools-tile').forEach(function(t) { t.remove(); });
 
+        var placed = {};
         saved.sections.forEach(function(tool) {
-            if (ENTRIES[tool]) navSections.insertBefore(createSectionBtn(tool), toolsWrap);
+            if (ENTRIES[tool]) { navSections.insertBefore(createSectionBtn(tool), toolsWrap); placed[tool] = true; }
         });
         saved.grid.forEach(function(tool) {
-            if (ENTRIES[tool]) grid.appendChild(createTile(tool));
+            if (ENTRIES[tool]) { grid.appendChild(createTile(tool)); placed[tool] = true; }
+        });
+
+        // Append any auth-gated tools missing from the saved layout — e.g. a
+        // tool added to the nav, or newly granted to this user, after the
+        // layout was last saved. Without this they'd be silently dropped, since
+        // the server-rendered tiles were cleared above.
+        Object.keys(ENTRIES).forEach(function(tool) {
+            if (!placed[tool]) grid.appendChild(createTile(tool));
         });
     }
 
