@@ -640,7 +640,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
-		userTier := GetParamFromSig(sig, "UserTier")
 		pageVars.ChartID = chartId
 
 		if PricesArchiveDB == nil {
@@ -651,13 +650,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				fmt.Println("Search: Failed to GetUUID: %w", err)
 				return
 			}
-			lb := lookbackForTier(userTier)
+			lb := chartLookback(sig)
 			pageVars.MaxLookbackDays = lb.Days()
 
 			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
-			pageVars.Datasets = getDatasets(r.Context(), chartId, co.Sealed, pageVars.AxisLabels, userTier)
+			pageVars.Datasets = getDatasets(r.Context(), chartId, co.Sealed, pageVars.AxisLabels, lb)
 			pageVars.Checkpoints = relevantCheckpoints(co.Name, earliest)
 			if len(pageVars.Datasets) == 0 {
 				pageVars.InfoMessage = "No chart data available"

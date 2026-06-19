@@ -47,24 +47,11 @@ type PriceRow struct {
 	TcgplayerLowSealedExpectedValue *float64 `json:"tcgplayer_low_sealed_expected_value"`
 }
 
+// Lookback is a number of days of history to consider.
 type Lookback int
 
-const (
-	LookbackStandard Lookback = iota
-	LookbackModern
-	LookbackLegacy
-	LookbackVintage
-)
-
 func (l Lookback) Days() int {
-	switch l {
-	case LookbackStandard:
-		return 730 // 2 years
-	case LookbackModern, LookbackLegacy, LookbackVintage:
-		return 3650 // 10 years
-	default:
-		return 30 // 30 days
-	}
+	return int(l)
 }
 
 func (l Lookback) Since() time.Time {

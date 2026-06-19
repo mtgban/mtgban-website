@@ -295,6 +295,7 @@ var OptionalFields = []string{
 	"SearchBuylistDisabled",
 	"SearchDownloadCSV",
 	"SearchChartDelete",
+	"SearchChartLoopback",
 	"ArbitEnabled",
 	"ArbitDisabledVendors",
 	"NewsEnabled",

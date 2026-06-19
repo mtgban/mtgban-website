@@ -43,9 +43,8 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sig := r.FormValue("sig")
-	userTier := GetParamFromSig(sig, "UserTier")
 
-	lb := lookbackForTier(userTier)
+	lb := chartLookback(sig)
 	maxDays := lb.Days()
 
 	earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
@@ -63,7 +62,7 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	axisLabels := getDateAxisValues(earliest)
-	datasets := getDatasets(r.Context(), uuid, co.Sealed, axisLabels, userTier)
+	datasets := getDatasets(r.Context(), uuid, co.Sealed, axisLabels, lb)
 
 	var apiDatasets []ChartAPIDataset
 	for _, ds := range datasets {
