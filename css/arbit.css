@@ -374,17 +374,18 @@
 .arb-spread-up { color: var(--asuccess); font-weight: 600; }
 .arb-spread-down { color: var(--adanger); font-weight: 600; }
 
-.arb-card-cell { display: flex; align-items: center; gap: 8px; min-width: 180px; }
+.arb-card-cell { display: flex; align-items: center; gap: 8px; }
 .arb-card-cell .set-icon { font-size: var(--text-2xl); flex-shrink: 0; }
-.arb-card-cell .card-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.arb-card-cell .card-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 220px; }
 
 .arb-card-cell .card-name-line {
     display: flex;
     align-items: center;
     gap: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    flex-wrap: wrap;
+    /* Wrap long names instead of forcing the column wide; overrides the
+       table-cell nowrap so the card title can break across lines */
+    white-space: normal;
 }
 
 .arb-card-cell .card-name-line a {
@@ -401,9 +402,8 @@
 .arb-card-cell .card-info .card-edition {
     font-size: var(--text-sm);
     color: var(--text-dim);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Wrap rather than truncate when the column is narrow */
+    white-space: normal;
 }
 
 .arb-quick-links { display: flex; gap: 3px; justify-content: center; }
