@@ -2,6 +2,12 @@
     padding: 28px 28px 80px;
 }
 
+/* Results span the full viewport width so the table can show every
+   column without hiding or scrolling */
+.page-standard.arb-wide {
+    max-width: none;
+}
+
 .arb-landing h1 {
     font-size: var(--text-8xl);
     font-weight: 700;
