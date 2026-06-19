@@ -170,6 +170,18 @@ var editionRenames = map[string]string{
 	"Judge Gift Cards 2014": "Judge Gift Cards",
 }
 
+// secretLairCategory groups every Secret Lair edition under a single category
+// instead of scattering them across Boxed Sets / promos by set type.
+const secretLairCategory = "Secret Lair"
+
+// isSecretLairSet reports whether a set belongs to the Secret Lair family
+// (Drop, Countdown, Ultimate Edition, Promo, Showcase Planes, …). They all
+// share the "Secret Lair" name prefix; SLX (Universes Within) does not and is
+// intentionally excluded.
+func isSecretLairSet(set *mtgmatcher.Set) bool {
+	return strings.HasPrefix(set.Name, "Secret Lair")
+}
+
 // Never pick #708090 as it's the gradient base
 var colorValues = map[string]string{
 	"white":      "#FFFAFA",
@@ -399,6 +411,9 @@ func getSealedEditions() ([]string, map[string][]EditionEntry) {
 		if !found {
 			category = set.Type
 		}
+		if isSecretLairSet(set) {
+			category = secretLairCategory
+		}
 
 		rename = editionRenames[set.Name]
 
@@ -440,6 +455,9 @@ func getAllEditionsByCategory() ([]string, map[string][]EditionEntry) {
 		category, found := categoryEdition[setType]
 		if !found {
 			category = "Other"
+		}
+		if isSecretLairSet(set) {
+			category = secretLairCategory
 		}
 
 		rename := editionRenames[set.Name]
