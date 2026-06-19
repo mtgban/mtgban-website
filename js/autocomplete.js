@@ -121,7 +121,7 @@ async function autocomplete(form, inp, sealed) {
 
         var list = document.createElement("DIV");
         list.setAttribute("id", inp.id + "autocomplete-list");
-        list.setAttribute("class", "autocomplete-items");
+        list.setAttribute("class", "autocomplete-items ac-dropdown");
 
         for (var i = 0; i < candidates.length; i++) {
             list.appendChild(buildProviderRow(candidates[i], detected.prefix, committed, valueBefore, tail));
@@ -199,7 +199,7 @@ async function autocomplete(form, inp, sealed) {
         /* Create a DIV element that will contain the items (values) */
         a = document.createElement("DIV");
         a.setAttribute("id", this.id + "autocomplete-list");
-        a.setAttribute("class", "autocomplete-items");
+        a.setAttribute("class", "autocomplete-items ac-dropdown");
 
         /* For each item in the array... */
         for (i = 0; i < arr.length; i++) {
@@ -335,8 +335,9 @@ async function autocomplete(form, inp, sealed) {
 
     /* Close all autocomplete lists in the document, except the one passed as an argument */
     function closeAllLists(elmnt) {
+        // Only our own dropdowns; other widgets reuse the autocomplete-items class.
         // Snapshot the live HTMLCollection so removeChild iteration is robust
-        var x = Array.from(document.getElementsByClassName("autocomplete-items"));
+        var x = Array.from(document.getElementsByClassName("ac-dropdown"));
         var anyRemoved = false;
         for (var i = 0; i < x.length; i++) {
             if (elmnt != x[i] && elmnt != inp) {
