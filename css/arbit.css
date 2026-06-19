@@ -253,6 +253,14 @@
 .arb-edition-filter:focus { border-color: var(--ainfo); }
 .arb-edition-filter::placeholder { color: var(--text-dim); }
 
+/* The global .anchor offsets jumps with a position:relative/top:-48px
+   hack; reset it here and use scroll-margin-top instead so jumping to a
+   section lands its header just below the fixed navbar */
+.arb-section .anchor {
+    position: static;
+    scroll-margin-top: var(--nav-height);
+}
+
 .arb-section-header {
     display: flex;
     align-items: center;

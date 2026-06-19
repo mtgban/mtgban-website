@@ -213,6 +213,7 @@
         </script>
 
         {{range $i, $arb := .Arb}}
+            <div class="arb-section">
             <span class="anchor" id="{{.Name}}"></span>
             <div class="arb-section-header">
                 <a class="arb-section-name" href="#top">{{.Name}}</a>
@@ -544,6 +545,7 @@
                 </tr>
                 </tbody>
             </table>
+            </div>
             </div>
         {{end}}
 
