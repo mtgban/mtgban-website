@@ -188,11 +188,20 @@
     navSections.querySelectorAll('.nav2-section-btn:not(.is-tools)').forEach(function(el) { el.remove(); });
     grid.querySelectorAll('.tools-tile').forEach(function(el) { el.remove(); });
 
+    var placed = {};
     saved.sections.forEach(function(tool) {
-        var el = mkSection(tool); if (el) navSections.insertBefore(el, toolsWrap);
+        var el = mkSection(tool); if (el) { navSections.insertBefore(el, toolsWrap); placed[tool] = true; }
     });
     saved.grid.forEach(function(tool) {
-        var el = mkTile(tool); if (el) grid.appendChild(el);
+        var el = mkTile(tool); if (el) { grid.appendChild(el); placed[tool] = true; }
+    });
+
+    // Append any server-rendered tool missing from the saved layout — e.g. a
+    // tool added to the nav, or newly granted to this user, after the layout
+    // was saved (Arbit/Reverse for a Root user with an older layout). Without
+    // this they'd be silently dropped, since the tiles were wiped above.
+    Object.keys(info).forEach(function(tool) {
+        if (!placed[tool]) { var el = mkTile(tool); if (el) grid.appendChild(el); }
     });
 
     // Flag for navbar.js so it skips its own restoreLayout pass —
