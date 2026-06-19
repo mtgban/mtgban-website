@@ -98,7 +98,6 @@
             <img id="hoverImage" class="hoverImage" src=""/>
         </div>
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
 
         <a name="top"></a>
@@ -420,7 +419,7 @@
                                 {{end}}
                                 <div class="card-info">
                                     <span class="card-name-line">
-                                        <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                        <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
                                         {{if $card.Reserved}} *{{end}}
                                         {{if $card.Stocks}} •{{end}}
                                         {{if eq $.ScraperShort $card.HotlistStore}}
@@ -430,8 +429,6 @@
                                             <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product">
                                                 <span class="emoji">🔎</span>
                                             </a>
-                                        {{else}}
-                                            <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">📝</span>
                                         {{end}}
                                     </span>
                                     <span class="card-edition">{{$card.Edition}}{{if not $.IsSealed}} · #{{$card.Number}}{{end}}</span>
