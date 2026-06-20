@@ -417,22 +417,20 @@
                                         <text font-size="12" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{$card.SetCode}}</text>
                                     </svg>
                                 {{end}}
-                                <div class="card-info">
-                                    <span class="card-name-line">
-                                        <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
-                                        {{if $card.Reserved}} *{{end}}
-                                        {{if $card.Stocks}} •{{end}}
-                                        {{if eq $.ScraperShort $card.HotlistStore}}
-                                            <span class="emoji" title="Highest price in 3 months">🌟</span>
-                                        {{end}}
-                                        {{if $card.Sealed}}
-                                            <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product">
-                                                <span class="emoji">🔎</span>
-                                            </a>
-                                        {{end}}
-                                    </span>
-                                    <span class="card-edition">{{$card.Edition}}{{if not $.IsSealed}} · #{{$card.Number}}{{end}}</span>
-                                </div>
+                                <span class="card-name-line">
+                                    <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
+                                    {{if $card.Reserved}} *{{end}}
+                                    {{if $card.Stocks}} •{{end}}
+                                    {{if eq $.ScraperShort $card.HotlistStore}}
+                                        <span class="emoji" title="Highest price in 3 months">🌟</span>
+                                    {{end}}
+                                    {{if $card.Sealed}}
+                                        <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product">
+                                            <span class="emoji">🔎</span>
+                                        </a>
+                                    {{end}}
+                                </span>
+                                <span class="card-edition">{{$card.Edition}}{{if not $.IsSealed}} · #{{$card.Number}}{{end}}</span>
                             </div>
                         </td>
                         <td>
