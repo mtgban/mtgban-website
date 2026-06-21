@@ -214,8 +214,6 @@ type NewspaperPage struct {
 	Priced string
 	// Which field to use for percentage change comparison
 	PercChanged string
-	// Whether the query applies to the New Newspaper
-	NewNewspaper bool
 	// Whether the page can be filtered by bucket name
 	HasBucket bool
 	// Short label for tab navigation
@@ -429,9 +427,6 @@ func cacheNewspaper() {
 	copy(next, current)
 
 	for i := range next {
-		if !next[i].NewNewspaper {
-			continue
-		}
 		if next[i].Query == "" {
 			continue
 		}
@@ -618,7 +613,6 @@ var newspaperPagesInitial = []NewspaperPage{
 				IsDollar: true,
 			},
 		},
-		NewNewspaper: true,
 		HasBucket:    true,
 		NeedsBuylist: true,
 		Short:        "Combined Spike",
@@ -692,10 +686,9 @@ var newspaperPagesInitial = []NewspaperPage{
 				IsDollar: true,
 			},
 		},
-		NewNewspaper: true,
-		HasBucket:    true,
-		Short:        "Spike Score",
-		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg>`,
+		HasBucket: true,
+		Short:     "Spike Score",
+		Icon:      `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg>`,
 	},
 	{
 		Title:  "Greatest Increase in Vendor Listings",
@@ -772,9 +765,8 @@ var newspaperPagesInitial = []NewspaperPage{
 				IsPerc:  true,
 			},
 		},
-		NewNewspaper: true,
-		Short:        "Vendors \u2191",
-		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>`,
+		Short: "Vendors \u2191",
+		Icon:  `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>`,
 	},
 	{
 		Title:  "Greatest Decrease in Vendor Listings",
@@ -851,9 +843,8 @@ var newspaperPagesInitial = []NewspaperPage{
 				IsPerc:  true,
 			},
 		},
-		NewNewspaper: true,
-		Short:        "Vendors \u2193",
-		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>`,
+		Short: "Vendors \u2193",
+		Icon:  `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>`,
 	},
 	{
 		Title:  "Greatest Increase in Buylist Offer",
@@ -936,7 +927,6 @@ var newspaperPagesInitial = []NewspaperPage{
 				IsPerc:  true,
 			},
 		},
-		NewNewspaper: true,
 		NeedsBuylist: true,
 		Short:        "Buylist \u2191",
 		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"/><path d="M18 12h.01"/><path d="M19 22v-6"/><path d="m22 19-3-3-3 3"/><path d="M6 12h.01"/><circle cx="12" cy="12" r="2"/></svg>`,
@@ -1022,461 +1012,9 @@ var newspaperPagesInitial = []NewspaperPage{
 				IsPerc:  true,
 			},
 		},
-		NewNewspaper: true,
 		NeedsBuylist: true,
 		Short:        "Buylist \u2193",
 		Icon:         `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"/><path d="m16 19 3 3 3-3"/><path d="M18 12h.01"/><path d="M19 16v6"/><path d="M6 12h.01"/><circle cx="12" cy="12" r="2"/></svg>`,
-	},
-	NewspaperPage{
-		Title:        "Newspaper Settings",
-		Option:       "options",
-		NewNewspaper: true,
-	},
-	NewspaperPage{
-		Title:  "Top 25 Singles (3 Week Market Review)",
-		Desc:   "Rankings are weighted via prior 21, 15, and 7 days via Retail, Buylist, and several other criteria to arrive at an overall ranking",
-		Offset: 3,
-		Priced: "n.Buylist",
-		Option: "review",
-		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff0000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4"/></svg>`,
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       n.Ranking,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Retail, n.Buylist, n.Vendors
-                FROM top_25 n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.uuid <> ''`,
-		Sort: "Ranking",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Ranking",
-				CanSort: true,
-				Field:   "Ranking",
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:    "Retail",
-				CanSort:  true,
-				Field:    "Retail",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Buylist",
-				CanSort:  true,
-				Field:    "Buylist",
-				IsDollar: true,
-			},
-			Heading{
-				Title:   "Vendors",
-				CanSort: true,
-				Field:   "Vendors",
-			},
-		},
-	},
-	NewspaperPage{
-		Title:  "Buylist Growth Forecast",
-		Desc:   "Forecasting Card Kingdom's Buylist Offers on Cards",
-		Offset: 2,
-		Priced: "n.Recent_BL",
-		Option: "ensemble_forecast",
-		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fae500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.828 14.828 21 21"/><path d="M21 16v5h-5"/><path d="m21 3-9 9-4-4-6 6"/><path d="M21 8V3h-5"/></svg>`,
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Recent_BL, n.Historical_plus_minus, n.Historical_Median, n.Historical_Max, n.Forecasted_BL, n.Forecast_plus_minus, n.Target_Date, n.Tier, n.Behavior, n.custom_sort
-                FROM ensemble_forecast n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.uuid <> ''`,
-		Sort:  "n.custom_sort",
-		Large: true,
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:    "Most Recent BL",
-				CanSort:  true,
-				Field:    "Recent_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Historical +/-",
-				CanSort:  true,
-				Field:    "Historical_plus_minus",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Historical Median",
-				CanSort:  true,
-				Field:    "Historical_Median",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Historical Max",
-				CanSort:  true,
-				Field:    "Historical_Max",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Forecasted BL",
-				CanSort:  true,
-				Field:    "Forecasted_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Forecast +/-",
-				CanSort:  true,
-				Field:    "Forecast_plus_minus",
-				IsDollar: true,
-			},
-			Heading{
-				Title:   "Forecasted Date",
-				CanSort: true,
-				Field:   "Target_Date",
-			},
-			Heading{
-				Title:   "Tier",
-				CanSort: true,
-				Field:   "Tier",
-			},
-			Heading{
-				Title:   "Behavior",
-				CanSort: true,
-				Field:   "Behavior",
-			},
-			Heading{
-				IsHidden: true,
-			},
-		},
-	},
-	NewspaperPage{
-		Title:  "Greatest Increase in Vendor Listings",
-		Desc:   "Information Sourced from TCG: Stock Increases indicate that there is more than enough supply to meet current demand across the reviewed time period (tl:dr - Avoid These)",
-		Offset: 2,
-		Option: "stock_inc",
-		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg>`,
-
-		PercChanged: "n.Week_Ago_Sellers_Chg",
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_Sellers, n.Week_Ago_Sellers, n.Month_Ago_Sellers, n.Week_Ago_Sellers_Chg
-                FROM vendor_levels n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.Week_Ago_Sellers_Chg is not NULL and n.Week_Ago_Sellers_Chg != 0 AND a.rdate <= CURRENT_DATE()`,
-		Sort: "n.Week_Ago_Sellers_Chg ASC",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Today's Seller",
-				CanSort: true,
-				Field:   "Todays_Sellers",
-			},
-			Heading{
-				Title:   "Last Week",
-				CanSort: true,
-				Field:   "Week_Ago_Sellers",
-			},
-			Heading{
-				Title:   "Month Ago",
-				CanSort: true,
-				Field:   "Month_Ago_Sellers",
-			},
-			Heading{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "Week_Ago_Sellers_Chg",
-				IsPerc:  true,
-			},
-		},
-	},
-	NewspaperPage{
-		Title:  "Greatest Decrease in Vendor Listings",
-		Desc:   "Information Sourced from TCG: Stock decreases indicate that there is not enough supply to meet current demand across the reviewed time period (tl:dr - Seek these out)",
-		Offset: 2,
-		Option: "stock_dec",
-		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg>`,
-
-		PercChanged: "n.Week_Ago_Sellers_Chg",
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_Sellers, n.Week_Ago_Sellers, n.Month_Ago_Sellers, n.Week_Ago_Sellers_Chg,
-                       CASE
-                           WHEN n.Week_Ago_Sellers < n.Month_Ago_Sellers
-                           THEN CASE
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers / 3     THEN 'S'
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers / 2     THEN 'A'
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 2 / 3 THEN 'B'
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 3 / 4 THEN 'C'
-                               WHEN n.Todays_Sellers <= n.Week_Ago_Sellers * 4 / 5 THEN 'D'
-                               WHEN n.Todays_Sellers <  n.Week_Ago_Sellers         THEN 'E'
-                               ELSE ''
-                           END
-                           ELSE ''
-                       END AS 'Trending'
-                FROM vendor_levels n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.Week_Ago_Sellers_Chg is not NULL and n.Week_Ago_Sellers_Chg != 0`,
-		Sort: "n.Week_Ago_Sellers_Chg DESC",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Today's Sellers",
-				CanSort: true,
-				Field:   "Todays_Sellers",
-			},
-			Heading{
-				Title:   "Last Week Sellers",
-				CanSort: true,
-				Field:   "Week_Ago_Sellers",
-			},
-			Heading{
-				Title:   "Month Ago Sellers",
-				CanSort: true,
-				Field:   "Month_Ago_Sellers",
-			},
-			Heading{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "Week_Ago_Sellers_Chg",
-				IsPerc:  true,
-			},
-			Heading{
-				Title:   "Tier",
-				CanSort: true,
-				Field:   "Trending",
-			},
-		},
-	},
-	NewspaperPage{
-		Title:  "Greatest Increase in Buylist Offer",
-		Desc:   "Information Sourced from CK: buylist increases indicate a higher sales rate (eg. higher demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
-		Offset: 2,
-		Priced: "n.Todays_BL",
-		Option: "buylist_inc",
-		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#08f730" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"/><path d="M18 12h.01"/><path d="M19 22v-6"/><path d="m22 19-3-3-3 3"/><path d="M6 12h.01"/><circle cx="12" cy="12" r="2"/></svg>`,
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg
-                FROM buylist_levels n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.Week_Ago_BL_Chg is not NULL and n.Week_Ago_BL_Chg != 0 and n.Yesterday_BL >= 1.25 and n.Todays_BL >= 1.25`,
-		Sort: "n.Week_Ago_BL_Chg DESC",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:    "Today's Buylist",
-				CanSort:  true,
-				Field:    "Todays_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Yesterday",
-				CanSort:  true,
-				Field:    "Yesterday_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Last Week",
-				CanSort:  true,
-				Field:    "Week_Ago_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Last Month",
-				CanSort:  true,
-				Field:    "Month_Ago_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "Week_Ago_BL_Chg",
-				IsPerc:  true,
-			},
-		},
-	},
-	NewspaperPage{
-		Title:  "Greatest Decrease in Buylist Offer",
-		Desc:   "Information Sourced from CK: Buylist Decreases indicate a declining sales rate (eg, Less demand). These may be fleeting, do not base a purchase solely off this metric unless dropshipping",
-		Offset: 2,
-		Priced: "n.Todays_BL",
-		Option: "buylist_dec",
-		Icon:   `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fa7000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5"/><path d="m16 19 3 3 3-3"/><path d="M18 12h.01"/><path d="M19 16v6"/><path d="M6 12h.01"/><circle cx="12" cy="12" r="2"/></svg>`,
-		Query: `SELECT DISTINCT n.row_names, n.uuid,
-                       a.Name, a.Set, a.Number, a.Rarity,
-                       n.Todays_BL, n.Yesterday_BL, n.Week_Ago_BL, n.Month_Ago_BL, n.Week_Ago_BL_Chg
-                FROM buylist_levels n
-                LEFT JOIN mtgjson_portable a ON n.uuid = a.uuid
-                WHERE n.Week_Ago_BL_Chg is not NULL and n.Week_Ago_BL_Chg != 0 and n.Yesterday_BL >= 1.25 and n.Todays_BL >= 1.25`,
-		Sort: "n.Week_Ago_BL_Chg ASC",
-		Head: []Heading{
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:   "Card Name",
-				CanSort: true,
-				Field:   "Name",
-			},
-			Heading{
-				Title:   "Edition",
-				CanSort: true,
-				Field:   "a.Set",
-			},
-			Heading{
-				Title:           "#",
-				ConditionalSort: true,
-				Field:           "a.Number",
-			},
-			Heading{
-				IsHidden: true,
-			},
-			Heading{
-				Title:    "Today's Buylist",
-				CanSort:  true,
-				Field:    "Todays_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Yesterday",
-				CanSort:  true,
-				Field:    "Yesterday_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Last Week",
-				CanSort:  true,
-				Field:    "Week_Ago_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:    "Last Month",
-				CanSort:  true,
-				Field:    "Month_Ago_BL",
-				IsDollar: true,
-			},
-			Heading{
-				Title:   "Weekly % Change",
-				CanSort: true,
-				Field:   "Week_Ago_BL_Chg",
-				IsPerc:  true,
-			},
-		},
 	},
 	NewspaperPage{
 		Title:  "Newspaper Settings",
@@ -1490,15 +1028,6 @@ var NewspaperAllRarities = []string{
 
 var BucketNames = []string{
 	"", "$2+", "$5+", "$10+", "$20+", "$35+", "$50+", "$75+",
-}
-
-func getLastDBUpdate(db *sql.DB) (time.Time, error) {
-	var lastUpdate string
-	err := db.QueryRow("SELECT data_value FROM newspaper_updated").Scan(&lastUpdate)
-	if err != nil {
-		return time.Now(), err
-	}
-	return time.Parse("2006-01-02", lastUpdate)
 }
 
 func Newspaper(w http.ResponseWriter, r *http.Request) {
@@ -1516,7 +1045,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.PickerID = "news-editions-picker"
 
 	// Check if any DB connection was made
-	if Config.DBAddress == "" && Config.NewNewspaperConfigLine == "" {
+	if Config.NewNewspaperConfigLine == "" {
 		pageVars.Title = "This feature is not enabled"
 		pageVars.ErrorMessage = ErrMsgDenied
 
@@ -1524,19 +1053,14 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var db *sql.DB
 	enabled := GetParamFromSig(sig, "NewsEnabled")
 	if enabled == "1day" {
-		db = Newspaper1dayDB
 		pageVars.IsOneDay = true
 	} else if enabled == "3day" {
-		db = Newspaper3dayDB
+		// do nothing
 	} else if enabled == "0day" || (DevMode && !SigCheck) {
 		force3day := readSetFlag(w, r, "force3day", "BanNewspaperPref")
-		if force3day {
-			db = Newspaper3dayDB
-		} else {
-			db = Newspaper1dayDB
+		if !force3day {
 			pageVars.IsOneDay = true
 		}
 		pageVars.CanSwitchDay = true
@@ -1562,45 +1086,21 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	maxPercChange, _ := strconv.ParseFloat(r.FormValue("max_change"), 64)
 	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
 
-	var query, defSort string
-
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
 	newspaperPages := GetNewspaperPages()
-	oldMode := page == "old"
 	for _, newspage := range newspaperPages {
-		if page == newspage.Option {
-			oldMode = !newspage.NewNewspaper
-			break
-		}
-	}
-
-	for _, newspage := range newspaperPages {
-		if (oldMode && newspage.NewNewspaper) || (!oldMode && !newspage.NewNewspaper) {
-			continue
-		}
 		if newspage.NeedsBuylist && Config.Game != DefaultGame {
-			continue
-		}
-		if !newspage.NewNewspaper && Config.Game != DefaultGame {
 			continue
 		}
 		pageVars.ToC = append(pageVars.ToC, newspage)
 	}
 
 	pageVars.LastUpdate = GetLastNewspaperUpdate()
-	if oldMode {
-		var err error
-		pageVars.LastUpdate, err = getLastDBUpdate(db)
-		if err != nil {
-			log.Println(err)
-		}
-		pageVars.Page = "old"
-	}
 
 	switch page {
-	case "", "old":
+	case "":
 		render(w, "news.html", pageVars)
 
 		return
@@ -1719,19 +1219,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.FilterMaxPercChange = maxPercChange
 	pageVars.Rarities = NewspaperAllRarities
 
-	var skipEditions string
 	skipEditionsOpt := readCookie(r, "NewspaperList")
-	if skipEditionsOpt != "" {
-		filters := strings.Split(skipEditionsOpt, ",")
-		for _, code := range filters {
-			// XXX: is set code available on the db row?
-			set, err := mtgmatcher.GetSet(code)
-			if err != nil {
-				continue
-			}
-			skipEditions += " AND a.Set <> '" + strings.Replace(set.Name, "'", "''", -1) + "'"
-		}
-	}
 
 	var results []NewspaperResult
 	for _, newspage := range pageVars.ToC {
@@ -1752,288 +1240,101 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			pageVars.CanFilterByPercentage = true
 		}
 
-		if newspage.NewNewspaper {
-			if newspage.Results == nil {
-				pageVars.InfoMessage = "This data is not ready yet, please try again in a few minutes"
-				pageVars.LastUpdate = time.Now()
-				render(w, "news.html", pageVars)
-				return
+		if newspage.Results == nil {
+			pageVars.InfoMessage = "This data is not ready yet, please try again in a few minutes"
+			pageVars.LastUpdate = time.Now()
+			render(w, "news.html", pageVars)
+			return
+		}
+
+		if newspage.HasBucket {
+			pageVars.Tiers = BucketNames
+		}
+
+		results = newspage.Results
+		pageVars.Editions = newspage.AvailableEditions
+		pageVars.Finishes = newspage.PossibleFinish
+		if !pageVars.IsOneDay {
+			results = newspage.Results3Day
+			pageVars.Editions = newspage.AvailableEditions3Day
+			pageVars.Finishes = newspage.PossibleFinish3Day
+		}
+
+		break
+	}
+
+	if skipEditionsOpt != "" || rarity != "" || filter != "" || bucket != "" || finish != "" {
+		var output []NewspaperResult
+		for _, result := range results {
+			if skipEditionsOpt != "" {
+				filters := strings.Split(skipEditionsOpt, ",")
+				set, err := mtgmatcher.GetSetByName(result.Edition)
+				if err == nil && slices.Contains(filters, set.Code) {
+					continue
+				}
 			}
-
-			if newspage.HasBucket {
-				pageVars.Tiers = BucketNames
-			}
-
-			results = newspage.Results
-			pageVars.Editions = newspage.AvailableEditions
-			pageVars.Finishes = newspage.PossibleFinish
-			if !pageVars.IsOneDay {
-				results = newspage.Results3Day
-				pageVars.Editions = newspage.AvailableEditions3Day
-				pageVars.Finishes = newspage.PossibleFinish3Day
-			}
-
-			break
-		}
-
-		// Get the total number of rows for the query
-		qs := strings.Split(newspage.Query, "FROM")
-		if len(qs) < 2 {
-			log.Println("Invalid query for page", page, " - \n", newspage.Query)
-			panic("Invalid query, missing at least a FROM to split on")
-		}
-
-		// Set query to retrieve total number of matches
-		subQuery := "SELECT COUNT(DISTINCT n.uuid) FROM" + strings.Join(qs[1:], "FROM")
-
-		// Add any extra filter that might affect number of results
-		if filter != "" {
-			subQuery += " AND a.Set = '" + strings.Replace(filter, "'", "''", -1) + "'"
-		}
-		if rarity != "" {
-			subQuery += " AND "
-			if strings.Contains(rarity, "/") {
-				subQuery += fmt.Sprintf("(a.Rarity = '%c' OR a.Rarity = '%c')", rarity[0], rarity[2])
-			} else if rarity == "S" {
-				// FIXME: this should be fixed in the DB
-				subQuery += "a.Rarity = 'special'"
-			} else {
-				subQuery += "a.Rarity = '" + rarity + "'"
-			}
-		}
-		if newspage.Priced != "" && minPrice != 0 {
-			subQuery += " AND " + newspage.Priced + " > " + fmt.Sprintf("%.2f", minPrice)
-		}
-		if newspage.Priced != "" && maxPrice != 0 {
-			subQuery += " AND " + newspage.Priced + " < " + fmt.Sprintf("%.2f", maxPrice)
-		}
-		if newspage.PercChanged != "" && minPercChange != 0 {
-			subQuery += " AND " + newspage.PercChanged + " > " + fmt.Sprintf("%.2f", minPercChange/100)
-		}
-		if newspage.PercChanged != "" && maxPercChange != 0 {
-			subQuery += " AND " + newspage.PercChanged + " < " + fmt.Sprintf("%.2f", maxPercChange/100)
-		}
-
-		subQuery += skipEditions
-
-		// Sub Go!
-		var elements int
-		err := db.QueryRow(subQuery + ";").Scan(&elements)
-		if err != nil {
-			log.Println(subQuery)
-			log.Println("pagination disabled", err)
-		}
-		// Ceiling division to get number of pages
-		pages := (elements + newsPageSize - 1) / newsPageSize
-		if DevMode {
-			log.Println(page, "page has", elements, "elements, for a total of", pages, "pages")
-		}
-		pageVars.TotalIndex = pages
-		if pageIndex <= 1 {
-			pageIndex = 1
-		} else if pageIndex > pageVars.TotalIndex {
-			pageIndex = pageVars.TotalIndex
-		}
-		pageVars.CurrentIndex = pageIndex
-		if pageVars.CurrentIndex > 1 {
-			pageVars.PrevIndex = pageVars.CurrentIndex - 1
-		}
-		if pageVars.CurrentIndex < pageVars.TotalIndex {
-			pageVars.NextIndex = pageVars.CurrentIndex + 1
-		}
-
-		query = newspage.Query
-		defSort = newspage.Sort
-
-		// Repeat as above to retrieve the possible editions
-		subQuery = "SELECT DISTINCT a.Set FROM" + strings.Join(qs[1:], "FROM") + skipEditions + " ORDER BY a.Set ASC"
-		rows, err := db.Query(subQuery + ";")
-		if err != nil {
-			log.Println(subQuery)
-			log.Println("editions disabled", err)
-			break
-		}
-		// First element is always initialized
-		pageVars.Editions = []string{""}
-		// Iterate over subresults
-		for rows.Next() {
-			var tmp string
-			err := rows.Scan(&tmp)
-			if err != nil {
+			if filter != "" && filter != result.Edition {
 				continue
 			}
-			pageVars.Editions = append(pageVars.Editions, tmp)
+			if bucket != "" && bucket != result.BucketName {
+				continue
+			}
+			if finish != "" && finish != result.Variant {
+				continue
+			}
+			if rarity != "" && result.Date != "" {
+				cardRarity := result.Date // Date field holds rarity for overridden rows
+				if strings.Contains(rarity, "/") {
+					rarities := strings.Split(rarity, "/")
+					if string(cardRarity[0]) != strings.ToLower(rarities[0]) && string(cardRarity[0]) != strings.ToLower(rarities[1]) {
+						continue
+					}
+				} else if string(cardRarity[0]) != strings.ToLower(rarity) {
+					continue
+				}
+			}
+			output = append(output, result)
 		}
+
+		results = output
 	}
 
-	if results == nil {
-		// Add any extra filter before sorting
-		// Note that this requires every query to end with an applicable WHERE clause
-		if filter != "" {
-			query += " AND a.Set = '" + strings.Replace(filter, "'", "''", -1) + "'"
-		}
-		if rarity != "" {
-			query += " AND "
-			if strings.Contains(rarity, "/") {
-				query += fmt.Sprintf("(a.Rarity = '%c' OR a.Rarity = '%c')", rarity[0], rarity[2])
-			} else if rarity == "S" {
-				query += "a.Rarity = 'special'"
-			} else {
-				query += "a.Rarity = '" + rarity + "'"
+	if sorting != "" {
+		for _, newspage := range pageVars.ToC {
+			if newspage.Option != page {
+				continue
 			}
-		}
 
-		// Check for price limits
-		if minPrice != 0 || maxPrice != 0 {
-			for _, newspage := range pageVars.ToC {
-				if newspage.Option != page || newspage.Priced == "" {
-					continue
-				}
-				if minPrice != 0 {
-					query += " AND " + newspage.Priced + " > " + fmt.Sprintf("%.2f", minPrice)
-				}
-				if maxPrice != 0 {
-					query += " AND " + newspage.Priced + " < " + fmt.Sprintf("%.2f", maxPrice)
-				}
-			}
-		}
-
-		if minPercChange != 0 || maxPercChange != 0 {
-			for _, newspage := range pageVars.ToC {
-				if newspage.Option != page && newspage.PercChanged == "" {
-					continue
-				}
-				if minPercChange != 0 {
-					query += " AND " + newspage.PercChanged + " > " + fmt.Sprintf("%.2f", minPercChange/100)
-				}
-				if maxPercChange != 0 {
-					query += " AND " + newspage.PercChanged + " < " + fmt.Sprintf("%.2f", maxPercChange/100)
-				}
-			}
-		}
-
-		query += skipEditions
-
-		// Set sorting options
-		if sorting != "" {
-			// Make sure this field is allowed to be sorted
-			canSort := false
-			for i := range pageVars.Headings {
-				if pageVars.Headings[i].Field == sorting {
-					canSort = pageVars.Headings[i].CanSort
-					if pageVars.Headings[i].ConditionalSort && filter != "" {
-						canSort = true
-					}
-					break
-				}
-			}
-			if canSort {
-				// Define a custom order for our special scale
-				if sorting == "Trending" {
-					sorting = `CASE
-                            WHEN Trending = 'S' THEN '7'
-                            WHEN Trending = 'A' THEN '6'
-                            WHEN Trending = 'B' THEN '5'
-                            WHEN Trending = 'C' THEN '4'
-                            WHEN Trending = 'D' THEN '3'
-                            WHEN Trending = 'E' THEN '2'
-                            WHEN Trending = ''  THEN '1'
-                            ELSE Trending
-                        END`
-				}
-				query += " ORDER BY " + sorting
+			sort.SliceStable(results, func(i, j int) bool {
+				a := results[i].FieldValue(sorting)
+				b := results[j].FieldValue(sorting)
+				var af, bf float64
+				af, _ = strconv.ParseFloat(a, 64)
+				bf, _ = strconv.ParseFloat(b, 64)
+				numberSort := af != 0 || bf != 0
 				if dir == "asc" {
-					query += " ASC"
-				} else if dir == "desc" {
-					query += " DESC"
-				}
-			}
-		} else if defSort != "" {
-			query += " ORDER BY " + defSort
-		}
-		// Keep things limited + pagination
-		query = fmt.Sprintf("%s LIMIT %d OFFSET %d", query, newsPageSize, newsPageSize*(pageIndex-1))
-
-		// GO GO GO
-		output, err := getResults(db, query)
-		if err != nil {
-			log.Println(query, err)
-		}
-		pageVars.Table = output
-	} else {
-		if skipEditionsOpt != "" || rarity != "" || filter != "" || bucket != "" || finish != "" {
-			var output []NewspaperResult
-			for _, result := range results {
-				if skipEditionsOpt != "" {
-					filters := strings.Split(skipEditionsOpt, ",")
-					set, err := mtgmatcher.GetSetByName(result.Edition)
-					if err == nil && slices.Contains(filters, set.Code) {
-						continue
-					}
-				}
-				if filter != "" && filter != result.Edition {
-					continue
-				}
-				if bucket != "" && bucket != result.BucketName {
-					continue
-				}
-				if finish != "" && finish != result.Variant {
-					continue
-				}
-				if rarity != "" && result.Date != "" {
-					cardRarity := result.Date // Date field holds rarity for overridden rows
-					if strings.Contains(rarity, "/") {
-						rarities := strings.Split(rarity, "/")
-						if string(cardRarity[0]) != strings.ToLower(rarities[0]) && string(cardRarity[0]) != strings.ToLower(rarities[1]) {
-							continue
-						}
-					} else if string(cardRarity[0]) != strings.ToLower(rarity) {
-						continue
-					}
-				}
-				output = append(output, result)
-			}
-
-			results = output
-		}
-
-		if sorting != "" {
-			for _, newspage := range pageVars.ToC {
-				if newspage.Option != page {
-					continue
-				}
-
-				sort.SliceStable(results, func(i, j int) bool {
-					a := results[i].FieldValue(sorting)
-					b := results[j].FieldValue(sorting)
-					var af, bf float64
-					af, _ = strconv.ParseFloat(a, 64)
-					bf, _ = strconv.ParseFloat(b, 64)
-					numberSort := af != 0 || bf != 0
-					if dir == "asc" {
-						if numberSort {
-							return af < bf
-						}
-						return a < b
-					}
 					if numberSort {
-						return af > bf
+						return af < bf
 					}
-					return a > b
-				})
-				break
-			}
+					return a < b
+				}
+				if numberSort {
+					return af > bf
+				}
+				return a > b
+			})
+			break
 		}
-
-		// Set the page size depending on level
-		pageSize := DefaultPageSize
-		extraSize, _ := strconv.ParseBool(GetParamFromSig(sig, "NewsLarge"))
-		if extraSize {
-			pageSize *= 2
-		}
-
-		pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 	}
+
+	// Set the page size depending on level
+	pageSize := DefaultPageSize
+	extraSize, _ := strconv.ParseBool(GetParamFromSig(sig, "NewsLarge"))
+	if extraSize {
+		pageSize *= 2
+	}
+
+	pageVars.Table, pageVars.Pagination = Paginate(results, pageIndex, pageSize, len(results))
 
 	for _, result := range pageVars.Table {
 		c := uuid2card(result.UUID, true, false, preferFlavor)

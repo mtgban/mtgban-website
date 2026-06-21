@@ -263,8 +263,6 @@ func paletteNewspaperTargetsJSON() template.JS {
 			group = "Buylist Levels"
 		case strings.Contains(p.Option, "stock"):
 			group = "Stock Movement"
-		case p.Option == "ensemble_forecast" || p.Option == "review":
-			group = "Analysis"
 		}
 
 		// Disambiguate duplicate titles by source.
@@ -282,11 +280,6 @@ func paletteNewspaperTargetsJSON() template.JS {
 		})
 	}
 	// Include Newspaper SubPages from the nav tree that aren't in NewspaperPages
-	out = append(out, PaletteNavTarget{
-		Value: "old",
-		Label: "Archive",
-		Group: "Other",
-	})
 	out = append(out, PaletteNavTarget{
 		Value: "syp",
 		Label: "TCG Syp List",

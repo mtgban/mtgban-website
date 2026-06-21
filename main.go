@@ -22,7 +22,6 @@ import (
 
 	"database/sql"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -371,16 +370,6 @@ func init() {
 			HasSettings: true,
 			SubPages: []NavElem{
 				{
-					Name:        "Archive",
-					Short:       "📰",
-					Description: "Past newspaper issues",
-					Link:        "/newspaper?page=old",
-					HasSettings: true,
-					ShouldHide: func() bool {
-						return Config.Game != DefaultGame
-					},
-				},
-				{
 					Name:        "TCG Syp List",
 					Short:       "📋",
 					Description: "Cards TCGplayer wants now",
@@ -470,7 +459,6 @@ type ConfigType struct {
 	CardBackImage          string             `json:"card_back_image"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	DBAddress              string             `json:"db_address"`
 	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
 	DiscordHook            string             `json:"discord_hook"`
 	DiscordNotifHook       string             `json:"discord_notif_hook"`
@@ -541,8 +529,6 @@ func loadTime(p *time.Time) time.Time {
 	return *p
 }
 
-var Newspaper3dayDB *sql.DB
-var Newspaper1dayDB *sql.DB
 var NewNewspaperDB *sql.DB
 
 var PricesArchiveDB *timeseries.Client
@@ -783,19 +769,6 @@ func openDBs() (err error) {
 		PricesArchiveDB, err = timeseries.NewClient(*Config.SqlConfig)
 		if err != nil {
 			log.Println("error creating a SQL client:", err)
-			return err
-		}
-	}
-
-	if Config.DBAddress == "" {
-		log.Println("no DB address set, Archive won't be loaded")
-	} else {
-		Newspaper3dayDB, err = sql.Open("mysql", Config.DBAddress+"/three_day_newspaper")
-		if err != nil {
-			return err
-		}
-		Newspaper1dayDB, err = sql.Open("mysql", Config.DBAddress+"/newspaper")
-		if err != nil {
 			return err
 		}
 	}
