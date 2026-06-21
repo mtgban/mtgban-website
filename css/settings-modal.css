@@ -341,7 +341,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.settings-toggle input { display: none; }
+/* Only hide the toggle's own checkbox, not the inline number inputs
+   (e.g. spread/value thresholds) nested inside the label text */
+.settings-toggle > input { display: none; }
 .settings-toggle-track {
     width: 2.4em;
     height: 1.25em;
