@@ -3,7 +3,8 @@ name: lorcana-deploy
 on:
   push:
     tags:
-      - 'lorcana-*' # deploy only when a new tag is created
+      - 'v*'
+      - 'lorcana-*'
   workflow_dispatch:
 
 permissions: {}
