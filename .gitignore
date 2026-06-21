@@ -35,3 +35,5 @@ compose-dev.yaml
 
 # IntelliJ
 .idea/
+
+pg-data/

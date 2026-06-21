@@ -105,6 +105,7 @@
         renderRecentSearchesInto(document.getElementById('m-recent-searches'), 'mobile');
         renderRecentSearchesInto(document.getElementById('desktop-recent-searches'), 'desktop');
     }
+    window.renderRecentSearches = renderRecentSearches;
 
     function renderRecentSearchesInto(container, mode) {
         if (!container) return;
