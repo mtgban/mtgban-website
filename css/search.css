@@ -660,6 +660,11 @@
 
 .result-quick-icons {
     grid-column: 3;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.qi-actions {
     display: flex;
     gap: 6px;
     align-items: center;
@@ -675,6 +680,11 @@
 .result-quick-icons a:hover,
 .result-quick-icons span:hover { color: var(--search-link); }
 .result-quick-icons img { width: 22px; height: auto; vertical-align: middle; }
+
+/* The kebab toggle + per-action text labels only exist in the collapsed
+   (single-column) layout; see the container query further down. */
+.qi-toggle { display: none; }
+.qi-label { display: none; }
 
 .result-source-sealed {
     font-size: var(--text-sm);
@@ -1458,6 +1468,87 @@
     .result-col + .result-col {
         border-left: none;
         border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    }
+
+    /* Collapse the row of card-action icons into a kebab dropdown so the
+       card name keeps the header width. Each item shows its icon plus its
+       title as a text label. */
+    .qi-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: none;
+        background: none;
+        border-radius: var(--radius-sm, 6px);
+        color: var(--search-text-dim);
+        cursor: pointer;
+    }
+    .qi-toggle:hover { background: var(--search-row-hover); color: var(--search-link); }
+
+    .qi-actions {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        min-width: 210px;
+        padding: 4px;
+        background: var(--search-surface-1);
+        border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+        border-radius: var(--radius-md, 8px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        z-index: 30;
+    }
+    .result-quick-icons.qi-open .qi-actions { display: flex; }
+
+    /* Each action becomes an icon + label row. The icon sits in a fixed-width
+       column so every label lines up regardless of icon kind (emoji text,
+       img, or svg) and width. */
+    .qi-actions > a,
+    .qi-actions > span,
+    .qi-actions > button {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        align-items: center;
+        justify-items: center;
+        gap: 10px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 10px;
+        border-radius: var(--radius-sm, 6px);
+        font-size: var(--text-xl);
+        color: var(--normal);
+    }
+    .qi-actions > a:hover,
+    .qi-actions > span:hover,
+    .qi-actions > button:hover { background: var(--search-row-hover); color: var(--normal); }
+    .qi-actions img { width: 20px; }
+    .qi-actions svg { width: 20px; height: 20px; }
+    .qi-actions .emoji { font-size: var(--text-xl); }
+
+    /* The favorite button matches the others (its base rule is more specific
+       and lays it out for the inline icon row). */
+    .result-quick-icons .qi-actions > .fav-btn {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        align-items: center;
+        justify-items: center;
+        gap: 10px;
+        padding: 7px 10px;
+    }
+
+    /* The injected text labels — left-aligned in their column, normal size. */
+    .qi-actions .qi-label {
+        display: inline;
+        justify-self: start;
+        font-size: var(--text-md);
+        color: var(--normal);
+        white-space: nowrap;
     }
 }
 
