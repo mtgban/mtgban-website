@@ -107,7 +107,7 @@
         <div class="arb-selector-bar">
             <div class="arb-current-store">
                 <span class="store-type">{{if .GlobalMode}}Index{{else if .ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
-                <select class="arb-store-select" onchange="if(this.value) window.location.href=this.value">
+                <select class="arb-store-select" onchange="if(/^\/(?!\/)/.test(this.value)) window.location.href=this.value">
                     {{range .ExtraNav}}
                         {{if and .Active (not (contains .Name "Sealed"))}}
                             <option value="" selected>{{.Name}}</option>
