@@ -1337,6 +1337,18 @@
     object-fit: contain;
 }
 
+/* Favorited state for the menu copy of the star. */
+.m-actions-fav.active { color: #f5c518; }
+.m-actions-fav.active svg { fill: #f5c518; stroke: #f5c518; }
+
+/* Portrait: collapse the favorite + chart buttons into the actions menu so the
+   card header shows just the kebab (mirrors the desktop narrow layout). In
+   landscape they stay inline and the menu copies hide (see the landscape block). */
+@media (orientation: portrait) {
+    .m-fav-btn,
+    .m-chart-btn { display: none; }
+}
+
 /* Chart drawer */
 .m-chart-drawer {
     position: fixed;
@@ -1975,6 +1987,11 @@
 
 /* Landscape: side-by-side Sellers / Buyers with inline card image */
 @media (orientation: landscape) {
+
+    /* Landscape has room for the favorite + chart buttons inline, so drop their
+       collapsed copies from the actions menu. */
+    .m-actions-fav,
+    .m-actions-chart { display: none; }
 
     /* Navbar inline search: show search in navbar, hide standalone bar */
     .m-nav-search {

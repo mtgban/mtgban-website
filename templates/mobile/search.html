@@ -228,6 +228,16 @@
                 </div>
             </div>
             <div class="m-actions-menu" data-card="{{$cardId}}">
+                {{/* In portrait the favorite + chart buttons collapse in here; in
+                     landscape they stay inline in the header and these are hidden. */}}
+                <button type="button" class="m-actions-item m-actions-fav fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this); closeActionsMenus();">
+                    <i data-lucide="star"></i><span>Favorite</span>
+                </button>
+                {{if not $.DisableChart}}
+                    <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}'); closeActionsMenus();">
+                        <i data-lucide="chart-line"></i><span>Price history</span>
+                    </button>
+                {{end}}
                 {{if $card.Sealed}}
                     {{if $card.Booster}}
                         <a class="m-actions-item" href='/search?q=unpack:"{{$card.Name}}"' onclick="closeActionsMenus()">

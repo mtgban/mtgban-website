@@ -99,6 +99,12 @@
         // Walk to the row container by class. Both button and row carry data-card-id,
         // so a [data-card-id] selector would match the button itself first.
         var row = btn.closest('.m-card-header, .result-header');
+        if (!row) {
+            // A fav button can sit outside the header (e.g. the mobile actions
+            // menu is a sibling of the header) — fall back to the card container.
+            var card = btn.closest('.m-card');
+            if (card) row = card.querySelector('.m-card-header');
+        }
         if (!row) return null;
 
         var cardId = row.getAttribute('data-card-id') || btn.getAttribute('data-card-id');
@@ -192,18 +198,25 @@
             if (favs[i].id === cardId) { idx = i; break; }
         }
 
+        var active;
         if (idx >= 0) {
             favs.splice(idx, 1);
-            btn.classList.remove('active');
+            active = false;
         } else {
             var data = extractCardData(btn);
-            if (data) {
-                favs.unshift(data);
-                btn.classList.add('active');
-            }
+            if (!data) return;
+            favs.unshift(data);
+            active = true;
         }
 
         saveFavorites(favs);
+
+        // Keep every star for this card in sync — the inline header button and
+        // its copy inside the mobile actions menu point at the same card.
+        document.querySelectorAll('.fav-btn').forEach(function(b) {
+            var id = b.getAttribute('data-card-id') || b.getAttribute('data-card');
+            if (id === cardId) b.classList.toggle('active', active);
+        });
     };
 
     // Mark stars on page load for already-favorited cards
