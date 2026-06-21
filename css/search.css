@@ -1065,6 +1065,37 @@
     gap: 8px;
     margin-top: 12px;
 }
+.chart-controls-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+/* Match the select's text size so the dropdown and the action buttons read as
+   one aligned row (the base .btn is var(--text-2xl), much larger). */
+.chart-controls-actions .btn {
+    font-size: var(--text-lg);
+    padding: 5px 8px;
+    line-height: 1.2;
+}
+.chart-controls select {
+    padding: 5px 30px 5px 12px;
+    border-radius: var(--radius-sm, 6px);
+    border: 1px solid var(--border-moderate);
+    background-color: var(--surface-2);
+    color: var(--normal);
+    font-size: var(--text-lg);
+    font-weight: 500;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+    transition: border-color 0.12s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239a9a9a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+}
+.chart-controls select:hover { border-color: var(--accent-border, var(--ainfo)); }
+.chart-controls select:focus { border-color: var(--ainfo); }
 .chart-pill {
     display: inline-block;
     padding: 4px 12px;
@@ -1172,7 +1203,7 @@
     align-items: center;
     gap: 14px;
     padding: 6px 10px;
-    margin: 8px 0 0;
+    margin: 0;
     border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
     border-radius: 6px;
     background: var(--surface-2, rgba(0, 0, 0, 0.03));

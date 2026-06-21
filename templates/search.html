@@ -397,8 +397,8 @@
                             <div class="chart-legend" id="chartLegend"></div>
                             <canvas id="cardChart" width="760" height="480"></canvas>
                             <div class="chart-controls">
-                                <p style="margin: 0;">
-                                    <select id="dateRange" onchange="changeRange(parseInt(this.value))" style="width: 110px">
+                                <p class="chart-controls-actions">
+                                    <select id="dateRange" onchange="changeRange(parseInt(this.value))">
                                         <option value="30">1 Month</option>
                                         <option value="90" {{if lt $.MaxLookbackDays 90}} disabled {{end}}>3 Months{{if lt $.MaxLookbackDays 90}} (Standard+){{end}}</option>
                                         <option value="180" {{if ge $.MaxLookbackDays 180}} selected {{end}} {{if lt $.MaxLookbackDays 180}} disabled {{end}}>6 Months{{if lt $.MaxLookbackDays 180}} (Standard+){{end}}</option>
