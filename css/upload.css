@@ -896,6 +896,14 @@
     align-items: center;
     gap: 12px;
     min-width: 260px;
+    position: relative;
+}
+/* Make the whole card cell (image included) open the card, not just the
+   name link, via a stretched click target */
+.ures-card-name a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
 }
 .ures-card-cell img {
     width: 44px;
@@ -1093,8 +1101,19 @@
 .opt-table tbody tr:nth-child(even) { background: var(--row-even); }
 .opt-table tbody tr:nth-child(odd) { background: var(--row-odd); }
 .opt-table tbody tr:hover { background: var(--row-hover); }
-.opt-name { font-weight: 500; }
+.opt-name { font-weight: 500; position: relative; }
 .opt-name a { color: var(--normal); }
+/* Stretch the name link across the whole cell so clicking anywhere opens
+   the card; keep the copy icon above it so it stays usable */
+.opt-name a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+}
+.opt-name .emoji {
+    position: relative;
+    z-index: 1;
+}
 .opt-set { color: var(--text-dim); font-size: var(--text-sm); }
 .opt-offer, .opt-loaded { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-base); text-align: center; white-space: nowrap; }
 .opt-offer .offer { display: inline-block; min-width: 5em; text-align: right; color: var(--asuccess); }
@@ -1168,6 +1187,9 @@
     margin-left: auto;
     flex-shrink: 0;
     padding: 0;
+    /* Stay above the cell's stretched card link so it remains clickable */
+    position: relative;
+    z-index: 1;
     background: none;
     border: 1px solid transparent;
     border-radius: 4px;
@@ -1198,6 +1220,9 @@
     padding: 4px 16px;
     text-align: center;
     align-self: flex-start;
+    /* Stay above the cell's stretched card link so it remains clickable */
+    position: relative;
+    z-index: 1;
     border-radius: 100px;
     background: var(--surface-3);
     border: 1px solid var(--border-moderate);
