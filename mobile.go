@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mileusna/useragent"
 )
@@ -43,11 +44,15 @@ func toggleMobileView(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   60 * 60 * 24 * 365, // 1 year
 		HttpOnly: false,
+		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	// Only honor same-origin relative redirect targets to avoid an open
+	// redirect: require a leading single slash (rejects "//evil.com",
+	// "https://evil.com", "javascript:", etc.).
 	redirect := r.FormValue("redirect")
-	if redirect == "" {
+	if !strings.HasPrefix(redirect, "/") || strings.HasPrefix(redirect, "//") {
 		redirect = "/"
 	}
 	http.Redirect(w, r, redirect, http.StatusFound)

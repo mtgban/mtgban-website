@@ -835,6 +835,9 @@ func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Tim
 		Path:    "/",
 		Expires: expires,
 		Value:   value,
+		// Only mark Secure when the site itself is served over HTTPS,
+		// otherwise the cookie would be dropped during local HTTP dev.
+		Secure: u.Scheme == "https",
 	}
 
 	if !global {
@@ -842,6 +845,15 @@ func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Tim
 		cookie.SameSite = http.SameSiteStrictMode
 	}
 	http.SetCookie(w, &cookie)
+}
+
+// isSecureRequest reports whether the request reached us over HTTPS,
+// accounting for a TLS-terminating proxy that sets X-Forwarded-Proto.
+func isSecureRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 // Retrieve default blocklists according to the signature contents
