@@ -1812,11 +1812,22 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 }
 
 func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
-	if !strings.Contains(link, "/collection/view/") {
+	// Re-validate the URL locally rather than trusting the caller's host
+	// switch: parse it here and require the exact TCGplayer store host so
+	// the request target can't be pointed at an arbitrary (e.g. internal)
+	// address. This also gives the static analyzer a sanitizer it can see.
+	u, err := url.Parse(link)
+	if err != nil {
+		return nil, errors.New("unsupported URL")
+	}
+	if u.Scheme != "https" || u.Host != "store.tcgplayer.com" {
+		return nil, errors.New("unsupported URL")
+	}
+	if !strings.Contains(u.Path, "/collection/view/") {
 		return nil, errors.New("unsupported URL")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, err
 	}
