@@ -942,16 +942,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Summary of the index entries
+		// Summary of the index entries. We pass the row's condition to
+		// every index; getPrice handles the MetadataOnly sources
+		// (TCGLow/TCGMarket/MKM*) by falling back to their flat price
+		// while still using TCGDirect's per-condition listing.
+		conds := uploadedData[i].OriginalCondition
+		if skipConds {
+			conds = ""
+		}
 		for indexKey, indexResult := range indexResults[cardId] {
-			var conds string
-			// TCG Direct is the only index price that varies by condition
-			if indexKey == "TCGDirect" {
-				conds = uploadedData[i].OriginalCondition
-			}
-			if skipConds {
-				conds = ""
-			}
 			indexPrice := getPrice(indexResult, conds)
 
 			if resultPrices[cardId+conds] == nil {
@@ -1286,6 +1285,22 @@ func getPrice(banPrice *BanPrice, conds string) float64 {
 			price = banPrice.Conditions[conds+"_foil"]
 			if price == 0 {
 				price = banPrice.Conditions[conds+"_etched"]
+			}
+		}
+		// MetadataOnly sources (TCGLow / TCGMarket / MKM*) never
+		// populate Conditions — they carry a single flat price in
+		// Regular/Foil/Etched. Fall back so a caller passing the
+		// row's condition still gets that flat price instead of 0.
+		// Sources that DO have per-condition data (real sellers and
+		// vendors) keep the original "return 0 if this specific
+		// condition isn't listed" semantic.
+		if price == 0 && len(banPrice.Conditions) == 0 {
+			price = banPrice.Regular
+			if price == 0 {
+				price = banPrice.Foil
+				if price == 0 {
+					price = banPrice.Etched
+				}
 			}
 		}
 	}
