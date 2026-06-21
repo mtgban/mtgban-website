@@ -61,14 +61,23 @@ ready=0
 for ((i=0; i<READY_TIMEOUT; i++)); do
     if curl -fs "http://127.0.0.1:${NEW}/healthz" >/dev/null 2>&1; then ready=1; break; fi
     if ! systemctl is-active --quiet "mtgban@${NEW}"; then
-        echo "!! mtgban@${NEW} died on startup:"
-        journalctl -u "mtgban@${NEW}" -n 40 --no-pager
+        echo "!! mtgban@${NEW} died on startup — last 60 log lines:"
+        journalctl -u "mtgban@${NEW}" -n 60 --no-pager
         exit 1
+    fi
+    # Heartbeat: surface the instance's own progress (datastore/scraper load,
+    # "healthz: not ready (uuids=… sellers=… vendors=…)") in the Action log
+    # every 15s so a slow boot is diagnosable without SSHing into the box.
+    if (( i > 0 && i % 15 == 0 )); then
+        echo "==> still waiting (${i}/${READY_TIMEOUT}s) — latest instance logs:"
+        journalctl -u "mtgban@${NEW}" -n 4 --no-pager | sed 's/^/     /'
     fi
     sleep 1
 done
 if [ "$ready" -ne 1 ]; then
-    echo "!! timeout waiting for :$NEW/healthz — rolling back"
+    echo "!! timeout waiting for :$NEW/healthz after ${READY_TIMEOUT}s — last 60 log lines:"
+    journalctl -u "mtgban@${NEW}" -n 60 --no-pager
+    echo "!! rolling back"
     sudo systemctl stop "mtgban@${NEW}"
     exit 1
 fi
