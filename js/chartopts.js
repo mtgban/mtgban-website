@@ -277,7 +277,7 @@ function readVar(name) {
     return window.getComputedStyle(el).getPropertyValue(name).trim();
 }
 
-function renderChartLegend(chart, containerId) {
+function renderChartLegend(chart, containerId, storageKey) {
     var container = document.getElementById(containerId);
     if (!container) return;
     var html = '';
@@ -298,6 +298,8 @@ function renderChartLegend(chart, containerId) {
             chart.setDatasetVisibility(idx, !visible);
             chart.update();
             this.classList.toggle('hidden');
+            // Remember which stores are disabled so the next load restores them.
+            saveLegendState(chart, storageKey);
         });
     });
 }
@@ -333,20 +335,18 @@ function rethemeFirstAxes(chart) {
 
 /* ── Legend persistence ── */
 
-function withLegendPersistence(legendStorageKey, opts) {
-    var defaultClick = Chart.defaults.plugins.legend.onClick;
-
-    opts.plugins.legend.onClick = function (e, legendItem, legend) {
-        defaultClick.call(this, e, legendItem, legend);
-
-        var chart = legend.chart;
-        var hidden = chart.data.datasets.map(function (_, i) {
-            return !chart.isDatasetVisible(i);
-        });
-        localStorage.setItem(legendStorageKey, JSON.stringify(hidden));
-    };
-
-    return opts;
+// Remember which datasets (stores) are hidden, so the next load can restore
+// the same set via applySavedLegendState. The built-in Chart.js legend is
+// disabled (display: false); toggling happens through the custom HTML legend
+// (renderChartLegend), which calls this on every click.
+function saveLegendState(chart, storageKey) {
+    if (!storageKey) return;
+    var hidden = chart.data.datasets.map(function (_, i) {
+        return !chart.isDatasetVisible(i);
+    });
+    try {
+        localStorage.setItem(storageKey, JSON.stringify(hidden));
+    } catch (e) { /* localStorage unavailable; non-fatal */ }
 }
 
 /* ── Checkpoint annotations ── */

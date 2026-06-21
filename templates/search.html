@@ -427,9 +427,6 @@
                             var allLabels = {{.AxisLabels}};
                             var opts = getChartOpts(allLabels, localStorage.getItem("chartSpanGaps"));
 
-                            // Override legend click function
-                            opts = withLegendPersistence(legendStorageKey, opts);
-
                             // Checkpoint annotations (bans/releases/reprints).
                             // clip: false lets badges render above the plot area in the
                             // top padding band reserved by buildCheckpointAnnotations.
@@ -481,8 +478,8 @@
                             // Load state from local storage
                             applySavedLegendState(cardChart, legendStorageKey);
 
-                            // Build custom HTML legend
-                            renderChartLegend(cardChart, 'chartLegend');
+                            // Build custom HTML legend (clicks persist via legendStorageKey)
+                            renderChartLegend(cardChart, 'chartLegend', legendStorageKey);
 
                             // Apply theme (light/dark)
                             rethemeFirstAxes(cardChart);
