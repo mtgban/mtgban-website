@@ -476,6 +476,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Embed.BuylistPrice = price4seller(allKeys[0], "CK")
 	}
 
+	// When the user asked to drop index data (skip:index), don't synthesize the
+	// no-price TCGplayer/CardMarket fallback links below.
+	skipIndex := false
+	for _, f := range config.StoreFilters {
+		if f.Name == "index" && !f.Negate {
+			skipIndex = true
+			break
+		}
+	}
+
 	// Readjust array of INDEX entires
 	for _, cardId := range allKeys {
 		indexArray := foundSellers[cardId]["INDEX"]
@@ -563,7 +573,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// If the TCG index is missing, we manually add one to get the link
-		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed {
+		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed && !skipIndex {
 			var link string
 			if pageVars.Metadata[cardId].TCGId == "" {
 				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardId].Name) + "&utm_medium=" + Config.Affiliate["TCG"] + "&utm_source=" + Config.Affiliate["TCG"]
@@ -580,7 +590,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Same for CM
-		if mkmIndex < 0 && !pageVars.Metadata[cardId].Sealed {
+		if mkmIndex < 0 && !pageVars.Metadata[cardId].Sealed && !skipIndex {
 			co, err := mtgmatcher.GetUUID(cardId)
 			if err == nil {
 				var link string
