@@ -28,9 +28,11 @@
 <body class="light-theme">
 <script>
 (function() {
-    var stored = localStorage.getItem('theme');
-    var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    document.body.className = theme === 'dark' ? 'dark-theme' : 'light-theme';
+    var v = localStorage.getItem('theme');
+    var pref = (v === 'light' || v === 'dark' || v === 'system') ? v : 'system';
+    var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.body.className = dark ? 'dark-theme' : 'light-theme';
+    document.body.setAttribute('data-theme-pref', pref);
 })();
 </script>
 
@@ -59,5 +61,6 @@ window.__BAN_PALETTE_TARGETS = {
 <script type="text/javascript" src="/js/palette-providers.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/command-palette.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
 </body>
 </html>

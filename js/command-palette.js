@@ -853,17 +853,24 @@
         var cmds = [
             {
                 name: 'Toggle Theme',
-                icon: localStorage.getItem('theme') === 'dark' ? 'sun' : 'moon',
-                keywords: ['dark', 'light', 'night', 'day', 'theme', 'mode'],
+                icon: (function () {
+                    var p = localStorage.getItem('theme');
+                    return p === 'dark' ? 'moon' : (p === 'light' ? 'sun' : 'sun-moon');
+                })(),
+                keywords: ['dark', 'light', 'night', 'day', 'theme', 'mode', 'system', 'auto'],
                 action: function () {
-                    var t = localStorage.getItem('theme') === 'dark' ? 'light' : 'dark';
-                    document.body.classList.toggle('dark-theme',  t === 'dark');
-                    document.body.classList.toggle('light-theme', t === 'light');
-                    localStorage.setItem('theme', t);
-                    var toggle = document.getElementById('theme-toggle');
-                    if (toggle) toggle.title = t === 'dark' ? 'Nightbound' : 'Daybound';
+                    var next;
+                    if (window.BANTheme) {
+                        next = window.BANTheme.cycle();
+                    } else {
+                        // Fallback: two-state toggle if nightmode.js isn't present.
+                        next = localStorage.getItem('theme') === 'dark' ? 'light' : 'dark';
+                        document.body.classList.toggle('dark-theme',  next === 'dark');
+                        document.body.classList.toggle('light-theme', next === 'light');
+                        localStorage.setItem('theme', next);
+                    }
                     closePalette();
-                    showToast('Theme: ' + t);
+                    showToast('Theme: ' + next);
                 }
             },
             { name: 'Random Card',   icon: 'dice-5',     keywords: ['random', 'surprise', 'lucky'],

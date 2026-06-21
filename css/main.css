@@ -395,28 +395,30 @@ a.pagination {
     transition: background 0.12s;
 }
 .ban-theme-toggle:hover { background: var(--surface-3, var(--navbackground)); }
+/* Don't leave the focus ring lingering after a click; keep it for keyboard nav. */
+.ban-theme-toggle:focus { outline: none; }
+.ban-theme-toggle:focus-visible {
+    outline: 2px solid var(--ainfo);
+    outline-offset: 2px;
+}
 
+/* Three stacked icons (sun / moon / system); the one matching the current
+   theme PREFERENCE is shown. Driven by <body data-theme-pref>, not the
+   resolved theme, so 'system' shows the monitor icon regardless of whether
+   the OS currently resolves to light or dark. */
 .theme-icon {
     position: absolute;
-    transition: opacity 0.35s ease, transform 0.45s ease;
-}
-.theme-icon-sun {
     opacity: 0;
     transform: rotate(-90deg);
+    transition: opacity 0.35s ease, transform 0.45s ease;
 }
-.theme-icon-moon {
+body[data-theme-pref="light"]  .theme-icon-sun,
+body[data-theme-pref="dark"]   .theme-icon-moon,
+body[data-theme-pref="system"] .theme-icon-system,
+/* Before JS sets the preference, default to the system icon (unset == system). */
+body:not([data-theme-pref])    .theme-icon-system {
     opacity: 1;
     transform: rotate(0deg);
-}
-
-/* Dark mode: moon out, sun in */
-.dark-theme .theme-icon-sun {
-    opacity: 1;
-    transform: rotate(0deg);
-}
-.dark-theme .theme-icon-moon {
-    opacity: 0;
-    transform: rotate(90deg);
 }
 
 /* Mobile hamburger */
