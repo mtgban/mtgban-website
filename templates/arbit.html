@@ -349,7 +349,10 @@
                     -->
                 </div>
                 {{if and (eq $i 0) (eq $.ScraperShort "SYP")}}
-                        {{end}}
+                    <div class="arb-load-btns">
+                        <a class="arb-load-btn csv" href="?page=syp&format=csv">Download CSV</a>
+                    </div>
+                {{end}}
                 <hr style="width: 100%; border: none; border-top: 1px solid var(--arb-border-subtle); margin: 0;">
             </div>
 
