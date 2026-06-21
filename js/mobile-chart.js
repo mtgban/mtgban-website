@@ -24,6 +24,15 @@
         document.cookie = HIDDEN_COOKIE + '=' + encodeURIComponent(names.join(',')) + '; path=/; max-age=' + maxAge + '; SameSite=Lax';
     }
 
+    // Remember which stores are currently hidden so the next chart restores them.
+    function saveHiddenVendors(chart) {
+        var hidden = [];
+        chart.data.datasets.forEach(function(ds, i) {
+            if (!chart.isDatasetVisible(i)) hidden.push(ds.label);
+        });
+        writeHiddenVendors(hidden);
+    }
+
     function pickInitialRange() {
         var saved = parseInt(localStorage.getItem('chartDateRange'));
         if (isNaN(saved) || saved <= 0) saved = 180;
@@ -322,6 +331,8 @@
                 chart.setDatasetVisibility(idx, !visible);
                 chart.update();
                 this.classList.toggle('hidden');
+                // Persist immediately, not only when the drawer closes.
+                saveHiddenVendors(chart);
             });
         });
     }
@@ -400,11 +411,7 @@
 
     window.hideChartDrawer = function() {
         if (currentChart) {
-            var hidden = [];
-            currentChart.data.datasets.forEach(function(ds, i) {
-                if (!currentChart.isDatasetVisible(i)) hidden.push(ds.label);
-            });
-            writeHiddenVendors(hidden);
+            saveHiddenVendors(currentChart);
         }
         document.getElementById('m-chart-overlay').classList.remove('open');
         document.getElementById('m-chart-drawer').classList.remove('open');
