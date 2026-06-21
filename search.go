@@ -1141,6 +1141,12 @@ func attemptMatch(query string) ([]string, error) {
 }
 
 func searchParallelNG(cardIds []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry, foundVendors map[string]map[string][]SearchEntry) {
+	// Initialize up front so callers can always assign into them; when retail or
+	// buylist is skipped the corresponding search is never run and the map would
+	// otherwise stay nil, panicking on the first write (e.g. the INDEX block).
+	foundSellers = map[string]map[string][]SearchEntry{}
+	foundVendors = map[string]map[string][]SearchEntry{}
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 
