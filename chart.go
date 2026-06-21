@@ -67,17 +67,18 @@ func getDateAxisValues(earliest time.Time) []string {
 	return dates
 }
 
-func lookbackForTier(tier string) timeseries.Lookback {
-	switch tier {
-	case "Vintage":
-		return timeseries.LookbackVintage
-	case "Legacy":
-		return timeseries.LookbackLegacy
-	case "Modern":
-		return timeseries.LookbackModern
-	default:
-		return timeseries.LookbackStandard
+// chartLookback returns the chart history window, in days, as encoded in
+// the signature under SearchChartLoopback. Absent or invalid values fall
+// back to 30 days.
+func chartLookback(sig string) timeseries.Lookback {
+	if DevMode && !SigCheck {
+		return timeseries.Lookback(3650)
 	}
+	days, err := strconv.Atoi(GetParamFromSig(sig, "SearchChartLoopback"))
+	if err != nil || days <= 0 {
+		days = 30
+	}
+	return timeseries.Lookback(days)
 }
 
 // getDatasets returns one Dataset per applicable config. All datasets for a
@@ -85,7 +86,7 @@ func lookbackForTier(tier string) timeseries.Lookback {
 // language=nil, lookback) result set, so we fetch HGetAll exactly once and
 // fan the rows out to every per-dataset render rather than firing N
 // identical SQL queries (and discarding 15/16 of each result).
-func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string, userTier string) []Dataset {
+func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string, lb timeseries.Lookback) []Dataset {
 	if PricesArchiveDB == nil {
 		return nil
 	}
@@ -112,7 +113,7 @@ func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string,
 		return nil
 	}
 
-	results, err := PricesArchiveDB.HGetAll(ctx, co.UUID, co.Foil, co.Etched, nil, lookbackForTier(userTier))
+	results, err := PricesArchiveDB.HGetAll(ctx, co.UUID, co.Foil, co.Etched, nil, lb)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -199,7 +200,7 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 // multi-card chart, plus the list of distinct reference names that have at
 // least one non-empty dataset. UUIDs that fail to resolve are skipped so a
 // single bad input doesn't take the whole chart down.
-func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string, userTier string) ([]Dataset, []string) {
+func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
 	cards := make([]multiCardInput, 0, len(cardIds))
 	for _, cardId := range cardIds {
 		co, err := mtgmatcher.GetUUID(cardId)
@@ -220,7 +221,7 @@ func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string,
 
 		cards = append(cards, multiCardInput{
 			Name:     cardName,
-			Datasets: getDatasets(ctx, cardId, co.Sealed, labels, userTier),
+			Datasets: getDatasets(ctx, cardId, co.Sealed, labels, lb),
 		})
 	}
 

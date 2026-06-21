@@ -298,9 +298,9 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
 	dumpType := ""
-	canRetail := slices.Contains(enabledModes, "retail") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
-	canBuylist := slices.Contains(enabledModes, "buylist") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
-	canSealed := slices.Contains(enabledModes, "sealed") || (slices.Contains(enabledModes, "all") || (DevMode && !SigCheck))
+	canRetail := canAccessMode(enabledModes, "retail")
+	canBuylist := canAccessMode(enabledModes, "buylist")
+	canSealed := canAccessMode(enabledModes, "sealed")
 	isSealed := strings.HasPrefix(urlPath, "sealed") && canSealed
 	if isSealed {
 		dumpType += "sealed"
@@ -436,12 +436,16 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		shouldQty := qty && !seller.Info().MetadataOnly && !seller.Info().NoQuantityInventory
 		shouldBaseCond := !seller.Info().MetadataOnly && !seller.Info().SealedMode
 
+		rule := EntryRule{
+			Edition: filterByEdition,
+			Finish:  filterByFinish,
+		}
 		for _, cardId := range filterByHash {
-			processEntry(out, inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, shouldQty, conds, shouldBaseCond)
+			processEntry(out, inventory[cardId], mode, cardId, sellerTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 		if filterByHash == nil {
 			for cardId := range inventory {
-				processEntry(out, inventory[cardId], mode, cardId, filterByEdition, filterByFinish, sellerTag, shouldQty, conds, shouldBaseCond)
+				processEntry(out, inventory[cardId], mode, cardId, sellerTag, shouldQty, conds, shouldBaseCond, rule)
 			}
 		}
 	}
@@ -449,7 +453,15 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 	return out
 }
 
-func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, mode, cardId, filterByEdition, filterByFinish, sellerTag string, qty, conds, shouldBaseCond bool) {
+type EntryRule struct {
+	Edition string
+	Finish  string
+
+	MinPrice float64
+	Rate     float64
+}
+
+func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, idMode, cardId, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
 	if len(entries) == 0 {
 		return
 	}
@@ -457,18 +469,28 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 	if err != nil {
 		return
 	}
-	if filterByEdition != "" && co.SetCode != filterByEdition {
-		return
-	}
-	if filterByFinish != "" && checkFinish(co, filterByFinish) {
-		return
-	}
-	id := getIdFunc(mode)(co)
+	id := getIdFunc(idMode)(co)
 	if id == "" {
 		return
 	}
 
-	basePrice := entries[0].Pricing()
+	rate := 1.0
+	for _, rule := range rules {
+		if rule.Edition != "" && co.SetCode != rule.Edition {
+			return
+		}
+		if rule.Finish != "" && checkFinish(co, rule.Finish) {
+			return
+		}
+		if entries[0].Pricing() < rule.MinPrice {
+			return
+		}
+		if rule.Rate != 0 {
+			rate = rule.Rate
+		}
+	}
+
+	basePrice := entries[0].Pricing() * rate
 	if basePrice == 0 {
 		return
 	}
@@ -477,79 +499,79 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 	if !found {
 		out[id] = map[string]*BanPrice{}
 	}
-	if out[id][sellerTag] == nil {
-		out[id][sellerTag] = &BanPrice{}
+	if out[id][scraperTag] == nil {
+		out[id][scraperTag] = &BanPrice{}
 	}
 
 	if shouldBaseCond {
-		out[id][sellerTag].Cond = entries[0].Condition()
+		out[id][scraperTag].Cond = entries[0].Condition()
 	}
 
-	if conds && out[id][sellerTag].Conditions == nil {
-		out[id][sellerTag].Conditions = map[string]float64{}
+	if conds && out[id][scraperTag].Conditions == nil {
+		out[id][scraperTag].Conditions = map[string]float64{}
 	}
 
 	if co.Sealed {
-		out[id][sellerTag].Sealed = basePrice
+		out[id][scraperTag].Sealed = basePrice
 		if qty {
 			for i := range entries {
-				out[id][sellerTag].QtySealed += entries[i].Qty()
+				out[id][scraperTag].QtySealed += entries[i].Qty()
 			}
 		}
 	} else if co.Etched {
-		out[id][sellerTag].Etched = basePrice
+		out[id][scraperTag].Etched = basePrice
 		if qty {
 			for i := range entries {
-				out[id][sellerTag].QtyEtched += entries[i].Qty()
+				out[id][scraperTag].QtyEtched += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition() + "_etched"
-				out[id][sellerTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing() * rate
 				if qty && entries[i].Qty() > 0 {
-					if out[id][sellerTag].Quantities == nil {
-						out[id][sellerTag].Quantities = map[string]int{}
+					if out[id][scraperTag].Quantities == nil {
+						out[id][scraperTag].Quantities = map[string]int{}
 					}
-					out[id][sellerTag].Quantities[condTag] = entries[i].Qty()
+					out[id][scraperTag].Quantities[condTag] = entries[i].Qty()
 				}
 			}
 		}
 	} else if co.Foil {
-		out[id][sellerTag].Foil = basePrice
+		out[id][scraperTag].Foil = basePrice
 		if qty {
 			for i := range entries {
-				out[id][sellerTag].QtyFoil += entries[i].Qty()
+				out[id][scraperTag].QtyFoil += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition() + "_foil"
-				out[id][sellerTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing() * rate
 				if qty && entries[i].Qty() > 0 {
-					if out[id][sellerTag].Quantities == nil {
-						out[id][sellerTag].Quantities = map[string]int{}
+					if out[id][scraperTag].Quantities == nil {
+						out[id][scraperTag].Quantities = map[string]int{}
 					}
-					out[id][sellerTag].Quantities[condTag] = entries[i].Qty()
+					out[id][scraperTag].Quantities[condTag] = entries[i].Qty()
 				}
 			}
 		}
 	} else {
-		out[id][sellerTag].Regular = basePrice
+		out[id][scraperTag].Regular = basePrice
 		if qty {
 			for i := range entries {
-				out[id][sellerTag].Qty += entries[i].Qty()
+				out[id][scraperTag].Qty += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
 				condTag := entries[i].Condition()
-				out[id][sellerTag].Conditions[condTag] = entries[i].Pricing()
+				out[id][scraperTag].Conditions[condTag] = entries[i].Pricing() * rate
 				if qty && entries[i].Qty() > 0 {
-					if out[id][sellerTag].Quantities == nil {
-						out[id][sellerTag].Quantities = map[string]int{}
+					if out[id][scraperTag].Quantities == nil {
+						out[id][scraperTag].Quantities = map[string]int{}
 					}
-					out[id][sellerTag].Quantities[condTag] = entries[i].Qty()
+					out[id][scraperTag].Quantities[condTag] = entries[i].Qty()
 				}
 			}
 		}
@@ -584,12 +606,17 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		// Loop through cards
 		shouldQty := qty && (!vendor.Info().MetadataOnly || vendor.Info().Shorthand == "SYP")
 		shouldBaseCond := !vendor.Info().MetadataOnly && !vendor.Info().SealedMode
+
+		rule := EntryRule{
+			Edition: filterByEdition,
+			Finish:  filterByFinish,
+		}
 		for _, cardId := range filterByHash {
-			processEntry(out, buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, shouldQty, conds, shouldBaseCond)
+			processEntry(out, buylist[cardId], mode, cardId, vendorTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 		if filterByHash == nil {
 			for cardId := range buylist {
-				processEntry(out, buylist[cardId], mode, cardId, filterByEdition, filterByFinish, vendorTag, shouldQty, conds, shouldBaseCond)
+				processEntry(out, buylist[cardId], mode, cardId, vendorTag, shouldQty, conds, shouldBaseCond, rule)
 			}
 		}
 	}
@@ -619,7 +646,6 @@ func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanP
 	w := csv.NewWriter(httpWriter)
 	return SimplePrice2CSV(w, pm, nil, sorted, false)
 }
-
 
 // SimplePrice2CSV converts price data to CSV. When uploadedData is provided,
 // each row corresponds to an uploaded entry and includes Loaded columns.

@@ -19,6 +19,7 @@
     <script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
@@ -163,10 +164,6 @@
         })();
     </script>
 
-    {{/* Set data for filter dropdown - populated in extra-scripts after DOM ready */}}
-    <script>
-    var mFilterSets = [{{range .AllKeys}}{{$card := index $.Metadata .}}{code:"{{$card.SetCode}}",name:"{{$card.Edition}}",keyrune:"{{$card.Keyrune}}"},{{end}}];
-    </script>
 
     {{/* Result count + sort pills */}}
     {{if .TotalUnique}}
@@ -232,6 +229,16 @@
                 </div>
             </div>
             <div class="m-actions-menu" data-card="{{$cardId}}">
+                {{/* In portrait the favorite + chart buttons collapse in here; in
+                     landscape they stay inline in the header and these are hidden. */}}
+                <button type="button" class="m-actions-item m-actions-fav fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this); closeActionsMenus();">
+                    <i data-lucide="star"></i><span>Favorite</span>
+                </button>
+                {{if not $.DisableChart}}
+                    <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}'); closeActionsMenus();">
+                        <i data-lucide="chart-line"></i><span>Price history</span>
+                    </button>
+                {{end}}
                 {{if $card.Sealed}}
                     {{if $card.Booster}}
                         <a class="m-actions-item" href='/search?q=unpack:"{{$card.Name}}"' onclick="closeActionsMenus()">
@@ -537,8 +544,7 @@
             <form id="m-filter-form" action="" method="GET">
                 <label>Edition / Set</label>
                 <div class="m-filter-set-picker" id="m-filter-set" data-value="">
-                    <button type="button" class="m-filter-set-current" id="m-filter-set-current" onclick="toggleSetPicker(event)">All Sets</button>
-                    <ul class="m-filter-set-list" id="m-filter-set-list" hidden></ul>
+                    <button type="button" class="m-filter-set-current" id="m-filter-set-current" onclick="openSetPicker()">All Sets</button>
                 </div>
 
                 <label>Finish</label>
@@ -552,6 +558,27 @@
                 <button type="button" class="m-filter-apply" onclick="applyFilters()">Apply</button>
             </form>
         </div>
+    </div>
+
+    {{/* Full-screen edition/set picker */}}
+    <div class="m-setpicker-overlay" id="m-setpicker-overlay">
+        <div class="m-setpicker-header">
+            <button type="button" class="m-setpicker-close" onclick="closeSetPicker()" aria-label="Close"><i data-lucide="x"></i></button>
+            <span class="m-setpicker-title">Select Edition</span>
+        </div>
+        <div class="m-setpicker-search">
+            <i data-lucide="search"></i>
+            <input type="text" id="m-setpicker-search-input" placeholder="Filter editions..." autocomplete="off" autocapitalize="none" spellcheck="false">
+        </div>
+        <ul class="m-filter-set-list" id="m-filter-set-list">
+            <li data-value="" data-name="All Sets" onclick="selectSet(event)">All Sets</li>
+            {{range .EditionFilterList}}
+            <li data-value="{{.Code}}" data-name="{{.Name}}" onclick="selectSet(event)">
+                {{if .Keyrune}}<i class="ss ss-{{.Keyrune}} ss-fw"></i>{{end}}
+                <span>{{.Name}}</span>
+            </li>
+            {{end}}
+        </ul>
     </div>
 
     {{/* Settings drawer */}}
@@ -811,73 +838,42 @@ document.querySelectorAll('.m-filter-pills').forEach(function(group) {
     });
 });
 
-// Populate set picker from data built during template render
-(function() {
-    var seen = {};
-    var list = document.getElementById('m-filter-set-list');
-    if (!list || !window.mFilterSets) return;
-
-    // "All Sets" entry first
-    var allLi = document.createElement('li');
-    allLi.dataset.value = '';
-    allLi.dataset.name = 'All Sets';
-    allLi.textContent = 'All Sets';
-    allLi.addEventListener('click', selectSet);
-    list.appendChild(allLi);
-
-    // Dedupe and sort alphabetically by name
-    var entries = [];
-    mFilterSets.forEach(function(s) {
-        if (!seen[s.code]) {
-            seen[s.code] = true;
-            entries.push(s);
-        }
-    });
-    entries.sort(function(a, b) { return a.name.localeCompare(b.name); });
-
-    entries.forEach(function(s) {
-        var li = document.createElement('li');
-        li.dataset.value = s.code;
-        li.dataset.name = s.name;
-        var bareKeyrune = (s.keyrune || '').split(' ')[0];
-        if (bareKeyrune) {
-            var icon = document.createElement('i');
-            icon.className = 'ss ' + bareKeyrune + ' ss-fw';
-            li.appendChild(icon);
-        }
-        var label = document.createElement('span');
-        label.textContent = s.name;
-        li.appendChild(label);
-        li.addEventListener('click', selectSet);
-        list.appendChild(li);
-    });
-})();
-
 function selectSet(e) {
     var li = e.currentTarget;
     var picker = document.getElementById('m-filter-set');
     var current = document.getElementById('m-filter-set-current');
-    var list = document.getElementById('m-filter-set-list');
     picker.dataset.value = li.dataset.value;
     current.textContent = li.dataset.name;
-    list.hidden = true;
+    closeSetPicker();
 }
 
-function toggleSetPicker(e) {
-    e.stopPropagation();
-    var list = document.getElementById('m-filter-set-list');
-    list.hidden = !list.hidden;
+function openSetPicker() {
+    var overlay = document.getElementById('m-setpicker-overlay');
+    overlay.classList.add('open');
+    document.body.classList.add('m-setpicker-lock');
+    var input = document.getElementById('m-setpicker-search-input');
+    if (input) { input.value = ''; filterSetList(''); }
 }
 
-// Close picker on outside click
-document.addEventListener('click', function(e) {
-    var picker = document.getElementById('m-filter-set');
+function closeSetPicker() {
+    document.getElementById('m-setpicker-overlay').classList.remove('open');
+    document.body.classList.remove('m-setpicker-lock');
+}
+
+function filterSetList(term) {
+    term = (term || '').toLowerCase();
     var list = document.getElementById('m-filter-set-list');
-    if (!picker || !list) return;
-    if (!picker.contains(e.target)) {
-        list.hidden = true;
-    }
-});
+    if (!list) return;
+    list.querySelectorAll('li').forEach(function(li) {
+        var name = (li.dataset.name || '').toLowerCase();
+        li.style.display = (!term || name.indexOf(term) !== -1) ? '' : 'none';
+    });
+}
+
+(function() {
+    var input = document.getElementById('m-setpicker-search-input');
+    if (input) input.addEventListener('input', function() { filterSetList(this.value); });
+})();
 
 function applyFilters() {
     var query = document.getElementById('searchbox').value.trim();

@@ -107,7 +107,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Println(err)
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -117,10 +117,9 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
 		csvWriter := csv.NewWriter(w)
-		err = UUID2TCGCSV(csvWriter, data.([]string), nil, nil)
+		err = UUID2TCGCSV(csvWriter, data.([]string), nil, nil, true)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		return
@@ -129,7 +128,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	err = json.NewEncoder(w).Encode(data)
 	if err != nil {
 		log.Println(err)
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 }
@@ -291,13 +290,19 @@ var tcgConditionMap = map[string]string{
 // If absent, quantity will be computed on the fly and entries will be merged
 // in a single entry (tcgplayer does not support csv operations with identical
 // items) and conditions will be set to NM.
-func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
+// UUID2TCGCSV writes a TCGplayer-importable CSV. The edition and display-name
+// columns are normally left blank: TCGplayer skips its name-match check when
+// they're empty, and our names don't always match theirs exactly (see commit
+// 1e39d5d). Pass withNames=true to restore them — used by the decklist
+// endpoint, where the human-readable name/edition is wanted in the output.
+func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error {
 	market, err := findSellerInventory("TCGPlayer")
 	if err != nil {
 		return err
 	}
 	direct, _ := findSellerInventory("TCGDirectLow")
 	low, _ := findSellerInventory("TCGLow")
+	sealed, _ := findSellerInventory("TCGSealed")
 
 	err = w.Write(tcgcsvHeader)
 	if err != nil {
@@ -330,26 +335,34 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 	for i, id := range cleanedIds {
 		var prices [3]float64
 
-		cond := "NM"
-		if conds != nil && conds[i] != "" {
-			cond = conds[i]
-		}
-
-		for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
-			for _, entry := range inv[id] {
-				if entry.Conditions == cond {
-					prices[j] = entry.Price
-					break
-				}
-			}
-		}
-
 		co, err := mtgmatcher.GetUUID(id)
 		if err != nil {
 			continue
 		}
 
-		tcgSkuId := findInstanceId("TCGPlayer", id, cond)
+		cond := "NM"
+		if conds != nil && conds[i] != "" && !co.Sealed {
+			cond = conds[i]
+		}
+
+		var tcgSkuId string
+		if co.Sealed {
+			tcgSkuId = findInstanceId("TCGSealed", id, cond)
+			for _, entries := range sealed {
+				prices[0] = entries[0].Price
+			}
+
+		} else {
+			tcgSkuId = findInstanceId("TCGPlayer", id, cond)
+			for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
+				for _, entry := range inv[id] {
+					if entry.Conditions == cond {
+						prices[j] = entry.Price
+						break
+					}
+				}
+			}
+		}
 
 		condLong := tcgConditionMap[cond]
 		if co.Foil || co.Etched {
@@ -359,9 +372,21 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		record := make([]string, 0, len(tcgcsvHeader))
 
 		record = append(record, tcgSkuId)
-		record = append(record, "Magic")
-		record = append(record, co.Edition)
-		record = append(record, co.Name)
+		switch Config.Game {
+		case "magic":
+			record = append(record, "Magic")
+		case "lorcana":
+			record = append(record, "Lorcana")
+		default:
+			panic("not implemented")
+		}
+		if withNames {
+			record = append(record, co.Edition)
+			record = append(record, co.Name)
+		} else {
+			record = append(record, "")
+			record = append(record, "")
+		}
 		record = append(record, "")
 		record = append(record, co.Number)
 		record = append(record, strings.ToUpper(co.Rarity[:1]))
@@ -405,7 +430,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Println(err)
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -417,8 +442,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 		csvWriter := csv.NewWriter(w)
 		err = UUID2MKMCSV(csvWriter, data.([]string), nil, nil)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		return
@@ -427,7 +451,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 	err = json.NewEncoder(w).Encode(data)
 	if err != nil {
 		log.Println(err)
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 }
@@ -747,8 +771,8 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 		allKeys = allKeys[:MaxSearchTotalResults]
 	}
 
-	canRetail := slices.Contains(enabledModes, "retail") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
-	canBuylist := slices.Contains(enabledModes, "buylist") || slices.Contains(enabledModes, "all") || (DevMode && !SigCheck)
+	canRetail := canAccessMode(enabledModes, "retail")
+	canBuylist := canAccessMode(enabledModes, "buylist")
 
 	// Build store lists
 	var enabledRetailStores []string
@@ -817,14 +841,14 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	name = strings.TrimPrefix(name, "/api/load/")
 
 	if GetParamFromSig(r.FormValue("sig"), "API") != name {
-		w.Write([]byte(`{"error": "not found"}`))
+		errorResponse(w, http.StatusNotFound, "not found")
 		return
 	}
 
 	config := Config.ScraperConfig
 	scrapersConfig, found := config.Config[name]
 	if !found {
-		w.Write([]byte(`{"error": "not found"}`))
+		errorResponse(w, http.StatusNotFound, "not found")
 		return
 	}
 
@@ -847,13 +871,13 @@ func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 
 	err := verify(r)
 	if err != nil {
-		w.Write([]byte(`{"error": "` + err.Error() + `"}`))
+		errorResponse(w, http.StatusUnauthorized, err.Error())
 		return
 	}
 
 	err = loadDatastore(Config.DatastorePath)
 	if err != nil {
-		w.Write([]byte(`{"error": "Failed to reload datastore: ` + err.Error() + `"}`))
+		errorResponse(w, http.StatusInternalServerError, "Failed to reload datastore: "+err.Error())
 		return
 	}
 

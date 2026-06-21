@@ -10,50 +10,69 @@
     // DOM, so all pages can live in one map. Add a new page here to
     // wire up its settings;
     // ============================================================
-    const PAGE_BINDINGS = {
-        search: {
-            // Use cookieLists (not lists) so both Singles and Sealed grids are
-            // collected via data-cookie attribute rather than a single element id.
-            cookieLists: ['SearchSellersList', 'SearchVendorsList'],
-            pills: {
-                'settings-search-sort': 'SearchDefaultSort',
-                'settings-search-listing': 'SearchListingPriority',
-                'settings-search-buylist-secondary': 'SearchBuylistSecondary',
-            },
-            selects: ['SearchSellersPriority', 'SearchVendorsPriority'],
-            misc: { 'settings-search-misc': 'SearchMiscOpts' },
+    // Flat catalog of every settings binding the page might wire up.
+    // Each binder is a no-op when its target element isn't in the DOM,
+    // so a single iteration handles every page — no need to know which
+    // page is active. The active page's HasSettings flag (set in
+    // main.go's NavElem definitions) gates the gear button's visible
+    // enabled state; this map only describes the controls themselves.
+    // Comments mark which page each grouping originates from so the
+    // bindings stay easy to navigate.
+    const BINDINGS = {
+        lists: {
+            // sleep
+            'settings-sleep-sellers': 'SleepersSellersList',
+            'settings-sleep-vendors': 'SleepersVendorsList',
         },
-        arbit: {
-            // Cookie name varies by route (ArbitVendorsList / GlobalVendorsList /
-            // ReverseVendorsList) and is read from the container's data-cookie attr.
-            dynamicLists: ['settings-arbit-vendors'],
+        // search — Singles + Sealed grids share one cookie list via
+        // a data-cookie attribute rather than a single element id.
+        cookieLists: ['SearchSellersList', 'SearchVendorsList'],
+        pills: {
+            // search
+            'settings-search-sort': 'SearchDefaultSort',
+            'settings-search-listing': 'SearchListingPriority',
+            'settings-search-buylist-secondary': 'SearchBuylistSecondary',
         },
-        sleep: {
-            lists: {
-                'settings-sleep-sellers': 'SleepersSellersList',
-                'settings-sleep-vendors': 'SleepersVendorsList',
-            },
-            editions: { 'sleep-editions-picker': 'SleepersEditionList' },
+        selects: [
+            // search
+            'SearchSellersPriority', 'SearchVendorsPriority',
+            // upload
+            'UploadSorting', 'UploadAltPrice', 'UploadPriceSource',
+            'UploadCustomBuyer', 'UploadCustomSealedBuyer',
+        ],
+        misc: {
+            // search
+            'settings-search-misc': 'SearchMiscOpts',
+            // upload
+            'settings-upload-checks': 'UploadOptimizerOpts',
+            'settings-upload-custom': 'UploadCustomOpts',
         },
-        news: {
-            editions: { 'news-editions-picker': 'NewspaperList' },
+        miscDefaults: {
+            // upload
+            'settings-upload-checks': ['lowval', 'lowvalabs', 'minmargin', 'customperc'],
         },
-        upload: {
-            misc: { 'settings-upload-checks': 'UploadOptimizerOpts' },
-            miscDefaults: {
-                'settings-upload-checks': ['lowval', 'lowvalabs', 'minmargin', 'customperc'],
-            },
-            selects: ['UploadSorting', 'UploadAltPrice', 'UploadPriceSource'],
-            texts: {
-                'opt-percspread': 'UploadPercSpread',
-                'opt-percspreadmax': 'UploadPercSpreadMax',
-                'opt-minval': 'UploadMinVal',
-                'opt-maxval': 'UploadMaxVal',
-                'opt-margin': 'UploadMargin',
-                'opt-custompercmax': 'UploadCustomPercMax',
-                'opt-multiplier': 'UploadMultiplier',
-                'opt-maxqty': 'UploadMaxQty',
-            },
+        texts: {
+            // upload
+            'opt-percspread': 'UploadPercSpread',
+            'opt-percspreadmax': 'UploadPercSpreadMax',
+            'opt-minval': 'UploadMinVal',
+            'opt-maxval': 'UploadMaxVal',
+            'opt-margin': 'UploadMargin',
+            'opt-custompercmax': 'UploadCustomPercMax',
+            'opt-multiplier': 'UploadMultiplier',
+            'opt-maxqty': 'UploadMaxQty',
+            'opt-customminprice': 'UploadCustomMinPrice',
+            'opt-customrate': 'UploadCustomRate',
+        },
+        // arbit — cookie name varies by route (ArbitVendorsList /
+        // GlobalVendorsList / ReverseVendorsList) and is read from the
+        // container's data-cookie attribute.
+        dynamicLists: ['settings-arbit-vendors'],
+        editions: {
+            // sleep
+            'sleep-editions-picker': 'SleepersEditionList',
+            // news
+            'news-editions-picker': 'NewspaperList',
         },
     };
 
@@ -165,7 +184,11 @@
         const sel = document.querySelector('#settings-modal select[data-cookie="' + cookieName + '"]');
         if (!sel) return;
         addBinding({
-            load: function () { sel.value = getCookie(cookieName); },
+            // Keep the markup's default selection when the cookie is not set
+            load: function () {
+                const val = getCookie(cookieName);
+                if (val) sel.value = val;
+            },
             save: function () { setCookie(cookieName, sel.value, 1000); },
             serialize: function () { return cookieName + '=' + sel.value; },
         });
@@ -224,19 +247,17 @@
 
     // ─── Walk the config and wire everything present in the DOM ──
     function autoWire() {
-        Object.values(PAGE_BINDINGS).forEach(function (page) {
-            Object.entries(page.lists || {}).forEach(function (e) { bindList(e[0], e[1]); });
-            (page.cookieLists || []).forEach(bindListByCookie);
-            Object.entries(page.pills || {}).forEach(function (e) { bindPills(e[0], e[1]); });
-            (page.selects || []).forEach(bindSelect);
-            Object.entries(page.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
-            Object.entries(page.misc || {}).forEach(function (e) {
-                const defaults = (page.miscDefaults || {})[e[0]];
-                bindMiscBitmap(e[0], e[1], defaults);
-            });
-            (page.dynamicLists || []).forEach(bindDynamicList);
-            Object.entries(page.editions || {}).forEach(function (e) { bindEditions(e[0], e[1]); });
+        Object.entries(BINDINGS.lists || {}).forEach(function (e) { bindList(e[0], e[1]); });
+        (BINDINGS.cookieLists || []).forEach(bindListByCookie);
+        Object.entries(BINDINGS.pills || {}).forEach(function (e) { bindPills(e[0], e[1]); });
+        (BINDINGS.selects || []).forEach(bindSelect);
+        Object.entries(BINDINGS.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
+        Object.entries(BINDINGS.misc || {}).forEach(function (e) {
+            const defaults = (BINDINGS.miscDefaults || {})[e[0]];
+            bindMiscBitmap(e[0], e[1], defaults);
         });
+        (BINDINGS.dynamicLists || []).forEach(bindDynamicList);
+        Object.entries(BINDINGS.editions || {}).forEach(function (e) { bindEditions(e[0], e[1]); });
     }
 
     function loadAll() { bindings.forEach(function (b) { b.load(); }); }

@@ -286,6 +286,63 @@ func init() {
 	}
 }
 
+// arbitLess returns the comparator for the given sort mode, or nil for
+// unknown modes (caller leaves the slice unsorted, matching the prior
+// switch's absence of a default case).
+func arbitLess(mode string, globalMode, preferFlavor bool) func(a, b *mtgban.ArbitEntry) bool {
+	switch mode {
+	case "available":
+		return func(a, b *mtgban.ArbitEntry) bool {
+			return a.InventoryEntry.Quantity > b.InventoryEntry.Quantity
+		}
+	case "sell_price":
+		return func(a, b *mtgban.ArbitEntry) bool {
+			return a.InventoryEntry.Price > b.InventoryEntry.Price
+		}
+	case "buy_price":
+		if globalMode {
+			return func(a, b *mtgban.ArbitEntry) bool {
+				return a.ReferenceEntry.Price > b.ReferenceEntry.Price
+			}
+		}
+		return func(a, b *mtgban.ArbitEntry) bool {
+			return a.BuylistEntry.BuyPrice > b.BuylistEntry.BuyPrice
+		}
+	case "profitability":
+		return func(a, b *mtgban.ArbitEntry) bool {
+			// Profitability is NaN when spread < 0; fall back to raw
+			// spread ordering so the NaN doesn't poison the comparator.
+			if a.Spread < 0 || b.Spread < 0 {
+				return a.Spread > b.Spread
+			}
+			return a.Profitability > b.Profitability
+		}
+	case "diff":
+		return func(a, b *mtgban.ArbitEntry) bool {
+			return a.Difference > b.Difference
+		}
+	case "spread":
+		return func(a, b *mtgban.ArbitEntry) bool {
+			return a.Spread > b.Spread
+		}
+	case "edition":
+		return func(a, b *mtgban.ArbitEntry) bool {
+			if a.CardId == b.CardId {
+				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
+			}
+			return sortSets(a.CardId, b.CardId)
+		}
+	case "alpha":
+		return func(a, b *mtgban.ArbitEntry) bool {
+			if a.CardId == b.CardId {
+				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
+			}
+			return sortSetsAlphabetical(a.CardId, b.CardId, preferFlavor)
+		}
+	}
+	return nil
+}
+
 type Arbitrage struct {
 	Name  string
 	Key   string
@@ -337,12 +394,9 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 	allowlistSellersOpt := GetParamFromSig(sig, "ArbitEnabled")
 
 	if allowlistSellersOpt == "ALL" || (DevMode && !SigCheck) {
-		for _, seller := range GetSellers() {
-			if seller.Info().MetadataOnly {
-				continue
-			}
-			allowlistSellers = append(allowlistSellers, seller.Info().Shorthand)
-		}
+		allowlistSellers = filterSellers(func(info mtgban.ScraperInfo) bool {
+			return !info.MetadataOnly
+		})
 		// Enable any option with BetaFlag
 		anyOptionEnabled = true
 	} else if allowlistSellersOpt == "" {
@@ -359,22 +413,16 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 		blocklistVendors = strings.Split(blocklistVendorsOpt, ",")
 	}
 
-	// Populate vendor keys for the settings modal (shown on every page load)
+	// Populate vendor keys for the settings modal (shown on every page load).
+	// In reverse mode the "vendor" column is actually a seller; same blocklist.
+	notBlocked := func(info mtgban.ScraperInfo) bool {
+		return !slices.Contains(blocklistVendors, info.Shorthand)
+	}
 	var vendorKeys []string
 	if reverse {
-		for _, seller := range GetSellers() {
-			if slices.Contains(blocklistVendors, seller.Info().Shorthand) {
-				continue
-			}
-			vendorKeys = append(vendorKeys, seller.Info().Shorthand)
-		}
+		vendorKeys = filterSellers(notBlocked)
 	} else {
-		for _, vendor := range GetVendors() {
-			if slices.Contains(blocklistVendors, vendor.Info().Shorthand) {
-				continue
-			}
-			vendorKeys = append(vendorKeys, vendor.Info().Shorthand)
-		}
+		vendorKeys = filterVendors(notBlocked)
 	}
 	pageVars.VendorKeys = sortKeysByScraperName(vendorKeys)
 
@@ -396,7 +444,10 @@ func arbit(w http.ResponseWriter, r *http.Request, reverse bool) {
 
 	start := time.Now()
 
-	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, true, anyOptionEnabled)
+	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+		AllResults:       true,
+		AnyOptionEnabled: anyOptionEnabled,
+	})
 
 	user := GetParamFromSig(sig, "UserEmail")
 	msg := fmt.Sprintf("Request by %s took %v", user, time.Since(start))
@@ -478,7 +529,10 @@ func Global(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now()
 
-	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, anyEnabled, false, anySpread)
+	scraperCompare(w, r, pageVars, allowlistSellers, blocklistVendors, scraperCompareOpts{
+		AllResults: anyEnabled,
+		AnySpread:  anySpread,
+	})
 
 	user := GetParamFromSig(sig, "UserEmail")
 	msg := fmt.Sprintf("Request by %s took %v", user, time.Since(start))
@@ -486,7 +540,17 @@ func Global(w http.ResponseWriter, r *http.Request) {
 	LogPages["Global"].Println(msg)
 }
 
-func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, flags ...bool) {
+// scraperCompareOpts gates the behavior of scraperCompare for its three
+// callers (Arbit, Reverse, Global). Replaces the previous positional
+// `flags ...bool` whose meaning was decoded from flags[0]/[1]/[2] inside
+// the function and required reading the body to understand each call.
+type scraperCompareOpts struct {
+	AllResults       bool // false caps the result list (MaxArbitResults, or MaxResultsGlobalLimit in global mode)
+	AnyOptionEnabled bool // show options gated by FilterOpt.BetaFlag
+	AnySpread        bool // use the higher spread/profitability thresholds (global mode only)
+}
+
+func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
 	r.ParseForm()
 
 	var source mtgban.Scraper
@@ -494,9 +558,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	var sorting string
 	arbitFilters := map[string]bool{}
 
-	limitedResults := len(flags) > 0 && !flags[0]
-	anyOptionEnabled := len(flags) > 1 && flags[1]
-	anySpread := len(flags) > 2 && flags[2]
+	limitedResults := !cmp.AllResults
+	anyOptionEnabled := cmp.AnyOptionEnabled
+	anySpread := cmp.AnySpread
 
 	pageVars.CanShowAll = anyOptionEnabled
 
@@ -807,55 +871,8 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if sorting == "" {
 			sorting = DefaultSortingOption
 		}
-		switch sorting {
-		case "available":
-			sort.Slice(arbit, func(i, j int) bool {
-				return arbit[i].InventoryEntry.Quantity > arbit[j].InventoryEntry.Quantity
-			})
-		case "sell_price":
-			sort.Slice(arbit, func(i, j int) bool {
-				return arbit[i].InventoryEntry.Price > arbit[j].InventoryEntry.Price
-			})
-		case "buy_price":
-			if pageVars.GlobalMode {
-				sort.Slice(arbit, func(i, j int) bool {
-					return arbit[i].ReferenceEntry.Price > arbit[j].ReferenceEntry.Price
-				})
-			} else {
-				sort.Slice(arbit, func(i, j int) bool {
-					return arbit[i].BuylistEntry.BuyPrice > arbit[j].BuylistEntry.BuyPrice
-				})
-			}
-		case "profitability":
-			sort.Slice(arbit, func(i, j int) bool {
-				// Profitability is NaN when spread is less than 0
-				if arbit[i].Spread < 0 || arbit[j].Spread < 0 {
-					return arbit[i].Spread > arbit[j].Spread
-				}
-				return arbit[i].Profitability > arbit[j].Profitability
-			})
-		case "diff":
-			sort.Slice(arbit, func(i, j int) bool {
-				return arbit[i].Difference > arbit[j].Difference
-			})
-		case "spread":
-			sort.Slice(arbit, func(i, j int) bool {
-				return arbit[i].Spread > arbit[j].Spread
-			})
-		case "edition":
-			sort.Slice(arbit, func(i, j int) bool {
-				if arbit[i].CardId == arbit[j].CardId {
-					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
-				}
-				return sortSets(arbit[i].CardId, arbit[j].CardId)
-			})
-		case "alpha":
-			sort.Slice(arbit, func(i, j int) bool {
-				if arbit[i].CardId == arbit[j].CardId {
-					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
-				}
-				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId, preferFlavor)
-			})
+		if less := arbitLess(sorting, pageVars.GlobalMode, preferFlavor); less != nil {
+			sort.Slice(arbit, func(i, j int) bool { return less(&arbit[i], &arbit[j]) })
 		}
 		pageVars.SortOption = sorting
 

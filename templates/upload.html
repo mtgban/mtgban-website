@@ -4,15 +4,82 @@
 {{end}}
 
 {{define "content"}}
+    <!-- Shared by input and results pages: inject optimizer settings (cookies) as hidden upload_form inputs -->
+    <script type="text/javascript">
+    function syncUploadOptionsFromSettings() {
+        var form = document.getElementById('upload_form');
+        if (!form) return;
+        // Remove any previously-injected hidden inputs
+        form.querySelectorAll('[data-injected-opt]').forEach(function (el) { el.remove(); });
+        function add(name, val) {
+            var inp = document.createElement('input');
+            inp.type = 'hidden';
+            inp.name = name;
+            inp.value = val == null ? '' : val;
+            inp.dataset.injectedOpt = '1';
+            form.appendChild(inp);
+        }
+        var optsRaw = getCookie('UploadOptimizerOpts');
+        var opts = (optsRaw === null || optsRaw === '')
+            ? ['lowval', 'lowvalabs', 'minmargin', 'customperc']
+            : optsRaw.split(',').filter(Boolean);
+        ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
+            if (opts.indexOf(k) >= 0) add(k, 'true');
+        });
+        add('percspread',     getCookie('UploadPercSpread')    || '60');
+        add('percspreadmax',  getCookie('UploadPercSpreadMax') || '0');
+        add('minval',         getCookie('UploadMinVal')        || '1');
+        add('maxval',         getCookie('UploadMaxVal')        || '0');
+        add('margin',         getCookie('UploadMargin')        || '10');
+        add('custompercmax',  getCookie('UploadCustomPercMax') || '100');
+        add('multiplier',     getCookie('UploadMultiplier')    || '1');
+        add('maxqty',         getCookie('UploadMaxQty')        || '0');
+        add('sorting',        getCookie('UploadSorting')       || '');
+        add('altPrice',       getCookie('UploadAltPrice')      || '');
+        add('pricesource',    getCookie('UploadPriceSource')   || '');
+        var customOpts = (getCookie('UploadCustomOpts') || '').split(',').filter(Boolean);
+        if (customOpts.indexOf('enabled') >= 0) {
+            add('custombuylist',      'true');
+            add('customseller',       getCookie('UploadCustomBuyer')       || 'TCGLow');
+            add('customsealedseller', getCookie('UploadCustomSealedBuyer') || 'TCGSealed');
+            add('customminprice',     getCookie('UploadCustomMinPrice')    || '7');
+            add('customrate',         getCookie('UploadCustomRate')        || '0.8');
+        }
+    }
+    </script>
     {{if or .UploadEntries .Optimized}}
         <div class="page-standard">
             <a class="back-link" href="/upload">&larr; Back to Uploader</a>
             <div class="page-header">
-                <h1>Results{{if and .SearchQuery (not (eq .SearchQuery "hashes"))}} from {{.SearchQuery}}{{end}}</h1>
+                <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{.UploadQuery}}{{end}}</h1>
                 <p class="page-subtitle">
-                    {{if .UploadEntries}}{{len .UploadEntries}} cards matched &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
+                    {{if .UploadEntries}}{{len .UploadEntries}} rows &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
+                    {{if .RemoteLinkURL}}
+                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="copyShareLink(this)" title="Copy shareable link">
+                            <i data-lucide="share-2" style="width:14px;height:14px;vertical-align:-2px"></i> Share
+                        </a>
+                        <input type="hidden" id="remoteLinkURL" value="{{.RemoteLinkURL}}">
+                    {{end}}
                 </p>
             </div>
+
+            {{if .RemoteLinkURL}}
+            <script>
+            function copyShareLink(el) {
+                var remoteURL = document.getElementById('remoteLinkURL').value;
+                var shareURL = window.location.origin + '/upload?gdocURL=' + encodeURIComponent(remoteURL);
+                navigator.clipboard.writeText(shareURL).then(function() {
+                    var orig = el.innerHTML;
+                    el.innerHTML = '<i data-lucide="check" style="width:14px;height:14px;vertical-align:-2px"></i> Copied!';
+                    lucide.createIcons();
+                    setTimeout(function() {
+                        el.innerHTML = orig;
+                        lucide.createIcons();
+                    }, 1500);
+                });
+            }
+            </script>
+            {{end}}
 
             {{template "upload-results" .}}
         </div>
@@ -34,6 +101,10 @@
                         <h2>Select Mode &amp; Stores</h2>
                     </div>
 
+                    <div class="upload-tabs" id="uploadTabs">
+                        <button type="button" class="upload-tab active" id="tab-singles" onclick="selectTab('singles')">Singles</button>
+                        <button type="button" class="upload-tab" id="tab-sealed" onclick="selectTab('sealed')">Sealed</button>
+                    </div>
                     <div class="upload-mode-stores-row">
                         <div class="upload-mode-col">
                             <div class="upload-mode-toggle">
@@ -52,7 +123,9 @@
                                 <span class="upload-mode-hint">Buylist access requires Legacy tier</span>
                             {{end}}
                         </div>
-                        <div class="upload-store-grid" id="storesBox">
+                        <div class="upload-store-area">
+                            <div class="upload-store-grid" id="singlesBox"></div>
+                            <div class="upload-store-grid upload-store-hidden" id="sealedBox"></div>
                         </div>
                     </div>
                     {{if not .CanChangeStores}}
@@ -138,38 +211,6 @@
                         const hiddenBools = [
                             "upload", "download", "estimate", "deckbox", "tcgplayer_csv"
                         ];
-                        function syncUploadOptionsFromSettings() {
-                            var form = document.getElementById('upload_form');
-                            if (!form) return;
-                            // Remove any previously-injected hidden inputs
-                            form.querySelectorAll('[data-injected-opt]').forEach(function (el) { el.remove(); });
-                            function add(name, val) {
-                                var inp = document.createElement('input');
-                                inp.type = 'hidden';
-                                inp.name = name;
-                                inp.value = val == null ? '' : val;
-                                inp.dataset.injectedOpt = '1';
-                                form.appendChild(inp);
-                            }
-                            var optsRaw = getCookie('UploadOptimizerOpts');
-                            var opts = (optsRaw === null || optsRaw === '')
-                                ? ['lowval', 'lowvalabs', 'minmargin', 'customperc']
-                                : optsRaw.split(',').filter(Boolean);
-                            ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
-                                if (opts.indexOf(k) >= 0) add(k, 'true');
-                            });
-                            add('percspread',     getCookie('UploadPercSpread')    || '60');
-                            add('percspreadmax',  getCookie('UploadPercSpreadMax') || '0');
-                            add('minval',         getCookie('UploadMinVal')        || '1');
-                            add('maxval',         getCookie('UploadMaxVal')        || '0');
-                            add('margin',         getCookie('UploadMargin')        || '10');
-                            add('custompercmax',  getCookie('UploadCustomPercMax') || '100');
-                            add('multiplier',     getCookie('UploadMultiplier')    || '1');
-                            add('maxqty',         getCookie('UploadMaxQty')        || '0');
-                            add('sorting',        getCookie('UploadSorting')       || '');
-                            add('altPrice',       getCookie('UploadAltPrice')      || '');
-                            add('pricesource',    getCookie('UploadPriceSource')   || '');
-                        }
                         function submitForm(field, newWindow) {
                             hiddenBools.forEach(element => {
                                 let formField = document.getElementById(element);
@@ -309,43 +350,69 @@
 
             window.reloadSelect = function(mode) {
                 localStorage.setItem("uploadMode", mode);
-                var selectBox = document.getElementById('storesBox');
-                if (selectBox) {
-                    const fields = [
-                        'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
-                    ];
+                const fields = [
+                    'submit_download', 'submit_estimate', 'submit_deckbox', 'submit_tcgplayer_csv'
+                ];
+                var singlesBox = document.getElementById('singlesBox');
+                if (singlesBox) {
                     if (mode == "buylist") {
-                        selectBox.innerHTML = " \
+                        singlesBox.innerHTML = " \
                             {{range .VendorKeys}} \
                                 <label class='upload-store-item'> \
                                     <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
                                 </label> \
                             {{end}} \
                         ";
-
-                        fields.forEach(element => {
-                            var btn = document.getElementById(element);
-                            if (btn) {
-                                btn.style.display = "inline"
-                            }
-                        })
-                    } else if (mode == "retail") {
-                        selectBox.innerHTML = " \
+                    } else {
+                        singlesBox.innerHTML = " \
                             {{range .SellerKeys}} \
                                 <label class='upload-store-item'> \
                                     <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
                                 </label> \
                             {{end}} \
                         ";
-
-                        fields.forEach(element => {
-                            var btn = document.getElementById(element);
-                            if (btn) {
-                                btn.style.display = "inline"
-                            }
-                        })
+                    }
+                    fields.forEach(element => {
+                        var btn = document.getElementById(element);
+                        if (btn) { btn.style.display = "inline"; }
+                    });
+                }
+                var sealedBox = document.getElementById('sealedBox');
+                if (sealedBox) {
+                    if (mode == "buylist") {
+                        sealedBox.innerHTML = " \
+                            {{range .SealedVendorKeys}} \
+                                <label class='upload-store-item'> \
+                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
+                                </label> \
+                            {{end}} \
+                        ";
+                    } else {
+                        sealedBox.innerHTML = " \
+                            {{range .SealedSellerKeys}} \
+                                <label class='upload-store-item'> \
+                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
+                                </label> \
+                            {{end}} \
+                        ";
+                    }
+                    if (!sealedBox.querySelector('input')) {
+                        sealedBox.innerHTML = "<span class='upload-mode-hint'>No sealed stores available for this mode.</span>";
                     }
                 }
+            };
+
+            window.selectTab = function(tab) {
+                var isSealed = (tab === 'sealed');
+                document.getElementById('tab-singles').classList.toggle('active', !isSealed);
+                document.getElementById('tab-sealed').classList.toggle('active', isSealed);
+                var singlesBox = document.getElementById('singlesBox');
+                var sealedBox = document.getElementById('sealedBox');
+                var sealedNote = document.getElementById('sealedNote');
+                if (singlesBox) singlesBox.classList.toggle('upload-store-hidden', isSealed);
+                if (sealedBox) sealedBox.classList.toggle('upload-store-hidden', !isSealed);
+                if (sealedNote) sealedNote.classList.toggle('upload-store-hidden', !isSealed);
+                try { localStorage.setItem('uploadTab', tab); } catch(e) {}
             };
 
             (function() {
@@ -390,6 +457,7 @@
                     document.getElementById('gdocURL').value = "";
                     var textArea = document.getElementById('textArea');
                     if (textArea) { textArea.value = ""; }
+                    try { localStorage.removeItem('uploadTextArea'); } catch(e) {}
                     const form = document.getElementById("upload_form");
                     form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
                     selectSource('file');
@@ -425,36 +493,59 @@
                 }
                 reloadSelect(savedMode);
 
+                var savedTab = localStorage.getItem("uploadTab");
+                selectTab(savedTab === "sealed" ? "sealed" : "singles");
 
                 var gdocInput = document.getElementById('gdocURL');
                 if (gdocInput) {
+                    // Fires on any change (paste OR typing). Clearing
+                    // already-empty fields is a no-op, so it's safe to
+                    // run on every keystroke after the first.
                     gdocInput.addEventListener('input', function() {
-                        var url = this.value.trim();
-                        if (url && (url.includes("docs.google.com") || url.includes("store.tcgplayer.com") || url.includes("moxfield.com"))) {
-                            var fileInput = document.getElementById('file');
-                            if (fileInput) fileInput.value = "";
-                            document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
-                            var ta = document.getElementById('textArea');
-                            if (ta) ta.value = "";
-                            const form = document.getElementById("upload_form");
-                            form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
-                            enabledButtons();
-                        }
+                        if (!this.value.trim()) return;
+                        var fileInput = document.getElementById('file');
+                        if (fileInput) fileInput.value = "";
+                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                        document.getElementById('clearFileBtn').style.display = 'none';
+                        var ta = document.getElementById('textArea');
+                        if (ta) ta.value = "";
+                        try { localStorage.removeItem('uploadTextArea'); } catch(e) {}
+                        const form = document.getElementById("upload_form");
+                        form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
+                        selectSource('url');
+                        enabledButtons();
                     });
                 }
 
                 var textAreaEl = document.getElementById('textArea');
                 if (textAreaEl) {
                     textAreaEl.addEventListener('input', function() {
-                        if (this.value.trim()) {
+                        if (!this.value.trim()) {
                             enabledButtons();
+                            return;
                         }
+                        // Symmetric with the URL/file handlers: any
+                        // content here means text is the active source,
+                        // so clear URL + file. localStorage stays
+                        // populated via the inline oninput attribute on
+                        // the textarea — the user's typed text is the
+                        // payload we want to remember.
+                        var urlInput = document.getElementById('gdocURL');
+                        if (urlInput) urlInput.value = "";
+                        var fileInput = document.getElementById('file');
+                        if (fileInput) fileInput.value = "";
+                        document.getElementById('fileLabel').innerHTML = 'Drop file here or <span class="upload-browse-link">browse</span><span class="upload-file-hint">CSV, XLS, XLSX &mdash; max 5MB</span>';
+                        document.getElementById('clearFileBtn').style.display = 'none';
+                        const form = document.getElementById("upload_form");
+                        form.querySelectorAll('input[name="hashes"]').forEach(el => el.remove());
+                        selectSource('text');
+                        enabledButtons();
                     });
                 }
             };
         </script>
 
-        {{if ne .SearchQuery ""}}
+        {{if ne .UploadQuery ""}}
             <script>
                 function getCardHashes() {
                     return Array.from(document.querySelectorAll('.searchResults tr[data-hash]')).map(row => row.dataset.hash);
@@ -543,6 +634,172 @@
     {{end}}
 {{end}}
 
+{{define "ures-results-table"}}
+{{$root := .Root}}
+{{$storeKeys := .StoreKeys}}
+{{$indexKeys := .IndexKeys}}
+<table class="ures-table">
+    <thead>
+        <tr>
+            <th style="width:380px;">Card</th>
+            <th class="r">Your Price</th>
+            <th class="c">Cond</th>
+            <th class="c">Qty</th>
+            {{range $storeKeys}}
+                <th class="r">{{scraper_name .}}</th>
+            {{end}}
+            <th>Index</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Entries}}
+            {{$cardId := .CardId}}
+            {{$card := (index $root.Metadata .CardId)}}
+            {{$scraperEntries := (index $root.ResultPrices (print .CardId .OriginalCondition))}}
+            <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
+                {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
+                <td>
+                    <div class="ures-card-cell">
+                        <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}" data-etched="{{$card.Etched}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
+                            <img src="{{$card.ImageURL}}" loading="lazy">
+                        </div>
+                        <div class="ures-card-info">
+                            <span class="ures-card-name">
+                                <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
+                            </span>
+                            <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
+                            {{if .MismatchAlias}}
+                            <button type="button" class="ures-pick-btn"
+                                data-hash="{{.CardId}}"
+                                data-aliases="{{range $i, $a := .PossibleAliases}}{{if $i}},{{end}}{{$a}}{{end}}"
+                                onclick="openPrintingPicker(this)">Select printing</button>
+                            {{end}}
+                        </div>
+                        <button type="button" class="ures-remove-btn" onclick="toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>
+                    </div>
+                </td>
+                <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
+                <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
+                <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
+                {{range $storeKeys}}
+                    {{$price := (index $scraperEntries .)}}
+                    <td class="ures-price {{if and (ne $price 0.0) (is_best_price $scraperEntries . $storeKeys $root.IsBuylist)}}best{{end}}">
+                        {{if ne $price 0.0}}
+                            <a href="https://mtgban.com/go/{{if $root.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
+                        {{else}}
+                            &mdash;
+                        {{end}}
+                    </td>
+                {{end}}
+                <td>
+                    <div class="ures-index">
+                        {{range $indexKeys}}
+                            {{$indexName := .}}
+                            {{$idxPrice := (index $scraperEntries $indexName)}}
+                            {{if $idxPrice}}
+                            <span><span class="idx-label">{{scraper_name $indexName}}</span><span class="idx-val">$ {{printf "%.2f" $idxPrice}}</span></span>
+                            {{end}}
+                        {{end}}
+                    </div>
+                </td>
+            </tr>
+        {{end}}
+        <tr class="ures-totals-row">
+            <td><span class="ures-totals-label">Totals ({{.Quantity}} {{.Noun}})</span></td>
+            <td></td>
+            <td></td>
+            <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.Quantity}}</td>
+            {{range $storeKeys}}
+                <td class="ures-price" style="font-weight:700">
+                    $ {{printf "%.2f" (index $root.TotalEntries .)}}
+                    {{$missing := (index $root.MissingCounts .)}}
+                    {{if ne $missing 0}}
+                        <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $root.MissingPrices .)}}</div>
+                    {{end}}
+                </td>
+            {{end}}
+            <td>
+                <div class="ures-index" style="font-weight:600">
+                    {{range $indexKeys}}
+                        {{$total := (index $root.TotalEntries .)}}
+                        {{if $total}}
+                        <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">$ {{printf "%.2f" $total}}</span></span>
+                        {{end}}
+                    {{end}}
+                </div>
+            </td>
+        </tr>
+    </tbody>
+</table>
+{{end}}
+
+{{define "ures-cat-strip"}}
+{{$root := .Root}}
+<div class="res-summary">
+    <div class="res-summary-stat">
+        <span class="label">{{.CountLabel}}</span>
+        <span class="val">{{.Quantity}}</span>
+    </div>
+    {{range .StoreKeys}}
+        <div class="res-summary-stat">
+            <span class="label">{{scraper_name .}}</span>
+            <span class="val">$ {{printf "%.2f" (index $root.TotalEntries .)}}</span>
+            {{$missing := (index $root.MissingCounts .)}}
+            {{if ne $missing 0}}
+                <span class="label">{{$missing}} missing</span>
+            {{end}}
+        </div>
+    {{end}}
+    {{range .IndexKeys}}
+        {{$total := (index $root.TotalEntries .)}}
+        {{if $total}}
+        <div class="res-summary-stat">
+            <span class="label">{{scraper_name .}}</span>
+            <span class="val blue">$ {{printf "%.2f" $total}}</span>
+        </div>
+        {{end}}
+    {{end}}
+    {{if $root.Optimized}}
+    <div class="res-summary-stat">
+        <span class="label">Optimizer Max</span>
+        <span class="val green">$ {{printf "%.2f" .Highest}}</span>
+    </div>
+    {{end}}
+</div>
+{{end}}
+
+{{define "ures-notfound-table"}}
+<table class="ures-table">
+    <thead>
+        <tr>
+            <th style="width:380px;">Card</th>
+            <th class="r">Your Price</th>
+            <th class="c">Cond</th>
+            <th class="c">Qty</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Entries}}
+        <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}">
+            <td>
+                <div class="ures-card-cell">
+                    <img src="https://cards.scryfall.io/back.png" loading="lazy">
+                    <div class="ures-card-info">
+                        <span class="ures-card-name"><a href="/search?q={{.Card.Name}}" target="_blank">{{.Card.Name}}</a></span>
+                        <span class="ures-card-set ures-not-found">Not found</span>
+                    </div>
+                </div>
+            </td>
+            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
+            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
+            <td style="text-align:center">{{.Quantity}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}
+
 {{define "upload-results"}}
     <div class="res-header">
         <!-- Row 1: View tabs + Export buttons -->
@@ -554,167 +811,109 @@
             {{if .CanBuylist}}
             <div class="res-btn-sep"></div>
             <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('download', false)">Get CSV</button>
-            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('estimate', true)">CardConduit</button>
-            <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('deckbox', false)">Deckbox</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="submitExport('estimate', true)">CardConduit</button>
+            <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="submitExport('deckbox', false)">Deckbox</button>
             <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('tcgplayer_csv', false)">TCGplayer CSV</button>
             {{end}}
         </div>
 
-        <!-- Row 2: Summary stats -->
-        <div class="res-summary">
-            <div class="res-summary-stat">
-                <span class="label">Cards</span>
-                <span class="val">{{.TotalQuantity}}</span>
-            </div>
-            {{range .ScraperKeys}}
-                <div class="res-summary-stat">
-                    <span class="label">{{scraper_name .}}</span>
-                    <span class="val">$ {{printf "%.2f" (index $.TotalEntries .)}}</span>
-                    {{$missing := (index $.MissingCounts .)}}
-                    {{if ne $missing 0}}
-                        <span class="label">{{$missing}} missing</span>
-                    {{end}}
-                </div>
-            {{end}}
-            {{range .IndexKeys}}
-                {{$total := (index $.TotalEntries .)}}
-                {{if $total}}
-                <div class="res-summary-stat">
-                    <span class="label">{{scraper_name .}}</span>
-                    <span class="val blue">$ {{printf "%.2f" $total}}</span>
-                </div>
-                {{end}}
-            {{end}}
-            {{if .Optimized}}
-            <div class="res-summary-stat">
-                <span class="label">Optimizer Max</span>
-                <span class="val green">$ {{printf "%.2f" .HighestTotal}}</span>
-            </div>
-            {{end}}
-        </div>
     </div>
 
     <!-- Tab: Results -->
-    <div class="res-panel active" id="panel-results">
-        <div class="ures-wrap">
-            <table class="ures-table">
-                <thead>
-                    <tr>
-                        <th style="width:380px;">Card</th>
-                        <th class="r">Your Price</th>
-                        <th class="c">Cond</th>
-                        <th class="c">Qty</th>
-                        {{range .ScraperKeys}}
-                            <th class="r">{{scraper_name .}}</th>
-                        {{end}}
-                        <th>Index</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {{range .UploadEntries}}
-                        {{$cardId := .CardId}}
-                        {{if .MismatchError}}
-                        <tr class="ures-error-row" data-hash="" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}">
-                            <td>
-                                <div class="ures-card-cell">
-                                    <img src="https://cards.scryfall.io/back.png" loading="lazy">
-                                    <div class="ures-card-info">
-                                        <span class="ures-card-name"><a href="/search?q={{.Card.Name}}" target="_blank">{{.Card.Name}}</a></span>
-                                        <span class="ures-card-set ures-not-found">Not found</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
-                            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
-                            <td style="text-align:center">{{.Quantity}}</td>
-                            {{range $.ScraperKeys}}<td class="ures-price no-data">&mdash;</td>{{end}}
-                            <td></td>
-                        </tr>
-                        {{else}}
-                        {{$card := (index $.Metadata .CardId)}}
-                        {{$scraperEntries := (index $.ResultPrices (print .CardId .OriginalCondition))}}
-                        {{$entryStoreKeys := $.ScraperKeys}}
-                        {{if $card.Sealed}}{{$entryStoreKeys = $.SealedScraperKeys}}{{end}}
-                        {{$entryIndexKeys := $.IndexKeys}}
-                        {{if $card.Sealed}}{{$entryIndexKeys = $.SealedIndexKeys}}{{end}}
-                        <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
-                            {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
-                            <td>
-                                <div class="ures-card-cell">
-                                    <div class="foil-wrap{{if $card.HasContentWarning}} content-warning{{end}}" data-foil="{{$card.Foil}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
-                                        <img src="{{$card.ImageURL}}" loading="lazy">
-                                    </div>
-                                    <div class="ures-card-info">
-                                        <span class="ures-card-name">
-                                            <a href="{{$card.SearchURL}}">{{$card.Name}}</a>
-                                            {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
-                                        </span>
-                                        <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
-                                        {{if .MismatchAlias}}
-                                        <button type="button" class="ures-pick-btn"
-                                            data-hash="{{.CardId}}"
-                                            data-aliases="{{range $i, $a := .PossibleAliases}}{{if $i}},{{end}}{{$a}}{{end}}"
-                                            onclick="openPrintingPicker(this)">Select printing</button>
-                                        {{end}}
-                                    </div>
-                                    <button type="button" class="ures-remove-btn" onclick="toggleRemoveRow(this)" title="Remove from results" aria-label="Remove from results">×</button>
-                                </div>
-                            </td>
-                            <td class="ures-price">$ {{printf "%.2f" .OriginalPrice}}</td>
-                            <td style="text-align:center"><span class="cond-badge">{{.OriginalCondition}}</span></td>
-                            <td style="text-align:center;font-family:var(--font-mono);font-size:var(--text-base)">{{.Quantity}}</td>
-                            {{range $entryStoreKeys}}
-                                {{$price := (index $scraperEntries .)}}
-                                <td class="ures-price {{if and (ne $price 0.0) (is_best_price $scraperEntries . $entryStoreKeys $.IsBuylist)}}best{{end}}">
-                                    {{if ne $price 0.0}}
-                                        <a href="https://mtgban.com/go/{{if $.IsBuylist}}b/{{end}}{{.}}/{{$cardId}}" target="_blank">$ {{printf "%.2f" $price}}</a>
-                                    {{else}}
-                                        &mdash;
-                                    {{end}}
-                                </td>
-                            {{end}}
-                            <td>
-                                <div class="ures-index">
-                                    {{range $entryIndexKeys}}
-                                        {{$indexName := .}}
-                                        {{$idxPrice := (index $scraperEntries $indexName)}}
-                                        {{if $idxPrice}}
-                                        <span><span class="idx-label">{{scraper_name $indexName}}</span><span class="idx-val">$ {{printf "%.2f" $idxPrice}}</span></span>
-                                        {{end}}
-                                    {{end}}
-                                </div>
-                            </td>
-                        </tr>
-                        {{end}}{{/* closes {{else}} for MismatchError */}}
-                    {{end}}
-                    <tr class="ures-totals-row">
-                        <td><span class="ures-totals-label">Totals ({{.TotalQuantity}} cards)</span></td>
-                        <td></td>
-                        <td></td>
-                        <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.TotalQuantity}}</td>
-                        {{range .AllScraperKeys}}
-                            <td class="ures-price" style="font-weight:700">
-                                $ {{printf "%.2f" (index $.TotalEntries .)}}
-                                {{$missing := (index $.MissingCounts .)}}
-                                {{if ne $missing 0}}
-                                    <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $.MissingPrices .)}}</div>
-                                {{end}}
-                            </td>
-                        {{end}}
-                        <td>
-                            <div class="ures-index" style="font-weight:600">
-                                {{range .IndexKeys}}
-                                    {{$total := (index $.TotalEntries .)}}
-                                    {{if $total}}
-                                    <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">$ {{printf "%.2f" $total}}</span></span>
-                                    {{end}}
-                                {{end}}
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+    <div class="res-panel active" id="panel-results" data-result-view="{{.DefaultResultView}}">
+        {{if .ShowResultTabs}}
+            <div class="ures-subtabs">
+                {{if .ShowAllTab}}<button class="ures-subtab{{if eq .DefaultResultView "all"}} on{{end}}" onclick="showUresView('all', this)">All</button>{{end}}
+                {{if .SinglesEntries}}<button class="ures-subtab{{if eq .DefaultResultView "singles"}} on{{end}}" onclick="showUresView('singles', this)">Singles</button>{{end}}
+                {{if .SealedEntries}}<button class="ures-subtab{{if eq .DefaultResultView "sealed"}} on{{end}}" onclick="showUresView('sealed', this)">Sealed</button>{{end}}
+                {{if .NotFoundEntries}}<button class="ures-subtab{{if eq .DefaultResultView "notfound"}} on{{end}}" onclick="showUresView('notfound', this)">Not Found</button>{{end}}
+            </div>
+            <div class="ures-views" data-ures-view="{{.DefaultResultView}}">
+                {{if .ShowAllTab}}
+                <div class="ures-strip ures-strip-all">
+                    <div class="res-summary">
+                        <div class="res-summary-stat">
+                            <span class="label">Entries</span>
+                            <span class="val">{{.TotalQuantity}}</span>
+                        </div>
+                        <div class="res-summary-stat">
+                            <span class="label">Singles</span>
+                            <span class="val">$ {{printf "%.2f" .SinglesHighest}}</span>
+                        </div>
+                        <div class="res-summary-stat">
+                            <span class="label">Sealed</span>
+                            <span class="val">$ {{printf "%.2f" .SealedHighest}}</span>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+                {{if .SinglesEntries}}
+                <div class="ures-strip ures-strip-singles">
+                    {{template "ures-cat-strip" (dict "CountLabel" "Cards" "Quantity" .SinglesQuantity "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Highest" .SinglesHighest "Root" .)}}
+                </div>
+                {{end}}
+                {{if .SealedEntries}}
+                <div class="ures-strip ures-strip-sealed">
+                    {{template "ures-cat-strip" (dict "CountLabel" "Products" "Quantity" .SealedQuantity "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Highest" .SealedHighest "Root" .)}}
+                </div>
+                {{end}}
+                {{if .NotFoundEntries}}
+                <div class="ures-strip ures-strip-notfound">
+                    <div class="res-summary">
+                        <div class="res-summary-stat">
+                            <span class="label">Not Found</span>
+                            <span class="val">{{len .NotFoundEntries}}</span>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+
+                {{if .SinglesEntries}}
+                <div class="ures-block ures-block-singles">
+                    <h3 class="ures-block-title">Singles</h3>
+                    <div class="ures-wrap">
+                        {{template "ures-results-table" (dict "Entries" .SinglesEntries "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Quantity" .SinglesQuantity "Noun" "cards" "Root" .)}}
+                    </div>
+                </div>
+                {{end}}
+                {{if .SealedEntries}}
+                <div class="ures-block ures-block-sealed">
+                    <h3 class="ures-block-title">Sealed</h3>
+                    <div class="ures-wrap">
+                        {{template "ures-results-table" (dict "Entries" .SealedEntries "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Quantity" .SealedQuantity "Noun" "products" "Root" .)}}
+                    </div>
+                </div>
+                {{end}}
+                {{if .NotFoundEntries}}
+                <div class="ures-block ures-block-notfound">
+                    <h3 class="ures-block-title">Not Found</h3>
+                    <div class="ures-wrap">
+                        {{template "ures-notfound-table" (dict "Entries" .NotFoundEntries)}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        {{else if .SinglesEntries}}
+            {{template "ures-cat-strip" (dict "CountLabel" "Cards" "Quantity" .SinglesQuantity "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Highest" .SinglesHighest "Root" .)}}
+            <div class="ures-wrap">
+                {{template "ures-results-table" (dict "Entries" .SinglesEntries "StoreKeys" .ScraperKeys "IndexKeys" .IndexKeys "Quantity" .SinglesQuantity "Noun" "cards" "Root" .)}}
+            </div>
+        {{else if .SealedEntries}}
+            {{template "ures-cat-strip" (dict "CountLabel" "Products" "Quantity" .SealedQuantity "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Highest" .SealedHighest "Root" .)}}
+            <div class="ures-wrap">
+                {{template "ures-results-table" (dict "Entries" .SealedEntries "StoreKeys" .SealedScraperKeys "IndexKeys" .SealedIndexKeys "Quantity" .SealedQuantity "Noun" "products" "Root" .)}}
+            </div>
+        {{else}}
+            <div class="res-summary">
+                <div class="res-summary-stat">
+                    <span class="label">Not Found</span>
+                    <span class="val">{{len .NotFoundEntries}}</span>
+                </div>
+            </div>
+            <div class="ures-wrap">
+                {{template "ures-notfound-table" (dict "Entries" .NotFoundEntries)}}
+            </div>
+        {{end}}
     </div>
 
     <!-- Tab: Optimizer -->
@@ -869,18 +1068,19 @@
                         <span class="opt-count">{{len $entries}} cards</span>
                         <span class="opt-total">$ {{printf "%.2f" $total}}</span>
                     </div>
-                    <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';document.getElementById('hoverWrap').setAttribute('data-foil','false');">
+                    <table class="opt-table" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
                         <thead><tr>
                             <th>Card</th>
                             <th>Set</th>
                             <th class="c">Offer</th>
                             <th class="c">Loaded</th>
                             <th>Spread</th>
+                            <th class="c" data-sort-method="none"><input type="checkbox" checked title="Toggle all" onchange="toggleAllOptRows(this)"></th>
                         </tr></thead>
                         <tbody>
                         {{range $entries}}
                             {{$card := (index $.Metadata .CardId)}}
-                            <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                            <tr data-opt-id="{{.CardId}}" data-opt-qty="{{.Quantity}}" data-opt-cond="{{.Condition}}" data-opt-name="{{(index $.Metadata .CardId).Name}}" data-opt-ckid="{{uuid2ckid .CardId}}" onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                                 <td class="opt-name">
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
                                     <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>
@@ -911,6 +1111,7 @@
                                         {{if and $.CanFilterByPrice (gt .Profitability 4.0)}}&#10071;{{end}}
                                     {{end}}
                                 </td>
+                                <td class="c"><input type="checkbox" checked class="opt-row-check" onchange="toggleOptRow(this)"></td>
                             </tr>
                         {{end}}
                         </tbody>
@@ -928,6 +1129,18 @@
         document.getElementById('panel-' + panel).classList.add('active');
         document.querySelectorAll('.res-tab').forEach(function(t) { t.classList.remove('on'); });
         btn.classList.add('on');
+        // Remember the view so a reload/refresh can return to it
+        try { sessionStorage.setItem('uploadResView', panel); } catch (e) {}
+    }
+    function showUresView(view, btn) {
+        var views = document.querySelector('.ures-views');
+        if (views) { views.setAttribute('data-ures-view', view); }
+        var bar = btn.closest('.ures-subtabs');
+        if (bar) {
+            bar.querySelectorAll('.ures-subtab').forEach(function(b) { b.classList.remove('on'); });
+        }
+        btn.classList.add('on');
+        updateExportButtons(view);
     }
     // One-time localStorage → cookie migration for the upload optimizer
     document.addEventListener('DOMContentLoaded', function migrateUploadPrefs() {
@@ -960,13 +1173,26 @@
         var allKeys = Object.keys(textMap).concat(['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults']);
         allKeys.forEach(function (k) { localStorage.removeItem(k); });
     });
-    // Auto-activate optimizer tab when "skip results" was checked
+    // Jump to the optimizer only on a fresh submission (from the main page
+    // or elsewhere). On a reload — page refresh or the Reload button — keep
+    // the view the user was in instead of forcing the optimizer.
     document.addEventListener('DOMContentLoaded', function () {
-        var opts = (getCookie('UploadOptimizerOpts') || '').split(',').filter(Boolean);
-        var skipResults = opts.indexOf('noresults') >= 0;
-        var optBtn = document.querySelector('.res-tab:nth-child(2)');
-        if (skipResults && optBtn) {
-            showResTab('optimizer', optBtn);
+        var nav = performance.getEntriesByType('navigation')[0];
+        var navType = nav ? nav.type : 'navigate';
+        var isReload = navType !== 'navigate' || sessionStorage.getItem('uploadReload') === '1';
+        sessionStorage.removeItem('uploadReload');
+
+        var panel;
+        if (isReload) {
+            panel = sessionStorage.getItem('uploadResView') || 'results';
+        } else {
+            var opts = (getCookie('UploadOptimizerOpts') || '').split(',').filter(Boolean);
+            panel = opts.indexOf('noresults') >= 0 ? 'optimizer' : 'results';
+        }
+        // 'results' is already the active panel; only act for the optimizer
+        if (panel === 'optimizer') {
+            var optBtn = document.querySelector('.res-tab:nth-child(2)');
+            if (optBtn) showResTab('optimizer', optBtn);
         }
     });
     </script>
@@ -976,6 +1202,91 @@
     <script src="https://unpkg.com/tablesort@5.3.0/dist/sorts/tablesort.number.min.js"></script>
     <script>
         document.querySelectorAll('.opt-table').forEach(function(t) { new Tablesort(t); });
+
+        function toggleOptRow(checkbox) {
+            var row = checkbox.closest('tr');
+            if (!row) return;
+            if (checkbox.checked) {
+                row.classList.remove('opt-removed');
+            } else {
+                row.classList.add('opt-removed');
+            }
+        }
+
+        function toggleAllOptRows(masterCheckbox) {
+            var table = masterCheckbox.closest('table');
+            if (!table) return;
+            table.querySelectorAll('.opt-row-check').forEach(function(cb) {
+                cb.checked = masterCheckbox.checked;
+                toggleOptRow(cb);
+            });
+        }
+
+        // Collect active (non-removed) rows from the optimizer table
+        function getActiveOptRows(section) {
+            var rows = [];
+            section.querySelectorAll('tr[data-opt-id]:not(.opt-removed)').forEach(function(row) {
+                rows.push({
+                    id: row.dataset.optId,
+                    qty: row.dataset.optQty || '1',
+                    cond: row.dataset.optCond || '',
+                    name: row.dataset.optName || '',
+                    ckid: row.dataset.optCkid || ''
+                });
+            });
+            return rows;
+        }
+
+        // Rebuild form inputs/values from active rows before submission
+        function filterOptForm(form) {
+            var section = form.closest('.opt-store');
+            if (!section) return;
+            var active = getActiveOptRows(section);
+            var allRows = section.querySelectorAll('tr[data-opt-id]');
+            // If nothing was removed, skip
+            if (active.length === allRows.length) return;
+
+            // For forms with a "json" input (CK buylist), rebuild the JSON
+            var jsonInput = form.querySelector('input[name="json"]');
+            if (jsonInput) {
+                var contents = active.map(function(r) {
+                    return '{"id":' + r.ckid + ',"qty":' + r.qty + '}';
+                });
+                jsonInput.value = '{"contents":[' + contents.join(',') + ',{}]}';
+                return;
+            }
+
+            // For forms with a "c" input (CK deckbuilder, TCG massentry), rebuild
+            var cInput = form.querySelector('input[name="c"]');
+            if (cInput) {
+                var val = active.map(function(r) { return r.qty + ' ' + r.name + '||'; }).join('');
+                cInput.value = val;
+                return;
+            }
+
+            // For per-entry forms (hashes), disable removed inputs
+            var removed = {};
+            section.querySelectorAll('tr.opt-removed').forEach(function(row) {
+                if (row.dataset.optId) removed[row.dataset.optId] = true;
+            });
+            var inputs = form.querySelectorAll('input[type="hidden"]');
+            var skip = false;
+            for (var i = 0; i < inputs.length; i++) {
+                var inp = inputs[i];
+                if (inp.name && inp.name.match(/hashes$/)) {
+                    skip = removed[inp.value] || false;
+                }
+                if (skip) inp.disabled = true;
+            }
+        }
+
+        // Intercept clicks on optimizer action buttons
+        document.addEventListener('click', function(e) {
+            var btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            var form = btn.closest('form');
+            if (form) filterOptForm(form);
+        }, true);
     </script>
     {{end}}
 
@@ -999,12 +1310,27 @@
         <input type="hidden" id="res_estimate" name="estimate" value="">
         <input type="hidden" id="res_deckbox" name="deckbox" value="">
         <input type="hidden" id="res_tcgplayer_csv" name="tcgplayer_csv" value="">
+        <input type="hidden" id="res_csvscope" name="csvscope" value="">
     </form>
 
     <script>
     var resExportFields = ["res_download", "res_estimate", "res_deckbox", "res_tcgplayer_csv"];
 
-    function ensureHashesLoaded() {
+    // The exportable result rows for a category: 'singles', 'sealed', or 'all'
+    // (both actionable blocks, never the Not Found block).
+    function exportRows(category) {
+        var views = document.querySelector('.ures-views');
+        var sel = '.ures-table tr[data-hash]';
+        if (!views) {
+            // Single-section upload (no sub-tabs): the one rendered table.
+            return document.querySelectorAll('#panel-results ' + sel);
+        }
+        if (category === 'singles') return views.querySelectorAll('.ures-block-singles ' + sel);
+        if (category === 'sealed') return views.querySelectorAll('.ures-block-sealed ' + sel);
+        return views.querySelectorAll('.ures-block-singles ' + sel + ', .ures-block-sealed ' + sel);
+    }
+
+    function ensureHashesLoaded(category) {
         var form = document.getElementById("upload_form");
 
         // Always rebuild from current row state so removed/picked rows take effect.
@@ -1013,7 +1339,7 @@
         });
 
         form.removeAttribute("enctype");
-        document.querySelectorAll('.ures-table tr[data-hash]').forEach(function(row) {
+        exportRows(category || 'all').forEach(function(row) {
             if (!row.dataset.hash) return;
             if (row.classList.contains('ures-removed-row')) return;
             var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
@@ -1028,35 +1354,79 @@
         });
     }
 
-    function submitExport(field, newWindow) {
-        ensureHashesLoaded();
+    // Active result view: 'all' | 'singles' | 'sealed' | 'notfound'. Falls back
+    // to the panel's data-result-view for single-section (untabbed) uploads.
+    function currentExportView() {
+        var views = document.querySelector('.ures-views');
+        if (views) return views.getAttribute('data-ures-view');
+        var panel = document.getElementById('panel-results');
+        return panel ? panel.getAttribute('data-result-view') : 'singles';
+    }
 
+    function runExport(field, category, newWindow) {
+        ensureHashesLoaded(category);
         resExportFields.forEach(function(id) {
             document.getElementById(id).value = "";
         });
         document.getElementById("res_" + field).value = "true";
-
+        var scope = document.getElementById("res_csvscope");
+        if (scope) {
+            scope.value = (field === 'download' && (category === 'singles' || category === 'sealed')) ? category : "";
+        }
         var form = document.getElementById("upload_form");
         form.target = newWindow ? '_blank' : '';
         form.submit();
     }
 
+    function submitExport(field, newWindow) {
+        var view = currentExportView();
+        if (view === 'notfound') return; // Not Found is not exportable
+
+        // Get CSV on the All tab splits into two narrow files (singles + sealed)
+        // because the categories use disjoint store columns. Everything else
+        // exports the active view in one file (All = both combined).
+        if (field === 'download' && view === 'all') {
+            runExport(field, 'singles', newWindow);
+            setTimeout(function() { runExport(field, 'sealed', newWindow); }, 900);
+            return;
+        }
+        runExport(field, view, newWindow);
+    }
+
+    // Hide the singles-only exporters on the Sealed tab, and all of them on
+    // Not Found.
+    function updateExportButtons(view) {
+        document.querySelectorAll('.res-export-btn').forEach(function(btn) {
+            var singlesOnly = btn.hasAttribute('data-singles-only');
+            var show = true;
+            if (view === 'notfound') show = false;
+            else if (view === 'sealed' && singlesOnly) show = false;
+            btn.style.display = show ? '' : 'none';
+        });
+    }
+
     // Re-process results with current settings (called by settings save)
     window.reprocessUploadResults = function() {
-        ensureHashesLoaded();
+        ensureHashesLoaded('all');
         syncUploadOptionsFromSettings();
         resExportFields.forEach(function(id) {
             document.getElementById(id).value = "";
         });
+        // Flag this as a reload so the page keeps the current view
+        try { sessionStorage.setItem('uploadReload', '1'); } catch (e) {}
         document.getElementById("upload_form").submit();
     };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        updateExportButtons(currentExportView());
+    });
     </script>
 
     <!-- Reload button (hidden until a pick or remove is made) -->
     <div id="reload-bar" class="ures-reload-bar" style="display:none">
         <span class="reload-stat" id="reload-fixed-wrap" style="display:none"><span class="count-fixed" id="reload-fixed-count">0</span> updated</span>
         <span class="reload-stat" id="reload-removed-wrap" style="display:none"><span class="count-removed" id="reload-removed-count">0</span> removed</span>
-        <button class="opt-btn load" onclick="document.getElementById('upload_form').submit()">Reload</button>
+        <button class="opt-btn load" onclick="reprocessUploadResults()">Reload</button>
     </div>
 
     <script>
@@ -1295,6 +1665,63 @@
                 <input type="text" id="opt-maxqty" value="0" class="settings-inline-num">
             </label>
         </div>
+    </div>
+</section>
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Custom Buylist Rule</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body" id="settings-upload-custom" data-cookie="UploadCustomOpts">
+        {{if .CanUploadCustom}}
+        <p class="section-desc">Include a series of rules for your own buylist to populate the optimizer results.</p>
+        <div class="settings-toggles-grid">
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="enabled">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Enable the custom buylist</span>
+            </label>
+        </div>
+        <div class="settings-upload-fields">
+            <label class="settings-field-row">
+                <span>Reference seller (singles)</span>
+                <select id="opt-customseller" data-cookie="UploadCustomBuyer">
+                    <optgroup label="Index">
+                        {{range $.AltKeys}}{{$name := scraper_name .}}{{if $name}}
+                        <option value="{{.}}" {{if eq . "TCGLow"}}selected{{end}}>{{$name}}</option>
+                        {{end}}{{end}}
+                    </optgroup>
+                    <optgroup label="Retailers">
+                        {{range $.SellerKeys}}{{$name := scraper_name .}}{{if $name}}
+                        <option value="{{.}}">{{$name}}</option>
+                        {{end}}{{end}}
+                    </optgroup>
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Reference seller (sealed)</span>
+                <select id="opt-customsealedseller" data-cookie="UploadCustomSealedBuyer">
+                    {{range $.SealedSellerKeys}}{{$name := scraper_name .}}{{if $name}}
+                    <option value="{{.}}" {{if eq . "TCGSealed"}}selected{{end}}>{{$name}}</option>
+                    {{end}}{{end}}
+                </select>
+            </label>
+            <label class="settings-field-row">
+                <span>Minimum price ($)</span>
+                <input type="text" id="opt-customminprice" value="7" class="settings-inline-num">
+            </label>
+            <label class="settings-field-row">
+                <span>Buy rate</span>
+                <input type="text" id="opt-customrate" value="0.8" class="settings-inline-num">
+            </label>
+        </div>
+        {{else}}
+        <p class="section-desc">
+            <i style="font-size: var(--text-sm); color: var(--greytext);">
+                Increase your tier to define a custom buylist and populate the optimizer results with your own offers!
+            </i>
+        </p>
+        {{end}}
     </div>
 </section>
 {{end}}

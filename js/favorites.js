@@ -99,6 +99,12 @@
         // Walk to the row container by class. Both button and row carry data-card-id,
         // so a [data-card-id] selector would match the button itself first.
         var row = btn.closest('.m-card-header, .result-header');
+        if (!row) {
+            // A fav button can sit outside the header (e.g. the mobile actions
+            // menu is a sibling of the header) — fall back to the card container.
+            var card = btn.closest('.m-card');
+            if (card) row = card.querySelector('.m-card-header');
+        }
         if (!row) return null;
 
         var cardId = row.getAttribute('data-card-id') || btn.getAttribute('data-card-id');
@@ -192,18 +198,25 @@
             if (favs[i].id === cardId) { idx = i; break; }
         }
 
+        var active;
         if (idx >= 0) {
             favs.splice(idx, 1);
-            btn.classList.remove('active');
+            active = false;
         } else {
             var data = extractCardData(btn);
-            if (data) {
-                favs.unshift(data);
-                btn.classList.add('active');
-            }
+            if (!data) return;
+            favs.unshift(data);
+            active = true;
         }
 
         saveFavorites(favs);
+
+        // Keep every star for this card in sync — the inline header button and
+        // its copy inside the mobile actions menu point at the same card.
+        document.querySelectorAll('.fav-btn').forEach(function(b) {
+            var id = b.getAttribute('data-card-id') || b.getAttribute('data-card');
+            if (id === cardId) b.classList.toggle('active', active);
+        });
     };
 
     // Mark stars on page load for already-favorited cards
@@ -227,6 +240,7 @@
         renderFavoritesInto(document.getElementById('m-favorites'), 'mobile');
         renderFavoritesInto(document.getElementById('desktop-favorites'), 'desktop');
     }
+    window.renderFavorites = renderFavorites;
 
     var paginationState = {}; // { containerId: { page: 0 } }
 
@@ -441,16 +455,7 @@
                         '</div>' +
                         '<div class="landing-empty-tooltip">Click the star to favorite</div>' +
                     '</div>' +
-                    '<div class="landing-empty-arrow" aria-hidden="true">' +
-                        '<svg width="50" height="40" viewBox="0 0 50 40" fill="none">' +
-                            '<defs>' +
-                                '<marker id="landing-empty-arrowhead-js" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">' +
-                                    '<path d="M0,0 L6,3 L0,6 z" fill="currentColor"/>' +
-                                '</marker>' +
-                            '</defs>' +
-                            '<path d="M5,20 L42,20" stroke="currentColor" stroke-width="1.5" fill="none" marker-end="url(#landing-empty-arrowhead-js)" stroke-linecap="round" stroke-dasharray="4,3"/>' +
-                        '</svg>' +
-                    '</div>' +
+                    '<div class="landing-empty-arrow" aria-hidden="true">→</div>' +
                     '<div class="landing-empty-side">' +
                         '<div class="landing-empty-side-label">Saved here</div>' +
                         '<div class="landing-empty-mini-fav">' +
@@ -473,24 +478,6 @@
                     '</div>' +
                 '</div>' +
             '</div>';
-    }
-
-    function thumbHtml(src, foil, cw) {
-        var cls = 'foil-wrap';
-        if (cw) cls += ' content-warning';
-        return '<div class="' + cls + '" data-foil="' + (foil ? 'true' : 'false') + '"' +
-               (cw ? ' onclick="this.classList.add(\'cw-revealed\');event.preventDefault();event.stopPropagation()"' : '') +
-               '><img src="' + escapeAttr(src) + '" loading="lazy" alt=""></div>';
-    }
-
-    function escapeHtml(str) {
-        var div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function escapeAttr(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
     }
 
     window.favPage = function(containerId, delta) {
@@ -580,6 +567,9 @@
 
         doRefresh();
     }
+    // Exposed so the sync layer can backfill prices on favorites arriving
+    // price-less from another device. Self-gating: only fetches when needed.
+    window.refreshFavorites = refreshFavorites;
 
     function showToast(msg) {
         var toast = document.getElementById('m-fav-toast') || document.getElementById('desktop-fav-toast');

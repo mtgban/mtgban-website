@@ -150,14 +150,16 @@ func PaletteCardMeta(w http.ResponseWriter, r *http.Request) {
 // PaletteSets returns all known set codes with display metadata.
 func PaletteSets(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
 	paletteSetsCacheMu.RLock()
 	data := paletteSetsCache
 	paletteSetsCacheMu.RUnlock()
-	if data == nil {
+	// cache not warm - dont serve [] for an hour
+	if len(data) == 0 {
+		w.Header().Set("Cache-Control", "no-store")
 		w.Write([]byte(`[]`))
 		return
 	}
+	w.Header().Set("Cache-Control", "public, max-age=3600")
 	w.Write(data)
 }
 
@@ -261,8 +263,6 @@ func paletteNewspaperTargetsJSON() template.JS {
 			group = "Buylist Levels"
 		case strings.Contains(p.Option, "stock"):
 			group = "Stock Movement"
-		case p.Option == "ensemble_forecast" || p.Option == "review":
-			group = "Analysis"
 		}
 
 		// Disambiguate duplicate titles by source.
@@ -280,11 +280,6 @@ func paletteNewspaperTargetsJSON() template.JS {
 		})
 	}
 	// Include Newspaper SubPages from the nav tree that aren't in NewspaperPages
-	out = append(out, PaletteNavTarget{
-		Value: "old",
-		Label: "Archive",
-		Group: "Other",
-	})
 	out = append(out, PaletteNavTarget{
 		Value: "syp",
 		Label: "TCG Syp List",

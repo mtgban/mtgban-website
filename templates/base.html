@@ -3,7 +3,18 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Start the Geist font fetch in parallel with the CSS. The
+         display=optional value tells the browser: either use the font
+         from frame 1 (if cached or it arrives within ~100ms) or fall
+         back for the whole session and never swap. Swap mid-render
+         was reflowing section-button labels and rippling through flex
+         into the search bar, causing a visible width change on first
+         load. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=optional">
     <link rel="stylesheet" type="text/css" href="/css/main.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/navbar.css?hash={{.Hash}}">
     {{block "extra-css" .}}{{end}}
     <link rel="stylesheet" type="text/css" href="/css/command-palette.css?hash={{.Hash}}">
     <link rel="stylesheet" type="text/css" href="/css/settings-modal.css?hash={{.Hash}}">
@@ -48,6 +59,7 @@ window.__BAN_PALETTE = {
     hash: "{{.Hash}}",
     user: "{{.BetaNav.Short}}"
 };
+window.__BAN_NAV = [{{range .Nav}}{ tool:"{{slug .Name}}", icon:"{{.Short}}", name:"{{.Name}}", desc:"{{.Description}}", href:"{{.Link}}", admin:{{if eq .Name "Admin"}}true{{else}}false{{end}} },{{end}}];
 </script>
 <script>
 window.__BAN_PALETTE_TARGETS = {
@@ -59,7 +71,10 @@ window.__BAN_PALETTE_TARGETS = {
 };
 </script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script type="text/javascript" src="/js/utils.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/autocomplete.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/navbar.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/palette-chips.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/palette-providers.js?hash={{.Hash}}"></script>
 <script type="text/javascript" src="/js/guide-data.js?hash={{.Hash}}"></script>

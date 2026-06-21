@@ -105,6 +105,7 @@
         renderRecentSearchesInto(document.getElementById('m-recent-searches'), 'mobile');
         renderRecentSearchesInto(document.getElementById('desktop-recent-searches'), 'desktop');
     }
+    window.renderRecentSearches = renderRecentSearches;
 
     function renderRecentSearchesInto(container, mode) {
         if (!container) return;
@@ -182,23 +183,6 @@
         }
     }
 
-    function escapeHtml(str) {
-        var div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function escapeAttr(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    }
-
-    function thumbHtml(src, foil, cw) {
-        var cls = 'foil-wrap';
-        if (cw) cls += ' content-warning';
-        return '<div class="' + cls + '" data-foil="' + (foil ? 'true' : 'false') + '"' +
-               (cw ? ' onclick="this.classList.add(\'cw-revealed\');event.preventDefault();event.stopPropagation()"' : '') +
-               '><img src="' + escapeAttr(src) + '" loading="lazy" alt=""></div>';
-    }
 
     window.deleteRecentSearch = function(query, ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
@@ -230,16 +214,18 @@
         }
     };
 
-    // Record search on form submit
+    // Record search on form submit (page bars and navbar share this store)
     function hookFormSubmit() {
-        var form = document.getElementById('searchform');
-        if (!form) return;
-
-        form.addEventListener('submit', function() {
-            var input = document.getElementById('searchbox');
-            if (input && input.value.trim()) {
-                addSearch(input.value);
-            }
+        var pairs = [['searchform', 'searchbox'], ['nav-searchform', 'nav-searchbox']];
+        pairs.forEach(function(ids) {
+            var form = document.getElementById(ids[0]);
+            if (!form) return;
+            form.addEventListener('submit', function() {
+                var input = document.getElementById(ids[1]);
+                if (input && input.value.trim()) {
+                    addSearch(input.value);
+                }
+            });
         });
     }
 

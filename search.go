@@ -313,6 +313,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	allKeys, err := searchAndFilter(config)
 	if err != nil {
 		pageVars.InfoMessage = NoCardsMessage
+		pageVars.CleanSearchQuery = config.CleanQuery
+		pageVars.DidYouMean, pageVars.AltSearches = buildSearchSuggestions(query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -326,6 +328,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	foundSellers, foundVendors := searchParallelNG(allKeys, config)
 
+	// Append the virtual custom buylist when enabled in the upload settings
+	canUploadCustom, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadCustom"))
+	canUploadCustom = canUploadCustom || (DevMode && !SigCheck)
+	if canUploadCustom && !config.SkipBuylist {
+		searchCustomBuylist(r, allKeys, foundVendors)
+	}
+
 	// Filter away any empty result
 	allKeys = PostSearchFilter(config, allKeys, foundSellers, foundVendors)
 
@@ -335,6 +344,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if hidePromos {
 			pageVars.InfoMessage = NoPromosMessage
 		}
+		pageVars.CleanSearchQuery = config.CleanQuery
+		pageVars.DidYouMean, pageVars.AltSearches = buildSearchSuggestions(query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -355,6 +366,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Needed to load search in Upload
 	pageVars.CardHashes = allKeys
+
+	if pageVars.IsMobile && !pageVars.IsSealed {
+		pageVars.EditionFilterList = editionsForSearch(allKeys)
+	}
 
 	// Sort sets as requested, default to chronological
 	switch pageVars.SearchSort {
@@ -501,6 +516,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Embed.BuylistPrice = price4seller(allKeys[0], "CK")
 	}
 
+	// When the user asked to drop index data (skip:index), don't synthesize the
+	// no-price TCGplayer/CardMarket fallback links below.
+	skipIndex := false
+	for _, f := range config.StoreFilters {
+		if f.Name == "index" && !f.Negate {
+			skipIndex = true
+			break
+		}
+	}
+
 	// Readjust array of INDEX entires
 	for _, cardId := range allKeys {
 		indexArray := foundSellers[cardId]["INDEX"]
@@ -588,7 +613,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// If the TCG index is missing, we manually add one to get the link
-		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed {
+		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed && !skipIndex {
 			var link string
 			if pageVars.Metadata[cardId].TCGId == "" {
 				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardId].Name) + "&utm_medium=" + Config.Affiliate["TCG"] + "&utm_source=" + Config.Affiliate["TCG"]
@@ -605,7 +630,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Same for CM
-		if mkmIndex < 0 && !pageVars.Metadata[cardId].Sealed {
+		if mkmIndex < 0 && !pageVars.Metadata[cardId].Sealed && !skipIndex {
 			co, err := mtgmatcher.GetUUID(cardId)
 			if err == nil {
 				var link string
@@ -667,7 +692,6 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
-		userTier := GetParamFromSig(sig, "UserTier")
 		pageVars.ChartID = chartId
 		pageVars.IsMultiChart = isMultiChart
 
@@ -679,19 +703,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				fmt.Println("Search: Failed to GetUUID: %w", err)
 				return
 			}
-			lb := lookbackForTier(userTier)
+			lb := chartLookback(sig)
 			pageVars.MaxLookbackDays = lb.Days()
 
 			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
-			pageVars.Datasets = getDatasets(r.Context(), chartId, co.Sealed, pageVars.AxisLabels, userTier)
+			pageVars.Datasets = getDatasets(r.Context(), chartId, co.Sealed, pageVars.AxisLabels, lb)
 			pageVars.Checkpoints = relevantCheckpoints(co.Name, earliest)
 			if len(pageVars.Datasets) == 0 {
 				pageVars.InfoMessage = "No chart data available"
 			}
 		} else {
-			lb := lookbackForTier(userTier)
+			lb := chartLookback(sig)
 			pageVars.MaxLookbackDays = lb.Days()
 
 			// Union of date ranges: pick the oldest earliest so every card's
@@ -714,7 +738,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				pageVars.InfoMessage = "No chart data available"
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)
-				datasets, refs := getDatasetsForMulti(r.Context(), chartIds, pageVars.AxisLabels, userTier)
+				datasets, refs := getDatasetsForMulti(r.Context(), chartIds, pageVars.AxisLabels, lb)
 				pageVars.Datasets = datasets
 				pageVars.ChartReferences = refs
 				// Multi-card mode: only set-release markers make sense as a
@@ -847,15 +871,10 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 				}
 
 				icon := Config.ScraperConfig.Icons[seller.Info().Shorthand]
-				name := seller.Info().Name
-				override, found := Config.ScraperConfig.NameOverride[seller.Info().Name]
-				if found {
-					name = override
-				}
 
 				// Prepare all the deets
 				res := SearchEntry{
-					ScraperName: name,
+					ScraperName: scraperName(seller.Info().Shorthand),
 					Shorthand:   seller.Info().Shorthand,
 					Price:       entry.Price,
 					Quantity:    entry.Quantity,
@@ -929,14 +948,9 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 				}
 
 				icon := Config.ScraperConfig.Icons[vendor.Info().Shorthand]
-				name := vendor.Info().Name
-				override, found := Config.ScraperConfig.NameOverride[vendor.Info().Name]
-				if found {
-					name = override
-				}
 
 				res := SearchEntry{
-					ScraperName:  name,
+					ScraperName:  scraperName(vendor.Info().Shorthand),
 					Shorthand:    vendor.Info().Shorthand,
 					Price:        entry.BuyPrice,
 					Credit:       entry.BuyPrice * vendor.Info().CreditMultiplier,
@@ -964,6 +978,73 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 	}
 
 	return
+}
+
+// Append a virtual buylist to search results, priced off the reference
+// seller inventories according to the custom buylist rule settings
+func searchCustomBuylist(r *http.Request, cardIds []string, foundVendors map[string]map[string][]SearchEntry) {
+	customOpts := strings.Split(readCookie(r, "UploadCustomOpts"), ",")
+	if !slices.Contains(customOpts, "enabled") {
+		return
+	}
+
+	rate, _ := strconv.ParseFloat(readCookie(r, "UploadCustomRate"), 64)
+	if rate <= 0 {
+		return
+	}
+	minPrice, _ := strconv.ParseFloat(readCookie(r, "UploadCustomMinPrice"), 64)
+
+	customSeller := readCookie(r, "UploadCustomBuyer")
+	customSealedSeller := readCookie(r, "UploadCustomSealedBuyer")
+	singles, _ := findSellerInventory(customSeller)
+	sealed, _ := findSellerInventory(customSealedSeller)
+
+	// Index price sources have a single meaningful price, while regular
+	// retailers list one price per condition
+	isIndex := slices.Contains(UploadIndexComparePriceList, customSeller)
+
+	for _, cardId := range cardIds {
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			continue
+		}
+
+		ref := singles
+		if co.Sealed {
+			ref = sealed
+		}
+		if ref == nil {
+			continue
+		}
+		entries, found := ref[cardId]
+		if !found || len(entries) == 0 {
+			continue
+		}
+
+		// The rule applies to the best available price
+		if entries[0].Price == 0 || entries[0].Price < minPrice {
+			continue
+		}
+
+		if foundVendors[cardId] == nil {
+			foundVendors[cardId] = map[string][]SearchEntry{}
+		}
+
+		for _, entry := range entries {
+			if entry.Price == 0 {
+				continue
+			}
+			condition := "INDEX"
+			if !isIndex {
+				condition = entry.Conditions
+			}
+			foundVendors[cardId][condition] = append(foundVendors[cardId][condition], SearchEntry{
+				ScraperName: "Custom Buylist",
+				Shorthand:   "CUSTOM",
+				Price:       entry.Price * rate,
+			})
+		}
+	}
 }
 
 func searchAndFilter(config SearchConfig) ([]string, error) {
@@ -1021,6 +1102,40 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		selectedUUIDs = append(selectedUUIDs, uuid)
 	}
 	return selectedUUIDs, nil
+}
+
+func editionsForSearch(allKeys []string) []EditionEntry {
+	codes := map[string]bool{}
+	seenNames := map[string]bool{}
+	for _, cardId := range allKeys {
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil || seenNames[co.Name] {
+			continue
+		}
+		seenNames[co.Name] = true
+		printings, err := mtgmatcher.Printings4Card(co.Name)
+		if err != nil {
+			continue
+		}
+		for _, code := range printings {
+			codes[code] = true
+		}
+	}
+	if len(codes) == 0 {
+		return nil
+	}
+
+	editions := GetEditions()
+	out := make([]EditionEntry, 0, len(codes))
+	for code := range codes {
+		if entry, ok := editions.AllEditionsMap[code]; ok {
+			out = append(out, entry)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
+	})
+	return out
 }
 
 func searchScryfall(query string) ([]string, error) {
@@ -1119,6 +1234,12 @@ func attemptMatch(query string) ([]string, error) {
 }
 
 func searchParallelNG(cardIds []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry, foundVendors map[string]map[string][]SearchEntry) {
+	// Initialize up front so callers can always assign into them; when retail or
+	// buylist is skipped the corresponding search is never run and the map would
+	// otherwise stay nil, panicking on the first write (e.g. the INDEX block).
+	foundSellers = map[string]map[string][]SearchEntry{}
+	foundVendors = map[string]map[string][]SearchEntry{}
+
 	var wg sync.WaitGroup
 	wg.Add(2)
 

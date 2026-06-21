@@ -250,6 +250,50 @@ func getSignatureFromCookies(r *http.Request) string {
 	return sig
 }
 
+// signedUserEmail returns the UserEmail from a validly-signed, unexpired cookie/sig, else "". Mirrors enforceSigning's HMAC check but allows any method.
+func signedUserEmail(r *http.Request) string {
+	sig := getSignatureFromCookies(r)
+	if querySig := r.FormValue("sig"); querySig != "" {
+		sig = querySig
+	}
+	if sig == "" {
+		return ""
+	}
+
+	raw, err := base64.StdEncoding.DecodeString(sig)
+	if err != nil {
+		return ""
+	}
+	v, err := url.ParseQuery(string(raw))
+	if err != nil {
+		return ""
+	}
+
+	if !SigCheck {
+		return v.Get("UserEmail")
+	}
+
+	q := url.Values{}
+	for _, optional := range append(OrderNav, OptionalFields...) {
+		if val := v.Get(optional); val != "" {
+			q.Set(optional, val)
+		}
+	}
+
+	link := DefaultServerURL
+	if !strings.HasSuffix(ServerURL, "mtgban.com") {
+		link = "http://localhost:" + fmt.Sprint(Config.Port)
+	}
+	exp := v.Get("Expires")
+	data := fmt.Sprintf("GET%s%s%s", exp, link, q.Encode())
+	valid := signHMACSHA1Base64([]byte(os.Getenv("BAN_SECRET")), []byte(data))
+	expires, err := strconv.ParseInt(exp, 10, 64)
+	if err != nil || valid != v.Get("Signature") || expires < time.Now().Unix() {
+		return ""
+	}
+	return v.Get("UserEmail")
+}
+
 // Put signature in cookies for one month, all domains can access this
 func putSignatureInCookies(w http.ResponseWriter, sig string) {
 	oneMonth := time.Now().Add(31 * 24 * 60 * 60 * time.Second)

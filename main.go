@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -16,19 +15,18 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
-	"slices"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
 
 	"database/sql"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/NYTimes/gziphandler"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/timeseries"
+	"github.com/mtgban/mtgban-website/userstate"
 
 	"github.com/leemcloughlin/logfile"
 	"golang.org/x/oauth2/google"
@@ -84,6 +82,7 @@ type PageVars struct {
 	SetKeyrunes  map[string]string
 	NoSort       bool
 	NoSettings   bool
+	HasSettings  bool
 	HasAvailable bool
 	CardBackURL  string
 	ShowUpsell   bool
@@ -91,6 +90,10 @@ type PageVars struct {
 	CanShowAll       bool
 	CleanSearchQuery string
 	CheckpointsText  string
+
+	// Suggestions shown when a search returns no results
+	DidYouMean  string
+	AltSearches []AltSearch
 
 	ScraperShort   string
 	HasAffiliate   bool
@@ -174,12 +177,13 @@ type PageVars struct {
 	StocksURL       string
 	AltEtchedId     string
 
-	EditionSort []string
-	EditionList map[string][]EditionEntry
-	IsSealed    bool
-	TotalSets   int
-	TotalCards  int
-	TotalUnique int
+	EditionSort       []string
+	EditionList       map[string][]EditionEntry
+	EditionFilterList []EditionEntry
+	IsSealed          bool
+	TotalSets         int
+	TotalCards        int
+	TotalUnique       int
 
 	// UPLOAD
 	// All the scrapers in singles/sealed mode
@@ -192,26 +196,43 @@ type PageVars struct {
 	SealedIndexKeys   []string
 
 	// Additional sources for index keys if needed
-	AltKeys         []string
-	SellerKeys      []string
-	VendorKeys      []string
-	ModalSellerKeys []string
-	ModalVendorKeys []string
-	UploadEntries   []UploadEntry
-	IsBuylist       bool
-	TotalEntries    map[string]float64
-	EnabledSellers  []string
-	EnabledVendors  []string
-	CanBuylist      bool
-	CanChangeStores bool
-	RemoteLinkURL   string
-	TotalQuantity   int
-	Optimized       map[string][]OptimizedUploadEntry
-	OptimizedTotals map[string]float64
-	HighestTotal    float64
-	MissingCounts   map[string]int
-	MissingPrices   map[string]float64
-	ResultPrices    map[string]map[string]float64
+	AltKeys              []string
+	SellerKeys           []string
+	VendorKeys           []string
+	SealedSellerKeys     []string
+	SealedVendorKeys     []string
+	ModalSellerKeys      []string
+	ModalVendorKeys      []string
+	UploadEntries        []UploadEntry
+	IsBuylist            bool
+	TotalEntries         map[string]float64
+	EnabledSellers       []string
+	EnabledVendors       []string
+	EnabledSealedSellers []string
+	EnabledSealedVendors []string
+	CanBuylist           bool
+	CanChangeStores      bool
+	CanUploadCustom      bool
+	RemoteLinkURL        string
+	TotalQuantity        int
+	Optimized            map[string][]OptimizedUploadEntry
+	OptimizedTotals      map[string]float64
+	HighestTotal         float64
+	MissingCounts        map[string]int
+	MissingPrices        map[string]float64
+	ResultPrices         map[string]map[string]float64
+	UploadQuery          string
+	// Upload singles/sealed/not-found split
+	SinglesEntries    []UploadEntry
+	SealedEntries     []UploadEntry
+	NotFoundEntries   []UploadEntry
+	SinglesQuantity   int
+	SealedQuantity    int
+	SinglesHighest    float64
+	SealedHighest     float64
+	ShowResultTabs    bool
+	ShowAllTab        bool
+	DefaultResultView string
 }
 
 type NavElem struct {
@@ -229,6 +250,9 @@ type NavElem struct {
 
 	// Icon or seller shorthand
 	Short string
+
+	// One-line subtitle shown on the Tools dropdown tile
+	Description string
 
 	// Response handler
 	Handle func(w http.ResponseWriter, r *http.Request)
@@ -250,6 +274,12 @@ type NavElem struct {
 
 	// Condition upon which the page should not be made visible
 	ShouldHide func() bool
+
+	// True for pages whose settings modal has bindings (mirrors
+	// PAGE_BINDINGS in js/settings.js). Used by the navbar inline
+	// script to pre-resolve the gear button's enabled state so it
+	// doesn't transition from is-disabled → enabled at load time.
+	HasSettings bool
 }
 
 var DefaultNav = []NavElem{
@@ -271,6 +301,7 @@ var OptionalFields = []string{
 	"SearchBuylistDisabled",
 	"SearchDownloadCSV",
 	"SearchChartDelete",
+	"SearchChartLoopback",
 	"ArbitEnabled",
 	"ArbitDisabledVendors",
 	"NewsEnabled",
@@ -279,6 +310,7 @@ var OptionalFields = []string{
 	"UploadChangeStoresEnabled",
 	"UploadOptimizer",
 	"UploadNoLimit",
+	"UploadCustom",
 	"AnyEnabled",
 	"AnyExperimentsEnabled",
 	"AnySpread",
@@ -308,21 +340,26 @@ var ExtraNavs map[string]*NavElem
 func init() {
 	ExtraNavs = map[string]*NavElem{
 		"Search": {
-			Name:   "Search",
-			Short:  "🔍",
-			Link:   "/search",
-			Handle: Search,
-			Page:   "search.html",
+			Name:        "Search",
+			Short:       "🔍",
+			Description: "Find a card by name",
+			Link:        "/search",
+			Handle:      Search,
+			Page:        "search.html",
+			HasSettings: true,
 			SubPages: []NavElem{
 				{
-					Name:  "Sets",
-					Short: "📦",
-					Link:  "/sets",
+					Name:        "Sets",
+					Short:       "📦",
+					Description: "Browse every set on file",
+					Link:        "/sets",
 				},
 				{
-					Name:  "Sealed",
-					Short: "🧱",
-					Link:  "/sealed",
+					Name:        "Sealed",
+					Short:       "🧱",
+					Description: "Sealed product search",
+					Link:        "/sealed",
+					HasSettings: true,
 					ShouldHide: func() bool {
 						return len(mtgmatcher.GetSealedUUIDs()) == 0
 					},
@@ -331,24 +368,20 @@ func init() {
 			AllowOffline: true,
 		},
 		"Newspaper": {
-			Name:   "Newspaper",
-			Short:  "🗞️",
-			Link:   "/newspaper",
-			Handle: Newspaper,
-			Page:   "news.html",
+			Name:        "Newspaper",
+			Short:       "🗞️",
+			Description: "Market movers & recent activity",
+			Link:        "/newspaper",
+			Handle:      Newspaper,
+			Page:        "news.html",
+			HasSettings: true,
 			SubPages: []NavElem{
 				{
-					Name:  "Archive",
-					Short: "📰",
-					Link:  "/newspaper?page=old",
-					ShouldHide: func() bool {
-						return Config.Game != DefaultGame
-					},
-				},
-				{
-					Name:  "TCG Syp List",
-					Short: "📋",
-					Link:  "/newspaper?page=syp",
+					Name:        "TCG Syp List",
+					Short:       "📋",
+					Description: "Cards TCGplayer wants now",
+					Link:        "/newspaper?page=syp",
+					HasSettings: true,
 					ShouldHide: func() bool {
 						_, err := findVendorBuylist("SYP")
 						return err != nil
@@ -357,47 +390,58 @@ func init() {
 			},
 		},
 		"Sleepers": {
-			Name:   "Sleepers",
-			Short:  "💤",
-			Link:   "/sleepers",
-			Handle: Sleepers,
-			Page:   "sleep.html",
+			Name:        "Sleepers",
+			Short:       "💤",
+			Description: "Under-the-radar picks",
+			Link:        "/sleepers",
+			Handle:      Sleepers,
+			Page:        "sleep.html",
+			HasSettings: true,
 		},
 		"Upload": {
-			Name:    "Upload",
-			Short:   "🚢",
-			Link:    "/upload",
-			Handle:  Upload,
-			Page:    "upload.html",
-			CanPOST: true,
+			Name:        "Upload",
+			Short:       "🚢",
+			Description: "Bulk price your collection",
+			Link:        "/upload",
+			Handle:      Upload,
+			Page:        "upload.html",
+			HasSettings: true,
+			CanPOST:     true,
 		},
 		"Global": {
-			Name:   "Global",
-			Short:  "🌍",
-			Link:   "/global",
-			Handle: Global,
-			Page:   "arbit.html",
+			Name:        "Global",
+			Short:       "🌍",
+			Description: "Cross-region price view",
+			Link:        "/global",
+			Handle:      Global,
+			Page:        "arbit.html",
+			HasSettings: true,
 		},
 		"Arbit": {
-			Name:   "Arbitrage",
-			Short:  "📈",
-			Link:   "/arbit",
-			Handle: Arbit,
-			Page:   "arbit.html",
+			Name:        "Arbitrage",
+			Short:       "📈",
+			Description: "Buy low, sell high spreads",
+			Link:        "/arbit",
+			Handle:      Arbit,
+			Page:        "arbit.html",
+			HasSettings: true,
 		},
 		"Reverse": {
-			Name:   "Reverse",
-			Short:  "📉",
-			Link:   "/reverse",
-			Handle: Reverse,
-			Page:   "arbit.html",
+			Name:        "Reverse",
+			Short:       "📉",
+			Description: "Reverse-direction arbitrage",
+			Link:        "/reverse",
+			Handle:      Reverse,
+			Page:        "arbit.html",
+			HasSettings: true,
 		},
 		"Admin": {
-			Name:   "Admin",
-			Short:  "❌",
-			Link:   "/admin",
-			Handle: Admin,
-			Page:   "admin.html",
+			Name:        "Admin",
+			Short:       "❌",
+			Description: "Restricted control panel",
+			Link:        "/admin",
+			Handle:      Admin,
+			Page:        "admin.html",
 
 			CanPOST:        true,
 			AlwaysOnForDev: true,
@@ -416,13 +460,12 @@ type ConfigType struct {
 		BackupPath      string `json:"backup_path"`
 		BucketAccessKey string `json:"bucket_access_key"`
 		BucketSecretKey string `json:"bucket_access_secret"`
-		CheckpointsPath string `json:"checkpoints_path,omitempty"`
+		CheckpointsPath string `json:"checkpoints_path"`
 	} `json:"datastore"`
 	Game                   string             `json:"game"`
 	CardBackImage          string             `json:"card_back_image"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	DBAddress              string             `json:"db_address"`
 	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
 	DiscordHook            string             `json:"discord_hook"`
 	DiscordNotifHook       string             `json:"discord_notif_hook"`
@@ -454,7 +497,8 @@ type ConfigType struct {
 	// The location of the configuation file
 	sourcePath string
 
-	SqlConfig *timeseries.SqlConfig `json:"sql_config"`
+	SqlConfig       *timeseries.SqlConfig `json:"sql_config"`
+	UserStateConfig *userstate.SqlConfig  `json:"user_state_config"`
 }
 
 var DevMode bool
@@ -493,11 +537,11 @@ func loadTime(p *time.Time) time.Time {
 	return *p
 }
 
-var Newspaper3dayDB *sql.DB
-var Newspaper1dayDB *sql.DB
 var NewNewspaperDB *sql.DB
 
 var PricesArchiveDB *timeseries.Client
+
+var UserStateDB *userstate.Client
 
 var GoogleDocsClient *http.Client
 
@@ -611,6 +655,10 @@ func genPageNav(activeTab, sig string) PageVars {
 	}
 	pageVars.Nav[mainNavIndex].Active = true
 	pageVars.Nav[mainNavIndex].Class = "active"
+	// Surface the active page's HasSettings on PageVars so the navbar
+	// template can pre-resolve the gear button's state without the
+	// inline script having to maintain a duplicate list of paths.
+	pageVars.HasSettings = pageVars.Nav[mainNavIndex].HasSettings
 
 	// Add user information if needed, or public
 	user := GetParamFromSig(sig, "UserEmail")
@@ -674,9 +722,7 @@ func preloadConfig(configPath string) error {
 
 func loadVars(port, datastorePath, offlineKey string) error {
 	// Preload
-	Config.Port = port
 	Config.Game = DefaultGame
-	Config.DatastorePath = DefaultDatastorePath
 	Config.OfflineKey = offlineKey
 
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
@@ -689,6 +735,17 @@ func loadVars(port, datastorePath, offlineKey string) error {
 	err = json.NewDecoder(reader).Decode(&Config)
 	if err != nil && !DevMode {
 		return err
+	}
+
+	// The -port and -ds flags, when provided, override whatever the config
+	// file set. This must happen after the decode above, which would otherwise
+	// clobber the flag values with the config's fields (breaking blue-green
+	// deploys that run instances on distinct ports).
+	if port != "" {
+		Config.Port = port
+	}
+	if datastorePath != "" {
+		Config.DatastorePath = datastorePath
 	}
 
 	// Ensure needed defaults
@@ -726,15 +783,12 @@ func openDBs() (err error) {
 		}
 	}
 
-	if Config.DBAddress == "" {
-		log.Println("no DB address set, Archive won't be loaded")
+	if Config.UserStateConfig == nil {
+		log.Println("no user_state configuration set, cross-device sync won't be available")
 	} else {
-		Newspaper3dayDB, err = sql.Open("mysql", Config.DBAddress+"/three_day_newspaper")
+		UserStateDB, err = userstate.NewClient(*Config.UserStateConfig)
 		if err != nil {
-			return err
-		}
-		Newspaper1dayDB, err = sql.Open("mysql", Config.DBAddress+"/newspaper")
-		if err != nil {
+			log.Println("error creating a user_state SQL client:", err)
 			return err
 		}
 	}
@@ -835,8 +889,8 @@ func loadDatastore(ds string) error {
 
 func main() {
 	configFilePath := flag.String("cfg", "", "Load configuration file")
-	port := flag.String("port", DefaultServerPort, "Override server port")
-	datastore := flag.String("ds", DefaultDatastorePath, "Override datastore path")
+	port := flag.String("port", "", "Override server port")
+	datastore := flag.String("ds", "", "Override datastore path")
 
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
@@ -971,12 +1025,8 @@ func main() {
 
 	// custom redirector
 	http.HandleFunc("/go/", Redirect)
-
-	// Redirect external URLs to the uploader (e.g. /https://store.tcgplayer.com/...)
-	http.HandleFunc("/http", func(w http.ResponseWriter, r *http.Request) {
-		extURL := strings.TrimPrefix(r.URL.Path, "/")
-		http.Redirect(w, r, "/upload?gdocURL="+url.QueryEscape(extURL), http.StatusFound)
-	})
+	http.HandleFunc("/http:/", UploadURLRedirect)
+	http.HandleFunc("/https:/", UploadURLRedirect)
 	http.HandleFunc("/random", RandomSearch)
 	http.HandleFunc("/randomsealed", RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
@@ -1030,6 +1080,7 @@ func main() {
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(http.HandlerFunc(BatchPricesAPI)))
+	http.Handle("/api/userstate/", noSigning(gziphandler.GzipHandler(http.HandlerFunc(UserStateAPI))))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
@@ -1083,196 +1134,6 @@ func main() {
 		return
 	}
 	ServerNotify("shutdown", "Server shutdown correctly")
-}
-
-func inList(haystack []string, needle string) bool {
-	return slices.Contains(haystack, needle)
-}
-
-// csvWithout returns csv with `drop` and any empty entries removed. Used by
-// the templates to build "remove this card" URLs that strip one entry from the
-// chart roster while keeping the rest in order.
-func csvWithout(csv, drop string) string {
-	parts := strings.Split(csv, ",")
-	out := parts[:0]
-	for _, p := range parts {
-		if p != "" && p != drop {
-			out = append(out, p)
-		}
-	}
-	return strings.Join(out, ",")
-}
-
-var funcMap = template.FuncMap{
-	"inc": func(i, j int) int {
-		return i + j
-	},
-	"in_list":     inList,
-	"csv_without": csvWithout,
-	"dec": func(i, j int) int {
-		return i - j
-	},
-	"mul": func(i float64, j int) float64 {
-		return i * float64(j)
-	},
-	"mulf": func(i, j float64) float64 {
-		return i * j
-	},
-	"print_perc": func(s string) string {
-		n, _ := strconv.ParseFloat(s, 64)
-		return fmt.Sprintf("%0.2f %%", n*100)
-	},
-	"perc_class": func(s string) string {
-		n, _ := strconv.ParseFloat(s, 64)
-		if n > 0 {
-			return "news-perc-up"
-		}
-		if n < 0 {
-			return "news-perc-down"
-		}
-		return "news-perc-zero"
-	},
-	"print_price": func(s string) string {
-		n, _ := strconv.ParseFloat(s, 64)
-		return fmt.Sprintf("$ %0.2f", n)
-	},
-	"scraper_name": func(s string) string {
-		return scraperName(s)
-	},
-	"strip_edition": func(name, edition string, sealed bool) string {
-		if !sealed || edition == "" {
-			return name
-		}
-		if strings.HasPrefix(name, edition) {
-			shortened := strings.TrimPrefix(name, edition)
-			shortened = strings.TrimLeft(shortened, " :-–—")
-			if shortened != "" {
-				return shortened
-			}
-		}
-		return name
-	},
-	"slug": func(s string) string {
-		s = strings.ToLower(s)
-		s = strings.ReplaceAll(s, " ", "-")
-		var b strings.Builder
-		for _, r := range s {
-			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
-				b.WriteRune(r)
-			}
-		}
-		return b.String()
-	},
-	"slice_has": func(s []string, p string) bool {
-		return slices.Contains(s, p)
-	},
-	"has_prefix": func(s, p string) bool {
-		return strings.HasPrefix(s, p)
-	},
-	"contains": func(s, p string) bool {
-		return strings.Contains(s, p)
-	},
-	"is_sealed_scraper": func(shorthand string) bool {
-		for _, seller := range GetSellers() {
-			if seller != nil && seller.Info().Shorthand == shorthand {
-				return seller.Info().SealedMode
-			}
-		}
-		for _, vendor := range GetVendors() {
-			if vendor != nil && vendor.Info().Shorthand == shorthand {
-				return vendor.Info().SealedMode
-			}
-		}
-		return false
-	},
-	"triple_column_start": func(i int, length int) bool {
-		return i == 0 || i == length/3 || i == length*2/3
-	},
-	"triple_column_end": func(i int, length int) bool {
-		return i == length/3-1 || i == length*2/3-1 || i == length-1
-	},
-	"load_partner": func(s string) string {
-		return Config.Affiliate[s]
-	},
-	"uuid2ckid": func(s string) string {
-		bl, err := findVendorBuylist("CK")
-		if err != nil {
-			return ""
-		}
-		entries, found := bl[s]
-		if !found {
-			return ""
-		}
-		return entries[0].OriginalId
-	},
-	"uuid2tcgid": func(s string) string {
-		return findTCGproductId(s)
-	},
-	"isSussy": func(m map[string]float64, s string) bool {
-		_, found := m[s]
-		return found
-	},
-	"invalid_direct": invalidDirect,
-	"color2hex": func(s string) string {
-		color, found := colorValues[s]
-		if !found {
-			return "#111111"
-		}
-		return color
-	},
-	"credit_factor": findCredit,
-	"tcg_market_price": func(s string) float64 {
-		return getTCGMarketPrice(s)
-	},
-	"base64enc": func(s string) string {
-		return base64.StdEncoding.EncodeToString([]byte(s))
-	},
-	"sixMonthsAgo": func(t time.Time) bool {
-		sixMonthsAgo := time.Now().AddDate(0, -6, 0)
-		return sixMonthsAgo.After(t)
-	},
-	"uuid2edition": func(s string) string {
-		return editionTitle(s)
-	},
-	"is_best_price": func(prices map[string]float64, store string, storeKeys []string, isBuylist bool) bool {
-		target := prices[store]
-		if target == 0 {
-			return false
-		}
-		for _, key := range storeKeys {
-			price := prices[key]
-			if price == 0 {
-				continue
-			}
-			if !isBuylist && price > target {
-				return false
-			}
-			if isBuylist && price < target {
-				return false
-			}
-		}
-		return true
-	},
-	"palette_newspaper_targets": paletteNewspaperTargetsJSON,
-	"palette_sleepers_targets":  paletteSleepersTargetsJSON,
-	"palette_arbit_targets":     func() template.JS { return paletteArbitTargetsJSON("arbit") },
-	"palette_reverse_targets":   func() template.JS { return paletteArbitTargetsJSON("reverse") },
-	"palette_global_targets":    func() template.JS { return paletteArbitTargetsJSON("global") },
-	"guide_stores":              guideStoresJSON,
-	"dict": func(values ...interface{}) (map[string]interface{}, error) {
-		if len(values)%2 != 0 {
-			return nil, errors.New("dict requires even number of args")
-		}
-		m := make(map[string]interface{}, len(values)/2)
-		for i := 0; i < len(values); i += 2 {
-			k, ok := values[i].(string)
-			if !ok {
-				return nil, errors.New("dict keys must be strings")
-			}
-			m[k] = values[i+1]
-		}
-		return m, nil
-	},
 }
 
 // templateCache holds pre-parsed templates keyed by their base name.

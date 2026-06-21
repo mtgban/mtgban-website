@@ -6,7 +6,6 @@
 /* Keep search content at the original (pre-bump) font scale,
    without affecting the navbar which uses the global scale */
 .search-layout,
-.search-bar-sticky,
 .search-landing,
 .sealed-layout {
     --text-2xs:  0.5625rem; /* 9px  */
@@ -63,88 +62,6 @@
     padding-right: 16px;
 }
 
-
-/* ═══ Search bar (spans full width above grid) ═══ */
-/* --search-bar-h is used by the sidebar to clear the sticky bar */
-.search-bar-sticky {
-    position: sticky;
-    top: var(--nav-height, 48px);
-    z-index: 50;
-    background: var(--background);
-    padding-top: 6px;
-    padding-bottom: 4px;
-}
-
-.search-input-row {
-    display: flex;
-    align-items: center;
-    position: relative;
-    margin-bottom: 10px;
-}
-
-.search-bar-wrap form,
-.search-bar-wrap form.autocomplete {
-    flex: 1;
-    display: flex;
-    min-width: 0;
-    width: auto;
-    position: relative;
-}
-.search-bar-wrap .search-input,
-.search-bar-wrap input.search-input {
-    flex: 1;
-    padding: 14px 14px 14px 14px;
-    border-radius: var(--radius-lg, 10px);
-    border: 1px solid var(--border-moderate, rgba(255,255,255,0.12));
-    background: var(--search-surface-1);
-    color: var(--normal);
-    font-size: var(--text-xl);
-    outline: none;
-    font-family: inherit;
-    transition: border-color 0.12s;
-    width: 100%;
-    box-sizing: border-box;
-}
-.search-bar-wrap .search-input:focus {
-    border-color: var(--search-link);
-}
-.search-bar-wrap .autocomplete:has(.autocomplete-items) .search-input {
-    border-radius: var(--radius-lg, 10px) var(--radius-lg, 10px) 0 0;
-    transition: border-radius 0.15s;
-}
-.search-bar-wrap .search-input::placeholder {
-    color: var(--search-text-dim);
-}
-
-.search-actions {
-    position: absolute;
-    right: 6px; top: 50%; transform: translateY(-50%);
-    display: flex;
-    border-radius: 10px;
-    overflow: hidden;
-    border: 1px solid var(--border-subtle);
-    background: var(--surface-3);
-    z-index: 1;
-}
-.search-action-btn {
-    padding: 8px 12px;
-    background: transparent; border: none;
-    color: var(--activetext);
-    cursor: pointer; text-decoration: none;
-    transition: all 0.15s;
-    display: flex; align-items: center; justify-content: center;
-}
-.search-action-btn svg {
-    width: 20px; height: 20px;
-}
-.search-action-btn + .search-action-btn {
-    border-left: 1px solid var(--border-subtle);
-}
-.search-action-btn:hover {
-    background: var(--accent-muted);
-    color: var(--ainfo);
-    text-decoration: none;
-}
 
 .search-sort-row {
     display: flex;
@@ -269,27 +186,6 @@
     background: var(--background);
     z-index: 1;
 }
-.sidebar-search form.autocomplete {
-    position: relative;
-    display: block;
-    width: 100%;
-    margin-bottom: 8px;
-}
-.sidebar-search .search-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 8px 12px;
-    border-radius: var(--radius-md, 10px);
-    border: 1px solid var(--border-moderate);
-    background: var(--search-surface-1);
-    font-size: var(--text-lg);
-    color: var(--normal);
-    outline: none;
-}
-.sidebar-search .search-input:focus {
-    border-color: var(--accent-border, rgba(91,141,239,0.4));
-    box-shadow: 0 0 0 3px var(--accent-muted, rgba(91,141,239,0.12));
-}
 .sidebar-search .search-sort-row {
     padding-bottom: 8px;
 }
@@ -323,7 +219,8 @@
     position: relative;
     margin-bottom: 14px;
 }
-.sidebar-img-wrap.foil-wrap[data-foil="true"]::after {
+.sidebar-img-wrap.foil-wrap[data-foil="true"]::after,
+.sidebar-img-wrap.foil-wrap[data-etched="true"]::after {
     border-radius: var(--radius-lg);
 }
 
@@ -337,7 +234,8 @@
 .sidebar-img-wrap[data-set="LEA"] .sidebar-card-img {
     border-radius: 22px;
 }
-.sidebar-img-wrap[data-set="LEA"].foil-wrap[data-foil="true"]::after {
+.sidebar-img-wrap[data-set="LEA"].foil-wrap[data-foil="true"]::after,
+.sidebar-img-wrap[data-set="LEA"].foil-wrap[data-etched="true"]::after {
     border-radius: 22px;
 }
 
@@ -586,6 +484,10 @@
 /* ═══ Results main area ═══ */
 .search-results {
     padding: 10px 18px 80px;
+    /* Query container so the Sellers/Buyers body can collapse to a single
+       column based on the real width available to the results (which depends
+       on whether the sidebar is showing), not on the raw viewport width. */
+    container: search-results / inline-size;
 }
 
 
@@ -758,6 +660,11 @@
 
 .result-quick-icons {
     grid-column: 3;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.qi-actions {
     display: flex;
     gap: 6px;
     align-items: center;
@@ -773,6 +680,46 @@
 .result-quick-icons a:hover,
 .result-quick-icons span:hover { color: var(--search-link); }
 .result-quick-icons img { width: 22px; height: auto; vertical-align: middle; }
+
+/* The kebab toggle + per-action text labels only exist in the collapsed
+   (single-column) layout; see the container query further down. */
+.qi-toggle { display: none; }
+.qi-label { display: none; }
+/* The image button only appears once the sidebar preview is hidden (≤900px);
+   it shares the favorite star's styling. */
+.qi-view-image { display: none; }
+.result-quick-icons .qi-view-image {
+    align-items: center;
+    justify-content: center;
+    padding: 0.15em;
+    background: transparent;
+    border: none;
+    color: var(--greytext);
+    cursor: pointer;
+}
+.result-quick-icons .qi-view-image:hover { color: var(--normal); }
+
+/* Lightbox that shows the card art when the sidebar preview isn't available. */
+.card-image-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    cursor: zoom-out;
+}
+.card-image-modal.open { display: flex; }
+.card-image-modal img {
+    max-width: min(92vw, 440px);
+    max-height: 92vh;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
 
 .result-source-sealed {
     font-size: var(--text-sm);
@@ -1414,6 +1361,84 @@ body.modal-embed .cp-overlay {
     display: none !important;
 }
 
+/* Chart-add modal picker: the styled search bar shown above the recent +
+ * favorites panes when the modal opens with no query. These classes only
+ * appear inside the modal (search-bar / sidebar-search templates), so the
+ * rules don't touch the navbar or the full-page landing search. */
+.search-bar-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 16px 0 10px;
+    background: var(--background);
+}
+.search-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.search-input-row .autocomplete {
+    flex: 1;
+    display: block;
+}
+/* The in-modal results view reuses .search-input in its sidebar; make that
+ * form fill its column instead of shrinking to the inline-block default. */
+.sidebar-search .autocomplete {
+    display: block;
+    width: 100%;
+}
+.search-input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 48px;
+    padding: 0 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-1);
+    color: var(--normal);
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12);
+}
+.search-input:focus {
+    border-color: var(--ainfo);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12), 0 0 0 3px var(--accent-muted);
+}
+.search-input::placeholder {
+    color: var(--text-dim);
+}
+.search-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.search-action-btn {
+    height: 48px;
+    width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+    color: var(--activetext);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.search-action-btn:hover {
+    background: var(--accent-muted);
+    border-color: var(--accent-border);
+    color: var(--ainfo);
+    text-decoration: none;
+}
+.search-action-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
 
 /* ═══ Options page ═══ */
 
@@ -1669,15 +1694,125 @@ body.modal-embed .cp-overlay {
         background: var(--background);
     }
     .search-sidebar > *:not(.sidebar-search) { display: none; }
+    /* Sidebar preview is gone here, so surface a per-card image button. */
+    .qi-view-image { display: inline-flex; }
     .result-body { grid-template-columns: 1fr; }
     .result-col + .result-col {
         border-left: none;
         border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     }
-    .search-bar-wrap { padding: 12px 16px 0; }
     .search-results { padding: 16px 16px 60px; }
     .result-header { padding: 8px 10px; gap: 6px; }
     .price-row { --price-row-h: 34px; padding: 0 10px; }
+}
+
+/* When the results area itself gets narrow — typically while the sidebar is
+   still showing, before the 900px viewport break — the side-by-side
+   Sellers/Buyers columns squeeze the store names and card title down to a
+   stub. Drop to a single column so each row gets the full width back. */
+@container search-results (width <= 560px) {
+    .result-body { grid-template-columns: 1fr; }
+    .result-col + .result-col {
+        border-left: none;
+        border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    }
+
+    /* Collapse the row of card-action icons into a kebab dropdown so the
+       card name keeps the header width. Each item shows its icon plus its
+       title as a text label. */
+    .qi-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: none;
+        background: none;
+        border-radius: var(--radius-sm, 6px);
+        color: var(--search-text-dim);
+        cursor: pointer;
+    }
+    .qi-toggle:hover { background: var(--search-row-hover); color: var(--search-link); }
+
+    .qi-actions {
+        display: none;
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        min-width: 210px;
+        padding: 4px;
+        background: var(--search-surface-1);
+        border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+        border-radius: var(--radius-md, 8px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        z-index: 30;
+    }
+    .result-quick-icons.qi-open .qi-actions { display: flex; }
+
+    /* This breakpoint still has the sidebar preview, so keep the image button
+       out of the dropdown (the grid rule below would otherwise reveal it). */
+    .qi-actions > .qi-view-image { display: none; }
+
+    /* Each action becomes an icon + label row. The icon sits in a fixed-width
+       column so every label lines up regardless of icon kind (emoji text,
+       img, or svg) and width. */
+    .qi-actions > a,
+    .qi-actions > span,
+    .qi-actions > button {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        align-items: center;
+        justify-items: center;
+        gap: 10px;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 10px;
+        border-radius: var(--radius-sm, 6px);
+        font-size: var(--text-xl);
+        color: var(--normal);
+    }
+    .qi-actions > a:hover,
+    .qi-actions > span:hover,
+    .qi-actions > button:hover { background: var(--search-row-hover); color: var(--normal); }
+    .qi-actions img { width: 20px; }
+    .qi-actions svg { width: 20px; height: 20px; }
+    .qi-actions .emoji { font-size: var(--text-xl); }
+
+    /* The favorite button matches the others (its base rule is more specific
+       and lays it out for the inline icon row). */
+    .result-quick-icons .qi-actions > .fav-btn {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        align-items: center;
+        justify-items: center;
+        gap: 10px;
+        padding: 7px 10px;
+    }
+
+    /* The injected text labels — left-aligned in their column, normal size. */
+    .qi-actions .qi-label {
+        display: inline;
+        justify-self: start;
+        font-size: var(--text-md);
+        color: var(--normal);
+        white-space: nowrap;
+    }
+}
+
+/* Tight two-column band (above the single-column break, so each column is
+   narrow): rather than ellipsing the buyer store names, fold away the
+   ratio/credit and quantity so the name keeps its room. The ratio/credit
+   stay available in the row's hover tooltip. The lower bound shares the
+   exact 560px edge with the single-column rule above (strict vs. non-strict
+   `<`) so there's no sub-pixel gap where the fields flash back in. */
+@container search-results (560px < width <= 720px) {
+    .price-right.has-buylist-extra { grid-template-columns: 7em; }
+    .price-right.has-buylist-extra .buylist-extra,
+    .price-right.has-buylist-extra .qty { display: none; }
 }
 
 @media (max-width: 900px) {
@@ -1729,8 +1864,6 @@ body.modal-embed .cp-overlay {
 }
 
 @media (max-width: 600px) {
-    .search-input-row { flex-wrap: wrap; }
-    .search-actions { width: 100%; justify-content: center; }
     .result-quick-icons { width: 100%; justify-content: flex-start; }
     .result-set-title { margin-left: 0; width: 100%; }
 }
@@ -1744,12 +1877,12 @@ body.modal-embed .cp-overlay {
 
 .search-landing-grid {
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: minmax(240px, 320px) 1fr;
     gap: 1rem;
     align-items: stretch;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 540px) {
     .search-landing-grid {
         grid-template-columns: 1fr;
     }
@@ -1763,6 +1896,7 @@ body.modal-embed .cp-overlay {
     border-radius: 0.5em;
     overflow: hidden;
     min-height: 50vh;
+    container-type: inline-size;
 }
 
 .landing-pane-header {
@@ -2216,6 +2350,7 @@ body.modal-embed .cp-overlay {
     color: var(--search-link);
     opacity: 0.55;
     margin-top: 1.5em;
+    font-size: 1.5em;
     animation: landing-empty-fade 0.5s ease both;
     animation-delay: 0.3s;
 }
@@ -2255,14 +2390,18 @@ body.modal-embed .cp-overlay {
     50%      { transform: scale(1.18); }
 }
 
-@media (max-width: 520px) {
+@container (max-width: 420px) {
     .landing-empty-flow {
         grid-template-columns: 1fr;
         gap: 0.5em;
     }
     .landing-empty-arrow {
-        transform: rotate(90deg);
         margin-top: 0;
+        font-size: 0;
+    }
+    .landing-empty-arrow::after {
+        content: '↓';
+        font-size: 1.5rem;
     }
 }
 
@@ -2578,8 +2717,8 @@ body.modal-embed .cp-overlay {
 }
 .fav-sort-pill i,
 .fav-sort-pill svg { width: 16px; height: 16px; }
-.fav-sort-pill .fav-sort-dir.asc { color: #22c55e; }
-.fav-sort-pill .fav-sort-dir.desc { color: #ef4444; }
+.fav-sort-pill .fav-sort-dir.asc,
+.fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
 
 /* -- Subgrid alignment for price columns -- */
 @supports (grid-template-columns: subgrid) {
@@ -2624,4 +2763,36 @@ body.modal-embed .cp-overlay {
     .rows-index .price-row > .index-label-1 { grid-column: 2; }
     .rows-index .price-row > .index-label-2 { grid-column: 3; }
     .rows-index .price-row > .index-label-3 { grid-column: 4; }
+}
+
+/* ── No-results suggestions (did you mean / broader searches) ── */
+.search-suggestions {
+    margin-top: 1.5em;
+    font-size: var(--text-xl);
+    color: var(--activetext);
+}
+.search-suggestion-didyoumean {
+    margin: 0 0 0.75em;
+}
+.search-suggestion-didyoumean a {
+    color: var(--ainfo);
+    font-weight: 600;
+}
+.search-suggestion-label {
+    margin: 0 0 0.4em;
+    color: var(--text-dim);
+}
+.search-suggestion-list {
+    margin: 0;
+    padding-left: 1.2em;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+.search-suggestion-list a {
+    color: var(--ainfo);
+}
+.search-suggestion-list a:hover,
+.search-suggestion-didyoumean a:hover {
+    text-decoration: underline;
 }

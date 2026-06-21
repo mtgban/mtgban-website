@@ -1,47 +1,82 @@
 {{define "navbar"}}
-<nav class="ban-nav">
-    <ul class="ban-nav-links">
+<nav class="navbar-v2">
+  <div class="nav2-inner">
+
+    <a class="nav2-brand" href="/" title="Home">
+        <img src="/img/logo/ban-stroop.png" alt="BAN">
+        <span class="nav2-brand-text">MTG<span class="ban">BAN</span></span>
+    </a>
+
+    <div class="nav2-search autocomplete">
+        <span class="nav2-search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <form id="nav-searchform" action="{{if .IsSealed}}/sealed{{else}}/search{{end}}" autocomplete="off" spellcheck="false">
+            <input id="nav-searchbox" type="text" name="q" placeholder="Search cards, sets, products…" value="{{.SearchQuery}}" maxlength="1000" autocapitalize="none" autofocus onFocus="this.setSelectionRange(0, this.value.length)">
+        </form>
+    </div>
+
+    <div class="nav2-sections">
         {{range .Nav}}
-        <li>
-            <a class="{{.Class}}" href="{{.Link}}">
-                <span class="nav-icon">{{.Short}}</span>
-                <span class="nav-full">{{.Name}}</span>
-                <span class="nav-short">{{.Name}}</span>
+            {{if or (eq .Name "Search") (eq .Name "Sealed")}}
+                <a class="nav2-section-btn" href="{{.Link}}" data-tool="{{slug .Name}}" data-icon="{{.Short}}" data-desc="{{.Description}}">{{.Name}}</a>
+            {{end}}
+        {{end}}
+        <div class="nav2-tools-wrap">
+            <button class="nav2-section-btn is-tools" id="tools-btn" type="button" aria-haspopup="menu" aria-expanded="false">
+                Tools
+                <svg class="chev" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="tools-dropdown" id="tools-dropdown" role="menu" aria-labelledby="tools-btn">
+        <div class="tools-grid" id="tools-grid">
+            {{range .Nav}}
+                {{if and (ne .Name "Home") (ne .Name "Search") (ne .Name "Sealed")}}
+                    <a class="tools-tile{{if eq .Name "Admin"}} is-admin{{end}}" href="{{.Link}}" data-tool="{{slug .Name}}">
+                        <span class="tools-tile-icon">{{.Short}}</span>
+                        <span class="tools-tile-text">
+                            <span class="tools-tile-name">{{.Name}}</span>
+                            <span class="tools-tile-desc">{{.Description}}</span>
+                        </span>
+                    </a>
+                {{end}}
+            {{end}}
+        </div>
+
+        <div class="tools-quick">
+            <span class="tools-quick-label">Links</span>
+            <a class="tools-quick-btn" href="https://www.patreon.com/mtgban" target="_blank" rel="noopener" title="Patreon">
+                <img src="/img/misc/patreon.png" alt="Patreon">Patreon
             </a>
-        </li>
-        {{end}}
-    </ul>
+            <a class="tools-quick-btn" href="/discord" title="Discord">
+                <img src="/img/misc/discord.png" alt="Discord">Discord
+            </a>
+            {{if .BetaNav}}
+            <span class="tools-quick-user" title="Account">{{.BetaNav.Short}}</span>
+            {{end}}
+            <span class="tools-quick-spacer"></span>
+            <button class="tools-quick-btn ban-theme-toggle" id="theme-toggle" type="button" title="Toggle theme">
+                <svg class="theme-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffdd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                <svg class="theme-icon theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1a5ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
+                <svg class="theme-icon theme-icon-system" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9a9a9a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </button>
+        </div>
+    </div>
+    <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
 
-    <div class="ban-nav-spacer"></div>
-
-    <div class="ban-nav-right">
-        {{if .BetaNav}}
-        <a class="{{.BetaNav.Class}}" href="{{.BetaNav.Link}}">
-            <span class="nav-icon">{{.BetaNav.Short}}</span>
+    <div class="nav2-utility">
+        <a class="nav2-icon-btn" href="/guide" title="Guide">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
         </a>
-        {{end}}
-        <a class="ban-nav-ext" href="https://www.patreon.com/mtgban" title="Patreon">
-            <img src="/img/misc/patreon.png" alt="Patreon">
+        <a class="nav2-icon-btn ban-settings-btn{{if not .HasSettings}} is-disabled{{end}}" id="nav-settings-btn" href="?settings=1"{{if .HasSettings}} title="Settings (Ctrl+,)"{{else}} title="No settings on this page" aria-disabled="true" tabindex="-1"{{end}} onclick="if(window.openSettings && !this.classList.contains('is-disabled')){event.preventDefault();window.openSettings();return false;}return false;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </a>
-        <a class="ban-nav-ext" {{if .PatreonLogin}}style="display:none"{{end}} href="/discord" title="Discord">
-            <img src="/img/misc/discord.png" alt="Discord">
-        </a>
-
-        <a class="ban-nav-ext" href="/guide" title="Guide">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--greytext)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
-        </a>
-        <button class="ban-theme-toggle" id="theme-toggle" type="button" title="Toggle theme">
-            <svg class="theme-icon theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffdd00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-            <svg class="theme-icon theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a5ea6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>
-        </button>
-        <script type="text/javascript" src="/js/nightmode.js?hash={{.Hash}}"></script>
-
-        <a class="ban-settings-btn is-disabled" id="nav-settings-btn" href="?settings=1" title="No settings on this page" aria-disabled="true" tabindex="-1" onclick="if(window.openSettings && !this.classList.contains('is-disabled')){event.preventDefault();window.openSettings();return false;}return false;">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--greytext)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </a>
-
         <button class="ban-nav-hamburger" onclick="document.getElementById('mobile-menu').classList.add('open'); document.getElementById('mobile-overlay').classList.add('open');">&#9776;</button>
     </div>
+
+  </div>
 </nav>
 
 <div class="ban-nav-mobile-overlay" id="mobile-overlay" onclick="this.classList.remove('open'); document.getElementById('mobile-menu').classList.remove('open');"></div>
@@ -64,4 +99,112 @@
     <hr class="ban-nav-mobile-divider">
     <a style="padding: 8px 12px; font-size: 0.85rem; color: var(--greytext); text-decoration: none;" href="#" onclick="window.location='/toggle-mobile?redirect='+encodeURIComponent(window.location.pathname+window.location.search); return false;">Switch to Mobile View</a>
 </div>
+
+<script>
+/*
+ * Synchronous, inline layout restoration. Runs IMMEDIATELY after the
+ * navbar DOM is parsed and BEFORE the browser paints — so the user
+ * never sees the server's default Search/Sealed layout flash before
+ * the user's customised section group renders. Pulls saved state from
+ * the same localStorage key the drag system writes (`mtgban_nav_layout_v1`).
+ *
+ * The deferred navbar.js still attaches drag handlers later in the
+ * load — this script only handles initial restoration.
+ */
+(function() {
+    var saved;
+    try { saved = JSON.parse(localStorage.getItem('mtgban_nav_layout_v1') || 'null'); } catch (e) { return; }
+    if (!saved || !Array.isArray(saved.sections) || !Array.isArray(saved.grid)) return;
+
+    var navSections = document.querySelector('.nav2-sections');
+    var grid = document.getElementById('tools-grid');
+    var toolsWrap = navSections && navSections.querySelector('.nav2-tools-wrap');
+    if (!navSections || !grid || !toolsWrap) return;
+
+    // Go's html/template percent-encodes non-ASCII attribute values
+    // for safety, so the emoji icons on Search/Sealed nav buttons
+    // arrive as e.g. "%f0%9f%a7%b1" instead of "🧱". Decode before
+    // using them as text content. The try/catch keeps things safe
+    // if a value somehow contains a stray '%'.
+    function decode(s) {
+        try { return s ? decodeURIComponent(s) : ''; } catch (e) { return s || ''; }
+    }
+
+    // Build a lookup of every navigable entry by reading whatever
+    // version of it the server happened to render (nav button for
+    // Search/Sealed via data-attrs, tile for everything else via
+    // children). Skip when we've already harvested an entry.
+    var info = {};
+    function read(el) {
+        var tool = el.getAttribute('data-tool');
+        if (!tool || info[tool]) return;
+        if (el.classList.contains('tools-tile')) {
+            info[tool] = {
+                name: (el.querySelector('.tools-tile-name') || {}).textContent || '',
+                icon: (el.querySelector('.tools-tile-icon') || {}).textContent || '',
+                desc: (el.querySelector('.tools-tile-desc') || {}).textContent || '',
+                href: el.getAttribute('href') || '#',
+                admin: el.classList.contains('is-admin')
+            };
+        } else {
+            info[tool] = {
+                name: el.textContent.trim(),
+                icon: decode(el.getAttribute('data-icon')),
+                desc: decode(el.getAttribute('data-desc')),
+                href: el.getAttribute('href') || '#',
+                admin: false
+            };
+        }
+    }
+    document.querySelectorAll('.nav2-sections .nav2-section-btn:not(.is-tools), #tools-grid .tools-tile').forEach(read);
+
+    function mkSection(tool) {
+        var e = info[tool]; if (!e) return null;
+        var a = document.createElement('a');
+        a.className = 'nav2-section-btn';
+        a.setAttribute('data-tool', tool);
+        a.setAttribute('data-icon', e.icon);
+        a.setAttribute('data-desc', e.desc);
+        a.setAttribute('href', e.href);
+        a.textContent = e.name;
+        return a;
+    }
+    function mkTile(tool) {
+        var e = info[tool]; if (!e) return null;
+        var a = document.createElement('a');
+        a.className = 'tools-tile' + (e.admin ? ' is-admin' : '');
+        a.setAttribute('data-tool', tool);
+        a.setAttribute('href', e.href);
+        a.innerHTML =
+            '<span class="tools-tile-icon">' + e.icon + '</span>' +
+            '<span class="tools-tile-text">' +
+                '<span class="tools-tile-name">' + e.name + '</span>' +
+                '<span class="tools-tile-desc">' + e.desc + '</span>' +
+            '</span>';
+        return a;
+    }
+
+    // Wipe and rebuild — this is a single synchronous DOM mutation
+    // before paint, so no intermediate state is visible.
+    navSections.querySelectorAll('.nav2-section-btn:not(.is-tools)').forEach(function(el) { el.remove(); });
+    grid.querySelectorAll('.tools-tile').forEach(function(el) { el.remove(); });
+
+    var placed = {};
+    saved.sections.forEach(function(tool) {
+        var el = mkSection(tool); if (el) { navSections.insertBefore(el, toolsWrap); placed[tool] = true; }
+    });
+    saved.grid.forEach(function(tool) {
+        var el = mkTile(tool); if (el) { grid.appendChild(el); placed[tool] = true; }
+    });
+
+    // Append any server-rendered tool missing from the saved layout — e.g. a
+    // tool added to the nav, or newly granted to this user, after the layout
+    // was saved (Arbit/Reverse for a Root user with an older layout). Without
+    // this they'd be silently dropped, since the tiles were wiped above.
+    Object.keys(info).forEach(function(tool) {
+        if (!placed[tool]) { var el = mkTile(tool); if (el) grid.appendChild(el); }
+    });
+})();
+
+</script>
 {{end}}

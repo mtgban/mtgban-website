@@ -1337,6 +1337,18 @@
     object-fit: contain;
 }
 
+/* Favorited state for the menu copy of the star. */
+.m-actions-fav.active { color: #f5c518; }
+.m-actions-fav.active svg { fill: #f5c518; stroke: #f5c518; }
+
+/* Portrait: collapse the favorite + chart buttons into the actions menu so the
+   card header shows just the kebab (mirrors the desktop narrow layout). In
+   landscape they stay inline and the menu copies hide (see the landscape block). */
+@media (orientation: portrait) {
+    .m-fav-btn,
+    .m-chart-btn { display: none; }
+}
+
 /* Chart drawer */
 .m-chart-drawer {
     position: fixed;
@@ -1976,6 +1988,11 @@
 /* Landscape: side-by-side Sellers / Buyers with inline card image */
 @media (orientation: landscape) {
 
+    /* Landscape has room for the favorite + chart buttons inline, so drop their
+       collapsed copies from the actions menu. */
+    .m-actions-fav,
+    .m-actions-chart { display: none; }
+
     /* Navbar inline search: show search in navbar, hide standalone bar */
     .m-nav-search {
         display: flex;
@@ -2260,21 +2277,94 @@
     border-color: var(--accent-border, rgba(91,141,239,0.35));
 }
 
-.m-filter-set-list {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    z-index: 5;
-    margin: 0;
-    padding: 4px 0;
-    list-style: none;
-    max-height: 50vh;
-    overflow-y: auto;
+/* Full-screen edition/set picker */
+.m-setpicker-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 600;
+    flex-direction: column;
     background: var(--surface-1, #181a22);
-    border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
+}
+
+.light-theme .m-setpicker-overlay { background: #fff; }
+
+.m-setpicker-overlay.open {
+    display: flex;
+}
+
+body.m-setpicker-lock {
+    overflow: hidden;
+}
+
+.m-setpicker-header {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    padding: 0.6em 0.85em;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+}
+
+.m-setpicker-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2em;
+    height: 2.2em;
+    border: none;
+    background: transparent;
+    color: var(--text);
     border-radius: 0.4em;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    cursor: pointer;
+}
+
+.m-setpicker-close i,
+.m-setpicker-close svg { width: 1.4em; height: 1.4em; }
+
+.m-setpicker-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.m-setpicker-search {
+    position: relative;
+    padding: 0.6em 0.85em;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+}
+
+.m-setpicker-search i,
+.m-setpicker-search svg {
+    position: absolute;
+    left: 1.6em;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1.1em;
+    height: 1.1em;
+    color: var(--greytext);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.m-setpicker-search input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.7em 0.85em 0.7em 2.6em;
+    background: var(--surface-2, rgba(255,255,255,0.04));
+    color: var(--text);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    border-radius: 0.4em;
+    font: inherit;
+}
+
+.m-filter-set-list {
+    flex: 1;
+    margin: 0;
+    padding: 0.25em 0;
+    list-style: none;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 
 .m-filter-set-list li {
@@ -2282,7 +2372,7 @@
     align-items: center;
     gap: 0.6em;
     min-height: 44px;
-    padding: 0 0.85em;
+    padding: 0 1em;
     cursor: pointer;
     color: var(--text);
 }
@@ -2374,5 +2464,5 @@
 }
 .m-fav-sort .fav-sort-pill i,
 .m-fav-sort .fav-sort-pill svg { width: 16px; height: 16px; }
-.m-fav-sort .fav-sort-pill .fav-sort-dir.asc { color: #22c55e; }
-.m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: #ef4444; }
+.m-fav-sort .fav-sort-pill .fav-sort-dir.asc,
+.m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }

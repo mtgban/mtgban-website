@@ -93,12 +93,11 @@
 {{end}}
 
 {{define "arbit-results"}}
-<div class="page-standard arb-page">
+<div class="page-standard arb-page arb-wide">
         <div id="hoverWrap" class="foil-wrap hoverWrap">
             <img id="hoverImage" class="hoverImage" src=""/>
         </div>
         <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
-        <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
         <script type="text/javascript" src="/js/updatesearch.js?hash={{.Hash}}"></script>
 
         <a name="top"></a>
@@ -108,7 +107,7 @@
         <div class="arb-selector-bar">
             <div class="arb-current-store">
                 <span class="store-type">{{if .GlobalMode}}Index{{else if .ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
-                <select class="arb-store-select" onchange="if(this.value) window.location.href=this.value">
+                <select class="arb-store-select" onchange="if(/^\/(?!\/)/.test(this.value)) window.location.href=this.value">
                     {{range .ExtraNav}}
                         {{if and .Active (not (contains .Name "Sealed"))}}
                             <option value="" selected>{{.Name}}</option>
@@ -138,6 +137,17 @@
                     {{end}}
                 </select>
             </div>
+            {{if and (not .LargeTable) .Arb}}
+            <div class="arb-current-store">
+                <span class="store-type">{{if .ReverseMode}}Buying from{{else}}Selling to{{end}}</span>
+                <select class="arb-store-select" onchange="if(this.value) location.hash = this.value">
+                    <option value="" disabled selected>Jump to…</option>
+                    {{range .Arb}}
+                        <option value="{{.Name}}">{{.Name}} ({{len .Arbit}})</option>
+                    {{end}}
+                </select>
+            </div>
+            {{end}}
         </div>
         {{end}}
 
@@ -161,16 +171,6 @@
                     {{end}}
                 {{end}}
                 <input class="arb-edition-filter" type="text" id="filterInput" onkeyup="filterTableByEdition()" placeholder="Filter edition...">
-            </div>
-
-            <!-- Jump-to bar -->
-            <div class="arb-jump-bar">
-                {{if .Arb}}
-                    <span class="arb-jump-label">Jump to</span>
-                    {{range .Arb}}
-                        <a class="arb-jump-chip" href="#{{.Name}}">{{.Name}} <span class="arb-jump-count">({{len .Arbit}})</span></a>
-                    {{end}}
-                {{end}}
             </div>
         {{else}}
             <br>
@@ -212,6 +212,7 @@
         </script>
 
         {{range $i, $arb := .Arb}}
+            <div class="arb-section">
             <span class="anchor" id="{{.Name}}"></span>
             <div class="arb-section-header">
                 <a class="arb-section-name" href="#top">{{.Name}}</a>
@@ -348,12 +349,15 @@
                     -->
                 </div>
                 {{if and (eq $i 0) (eq $.ScraperShort "SYP")}}
-                        {{end}}
+                    <div class="arb-load-btns">
+                        <a class="arb-load-btn csv" href="?page=syp&format=csv">Download CSV</a>
+                    </div>
+                {{end}}
                 <hr style="width: 100%; border: none; border-top: 1px solid var(--arb-border-subtle); margin: 0;">
             </div>
 
             <div class="arb-table-wrap">
-            <table class="table-data arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';document.getElementById('hoverWrap').setAttribute('data-foil','false');">
+            <table class="table-data arb-table filterable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
@@ -397,13 +401,14 @@
                         {{end}}
                     {{end}}
                     <th class="c">Links</th>
+                    <th class="c"><input type="checkbox" checked title="Toggle all" onchange="toggleAllArbitRows(this)"></th>
                 </tr>
                 </thead>
                 <tbody>
                 {{$arbitContainer := .}}
                 {{range .Arbit}}
                     {{$card := (index $.Metadata .CardId)}}
-                    <tr onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                    <tr data-arb-id="{{.CardId}}" data-arb-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-arb-name="{{$card.Name}}" data-arb-cond="{{.InventoryEntry.Conditions}}" data-arb-ckid="{{uuid2ckid .CardId}}" data-arb-tcgid="{{uuid2tcgid .CardId}}" onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                         <td>
                             <div class="arb-card-cell">
                                 {{$keyrune := $card.Keyrune}}
@@ -415,24 +420,20 @@
                                         <text font-size="12" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{$card.SetCode}}</text>
                                     </svg>
                                 {{end}}
-                                <div class="card-info">
-                                    <span class="card-name-line">
-                                        <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
-                                        {{if $card.Reserved}} *{{end}}
-                                        {{if $card.Stocks}} •{{end}}
-                                        {{if eq $.ScraperShort $card.HotlistStore}}
-                                            <span class="emoji" title="Highest price in 3 months">🌟</span>
-                                        {{end}}
-                                        {{if $card.Sealed}}
-                                            <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product">
-                                                <span class="emoji">🔎</span>
-                                            </a>
-                                        {{else}}
-                                            <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">📝</span>
-                                        {{end}}
-                                    </span>
-                                    <span class="card-edition">{{$card.Edition}}{{if not $.IsSealed}} · #{{$card.Number}}{{end}}</span>
-                                </div>
+                                <span class="card-name-line">
+                                    <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
+                                    {{if $card.Reserved}} *{{end}}
+                                    {{if $card.Stocks}} •{{end}}
+                                    {{if eq $.ScraperShort $card.HotlistStore}}
+                                        <span class="emoji" title="Highest price in 3 months">🌟</span>
+                                    {{end}}
+                                    {{if $card.Sealed}}
+                                        <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product">
+                                            <span class="emoji">🔎</span>
+                                        </a>
+                                    {{end}}
+                                </span>
+                                <span class="card-edition">{{$card.Edition}}{{if not $.IsSealed}} · #{{$card.Number}}{{end}}</span>
                             </div>
                         </td>
                         <td>
@@ -513,6 +514,7 @@
                                 {{end}}
                             </div>
                         </td>
+                        <td class="c"><input type="checkbox" checked class="arb-row-check" onchange="toggleArbitRow(this)"></td>
                     </tr>
                 {{end}}
 
@@ -542,6 +544,7 @@
                 </tbody>
             </table>
             </div>
+            </div>
         {{end}}
 
         <br>
@@ -552,6 +555,110 @@
         </p>
         <br>
 </div>
+
+<script>
+function toggleArbitRow(checkbox) {
+    var row = checkbox.closest('tr');
+    if (!row) return;
+    if (checkbox.checked) {
+        row.classList.remove('arb-removed');
+    } else {
+        row.classList.add('arb-removed');
+    }
+}
+
+function toggleAllArbitRows(masterCheckbox) {
+    var table = masterCheckbox.closest('table');
+    if (!table) return;
+    var checkboxes = table.querySelectorAll('.arb-row-check');
+    checkboxes.forEach(function(cb) {
+        cb.checked = masterCheckbox.checked;
+        toggleArbitRow(cb);
+    });
+}
+
+// Collect active (non-removed) rows from the arbit table in the same section
+function getActiveArbRows(section) {
+    var rows = [];
+    section.querySelectorAll('tr[data-arb-id]:not(.arb-removed)').forEach(function(row) {
+        rows.push({
+            id: row.dataset.arbId,
+            qty: row.dataset.arbQty || '1',
+            name: row.dataset.arbName || '',
+            cond: row.dataset.arbCond || '',
+            ckid: row.dataset.arbCkid || '',
+            tcgid: row.dataset.arbTcgid || ''
+        });
+    });
+    return rows;
+}
+
+function filterArbForm(form) {
+    var section = form.closest('.arb-page');
+    if (!section) return;
+    var active = getActiveArbRows(section);
+    var allRows = section.querySelectorAll('tr[data-arb-id]');
+    if (active.length === allRows.length) return;
+
+    // CK buylist JSON
+    var jsonInput = form.querySelector('input[name="json"]');
+    if (jsonInput) {
+        var contents = active.map(function(r) {
+            return '{"id":' + r.ckid + ',"qty":' + r.qty + '}';
+        });
+        jsonInput.value = '{"contents":[' + contents.join(',') + ',{}]}';
+        return;
+    }
+
+    // CK/CSI deckbuilder (name="c" or name="sList")
+    var cInput = form.querySelector('input[name="c"]');
+    if (cInput) {
+        // Check if TCG format (qty-tcgid||) or CK format (qty name||)
+        if (cInput.value.match(/\d+-\d+\|\|/)) {
+            cInput.value = active.map(function(r) { return r.qty + '-' + r.tcgid + '||'; }).join('');
+        } else {
+            cInput.value = active.map(function(r) { return r.qty + ' ' + r.name + '||'; }).join('');
+        }
+        return;
+    }
+    var sListInput = form.querySelector('input[name="sList"]');
+    if (sListInput) {
+        sListInput.value = active.map(function(r) { return r.qty + ' ' + r.name + '|'; }).join('');
+        return;
+    }
+
+    // Manapool deck (base64 encoded)
+    var deckInput = form.querySelector('input[name="deck"]');
+    if (deckInput) {
+        var deck = active.map(function(r) { return r.qty + ' ' + r.name; }).join('\n');
+        deckInput.value = btoa(deck);
+        return;
+    }
+
+    // Per-entry forms (hashes) — disable removed input groups
+    var removed = {};
+    section.querySelectorAll('tr.arb-removed').forEach(function(row) {
+        if (row.dataset.arbId) removed[row.dataset.arbId] = true;
+    });
+    var inputs = form.querySelectorAll('input[type="hidden"]');
+    var skip = false;
+    for (var i = 0; i < inputs.length; i++) {
+        var inp = inputs[i];
+        if (inp.name && inp.name.match(/hashes$/)) {
+            skip = removed[inp.value] || false;
+        }
+        if (skip) inp.disabled = true;
+    }
+}
+
+// Intercept clicks on arbit action buttons
+document.addEventListener('click', function(e) {
+    var btn = e.target.closest('.arb-load-btn');
+    if (!btn) return;
+    var form = btn.closest('form');
+    if (form) filterArbForm(form);
+}, true);
+</script>
 {{end}}
 
 {{define "settings-content"}}

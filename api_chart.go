@@ -27,25 +27,24 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	uuid := strings.TrimPrefix(r.URL.Path, "/api/chart/")
 	uuid = strings.TrimSuffix(uuid, "/")
 	if uuid == "" {
-		http.Error(w, "missing card UUID", http.StatusBadRequest)
+		errorResponse(w, http.StatusBadRequest, "missing card UUID")
 		return
 	}
 
 	if PricesArchiveDB == nil {
-		http.Error(w, "charts not available", http.StatusServiceUnavailable)
+		errorResponse(w, http.StatusServiceUnavailable, "charts not available")
 		return
 	}
 
 	co, err := mtgmatcher.GetUUID(uuid)
 	if err != nil {
-		http.Error(w, "card not found", http.StatusNotFound)
+		errorResponse(w, http.StatusNotFound, "card not found")
 		return
 	}
 
 	sig := r.FormValue("sig")
-	userTier := GetParamFromSig(sig, "UserTier")
 
-	lb := lookbackForTier(userTier)
+	lb := chartLookback(sig)
 	maxDays := lb.Days()
 
 	earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
@@ -63,7 +62,7 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	axisLabels := getDateAxisValues(earliest)
-	datasets := getDatasets(r.Context(), uuid, co.Sealed, axisLabels, userTier)
+	datasets := getDatasets(r.Context(), uuid, co.Sealed, axisLabels, lb)
 
 	var apiDatasets []ChartAPIDataset
 	for _, ds := range datasets {

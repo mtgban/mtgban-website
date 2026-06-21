@@ -5,9 +5,38 @@
  * If a user scrolls up and down, selects an entry and presses Enter, or
  * clicks on a field, they will be submitting the form automatically.
  */
+
+/* Shared across all autocomplete instances on a page. */
+var __acCardMetaCache = {};
+var __acCardMetaInflight = {};
+
+function __acEsc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+}
+
+/* Returns cached card meta, or null while a fetch is in flight. */
+function __acFetchCardMeta(name, onReady) {
+    if (!name) return null;
+    if (__acCardMetaCache[name]) return __acCardMetaCache[name];
+    if (__acCardMetaInflight[name]) return null;
+    __acCardMetaInflight[name] = fetch('/api/palette/card/' + encodeURIComponent(name))
+        .then(function (r) { return r.ok ? r.json() : { found: false }; })
+        .then(function (data) {
+            if (data && data.found) __acCardMetaCache[name] = data;
+            delete __acCardMetaInflight[name];
+            if (typeof onReady === 'function') onReady();
+            return data;
+        })
+        .catch(function () { delete __acCardMetaInflight[name]; });
+    return null;
+}
+
 async function autocomplete(form, inp, sealed) {
     var currentFocus;
     var minlen = 3;
+    var providerMode = false;
     const arr = await fetchNames(sealed);
 
     // Track viewport listeners so we can detach them when the dropdown closes
@@ -48,14 +77,117 @@ async function autocomplete(form, inp, sealed) {
         }
     }
 
+    /* Render the active token's provider candidates. Returns true if a known
+     * prefix was detected (so the caller skips card-name suggestions). */
+    function renderProviderDropdown() {
+        var providers = window.__palette_providers;
+        if (!providers) return false;
+
+        var caret = inp.selectionStart;
+        if (typeof caret !== 'number') caret = inp.value.length;
+        var head = inp.value.slice(0, caret);
+        var tokenStart = head.lastIndexOf(' ') + 1;
+        var token = head.slice(tokenStart);
+
+        var detected = providers.detectPrefix(token);
+        if (!detected) return false;
+        var provider = providers.getProvider(detected.prefix);
+        if (!provider) return false;
+
+        /* Split the remainder on the last comma for multi-value lists. */
+        var remainder = detected.query;
+        var lastComma = remainder.lastIndexOf(',');
+        var committed = lastComma >= 0 ? remainder.slice(0, lastComma + 1) : '';
+        var filterQuery = lastComma >= 0 ? remainder.slice(lastComma + 1) : remainder;
+
+        /* Card-context narrowing from a quoted name before the active token. */
+        var cardMeta = null;
+        var match = inp.value.slice(0, tokenStart).match(/"([^"]+)"/);
+        if (match) {
+            /* On resolve the cache is populated, so the re-dispatch hits cache and stops. */
+            cardMeta = __acFetchCardMeta(match[1], function () {
+                if (currentItemsDiv && document.activeElement === inp) {
+                    inp.dispatchEvent(new InputEvent('input'));
+                }
+            });
+        }
+
+        var candidates = (provider.getCandidates(filterQuery, { chips: [], cardMeta: cardMeta }) || []).slice(0, 30);
+
+        currentFocus = -1;
+
+        var valueBefore = inp.value.slice(0, tokenStart);
+        var tail = inp.value.slice(caret);
+
+        var list = document.createElement("DIV");
+        list.setAttribute("id", inp.id + "autocomplete-list");
+        list.setAttribute("class", "autocomplete-items ac-dropdown");
+
+        for (var i = 0; i < candidates.length; i++) {
+            list.appendChild(buildProviderRow(candidates[i], detected.prefix, committed, valueBefore, tail));
+        }
+
+        if (list.hasChildNodes()) {
+            inp.parentNode.appendChild(list);
+            currentItemsDiv = list;
+            providerMode = true;
+            fitToViewport();
+            attachViewportListeners();
+        }
+        /* Return true even with no matches: a known prefix suppresses name suggestions. */
+        return true;
+    }
+
+    function buildProviderRow(candidate, prefix, committed, valueBefore, tail) {
+        var row = document.createElement("DIV");
+
+        if (candidate.disabled) {
+            row.className = "autocomplete-disabled";
+            row.textContent = candidate.label || '';
+            return row;
+        }
+
+        var iconInner = '';
+        if (candidate.keyrune) {
+            var kr = String(candidate.keyrune).toLowerCase().replace(/[^a-z0-9]/g, '');
+            iconInner = '<i class="ss ss-fw ss-' + kr + '"></i>';
+        } else if (candidate.iconColor) {
+            /* Whitelist CSS color chars; HTML-escaping alone does not stop CSS injection. */
+            var safeColor = /^[a-zA-Z0-9#(),%. +-]+$/.test(candidate.iconColor) ? candidate.iconColor : '';
+            iconInner = '<span class="ac-swatch" style="background:' + safeColor + '"></span>';
+        }
+
+        /* Fixed-width icon column so labels left-align regardless of symbol width. */
+        var label = candidate.label || candidate.value || '';
+        var sub = candidate.sublabel ? '<span class="ac-sub">' + __acEsc(candidate.sublabel) + '</span>' : '';
+        row.innerHTML = '<span class="ac-icon">' + iconInner + '</span><span class="ac-label">' + __acEsc(label) + '</span>' + sub;
+
+        var newToken = prefix + committed + candidate.value;
+        row.addEventListener("click", function () {
+            inp.value = valueBefore + newToken + tail;
+            var pos = (valueBefore + newToken).length;
+            closeAllLists();
+            inp.focus();
+            try { inp.setSelectionRange(pos, pos); } catch (e) {}
+        });
+        return row;
+    }
+
     /* Execute a function when someone writes in the text field: */
     inp.addEventListener("input", function(e) {
         var a, b, i, val = this.value;
         /* Close any already open lists of autocompleted values */
         closeAllLists();
+        providerMode = false;
         if (!val) {
             return false;
         }
+
+        /* Prefix-driven sub-option suggestions take precedence over names. */
+        if (renderProviderDropdown()) {
+            return;
+        }
+
         /* Clean up input string */
         val = val.trim();
 
@@ -67,7 +199,7 @@ async function autocomplete(form, inp, sealed) {
         /* Create a DIV element that will contain the items (values) */
         a = document.createElement("DIV");
         a.setAttribute("id", this.id + "autocomplete-list");
-        a.setAttribute("class", "autocomplete-items");
+        a.setAttribute("class", "autocomplete-items ac-dropdown");
 
         /* For each item in the array... */
         for (i = 0; i < arr.length; i++) {
@@ -167,8 +299,13 @@ async function autocomplete(form, inp, sealed) {
             /* If the TAB or RIGHT ARROW keys are pressed, and if the selector
              * is open, do not move focus */
             e.preventDefault();
-            /* initialize the input field with what is selected */
-            this.value = x[currentFocus].textContent;
+            if (providerMode) {
+                /* Provider rows splice a value, so select rather than copy text. */
+                if (x) x[currentFocus].click();
+            } else {
+                /* initialize the input field with what is selected */
+                this.value = x[currentFocus].textContent;
+            }
         }
     });
 
@@ -198,8 +335,9 @@ async function autocomplete(form, inp, sealed) {
 
     /* Close all autocomplete lists in the document, except the one passed as an argument */
     function closeAllLists(elmnt) {
+        // Only our own dropdowns; other widgets reuse the autocomplete-items class.
         // Snapshot the live HTMLCollection so removeChild iteration is robust
-        var x = Array.from(document.getElementsByClassName("autocomplete-items"));
+        var x = Array.from(document.getElementsByClassName("ac-dropdown"));
         var anyRemoved = false;
         for (var i = 0; i < x.length; i++) {
             if (elmnt != x[i] && elmnt != inp) {
@@ -218,4 +356,15 @@ async function autocomplete(form, inp, sealed) {
     document.addEventListener("click", function(e) {
         closeAllLists(e.target);
     });
+
+    /* Refresh an open provider dropdown when sets/stores JSON finishes loading. */
+    /* Guard against double-registering if autocomplete() runs twice for this input. */
+    if (window.__palette_providers && typeof window.__palette_providers.setOnDataReady === 'function' && !inp._acDataReadyRegistered) {
+        inp._acDataReadyRegistered = true;
+        window.__palette_providers.setOnDataReady(function () {
+            if (providerMode && currentItemsDiv && document.activeElement === inp) {
+                inp.dispatchEvent(new InputEvent('input'));
+            }
+        });
+    }
 };

@@ -9,7 +9,6 @@ require (
 	github.com/bwmarrin/discordgo v0.27.1
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
 	github.com/extrame/xls v0.0.1
-	github.com/go-sql-driver/mysql v1.7.1
 	github.com/hashicorp/go-cleanhttp v0.5.2
 	github.com/leemcloughlin/logfile v0.0.0-20201123203928-cff1c8a30a10
 	github.com/lib/pq v1.11.1

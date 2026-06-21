@@ -11,8 +11,13 @@
 
     var providers = {};
 
-    var onDataReady = null;
-    function setOnDataReady(cb) { onDataReady = cb; }
+    var onDataReadyCbs = [];
+    function setOnDataReady(cb) { if (typeof cb === 'function') onDataReadyCbs.push(cb); }
+    function fireOnDataReady() {
+        for (var i = 0; i < onDataReadyCbs.length; i++) {
+            try { onDataReadyCbs[i](); } catch (e) { console.error('onDataReady cb error', e); }
+        }
+    }
 
     function register(p) {
         if (!p || !p.prefix) return;
@@ -41,15 +46,28 @@
         return providers[prefix.toLowerCase()] || null;
     }
 
-    // Shared substring filter: matches query against label + value + sublabel.
+    // Shared filter: matches when the query is a prefix of the value (e.g. a set
+    // code) or a prefix of any word in the label. Plain substring was too loose
+    // (typing "m" matched "Commander"); prefix matching reflects how filters like
+    // s: are actually typed.
+    function startsWithPrefix(s, q) {
+        return !!s && String(s).toLowerCase().lastIndexOf(q, 0) === 0;
+    }
+    function wordStartsWithPrefix(s, q) {
+        if (!s) return false;
+        var words = String(s).toLowerCase().split(/[\s\-_,/:]+/);
+        for (var i = 0; i < words.length; i++) {
+            if (words[i].lastIndexOf(q, 0) === 0) return true;
+        }
+        return false;
+    }
     function filterEntries(entries, query) {
         if (!query) return entries;
         var q = query.toLowerCase();
         var out = [];
         for (var i = 0; i < entries.length; i++) {
             var e = entries[i];
-            var hay = (e.label || '') + ' ' + (e.value || '') + ' ' + (e.sublabel || '');
-            if (hay.toLowerCase().indexOf(q) >= 0) out.push(e);
+            if (startsWithPrefix(e.value, q) || wordStartsWithPrefix(e.label, q)) out.push(e);
         }
         return out;
     }
@@ -346,13 +364,13 @@
             .then(function (data) {
                 setsCache = data || [];
                 setsCacheFetching = null;
-                if (typeof onDataReady === 'function') onDataReady();
+                fireOnDataReady();
                 return setsCache;
             })
             .catch(function () {
                 setsCache = [];
                 setsCacheFetching = null;
-                if (typeof onDataReady === 'function') onDataReady();
+                fireOnDataReady();
                 return setsCache;
             });
         return setsCacheFetching;
@@ -412,13 +430,13 @@
             .then(function (data) {
                 storesCache = data || { sellers: [], vendors: [] };
                 storesCacheFetching = null;
-                if (typeof onDataReady === 'function') onDataReady();
+                fireOnDataReady();
                 return storesCache;
             })
             .catch(function () {
                 storesCache = { sellers: [], vendors: [] };
                 storesCacheFetching = null;
-                if (typeof onDataReady === 'function') onDataReady();
+                fireOnDataReady();
                 return storesCache;
             });
         return storesCacheFetching;

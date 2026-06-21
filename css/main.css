@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=optional');
 
 /* Ubuntu-ish Colour theme
    Dark brown - #332532
@@ -92,7 +92,7 @@ html { font-size: 17px; }
     --font-mono: 'Geist', sans-serif;
 
     /* ── Layout tokens ── */
-    --nav-height: 48px;
+    --nav-height: 56px;
     --page-gutter: 3vw;
     --page-max-width: min(80vw, 1600px);
     --content-padding-top: calc(var(--nav-height) + 2vh);
@@ -126,6 +126,10 @@ html { font-size: 17px; }
 }
 
 .light-theme {
+    /* Render native form controls (checkboxes, selects, scrollbars) in the
+       matching scheme and opt out of Android Chrome's auto-dark force-darkening,
+       which otherwise mangles native checkboxes into invisibility. */
+    color-scheme: light;
     --normal: var(--black);
     --background: var(--white);
     --tralternatebase: var(--realwhite);
@@ -187,6 +191,7 @@ html { font-size: 17px; }
 }
 
 .dark-theme {
+    color-scheme: dark;
     --normal: var(--darkgrey);
     --background: var(--lightblack);
     --tralternatebase: var(--verydarkgrey);
@@ -378,83 +383,6 @@ a.pagination {
 
 /*********** TOP NAVBAR ***********/
 
-.ban-nav {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
-    height: var(--nav-height, 40px);
-    background: var(--navbackground);
-    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
-    display: flex; align-items: center;
-    padding: 0 20px;
-    gap: 0;
-}
-
-/* Main links */
-.ban-nav-links {
-    display: flex; align-items: center; gap: 2px;
-    list-style: none;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-    scrollbar-color: transparent transparent;
-    margin: 0; padding: 0;
-}
-.ban-nav-links::-webkit-scrollbar { height: 3px; }
-.ban-nav-links::-webkit-scrollbar-track { background: transparent; }
-.ban-nav-links::-webkit-scrollbar-thumb { background: var(--surface-4); border-radius: 2px; }
-
-.ban-nav-links a {
-    display: flex; align-items: center; gap: 5px;
-    padding: 7px 14px;
-    border-radius: var(--radius-sm, 6px);
-    color: var(--activetext);
-    text-decoration: none;
-    font-size: var(--text-md); font-weight: 500;
-    white-space: nowrap;
-    transition: all 0.12s;
-}
-.ban-nav-links a:hover {
-    color: var(--normal);
-    background: var(--surface-3, var(--navbackground));
-}
-.ban-nav-links a.active,
-.ban-nav-links a.selected {
-    color: var(--ainfo);
-    background: var(--accent-muted, rgba(91,141,239,0.12));
-}
-.light-theme .ban-nav-links a.active,
-.light-theme .ban-nav-links a.selected {
-    color: var(--activetext);
-    background: rgba(30,144,255,0.12);
-    border: 1px solid rgba(30,144,255,0.30);
-}
-
-/* Emoji/icon in nav items */
-.ban-nav-links .nav-icon {
-    font-size: var(--text-xl);
-    line-height: 1;
-}
-/* Text labels: full on desktop, short on squeeze */
-.ban-nav-links .nav-full { display: inline; }
-.ban-nav-links .nav-short { display: none; }
-
-/* Spacer pushes right section */
-.ban-nav-spacer { flex: 1; }
-
-/* Right section: external links + theme toggle */
-.ban-nav-right {
-    display: flex; align-items: center; gap: 6px;
-    flex-shrink: 0;
-}
-.ban-nav-ext {
-    display: flex; align-items: center; justify-content: center;
-    padding: 7px; border-radius: var(--radius-sm, 6px);
-    transition: all 0.12s;
-    text-decoration: none;
-}
-.ban-nav-ext:hover { background: var(--surface-3, var(--navbackground)); }
-.ban-nav-ext img { width: 20px; height: 20px; opacity: 0.7; transition: opacity 0.12s; border-radius: var(--radius-sm, 6px); }
-.ban-nav-ext:hover img { opacity: 1; }
-
 /* Theme toggle */
 .ban-theme-toggle {
     position: relative;
@@ -467,28 +395,30 @@ a.pagination {
     transition: background 0.12s;
 }
 .ban-theme-toggle:hover { background: var(--surface-3, var(--navbackground)); }
+/* Don't leave the focus ring lingering after a click; keep it for keyboard nav. */
+.ban-theme-toggle:focus { outline: none; }
+.ban-theme-toggle:focus-visible {
+    outline: 2px solid var(--ainfo);
+    outline-offset: 2px;
+}
 
+/* Three stacked icons (sun / moon / system); the one matching the current
+   theme PREFERENCE is shown. Driven by <body data-theme-pref>, not the
+   resolved theme, so 'system' shows the monitor icon regardless of whether
+   the OS currently resolves to light or dark. */
 .theme-icon {
     position: absolute;
-    transition: opacity 0.35s ease, transform 0.45s ease;
-}
-.theme-icon-sun {
     opacity: 0;
     transform: rotate(-90deg);
+    transition: opacity 0.35s ease, transform 0.45s ease;
 }
-.theme-icon-moon {
+body[data-theme-pref="light"]  .theme-icon-sun,
+body[data-theme-pref="dark"]   .theme-icon-moon,
+body[data-theme-pref="system"] .theme-icon-system,
+/* Before JS sets the preference, default to the system icon (unset == system). */
+body:not([data-theme-pref])    .theme-icon-system {
     opacity: 1;
     transform: rotate(0deg);
-}
-
-/* Dark mode: moon out, sun in */
-.dark-theme .theme-icon-sun {
-    opacity: 1;
-    transform: rotate(0deg);
-}
-.dark-theme .theme-icon-moon {
-    opacity: 0;
-    transform: rotate(90deg);
 }
 
 /* Mobile hamburger */
@@ -505,26 +435,48 @@ a.pagination {
 }
 .ban-nav-hamburger:hover { border-color: var(--accent-border, rgba(91,141,239,0.25)); color: var(--normal); }
 
-/* Mobile slide-out menu */
+/* Mobile slide-out menu.
+   Overlay and menu use the same 0.25s timing so they fade/slide off
+   in lock-step. Using visibility (rather than display: none) lets the
+   overlay's opacity transition actually play to completion on close,
+   and the visibility transition is delayed to the end of the duration
+   so the element stays interactive (and visually present) until the
+   menu has finished sliding off-screen. */
 .ban-nav-mobile-overlay {
-    display: none;
     position: fixed; inset: 0; z-index: 250;
     background: rgba(0,0,0,0.5);
-    opacity: 0; transition: opacity 0.2s;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.25s ease, visibility 0s linear 0.25s;
 }
-.ban-nav-mobile-overlay.open { display: block; opacity: 1; }
+.ban-nav-mobile-overlay.open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    /* Inverse on open: flip visibility immediately so the fade-in plays. */
+    transition: opacity 0.25s ease, visibility 0s linear 0s;
+}
 
 .ban-nav-mobile-menu {
-    position: fixed; top: 0; right: -280px; z-index: 260;
+    position: fixed; top: 0; right: 0; z-index: 260;
     width: 280px; height: 100vh;
     background: var(--navbackground);
     border-left: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     padding: 20px;
-    transition: right 0.25s ease;
     overflow-y: auto;
     visibility: hidden;
+    /* Slide via transform (GPU-composited, no layout thrash) — much
+       smoother than animating `right`, which was producing a final-
+       frame snap when the visibility flip landed. */
+    transform: translateX(100%);
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
 }
-.ban-nav-mobile-menu.open { right: 0; visibility: visible; }
+.ban-nav-mobile-menu.open {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 0.25s ease, visibility 0s linear 0s;
+}
 
 .ban-nav-mobile-close {
     display: flex; align-items: center; justify-content: center;
@@ -563,13 +515,8 @@ a.pagination {
 }
 .ban-nav-mobile-ext a img { width: 22px; height: 22px; opacity: 0.7; }
 
-/* Responsive: shorten labels then collapse to hamburger */
-@media (max-width: 1100px) {
-    .ban-nav-links .nav-full { display: none; }
-    .ban-nav-links .nav-short { display: inline; }
-}
-@media (max-width: 1000px) {
-    .ban-nav-links { display: none; }
+/* Responsive: collapse to hamburger */
+@media (max-width: 900px) {
     .ban-nav-hamburger { display: flex; }
 }
 
@@ -640,7 +587,7 @@ a.selected:hover{
 }
 /* ═══ Base template layout ═══ */
 .page-content {
-    padding-top: 75px;
+    padding-top: 83px;
     min-height: 100vh;
 }
 
@@ -808,10 +755,6 @@ a.selected:hover{
     margin-left: 20px;
 }
 
-.search-input{
-    font-size: var(--text-2xl);
-}
-
 .search {
     padding: 8px 8px;
     display: inline-block;
@@ -892,6 +835,33 @@ th a {
 .autocomplete-active {
     background: var(--accent-muted) !important;
     color: var(--ainfo) !important;
+}
+.autocomplete-items .ac-icon {
+    display: inline-block;
+    width: 1.5em;
+    text-align: center;
+    vertical-align: middle;
+    margin-right: 0.5em;
+}
+.autocomplete-items .ac-sub {
+    color: var(--greytext);
+    font-size: var(--text-sm);
+    margin-left: 0.5em;
+}
+.autocomplete-items .ac-swatch {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+.autocomplete-items .autocomplete-disabled {
+    cursor: default;
+    color: var(--greytext);
+    font-style: italic;
+}
+.autocomplete-items .autocomplete-disabled:hover {
+    background: transparent;
 }
 
 pre {
@@ -1072,7 +1042,8 @@ img.content-warning.cw-revealed {
 .foil-wrap > img {
     display: block;
 }
-.foil-wrap[data-foil="true"]::after {
+.foil-wrap[data-foil="true"]::after,
+.foil-wrap[data-etched="true"]::after {
     content: "";
     position: absolute;
     inset: 0;
@@ -1090,6 +1061,19 @@ img.content-warning.cw-revealed {
     );
     mix-blend-mode: screen;
     pointer-events: none;
+}
+.foil-wrap[data-etched="true"]::after {
+    background: linear-gradient(
+        105deg,
+        rgba(235, 66, 137, 0.20) 0%,
+        rgba(166, 68, 253, 0.22) 15%,
+        rgba(47, 107, 236, 0.22) 30%,
+        rgba(63, 218, 216, 0.25) 45%,
+        rgba(79, 220, 74, 0.25) 55%,
+        rgba(208, 222, 33, 0.25) 70%,
+        rgba(255, 154, 0, 0.22) 85%,
+        rgba(255, 0, 0, 0.22) 100%
+    );
 }
 
 @font-face {

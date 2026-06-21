@@ -30,6 +30,10 @@ type SearchConfig struct {
 	// Full query searched (may be blank)
 	FullQuery string
 
+	// Raw filter tokens found in the query (eg "s:lea", "f:foil"),
+	// used to suggest broader searches when nothing is found
+	AppliedFilters []string
+
 	// String where to stash non-user facing data
 	PrivateData string
 
@@ -583,6 +587,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 
 	// Iterate over the various possible filters
 	fields := re.FindAllString(query, -1)
+	config.AppliedFilters = fields
 	for _, field := range fields {
 		query = strings.Replace(query, field, "", 1)
 

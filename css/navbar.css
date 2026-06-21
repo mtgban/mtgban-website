@@ -1,0 +1,480 @@
+/* ============================================================
+   Navbar v2 — Logo · Search · Section buttons · Utility icons
+   ============================================================ */
+
+:root {
+    --nav2-height: var(--nav-height, 56px);
+}
+
+.navbar-v2 {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+    height: var(--nav2-height);
+    background: var(--navbackground);
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    display: flex;
+    justify-content: center;
+}
+.nav2-inner {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    /* Fixed 1000px band, centered on the page regardless of viewport
+       width. At narrower viewports the band shrinks too, but always
+       keeps 16px of breathing room on each side so it never glues to
+       the edge. Search bar absorbs leftover space; when too many
+       section buttons are present it shrinks down (see .nav2-search). */
+    max-width: min(1000px, calc(100% - 32px));
+    height: 100%;
+    display: flex; align-items: center;
+    padding: 0;
+    gap: 10px;
+}
+
+/* ── Brand / logo ─────────────────────────────────────────── */
+.nav2-brand {
+    display: flex; align-items: center; gap: 9px;
+    text-decoration: none;
+    color: var(--normal);
+    flex-shrink: 0;
+    padding: 4px 6px;
+    border-radius: var(--radius-sm, 6px);
+    transition: background 0.12s;
+    /* Pair with margin-right: auto on .nav2-utility to split any
+       slack equally between the left of brand and the right of utility
+       — keeps the navbar visually centered as section buttons are
+       added or removed. Auto margins only consume slack; if the search
+       bar has absorbed it all, these collapse to zero. */
+    margin-left: auto;
+}
+.nav2-brand:hover { background: var(--surface-3, var(--navbackground)); }
+.nav2-brand img { width: 28px; height: 28px; }
+.nav2-brand-text {
+    /* font-family inherited from .navbar-v2 system stack below so the
+       brand width doesn't change when Geist eventually loads — that
+       width change rippled through flex to the search bar on Firefox. */
+    font-weight: 700;
+    font-size: var(--text-4xl);
+    letter-spacing: -0.01em;
+    color: var(--normal);
+}
+
+/* Use a system font stack for the navbar text so no async font load
+   can swap mid-render and ripple through the flex layout to the
+   search bar. Geist still applies to the rest of the page; only
+   navbar labels and the search input are pinned to the system stack.
+   This eliminates the Firefox first-paint search-bar jump caused by
+   late font-metric adoption.
+   !important is needed because main.css sets `* { font-family: Geist }`
+   and several navbar elements have their own Geist declarations.
+   .ss is exempted so keyrune set symbols in the search autocomplete keep
+   their icon font instead of rendering as tofu. */
+.navbar-v2,
+.navbar-v2 *:not(.ss) {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif !important;
+}
+.nav2-brand-text .ban {
+    color: #ff5e5e;
+}
+.light-theme .nav2-brand-text .ban { color: #c41e3a; }
+
+/* ── Search bar ───────────────────────────────────────────── */
+.nav2-search {
+    position: relative;
+    /* Grow to fill leftover space, but shrink hard when sections grow
+       (more promoted buttons → narrower search). 80px floor keeps the
+       icon + a couple chars visible even at the 5-button cap. Section
+       buttons keep priority: search is capped at 480px so any further
+       slack sits between the cluster and utility (auto-margin) rather
+       than ballooning the input. The narrow-viewport media query below
+       drops this cap when sections are hidden, so the search bar fills
+       the bar end-to-end. */
+    flex: 1 1 240px;
+    min-width: 80px;
+    max-width: 480px;
+}
+.nav2-search-icon {
+    position: absolute;
+    left: 11px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--greytext);
+    pointer-events: none;
+    display: flex;
+}
+.nav2-search input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 36px;
+    padding: 0 14px 0 36px;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+    background: var(--surface-2, rgba(255,255,255,0.04));
+    color: var(--normal);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    outline: none;
+    transition: border-color 0.12s, background 0.12s;
+}
+.nav2-search input::placeholder { color: var(--greytext); opacity: 0.8; }
+.nav2-search input:focus {
+    border-color: var(--accent-border, rgba(91,141,239,0.45));
+    background: var(--surface-3, rgba(255,255,255,0.06));
+}
+.light-theme .nav2-search input {
+    background: #fff;
+    border-color: rgba(0,0,0,0.12);
+}
+.light-theme .nav2-search input:focus {
+    border-color: rgba(30,144,255,0.45);
+}
+/* ── Section buttons (Search / Sealed / Upload / Tools) ──── */
+.nav2-sections {
+    display: flex; align-items: center; gap: 2px;
+    flex-shrink: 0;
+    flex-grow: 0;
+}
+.nav2-section-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px;
+    border-radius: var(--radius-sm, 6px);
+    color: var(--activetext);
+    text-decoration: none;
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s;
+}
+.nav2-section-btn:hover {
+    color: var(--normal);
+    background: var(--surface-3, var(--navbackground));
+}
+.nav2-section-btn .chev {
+    transition: transform 0.18s;
+    color: var(--greytext);
+}
+.nav2-section-btn[aria-expanded="true"] .chev { transform: rotate(180deg); }
+
+/* ── Utility icon group (right side) ─────────────────────── */
+.nav2-spacer { display: none; }
+.nav2-utility {
+    display: flex; align-items: center; gap: 4px;
+    flex-shrink: 0;
+    /* margin-left: -10 cancels the 10px inner-flex gap so the Guide ?
+       icon sits flush against the Tools button. margin-right: auto
+       pairs with .nav2-brand's margin-left: auto to split any slack
+       evenly between the two ends — keeps the bar centered when the
+       section group shrinks (items dragged out). At narrow viewport
+       sections are hidden and search has no max-width, so all slack is
+       absorbed by the search bar before any auto-margin sees it. */
+    margin-left: -10px;
+    margin-right: auto;
+}
+@media (max-width: 900px) {
+    .nav2-utility { margin-left: 0; }
+}
+.nav2-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--greytext);
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
+}
+.nav2-icon-btn:hover {
+    background: var(--surface-3, var(--navbackground));
+    color: var(--normal);
+}
+/* Match the hamburger button's footprint and hover state to the
+   Guide ? and Settings gear icons — main.css gives it a visible
+   border and accent hover, which clashes with the borderless,
+   tinted-background look of the other utility icons. */
+.nav2-utility .ban-nav-hamburger {
+    border: none;
+    background: transparent;
+    color: var(--greytext);
+    font-size: var(--text-5xl);
+}
+.nav2-utility .ban-nav-hamburger:hover {
+    background: var(--surface-3, var(--navbackground));
+    border: none;
+    color: var(--normal);
+}
+/* Settings button uses the .ban-settings-btn class from settings-modal.css,
+   which adds padding: 7px AND a blue-accent (--ainfo) hover color. Inside
+   the navbar that padding blows the hit/hover box up to 50×50, and the
+   accent color makes the gear's hover state diverge from the other utility
+   icons. Override both so the gear matches the Guide ? icon exactly. */
+.nav2-utility .ban-settings-btn { padding: 0; }
+.nav2-utility .ban-settings-btn:hover { color: var(--normal); }
+
+/* ── Tools dropdown (mega menu) ───────────────────────────── */
+.nav2-tools-wrap {
+    position: relative;
+}
+/* The dropdown is anchored to the navbar inner's right edge, NOT to
+   the Tools button. That way the Tools button can shift left/right
+   when section buttons resize (after a swap) without the dropdown
+   sliding underneath it. */
+.tools-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: min(620px, 92vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    background: var(--surface-1);
+    color: var(--normal);
+    border: 1px solid var(--border-moderate);
+    border-radius: var(--radius-md, 10px);
+    box-shadow:
+        0 18px 48px rgba(0,0,0,0.35),
+        0 4px 12px rgba(0,0,0,0.22),
+        inset 0 1px 0 rgba(255,255,255,0.04);
+    z-index: 250;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px) scale(0.985);
+    transform-origin: top right;
+    transition: opacity 0.14s ease, transform 0.14s cubic-bezier(0.2, 0.9, 0.35, 1.1);
+    padding: 12px;
+    font-family: var(--font-mono);
+}
+.tools-dropdown.open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+}
+.tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 8px;
+}
+
+/* Quick-actions strip at the bottom of the dropdown */
+.tools-divider-h {
+    display: none;
+}
+.tools-quick {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    /* Bleed to the dropdown edges and tint the background */
+    margin: 12px -12px -12px;
+    padding: 10px 14px;
+    background: var(--surface-3, rgba(0,0,0,0.05));
+    border-top: 1px solid var(--border-subtle, rgba(0,0,0,0.08));
+    border-bottom-left-radius: var(--radius-md, 10px);
+    border-bottom-right-radius: var(--radius-md, 10px);
+}
+.light-theme .tools-quick { background: #eef0f3; }
+.dark-theme .tools-quick { background: #15181d; }
+.tools-quick-label {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--greytext);
+    font-weight: 600;
+    margin-right: 6px;
+}
+.tools-quick-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    color: var(--activetext);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.12s;
+}
+.tools-quick-btn:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-border, rgba(91,141,239,0.3));
+    color: var(--normal);
+}
+.tools-quick-btn img {
+    width: 18px; height: 18px;
+    border-radius: 4px;
+    opacity: 0.85;
+}
+.tools-quick-btn:hover img { opacity: 1; }
+/* The theme toggle stays a square icon button, not a labeled pill. */
+.tools-quick-btn.ban-theme-toggle {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+}
+.tools-quick-spacer { flex: 1; }
+.tools-tile {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px;
+    text-decoration: none;
+    color: var(--normal);
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md, 8px);
+    transition: all 0.12s;
+}
+.tools-tile:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-border, rgba(91,141,239,0.3));
+}
+.tools-tile-icon {
+    font-size: 1.45rem;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 1.6em; height: 1.6em;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--surface-3);
+    border-radius: var(--radius-sm, 6px);
+}
+.tools-tile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tools-tile-name {
+    font-weight: 600;
+    font-size: var(--text-lg);
+    color: var(--headingtext);
+}
+.tools-tile-desc {
+    font-size: var(--text-sm);
+    color: var(--greytext);
+    line-height: 1.3;
+}
+/* The --greytext var resolves to a deep blue-grey that's fine on a
+   light background but reads too dim against the dark-theme tile
+   surface. Brighten both name and description for dark mode. */
+.dark-theme .tools-tile-name {
+    color: #f0f3fa;
+}
+.dark-theme .tools-tile-desc {
+    color: #b6bccc;
+}
+.tools-tile.is-admin {
+    border-style: dashed;
+}
+.tools-tile.is-admin .tools-tile-name { color: #ff8855; }
+.dark-theme .tools-tile.is-admin .tools-tile-name { color: #ff8855; }
+
+/* ── Drag & drop reorder + swap ───────────────────────────── */
+.tools-tile,
+.nav2-section-btn:not(.is-tools) { cursor: grab; }
+.tools-tile:active,
+.nav2-section-btn:not(.is-tools):active { cursor: grabbing; }
+.tools-tile.dragging,
+.nav2-section-btn.dragging {
+    opacity: 0.35;
+    transform: scale(0.97);
+}
+/* Drop indicators inside the grid (reorder): blue bar on a side */
+.tools-tile.drop-before {
+    box-shadow: inset 3px 0 0 var(--ainfo, #5b8def);
+}
+.tools-tile.drop-after {
+    box-shadow: inset -3px 0 0 var(--ainfo, #5b8def);
+}
+/* Swap indicator: tile or nav button being targeted for a swap */
+.tools-tile.swap-target,
+.nav2-section-btn.swap-target {
+    outline: 2px dashed var(--ainfo, #5b8def);
+    outline-offset: 2px;
+    background: var(--accent-muted, rgba(91,141,239,0.12));
+}
+/* Container-level drop targets for promote (tile→navbar) and demote
+   (navbtn→dropdown). Outline frames the receiving zone. */
+.tools-grid.demote-target {
+    outline: 2px dashed var(--ainfo, #5b8def);
+    outline-offset: 4px;
+    border-radius: var(--radius-sm, 6px);
+}
+
+/* Promote drop slot — a dedicated, button-sized placeholder that
+   appears in the section strip while a tile is being dragged. Gives
+   the user a clearly aimable target instead of a 2px gap. */
+.nav2-promote-slot {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    min-width: 110px;
+    padding: 0 14px;
+    border: 2px dashed var(--ainfo, #5b8def);
+    border-radius: var(--radius-sm, 6px);
+    color: var(--ainfo, #5b8def);
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    font-weight: 500;
+    opacity: 0.7;
+    transition: opacity 0.12s, background 0.12s, transform 0.12s;
+    user-select: none;
+    pointer-events: auto;
+}
+.nav2-promote-slot.hover {
+    opacity: 1;
+    background: var(--accent-muted, rgba(91,141,239,0.12));
+    transform: scale(1.03);
+}
+
+@media (max-width: 900px) {
+    .nav2-search-hint { display: none; }
+    .nav2-section-btn { padding: 7px 10px; font-size: var(--text-sm); }
+    .nav2-brand-text { display: none; }
+}
+
+/* When the section group fills with 4+ promoted buttons the search bar
+   shrinks below ~150px and starts to feel cramped — drop the brand
+   wordmark so the icon stands alone and the search bar reclaims ~90px.
+   :nth-child(4) on .nav2-sections matches the 4th non-Tools button
+   (the Tools wrap is always the last child so the math holds). */
+.nav2-inner:has(.nav2-sections > .nav2-section-btn:not(.is-tools):nth-child(4)) .nav2-brand-text {
+    display: none;
+}
+@media (max-width: 700px) {
+    .nav2-sections .nav2-section-btn:not(.is-tools) { display: none; }
+}
+
+/* ── Nav search autocomplete dropdown ─────────────────────── */
+/* On open, square only the bottom corners so the menu attaches seamlessly.
+   18px (half the 36px height) keeps the top ends at their unfocused pill
+   radius; using 999px here would clamp the top corners larger. */
+.nav2-search .autocomplete-items {
+    z-index: 260;
+}
+.nav2-search.autocomplete:has(.autocomplete-items) input {
+    border-radius: 18px 18px 0 0;
+    /* Snap the corners with the menu instead of the shared 0.15s morph. */
+    transition: border-radius 0.06s ease, border-color 0.12s, background 0.12s;
+}
+
+/* ── Narrow-width: fall back to the existing hamburger menu ── */
+@media (max-width: 900px) {
+    .nav2-sections { display: none; }
+    .ban-nav-hamburger { display: flex; }
+    /* No section buttons here, so let search absorb the full bar width
+       between brand and utility — no max-width, no trailing slack. */
+    .nav2-search { max-width: none; }
+}
+
+/* ── User badge in the Tools "Links" strip ────────────────── */
+.tools-quick-user {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    color: var(--greytext);
+    padding: 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+}

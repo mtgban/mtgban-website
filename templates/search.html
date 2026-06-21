@@ -47,6 +47,7 @@
     {{end}}
     <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
@@ -57,7 +58,10 @@
         {{template "search-sealed" .}}
     {{else}}
         {{if eq .SearchQuery ""}}
-            {{template "search-bar" .}}
+            {{/* The modal has no navbar, so it needs its own search bar; the
+                 landing panes (recent searches + favorites) render underneath
+                 in both contexts so the picker isn't just a bare input. */}}
+            {{if .ModalMode}}{{template "search-bar" .}}{{end}}
             {{template "search-landing-panes" .}}
         {{else}}
             {{template "search-results" .}}
@@ -69,11 +73,15 @@
 
 {{define "sidebar-search"}}
 <div class="sidebar-search">
+    {{/* The navbar (and its search box) is hidden inside the chart-add modal,
+         so render an in-page search form there to drive the card picker. */}}
+    {{if .ModalMode}}
     <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
         <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
         {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
-        {{if .ModalMode}}<input type="hidden" name="modal" value="1">{{end}}
+        <input type="hidden" name="modal" value="1">
     </form>
+    {{end}}
     <div class="search-sort-row">
         {{if .NoSort}}
             <span class="search-sort-label">Sort from syntax</span>
@@ -101,12 +109,16 @@
             </span>
         </div>
     {{end}}
+    {{if .ModalMode}}
     <script type="text/javascript">
         autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
     </script>
+    {{end}}
 </div>
 {{end}}
 
+{{/* Standalone search bar, used as the empty-query picker inside the chart-add
+     modal (the regular landing page uses the navbar search instead). */}}
 {{define "search-bar"}}
 <div class="page-standard search-bar-sticky">
     <div class="search-bar-wrap">
@@ -114,7 +126,7 @@
             <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
                 <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
                 {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
-        {{if .ModalMode}}<input type="hidden" name="modal" value="1">{{end}}
+                {{if .ModalMode}}<input type="hidden" name="modal" value="1">{{end}}
             </form>
             <div class="search-actions">
                 <button class="search-action-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
@@ -141,17 +153,21 @@
             <div class="sealed-main" id="sealed-main">
                 <h1>Sealed Products</h1>
 
+                {{/* In-page sealed search box for the chart-add modal, where the
+                     navbar search is not rendered. */}}
+                {{if .ModalMode}}
                 <div class="sealed-toolbar">
                     <form class="sealed-search-form autocomplete" id="searchform" action="/sealed" method="get" autocomplete="off" spellcheck="false">
                         <input id="searchbox" class="sealed-search" type="text" name="q" placeholder="Search for a product..." autocomplete="off" autocapitalize="none" maxlength="1000">
                         {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
-                        {{if .ModalMode}}<input type="hidden" name="modal" value="1">{{end}}
+                        <input type="hidden" name="modal" value="1">
                     </form>
                     <a id="sealed-surprise" href="#">Surprise Me</a>
                 </div>
                 <script type="text/javascript">
                     autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
                 </script>
+                {{end}}
 
                 {{range $key := .EditionSort}}
                     {{$editionList := index $.EditionList $key}}
@@ -177,9 +193,26 @@
 
 {{define "search-results"}}
     {{if not .AllKeys}}
-        {{template "search-bar" .}}
         <div class="page-standard" style="padding-top: 2em;">
             <p style="color: var(--activetext); font-size: var(--text-3xl);"><em>{{.InfoMessage}}</em></p>
+            {{if or .DidYouMean .AltSearches}}
+                {{$base := "search"}}{{if .IsSealed}}{{$base = "sealed"}}{{end}}
+                <div class="search-suggestions">
+                    {{if .DidYouMean}}
+                        <p class="search-suggestion-didyoumean">
+                            Did you mean <a href="{{$base}}?q={{.DidYouMean}}">{{.DidYouMean}}</a>?
+                        </p>
+                    {{end}}
+                    {{if .AltSearches}}
+                        <p class="search-suggestion-label">Try a broader search:</p>
+                        <ul class="search-suggestion-list">
+                            {{range .AltSearches}}
+                                <li><a href="{{$base}}?q={{.Query}}">{{.Label}}</a></li>
+                            {{end}}
+                        </ul>
+                    {{end}}
+                </div>
+            {{end}}
         </div>
     {{else}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
@@ -262,11 +295,12 @@
                     container.appendChild(dropdown);
                 }
 
-                function updateSidebar(src, printings, products, isFoil, setCode, hasWarning) {
+                function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning) {
                     document.getElementById('cardImage').src=src;
                     var wrapper = document.getElementById('cardImageWrapper');
                     if (wrapper) {
                         wrapper.setAttribute('data-foil', isFoil ? 'true' : 'false');
+                        wrapper.setAttribute('data-etched', isEtched ? 'true' : 'false');
                         wrapper.setAttribute('data-set', setCode);
                         if (hasWarning) {
                             wrapper.classList.add('content-warning');
@@ -345,7 +379,7 @@
                 <div class="search-sidebar">
                     {{template "sidebar-search" .}}
                     <div class="sidebar-body">
-                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox');input.focus();input.setSelectionRange(0,input.value.length);">
+                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
                             <img class="sidebar-card-img" id="cardImage" src=""/>
                         </div>
                         <div class="sidebar-printings" id="printings"></div>
@@ -411,6 +445,7 @@
                     {{$firstPrint := ""}}
                     {{$firstProduct := ""}}
                     {{$firstFoil := false}}
+                    {{$firstEtched := false}}
                     {{$firstSetCode := ""}}
                     {{$firstWarning := false}}
 
@@ -776,6 +811,7 @@
                             {{$firstPrint = $card.Printings}}
                             {{$firstProduct = $card.Products}}
                             {{$firstFoil = $card.Foil}}
+                            {{$firstEtched = $card.Etched}}
                             {{$firstSetCode = $card.SetCode}}
                             {{$firstWarning = $card.HasContentWarning}}
                         {{end}}
@@ -794,7 +830,7 @@
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
-                                 onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                                 onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -826,6 +862,8 @@
                                     </span>
                                 </div>
                                 <div class="result-quick-icons">
+                                    <button type="button" class="qi-toggle" title="More actions" aria-label="More actions" aria-expanded="false"><i data-lucide="ellipsis-vertical"></i></button>
+                                    <div class="qi-actions">
                                     {{if $card.Sealed}}
                                         {{if $card.Booster}}
                                             <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">&#127873;</span></a>
@@ -860,7 +898,11 @@
                                             <a class="chart-add-link" data-card-id="{{$cardId}}" href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
                                         {{end}}
                                     {{end}}
+                                    {{/* Shown only when the screen is narrow enough that the sidebar
+                                         preview is hidden; opens the card art in a lightbox. */}}
+                                    <button type="button" class="qi-view-image" title="View image" onclick="showCardImageFromBtn(this)"><i data-lucide="image"></i></button>
                                     <button class="fav-btn" data-card-id="{{$cardId}}" onclick="toggleFavorite(this)" title="Toggle favorite"><i data-lucide="star"></i></button>
+                                    </div>
                                 </div>
                             </div>
                             {{if or (ne $card.Variant "") $card.Flag}}
@@ -873,7 +915,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
@@ -1090,7 +1132,7 @@
                     {{$firstImg = $.CardBackURL}}
                 {{end}}
                 <script type="text/javascript">
-                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstSetCode}}, {{$firstWarning}});
+                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}});
                 </script>
             </div>{{/* Close .search-layout */}}
     <br>
@@ -1130,9 +1172,9 @@
         var headers = document.querySelectorAll('.result-header');
         if (headers.length === 0) return;
 
-        var searchbox = document.getElementById('searchbox');
+        var searchbox = document.getElementById('searchbox') || document.getElementById('nav-searchbox');
 
-        var STICKY_OFFSET = 69; // nav-height(48) + cover(21)
+        var STICKY_OFFSET = 77; // nav-height(56) + cover(21)
         var currentIdx = 0;
 
         document.addEventListener('keydown', function(e) {
@@ -1176,7 +1218,7 @@
                     return;
                 }
                 currentIdx--;
-                // Stuck headers report rect.top=69 (sticky position), so
+                // Stuck headers report rect.top=77 (sticky position), so
                 // briefly scroll to top to measure the natural position
                 var saved = window.scrollY;
                 window.scrollTo(0, 0);
@@ -1288,6 +1330,84 @@ body.modal-embed .cp-overlay { display: none !important; }
 })();
 </script>
 {{end}}
+<script>
+(function () {
+    // Card-action icons collapse into a kebab dropdown in the single-column
+    // layout (see .qi-toggle / .qi-actions in search.css). Give each action a
+    // visible text label from its title, and wire the toggle open/close.
+    var groups = document.querySelectorAll('.result-quick-icons');
+    if (!groups.length) return;
+
+    groups.forEach(function (group) {
+        var toggle = group.querySelector('.qi-toggle');
+        var actions = group.querySelector('.qi-actions');
+        if (!toggle || !actions) return;
+
+        actions.querySelectorAll(':scope > a, :scope > span, :scope > button').forEach(function (el) {
+            var title = el.getAttribute('title');
+            if (!title || el.querySelector('.qi-label')) return;
+            var label = document.createElement('span');
+            label.className = 'qi-label';
+            label.textContent = title;
+            el.appendChild(label);
+        });
+
+        function close() {
+            group.classList.remove('qi-open');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+
+        toggle.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var open = !group.classList.contains('qi-open');
+            // Only one menu open at a time.
+            groups.forEach(function (g) {
+                g.classList.remove('qi-open');
+                var t = g.querySelector('.qi-toggle');
+                if (t) t.setAttribute('aria-expanded', 'false');
+            });
+            if (open) {
+                group.classList.add('qi-open');
+                toggle.setAttribute('aria-expanded', 'true');
+            }
+        });
+
+        // Picking an action dismisses the menu.
+        actions.addEventListener('click', close);
+    });
+
+    // Click anywhere else closes any open menu.
+    document.addEventListener('click', function () {
+        groups.forEach(function (g) {
+            g.classList.remove('qi-open');
+            var t = g.querySelector('.qi-toggle');
+            if (t) t.setAttribute('aria-expanded', 'false');
+        });
+    });
+})();
+</script>
+
+<!-- Lightbox for the card image, used when the screen is too narrow to show
+     the sidebar preview (see .qi-view-image / .card-image-modal). -->
+<div class="card-image-modal" id="cardImageModal" onclick="hideCardImage()">
+    <img id="cardImageModalImg" src="" alt="Card image">
+</div>
+<script>
+    function showCardImageFromBtn(btn) {
+        var header = btn.closest('.result-header');
+        if (!header) return;
+        var url = header.getAttribute('data-image-url');
+        if (!url) return;
+        document.getElementById('cardImageModalImg').src = url;
+        document.getElementById('cardImageModal').classList.add('open');
+    }
+    function hideCardImage() {
+        document.getElementById('cardImageModal').classList.remove('open');
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') hideCardImage();
+    });
+</script>
 {{end}}
 
 {{define "settings-content"}}

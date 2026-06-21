@@ -71,11 +71,11 @@ type GenericCard struct {
 	Flag         string
 	LangTag      string
 
-	RarityColor  string
-	ScryfallURL  string
-	DeckboxURL   string
-	CKRestockURL string
-	SourceSealed []string
+	RarityColor       string
+	ScryfallURL       string
+	DeckboxURL        string
+	CKRestockURL      string
+	SourceSealed      []string
 	HotlistStore      string
 	Newspaper         bool
 	HasContentWarning bool
@@ -216,6 +216,52 @@ const (
 	MaxRuneSymbols = 57
 )
 
+// filterSellers returns the shorthand of every loaded seller for which
+// predicate(info) is true.
+func filterSellers(predicate func(mtgban.ScraperInfo) bool) []string {
+	var out []string
+	for _, s := range GetSellers() {
+		info := s.Info()
+		if predicate(info) {
+			out = append(out, info.Shorthand)
+		}
+	}
+	return out
+}
+
+// filterVendors is the vendor analog of filterSellers.
+func filterVendors(predicate func(mtgban.ScraperInfo) bool) []string {
+	var out []string
+	for _, v := range GetVendors() {
+		info := v.Info()
+		if predicate(info) {
+			out = append(out, info.Shorthand)
+		}
+	}
+	return out
+}
+
+// canAccessMode reports whether the caller is allowed to read the given
+// API mode (retail/buylist/sealed). Access is granted if the mode is in
+// the signed enabledModes list, the list contains "all", or signature
+// checks are disabled in dev mode.
+func canAccessMode(enabledModes []string, target string) bool {
+	return slices.Contains(enabledModes, target) ||
+		slices.Contains(enabledModes, "all") ||
+		(DevMode && !SigCheck)
+}
+
+// errorResponse writes a JSON error body with the given status code and
+// the Content-Type header set to application/json. The message is encoded
+// via json.NewEncoder so embedded quotes/backslashes are escaped properly.
+func errorResponse(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(struct {
+		Error string `json:"error"`
+	}{Error: msg})
+}
+
 // Return the CreditMultiplier for any given vendor
 func findCredit(shorthand string) float64 {
 	for _, vendor := range GetVendors() {
@@ -301,6 +347,19 @@ func findInstanceId(sellerName, cardId, cond string) string {
 	for _, entry := range tcgplayer[cardId] {
 		if entry.Conditions == cond {
 			return entry.InstanceId
+		}
+	}
+	return ""
+}
+
+// Convert instance id (sku) to card id for a given store
+func instanceId2UUID(sellerName, instanceId string) string {
+	store, _ := findSellerInventory(sellerName)
+	for uuid, entries := range store {
+		for _, entry := range entries {
+			if entry.InstanceId == instanceId {
+				return uuid
+			}
 		}
 	}
 	return ""
@@ -574,11 +633,11 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		Flag:         allLanguageFlags[co.Language],
 		LangTag:      mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
-		RarityColor:  rarityColor,
-		ScryfallURL:  scryfallURL,
-		DeckboxURL:   deckboxURL,
-		CKRestockURL: restockURL,
-		SourceSealed: sourceSealed,
+		RarityColor:       rarityColor,
+		ScryfallURL:       scryfallURL,
+		DeckboxURL:        deckboxURL,
+		CKRestockURL:      restockURL,
+		SourceSealed:      sourceSealed,
 		HotlistStore:      hotlistStore,
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
@@ -776,6 +835,9 @@ func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Tim
 		Path:    "/",
 		Expires: expires,
 		Value:   value,
+		// Only mark Secure when the site itself is served over HTTPS,
+		// otherwise the cookie would be dropped during local HTTP dev.
+		Secure: u.Scheme == "https",
 	}
 
 	if !global {
@@ -783,6 +845,15 @@ func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Tim
 		cookie.SameSite = http.SameSiteStrictMode
 	}
 	http.SetCookie(w, &cookie)
+}
+
+// isSecureRequest reports whether the request reached us over HTTPS,
+// accounting for a TLS-terminating proxy that sets X-Forwarded-Proto.
+func isSecureRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 // Retrieve default blocklists according to the signature contents
@@ -906,15 +977,27 @@ func getTCGSimulationIQR(productId string) float64 {
 func scraperName(shorthand string) string {
 	for _, seller := range GetSellers() {
 		if shorthand == seller.Info().Shorthand {
-			return seller.Info().Name
+			name := seller.Info().Name
+			override, found := Config.ScraperConfig.NameOverride[seller.Info().Name]
+			if found {
+				name = override
+			}
+			return name
 		}
 	}
 	for _, vendor := range GetVendors() {
 		if shorthand == vendor.Info().Shorthand {
-			return vendor.Info().Name
+			name := vendor.Info().Name
+			override, found := Config.ScraperConfig.NameOverride[vendor.Info().Name]
+			if found {
+				name = override
+			}
+			return name
 		}
 	}
-	return ""
+
+	// If nothing is found, check if there is a custom override for the shorthand itself
+	return Config.ScraperConfig.NameOverride[shorthand]
 }
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
