@@ -302,6 +302,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 	}
 	direct, _ := findSellerInventory("TCGDirectLow")
 	low, _ := findSellerInventory("TCGLow")
+	sealed, _ := findSellerInventory("TCGSealed")
 
 	err = w.Write(tcgcsvHeader)
 	if err != nil {
@@ -334,26 +335,36 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 	for i, id := range cleanedIds {
 		var prices [3]float64
 
-		cond := "NM"
-		if conds != nil && conds[i] != "" {
-			cond = conds[i]
-		}
-
-		for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
-			for _, entry := range inv[id] {
-				if entry.Conditions == cond {
-					prices[j] = entry.Price
-					break
-				}
-			}
-		}
-
 		co, err := mtgmatcher.GetUUID(id)
 		if err != nil {
 			continue
 		}
 
-		tcgSkuId := findInstanceId("TCGPlayer", id, cond)
+		cond := "NM"
+		if conds != nil && conds[i] != "" && !co.Sealed {
+			cond = conds[i]
+		}
+
+		var tcgSkuId string
+		if co.Sealed {
+			tcgSkuId = findInstanceId("TCGSealed", id, cond)
+
+			for _, entries := range sealed {
+				prices[0] = entries[0].Price
+			}
+
+		} else {
+			tcgSkuId = findInstanceId("TCGPlayer", id, cond)
+
+			for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
+				for _, entry := range inv[id] {
+					if entry.Conditions == cond {
+						prices[j] = entry.Price
+						break
+					}
+				}
+			}
+		}
 
 		condLong := tcgConditionMap[cond]
 		if co.Foil || co.Etched {
