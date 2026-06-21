@@ -343,6 +343,8 @@
         setRangePickerDisabled(true);
         overlay.classList.add('open');
         drawer.classList.add('open');
+        // Lock background scrolling while the chart drawer is open
+        document.body.style.overflow = 'hidden';
 
         if (currentChart) {
             currentChart.destroy();
@@ -406,6 +408,8 @@
         }
         document.getElementById('m-chart-overlay').classList.remove('open');
         document.getElementById('m-chart-drawer').classList.remove('open');
+        // Restore background scrolling
+        document.body.style.overflow = '';
     };
 
     window.resetChartZoom = function() {
