@@ -685,6 +685,41 @@
    (single-column) layout; see the container query further down. */
 .qi-toggle { display: none; }
 .qi-label { display: none; }
+/* The image button only appears once the sidebar preview is hidden (≤900px);
+   it shares the favorite star's styling. */
+.qi-view-image { display: none; }
+.result-quick-icons .qi-view-image {
+    align-items: center;
+    justify-content: center;
+    padding: 0.15em;
+    background: transparent;
+    border: none;
+    color: var(--greytext);
+    cursor: pointer;
+}
+.result-quick-icons .qi-view-image:hover { color: var(--normal); }
+
+/* Lightbox that shows the card art when the sidebar preview isn't available. */
+.card-image-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    cursor: zoom-out;
+}
+.card-image-modal.open { display: flex; }
+.card-image-modal img {
+    max-width: min(92vw, 440px);
+    max-height: 92vh;
+    border-radius: var(--radius-lg);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
 
 .result-source-sealed {
     font-size: var(--text-sm);
@@ -1449,6 +1484,8 @@
         background: var(--background);
     }
     .search-sidebar > *:not(.sidebar-search) { display: none; }
+    /* Sidebar preview is gone here, so surface a per-card image button. */
+    .qi-view-image { display: inline-flex; }
     .result-body { grid-template-columns: 1fr; }
     .result-col + .result-col {
         border-left: none;
@@ -1505,6 +1542,10 @@
         z-index: 30;
     }
     .result-quick-icons.qi-open .qi-actions { display: flex; }
+
+    /* This breakpoint still has the sidebar preview, so keep the image button
+       out of the dropdown (the grid rule below would otherwise reveal it). */
+    .qi-actions > .qi-view-image { display: none; }
 
     /* Each action becomes an icon + label row. The icon sits in a fixed-width
        column so every label lines up regardless of icon kind (emoji text,

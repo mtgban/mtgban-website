@@ -647,6 +647,9 @@
                                     {{if and (not $.DisableChart) (eq $.ChartID "")}}
                                         <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
                                     {{end}}
+                                    {{/* Shown only when the screen is narrow enough that the sidebar
+                                         preview is hidden; opens the card art in a lightbox. */}}
+                                    <button type="button" class="qi-view-image" title="View image" onclick="showCardImageFromBtn(this)"><i data-lucide="image"></i></button>
                                     <button class="fav-btn" data-card-id="{{$cardId}}" onclick="toggleFavorite(this)" title="Toggle favorite"><i data-lucide="star"></i></button>
                                     </div>
                                 </div>
@@ -1061,6 +1064,28 @@
         });
     });
 })();
+</script>
+
+<!-- Lightbox for the card image, used when the screen is too narrow to show
+     the sidebar preview (see .qi-view-image / .card-image-modal). -->
+<div class="card-image-modal" id="cardImageModal" onclick="hideCardImage()">
+    <img id="cardImageModalImg" src="" alt="Card image">
+</div>
+<script>
+    function showCardImageFromBtn(btn) {
+        var header = btn.closest('.result-header');
+        if (!header) return;
+        var url = header.getAttribute('data-image-url');
+        if (!url) return;
+        document.getElementById('cardImageModalImg').src = url;
+        document.getElementById('cardImageModal').classList.add('open');
+    }
+    function hideCardImage() {
+        document.getElementById('cardImageModal').classList.remove('open');
+    }
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') hideCardImage();
+    });
 </script>
 {{end}}
 
