@@ -484,6 +484,10 @@
 /* ═══ Results main area ═══ */
 .search-results {
     padding: 10px 18px 80px;
+    /* Query container so the Sellers/Buyers body can collapse to a single
+       column based on the real width available to the results (which depends
+       on whether the sidebar is showing), not on the raw viewport width. */
+    container: search-results / inline-size;
 }
 
 
@@ -1443,6 +1447,30 @@
     .search-results { padding: 16px 16px 60px; }
     .result-header { padding: 8px 10px; gap: 6px; }
     .price-row { --price-row-h: 34px; padding: 0 10px; }
+}
+
+/* When the results area itself gets narrow — typically while the sidebar is
+   still showing, before the 900px viewport break — the side-by-side
+   Sellers/Buyers columns squeeze the store names and card title down to a
+   stub. Drop to a single column so each row gets the full width back. */
+@container search-results (width <= 560px) {
+    .result-body { grid-template-columns: 1fr; }
+    .result-col + .result-col {
+        border-left: none;
+        border-top: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    }
+}
+
+/* Tight two-column band (above the single-column break, so each column is
+   narrow): rather than ellipsing the buyer store names, fold away the
+   ratio/credit and quantity so the name keeps its room. The ratio/credit
+   stay available in the row's hover tooltip. The lower bound shares the
+   exact 560px edge with the single-column rule above (strict vs. non-strict
+   `<`) so there's no sub-pixel gap where the fields flash back in. */
+@container search-results (560px < width <= 720px) {
+    .price-right.has-buylist-extra { grid-template-columns: 7em; }
+    .price-right.has-buylist-extra .buylist-extra,
+    .price-right.has-buylist-extra .qty { display: none; }
 }
 
 @media (max-width: 900px) {
