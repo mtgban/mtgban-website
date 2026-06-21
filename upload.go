@@ -1788,7 +1788,21 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	if deckID == "" {
 		return nil, errors.New("invalid Moxfield deck URL")
 	}
-	moxURL := fmt.Sprintf("%s%s", Config.Uploader["moxfield"], link)
+
+	// Build the request URL from the configured proxy base so the host
+	// is provably the trusted config host, never user-influenced.
+	// `link` is the path component of the user-submitted Moxfield URL;
+	// require a clean absolute path so it can't inject a scheme or host
+	// (e.g. via a leading "//" or an embedded "://").
+	if !strings.HasPrefix(link, "/") || strings.HasPrefix(link, "//") || strings.Contains(link, "://") {
+		return nil, errors.New("invalid Moxfield deck URL")
+	}
+	base, err := url.Parse(Config.Uploader["moxfield"])
+	if err != nil {
+		return nil, errors.New("invalid Moxfield uploader configuration")
+	}
+	base.Path = path.Join(base.Path, link)
+	moxURL := base.String()
 
 	items, err := moxfield.Load(ctx, moxURL, maxRows)
 	if err != nil {
