@@ -225,7 +225,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			case "SCG":
 				err = UUID2SCGCSV(csvWriter, hashes, hashesQtys)
 			case "TCG":
-				err = UUID2TCGCSV(csvWriter, hashes, hashesQtys, hashesCond)
+				err = UUID2TCGCSV(csvWriter, hashes, hashesQtys, hashesCond, false)
 			}
 			if err != nil {
 				w.Header().Del("Content-Type")
@@ -658,7 +658,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			conds = append(conds, uploadedData[i].OriginalCondition)
 		}
 
-		err = UUID2TCGCSV(csvWriter, ids, qtys, conds)
+		err = UUID2TCGCSV(csvWriter, ids, qtys, conds, false)
 		if err != nil {
 			w.Header().Del("Content-Type")
 			UserNotify("upload", err.Error())

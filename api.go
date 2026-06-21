@@ -117,7 +117,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
 		csvWriter := csv.NewWriter(w)
-		err = UUID2TCGCSV(csvWriter, data.([]string), nil, nil)
+		err = UUID2TCGCSV(csvWriter, data.([]string), nil, nil, true)
 		if err != nil {
 			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -290,7 +290,12 @@ var tcgConditionMap = map[string]string{
 // If absent, quantity will be computed on the fly and entries will be merged
 // in a single entry (tcgplayer does not support csv operations with identical
 // items) and conditions will be set to NM.
-func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
+// UUID2TCGCSV writes a TCGplayer-importable CSV. The edition and display-name
+// columns are normally left blank: TCGplayer skips its name-match check when
+// they're empty, and our names don't always match theirs exactly (see commit
+// 1e39d5d). Pass withNames=true to restore them — used by the decklist
+// endpoint, where the human-readable name/edition is wanted in the output.
+func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error {
 	market, err := findSellerInventory("TCGPlayer")
 	if err != nil {
 		return err
@@ -359,8 +364,13 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 
 		record = append(record, tcgSkuId)
 		record = append(record, "Magic")
-		record = append(record, "") // Needs to be the tcgplayer edition name
-		record = append(record, "") // Needs to be the tcgplayer display name
+		if withNames {
+			record = append(record, co.Edition)
+			record = append(record, co.Name)
+		} else {
+			record = append(record, "")
+			record = append(record, "")
+		}
 		record = append(record, "")
 		record = append(record, co.Number)
 		record = append(record, strings.ToUpper(co.Rarity[:1]))
