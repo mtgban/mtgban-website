@@ -126,6 +126,10 @@ html { font-size: 17px; }
 }
 
 .light-theme {
+    /* Render native form controls (checkboxes, selects, scrollbars) in the
+       matching scheme and opt out of Android Chrome's auto-dark force-darkening,
+       which otherwise mangles native checkboxes into invisibility. */
+    color-scheme: light;
     --normal: var(--black);
     --background: var(--white);
     --tralternatebase: var(--realwhite);
@@ -187,6 +191,7 @@ html { font-size: 17px; }
 }
 
 .dark-theme {
+    color-scheme: dark;
     --normal: var(--darkgrey);
     --background: var(--lightblack);
     --tralternatebase: var(--verydarkgrey);
