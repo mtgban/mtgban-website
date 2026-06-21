@@ -404,8 +404,8 @@
                                         <option value="180" {{if ge $.MaxLookbackDays 180}} selected {{end}} {{if lt $.MaxLookbackDays 180}} disabled {{end}}>6 Months{{if lt $.MaxLookbackDays 180}} (Standard+){{end}}</option>
                                         <option value="365" {{if lt $.MaxLookbackDays 365}} disabled {{end}}>1 Year{{if lt $.MaxLookbackDays 365}} (Standard+){{end}}</option>
                                         <option value="730" {{if lt $.MaxLookbackDays 730}} disabled {{end}}>2 Years{{if lt $.MaxLookbackDays 730}} (Standard+){{end}}</option>
-                                        <option value="1825"{{if lt $.MaxLookbackDays 1825}} disabled {{end}}>5 Years{{if lt $.MaxLookbackDays 1825}} (Modern+){{end}}</option>
-                                        <option value="3650"{{if lt $.MaxLookbackDays 3650}} disabled {{end}}>10 Years{{if lt $.MaxLookbackDays 3650}} (Modern+){{end}}</option>
+                                        <option value="1825"{{if lt $.MaxLookbackDays 1800}} disabled {{end}}>5 Years{{if lt $.MaxLookbackDays 1800}} (Modern+){{end}}</option>
+                                        <option value="3650"{{if lt $.MaxLookbackDays 3650}} disabled {{end}}>10 Years{{if lt $.MaxLookbackDays 3650}} (Legacy+){{end}}</option>
                                     </select>
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
