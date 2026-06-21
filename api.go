@@ -348,14 +348,12 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 		var tcgSkuId string
 		if co.Sealed {
 			tcgSkuId = findInstanceId("TCGSealed", id, cond)
-
 			for _, entries := range sealed {
 				prices[0] = entries[0].Price
 			}
 
 		} else {
 			tcgSkuId = findInstanceId("TCGPlayer", id, cond)
-
 			for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
 				for _, entry := range inv[id] {
 					if entry.Conditions == cond {
@@ -374,7 +372,14 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 		record := make([]string, 0, len(tcgcsvHeader))
 
 		record = append(record, tcgSkuId)
-		record = append(record, "Magic")
+		switch Config.Game {
+		case "magic":
+			record = append(record, "Magic")
+		case "lorcana":
+			record = append(record, "Lorcana")
+		default:
+			panic("not implemented")
+		}
 		if withNames {
 			record = append(record, co.Edition)
 			record = append(record, co.Name)
