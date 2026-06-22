@@ -356,7 +356,7 @@
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-price">{{if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else if $entry.BundleIcon}}<span class="amzn-badge"></span>{{else}}n/a{{end}}</span>
                                         <span class="m-vendor-qty"></span>
                                     </span>
                                 </div>

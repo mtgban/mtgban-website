@@ -690,7 +690,7 @@
                                                 {{end}}
                                             {{end}}
                                             {{range $entries}}
-                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
                                                     {{if .Locked}}
                                                         <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                         <span class="locked-cta">
@@ -702,22 +702,33 @@
                                                     {{else if eq .URL ""}}
                                                         <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{else}}
+                                                        {{if .Badge}}
+                                                        <a class="store-name amzn-badge" href="{{.URL}}" target="_blank" rel="sponsored noopener" aria-label="Available at Amazon"></a>
+                                                        {{else}}
                                                         <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                        {{end}}
                                                     {{end}}
                                                     {{if not .Locked}}
                                                     {{if and (eq $conditions "INDEX") $.IsSealed}}
                                                         <span class="price-right index-cols">
-                                                        <span class="price"><span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span></span>
+                                                        <span class="price">
+                                                            {{if .Price}}
+                                                                <span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
+                                                            {{else if .BundleIcon}}
+                                                            {{else}}
+                                                                n/a
+                                                            {{end}}
+                                                        </span>
                                                         {{$iqr := 0.0}}{{if .Secondary}}{{$iqr = index .ExtraValues "iqr"}}{{end}}
                                                         <span class="price{{if gt $iqr 150.0}} price-warn{{end}}" {{if gt $iqr 150.0}}title="High Simulation IQR: {{printf "%.2f" $iqr}}"{{end}}>
                                                             {{if .Secondary}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span>
-                                                            {{else}}n/a{{end}}
+                                                            {{else if not .BundleIcon}}n/a{{end}}
                                                         </span>
                                                         <span class="price">
                                                             {{if .Secondary}}
                                                                 {{$stdDev := index .ExtraValues "stdDev"}}
                                                                 {{if $stdDev}}<span class="cur">$</span><span class="amt">{{printf "%.2f" $stdDev}}</span>{{else}}n/a{{end}}
-                                                            {{else}}n/a{{end}}
+                                                            {{else if not .BundleIcon}}n/a{{end}}
                                                         </span>
                                                         </span>
                                                     {{end}}
@@ -735,7 +746,7 @@
                                                 <div class="price-cond-header">{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
                                             {{end}}
                                             {{range $entries}}
-                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
                                                     {{if .Locked}}
                                                         <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                         <span class="locked-cta">
@@ -747,7 +758,11 @@
                                                     {{else if eq .URL ""}}
                                                         <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{else}}
+                                                        {{if .Badge}}
+                                                        <a class="store-name amzn-badge" href="{{.URL}}" target="_blank" rel="sponsored noopener" aria-label="Available at Amazon"></a>
+                                                        {{else}}
                                                         <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                        {{end}}
                                                     {{end}}
                                                     {{if not .Locked}}
                                                         {{$priceWarn := false}}
@@ -760,15 +775,18 @@
                                                         <span class="price-right">
                                                         {{end}}
                                                         <span class="price{{if $priceWarn}} price-warn{{end}}" {{if .Credit}}title="Equivalent price if paid with credit: $ {{printf "%.2f" .Credit}}"{{end}} {{if $priceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{end}}>
-                                                            {{if .Price}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
-                                                            {{else}}n/a
+                                                            {{if .Price}}
+                                                                <span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
+                                                            {{else if .BundleIcon}}
+                                                            {{else}}
+                                                                n/a
                                                             {{end}}
                                                         </span>
                                                         {{if .Secondary}}
                                                             <span class="secondary"><span class="cur">$</span><span class="amt">{{printf "%.2f" .Secondary}}</span></span>
                                                         {{else}}
                                                             <span class="qty" {{if eq .Shorthand "TCGDirect"}}id="qty-{{.Shorthand}}-{{$conditions}}-{{$cardId}}"{{end}}>
-                                                                {{if .BundleIcon}}
+                                                                {{if and .BundleIcon .Price}}
                                                                     <img style="padding-top:4px;" src="{{.BundleIcon}}">
                                                                 {{else if not .NoQuantity}}
                                                                     {{.Quantity}}
@@ -807,7 +825,7 @@
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{else}}title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'{{end}}>
+                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{else}}title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'{{end}}>
                                                 {{if .Locked}}
                                                     <span class="store-name dim">{{.ScraperName}} {{.Country}}</span>
                                                     <span class="locked-cta">

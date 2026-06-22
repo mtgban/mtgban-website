@@ -547,6 +547,18 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Official "Available at Amazon" badge shown in the INDEX price slot.
+   Two theme variants are swapped via the .dark-theme class. */
+.m-vendor-price .amzn-badge {
+    display: inline-block;
+    width: 88px;
+    height: 14px;
+    background: url("/img/misc/available-at-amazon-light.png") left center / contain no-repeat;
+}
+.dark-theme .m-vendor-price .amzn-badge {
+    background-image: url("/img/misc/available-at-amazon-dark.png");
+}
+
 .m-vendor-qty {
     font-size: 0.7rem;
     color: var(--greytext);

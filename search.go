@@ -52,6 +52,11 @@ type SearchEntry struct {
 	NoQuantity   bool
 	BundleIcon   string
 
+	// Badge renders this entry as the official "Available at Amazon"
+	// search-link badge rather than a normal store row. BundleIcon is a
+	// generic per-store icon, so it cannot be used to single this out.
+	Badge bool
+
 	Country string
 
 	Secondary float64
@@ -611,6 +616,18 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					NoQuantity:  true,
 				})
 			}
+		}
+
+		// Amazon search-by-name link (no price or condition); added to every
+		// INDEX section for singles and sealed alike, unless index data was skipped.
+		if !skipIndex {
+			tmp = append([]SearchEntry{{
+				ScraperName: "Search on AMAZON",
+				URL:         "https://www.amazon.com/s?k=" + url.QueryEscape(pageVars.Metadata[cardId].Name) + "&tag=" + Config.Affiliate["AMZN"],
+				BundleIcon:  "/img/misc/available-at-amazon-light.png",
+				Badge:       true,
+				NoQuantity:  true,
+			}}, tmp...)
 		}
 
 		// In case there are no results at all

@@ -888,6 +888,27 @@
     gap: 0 0.25em;
     justify-self: end;
 }
+/* Official "Available at Amazon" badge used as the INDEX search link, in
+   place of a store name. Two theme variants are swapped via .dark-theme. */
+.store-name.amzn-badge {
+    width: 111px; /* the badge's natural width at 18px tall (635:103) */
+    height: 18px;
+    background: url("/img/misc/available-at-amazon-light.png") center / contain no-repeat;
+}
+.dark-theme .store-name.amzn-badge {
+    background-image: url("/img/misc/available-at-amazon-dark.png");
+}
+/* The badge row has no price data, so drop the subgrid columns entirely
+   and center the badge in a plain flex row — both across the whole Sellers
+   column and vertically. (Spanning grid columns pinned the badge to the
+   top of the row, which align-self/align-content couldn't undo.) */
+.rows-main > .price-row.price-row-badge,
+.rows-index > .price-row.price-row-badge {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.price-row-badge .price-right { display: none; }
 .price-row .price .cur {
     color: var(--search-text-dim);
 }
