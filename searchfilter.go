@@ -162,7 +162,7 @@ func fixupStoreCodeNG(code string) []string {
 
 		// Validate the input against the registered scrapers
 		for _, seller := range GetSellers() {
-			if filters[i] != strings.ToLower(seller.Info().Name) &&
+			if filters[i] != strings.ToLower(scraperName(seller.Info().Shorthand)) &&
 				filters[i] != strings.ToLower(seller.Info().Shorthand) {
 				continue
 			}
@@ -170,7 +170,7 @@ func fixupStoreCodeNG(code string) []string {
 			break
 		}
 		for _, vendor := range GetVendors() {
-			if filters[i] != strings.ToLower(vendor.Info().Name) &&
+			if filters[i] != strings.ToLower(scraperName(vendor.Info().Shorthand)) &&
 				filters[i] != strings.ToLower(vendor.Info().Shorthand) {
 				continue
 			}
