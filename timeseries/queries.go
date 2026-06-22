@@ -274,13 +274,13 @@ type AggregatePriceKey struct {
 }
 
 // AggregatePriceStats holds per-card summary statistics of one price column
-// over a date window: the max, the min, and the count of buying days that
-// contributed to them. All values are computed from rows where the column is
-// strictly positive, so Count is the number of days the vendor actually
-// reported a price.
+// over a date window: max, min, discrete 90th percentile, and the count of
+// rows that contributed to them. Computed from rows where the column is
+// strictly positive, so Count is the number of buying days.
 type AggregatePriceStats struct {
 	Max   float64
 	Min   float64
+	P90   float64
 	Count int64
 }
 
@@ -329,9 +329,10 @@ func (c *Client) GetAggregatePriceStats(ctx context.Context, datasetIndex int, s
 	// column is hard-coded in columnForDataset; safe to interpolate.
 	q := fmt.Sprintf(`
 		SELECT mtgjson_uuid, is_foil, is_etched,
-		       MAX(%[1]s)  AS max_price,
-		       MIN(%[1]s)  AS min_price,
-		       COUNT(*)    AS sample_count
+		       MAX(%[1]s)                                            AS max_price,
+		       MIN(%[1]s)                                            AS min_price,
+		       percentile_disc(0.9) WITHIN GROUP (ORDER BY %[1]s)    AS p90_price,
+		       COUNT(*)                                              AS sample_count
 		  FROM product_prices
 		 WHERE date >= $1 AND %[1]s > 0
 		 GROUP BY mtgjson_uuid, is_foil, is_etched`, column)
@@ -346,7 +347,7 @@ func (c *Client) GetAggregatePriceStats(ctx context.Context, datasetIndex int, s
 	for rows.Next() {
 		var key AggregatePriceKey
 		var stats AggregatePriceStats
-		if err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &stats.Max, &stats.Min, &stats.Count); err != nil {
+		if err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &stats.Max, &stats.Min, &stats.P90, &stats.Count); err != nil {
 			return nil, err
 		}
 		result[key] = stats
