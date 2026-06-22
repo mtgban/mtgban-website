@@ -273,12 +273,15 @@ type AggregatePriceKey struct {
 	IsEtched    bool
 }
 
-// AggregatePriceRange holds the min/max of one price column for a card variant
-// over a date window. Both values are guaranteed non-null because the query
-// filters out null prices before aggregating.
-type AggregatePriceRange struct {
-	Max float64
-	Min float64
+// AggregatePriceStats holds per-card summary statistics of one price column
+// over a date window: the max, the min, and the count of buying days that
+// contributed to them. All values are computed from rows where the column is
+// strictly positive, so Count is the number of days the vendor actually
+// reported a price.
+type AggregatePriceStats struct {
+	Max   float64
+	Min   float64
+	Count int64
 }
 
 // columnForDataset returns the database column name matching a dataset config
@@ -310,23 +313,27 @@ func columnForDataset(index int) string {
 	}
 }
 
-// GetAggregatePriceRange returns per-card max and min of the price column
-// matching datasetIndex, over rows with date >= since. The result is keyed by
-// (uuid, foil, etched) so callers can do O(1) lookups while iterating a
-// buylist or inventory.
-func (c *Client) GetAggregatePriceRange(ctx context.Context, datasetIndex int, since time.Time) (map[AggregatePriceKey]AggregatePriceRange, error) {
+// GetAggregatePriceStats returns per-card summary statistics of the price
+// column matching datasetIndex, over rows with date >= since. The result is
+// keyed by (uuid, foil, etched) so callers can do O(1) lookups while iterating
+// a buylist or inventory.
+//
+// The > 0 filter excludes both NULLs and any 0 stored on a not-buying day, so
+// each card's stats reflect only days the vendor was actually buying.
+func (c *Client) GetAggregatePriceStats(ctx context.Context, datasetIndex int, since time.Time) (map[AggregatePriceKey]AggregatePriceStats, error) {
 	column := columnForDataset(datasetIndex)
 	if column == "" {
 		return nil, fmt.Errorf("timeseries: unknown dataset index %d", datasetIndex)
 	}
 
-	// column is hard-coded above; safe to interpolate into the query.
+	// column is hard-coded in columnForDataset; safe to interpolate.
 	q := fmt.Sprintf(`
 		SELECT mtgjson_uuid, is_foil, is_etched,
-		       MAX(%[1]s) AS max_price,
-		       MIN(%[1]s) AS min_price
+		       MAX(%[1]s)  AS max_price,
+		       MIN(%[1]s)  AS min_price,
+		       COUNT(*)    AS sample_count
 		  FROM product_prices
-		 WHERE date >= $1 AND %[1]s IS NOT NULL
+		 WHERE date >= $1 AND %[1]s > 0
 		 GROUP BY mtgjson_uuid, is_foil, is_etched`, column)
 
 	rows, err := c.db.QueryContext(ctx, q, since)
@@ -335,14 +342,14 @@ func (c *Client) GetAggregatePriceRange(ctx context.Context, datasetIndex int, s
 	}
 	defer rows.Close()
 
-	result := make(map[AggregatePriceKey]AggregatePriceRange)
+	result := make(map[AggregatePriceKey]AggregatePriceStats)
 	for rows.Next() {
 		var key AggregatePriceKey
-		var agg AggregatePriceRange
-		if err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &agg.Max, &agg.Min); err != nil {
+		var stats AggregatePriceStats
+		if err := rows.Scan(&key.MtgjsonUUID, &key.IsFoil, &key.IsEtched, &stats.Max, &stats.Min, &stats.Count); err != nil {
 			return nil, err
 		}
-		result[key] = agg
+		result[key] = stats
 	}
 	return result, rows.Err()
 }
