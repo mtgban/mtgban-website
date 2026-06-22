@@ -697,6 +697,7 @@ func runSealedAnalysis() {
 	for label, record := range buylistMetrics("CK", map[string]buylistReducer{
 		"hotlist": hotlistReducer,
 		"highest": highestBuylistPrice,
+		"goodP90": goodBuylistPrice,
 	}) {
 		infos[label] = record
 	}
@@ -717,6 +718,19 @@ func highestBuylistPrice(stats timeseries.AggregatePriceStats, _ float64) (float
 		return 0, false
 	}
 	return stats.Max, true
+}
+
+// minNumberDays is the minimum buying-day count required to report a P90.
+const minNumberDays = 30
+
+// goodBuylistPrice is a buylistReducer that selects the discrete 90th
+// percentile from the precomputed stats. Returns false when fewer than
+// minNumberDays buying days are available.
+func goodBuylistPrice(stats timeseries.AggregatePriceStats, _ float64) (float64, bool) {
+	if stats.Count < minNumberDays {
+		return 0, false
+	}
+	return stats.P90, true
 }
 
 // hotlistReducer flags cards whose current buylist price ties or beats every

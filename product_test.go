@@ -86,3 +86,30 @@ func TestHighestBuylistPrice(t *testing.T) {
 		}
 	}
 }
+
+// TestGoodBuylistPrice covers the P90 metric. The actual percentile math runs
+// in Postgres; this reducer is just a field selector with a sample-count gate,
+// so the cases pin the gate boundaries and the field selection.
+func TestGoodBuylistPrice(t *testing.T) {
+	minSamples := int64(minNumberDays)
+
+	cases := []struct {
+		name  string
+		stats timeseries.AggregatePriceStats
+		want  float64
+		ok    bool
+	}{
+		{"no data", timeseries.AggregatePriceStats{}, 0, false},
+		{"one below the minimum", timeseries.AggregatePriceStats{P90: 5, Count: minSamples - 1}, 0, false},
+		{"exactly the minimum", timeseries.AggregatePriceStats{P90: 5, Count: minSamples}, 5, true},
+		{"well above the minimum", timeseries.AggregatePriceStats{P90: 12, Count: 90}, 12, true},
+		// The selector reports P90, not Max — the metric IS the percentile.
+		{"reports P90, ignores Max", timeseries.AggregatePriceStats{Max: 100, P90: 5, Count: 30}, 5, true},
+	}
+	for _, tc := range cases {
+		got, ok := goodBuylistPrice(tc.stats, 0)
+		if ok != tc.ok || !almostEqual(got, tc.want) {
+			t.Errorf("%s: got (%v, %v), want (%v, %v)", tc.name, got, ok, tc.want, tc.ok)
+		}
+	}
+}
