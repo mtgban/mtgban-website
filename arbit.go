@@ -669,7 +669,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 
 		nav := NavElem{
-			Name:  scraper.Info().Name,
+			Name:  scraperName(scraper.Info().Shorthand),
 			Short: scraper.Info().Shorthand,
 			Link:  link,
 		}
@@ -881,14 +881,8 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			arbit = arbit[:MaxArbitResults]
 		}
 
-		name := scraper.Info().Name
-		switch name {
-		case "Sealed EV Scraper":
-			name = "Card Kingdom Singles Buylist"
-		}
-
 		entry := Arbitrage{
-			Name:             name,
+			Name:             scraperName(scraper.Info().Shorthand),
 			Key:              scraper.Info().Shorthand,
 			Arbit:            arbit,
 			HasNoCredit:      scraper.Info().CreditMultiplier == 0,
@@ -919,7 +913,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	}
 
 	if pageVars.GlobalMode {
-		pageVars.Title = "Market Imbalance in " + source.Info().Name
+		pageVars.Title = "Market Imbalance in " + scraperName(source.Info().Shorthand)
 	} else {
 		pageVars.Title = "Arbitrage"
 		if pageVars.ReverseMode {
@@ -927,7 +921,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		} else {
 			pageVars.Title += " from "
 		}
-		pageVars.Title += source.Info().Name
+		pageVars.Title += scraperName(source.Info().Shorthand)
 	}
 
 	render(w, "arbit.html", pageVars)
