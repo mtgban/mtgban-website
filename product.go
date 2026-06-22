@@ -696,6 +696,7 @@ func runSealedAnalysis() {
 	runRawSetValue(infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
 	for label, record := range buylistMetrics("CK", map[string]buylistReducer{
 		"hotlist": hotlistReducer,
+		"highest": highestBuylistPrice,
 	}) {
 		infos[label] = record
 	}
@@ -707,6 +708,16 @@ func runSealedAnalysis() {
 // buylist price to a single reported value. ok=false omits the card from this
 // reducer's output (cards are still considered for the other reducers).
 type buylistReducer func(stats timeseries.AggregatePriceStats, current float64) (float64, bool)
+
+// highestBuylistPrice is a buylistReducer that reports the absolute peak price
+// in the 90-day window: stats.Max, spikes included. The current price is
+// unused. Returns false when the card has no buying days in the window.
+func highestBuylistPrice(stats timeseries.AggregatePriceStats, _ float64) (float64, bool) {
+	if stats.Count == 0 {
+		return 0, false
+	}
+	return stats.Max, true
+}
 
 // hotlistReducer flags cards whose current buylist price ties or beats every
 // price stored in the last 90 days, reporting the lowest price seen in that

@@ -64,3 +64,25 @@ func TestHotlistReducer(t *testing.T) {
 		}
 	}
 }
+
+// TestHighestBuylistPrice covers the absolute-peak metric: it reports stats.Max
+// whenever the card has any buying days in the window.
+func TestHighestBuylistPrice(t *testing.T) {
+	cases := []struct {
+		name  string
+		stats timeseries.AggregatePriceStats
+		want  float64
+		ok    bool
+	}{
+		{"no data", timeseries.AggregatePriceStats{}, 0, false},
+		{"single buying day", timeseries.AggregatePriceStats{Max: 7, Min: 7, Count: 1}, 7, true},
+		{"flat window", timeseries.AggregatePriceStats{Max: 5, Min: 5, Count: 30}, 5, true},
+		{"includes a spike", timeseries.AggregatePriceStats{Max: 100, Min: 2, Count: 31}, 100, true},
+	}
+	for _, tc := range cases {
+		got, ok := highestBuylistPrice(tc.stats, 0)
+		if ok != tc.ok || !almostEqual(got, tc.want) {
+			t.Errorf("%s: got (%v, %v), want (%v, %v)", tc.name, got, ok, tc.want, tc.ok)
+		}
+	}
+}
