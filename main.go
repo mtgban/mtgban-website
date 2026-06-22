@@ -993,17 +993,6 @@ func main() {
 		// Reload DB Newspaper every 3 hours
 		c.AddFunc("33 */3 * * *", cacheNewspaper)
 
-		for _, refresh := range Config.ScraperConfig.ForceReloadAt {
-			c.AddFunc(refresh, func() {
-				log.Println("Reloading ScraperConfig")
-				err := loadScrapersNG(Config.ScraperConfig)
-				if err != nil {
-					ServerNotify("Reload", "Unable to reload ScraperConfig: "+err.Error())
-				}
-			})
-
-		}
-
 		c.Start()
 	}
 
