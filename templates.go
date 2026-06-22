@@ -100,6 +100,9 @@ var funcMap = template.FuncMap{
 	"load_partner": func(s string) string {
 		return Config.Affiliate[s]
 	},
+	"game_title": func() string {
+		return gameMap[Config.Game]
+	},
 	"uuid2ckid": func(s string) string {
 		bl, err := findVendorBuylist("CK")
 		if err != nil {

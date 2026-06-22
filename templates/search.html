@@ -392,6 +392,10 @@
                     {{$firstSetCode := ""}}
                     {{$firstWarning := false}}
 
+                    {{if and .PatreonLogin .AllKeys (not .ChartID)}}
+                        <p class="search-results-blurb">Compare prices and availability for {{game_title}} {{if .IsSealed}}sealed products{{else}}singles{{end}} across markets below. On the left sidebar you can refine your search or expand it looking for products containing your search results. You may tweak sorting as needed.</p>
+                    {{end}}
+
                     {{if .ChartID}}
                         <div class="chart-container">
                             <div class="chart-legend" id="chartLegend"></div>

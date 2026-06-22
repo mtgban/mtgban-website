@@ -490,6 +490,16 @@
     container: search-results / inline-size;
 }
 
+/* Affiliate/value-prop note shown to logged-out visitors above the results. */
+.search-results-blurb {
+    max-width: 720px;
+    margin: 2em auto 0.5em;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--search-text-dim);
+    text-align: center;
+}
+
 
 /* ── Card spacing ── */
 .result-body {
