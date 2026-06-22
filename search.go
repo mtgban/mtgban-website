@@ -622,6 +622,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if sig == "" && SigCheck {
 			for j, foundSet := range []map[string]map[string][]SearchEntry{foundSellers, foundVendors} {
 				for cond := range foundSet[cardId] {
+					// Index/reference prices stay visible to everyone.
+					if cond == "INDEX" {
+						continue
+					}
 					entries := foundSet[cardId][cond]
 					for i := range entries {
 						if j == 0 && !slices.Contains(Config.AffiliatesList, entries[i].Shorthand) {
