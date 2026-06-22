@@ -1085,8 +1085,6 @@
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
                                     <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
-                                    {{if $card.Reserved}} *{{end}}
-                                    {{if $card.Stocks}} &bull;{{end}}
                                 </td>
                                 <td class="opt-set">
                                     <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.SetCode}} #{{$card.Number}}
