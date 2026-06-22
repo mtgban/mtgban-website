@@ -58,6 +58,10 @@
         {{template "search-sealed" .}}
     {{else}}
         {{if eq .SearchQuery ""}}
+            {{/* The modal has no navbar, so it needs its own search bar; the
+                 landing panes (recent searches + favorites) render underneath
+                 in both contexts so the picker isn't just a bare input. */}}
+            {{if .ModalMode}}{{template "search-bar" .}}{{end}}
             {{template "search-landing-panes" .}}
         {{else}}
             {{template "search-results" .}}
@@ -69,6 +73,15 @@
 
 {{define "sidebar-search"}}
 <div class="sidebar-search">
+    {{/* The navbar (and its search box) is hidden inside the chart-add modal,
+         so render an in-page search form there to drive the card picker. */}}
+    {{if .ModalMode}}
+    <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+        <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
+        {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
+        <input type="hidden" name="modal" value="1">
+    </form>
+    {{end}}
     <div class="search-sort-row">
         {{if .NoSort}}
             <span class="search-sort-label">Sort from syntax</span>
@@ -96,6 +109,34 @@
             </span>
         </div>
     {{end}}
+    {{if .ModalMode}}
+    <script type="text/javascript">
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+    </script>
+    {{end}}
+</div>
+{{end}}
+
+{{/* Standalone search bar, used as the empty-query picker inside the chart-add
+     modal (the regular landing page uses the navbar search instead). */}}
+{{define "search-bar"}}
+<div class="page-standard search-bar-sticky">
+    <div class="search-bar-wrap">
+        <div class="search-input-row">
+            <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="searchform">
+                <input id="searchbox" class="search-input" onFocus="this.setSelectionRange(0, this.value.length)" type="text" name="q" placeholder="Enter a {{if .IsSealed}}product{{else}}card{{end}} name" value="{{.SearchQuery}}" maxlength="1000" autofocus autocapitalize="none">
+                {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
+                {{if .ModalMode}}<input type="hidden" name="modal" value="1">{{end}}
+            </form>
+            <div class="search-actions">
+                <button class="search-action-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
+                <a class="search-action-btn" href="/random{{if .IsSealed}}sealed{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
+            </div>
+        </div>
+    </div>
+    <script type="text/javascript">
+        autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), {{if .IsSealed}}"true"{{else}}"false"{{end}});
+    </script>
 </div>
 {{end}}
 
@@ -111,6 +152,22 @@
 
             <div class="sealed-main" id="sealed-main">
                 <h1>Sealed Products</h1>
+
+                {{/* In-page sealed search box for the chart-add modal, where the
+                     navbar search is not rendered. */}}
+                {{if .ModalMode}}
+                <div class="sealed-toolbar">
+                    <form class="sealed-search-form autocomplete" id="searchform" action="/sealed" method="get" autocomplete="off" spellcheck="false">
+                        <input id="searchbox" class="sealed-search" type="text" name="q" placeholder="Search for a product..." autocomplete="off" autocapitalize="none" maxlength="1000">
+                        {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
+                        <input type="hidden" name="modal" value="1">
+                    </form>
+                    <a id="sealed-surprise" href="#">Surprise Me</a>
+                </div>
+                <script type="text/javascript">
+                    autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "true");
+                </script>
+                {{end}}
 
                 {{range $key := .EditionSort}}
                     {{$editionList := index $.EditionList $key}}
@@ -409,8 +466,17 @@
                                     </select>
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
+                                    <a class="btn default chart-add-btn" href="javascript:openChartAddModal()" title="Add another card to this chart">&#10133; Add card</a>
                                 </p>
-                                {{if .Checkpoints}}
+                                {{if .IsMultiChart}}
+                                {{if .ChartReferences}}
+                                <p class="chart-ref-picker" style="margin: 0.25em 0 0 0;">
+                                    {{range .ChartReferences}}
+                                        <a class="btn default ref-picker-btn" data-ref="{{.}}" href="javascript:void(0)" onclick="selectReference({{.}}); return false;">{{.}}</a>
+                                    {{end}}
+                                </p>
+                                {{end}}
+                                {{else if .Checkpoints}}
                                 <p class="chart-checkpoint-toggles">
                                     <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
                                     <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
@@ -463,6 +529,7 @@
                                                 label: {{.Name}},
                                                 data: {{.Data}},
                                                 borderColor: {{.Color}},
+                                                referenceKey: {{.Reference}},
                                                 fill: 'origin',
                                             },
                                         {{end}}
@@ -475,8 +542,97 @@
                             window.cardChart = cardChart;
                             checkpointChartRef.chart = cardChart;
 
+                            {{if .IsMultiChart}}
+                            // Multi-card mode: keep one persistent line per card and swap its
+                            // data array when the reference changes. Chart.js then animates the
+                            // value transition (TCG Low → TCG Market morphs in place) instead
+                            // of fading datasets in/out, which feels choppy and makes the Y
+                            // axis snap.
+                            var chartReferences = {{.ChartReferences}};
+                            var savedRef = localStorage.getItem('chartMultiRef');
+                            var currentReference = (savedRef && chartReferences.indexOf(savedRef) >= 0)
+                                ? savedRef : chartReferences[0];
+
+                            // Reshape the server-rendered (card × reference) datasets into a
+                            // cardName -> { color, references: { ref: data } } lookup, then
+                            // collapse the chart down to one dataset per card.
+                            var cardLines = {};
+                            var cardOrder = [];
+                            cardChart.data.datasets.forEach(function(ds) {
+                                if (!cardLines[ds.label]) {
+                                    cardLines[ds.label] = { color: ds.borderColor, references: {} };
+                                    cardOrder.push(ds.label);
+                                }
+                                cardLines[ds.label].references[ds.referenceKey] = ds.data;
+                            });
+                            cardChart.data.datasets = cardOrder.map(function(name) {
+                                var cl = cardLines[name];
+                                return {
+                                    label: name,
+                                    data: cl.references[currentReference] || [],
+                                    borderColor: cl.color,
+                                    fill: 'origin',
+                                };
+                            });
+                            cardChart.update('none');
+
+                            function selectReference(ref) {
+                                currentReference = ref;
+
+                                var newByLabel = {};
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    var cl = cardLines[ds.label];
+                                    newByLabel[ds.label] = cl ? (cl.references[ref] || []) : [];
+                                });
+
+                                // Pre-bridge: for positions that are NaN in current data but
+                                // have a value in the new reference, plant the nearest valid
+                                // neighbor's value as the starting point. update('none') commits
+                                // that state instantly, then the second update() animates from
+                                // it to the real new data — newly-appearing points slide out of
+                                // the existing line instead of popping in at their final spot.
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    var newData = newByLabel[ds.label];
+                                    var oldData = ds.data;
+                                    var bridged = oldData.map(function(v, i) {
+                                        var oldNum = parseFloat(v);
+                                        if (!isNaN(oldNum)) return oldNum;
+                                        var newNum = parseFloat(newData[i]);
+                                        if (isNaN(newNum)) return NaN;
+                                        for (var k = 1; k < oldData.length; k++) {
+                                            if (i - k >= 0) {
+                                                var leftVal = parseFloat(oldData[i - k]);
+                                                if (!isNaN(leftVal)) return leftVal;
+                                            }
+                                            if (i + k < oldData.length) {
+                                                var rightVal = parseFloat(oldData[i + k]);
+                                                if (!isNaN(rightVal)) return rightVal;
+                                            }
+                                        }
+                                        return newNum;
+                                    });
+                                    ds.data = bridged;
+                                });
+                                cardChart.update('none');
+
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    ds.data = newByLabel[ds.label];
+                                });
+                                cardChart.update();
+
+                                renderChartLegend(cardChart, 'chartLegend');
+                                document.querySelectorAll('.ref-picker-btn').forEach(function(btn) {
+                                    btn.classList.toggle('active', btn.getAttribute('data-ref') === ref);
+                                });
+                                localStorage.setItem('chartMultiRef', ref);
+                            }
+                            document.querySelectorAll('.ref-picker-btn').forEach(function(btn) {
+                                btn.classList.toggle('active', btn.getAttribute('data-ref') === currentReference);
+                            });
+                            {{else}}
                             // Load state from local storage
                             applySavedLegendState(cardChart, legendStorageKey);
+                            {{end}}
 
                             // Build custom HTML legend (clicks persist via legendStorageKey)
                             renderChartLegend(cardChart, 'chartLegend', legendStorageKey);
@@ -524,8 +680,12 @@
                             }
                             function downloadAsImg() {
                                 var chartImg = document.createElement('a');
+                                {{if .IsMultiChart}}
+                                chartImg.download = 'mtgban-chart.png';
+                                {{else}}
                                 {{$card := (index $.Metadata .ChartID)}}
                                 chartImg.download = '{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png';
+                                {{end}}
 
                                 var scaleFactor = 2;
                                 var border = 10;
@@ -542,7 +702,91 @@
                                 chartImg.href = exportCanvas.toDataURL("image/png");
                                 chartImg.click();
                             }
+
+                            // Hoist the overlay to <body> so no ancestor's
+                            // transform/filter/backdrop-filter can trap its
+                            // position: fixed inside a containing block, and
+                            // apply the critical positioning styles inline so
+                            // the modal renders correctly even if css/search.css
+                            // is serving a stale browser-cached copy.
+                            (function() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                if (!overlay || overlay.parentNode === document.body) return;
+                                document.body.appendChild(overlay);
+                            })();
+
+                            function openChartAddModal() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                var frame = document.getElementById('chartAddFrame');
+                                if (!overlay || !frame) return;
+                                var base = '/search?chart={{.ChartIDsCSV}}&modal=1';
+                                {{if .IsSealed}}base = '/sealed?chart={{.ChartIDsCSV}}&modal=1';{{end}}
+                                // Always reload on open so the iframe picks up
+                                // the latest localStorage theme (and any other
+                                // parent-side state) instead of reusing the
+                                // body class it was first rendered with.
+                                frame.src = base;
+                                overlay.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;justify-content:center;align-items:center;padding:4vh 4vw;';
+                                overlay.classList.add('open');
+                                document.body.classList.add('chart-add-open');
+                                document.body.style.overflow = 'hidden';
+                            }
+                            function closeChartAddModal() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                if (!overlay) return;
+                                overlay.style.display = 'none';
+                                overlay.classList.remove('open');
+                                document.body.classList.remove('chart-add-open');
+                                document.body.style.overflow = '';
+                            }
+                            document.addEventListener('keydown', function(e) {
+                                if (e.key === 'Escape') {
+                                    var overlay = document.getElementById('chartAddOverlay');
+                                    if (overlay && overlay.classList.contains('open')) {
+                                        closeChartAddModal();
+                                    }
+                                }
+                            });
+                            window.addEventListener('message', function(e) {
+                                if (e.origin !== window.location.origin) return;
+                                if (!e.data) return;
+                                var t = e.data.type;
+                                if (t !== 'mtgban-add-to-chart' && t !== 'mtgban-remove-from-chart') return;
+                                var cardId = e.data.cardId;
+                                if (!cardId) return;
+                                var existing = '{{.ChartIDsCSV}}'.split(',').filter(Boolean);
+                                var idx = existing.indexOf(cardId);
+                                if (t === 'mtgban-add-to-chart') {
+                                    if (idx !== -1) { closeChartAddModal(); return; }
+                                    existing.push(cardId);
+                                } else {
+                                    if (idx === -1) { closeChartAddModal(); return; }
+                                    existing.splice(idx, 1);
+                                }
+                                var url = new URL(window.location.href);
+                                if (existing.length) {
+                                    url.searchParams.set('chart', existing.join(','));
+                                } else {
+                                    url.searchParams.delete('chart');
+                                }
+                                url.searchParams.delete('q');
+                                window.location = url.toString();
+                            });
                         </script>
+
+                        <div id="chartAddOverlay" class="chart-add-overlay" style="display:none;" onclick="if(event.target===this)closeChartAddModal()">
+                            <div class="chart-add-dialog" role="dialog" aria-label="Add card to chart"
+                                 style="width:92vw;max-width:1400px;height:92vh;background:var(--background,#fff);border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:14px;box-shadow:0 24px 72px rgba(0,0,0,0.45);display:flex;flex-direction:column;overflow:hidden;">
+                                <div class="chart-add-header"
+                                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-subtle,rgba(0,0,0,0.08));flex-shrink:0;background:var(--navbackground,var(--background,#fff));">
+                                    <span class="chart-add-title" style="font-size:14px;font-weight:600;color:var(--normal);">&#10133; Add a card to this chart</span>
+                                    <button class="chart-add-close" type="button" onclick="closeChartAddModal()" aria-label="Close"
+                                            style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:var(--normal);padding:0 6px;">&times;</button>
+                                </div>
+                                <iframe id="chartAddFrame" class="chart-add-frame" title="Search for a card to add"
+                                        style="flex:1;width:100%;border:0;background:var(--background,#fff);"></iframe>
+                            </div>
+                        </div>
                     {{end}}
 
                     <svg height="0" width="0" xmlns="http://www.w3.org/2000/svg">
@@ -642,8 +886,14 @@
                                     {{if $card.TCGId}}
                                         <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 src="/img/logo/tcgapp.png"></a>
                                     {{end}}
-                                    {{if and (not $.DisableChart) (eq $.ChartID "")}}
-                                        <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
+                                    {{if not $.DisableChart}}
+                                        {{if eq $.ChartIDsCSV ""}}
+                                            <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
+                                        {{else if in_list $.ChartIDs $cardId}}
+                                            <a class="chart-remove-link" data-card-id="{{$cardId}}" href="?chart={{csv_without $.ChartIDsCSV $cardId}}" title="Remove from this chart">&#128200;&#10134;</a>
+                                        {{else}}
+                                            <a class="chart-add-link" data-card-id="{{$cardId}}" href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
+                                        {{end}}
                                     {{end}}
                                     {{/* Shown only when the screen is narrow enough that the sidebar
                                          preview is hidden; opens the card art in a lightbox. */}}
@@ -1007,6 +1257,76 @@
 
 {{define "extra-scripts"}}
 <script>lucide.createIcons();</script>
+{{if .ModalMode}}
+<style>
+/* Inline so the iframe content sheds page chrome even when css/search.css is
+ * serving a stale browser-cached copy without the body.modal-embed rules. */
+body.modal-embed { margin: 0 !important; }
+body.modal-embed .page-content { padding-top: 0 !important; min-height: auto !important; }
+body.modal-embed .search-bar-sticky { top: 0 !important; }
+body.modal-embed .search-layout { margin-top: 0 !important; min-height: auto !important; }
+body.modal-embed .ban-confirm-dialog-host,
+body.modal-embed .cp-overlay { display: none !important; }
+</style>
+<script>
+(function() {
+    var chartCtx = {{.ChartIDsCSV}};
+
+    // Mirror localStorage.theme into the iframe body. The 'storage' event fires
+    // in other same-origin documents when the parent's nightmode.js writes a
+    // new value, so toggling the navbar moon button while the modal is open
+    // flips the iframe content with it.
+    function applyTheme() {
+        var t = localStorage.getItem('theme');
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var dark = t ? (t === 'dark') : prefersDark;
+        document.body.classList.toggle('dark-theme', dark);
+        document.body.classList.toggle('light-theme', !dark);
+    }
+    applyTheme();
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'theme' || e.key === null) applyTheme();
+    });
+
+    // Tag every same-origin link to /search or /sealed (including bare ?q=...)
+    // with modal=1 and the active chart roster, so clicking around inside the
+    // modal keeps the iframe in modal mode instead of escaping to a full page.
+    function decorate() {
+        document.querySelectorAll('a[href]').forEach(function(a) {
+            if (a.dataset.modalDecorated === '1') return;
+            var raw = a.getAttribute('href');
+            if (!raw) return;
+            if (raw.charAt(0) === '#' || raw.indexOf('javascript:') === 0) return;
+            if (a.target === '_blank') return;
+            var url;
+            try { url = new URL(raw, window.location.href); } catch (e) { return; }
+            if (url.origin !== window.location.origin) return;
+            if (!/^\/(search|sealed)\/?$/.test(url.pathname)) return;
+            if (chartCtx && !url.searchParams.has('chart')) {
+                url.searchParams.set('chart', chartCtx);
+            }
+            url.searchParams.set('modal', '1');
+            a.href = url.toString();
+            a.dataset.modalDecorated = '1';
+        });
+    }
+    decorate();
+    new MutationObserver(decorate).observe(document.body, { childList: true, subtree: true });
+
+    document.addEventListener('click', function(e) {
+        var add = e.target.closest('a.chart-add-link');
+        var rm = e.target.closest('a.chart-remove-link');
+        var a = add || rm;
+        if (!a) return;
+        var cardId = a.getAttribute('data-card-id');
+        if (!cardId || !window.parent || window.parent === window) return;
+        e.preventDefault();
+        var type = add ? 'mtgban-add-to-chart' : 'mtgban-remove-from-chart';
+        window.parent.postMessage({ type: type, cardId: cardId }, window.location.origin);
+    });
+})();
+</script>
+{{end}}
 <script>
 (function () {
     // Card-action icons collapse into a kebab dropdown in the single-column

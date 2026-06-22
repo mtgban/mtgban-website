@@ -1261,6 +1261,216 @@
 }
 
 
+/* Multi-card chart reference picker: one button per price source (TCG Low,
+ * Card Kingdom Buy, etc.) — clicking switches which reference all charted
+ * cards display. Mirrors the chart-event toggle box for visual consistency. */
+.chart-ref-picker {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 10px;
+    margin: 8px 0 0;
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 6px;
+    background: var(--surface-2, rgba(0, 0, 0, 0.03));
+    font-size: 12px;
+}
+.chart-ref-picker::before {
+    content: 'Price source:';
+    color: var(--text-secondary, #666);
+    font-weight: 500;
+}
+.chart-ref-picker .ref-picker-btn {
+    padding: 2px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.2));
+    background: transparent;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.chart-ref-picker .ref-picker-btn:hover {
+    background-color: rgba(54, 162, 235, 0.1);
+}
+.chart-ref-picker .ref-picker-btn.active {
+    background-color: rgba(54, 162, 235, 0.2);
+    border-color: rgba(54, 162, 235, 0.6);
+    font-weight: 500;
+}
+
+
+/* Remove-from-chart anchor on rows whose card is already in the chart roster.
+ * Tinted so the minus glyph reads as a destructive action rather than the
+ * neutral "view chart" icon used in plain search results. */
+.chart-remove-link {
+    filter: hue-rotate(180deg) saturate(1.3);
+    opacity: 0.85;
+}
+.chart-remove-link:hover {
+    opacity: 1;
+}
+
+/* Add-to-chart modal: overlay + dialog containing an iframe of /search?modal=1.
+ * The iframe reuses the full search UI; clicks on result-row chart-add icons
+ * postMessage back to the parent so the chart roster updates in place. */
+.chart-add-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 600;
+    justify-content: center;
+    align-items: center;
+    padding: 4vh 4vw;
+}
+.chart-add-overlay.open {
+    display: flex;
+}
+body.chart-add-open {
+    overflow: hidden;
+}
+.chart-add-dialog {
+    width: 100%;
+    max-width: 1100px;
+    height: 100%;
+    max-height: 92vh;
+    background: var(--background, #fff);
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 12px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.chart-add-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-subtle, rgba(0, 0, 0, 0.08));
+    flex-shrink: 0;
+}
+.chart-add-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--normal);
+}
+.chart-add-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--normal);
+    padding: 0 6px;
+}
+.chart-add-close:hover {
+    color: var(--awarning, #d97706);
+}
+.chart-add-frame {
+    flex: 1;
+    width: 100%;
+    border: 0;
+    background: var(--background, #fff);
+}
+
+/* Embed mode: the search page is loaded inside the modal iframe. Hide the
+ * site nav and drop the page padding so the search UI feels like a native
+ * modal panel instead of a full webpage stuffed into a frame. */
+body.modal-embed .page-content {
+    padding-top: 0;
+}
+body.modal-embed .search-bar-sticky {
+    top: 0;
+}
+body.modal-embed .ban-confirm-dialog-host,
+body.modal-embed .cp-overlay {
+    display: none !important;
+}
+
+/* Chart-add modal picker: the styled search bar shown above the recent +
+ * favorites panes when the modal opens with no query. These classes only
+ * appear inside the modal (search-bar / sidebar-search templates), so the
+ * rules don't touch the navbar or the full-page landing search. */
+.search-bar-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 16px 0 10px;
+    background: var(--background);
+}
+.search-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.search-input-row .autocomplete {
+    flex: 1;
+    display: block;
+}
+/* The in-modal results view reuses .search-input in its sidebar; make that
+ * form fill its column instead of shrinking to the inline-block default. */
+.sidebar-search .autocomplete {
+    display: block;
+    width: 100%;
+}
+.search-input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 48px;
+    padding: 0 18px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-1);
+    color: var(--normal);
+    font-size: 16px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12);
+}
+.search-input:focus {
+    border-color: var(--ainfo);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.12), 0 0 0 3px var(--accent-muted);
+}
+.search-input::placeholder {
+    color: var(--text-dim);
+}
+.search-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.search-action-btn {
+    height: 48px;
+    width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-2);
+    color: var(--activetext);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.search-action-btn:hover {
+    background: var(--accent-muted);
+    border-color: var(--accent-border);
+    color: var(--ainfo);
+    text-decoration: none;
+}
+.search-action-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+
 /* ═══ Options page ═══ */
 
 .opts-page {
