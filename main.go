@@ -663,7 +663,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		}
 		_, noAuth := Config.ACL["Any"][pageVars.Nav[mainNavIndex].Name]
 		if noAuth {
-			user = "Beta Public Access"
+			user = ""
 		}
 	}
 
