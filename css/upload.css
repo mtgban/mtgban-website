@@ -1119,6 +1119,7 @@
 .opt-offer .offer { display: inline-block; min-width: 5em; text-align: right; color: var(--asuccess); }
 .opt-loaded .loaded-wrap { display: inline-block; text-align: right; }
 .opt-loaded .loaded { display: inline-block; min-width: 5em; text-align: right; color: var(--activetext); }
+.opt-offer .opt-icons,
 .opt-loaded .opt-icons { display: inline-block; width: 2em; text-align: left; padding-left: 6px; }
 .opt-spread { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-base); font-weight: 600; text-align: right; white-space: nowrap; }
 .opt-spread.hot { color: var(--awarning); }
