@@ -10,19 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  # Fetch and cache the MTGJSON AllPrintings datastore via the reusable
-  # workflow in the go-mtgban companion repo. We don't pass `game` (the
-  # extra B2 upload + production ping is the go-mtgban repo's job, not
-  # ours) — we just consume the cached .xz and decompress it for tests.
-  cache-datastore:
-    uses: mtgban/go-mtgban/.github/workflows/cache-file.yml@master
-    with:
-      url: ${{ vars.DATASTORE_MAGIC }}
-      path: "datastore/"
-    secrets: inherit
-
   test:
-    needs: [cache-datastore]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -33,15 +21,29 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Restore datastore cache
-        uses: actions/cache/restore@v5
+      - name: Compute datastore cache key
+        id: ds
+        run: |
+          etag=$(curl -sI "${{ vars.DATASTORE_MAGIC }}" | grep -i etag | tr -d '\r"' | cut -f 2 -d " ")
+          base=$(basename "${{ vars.DATASTORE_MAGIC }}" | cut -d? -f1)
+          echo "key=$base-$etag" >> "$GITHUB_OUTPUT"
+          echo "filepath=datastore/$base" >> "$GITHUB_OUTPUT"
+
+      - name: Cache datastore
+        id: cache
+        uses: actions/cache@v5
         with:
           path: "datastore/"
-          key: ${{ needs.cache-datastore.outputs.key }}
-          fail-on-cache-miss: true
+          key: ${{ steps.ds.outputs.key }}
+
+      - name: Download datastore (cache miss)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p datastore/
+          curl -L "${{ vars.DATASTORE_MAGIC }}" -o "${{ steps.ds.outputs.filepath }}"
 
       - name: Decompress datastore
-        run: xz -dc ${{ needs.cache-datastore.outputs.filepath }} > allprintings5.json
+        run: xz -dc "${{ steps.ds.outputs.filepath }}" > allprintings5.json
 
       - name: go build ./...
         run: go build ./...
