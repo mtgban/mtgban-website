@@ -694,12 +694,34 @@ func runSealedAnalysis() {
 	infos := map[string]mtgban.InventoryRecord{}
 
 	runRawSetValue(infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
-	infos["hotlist"] = checkHighestBuylists("CK")
+	for label, record := range buylistMetrics("CK", map[string]buylistReducer{
+		"hotlist": hotlistReducer,
+	}) {
+		infos[label] = record
+	}
 
 	infosPtr.Store(&infos)
 }
 
-func checkHighestBuylists(store string) mtgban.InventoryRecord {
+// buylistReducer maps a card's 90-day buying-day price stats and its current
+// buylist price to a single reported value. ok=false omits the card from this
+// reducer's output (cards are still considered for the other reducers).
+type buylistReducer func(stats timeseries.AggregatePriceStats, current float64) (float64, bool)
+
+// hotlistReducer flags cards whose current buylist price ties or beats every
+// price stored in the last 90 days, reporting the lowest price seen in that
+// window so the UI can show how far it has climbed.
+func hotlistReducer(stats timeseries.AggregatePriceStats, current float64) (float64, bool) {
+	if stats.Count == 0 || current < stats.Max {
+		return 0, false
+	}
+	return stats.Min, true
+}
+
+// buylistMetrics computes multiple per-card buylist metrics in a single pass:
+// one aggregate query covers the whole 90-day window, then every card runs
+// through every reducer. The result is keyed by the same labels passed in.
+func buylistMetrics(store string, reducers map[string]buylistReducer) map[string]mtgban.InventoryRecord {
 	bl, err := findVendorBuylist(store)
 	if err != nil {
 		return nil
@@ -724,28 +746,26 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 		return nil
 	}
 
-	log.Println("Running hotlist checks for", store)
+	log.Printf("Running %d buylist metrics for %s", len(reducers), store)
 
 	threeMonthsAgo := time.Now().AddDate(0, 0, -90)
 
-	// One aggregate query for the whole buylist instead of N per-card
-	// HGetAlls. The result is keyed by (uuid, foil, etched); each entry holds
-	// the max and min stored price over the 90-day window.
-	aggregate, err := PricesArchiveDB.GetAggregatePriceRange(context.Background(), datasetIndex, threeMonthsAgo)
+	// One aggregate query for the whole buylist instead of N per-card lookups.
+	// Postgres computes the stats; each reducer just selects the field it
+	// cares about.
+	statsByCard, err := PricesArchiveDB.GetAggregatePriceStats(context.Background(), datasetIndex, threeMonthsAgo)
 	if err != nil {
 		log.Println(err)
 		return nil
 	}
 
-	highestBuylistInThreeMonths := mtgban.InventoryRecord{}
-	for cardId, entries := range bl {
-		// Sanity check
-		buylistPrice := entries[0].BuyPrice
-		if buylistPrice == 0 {
-			continue
-		}
+	out := make(map[string]mtgban.InventoryRecord, len(reducers))
+	for label := range reducers {
+		out[label] = mtgban.InventoryRecord{}
+	}
 
-		// Skip cards that are too recent
+	for cardId, entries := range bl {
+		// Skip cards too recent to have a meaningful 90-day window
 		cardDate, err := mtgmatcher.CardReleaseDate(cardId)
 		if err != nil || cardDate.After(threeMonthsAgo) {
 			continue
@@ -757,7 +777,7 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 			continue
 		}
 
-		agg, ok := aggregate[timeseries.AggregatePriceKey{
+		stats, ok := statsByCard[timeseries.AggregatePriceKey{
 			MtgjsonUUID: timeseries.NormalizeUUID(co.UUID),
 			IsFoil:      co.Foil,
 			IsEtched:    co.Etched,
@@ -766,18 +786,20 @@ func checkHighestBuylists(store string) mtgban.InventoryRecord {
 			continue
 		}
 
-		// Keep cards whose current buylist price ties or beats every stored
-		// price in the last 3 months. Report the lowest seen price in that
-		// window so the UI can show how far it's climbed.
-		if buylistPrice < agg.Max {
-			continue
+		current := entries[0].BuyPrice
+		for label, reduce := range reducers {
+			value, ok := reduce(stats, current)
+			if !ok {
+				continue
+			}
+			out[label][cardId] = []mtgban.InventoryEntry{{Price: value}}
 		}
-
-		highestBuylistInThreeMonths[cardId] = []mtgban.InventoryEntry{{Price: agg.Min}}
 	}
 
-	log.Printf("Found %d prices on hotlist", len(highestBuylistInThreeMonths))
-	return highestBuylistInThreeMonths
+	for label, record := range out {
+		log.Printf("Found %d %s entries", len(record), label)
+	}
+	return out
 }
 
 func runRawSetValue(infos map[string]mtgban.InventoryRecord, tcgInventory, tcgDirect mtgban.InventoryRecord, ckBuylist, directNetBuylist mtgban.BuylistRecord) {
