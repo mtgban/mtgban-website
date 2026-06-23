@@ -157,16 +157,13 @@
                 </div>
             {{end}}
             {{if .PopularSearches}}
-            <div class="search-popular">
-                <div class="search-popular-title">Popular searches</div>
-                <div class="search-popular-grid">
+            <div class="search-popular search-suggestions">
+                <p class="search-suggestion-label">Popular searches:</p>
+                <ul class="search-suggestion-list">
                     {{range .PopularSearches}}
-                    <a class="search-popular-card" href="{{.URL}}" title="{{.Label}}">
-                        <img class="search-popular-img" src="{{.ImageURL}}" alt="{{.Label}}" loading="lazy">
-                        <span class="search-popular-label">{{.Label}}</span>
-                    </a>
+                    <li><a href="{{.URL}}">{{.Label}}</a></li>
                     {{end}}
-                </div>
+                </ul>
             </div>
             {{end}}
         </div>
