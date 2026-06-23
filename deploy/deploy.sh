@@ -20,7 +20,7 @@ set -euo pipefail
 CO_PREFIX=/home/koda/src/mtgban-website-      # per-port checkouts: ${CO_PREFIX}8081 / ...8082
 UPSTREAM_CONF=/etc/nginx/conf.d/mtgban_upstream.conf   # chown'd to koda, see README
 DRAIN_SECONDS=5        # let nginx finish routing to the new port before stopping old
-READY_TIMEOUT=180      # max seconds to wait for the new instance's datastore
+READY_TIMEOUT=300      # max seconds to wait for the new instance's datastore
 
 # Go isn't on the non-interactive SSH PATH by default; adjust to `which go`.
 export PATH="/usr/local/go/bin:${HOME}/go/bin:${PATH}"

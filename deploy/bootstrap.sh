@@ -20,7 +20,7 @@ BOOT_PORT=8081                                   # the instance enabled at boot
 ENV_FILE=${ENV_FILE:-/etc/mtgban.env}
 UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}
 SUDOERS_FILE=${SUDOERS_FILE:-/etc/sudoers.d/mtgban-deploy}
-READY_TIMEOUT=${READY_TIMEOUT:-180}
+READY_TIMEOUT=${READY_TIMEOUT:-300}
 export PATH="/usr/local/go/bin:${HOME}/go/bin:${PATH}"
 # ---------------------------------------------------------------------------
 
