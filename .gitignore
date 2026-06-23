@@ -37,3 +37,6 @@ compose-dev.yaml
 .idea/
 
 pg-data/
+
+# Claude Workspaces
+.claude
