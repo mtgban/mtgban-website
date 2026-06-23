@@ -32,6 +32,16 @@
 
     <div class="tools-dropdown" id="tools-dropdown" role="menu" aria-labelledby="tools-btn">
         <div class="tools-grid" id="tools-grid">
+            <button class="tools-tile-hint" id="nav-hint" type="button" title="Got it — hide this tip" hidden>
+                <span class="tools-tile-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+                </span>
+                <span class="tools-tile-text">
+                    <span class="tools-tile-name">Drag to rearrange</span>
+                    <span class="tools-tile-desc">Drag any tile onto the bar, or reorder them however you like.</span>
+                </span>
+                <span class="tools-tile-hint-x" aria-hidden="true">&times;</span>
+            </button>
             {{range .Nav}}
                 {{if and (ne .Name "Home") (ne .Name "Search") (ne .Name "Sealed")}}
                     <a class="tools-tile{{if eq .Name "Admin"}} is-admin{{end}}" href="{{.Link}}" data-tool="{{slug .Name}}">
@@ -206,5 +216,19 @@
     });
 })();
 
+</script>
+
+<script>
+/*
+ * Reveal the drag hint before paint, unless the user dismissed it once
+ * already (persisted in localStorage). Hidden-by-default + reveal — rather
+ * than shown-by-default + remove — means dismissers never see a flash, and
+ * visitors without localStorage simply never see the tip (drag needs JS too).
+ */
+(function() {
+    try { if (localStorage.getItem('mtgban_nav_hint_dismissed')) return; } catch (e) { return; }
+    var h = document.getElementById('nav-hint');
+    if (h) h.hidden = false;
+})();
 </script>
 {{end}}

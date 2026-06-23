@@ -361,6 +361,42 @@
 .dark-theme .tools-tile-desc {
     color: #b6bccc;
 }
+
+/* ── Drag hint: a one-time, dismissible tile in the Tools dropdown telling
+   users the tiles can be dragged to rearrange — reordered or pulled onto the
+   bar. Mirrors .tools-tile's box but is clearly a tip: not draggable, not
+   harvested into the saved layout, and removed for good on click. Spans the
+   grid width at the top; revealed pre-paint unless already dismissed. ──── */
+.tools-tile-hint {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    text-align: left;
+    color: var(--normal);
+    background: var(--accent-muted, rgba(91,141,239,0.1));
+    border: 1px dashed var(--accent-border, rgba(91,141,239,0.55));
+    border-radius: var(--radius-md, 8px);
+    cursor: pointer;
+    transition: background 0.12s, border-color 0.12s;
+}
+.tools-tile-hint[hidden] { display: none; }
+.tools-tile-hint:hover {
+    background: var(--accent-muted, rgba(91,141,239,0.18));
+    border-color: var(--ainfo, rgba(91,141,239,0.7));
+}
+.tools-tile-hint .tools-tile-icon { color: var(--ainfo); }
+.tools-tile-hint-x {
+    margin-left: auto;
+    padding-left: 10px;
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--greytext);
+    opacity: 0.55;
+    flex-shrink: 0;
+}
+.tools-tile-hint:hover .tools-tile-hint-x { opacity: 1; }
 .tools-tile.is-admin {
     border-style: dashed;
 }

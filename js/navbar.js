@@ -288,6 +288,20 @@
     Array.from(document.querySelectorAll('.tools-tile, .nav2-section-btn:not(.is-tools)')).forEach(attachSlotHandlers);
 })();
 
+// ── Drag hint tile: dismiss on click, remembered forever ────
+(function() {
+    var hint = document.getElementById('nav-hint');
+    if (!hint) return;
+    hint.addEventListener('click', function(e) {
+        // Keep the Tools dropdown open. Without this, the click bubbles to the
+        // document outside-click handler, which — now that the tile is being
+        // removed — sees a target no longer inside the dropdown and closes it.
+        e.stopPropagation();
+        try { localStorage.setItem('mtgban_nav_hint_dismissed', '1'); } catch (err) {}
+        hint.remove();
+    });
+})();
+
 // ── Context-aware nav search autocomplete ───────────────────
 (function() {
     var form = document.getElementById('nav-searchform');
