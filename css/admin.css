@@ -162,26 +162,6 @@
     font-family: var(--font-mono);
     font-size: var(--text-sm);
 }
-.status-ok { color: var(--asuccess); }
-.status-busy { color: var(--awarning); }
-.status-err { color: var(--adanger); }
-.badge-sealed {
-    font-size: var(--text-xs);
-    padding: 1px 5px;
-    border-radius: 8px;
-    background: rgba(91,141,239,0.1);
-    color: var(--ainfo);
-    margin-left: 4px;
-}
-.badge-meta {
-    font-size: var(--text-xs);
-    padding: 1px 5px;
-    border-radius: 8px;
-    background: rgba(210,153,34,0.1);
-    color: var(--awarning);
-    margin-left: 4px;
-}
-
 /* ── Tools Tab ── */
 .tools-grid {
     display: grid;
