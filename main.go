@@ -1023,6 +1023,9 @@ func main() {
 	// Public guide page
 	http.Handle("/guide", noSigning(http.HandlerFunc(Guide)))
 
+	// Public privacy policy (cookie + Amazon Associates disclosures)
+	http.Handle("/privacy", noSigning(http.HandlerFunc(Privacy)))
+
 	// Mobile/desktop view toggle
 	http.HandleFunc("/toggle-mobile", toggleMobileView)
 

@@ -1316,3 +1316,37 @@ table.tiers td div {
     background: color-mix(in srgb, var(--adanger, #c0392b) 88%, white);
     border-color: color-mix(in srgb, var(--adanger, #c0392b) 88%, white);
 }
+
+/* ═══ Persistent site footer (affiliate + privacy disclosures) ═══ */
+.site-footer {
+    margin-top: 48px;
+    padding: 20px 24px 28px;
+    border-top: 1px solid var(--border-subtle);
+    text-align: center;
+}
+.site-footer-disclosure {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-dim);
+}
+.site-footer-disclosure a {
+    color: var(--text-dim);
+    text-decoration: underline;
+}
+.site-footer-disclosure a:hover { color: var(--activetext); }
+
+/* ═══ Legal / policy pages (privacy) ═══ */
+.legal {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 24px 8px;
+    line-height: 1.6;
+    color: var(--text-dim);
+}
+.legal h1 { font-size: 28px; margin: 0 0 4px; color: var(--normal); }
+.legal h2 { font-size: 18px; margin: 28px 0 8px; color: var(--normal); }
+.legal .legal-updated { font-size: 13px; margin: 0 0 24px; }
+.legal ul { padding-left: 20px; }
+.legal li { margin-bottom: 8px; }
+.legal a { color: var(--ainfo); }
