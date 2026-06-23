@@ -64,6 +64,28 @@
     <div class="landing-footer">
         <div class="landing-divider"></div>
 
+        {{if .PopularSearches}}
+        <div class="landing-popular">
+            <div class="landing-popular-title">Popular searches</div>
+            <div class="landing-popular-viewport">
+                <div class="landing-popular-track" style="animation-duration: calc({{len .PopularSearches}} * 4s)">
+                    {{range .PopularSearches}}
+                    <a class="landing-popular-card" href="{{.URL}}" title="{{.Label}}">
+                        <img class="landing-popular-img" src="{{.ImageURL}}" alt="{{.Label}}" loading="lazy">
+                        <span class="landing-popular-label">{{.Label}}</span>
+                    </a>
+                    {{end}}
+                    {{range .PopularSearches}}
+                    <a class="landing-popular-card" href="{{.URL}}" title="{{.Label}}" aria-hidden="true" tabindex="-1">
+                        <img class="landing-popular-img" src="{{.ImageURL}}" alt="" loading="lazy">
+                        <span class="landing-popular-label">{{.Label}}</span>
+                    </a>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+        {{end}}
+
         <div class="landing-game-links">
             <a href="https://mtgban.com">Magic: the Gathering</a>
             <span>|</span>

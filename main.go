@@ -87,6 +87,8 @@ type PageVars struct {
 	CardBackURL  string
 	ShowUpsell   bool
 
+	PopularSearches []PopularSearch
+
 	CanShowAll       bool
 	CleanSearchQuery string
 	CheckpointsText  string
@@ -484,6 +486,8 @@ type ConfigType struct {
 	ApiUserSecrets         map[string]string  `json:"api_user_secrets"`
 	GoogleCredentials      string             `json:"google_credentials"`
 	BuylistMarketCredit    map[string]float64 `json:"buylist_market_credit"`
+
+	PopularSearches []PopularSearchEntry `json:"popular_searches"`
 
 	ACL map[string]map[string]map[string]string `json:"acl"`
 

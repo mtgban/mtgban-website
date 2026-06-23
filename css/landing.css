@@ -148,6 +148,77 @@
 }
 .landing-tool .t-icon { font-size: 14px; }
 
+/* ═══ Popular searches carousel ═══ */
+.landing-popular {
+    width: 100%;
+    margin-bottom: 12px;
+}
+.landing-popular-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 12px;
+}
+/* Viewport clips the scrolling track and fades both edges. */
+.landing-popular-viewport {
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+            mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+/* The tile list is rendered twice; translating by -50% loops seamlessly.
+   Speed scales with the tile count via an inline animation-duration. */
+.landing-popular-track {
+    display: flex;
+    width: max-content;
+    animation: landing-popular-scroll 30s linear infinite;
+}
+.landing-popular:hover .landing-popular-track,
+.landing-popular-track:focus-within {
+    animation-play-state: paused;
+}
+@keyframes landing-popular-scroll {
+    to { transform: translateX(-50%); }
+}
+.landing-popular-card {
+    flex: 0 0 auto;
+    margin-right: 16px; /* gap baked into width so -50% stays seamless */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 96px;
+    text-decoration: none;
+    color: var(--text-dim);
+}
+.landing-popular-card:hover {
+    color: var(--activetext);
+    text-decoration: none;
+}
+.landing-popular-img {
+    width: 96px;
+    height: 134px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+    background: var(--surface-1);
+    transition: transform 0.15s;
+}
+.landing-popular-card:hover .landing-popular-img {
+    transform: translateY(-3px);
+}
+.landing-popular-label {
+    font-size: 11px;
+    line-height: 1.3;
+    text-align: center;
+}
+@media (prefers-reduced-motion: reduce) {
+    .landing-popular-track { animation: none; }
+    .landing-popular-viewport { overflow-x: auto; }
+}
+
 
 /* ═══ Footer — pinned to bottom ═══ */
 .landing-footer {

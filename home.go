@@ -31,5 +31,7 @@ func Home(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
+	pageVars.PopularSearches = getPopularSearches()
+
 	render(w, "home.html", pageVars)
 }
