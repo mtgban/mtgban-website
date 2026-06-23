@@ -14,7 +14,6 @@ import (
 )
 
 type TimeseriesConfig struct {
-	Address  string          `json:"address"`
 	Datasets []DatasetConfig `json:"datasets"`
 }
 
