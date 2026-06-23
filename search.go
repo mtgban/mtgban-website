@@ -278,6 +278,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	allKeys, err := searchAndFilter(config)
 	if err != nil {
 		pageVars.InfoMessage = NoCardsMessage
+		pageVars.PopularSearches = getPopularSearches()
 		pageVars.CleanSearchQuery = config.CleanQuery
 		pageVars.DidYouMean, pageVars.AltSearches = buildSearchSuggestions(query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
@@ -309,6 +310,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if hidePromos {
 			pageVars.InfoMessage = NoPromosMessage
 		}
+		pageVars.PopularSearches = getPopularSearches()
 		pageVars.CleanSearchQuery = config.CleanQuery
 		pageVars.DidYouMean, pageVars.AltSearches = buildSearchSuggestions(query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)

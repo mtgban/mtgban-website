@@ -2393,3 +2393,53 @@
 .search-suggestion-didyoumean a:hover {
     text-decoration: underline;
 }
+
+/* Popular searches shown on the empty-results search page (static grid, no carousel). */
+.search-popular {
+    margin-top: 2.5em;
+}
+.search-popular-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 16px;
+}
+.search-popular-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+}
+.search-popular-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 96px;
+    text-decoration: none;
+    color: var(--text-dim);
+}
+.search-popular-card:hover {
+    color: var(--activetext);
+    text-decoration: none;
+}
+.search-popular-img {
+    width: 96px;
+    height: 134px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+    background: var(--surface-1);
+    transition: transform 0.15s;
+}
+.search-popular-card:hover .search-popular-img {
+    transform: translateY(-3px);
+}
+.search-popular-label {
+    font-size: 11px;
+    line-height: 1.3;
+    text-align: center;
+}

@@ -156,6 +156,19 @@
                     {{end}}
                 </div>
             {{end}}
+            {{if .PopularSearches}}
+            <div class="search-popular">
+                <div class="search-popular-title">Popular searches</div>
+                <div class="search-popular-grid">
+                    {{range .PopularSearches}}
+                    <a class="search-popular-card" href="{{.URL}}" title="{{.Label}}">
+                        <img class="search-popular-img" src="{{.ImageURL}}" alt="{{.Label}}" loading="lazy">
+                        <span class="search-popular-label">{{.Label}}</span>
+                    </a>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
         </div>
     {{else}}
             <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
