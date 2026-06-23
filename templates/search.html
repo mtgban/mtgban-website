@@ -147,7 +147,7 @@
                         </p>
                     {{end}}
                     {{if .AltSearches}}
-                        <p class="search-suggestion-label">Try a broader search:</p>
+                        <p class="search-suggestion-label">Try one of these:</p>
                         <ul class="search-suggestion-list">
                             {{range .AltSearches}}
                                 <li><a href="{{$base}}?q={{.Query}}">{{.Label}}</a></li>
