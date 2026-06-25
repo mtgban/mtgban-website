@@ -411,8 +411,15 @@ func checkForLinks(mGuildID, mContent string) (string, string) {
 			continue
 		}
 		shouldSkip := false
-		for _, skip := range append(store.Skip, store.DefaultFields...) {
+		for _, skip := range store.Skip {
 			if strings.Contains(mContent, skip) {
+				shouldSkip = true
+				break
+			}
+		}
+		for _, skip := range store.DefaultFields {
+			// Check for query params only
+			if strings.Contains(mContent, "?"+skip+"=") || strings.Contains(mContent, "&"+skip+"=") {
 				shouldSkip = true
 				break
 			}
