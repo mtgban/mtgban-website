@@ -370,8 +370,13 @@
 
             // "only" affordance on each store: check this store, uncheck the
             // rest — scoped to the store's own grid box so the other tab's
-            // stores (e.g. sealed while on singles) are left untouched. The
-            // checkboxes are rebuilt by reloadSelect, so use delegation.
+            // stores (e.g. sealed while on singles) are left untouched.
+            //
+            // After firing "only", the same control flips to "exclude" while
+            // the pointer stays on the row: clicking it then selects every
+            // OTHER store (this one off). Leaving the row resets it back to
+            // "only" for next time. Checkboxes are rebuilt by reloadSelect,
+            // so use click delegation.
             document.addEventListener('click', function(e) {
                 var only = e.target.closest('.upload-store-only');
                 if (!only) return;
@@ -383,9 +388,36 @@
                 if (!item || !box) return;
                 var target = item.querySelector('input[type="checkbox"]');
                 if (!target || target.disabled) return;
+
+                var isExclude = only.dataset.mode === 'exclude';
                 box.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
-                    cb.checked = (cb === target);
+                    if (cb.disabled) return;
+                    // only: this on, rest off.  exclude: this off, rest on.
+                    cb.checked = isExclude ? (cb !== target) : (cb === target);
                 });
+
+                function toOnly() {
+                    only.textContent = 'only';
+                    only.dataset.mode = 'only';
+                    only.title = 'Select only this store';
+                }
+                function toExclude() {
+                    only.textContent = 'exclude';
+                    only.dataset.mode = 'exclude';
+                    only.title = 'Select every other store';
+                }
+                // Flip the affordance to the inverse action for the next click.
+                if (isExclude) { toOnly(); } else { toExclude(); }
+
+                // Reset to plain "only" once the pointer leaves the row. Guard
+                // against binding more than one pending reset during ping-pong.
+                if (!item.dataset.resetBound) {
+                    item.dataset.resetBound = '1';
+                    item.addEventListener('mouseleave', function () {
+                        toOnly();
+                        delete item.dataset.resetBound;
+                    }, { once: true });
+                }
             });
 
             window.reloadSelect = function(mode) {
