@@ -183,6 +183,12 @@
     cursor: pointer;
     outline: none;
 }
+/* The transparent select face leaves the native option popup white in dark
+   mode; give the options a theme-aware background so the menu stays readable. */
+.arb-store-select option {
+    background-color: var(--surface-2);
+    color: var(--normal);
+}
 
 .arb-opts-link {
     margin-left: auto;
