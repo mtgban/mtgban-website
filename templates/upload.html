@@ -348,6 +348,26 @@
                 });
             }
 
+            // "only" affordance on each store: check this store, uncheck the
+            // rest — scoped to the store's own grid box so the other tab's
+            // stores (e.g. sealed while on singles) are left untouched. The
+            // checkboxes are rebuilt by reloadSelect, so use delegation.
+            document.addEventListener('click', function(e) {
+                var only = e.target.closest('.upload-store-only');
+                if (!only) return;
+                // Inside a <label>, so stop the default checkbox toggle.
+                e.preventDefault();
+                e.stopPropagation();
+                var item = only.closest('.upload-store-item');
+                var box = only.closest('.upload-store-grid');
+                if (!item || !box) return;
+                var target = item.querySelector('input[type="checkbox"]');
+                if (!target || target.disabled) return;
+                box.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                    cb.checked = (cb === target);
+                });
+            });
+
             window.reloadSelect = function(mode) {
                 localStorage.setItem("uploadMode", mode);
                 const fields = [
@@ -359,7 +379,7 @@
                         singlesBox.innerHTML = " \
                             {{range .VendorKeys}} \
                                 <label class='upload-store-item'> \
-                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
+                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{scraper_name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
                                 </label> \
                             {{end}} \
                         ";
@@ -367,7 +387,7 @@
                         singlesBox.innerHTML = " \
                             {{range .SellerKeys}} \
                                 <label class='upload-store-item'> \
-                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
+                                    <input type='checkbox' name='stores' id='{{.}}' value='{{.}}' {{if slice_has $.EnabledSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{scraper_name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
                                 </label> \
                             {{end}} \
                         ";
@@ -383,7 +403,7 @@
                         sealedBox.innerHTML = " \
                             {{range .SealedVendorKeys}} \
                                 <label class='upload-store-item'> \
-                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
+                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedVendors .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{scraper_name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
                                 </label> \
                             {{end}} \
                         ";
@@ -391,7 +411,7 @@
                         sealedBox.innerHTML = " \
                             {{range .SealedSellerKeys}} \
                                 <label class='upload-store-item'> \
-                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> {{scraper_name .}} \
+                                    <input type='checkbox' name='sealed_stores' id='sealed-{{.}}' value='{{.}}' {{if slice_has $.EnabledSealedSellers .}}checked{{end}} {{if not $.CanChangeStores}}disabled{{end}}> <span class='upload-store-name'>{{scraper_name .}}</span><span class='upload-store-only' title='Select only this store'>only</span> \
                                 </label> \
                             {{end}} \
                         ";

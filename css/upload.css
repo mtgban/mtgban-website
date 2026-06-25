@@ -239,6 +239,40 @@
     height: 15px;
 }
 
+/* Store name takes the row; the "only" shortcut sits at the end. */
+.upload-store-name {
+    flex: 1;
+    min-width: 0;
+}
+.upload-store-only {
+    flex-shrink: 0;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ainfo);
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    background: var(--accent-muted);
+    border: 1px solid var(--accent-border);
+    cursor: pointer;
+    /* Revealed on row hover only. */
+    opacity: 0;
+    transition: opacity 0.12s;
+}
+.upload-store-item:hover .upload-store-only {
+    opacity: 1;
+}
+.upload-store-only:hover {
+    color: var(--normal);
+    background: var(--surface-3);
+}
+/* No store customization (sub-Modern tier): checkboxes are disabled, so
+   the "only" shortcut would be a no-op — hide it. */
+.upload-store-item:has(input:disabled) .upload-store-only {
+    display: none;
+}
+
 /* ── Source Selector ── */
 .upload-source-options {
     display: grid;
