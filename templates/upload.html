@@ -122,6 +122,13 @@
                             {{if not .CanBuylist}}
                                 <span class="upload-mode-hint">Buylist access requires Legacy tier</span>
                             {{end}}
+                            {{if .CanChangeStores}}
+                            <div class="upload-store-bulk">
+                                <button type="button" class="upload-store-bulk-btn" onclick="setVisibleStores(true)">Select all</button>
+                                <span class="upload-store-bulk-sep">·</span>
+                                <button type="button" class="upload-store-bulk-btn" onclick="setVisibleStores(false)">Clear</button>
+                            </div>
+                            {{end}}
                         </div>
                         <div class="upload-store-area">
                             <div class="upload-store-grid" id="singlesBox"></div>
@@ -347,6 +354,19 @@
                     }
                 });
             }
+
+            // Bulk select / clear for the currently visible store box only
+            // (the active Singles or Sealed tab, in the current Retail/
+            // Buylist mode). The other tab's box carries .upload-store-hidden,
+            // so :not(.upload-store-hidden) targets just the visible one and
+            // leaves the hidden tab's selections untouched.
+            window.setVisibleStores = function(checked) {
+                var box = document.querySelector('.upload-store-grid:not(.upload-store-hidden)');
+                if (!box) return;
+                box.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                    if (!cb.disabled) cb.checked = checked;
+                });
+            };
 
             // "only" affordance on each store: check this store, uncheck the
             // rest — scoped to the store's own grid box so the other tab's
