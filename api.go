@@ -348,10 +348,10 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 		var tcgSkuId string
 		if co.Sealed {
 			tcgSkuId = findInstanceId("TCGSealed", id, cond)
-			for _, entries := range sealed {
-				prices[0] = entries[0].Price
+			for _, entry := range sealed[id] {
+				prices[0] = entry.Price
+				break
 			}
-
 		} else {
 			tcgSkuId = findInstanceId("TCGPlayer", id, cond)
 			for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
