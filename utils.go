@@ -352,17 +352,15 @@ func findInstanceId(sellerName, cardId, cond string) string {
 	return ""
 }
 
-// Convert instance id (sku) to card id for a given store
-func instanceId2UUID(sellerName, instanceId string) string {
-	store, _ := findSellerInventory(sellerName)
-	for uuid, entries := range store {
-		for _, entry := range entries {
-			if entry.InstanceId == instanceId {
-				return uuid
-			}
-		}
+// tcgSKU2UUID resolves a TCGplayer SKU (instance id) to a card uuid using the
+// precomputed "tcgskuid" index from runSealedAnalysis (O(1)), where the uuid is
+// stored in each entry's OriginalId. Returns "" if the SKU is unknown.
+func tcgSKU2UUID(sku string) string {
+	entries := GetInfos()["tcgskuid"][sku]
+	if len(entries) == 0 {
+		return ""
 	}
-	return ""
+	return entries[0].OriginalId
 }
 
 // Look for the original id (product id) of a card in a given inventory

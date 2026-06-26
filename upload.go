@@ -1644,13 +1644,10 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	// or name matching might interfere with actual results
 	idx, found = indexMap["tcgSku"]
 	if found && idx < len(record) {
-		skuId := record[idx]
-		for _, store := range []string{"TCGSealed", "TCGPlayer"} {
-			res.Card.Id = instanceId2UUID(store, skuId)
-			if res.Card.Id != "" {
-				break
-			}
-		}
+		// Resolve the TCGplayer SKU via the precomputed tcgskuid index (O(1),
+		// covers singles and sealed). Unknown SKUs (incl. "Unavailable", which
+		// TCGplayer exports for products without one) simply return "".
+		res.Card.Id = tcgSKU2UUID(record[idx])
 	}
 
 	res.Card.Name = record[indexMap["cardName"]]
