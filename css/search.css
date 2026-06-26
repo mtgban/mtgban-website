@@ -1516,6 +1516,18 @@
     gap: 0.5em;
 }
 
+/* Export toolbar: download/import sit flush together as one unit, the
+   two uploader buttons (retail/buylist) flush as another, with the
+   standard 0.5em gap separating the two groups. */
+.landing-pane-export {
+    display: flex;
+    gap: 0.5em;
+}
+.landing-pane-export-pair {
+    display: flex;
+    gap: 0;
+}
+
 .landing-pane-btn {
     background: transparent;
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.12));
@@ -1542,6 +1554,12 @@
     width: 16px;
     height: 16px;
 }
+/* Send-to-uploader: green = retail, orange = buylist (matches the
+   search sidebar's Retail/Buylist colour coding). */
+.landing-pane-btn-retail { color: var(--asuccess); }
+.landing-pane-btn-buylist { color: var(--awarning); }
+.landing-pane-btn-retail:hover,
+.landing-pane-btn-buylist:hover { background: var(--surface-3); }
 
 .landing-pane-body {
     flex: 1 1 auto;

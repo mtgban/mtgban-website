@@ -312,6 +312,20 @@
             html += '<span class="landing-pane-title">Favorites</span>';
             html += '<span class="landing-pane-actions">';
             html += '<span class="landing-pane-sort">' + sortPillsHtml() + '</span>';
+            // Export controls. No gate: these only touch the user's own
+            // client-side favorites (CSV is built locally; the uploader
+            // transfer POSTs to /upload, which enforces its own auth).
+            // Retail/Buylist follow the search sidebar's colour coding.
+            html += '<span class="landing-pane-export">';
+            html += '<span class="landing-pane-export-pair">';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.downloadFavoritesCSV()" title="Download favorites as CSV" aria-label="Download favorites as CSV"><i data-lucide="download"></i></button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.importFavoritesCSV()" title="Import favorites from CSV" aria-label="Import favorites from CSV"><i data-lucide="file-up"></i></button>';
+            html += '</span>';
+            html += '<span class="landing-pane-export-pair">';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon landing-pane-btn-retail" onclick="window.sendFavoritesToUploader(\'retail\')" title="Send to uploader (retail)" aria-label="Send to uploader (retail)"><i data-lucide="upload"></i></button>';
+            html += '<button class="landing-pane-btn landing-pane-btn-icon landing-pane-btn-buylist" onclick="window.sendFavoritesToUploader(\'buylist\')" title="Send to uploader (buylist)" aria-label="Send to uploader (buylist)"><i data-lucide="upload"></i></button>';
+            html += '</span>';
+            html += '</span>';
             html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.manualRefreshFavorites()" title="Update prices" aria-label="Update prices"><i data-lucide="refresh-cw"></i></button>';
             html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.clearFavorites(this)" title="Clear favorites" aria-label="Clear favorites"><i data-lucide="trash-2"></i></button>';
             html += '</span>';
@@ -427,6 +441,9 @@
         return '' +
             '<div class="landing-pane-header">' +
                 '<span class="landing-pane-title">Favorites</span>' +
+                '<span class="landing-pane-actions">' +
+                    '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.importFavoritesCSV()" title="Import favorites from CSV" aria-label="Import favorites from CSV"><i data-lucide="file-up"></i></button>' +
+                '</span>' +
             '</div>' +
             '<div class="landing-empty-fav">' +
                 '<div class="landing-empty-headline">' +
@@ -546,6 +563,190 @@
         } else {
             doClear();
         }
+    };
+
+    // ── Export: download as CSV / send to the uploader ──────────────
+    // Not gated: the CSV is built entirely client-side from the user's
+    // own favorites, and the uploader transfer POSTs to /upload, which
+    // enforces its own server-side auth.
+    function csvCell(v) {
+        v = (v == null ? '' : String(v));
+        return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+    }
+    function favFinish(f) {
+        if (f.finishTag) return f.finishTag;
+        if (f.etched) return 'Etched';
+        if (f.foil) return 'Foil';
+        return '';
+    }
+    window.downloadFavoritesCSV = function() {
+        var favs = getFavorites();
+        if (!favs.length) return;
+        var rows = [['UUID', 'Name', 'Edition', 'Set', 'Number', 'Finish', 'Best Sell', 'Sell Store', 'Best Buy', 'Buy Store']];
+        favs.forEach(function(f) {
+            rows.push([
+                f.id, f.name, f.edition, f.set, f.number, favFinish(f),
+                (f.sellPrice != null ? f.sellPrice.toFixed(2) : ''), f.sellVendor,
+                (f.buyPrice != null ? f.buyPrice.toFixed(2) : ''), f.buyVendor
+            ]);
+        });
+        var csv = rows.map(function(r) { return r.map(csvCell).join(','); }).join('\r\n');
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'mtgban_favorites.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 0);
+    };
+    // Hand the favorites off to the uploader exactly like the search
+    // sidebar does: POST one "hashes" input per card plus the mode.
+    window.sendFavoritesToUploader = function(mode) {
+        var favs = getFavorites();
+        if (!favs.length) return;
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = '/upload';
+        form.style.display = 'none';
+        var m = document.createElement('input');
+        m.type = 'hidden';
+        m.name = 'mode';
+        m.value = mode === 'buylist' ? 'true' : 'false';
+        form.appendChild(m);
+        favs.forEach(function(f) {
+            if (!f.id) return;
+            var h = document.createElement('input');
+            h.type = 'hidden';
+            h.name = 'hashes';
+            h.value = f.id;
+            form.appendChild(h);
+        });
+        document.body.appendChild(form);
+        form.submit();
+    };
+
+    // ── Import: restore favorites from an MTGBAN favorites CSV ──────
+    // Only accepts the exact format produced by downloadFavoritesCSV
+    // (header checked below). Merges by UUID into the current favorites.
+    var FAV_CSV_HEADER = ['UUID', 'Name', 'Edition', 'Set', 'Number', 'Finish', 'Best Sell', 'Sell Store', 'Best Buy', 'Buy Store'];
+
+    // Minimal RFC-4180-ish parser: handles quoted fields, "" escapes, and
+    // both \n and \r\n line endings.
+    function parseCSV(text) {
+        var rows = [], row = [], field = '', inQ = false, i = 0, n = text.length;
+        while (i < n) {
+            var c = text[i];
+            if (inQ) {
+                if (c === '"') {
+                    if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+                    inQ = false; i++; continue;
+                }
+                field += c; i++; continue;
+            }
+            if (c === '"') { inQ = true; i++; continue; }
+            if (c === ',') { row.push(field); field = ''; i++; continue; }
+            if (c === '\r') { i++; continue; }
+            if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+            field += c; i++;
+        }
+        if (field !== '' || row.length) { row.push(field); rows.push(row); }
+        return rows;
+    }
+
+    function importFavoritesText(text) {
+        var rows = parseCSV(text).filter(function(r) {
+            return r.length > 1 || (r.length === 1 && r[0].trim() !== '');
+        });
+        if (!rows.length) { showToast('Empty file'); return; }
+        var header = rows[0].map(function(h) { return (h || '').trim().toLowerCase(); });
+        var expected = FAV_CSV_HEADER.map(function(h) { return h.toLowerCase(); });
+        if (header.join('|') !== expected.join('|')) {
+            showToast('Not an MTGBAN favorites CSV');
+            return;
+        }
+
+        var byId = {};
+        var order = [];
+        getFavorites().forEach(function(f) { byId[f.id] = f; order.push(f.id); });
+
+        var added = 0;
+        for (var r = 1; r < rows.length; r++) {
+            var c = rows[r];
+            if (c.length < FAV_CSV_HEADER.length) continue;
+            var id = (c[0] || '').trim();
+            var name = c[1] || '';
+            if (!id || !name) continue;
+
+            var finish = c[5] || '';
+            var lf = finish.toLowerCase();
+            var foil = lf === 'foil' || lf === 'altfoil';
+            var etched = lf === 'etched';
+
+            var query = name;
+            if (c[3]) query += ' s:' + c[3];
+            if (c[4]) query += ' cn:' + c[4];
+            if (etched) query += ' f:etched';
+            else if (foil) query += ' f:foil';
+
+            var sell = parseFloat(c[6]);
+            var buy = parseFloat(c[8]);
+
+            var prev = byId[id];
+            var fav = {
+                id: id,
+                name: name,
+                set: c[3] || '',
+                edition: c[2] || '',
+                number: c[4] || '',
+                foil: foil,
+                etched: etched,
+                finishTag: finish,
+                finishClass: etched ? 'etched' : (foil ? 'foil' : ''),
+                treatments: [],
+                sellPrice: isNaN(sell) ? null : sell,
+                sellVendor: c[7] || '',
+                buyPrice: isNaN(buy) ? null : buy,
+                buyVendor: c[9] || '',
+                query: query,
+                img: prev ? (prev.img || '') : '',
+                cw: prev ? !!prev.cw : false,
+                // Preserve pin + original add-time for cards already saved.
+                pinned: prev ? prev.pinned : false,
+                t: prev ? prev.t : Date.now()
+            };
+            if (!prev) { order.push(id); added++; }
+            byId[id] = fav;
+        }
+
+        saveFavorites(order.map(function(k) { return byId[k]; }));
+        var desktop = document.getElementById('desktop-favorites');
+        if (desktop) renderFavoritesInto(desktop, 'desktop');
+        var mobile = document.getElementById('m-favorites');
+        if (mobile) renderFavoritesInto(mobile, 'mobile');
+        showToast(added > 0 ? ('Imported ' + added + ' card' + (added === 1 ? '' : 's')) : 'Favorites already up to date');
+    }
+
+    var favImportInput = null;
+    window.importFavoritesCSV = function() {
+        if (!favImportInput) {
+            favImportInput = document.createElement('input');
+            favImportInput.type = 'file';
+            favImportInput.accept = '.csv,text/csv';
+            favImportInput.style.display = 'none';
+            favImportInput.addEventListener('change', function() {
+                var file = favImportInput.files && favImportInput.files[0];
+                if (file) {
+                    var reader = new FileReader();
+                    reader.onload = function() { importFavoritesText(String(reader.result || '')); };
+                    reader.readAsText(file);
+                }
+                favImportInput.value = ''; // allow re-importing the same file
+            });
+            document.body.appendChild(favImportInput);
+        }
+        favImportInput.click();
     };
 
     // Refresh stale favorites from server
