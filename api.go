@@ -309,14 +309,20 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 		return err
 	}
 
-	// Track total quantity, and skip repeats
+	// Accumulate per-(id, condition) quantities and remember the (id, condition)
+	// for each unique key, plus the keys in first-seen order so the CSV rows
+	// come out deterministically. Keying by id+condition keeps each distinct
+	// condition as its own row and ties the condition to its id — the old code
+	// re-derived it from conds[i] using the deduped index, which misaligned
+	// (and broke the qty lookup) after the first repeated id.
+	type tcgRow struct{ id, cond string }
 	qty := map[string]int{}
-	var cleanedIds []string
+	rowByKey := map[string]tcgRow{}
+	var order []string
 	for i, id := range ids {
 		quantity := 1
 		if qtys != nil {
-			q, err := strconv.Atoi(qtys[i])
-			if err == nil {
+			if q, err := strconv.Atoi(qtys[i]); err == nil {
 				quantity = q
 			}
 		}
@@ -324,25 +330,22 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 		if conds != nil && conds[i] != "" {
 			cond = conds[i]
 		}
-		qty[id+cond] += quantity
-
-		if slices.Contains(cleanedIds, id) {
-			continue
+		key := id + cond
+		qty[key] += quantity
+		if _, ok := rowByKey[key]; !ok {
+			order = append(order, key)
+			rowByKey[key] = tcgRow{id, cond}
 		}
-		cleanedIds = append(cleanedIds, id)
 	}
 
-	for i, id := range cleanedIds {
+	for _, key := range order {
+		row := rowByKey[key]
+		id, cond := row.id, row.cond
 		var prices [3]float64
 
 		co, err := mtgmatcher.GetUUID(id)
 		if err != nil {
 			continue
-		}
-
-		cond := "NM"
-		if conds != nil && conds[i] != "" && !co.Sealed {
-			cond = conds[i]
 		}
 
 		var tcgSkuId string
@@ -396,7 +399,7 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 		record = append(record, "")
 		record = append(record, fmt.Sprintf("%0.2f", prices[2]))
 		record = append(record, "")
-		record = append(record, fmt.Sprint(qty[id+cond]))
+		record = append(record, fmt.Sprint(qty[key]))
 		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
 		record = append(record, "")
 
