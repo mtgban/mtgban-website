@@ -371,7 +371,7 @@
                     <th class="c">
                         <a href="javascript:sortBy('sell_price', '{{.Name}}')">
                             {{if $.GlobalMode}}
-                                {{if $.IsSealed}}{{.Name}}{{else}}{{$.ScraperShort}}{{end}}
+                                {{if $.IsSealed}}{{.Name}}{{else}}{{scraper_name $.ScraperShort}}{{end}}
                             {{else}}
                                 Sell Price
                             {{end}}
@@ -381,7 +381,7 @@
                         <th class="c">
                             <a href="javascript:sortBy('buy_price', '{{.Name}}')">
                                 {{if $.GlobalMode}}
-                                    {{if $.IsSealed}}{{$.ScraperShort}}{{else}}{{.Name}}{{end}}
+                                    {{if $.IsSealed}}{{scraper_name $.ScraperShort}}{{else}}{{.Name}}{{end}}
                                 {{else}}
                                     Buy Price
                                 {{end}}
