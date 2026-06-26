@@ -493,100 +493,37 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Readjust array of INDEX entires
+	// Rebuild each card's INDEX rows. collapseIndex/collapseSealedEV scan the
+	// array themselves, so there's no per-entry dispatch here — just collapse
+	// each known source directly and pass the rest through. Row order is TCG,
+	// Cardmarket, sealed EV, then everything else.
 	for _, cardId := range allKeys {
 		indexArray := foundSellers[cardId]["INDEX"]
-		tmp := indexArray[:0]
-		mkmIndex := -1
-		tcgIndex := -1
-		tcgSeen := false
-		var sealedEVindexes map[string]int
+		evShorts := Config.ScraperConfig.Config["sealed_ev"]["retail"]
 
-		// Iterate on array, always passthrough, except for specific entries
-		for i := range indexArray {
-			// Set index for sealed reuse
-			evIndex := 0
-			if strings.Contains(indexArray[i].ScraperName, " Sim") {
-				evIndex = 1
-			}
+		tcgRow, hasTCG := collapseIndex(indexArray, "TCGLow", "TCGMarket", "", "", "TCG (Low / Market)")
+		mkmRow, hasMKM := collapseIndex(indexArray, "MKMLow", "MKMTrend", "Cardmarket Low", "Cardmarket Trend", "CM (Low / Trend)")
+		evRows, hasEV := collapseSealedEV(indexArray, evShorts)
 
-			switch indexArray[i].Shorthand {
-			case "MKMLow":
-				indexArray[i].ScraperName = "Cardmarket Low"
-				// Save reference to the array
-				tmp = append(tmp, indexArray[i])
-				mkmIndex = len(tmp) - 1
-			case "MKMTrend":
-				// If the reference is found, add a secondary price
-				// otherwise just leave it as is
-				if mkmIndex >= 0 {
-					tmp[mkmIndex].Secondary = indexArray[i].Price
-					tmp[mkmIndex].ScraperName = "CM (Low / Trend)"
-				} else {
-					indexArray[i].ScraperName = "Cardmarket Trend"
-					tmp = append(tmp, indexArray[i])
-				}
-			case "TCGLow":
-				// Save reference to the array
-				tmp = append(tmp, indexArray[i])
-				tcgIndex = len(tmp) - 1
-				tcgSeen = true
-			case "TCGMarket":
-				// If the reference is found, add a secondary price
-				// otherwise just leave it as is
-				if tcgIndex >= 0 {
-					tmp[tcgIndex].Secondary = indexArray[i].Price
-					tmp[tcgIndex].ScraperName = "TCG (Low / Market)"
-				} else {
-					tmp = append(tmp, indexArray[i])
-					// Point at this entry (not tmp[0]) so a later stray
-					// TCGMarket merges here, not into an unrelated row.
-					tcgIndex = len(tmp) - 1
-				}
-				// Flag (separate from the index) that TCG was present, so the
-				// fallback link below isn't added.
-				tcgSeen = true
-			default:
-				if slices.Contains(Config.ScraperConfig.Config["sealed_ev"]["retail"], indexArray[i].Shorthand) {
-					if getTCGSimulationIQR(cardId) > IQRThreshold {
-						pageVars.InfoMessage = "CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values"
-					}
+		var tmp []SearchEntry
+		if hasTCG {
+			tmp = append(tmp, tcgRow)
+		}
+		if hasMKM {
+			tmp = append(tmp, mkmRow)
+		}
+		tmp = append(tmp, evRows...)
 
-					if sealedEVindexes == nil {
-						sealedEVindexes = map[string]int{}
-					}
+		// Pass through everything the collapsers didn't consume.
+		consumed := append([]string{"TCGLow", "TCGMarket", "MKMLow", "MKMTrend"}, evShorts...)
+		tmp = append(tmp, passthroughIndex(indexArray, consumed)...)
 
-					// Determine an identifiers from the name (the second word)
-					fields := strings.Fields(indexArray[i].ScraperName)
-					if len(fields) < 2 {
-						continue
-					}
-					id := fields[1]
-
-					// If index is not present add to array and save index
-					idx, found := sealedEVindexes[id]
-					if !found {
-						tmp = append(tmp, indexArray[i])
-						idx = len(tmp) - 1
-						sealedEVindexes[id] = idx
-					}
-
-					// Index is present, add to the existing entry
-					switch evIndex {
-					case 0:
-						tmp[idx].Price = indexArray[i].Price
-					case 1:
-						tmp[idx].Secondary = indexArray[i].Price
-						tmp[idx].ExtraValues = indexArray[i].ExtraValues
-					}
-				} else {
-					tmp = append(tmp, indexArray[i])
-				}
-			}
+		if hasEV && getTCGSimulationIQR(cardId) > IQRThreshold {
+			pageVars.InfoMessage = "CAUTION - This search includes products with a high IQR, please check the FAQs to understand how it may impact the computed values"
 		}
 
 		// If no TCG reference was present, we manually add one to get the link
-		if !tcgSeen && !pageVars.Metadata[cardId].Sealed && !skipIndex {
+		if !hasTCG && !pageVars.Metadata[cardId].Sealed && !skipIndex {
 			var link string
 			if pageVars.Metadata[cardId].TCGId == "" {
 				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardId].Name) + "&utm_medium=" + Config.Affiliate["TCG"] + "&utm_source=" + Config.Affiliate["TCG"]
@@ -603,7 +540,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Same for CM
-		if mkmIndex < 0 && !pageVars.Metadata[cardId].Sealed && !skipIndex {
+		if !hasMKM && !pageVars.Metadata[cardId].Sealed && !skipIndex {
 			co, err := mtgmatcher.GetUUID(cardId)
 			if err == nil {
 				var link string
@@ -761,6 +698,103 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// collapseIndex folds a paired low/market reference (e.g. TCGLow + TCGMarket)
+// from a card's INDEX entries into a single row: the low price as the primary
+// and the market price as the secondary, under the merged label. The first of
+// each shorthand is used (so repeats are deduped), and the pair merges
+// regardless of the order the two entries appear in. When only one side is
+// present it's returned on its own, renamed to its solo label (an empty solo
+// label keeps the scraper's own name). Returns false when neither is found.
+func collapseIndex(entries []SearchEntry, lowShort, marketShort, lowSolo, marketSolo, merged string) (SearchEntry, bool) {
+	var low, market *SearchEntry
+	for i := range entries {
+		switch entries[i].Shorthand {
+		case lowShort:
+			if low == nil {
+				low = &entries[i]
+			}
+		case marketShort:
+			if market == nil {
+				market = &entries[i]
+			}
+		}
+	}
+
+	switch {
+	case low != nil && market != nil:
+		row := *low
+		row.Secondary = market.Price
+		row.ScraperName = merged
+		return row, true
+	case low != nil:
+		row := *low
+		if lowSolo != "" {
+			row.ScraperName = lowSolo
+		}
+		return row, true
+	case market != nil:
+		row := *market
+		if marketSolo != "" {
+			row.ScraperName = marketSolo
+		}
+		return row, true
+	default:
+		return SearchEntry{}, false
+	}
+}
+
+// collapseSealedEV folds the sealed expected-value rows from a card's INDEX
+// entries into one row per product: a base entry and its " Sim" sibling, paired
+// by the product id in the scraper name (its second word), become base price
+// primary and simulated price secondary. evShorts is the set of sealed-EV
+// scraper shorthands. Returns the collapsed rows and whether any EV entry was
+// present (so the caller can flag a high-IQR caution).
+func collapseSealedEV(entries []SearchEntry, evShorts []string) (rows []SearchEntry, seen bool) {
+	pos := map[string]int{}
+	for i := range entries {
+		if !slices.Contains(evShorts, entries[i].Shorthand) {
+			continue
+		}
+		seen = true
+
+		// The product id is the second word of the scraper name.
+		fields := strings.Fields(entries[i].ScraperName)
+		if len(fields) < 2 {
+			continue
+		}
+		id := fields[1]
+
+		idx, found := pos[id]
+		if !found {
+			rows = append(rows, entries[i])
+			idx = len(rows) - 1
+			pos[id] = idx
+		}
+
+		if strings.Contains(entries[i].ScraperName, " Sim") {
+			rows[idx].Secondary = entries[i].Price
+			rows[idx].ExtraValues = entries[i].ExtraValues
+		} else {
+			rows[idx].Price = entries[i].Price
+		}
+	}
+	return rows, seen
+}
+
+// passthroughIndex returns the INDEX entries whose shorthand isn't in consumed
+// — i.e. everything not already folded into a collapsed row — preserving their
+// original order.
+func passthroughIndex(entries []SearchEntry, consumed []string) []SearchEntry {
+	var out []SearchEntry
+	for i := range entries {
+		if slices.Contains(consumed, entries[i].Shorthand) {
+			continue
+		}
+		out = append(out, entries[i])
+	}
+	return out
 }
 
 func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[string]map[string][]SearchEntry) {
