@@ -499,6 +499,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		tmp := indexArray[:0]
 		mkmIndex := -1
 		tcgIndex := -1
+		tcgSeen := false
 		var sealedEVindexes map[string]int
 
 		// Iterate on array, always passthrough, except for specific entries
@@ -529,6 +530,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				// Save reference to the array
 				tmp = append(tmp, indexArray[i])
 				tcgIndex = len(tmp) - 1
+				tcgSeen = true
 			case "TCGMarket":
 				// If the reference is found, add a secondary price
 				// otherwise just leave it as is
@@ -537,9 +539,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					tmp[tcgIndex].ScraperName = "TCG (Low / Market)"
 				} else {
 					tmp = append(tmp, indexArray[i])
+					// Point at this entry (not tmp[0]) so a later stray
+					// TCGMarket merges here, not into an unrelated row.
+					tcgIndex = len(tmp) - 1
 				}
-				// Set the index so we know TCG was present
-				tcgIndex = 0
+				// Flag (separate from the index) that TCG was present, so the
+				// fallback link below isn't added.
+				tcgSeen = true
 			default:
 				if slices.Contains(Config.ScraperConfig.Config["sealed_ev"]["retail"], indexArray[i].Shorthand) {
 					if getTCGSimulationIQR(cardId) > IQRThreshold {
@@ -579,8 +585,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// If the TCG index is missing, we manually add one to get the link
-		if tcgIndex < 0 && !pageVars.Metadata[cardId].Sealed && !skipIndex {
+		// If no TCG reference was present, we manually add one to get the link
+		if !tcgSeen && !pageVars.Metadata[cardId].Sealed && !skipIndex {
 			var link string
 			if pageVars.Metadata[cardId].TCGId == "" {
 				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardId].Name) + "&utm_medium=" + Config.Affiliate["TCG"] + "&utm_source=" + Config.Affiliate["TCG"]
