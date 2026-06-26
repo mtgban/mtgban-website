@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -102,6 +103,22 @@ var funcMap = template.FuncMap{
 	},
 	"game_title": func() string {
 		return gameMap[Config.Game]
+	},
+	// amazon_search_url builds a game-aware Amazon Associates search link
+	// (e.g. ?k=Magic:+The+Gathering). Amazon's Associates policy flags
+	// linking to a bare storefront/browse-node with no product, so this
+	// lands on real product results instead. The affiliate tag is appended
+	// when configured.
+	"amazon_search_url": func() string {
+		keyword := gameMap[Config.Game]
+		if keyword == "" {
+			keyword = "trading card games"
+		}
+		link := "https://www.amazon.com/s?k=" + url.QueryEscape(keyword)
+		if tag := Config.Affiliate["AMZN"]; tag != "" {
+			link += "&tag=" + url.QueryEscape(tag)
+		}
+		return link
 	},
 	"uuid2ckid": func(s string) string {
 		bl, err := findVendorBuylist("CK")
