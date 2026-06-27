@@ -1668,6 +1668,15 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 				if found {
 					return false
 				}
+			case "ckp90":
+				// Cards whose current Card Kingdom buylist meets its latest P90.
+				if good := getGoodBuylistPrice(co.UUID); good > 0 {
+					if bl, err := findVendorBuylist("CK"); err == nil {
+						if entries, ok := bl[co.UUID]; ok && len(entries) > 0 && entries[0].BuyPrice >= good {
+							return false
+						}
+					}
+				}
 			case "newspaper":
 				if uuids := GetNewspaperUUIDs(); uuids != nil {
 					if _, found := uuids[co.UUID]; found {

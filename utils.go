@@ -958,6 +958,27 @@ func getTCGMarketPrice(cardId string) float64 {
 	return entries[0].Price
 }
 
+// getGoodBuylistPrice returns the "good" buylist threshold for a card — Card
+// Kingdom's latest 90-day P90 buylist price (goodP90) — or 0 when unavailable.
+// A buylist offer at or above this is worth flagging to the user.
+func getGoodBuylistPrice(cardId string) float64 {
+	entries, found := GetInfos()["goodP90"][cardId]
+	if !found || len(entries) == 0 {
+		return 0
+	}
+	return entries[0].Price
+}
+
+// getHighestBuylistPrice returns Card Kingdom's peak buylist price for a card
+// over the last 90 days (the "highest" metric), or 0 when unavailable.
+func getHighestBuylistPrice(cardId string) float64 {
+	entries, found := GetInfos()["highest"][cardId]
+	if !found || len(entries) == 0 {
+		return 0
+	}
+	return entries[0].Price
+}
+
 // Retrieve the IQR of the simulation using TCGplayer Low as base
 func getTCGSimulationIQR(productId string) float64 {
 	inv, err := findSellerInventory("TCGLowSim")
