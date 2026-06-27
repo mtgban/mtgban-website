@@ -435,7 +435,7 @@
                         </div>
                         <script>
                             // Set a per-chart-style key
-                            var legendStorageKey = 'BANChart{{if $.IsSealed}}Sealed{{end}}';
+                            var legendStorageKey = 'BANChart{{if (index $.Metadata $.ChartID).Sealed}}Sealed{{end}}';
 
                             // Prepare options
                             var allLabels = {{.AxisLabels}};
@@ -687,10 +687,10 @@
                                     {{/* Sealed INDEX rows live in their own grid scope so EV/Median/StdDev columns align among themselves. Singles INDEX rows (TCG Direct Low, TCG Low/Market) flow through rows-main with the regular row shape. */}}
                                     <div class="rows-index">
                                     {{range $conditions := $.CondKeys}}
-                                        {{if and (eq $conditions "INDEX") $.IsSealed}}
+                                        {{if and (eq $conditions "INDEX") $card.Sealed}}
                                             {{$entries := (index $condsEntry $conditions)}}
                                             {{if $entries}}
-                                                {{if $.IsSealed}}
+                                                {{if $card.Sealed}}
                                                     <div class="price-row price-index-header">
                                                         <span class="store-name" style="visibility:hidden">&nbsp;</span>
                                                         <span class="index-label index-label-1">EV</span>
@@ -719,7 +719,7 @@
                                                         {{end}}
                                                     {{end}}
                                                     {{if not .Locked}}
-                                                    {{if and (eq $conditions "INDEX") $.IsSealed}}
+                                                    {{if and (eq $conditions "INDEX") $card.Sealed}}
                                                         <span class="price-right index-cols">
                                                         <span class="price">
                                                             {{if .Price}}
@@ -750,10 +750,10 @@
                                     </div>
                                     <div class="rows-main">
                                     {{range $conditions := $.CondKeys}}
-                                        {{if not (and (eq $conditions "INDEX") $.IsSealed)}}
+                                        {{if not (and (eq $conditions "INDEX") $card.Sealed)}}
                                             {{$entries := (index $condsEntry $conditions)}}
                                             {{if and $entries (ne $conditions "INDEX")}}
-                                                <div class="price-cond-header">{{if $.IsSealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
+                                                <div class="price-cond-header">{{if $card.Sealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
                                             {{end}}
                                             {{range $entries}}
                                                 <div class="price-row{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
@@ -831,7 +831,7 @@
                                         {{$entries := (index $condsEntry $conditions)}}
                                         {{if ne $conditions "INDEX"}}
                                             {{if $entries}}
-                                                <div class="price-cond-header">{{if $.IsSealed}}Sell to{{else}}Condition: {{$conditions}}{{end}}</div>
+                                                <div class="price-cond-header">{{if $card.Sealed}}Sell to{{else}}Condition: {{$conditions}}{{end}}</div>
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
