@@ -1087,9 +1087,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				}
 
 				if factor > 0 {
-					profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log(1+factor)
+					profitability = ((comparePrice - price) / (price + ProfitabilityConstant)) * math.Log10(1+factor)
 					if qty > 1 {
-						profitability *= math.Pow(float64(qty), 0.25)
+						profitability *= math.Sqrt(float64(qty))
 					}
 				}
 			}

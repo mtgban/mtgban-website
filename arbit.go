@@ -19,7 +19,7 @@ const (
 	MaxArbitResults = 450
 	MaxPriceRatio   = 120.0
 	MinSpread       = 10.0
-	MinProfitable   = 4.0
+	MinProfitable   = 1.74
 	MaxSpreadGlobal = 1000
 	MinSpreadGlobal = 200.0
 
