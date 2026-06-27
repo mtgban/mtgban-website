@@ -702,7 +702,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		return
 	}
 
-	pageVars.IsSealed = source.Info().SealedMode
 	pageVars.ScraperShort = source.Info().Shorthand
 	pageVars.HasAffiliate = slices.Contains(Config.AffiliatesList, source.Info().Shorthand)
 	pageVars.ArbitFilters = arbitFilters
@@ -730,10 +729,10 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if config.ArbitOnly && pageVars.GlobalMode {
 			continue
 		}
-		if config.NoSealed && pageVars.IsSealed {
+		if config.NoSealed && source.Info().SealedMode {
 			continue
 		}
-		if config.SealedOnly && !pageVars.IsSealed {
+		if config.SealedOnly && !source.Info().SealedMode {
 			continue
 		}
 		if config.BetaFlag && !anyOptionEnabled {
