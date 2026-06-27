@@ -448,6 +448,8 @@ func price4vendor(cardId, shorthand string) float64 {
 var re *regexp.Regexp
 
 var FilterOperations = map[string][]string{
+	"format":    []string{":"},
+	"legal":     []string{":"},
 	"sm":        []string{":"},
 	"skip":      []string{":"},
 	"sort":      []string{":"},
@@ -513,6 +515,25 @@ func init() {
 	regexpOptions = fmt.Sprintf(`-?(%s|%s)[:<>](("([^"]+)"|\S+))+`, strings.Join(opts, "|"), strings.ToUpper(strings.Join(opts, "|")))
 
 	re = regexp.MustCompile(regexpOptions)
+}
+
+// fixupFormatNG normalizes a comma-separated list of format names to the
+// lowercase keys used in a card's legalities map, mapping a couple of aliases.
+func fixupFormatNG(code string) []string {
+	var out []string
+	for _, format := range strings.Split(strings.ToLower(code), ",") {
+		format = strings.TrimSpace(format)
+		switch format {
+		case "":
+			continue
+		case "edh":
+			format = "commander"
+		case "pdh":
+			format = "paupercommander"
+		}
+		out = append(out, format)
+	}
+	return out
 }
 
 func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []string, miscSearchOpts []string) (config SearchConfig) {
@@ -785,6 +806,12 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Name:   "on",
 				Negate: negate,
 				Values: strings.Split(strings.ToLower(code), ","),
+			})
+		case "format", "legal":
+			filters = append(filters, FilterElem{
+				Name:   "format",
+				Negate: negate,
+				Values: fixupFormatNG(code),
 			})
 		case "date", "year":
 			opt := "date"
@@ -1479,6 +1506,16 @@ var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObjec
 	},
 	"rarity": func(filters []string, co *mtgmatcher.CardObject) bool {
 		return !slices.Contains(filters, co.Rarity)
+	},
+	"format": func(filters []string, co *mtgmatcher.CardObject) bool {
+		// Keep the card if it's legal (or restricted) in any requested format.
+		for _, value := range filters {
+			switch co.Legalities[value] {
+			case "Legal", "Restricted":
+				return false
+			}
+		}
+		return true
 	},
 	"rarity_greater_than": func(filters []string, co *mtgmatcher.CardObject) bool {
 		rarityIndex, found := rarityMap[filters[0]]

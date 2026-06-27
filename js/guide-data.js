@@ -430,6 +430,48 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'format',
+            category: 'Search Syntax',
+            title: 'Format',
+            icon: 'gavel',
+            summary: 'Filter by format legality (format:standard, format:modern).',
+            snippets: ['format:standard', 'format:modern', 'format:commander'],
+            keywords: ['format', 'legal', 'legality', 'banned', 'restricted', 'standard', 'pioneer', 'modern', 'legacy', 'vintage', 'pauper', 'commander', 'edh', 'brawl', 'oathbreaker', 'pdh'],
+            content: {
+                description: 'Filter to cards that are legal (or restricted) in a given format with <code>format:NAME</code> (alias <code>legal:NAME</code>). Banned and not-legal cards are excluded; negate with <code>-format:NAME</code>. Combine formats with commas to match any of them.',
+                table: [
+                    { value: 'standard', short: 'Standard' },
+                    { value: 'pioneer', short: 'Pioneer' },
+                    { value: 'modern', short: 'Modern' },
+                    { value: 'legacy', short: 'Legacy' },
+                    { value: 'vintage', short: 'Vintage' },
+                    { value: 'pauper', short: 'Pauper' },
+                    { value: 'commander', short: 'Commander (alias: edh)' },
+                    { value: 'oathbreaker', short: 'Oathbreaker' },
+                    { value: 'brawl', short: 'Brawl' },
+                    { value: 'standardbrawl', short: 'Standard Brawl' },
+                    { value: 'historic', short: 'Historic' },
+                    { value: 'timeless', short: 'Timeless' },
+                    { value: 'alchemy', short: 'Alchemy' },
+                    { value: 'explorer', short: 'Explorer' },
+                    { value: 'gladiator', short: 'Gladiator' },
+                    { value: 'penny', short: 'Penny Dreadful' },
+                    { value: 'duel', short: 'Duel Commander' },
+                    { value: 'premodern', short: 'Premodern' },
+                    { value: 'oldschool', short: 'Old School' },
+                    { value: 'predh', short: 'PreDH' },
+                    { value: 'paupercommander', short: 'Pauper Commander (alias: pdh)' },
+                    { value: 'future', short: 'Future Standard' }
+                ],
+                examples: [
+                    { query: 'format:standard', desc: 'Cards legal in Standard' },
+                    { query: 'format:modern r:mythic', desc: 'Modern-legal mythics' },
+                    { query: 'format:commander', desc: 'Commander-legal cards (alias: format:edh)' },
+                    { query: 'format:legacy,vintage', desc: 'Legal in Legacy or Vintage' }
+                ]
+            }
+        },
+        {
             id: 'rarity',
             category: 'Search Syntax',
             title: 'Rarity',

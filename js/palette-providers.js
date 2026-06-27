@@ -182,6 +182,38 @@
         }
     });
 
+    // Format legality
+    var formatOptions = [
+        { value: 'standard', label: 'Standard' },
+        { value: 'pioneer', label: 'Pioneer' },
+        { value: 'modern', label: 'Modern' },
+        { value: 'legacy', label: 'Legacy' },
+        { value: 'vintage', label: 'Vintage' },
+        { value: 'pauper', label: 'Pauper' },
+        { value: 'commander', label: 'Commander', sublabel: 'edh' },
+        { value: 'oathbreaker', label: 'Oathbreaker' },
+        { value: 'brawl', label: 'Brawl' },
+        { value: 'standardbrawl', label: 'Standard Brawl' },
+        { value: 'historic', label: 'Historic' },
+        { value: 'timeless', label: 'Timeless' },
+        { value: 'alchemy', label: 'Alchemy' },
+        { value: 'explorer', label: 'Explorer' },
+        { value: 'gladiator', label: 'Gladiator' },
+        { value: 'penny', label: 'Penny Dreadful' },
+        { value: 'duel', label: 'Duel Commander' },
+        { value: 'premodern', label: 'Premodern' },
+        { value: 'oldschool', label: 'Old School' },
+        { value: 'predh', label: 'PreDH' },
+        { value: 'paupercommander', label: 'Pauper Commander', sublabel: 'pdh' },
+        { value: 'future', label: 'Future Standard' }
+    ];
+    register({
+        prefix: 'format:',
+        name: 'Format Legality',
+        icon: 'gavel',
+        getCandidates: function (query) { return filterEntries(formatOptions, query); }
+    });
+
     // Property tags (is: and not: share the same list)
     var isTagOptions = [
         { value: 'reserved', label: 'Reserved List', group: 'Legal' },
