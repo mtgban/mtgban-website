@@ -495,8 +495,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Rebuild each card's INDEX rows. collapseIndex/collapseSealedEV scan the
 	// array themselves, so there's no per-entry dispatch here — just collapse
-	// each known source directly and pass the rest through. Row order is TCG,
-	// Cardmarket, sealed EV, then everything else.
+	// each known source directly and pass the rest through, then sort the
+	// resulting reference rows alphabetically by store name.
 	for _, cardId := range allKeys {
 		indexArray := foundSellers[cardId]["INDEX"]
 		evShorts := Config.ScraperConfig.Config["sealed_ev"]["retail"]
@@ -562,6 +562,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
+
+		// Show the index reference rows in alphabetical order by store name.
+		sort.SliceStable(tmp, func(i, j int) bool {
+			return strings.ToLower(tmp[i].ScraperName) < strings.ToLower(tmp[j].ScraperName)
+		})
 
 		// Amazon search-by-name link (no price or condition); added to every
 		// INDEX section for singles and sealed alike, unless index data was skipped.
