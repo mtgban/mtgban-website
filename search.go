@@ -324,7 +324,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Allow displaying the "search all" link only when something
 	// was searched and no options were specified for it
-	canShowAll := config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
+	canShowAll := !pageVars.IsSealed && config.CleanQuery != "" && (len(config.CardFilters) != 0 || len(config.UUIDs) != 0)
 	pageVars.CanShowAll = canShowAll
 	pageVars.CleanSearchQuery = config.CleanQuery
 
@@ -644,23 +644,28 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
-			Id:   chartId,
-			Foil: !co.Foil,
-		})
-		if err == nil && altId != chartId {
-			pageVars.Alternative = altId
-		}
+		// Foil/etched alternates and the MTGStocks link only apply to
+		// singles; leave them empty for a sealed product so the sidebar's
+		// self-checks hide them.
+		if !co.Sealed {
+			altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
+				Id:   chartId,
+				Foil: !co.Foil,
+			})
+			if err == nil && altId != chartId {
+				pageVars.Alternative = altId
+			}
 
-		altId, err = mtgmatcher.Match(&mtgmatcher.InputCard{
-			Id:        chartId,
-			Variation: "Etched",
-		})
-		if err == nil && altId != chartId {
-			pageVars.AltEtchedId = altId
-		}
+			altId, err = mtgmatcher.Match(&mtgmatcher.InputCard{
+				Id:        chartId,
+				Variation: "Etched",
+			})
+			if err == nil && altId != chartId {
+				pageVars.AltEtchedId = altId
+			}
 
-		pageVars.StocksURL = pageVars.Metadata[chartId].StocksURL
+			pageVars.StocksURL = pageVars.Metadata[chartId].StocksURL
+		}
 	}
 
 	var source string

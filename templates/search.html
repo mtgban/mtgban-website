@@ -335,28 +335,24 @@
                             <img class="sidebar-card-img" id="cardImage" src=""/>
                         </div>
                         <div class="sidebar-printings" id="printings"></div>
-                    {{if not .IsSealed}}
                         {{if .CanShowAll}}
                             <a class="sidebar-action primary" href="search?q={{.CleanSearchQuery}}">Show all versions</a>
                         {{end}}
-                    {{end}}
                         {{if .HasAvailable}}
                             <div class="sidebar-products-card">
                                 <div class="sidebar-products-title">Available In</div>
                                 <div class="sidebar-products-list" id="products"></div>
                             </div>
                         {{end}}
-                    {{if not .IsSealed}}
-                        {{if not (eq .Alternative "")}}
+                        {{if .Alternative}}
                             <a class="sidebar-action warning" href="/search?chart={{.Alternative}}">Switch Foil/Non-Foil</a>
                         {{end}}
-                        {{if not (eq .AltEtchedId "")}}
+                        {{if .AltEtchedId}}
                             <a class="sidebar-action warning" href="/search?chart={{.AltEtchedId}}">Switch Etched/Non-Etched</a>
                         {{end}}
-                        {{if not (eq .StocksURL "")}}
+                        {{if .StocksURL}}
                             <a class="sidebar-action success" href="{{.StocksURL}}" target="_blank">Check MTGStocks charts</a>
                         {{end}}
-                    {{end}}
                     </div>
                     {{if .CanDownloadCSV}}
                     <div class="sidebar-footer">
