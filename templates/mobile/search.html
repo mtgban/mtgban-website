@@ -516,15 +516,14 @@
             <i data-lucide="search-x" class="m-no-results-icon"></i>
             <p class="m-no-results-msg">No results for &ldquo;{{.SearchQuery}}&rdquo;.</p>
             {{if or .DidYouMean .AltSearches}}
-                {{$base := "search"}}{{if .IsSealed}}{{$base = "sealed"}}{{end}}
                 {{if .DidYouMean}}
-                    <p class="m-no-results-hint">Did you mean <a href="{{$base}}?q={{.DidYouMean}}">{{.DidYouMean}}</a>?</p>
+                    <p class="m-no-results-hint">Did you mean <a href="?q={{.DidYouMean}}">{{.DidYouMean}}</a>?</p>
                 {{end}}
                 {{if .AltSearches}}
                     <p class="m-no-results-hint">Try one of these:</p>
                     <ul class="m-no-results-suggestions">
                         {{range .AltSearches}}
-                            <li><a href="{{$base}}?q={{.Query}}">{{.Label}}</a></li>
+                            <li><a href="?q={{.Query}}">{{.Label}}</a></li>
                         {{end}}
                     </ul>
                 {{end}}
