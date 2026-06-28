@@ -34,7 +34,7 @@
         <div class="m-page">
             <p style="padding: 1em;"><a href="/search">Return to search</a></p>
         </div>
-    {{else if and (eq .SearchQuery "") .IsSealed}}
+    {{else if and (eq .SearchQuery "") .EditionSort}}
         {{template "m-sealed-landing" .}}
     {{else}}
         {{if eq .SearchQuery ""}}

@@ -54,7 +54,7 @@
 {{end}}
 
 {{define "content"}}
-    {{if and (eq .SearchQuery "") .IsSealed}}
+    {{if and (eq .SearchQuery "") .EditionSort}}
         {{template "search-sealed" .}}
     {{else}}
         {{if eq .SearchQuery ""}}
