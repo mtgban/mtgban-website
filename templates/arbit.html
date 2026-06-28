@@ -364,7 +364,7 @@
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
-                    <th class="c">{{if $sealedSource}}Decklist{{else}}Finish{{end}}</th>
+                    <th class="c"></th>
                     {{if not .HasNoConds}}
                         <th class="c">Cond</th>
                     {{end}}
@@ -429,20 +429,10 @@
                                         <span class="emoji" title="Highest price in 3 months">🌟</span>
                                     {{end}}
                                 </span>
-                                <span class="card-edition">{{$card.Edition}}{{if not $sealedSource}} · #{{$card.Number}}{{end}}</span>
+                                <span class="card-edition">{{$card.Edition}}{{if not $sealedSource}} · #{{$card.Number}}{{end}}{{if $card.Sealed}} · <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>{{else if $card.HasDeck}} · Decklist{{else if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}</span>
                             </div>
                         </td>
-                        <td>
-                            {{if $card.Sealed}}
-                                <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>
-                            {{else if $card.HasDeck}}
-                                <span title="Decklist">🎁</span>
-                            {{else if $card.Etched}}
-                                <span title="Etched">💫</span>
-                            {{else if $card.Foil}}
-                                <span title="Foil">✨</span>
-                            {{end}}
-                        </td>
+                        <td></td>
                         {{if not $save.HasNoConds}}
                             <td>
                                 {{.InventoryEntry.Conditions}}

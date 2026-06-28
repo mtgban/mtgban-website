@@ -1159,12 +1159,7 @@
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
                                 </td>
                                 <td class="opt-set">
-                                    <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.SetCode}} #{{$card.Number}}
-                                    {{if $card.Etched}}
-                                        <span title="Etched">&#128171;</span>
-                                    {{else if $card.Foil}}
-                                        <span title="Foil">&#10024;</span>
-                                    {{end}}
+                                    <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.SetCode}} #{{$card.Number}}{{if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}
                                 </td>
                                 {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
                                 {{$price := (index $scraperEntries $scraperKey)}}
