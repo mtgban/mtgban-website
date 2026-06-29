@@ -75,7 +75,8 @@
 
                 <div class="news-fg">
                     <span class="news-fl">Price</span>
-                    <input type="text" name="min_price" {{if .MinPrice}}value="{{.MinPrice}}"{{end}} placeholder="Min $">
+                    <input type="text" name="min_price" {{if .MinPrice}}value="{{.MinPrice}}"{{end}} placeholder="Now $">
+                    <input type="text" name="min_was" {{if .MinPriorPrice}}value="{{.MinPriorPrice}}"{{end}} placeholder="Was $">
                 </div>
                 <span class="toolbar-sep"></span>
 
@@ -155,12 +156,12 @@
 
             <div class="news-pagination">
                 {{if ne .CurrentIndex 1}}
-                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
+                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
                 {{end}}
                 <span class="cur">{{.CurrentIndex}}</span>
                 <span class="pg-info">/ {{.TotalIndex}}</span>
                 {{if ne .CurrentIndex .TotalIndex}}
-                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
+                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
                 {{end}}
             </div>
 
@@ -182,7 +183,7 @@
 {{define "screener-sort"}}
     {{$s := .Vars.Screener}}
     <span class="sort-links">
-        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=desc">&#9660;</a>
-        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=asc">&#9650;</a>
+        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=desc">&#9660;</a>
+        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_was={{$s.MinPriorPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=asc">&#9650;</a>
     </span>
 {{end}}

@@ -132,6 +132,24 @@ func TestScreenerEditionsAndFilter(t *testing.T) {
 	}
 }
 
+func TestFilterScreenerRowsPriorFloor(t *testing.T) {
+	// sampleMovers priors: a=50, b=50, c=80, d=1.
+	got := uuidSet(filterScreenerRows(sampleMovers(), screenerFilter{Move: "either", MinPct: 0, MinPriorPrice: 70}))
+	if !got["c"] {
+		t.Errorf("c (was 80) should pass a was>=70 floor, got %v", got)
+	}
+	if got["a"] || got["b"] || got["d"] {
+		t.Errorf("only c was >= 70, got %v", got)
+	}
+
+	// Current and prior floors combine (AND): now>=50 keeps a,b; was>=0 keeps all.
+	both := uuidSet(filterScreenerRows(sampleMovers(), screenerFilter{Move: "either", MinPct: 0, MinPrice: 50, MinPriorPrice: 70}))
+	if len(both) != 0 {
+		// a,b have prior 50 (<70); c has current 40 (<50). No row satisfies both.
+		t.Errorf("no row satisfies now>=50 AND was>=70, got %v", both)
+	}
+}
+
 func TestValidPageSize(t *testing.T) {
 	for _, n := range []int{25, 50, 100} {
 		if validPageSize(n) != n {
@@ -201,7 +219,7 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 	screenerCache = map[string]screenerCacheEntry{}
 	screenerCacheMu.Unlock()
 
-	screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
+	screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
 		return []timeseries.MoverRow{
 			{MtgjsonUUID: "good1"}, {MtgjsonUUID: "bad"}, {MtgjsonUUID: "box"},
 		}, nil
@@ -217,7 +235,7 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 		}
 	}
 
-	rows, err := cachedMovers(context.Background(), 2, 30, 5)
+	rows, err := cachedMovers(context.Background(), 2, 30, 5, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,33 +268,41 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCacheMu.Unlock()
 
 	screenerClassify = func(uuid string) (screenerMeta, bool) { return screenerMeta{}, true }
-	screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
-		calls[screenerCacheKey(metric, window, minPrice)]++
+	screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
+		calls[screenerCacheKey(metric, window, minPrice, minPriorPrice)]++
 		return []timeseries.MoverRow{{MtgjsonUUID: "x"}}, nil
 	}
 
 	// First call fetches, second is served from cache.
-	if _, err := cachedMovers(context.Background(), 2, 30, 5); err != nil {
+	if _, err := cachedMovers(context.Background(), 2, 30, 5, 0); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cachedMovers(context.Background(), 2, 30, 5); err != nil {
+	if _, err := cachedMovers(context.Background(), 2, 30, 5, 0); err != nil {
 		t.Fatal(err)
 	}
-	if calls[screenerCacheKey(2, 30, 5)] != 1 {
-		t.Errorf("expected 1 fetch for (2,30,5), got %d", calls[screenerCacheKey(2, 30, 5)])
+	if calls[screenerCacheKey(2, 30, 5, 0)] != 1 {
+		t.Errorf("expected 1 fetch for (2,30,5,0), got %d", calls[screenerCacheKey(2, 30, 5, 0)])
 	}
 
-	// A different floor is a distinct cache key and triggers a separate fetch.
-	if _, err := cachedMovers(context.Background(), 2, 30, 10); err != nil {
+	// A different current floor is a distinct cache key.
+	if _, err := cachedMovers(context.Background(), 2, 30, 10, 0); err != nil {
 		t.Fatal(err)
 	}
-	if calls[screenerCacheKey(2, 30, 10)] != 1 {
-		t.Errorf("expected 1 fetch for (2,30,10), got %d", calls[screenerCacheKey(2, 30, 10)])
+	if calls[screenerCacheKey(2, 30, 10, 0)] != 1 {
+		t.Errorf("expected 1 fetch for (2,30,10,0), got %d", calls[screenerCacheKey(2, 30, 10, 0)])
+	}
+
+	// A different prior floor is also a distinct cache key.
+	if _, err := cachedMovers(context.Background(), 2, 30, 5, 100); err != nil {
+		t.Fatal(err)
+	}
+	if calls[screenerCacheKey(2, 30, 5, 100)] != 1 {
+		t.Errorf("expected 1 fetch for (2,30,5,100), got %d", calls[screenerCacheKey(2, 30, 5, 100)])
 	}
 
 	// Fill past the cap with distinct keys; the map must stay bounded.
 	for w := 0; w < screenerCacheMax+5; w++ {
-		if _, err := cachedMovers(context.Background(), 99, w, 5); err != nil {
+		if _, err := cachedMovers(context.Background(), 99, w, 5, 0); err != nil {
 			t.Fatal(err)
 		}
 	}

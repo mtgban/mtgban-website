@@ -93,13 +93,14 @@ func (r ScreenerResult) FieldValue(name string) string {
 }
 
 type screenerFilter struct {
-	Metric   int
-	Window   int
-	Kind     string // singles | sealed | both
-	Move     string // up | down | either
-	MinPrice float64
-	MinPct   float64 // whole percent, e.g. 20
-	MaxPct   float64 // whole percent, 0 == off
+	Metric        int
+	Window        int
+	Kind          string  // singles | sealed | both
+	Move          string  // up | down | either
+	MinPrice      float64 // floor on current price
+	MinPriorPrice float64 // floor on the prior ("was") price
+	MinPct        float64 // whole percent, e.g. 20
+	MaxPct        float64 // whole percent, 0 == off
 }
 
 func filterScreenerRows(rows []screenerRow, f screenerFilter) []ScreenerResult {
@@ -125,6 +126,9 @@ func filterScreenerRows(rows []screenerRow, f screenerFilter) []ScreenerResult {
 			continue
 		}
 		if row.Current < f.MinPrice {
+			continue
+		}
+		if row.Prior < f.MinPriorPrice {
 			continue
 		}
 		pct := (row.Current - row.Prior) / row.Prior
@@ -266,13 +270,13 @@ var (
 	screenerCache   = map[string]screenerCacheEntry{}
 )
 
-func screenerCacheKey(metric, window int, minPrice float64) string {
-	return fmt.Sprintf("%d:%d:%.2f", metric, window, minPrice)
+func screenerCacheKey(metric, window int, minPrice, minPriorPrice float64) string {
+	return fmt.Sprintf("%d:%d:%.2f:%.2f", metric, window, minPrice, minPriorPrice)
 }
 
 // overridable in tests
-var screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
-	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice)
+var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
+	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice, minPriorPrice)
 }
 
 type screenerMeta struct {
@@ -290,8 +294,8 @@ var screenerClassify = func(uuid string) (screenerMeta, bool) {
 	return screenerMeta{Sealed: co.Sealed, SetCode: co.SetCode, Edition: co.Edition}, true
 }
 
-func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]screenerRow, error) {
-	key := screenerCacheKey(metric, window, minPrice)
+func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
+	key := screenerCacheKey(metric, window, minPrice, minPriorPrice)
 
 	screenerCacheMu.Lock()
 	e, ok := screenerCache[key]
@@ -300,7 +304,7 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]
 		return e.rows, nil
 	}
 
-	raw, err := screenerFetch(ctx, metric, window, minPrice)
+	raw, err := screenerFetch(ctx, metric, window, minPrice, minPriorPrice)
 	if err != nil {
 		return nil, err
 	}
@@ -337,6 +341,7 @@ type ScreenerVars struct {
 	SelKind       string
 	Move          string
 	MinPrice      float64
+	MinPriorPrice float64
 	MinPct        float64
 	MaxPct        float64
 	Editions      []EditionFacet
@@ -398,6 +403,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 		kind = "singles"
 	}
 	minPrice, _ := strconv.ParseFloat(r.FormValue("min_price"), 64)
+	minWas, _ := strconv.ParseFloat(r.FormValue("min_was"), 64)
 	minPct, _ := strconv.ParseFloat(r.FormValue("min_pct"), 64)
 	maxPct, _ := strconv.ParseFloat(r.FormValue("max_pct"), 64)
 	size := validPageSize(atoiDefault(r.FormValue("size"), 25))
@@ -427,6 +433,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 		SelKind:       kind,
 		Move:          move,
 		MinPrice:      minPrice,
+		MinPriorPrice: minWas,
 		MinPct:        minPct,
 		MaxPct:        maxPct,
 		SelEditions:   selEditions,
@@ -436,7 +443,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	}
 	pageVars.Screener = sv
 
-	rows, err := cachedMovers(r.Context(), metric, window, minPrice)
+	rows, err := cachedMovers(r.Context(), metric, window, minPrice, minWas)
 	if err != nil {
 		pageVars.InfoMessage = "Screener data is temporarily unavailable, please try again shortly"
 		render(w, "screener.html", pageVars)
@@ -445,7 +452,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 
 	results := filterScreenerRows(rows, screenerFilter{
 		Metric: metric, Window: window, Kind: kind, Move: move,
-		MinPrice: minPrice, MinPct: minPct, MaxPct: maxPct,
+		MinPrice: minPrice, MinPriorPrice: minWas, MinPct: minPct, MaxPct: maxPct,
 	})
 
 	// Facet the edition list before narrowing, then apply the edition filter.

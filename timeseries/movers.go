@@ -14,7 +14,7 @@ type MoverRow struct {
 	Prior       float64
 }
 
-func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int, minPrice float64) ([]MoverRow, error) {
+func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int, minPrice, minPriorPrice float64) ([]MoverRow, error) {
 	column := columnForDataset(datasetIndex)
 	if column == "" {
 		return nil, fmt.Errorf("timeseries: unknown dataset index %d", datasetIndex)
@@ -52,12 +52,12 @@ func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int
 		old AS (
 			SELECT mtgjson_uuid, is_foil, is_etched, is_alt, %[1]s AS p
 			  FROM product_prices
-			 WHERE date = $2::date AND language = '' AND %[1]s > 0
+			 WHERE date = $2::date AND language = '' AND %[1]s > 0 AND %[1]s >= $4
 		)
 		SELECT cur.mtgjson_uuid, cur.is_foil, cur.is_etched, cur.p, old.p
 		  FROM cur JOIN old USING (mtgjson_uuid, is_foil, is_etched, is_alt)`, column)
 
-	rows, err := c.db.QueryContext(ctx, q, latestStr, priorStr, minPrice)
+	rows, err := c.db.QueryContext(ctx, q, latestStr, priorStr, minPrice, minPriorPrice)
 	if err != nil {
 		return nil, err
 	}
