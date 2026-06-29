@@ -130,6 +130,28 @@ func TestValidMetricAndWindow(t *testing.T) {
 	}
 }
 
+func TestBuildScreenerDisplaySkipsUnresolved(t *testing.T) {
+	results := []ScreenerResult{
+		{UUID: "good1"}, {UUID: "bad"}, {UUID: "good2"},
+	}
+	resolve := func(uuid string) GenericCard {
+		if uuid == "bad" {
+			return GenericCard{} // unresolved
+		}
+		return GenericCard{UUID: uuid, Name: "Card " + uuid}
+	}
+	got := buildScreenerDisplay(results, resolve)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 displayable, got %d", len(got))
+	}
+	if got[0].Row.UUID != "good1" || got[1].Row.UUID != "good2" {
+		t.Errorf("wrong rows kept: %v, %v", got[0].Row.UUID, got[1].Row.UUID)
+	}
+	if got[0].Card.Name != "Card good1" {
+		t.Errorf("card not paired: %q", got[0].Card.Name)
+	}
+}
+
 func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	calls := map[string]int{}
 	prev := screenerFetch

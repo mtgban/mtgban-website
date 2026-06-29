@@ -259,6 +259,26 @@ func atoiDefault(s string, def int) int {
 	return def
 }
 
+// screenerDisplay pairs a result with its resolved card.
+type screenerDisplay struct {
+	Row  ScreenerResult
+	Card GenericCard
+}
+
+// buildScreenerDisplay resolves each result to a card and drops rows that do
+// not resolve, so blank rows never reach the page or pagination counts.
+func buildScreenerDisplay(results []ScreenerResult, resolve func(uuid string) GenericCard) []screenerDisplay {
+	var out []screenerDisplay
+	for _, res := range results {
+		c := resolve(res.UUID)
+		if c.Name == "" {
+			continue
+		}
+		out = append(out, screenerDisplay{Row: res, Card: c})
+	}
+	return out
+}
+
 // Screener serves the price-movers screener page.
 func Screener(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
@@ -349,14 +369,17 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	pageVars.SortOption = sorting
 	pageVars.SortDir = dir
 
-	var paged []ScreenerResult
-	paged, pageVars.Pagination = Paginate(results, pageIndex, DefaultPageSize, len(results))
-	sv.Rows = paged
+	display := buildScreenerDisplay(results, func(uuid string) GenericCard {
+		return uuid2card(uuid, true, false, preferFlavor)
+	})
 
-	for _, res := range paged {
-		c := uuid2card(res.UUID, true, false, preferFlavor)
-		pageVars.Cards = append(pageVars.Cards, c)
-		pageVars.CardHashes = append(pageVars.CardHashes, res.UUID)
+	var paged []screenerDisplay
+	paged, pageVars.Pagination = Paginate(display, pageIndex, DefaultPageSize, len(display))
+
+	for _, d := range paged {
+		sv.Rows = append(sv.Rows, d.Row)
+		pageVars.Cards = append(pageVars.Cards, d.Card)
+		pageVars.CardHashes = append(pageVars.CardHashes, d.Row.UUID)
 	}
 
 	if len(paged) == 0 {
