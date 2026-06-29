@@ -94,7 +94,7 @@
                         <div class="screener-editions-menu">
                             {{range .Editions}}
                                 <label class="screener-edition-item">
-                                    <input type="checkbox" name="edition" value="{{.Code}}" {{if index $.Screener.SelEditionSet .Code}}checked{{end}} onchange="this.form.submit()">
+                                    <input type="checkbox" name="edition" value="{{.Code}}" {{if index $.Screener.SelEditionSet .Code}}checked{{end}}>
                                     <span class="screener-edition-name">{{.Name}}</span>
                                     <span class="screener-edition-count">{{.Count}}</span>
                                 </label>
@@ -123,7 +123,7 @@
             <table class="table-data news-table" id="screenerTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
                 <thead>
                     <tr>
-                        <th class="news-th-card">Card</th>
+                        <th class="news-th-card">{{if eq .Screener.SelKind "sealed"}}Products{{else if eq .Screener.SelKind "both"}}Entries{{else}}Card{{end}}</th>
                         <th class="r screener-dollar">Current {{template "screener-sort" (dict "Field" "current" "Vars" $)}}</th>
                         <th class="r screener-dollar">Was {{template "screener-sort" (dict "Field" "prior" "Vars" $)}}</th>
                         <th class="r screener-pct">% Change {{template "screener-sort" (dict "Field" "pct" "Vars" $)}}</th>
