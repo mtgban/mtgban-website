@@ -88,3 +88,9 @@
     background: linear-gradient(135deg, #ea8d66, #fdef8a, #8bcc93, #a6dced);
     color: #222;
 }
+
+.result-badge.treatment {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--search-text-dim, #aaa);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}

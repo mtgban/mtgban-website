@@ -468,8 +468,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	sv.Rows = paged
 
 	for _, res := range paged {
-		// The DB uuid is finish-agnostic; resolve the foil/etched variant so the
-		// card reflects the priced finish.
+		// DB uuid is finish-agnostic; resolve the priced foil/etched variant.
 		cardId, err := mtgmatcher.MatchId(res.UUID, res.IsFoil, res.IsEtched)
 		if err != nil {
 			cardId = res.UUID
