@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"testing"
 
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -126,5 +127,48 @@ func TestValidMetricAndWindow(t *testing.T) {
 	}
 	if validWindow(31) {
 		t.Error("window 31 is not a preset, should be invalid")
+	}
+}
+
+func TestCachedMoversCachesAndEvicts(t *testing.T) {
+	calls := map[string]int{}
+	prev := screenerFetch
+	t.Cleanup(func() {
+		screenerFetch = prev
+		screenerCacheMu.Lock()
+		screenerCache = map[string]screenerCacheEntry{}
+		screenerCacheMu.Unlock()
+	})
+	screenerCacheMu.Lock()
+	screenerCache = map[string]screenerCacheEntry{}
+	screenerCacheMu.Unlock()
+
+	screenerFetch = func(ctx context.Context, metric, window int) ([]timeseries.MoverRow, error) {
+		calls[screenerCacheKey(metric, window)]++
+		return []timeseries.MoverRow{{MtgjsonUUID: "x"}}, nil
+	}
+
+	// First call fetches, second is served from cache.
+	if _, err := cachedMovers(context.Background(), 2, 30); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cachedMovers(context.Background(), 2, 30); err != nil {
+		t.Fatal(err)
+	}
+	if calls[screenerCacheKey(2, 30)] != 1 {
+		t.Errorf("expected 1 fetch for (2,30), got %d", calls[screenerCacheKey(2, 30)])
+	}
+
+	// Fill past the cap with distinct keys; the map must stay bounded.
+	for w := 0; w < screenerCacheMax+5; w++ {
+		if _, err := cachedMovers(context.Background(), 99, w); err != nil {
+			t.Fatal(err)
+		}
+	}
+	screenerCacheMu.Lock()
+	n := len(screenerCache)
+	screenerCacheMu.Unlock()
+	if n > screenerCacheMax {
+		t.Errorf("cache size %d exceeds cap %d", n, screenerCacheMax)
 	}
 }

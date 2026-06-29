@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"sort"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/mtgban/mtgban-website/timeseries"
 )
@@ -171,4 +175,63 @@ func sortScreenerRows(rows []ScreenerResult, field, dir string) {
 		}
 		return a > b
 	})
+}
+
+type screenerCacheEntry struct {
+	rows    []timeseries.MoverRow
+	fetched time.Time
+}
+
+const (
+	screenerCacheTTL = 3 * time.Hour
+	screenerCacheMax = 16
+)
+
+var (
+	screenerCacheMu sync.Mutex
+	screenerCache   = map[string]screenerCacheEntry{}
+)
+
+func screenerCacheKey(metric, window int) string {
+	return fmt.Sprintf("%d:%d", metric, window)
+}
+
+// screenerFetch is the source of raw movers; overridable in tests.
+var screenerFetch = func(ctx context.Context, metric, window int) ([]timeseries.MoverRow, error) {
+	return PricesArchiveDB.GetMovers(ctx, metric, window)
+}
+
+// cachedMovers returns the raw change-list for a metric and window, fetching on
+// a cache miss or stale entry and evicting the oldest entry past the cap.
+func cachedMovers(ctx context.Context, metric, window int) ([]timeseries.MoverRow, error) {
+	key := screenerCacheKey(metric, window)
+
+	screenerCacheMu.Lock()
+	e, ok := screenerCache[key]
+	screenerCacheMu.Unlock()
+	if ok && time.Since(e.fetched) < screenerCacheTTL {
+		return e.rows, nil
+	}
+
+	rows, err := screenerFetch(ctx, metric, window)
+	if err != nil {
+		return nil, err
+	}
+
+	screenerCacheMu.Lock()
+	if _, exists := screenerCache[key]; !exists && len(screenerCache) >= screenerCacheMax {
+		var oldestKey string
+		var oldest time.Time
+		first := true
+		for k, v := range screenerCache {
+			if first || v.fetched.Before(oldest) {
+				oldestKey, oldest, first = k, v.fetched, false
+			}
+		}
+		delete(screenerCache, oldestKey)
+	}
+	screenerCache[key] = screenerCacheEntry{rows: rows, fetched: time.Now()}
+	screenerCacheMu.Unlock()
+
+	return rows, nil
 }
