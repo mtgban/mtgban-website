@@ -1144,7 +1144,10 @@
     text-align: left;
     cursor: pointer;
     position: sticky;
-    top: calc(var(--nav-height) + 47px);
+    /* Pin flush under the sticky .opt-store-header. Kept a hair short so the
+       column header tucks under it (overlap hidden behind the header) rather
+       than leaving a gap that lets a data row show through when scrolling. */
+    top: calc(var(--nav-height) + 40px);
     z-index: 4;
 }
 .opt-table th:hover { color: var(--activetext); }
