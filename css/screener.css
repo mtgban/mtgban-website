@@ -63,13 +63,47 @@
     font-size: var(--text-xs);
 }
 
+/* Lock column widths so re-sorting does not reflow them. */
+#screenerTable {
+    table-layout: fixed;
+}
+#screenerTable th {
+    width: 15%;
+}
+#screenerTable th.news-th-card {
+    width: 40%;
+}
+
+/* Right-align dollar columns with tabular figures so decimal points line up. */
+#screenerTable .screener-dollar {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A bit more row height so finish chips are not clipped. */
+#screenerTable td {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+/* Name ellipsizes on its own; the finish chip stays a free sibling so it is not clipped. */
+.screener-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-width: 0;
+}
+.screener-name-row .card-name {
+    min-width: 0;
+}
+
 .result-badge {
     font-size: var(--text-xs, 0.7em);
     padding: 0.1em 0.4em;
     border-radius: var(--radius-sm, 0.35em);
     font-weight: 600;
-    margin-left: 0.4em;
-    vertical-align: middle;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .result-badge.foil {

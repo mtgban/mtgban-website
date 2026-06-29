@@ -124,10 +124,10 @@
                 <thead>
                     <tr>
                         <th class="news-th-card">Card</th>
-                        <th class="r">Current {{template "screener-sort" (dict "Field" "current" "Vars" $)}}</th>
-                        <th class="r">Was {{template "screener-sort" (dict "Field" "prior" "Vars" $)}}</th>
-                        <th class="r">% Change {{template "screener-sort" (dict "Field" "pct" "Vars" $)}}</th>
-                        <th class="r">$ Change {{template "screener-sort" (dict "Field" "abs" "Vars" $)}}</th>
+                        <th class="r screener-dollar">Current {{template "screener-sort" (dict "Field" "current" "Vars" $)}}</th>
+                        <th class="r screener-dollar">Was {{template "screener-sort" (dict "Field" "prior" "Vars" $)}}</th>
+                        <th class="r screener-pct">% Change {{template "screener-sort" (dict "Field" "pct" "Vars" $)}}</th>
+                        <th class="r screener-dollar">$ Change {{template "screener-sort" (dict "Field" "abs" "Vars" $)}}</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -140,15 +140,18 @@
                                         <i class="ss {{$card.Keyrune}} ss-1x ss-fw set-icon"></i>
                                     {{end}}
                                     <div class="card-detail">
-                                        <span class="card-name"><a href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{if $card.FinishTag}} <span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}</span>
+                                        <div class="screener-name-row">
+                                            <a class="card-name" href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                            {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
+                                        </div>
                                         <span class="set-sub">{{$card.Edition}} &bull; #{{$card.Number}}</span>
                                     </div>
                                 </div>
                             </td>
-                            <td class="news-num">{{print_price ($row.FieldValue "current")}}</td>
-                            <td class="news-num">{{print_price ($row.FieldValue "prior")}}</td>
-                            <td class="news-num"><span class="news-perc {{perc_class ($row.FieldValue "pct")}}">{{print_perc ($row.FieldValue "pct")}}</span></td>
-                            <td class="news-num">{{print_price ($row.FieldValue "abs")}}</td>
+                            <td class="news-num screener-dollar">{{print_price ($row.FieldValue "current")}}</td>
+                            <td class="news-num screener-dollar">{{print_price ($row.FieldValue "prior")}}</td>
+                            <td class="news-num screener-pct"><span class="news-perc {{perc_class ($row.FieldValue "pct")}}">{{print_perc ($row.FieldValue "pct")}}</span></td>
+                            <td class="news-num screener-dollar">{{print_price ($row.FieldValue "abs")}}</td>
                         </tr>
                     {{end}}
                 </tbody>
