@@ -116,14 +116,13 @@
             </table>
 
             <div class="news-pagination">
-                {{$q := printf "metric=%d&window=%d&move=%s&min_price=%v&min_pct=%v&max_pct=%v&sort=%s&dir=%s" .Screener.SelMetric .Screener.SelWindow .Screener.Move .Screener.MinPrice .Screener.MinPct .Screener.MaxPct .SortOption .SortDir}}
                 {{if ne .CurrentIndex 1}}
-                    <a href="/screener?{{$q}}&index={{.PrevIndex}}">&lt;</a>
+                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
                 {{end}}
                 <span class="cur">{{.CurrentIndex}}</span>
                 <span class="pg-info">/ {{.TotalIndex}}</span>
                 {{if ne .CurrentIndex .TotalIndex}}
-                    <a href="/screener?{{$q}}&index={{.NextIndex}}">&gt;</a>
+                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
                 {{end}}
             </div>
 
@@ -143,9 +142,9 @@
 {{end}}
 
 {{define "screener-sort"}}
-    {{$q := printf "metric=%d&window=%d&move=%s&min_price=%v&min_pct=%v&max_pct=%v" .Vars.Screener.SelMetric .Vars.Screener.SelWindow .Vars.Screener.Move .Vars.Screener.MinPrice .Vars.Screener.MinPct .Vars.Screener.MaxPct}}
+    {{$s := .Vars.Screener}}
     <span class="sort-links">
-        <a href="/screener?{{$q}}&sort={{.Field}}&dir=desc">&#9660;</a>
-        <a href="/screener?{{$q}}&sort={{.Field}}&dir=asc">&#9650;</a>
+        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&sort={{.Field}}&dir=desc">&#9660;</a>
+        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&sort={{.Field}}&dir=asc">&#9650;</a>
     </span>
 {{end}}
