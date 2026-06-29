@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"slices"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -234,4 +237,131 @@ func cachedMovers(ctx context.Context, metric, window int) ([]timeseries.MoverRo
 	screenerCacheMu.Unlock()
 
 	return rows, nil
+}
+
+// ScreenerVars is the screener-specific template payload, hung off PageVars.
+type ScreenerVars struct {
+	Metrics   []ScreenerMetric
+	Windows   []ScreenerWindow
+	SelMetric int
+	SelWindow int
+	Move      string
+	MinPrice  float64
+	MinPct    float64
+	MaxPct    float64
+	Rows      []ScreenerResult
+}
+
+func atoiDefault(s string, def int) int {
+	if v, err := strconv.Atoi(s); err == nil {
+		return v
+	}
+	return def
+}
+
+// Screener serves the price-movers screener page.
+func Screener(w http.ResponseWriter, r *http.Request) {
+	sig := getSignatureFromCookies(r)
+
+	pageVars := genPageNav("Screener", sig)
+	pageVars.IsMobile = isMobileRequest(r)
+	if pageVars.IsMobile {
+		pageVars.Nav = filterNavForMobile(pageVars.Nav)
+	}
+	pageVars.Title = "Price Movers Screener"
+
+	if PricesArchiveDB == nil {
+		pageVars.Title = "This feature is not enabled"
+		pageVars.ErrorMessage = ErrMsgDenied
+		render(w, "screener.html", pageVars)
+		return
+	}
+
+	// Reuse the Newspaper access tier.
+	enabled := GetParamFromSig(sig, "NewsEnabled")
+	if !(enabled == "1day" || enabled == "3day" || enabled == "0day" || (DevMode && !SigCheck)) {
+		pageVars.Title = "This feature is BANned"
+		pageVars.ErrorMessage = ErrMsgDenied
+		render(w, "screener.html", pageVars)
+		return
+	}
+
+	r.ParseForm()
+	metric := atoiDefault(r.FormValue("metric"), 2)
+	window := atoiDefault(r.FormValue("window"), 30)
+	if !validMetric(metric) {
+		metric = 2
+	}
+	if !validWindow(window) {
+		window = 30
+	}
+	move := r.FormValue("move")
+	if move != "up" && move != "down" && move != "either" {
+		move = "up"
+	}
+	minPrice, _ := strconv.ParseFloat(r.FormValue("min_price"), 64)
+	minPct, _ := strconv.ParseFloat(r.FormValue("min_pct"), 64)
+	maxPct, _ := strconv.ParseFloat(r.FormValue("max_pct"), 64)
+	sorting := r.FormValue("sort")
+	dir := r.FormValue("dir")
+	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
+
+	// Fresh load with no filter params: apply the landing defaults.
+	if r.FormValue("metric") == "" && r.FormValue("min_price") == "" && r.FormValue("min_pct") == "" {
+		minPrice = 5
+		minPct = 20
+	}
+
+	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
+	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
+
+	sv := &ScreenerVars{
+		Metrics:   screenerMetrics,
+		Windows:   screenerWindows,
+		SelMetric: metric,
+		SelWindow: window,
+		Move:      move,
+		MinPrice:  minPrice,
+		MinPct:    minPct,
+		MaxPct:    maxPct,
+	}
+	pageVars.Screener = sv
+
+	rows, err := cachedMovers(r.Context(), metric, window)
+	if err != nil {
+		pageVars.InfoMessage = "Screener data is temporarily unavailable, please try again shortly"
+		render(w, "screener.html", pageVars)
+		return
+	}
+
+	results := filterScreenerRows(rows, screenerFilter{
+		Metric: metric, Window: window, Move: move,
+		MinPrice: minPrice, MinPct: minPct, MaxPct: maxPct,
+	})
+
+	if sorting == "" {
+		sorting = "pct"
+		if dir == "" {
+			dir = "desc"
+		}
+	}
+	sortScreenerRows(results, sorting, dir)
+	pageVars.SortOption = sorting
+	pageVars.SortDir = dir
+
+	var paged []ScreenerResult
+	paged, pageVars.Pagination = Paginate(results, pageIndex, DefaultPageSize, len(results))
+	sv.Rows = paged
+
+	for _, res := range paged {
+		c := uuid2card(res.UUID, true, false, preferFlavor)
+		pageVars.Cards = append(pageVars.Cards, c)
+		pageVars.CardHashes = append(pageVars.CardHashes, res.UUID)
+	}
+
+	if len(paged) == 0 {
+		pageVars.InfoMessage = "No cards match the current filters"
+	}
+
+	render(w, "screener.html", pageVars)
 }

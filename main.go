@@ -239,6 +239,9 @@ type PageVars struct {
 	ShowResultTabs    bool
 	ShowAllTab        bool
 	DefaultResultView string
+
+	// Price-movers screener payload (nil on non-screener pages).
+	Screener *ScreenerVars
 }
 
 type NavElem struct {
@@ -329,6 +332,7 @@ var OptionalFields = []string{
 var OrderNav = []string{
 	"Search",
 	"Newspaper",
+	"Screener",
 	"Sleepers",
 	"Upload",
 	"Global",
@@ -394,6 +398,14 @@ func init() {
 					},
 				},
 			},
+		},
+		"Screener": {
+			Name:        "Screener",
+			Short:       "🔎",
+			Description: "Find cards by price move over time",
+			Link:        "/screener",
+			Handle:      Screener,
+			Page:        "screener.html",
 		},
 		"Sleepers": {
 			Name:        "Sleepers",
