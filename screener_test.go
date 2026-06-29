@@ -130,33 +130,12 @@ func TestValidMetricAndWindow(t *testing.T) {
 	}
 }
 
-func TestBuildScreenerDisplaySkipsUnresolved(t *testing.T) {
-	results := []ScreenerResult{
-		{UUID: "good1"}, {UUID: "bad"}, {UUID: "good2"},
-	}
-	resolve := func(uuid string) GenericCard {
-		if uuid == "bad" {
-			return GenericCard{} // unresolved
-		}
-		return GenericCard{UUID: uuid, Name: "Card " + uuid}
-	}
-	got := buildScreenerDisplay(results, resolve)
-	if len(got) != 2 {
-		t.Fatalf("expected 2 displayable, got %d", len(got))
-	}
-	if got[0].Row.UUID != "good1" || got[1].Row.UUID != "good2" {
-		t.Errorf("wrong rows kept: %v, %v", got[0].Row.UUID, got[1].Row.UUID)
-	}
-	if got[0].Card.Name != "Card good1" {
-		t.Errorf("card not paired: %q", got[0].Card.Name)
-	}
-}
-
-func TestCachedMoversCachesAndEvicts(t *testing.T) {
-	calls := map[string]int{}
-	prev := screenerFetch
+func TestCachedMoversFiltersUnresolvable(t *testing.T) {
+	prevFetch := screenerFetch
+	prevResolvable := screenerResolvable
 	t.Cleanup(func() {
-		screenerFetch = prev
+		screenerFetch = prevFetch
+		screenerResolvable = prevResolvable
 		screenerCacheMu.Lock()
 		screenerCache = map[string]screenerCacheEntry{}
 		screenerCacheMu.Unlock()
@@ -165,25 +144,70 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCache = map[string]screenerCacheEntry{}
 	screenerCacheMu.Unlock()
 
-	screenerFetch = func(ctx context.Context, metric, window int) ([]timeseries.MoverRow, error) {
-		calls[screenerCacheKey(metric, window)]++
+	screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
+		return []timeseries.MoverRow{
+			{MtgjsonUUID: "good1"}, {MtgjsonUUID: "bad"}, {MtgjsonUUID: "good2"},
+		}, nil
+	}
+	screenerResolvable = func(uuid string) bool { return uuid != "bad" }
+
+	rows, err := cachedMovers(context.Background(), 2, 30, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 resolvable rows, got %d", len(rows))
+	}
+	for _, r := range rows {
+		if r.MtgjsonUUID == "bad" {
+			t.Errorf("unresolvable UUID not filtered: %s", r.MtgjsonUUID)
+		}
+	}
+}
+
+func TestCachedMoversCachesAndEvicts(t *testing.T) {
+	calls := map[string]int{}
+	prevFetch := screenerFetch
+	prevResolvable := screenerResolvable
+	t.Cleanup(func() {
+		screenerFetch = prevFetch
+		screenerResolvable = prevResolvable
+		screenerCacheMu.Lock()
+		screenerCache = map[string]screenerCacheEntry{}
+		screenerCacheMu.Unlock()
+	})
+	screenerCacheMu.Lock()
+	screenerCache = map[string]screenerCacheEntry{}
+	screenerCacheMu.Unlock()
+
+	screenerResolvable = func(uuid string) bool { return true }
+	screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
+		calls[screenerCacheKey(metric, window, minPrice)]++
 		return []timeseries.MoverRow{{MtgjsonUUID: "x"}}, nil
 	}
 
 	// First call fetches, second is served from cache.
-	if _, err := cachedMovers(context.Background(), 2, 30); err != nil {
+	if _, err := cachedMovers(context.Background(), 2, 30, 5); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cachedMovers(context.Background(), 2, 30); err != nil {
+	if _, err := cachedMovers(context.Background(), 2, 30, 5); err != nil {
 		t.Fatal(err)
 	}
-	if calls[screenerCacheKey(2, 30)] != 1 {
-		t.Errorf("expected 1 fetch for (2,30), got %d", calls[screenerCacheKey(2, 30)])
+	if calls[screenerCacheKey(2, 30, 5)] != 1 {
+		t.Errorf("expected 1 fetch for (2,30,5), got %d", calls[screenerCacheKey(2, 30, 5)])
+	}
+
+	// A different floor is a distinct cache key and triggers a separate fetch.
+	if _, err := cachedMovers(context.Background(), 2, 30, 10); err != nil {
+		t.Fatal(err)
+	}
+	if calls[screenerCacheKey(2, 30, 10)] != 1 {
+		t.Errorf("expected 1 fetch for (2,30,10), got %d", calls[screenerCacheKey(2, 30, 10)])
 	}
 
 	// Fill past the cap with distinct keys; the map must stay bounded.
 	for w := 0; w < screenerCacheMax+5; w++ {
-		if _, err := cachedMovers(context.Background(), 99, w); err != nil {
+		if _, err := cachedMovers(context.Background(), 99, w, 5); err != nil {
 			t.Fatal(err)
 		}
 	}

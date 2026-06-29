@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -195,19 +196,29 @@ var (
 	screenerCache   = map[string]screenerCacheEntry{}
 )
 
-func screenerCacheKey(metric, window int) string {
-	return fmt.Sprintf("%d:%d", metric, window)
+func screenerCacheKey(metric, window int, minPrice float64) string {
+	return fmt.Sprintf("%d:%d:%.2f", metric, window, minPrice)
 }
 
 // screenerFetch is the source of raw movers; overridable in tests.
-var screenerFetch = func(ctx context.Context, metric, window int) ([]timeseries.MoverRow, error) {
-	return PricesArchiveDB.GetMovers(ctx, metric, window)
+var screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
+	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice)
 }
 
-// cachedMovers returns the raw change-list for a metric and window, fetching on
-// a cache miss or stale entry and evicting the oldest entry past the cap.
-func cachedMovers(ctx context.Context, metric, window int) ([]timeseries.MoverRow, error) {
-	key := screenerCacheKey(metric, window)
+// screenerResolvable reports whether a UUID maps to a known card; overridable
+// in tests. Resolvability depends only on the static matcher datastore, so it
+// is computed once at cache-build time rather than per request.
+var screenerResolvable = func(uuid string) bool {
+	_, err := mtgmatcher.GetUUID(uuid)
+	return err == nil
+}
+
+// cachedMovers returns the change-list for a metric, window, and dollar floor,
+// fetching on a cache miss or stale entry and evicting the oldest entry past
+// the cap. Unresolvable UUIDs are dropped here so the page handler can resolve
+// only the rows it displays.
+func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
+	key := screenerCacheKey(metric, window, minPrice)
 
 	screenerCacheMu.Lock()
 	e, ok := screenerCache[key]
@@ -216,9 +227,15 @@ func cachedMovers(ctx context.Context, metric, window int) ([]timeseries.MoverRo
 		return e.rows, nil
 	}
 
-	rows, err := screenerFetch(ctx, metric, window)
+	raw, err := screenerFetch(ctx, metric, window, minPrice)
 	if err != nil {
 		return nil, err
+	}
+	rows := make([]timeseries.MoverRow, 0, len(raw))
+	for _, row := range raw {
+		if screenerResolvable(row.MtgjsonUUID) {
+			rows = append(rows, row)
+		}
 	}
 
 	screenerCacheMu.Lock()
@@ -257,26 +274,6 @@ func atoiDefault(s string, def int) int {
 		return v
 	}
 	return def
-}
-
-// screenerDisplay pairs a result with its resolved card.
-type screenerDisplay struct {
-	Row  ScreenerResult
-	Card GenericCard
-}
-
-// buildScreenerDisplay resolves each result to a card and drops rows that do
-// not resolve, so blank rows never reach the page or pagination counts.
-func buildScreenerDisplay(results []ScreenerResult, resolve func(uuid string) GenericCard) []screenerDisplay {
-	var out []screenerDisplay
-	for _, res := range results {
-		c := resolve(res.UUID)
-		if c.Name == "" {
-			continue
-		}
-		out = append(out, screenerDisplay{Row: res, Card: c})
-	}
-	return out
 }
 
 // Screener serves the price-movers screener page.
@@ -347,7 +344,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	}
 	pageVars.Screener = sv
 
-	rows, err := cachedMovers(r.Context(), metric, window)
+	rows, err := cachedMovers(r.Context(), metric, window, minPrice)
 	if err != nil {
 		pageVars.InfoMessage = "Screener data is temporarily unavailable, please try again shortly"
 		render(w, "screener.html", pageVars)
@@ -369,17 +366,16 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	pageVars.SortOption = sorting
 	pageVars.SortDir = dir
 
-	display := buildScreenerDisplay(results, func(uuid string) GenericCard {
-		return uuid2card(uuid, true, false, preferFlavor)
-	})
+	// Cached rows are pre-filtered to resolvable UUIDs, so resolve only the
+	// visible page rather than the whole filtered set.
+	var paged []ScreenerResult
+	paged, pageVars.Pagination = Paginate(results, pageIndex, DefaultPageSize, len(results))
+	sv.Rows = paged
 
-	var paged []screenerDisplay
-	paged, pageVars.Pagination = Paginate(display, pageIndex, DefaultPageSize, len(display))
-
-	for _, d := range paged {
-		sv.Rows = append(sv.Rows, d.Row)
-		pageVars.Cards = append(pageVars.Cards, d.Card)
-		pageVars.CardHashes = append(pageVars.CardHashes, d.Row.UUID)
+	for _, res := range paged {
+		c := uuid2card(res.UUID, true, false, preferFlavor)
+		pageVars.Cards = append(pageVars.Cards, c)
+		pageVars.CardHashes = append(pageVars.CardHashes, res.UUID)
 	}
 
 	if len(paged) == 0 {

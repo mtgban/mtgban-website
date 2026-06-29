@@ -17,9 +17,10 @@ type MoverRow struct {
 
 // GetMovers returns, for the price column matching datasetIndex, every card
 // present both in the latest daily snapshot and in the nearest snapshot on or
-// before windowDays ago, with both prices > 0. Dates are resolved first and
-// passed as literals so Postgres uses the fast index-equality plan.
-func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int) ([]MoverRow, error) {
+// before windowDays ago, with both prices > 0 and the current price >= minPrice.
+// Dates are resolved first and passed as literals so Postgres uses the fast
+// index-equality plan; the minPrice floor cuts the rows transferred and cached.
+func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int, minPrice float64) ([]MoverRow, error) {
 	column := columnForDataset(datasetIndex)
 	if column == "" {
 		return nil, fmt.Errorf("timeseries: unknown dataset index %d", datasetIndex)
@@ -52,7 +53,7 @@ func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int
 		WITH cur AS (
 			SELECT mtgjson_uuid, is_foil, is_etched, is_alt, %[1]s AS p
 			  FROM product_prices
-			 WHERE date = $1::date AND language = '' AND %[1]s > 0
+			 WHERE date = $1::date AND language = '' AND %[1]s > 0 AND %[1]s >= $3
 		),
 		old AS (
 			SELECT mtgjson_uuid, is_foil, is_etched, is_alt, %[1]s AS p
@@ -62,7 +63,7 @@ func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int
 		SELECT cur.mtgjson_uuid, cur.is_foil, cur.is_etched, cur.p, old.p
 		  FROM cur JOIN old USING (mtgjson_uuid, is_foil, is_etched, is_alt)`, column)
 
-	rows, err := c.db.QueryContext(ctx, q, latestStr, priorStr)
+	rows, err := c.db.QueryContext(ctx, q, latestStr, priorStr, minPrice)
 	if err != nil {
 		return nil, err
 	}
