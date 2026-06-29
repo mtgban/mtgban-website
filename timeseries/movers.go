@@ -6,7 +6,6 @@ import (
 	"fmt"
 )
 
-// MoverRow is one card's price now versus N days ago, for a single metric.
 type MoverRow struct {
 	MtgjsonUUID string
 	IsFoil      bool
@@ -15,18 +14,14 @@ type MoverRow struct {
 	Prior       float64
 }
 
-// GetMovers returns, for the price column matching datasetIndex, every card
-// present both in the latest daily snapshot and in the nearest snapshot on or
-// before windowDays ago, with both prices > 0 and the current price >= minPrice.
-// Dates are resolved first and passed as literals so Postgres uses the fast
-// index-equality plan; the minPrice floor cuts the rows transferred and cached.
 func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int, minPrice float64) ([]MoverRow, error) {
 	column := columnForDataset(datasetIndex)
 	if column == "" {
 		return nil, fmt.Errorf("timeseries: unknown dataset index %d", datasetIndex)
 	}
 
-	// Latest snapshot date.
+	// Resolve both dates first so the join can use literal-date index equality;
+	// folding the date lookups into the join degrades to a ~40x slower plan.
 	var latest sql.NullTime
 	if err := c.db.QueryRowContext(ctx, `SELECT max(date) FROM product_prices`).Scan(&latest); err != nil {
 		return nil, err
@@ -37,7 +32,6 @@ func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int
 	latestStr := latest.Time.Format("2006-01-02")
 	targetStr := latest.Time.AddDate(0, 0, -windowDays).Format("2006-01-02")
 
-	// Nearest snapshot on or before the target date.
 	var prior sql.NullTime
 	if err := c.db.QueryRowContext(ctx,
 		`SELECT max(date) FROM product_prices WHERE date <= $1::date`, targetStr).Scan(&prior); err != nil {
@@ -48,7 +42,7 @@ func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int
 	}
 	priorStr := prior.Time.Format("2006-01-02")
 
-	// column comes from columnForDataset (hard-coded), safe to interpolate.
+	// column is hard-coded via columnForDataset, safe to interpolate.
 	q := fmt.Sprintf(`
 		WITH cur AS (
 			SELECT mtgjson_uuid, is_foil, is_etched, is_alt, %[1]s AS p

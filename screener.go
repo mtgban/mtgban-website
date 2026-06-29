@@ -15,14 +15,12 @@ import (
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
-// ScreenerMetric is a selectable price metric (dataset index plus label).
 type ScreenerMetric struct {
 	Index int
 	Name  string
 }
 
-// screenerMetrics mirrors config.json timeseries_config.datasets. TCG Low first
-// so it is the default landing metric.
+// Order mirrors config.json datasets; TCG Low first as the default.
 var screenerMetrics = []ScreenerMetric{
 	{2, "TCGplayer Low"},
 	{3, "TCGplayer Market"},
@@ -36,7 +34,6 @@ var screenerMetrics = []ScreenerMetric{
 	{8, "Sealed EV (TCG Low)"},
 }
 
-// ScreenerWindow is a selectable lookback in days.
 type ScreenerWindow struct {
 	Days  int
 	Label string
@@ -68,7 +65,6 @@ func validWindow(days int) bool {
 	return false
 }
 
-// ScreenerResult is one display row.
 type ScreenerResult struct {
 	UUID      string
 	IsFoil    bool
@@ -79,7 +75,6 @@ type ScreenerResult struct {
 	AbsChange float64
 }
 
-// FieldValue returns a field as a string for sorting and template rendering.
 func (r ScreenerResult) FieldValue(name string) string {
 	switch name {
 	case "current":
@@ -95,18 +90,15 @@ func (r ScreenerResult) FieldValue(name string) string {
 	}
 }
 
-// screenerFilter holds the user-editable thresholds.
 type screenerFilter struct {
 	Metric   int
 	Window   int
 	Move     string  // up | down | either
-	MinPrice float64 // dollar floor on current price
+	MinPrice float64
 	MinPct   float64 // whole percent, e.g. 20
-	MaxPct   float64 // optional sanity cap in whole percent, 0 == off
+	MaxPct   float64 // whole percent, 0 == off
 }
 
-// filterScreenerRows computes change, applies the thresholds, and dedups by
-// (uuid, foil, etched). Rows with a non-positive prior price are skipped.
 func filterScreenerRows(rows []timeseries.MoverRow, f screenerFilter) []ScreenerResult {
 	type key struct {
 		uuid   string
@@ -166,7 +158,6 @@ func abs(f float64) float64 {
 	return f
 }
 
-// sortScreenerRows sorts in place by a ScreenerResult field name and direction.
 func sortScreenerRows(rows []ScreenerResult, field, dir string) {
 	if field == "" {
 		field = "pct"
@@ -200,23 +191,17 @@ func screenerCacheKey(metric, window int, minPrice float64) string {
 	return fmt.Sprintf("%d:%d:%.2f", metric, window, minPrice)
 }
 
-// screenerFetch is the source of raw movers; overridable in tests.
+// overridable in tests
 var screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
 	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice)
 }
 
-// screenerResolvable reports whether a UUID maps to a known card; overridable
-// in tests. Resolvability depends only on the static matcher datastore, so it
-// is computed once at cache-build time rather than per request.
+// Resolvability is static, so filter once at cache build, not per request; overridable in tests.
 var screenerResolvable = func(uuid string) bool {
 	_, err := mtgmatcher.GetUUID(uuid)
 	return err == nil
 }
 
-// cachedMovers returns the change-list for a metric, window, and dollar floor,
-// fetching on a cache miss or stale entry and evicting the oldest entry past
-// the cap. Unresolvable UUIDs are dropped here so the page handler can resolve
-// only the rows it displays.
 func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
 	key := screenerCacheKey(metric, window, minPrice)
 
@@ -256,7 +241,6 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]
 	return rows, nil
 }
 
-// ScreenerVars is the screener-specific template payload, hung off PageVars.
 type ScreenerVars struct {
 	Metrics   []ScreenerMetric
 	Windows   []ScreenerWindow
@@ -276,7 +260,6 @@ func atoiDefault(s string, def int) int {
 	return def
 }
 
-// Screener serves the price-movers screener page.
 func Screener(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
@@ -366,8 +349,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	pageVars.SortOption = sorting
 	pageVars.SortDir = dir
 
-	// Cached rows are pre-filtered to resolvable UUIDs, so resolve only the
-	// visible page rather than the whole filtered set.
+	// Cached rows are already resolvable, so resolve only the visible page.
 	var paged []ScreenerResult
 	paged, pageVars.Pagination = Paginate(results, pageIndex, DefaultPageSize, len(results))
 	sv.Rows = paged
