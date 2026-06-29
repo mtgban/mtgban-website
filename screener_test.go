@@ -142,7 +142,7 @@ func TestFilterScreenerRowsPriorFloor(t *testing.T) {
 		t.Errorf("only c was >= 70, got %v", got)
 	}
 
-	// Current and prior floors combine (AND): now>=50 keeps a,b; was>=0 keeps all.
+	// Floors combine with AND: no row has both now>=50 and was>=70.
 	both := uuidSet(filterScreenerRows(sampleMovers(), screenerFilter{Move: "either", MinPct: 0, MinPrice: 50, MinPriorPrice: 70}))
 	if len(both) != 0 {
 		// a,b have prior 50 (<70); c has current 40 (<50). No row satisfies both.
