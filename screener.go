@@ -193,8 +193,6 @@ type EditionFacet struct {
 	Count int
 }
 
-// Facets are computed before the edition filter is applied, so checking one
-// edition does not remove the others from the list.
 func screenerEditions(results []ScreenerResult) []EditionFacet {
 	counts := map[string]int{}
 	names := map[string]string{}
