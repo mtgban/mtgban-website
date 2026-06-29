@@ -468,9 +468,15 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	sv.Rows = paged
 
 	for _, res := range paged {
-		c := uuid2card(res.UUID, true, false, preferFlavor)
+		// The DB uuid is finish-agnostic; resolve the foil/etched variant so the
+		// card reflects the priced finish.
+		cardId, err := mtgmatcher.MatchId(res.UUID, res.IsFoil, res.IsEtched)
+		if err != nil {
+			cardId = res.UUID
+		}
+		c := uuid2card(cardId, true, false, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
-		pageVars.CardHashes = append(pageVars.CardHashes, res.UUID)
+		pageVars.CardHashes = append(pageVars.CardHashes, cardId)
 	}
 
 	if len(paged) == 0 {

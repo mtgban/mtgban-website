@@ -63,3 +63,28 @@
     opacity: 0.6;
     font-size: var(--text-sm, 0.85em);
 }
+
+.result-badge {
+    font-size: var(--text-xs, 0.7em);
+    padding: 0.1em 0.4em;
+    border-radius: var(--radius-sm, 0.35em);
+    font-weight: 600;
+    margin-left: 0.4em;
+    vertical-align: middle;
+}
+
+.result-badge.foil {
+    background: rgba(253, 239, 138, 0.15);
+    color: #fdef8a;
+    border: 1px solid rgba(253, 239, 138, 0.3);
+}
+
+.result-badge.etched {
+    background: linear-gradient(135deg, #a6dced, #c9b1ff);
+    color: #222;
+}
+
+.result-badge.altfoil {
+    background: linear-gradient(135deg, #ea8d66, #fdef8a, #8bcc93, #a6dced);
+    color: #222;
+}
