@@ -51,6 +51,20 @@
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    {{if .CanFixSearch}}
+    <script>
+        // Admin Fix mode: the per-result toggle shows a Fix link on each store
+        // and persists across page loads until clicked again. Applied in <head>
+        // so the links don't flash on/off as the page loads.
+        if (localStorage.getItem("adminFixMode") === "on") {
+            document.documentElement.classList.add("admin-fix-mode");
+        }
+        function toggleAdminFixMode() {
+            var on = document.documentElement.classList.toggle("admin-fix-mode");
+            localStorage.setItem("adminFixMode", on ? "on" : "off");
+        }
+    </script>
+    {{end}}
 {{end}}
 
 {{define "content"}}
@@ -653,6 +667,9 @@
                                 <div class="result-quick-icons">
                                     <button type="button" class="qi-toggle" title="More actions" aria-label="More actions" aria-expanded="false"><i data-lucide="ellipsis-vertical"></i></button>
                                     <div class="qi-actions">
+                                    {{if $.CanFixSearch}}
+                                        <span class="emoji" style="cursor: pointer;" title="Toggle Fix mode — show a Fix link on each store (admin)" onclick="toggleAdminFixMode()">&#128295;</span>
+                                    {{end}}
                                     {{if $card.Sealed}}
                                         {{if $card.Booster}}
                                             <a href='/search?q=unpack:"{{$card.Name}}"' title="Simulate opening a booster pack"><span class="emoji">&#127873;</span></a>
@@ -787,14 +804,19 @@
                                                                 <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
                                                             {{end}}
                                                         </span>
-                                                    {{else if eq .URL ""}}
-                                                        <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{else}}
-                                                        {{if .Badge}}
-                                                        <a class="store-name amzn-badge" href="{{.URL}}" target="_blank" rel="sponsored noopener" aria-label="Available at Amazon"></a>
+                                                        <span class="store-cell">
+                                                        {{if eq .URL ""}}
+                                                            <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                        {{else if .Badge}}
+                                                            <a class="store-name amzn-badge" href="{{.URL}}" target="_blank" rel="sponsored noopener" aria-label="Available at Amazon"></a>
                                                         {{else}}
-                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
+                                                            <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                         {{end}}
+                                                        {{if $.CanFixSearch}}
+                                                            <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=retail&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
+                                                        {{end}}
+                                                        </span>
                                                     {{end}}
                                                     {{if not .Locked}}
                                                         {{$priceWarn := false}}
@@ -858,10 +880,17 @@
                                                             <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
                                                         {{end}}
                                                     </span>
-                                                {{else if eq .URL ""}}
-                                                    <a class="store-name dim">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}</a>
                                                 {{else}}
-                                                    <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}</a>
+                                                    <span class="store-cell">
+                                                    {{if eq .URL ""}}
+                                                        <a class="store-name dim">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}</a>
+                                                    {{else}}
+                                                        <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}} {{.Country}}{{buylist_badge .Shorthand $card.HotlistStore}}</a>
+                                                    {{end}}
+                                                    {{if $.CanFixSearch}}
+                                                        <a class="store-fix" href="/admin?page=overrides&fixstore={{.Shorthand}}&fixkind=buylist&fixwrong={{$cardId}}" target="_blank" rel="noopener" title="Fix this card's match for {{.ScraperName}}">FIX</a>
+                                                    {{end}}
+                                                    </span>
                                                 {{end}}
                                                 {{if not .Locked}}
                                                 {{$blPriceWarn := false}}

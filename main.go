@@ -89,9 +89,16 @@ type PageVars struct {
 
 	PopularSearches []PopularSearch
 
-	CanShowAll       bool
-	CleanSearchQuery string
-	CheckpointsText  string
+	CanShowAll         bool
+	CleanSearchQuery   string
+	CheckpointsText    string
+	KeyOverridesText   string
+	OverrideStores     []string
+	OverrideFixStore   string
+	OverrideFixKind    string
+	OverrideWrongCard  *OverrideCard
+	OverrideCandidates []OverrideCard
+	CanFixSearch       bool
 
 	// Suggestions shown when a search returns no results
 	DidYouMean  string
@@ -919,6 +926,12 @@ func main() {
 		} else {
 			log.Fatalln("unable to load config file:", err)
 		}
+	}
+
+	// Load the per-seller UUID overrides applied when scrapers (re)load.
+	err = loadKeyOverrides()
+	if err != nil {
+		log.Println("unable to load key overrides:", err)
 	}
 
 	_, err = os.Stat(LogDir)

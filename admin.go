@@ -362,6 +362,76 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.CheckpointsText = cpText
 	}
 
+	// -- Key overrides: handle POST if submitted --
+	newOverrides := r.FormValue("keyOverridesTextArea")
+	if newOverrides != "" {
+		var parsed KeyOverrides
+		if err := json.Unmarshal([]byte(newOverrides), &parsed); err != nil {
+			pageVars.WarningMessage = "Key overrides JSON invalid: " + err.Error()
+		} else if bad := validateKeyOverrides(parsed); len(bad) > 0 {
+			pageVars.WarningMessage = "Key overrides have unknown target UUIDs: " + strings.Join(bad, "; ")
+		} else {
+			// Reload every shorthand touched by either the old or new set, so
+			// removed overrides revert and added ones apply right away.
+			affected := map[string]struct{}{}
+			for shorthand := range GetKeyOverrides() {
+				affected[shorthand] = struct{}{}
+			}
+			for shorthand := range parsed {
+				affected[shorthand] = struct{}{}
+			}
+			if err := saveKeyOverrides(parsed); err != nil {
+				pageVars.WarningMessage = "Key overrides save failed: " + err.Error()
+			} else {
+				reloadOverriddenScrapers(affected)
+				pageVars.InfoMessage = "Key overrides updated"
+				// Non-blocking: flag any chained remaps that slipped in.
+				if chains := detectOverrideChains(parsed); len(chains) > 0 {
+					pageVars.WarningMessage = "Chained overrides (ambiguous at load): " + strings.Join(chains, "; ")
+				}
+			}
+		}
+	}
+
+	// -- Key overrides: load editor text (keep submitted text on failure) --
+	if newOverrides != "" && pageVars.WarningMessage != "" {
+		pageVars.KeyOverridesText = newOverrides
+	} else if koText, err := currentKeyOverridesJSON(); err != nil {
+		if pageVars.InfoMessage == "" {
+			pageVars.InfoMessage = err.Error()
+		}
+	} else {
+		pageVars.KeyOverridesText = koText
+	}
+
+	// -- Key overrides: store list for the builder dropdown --
+	storeSet := map[string]struct{}{}
+	for _, s := range GetSellers() {
+		storeSet[s.Info().Shorthand] = struct{}{}
+	}
+	for _, v := range GetVendors() {
+		storeSet[v.Info().Shorthand] = struct{}{}
+	}
+	stores := make([]string, 0, len(storeSet))
+	for shorthand := range storeSet {
+		stores = append(stores, shorthand)
+	}
+	sort.Strings(stores)
+	pageVars.OverrideStores = stores
+
+	// -- Key overrides: pre-fill the builder from a search "Fix" link. Store,
+	// kind (retail/buylist) and the wrong card all come from the link; the wrong
+	// card and its same-name printings are resolved here from the in-memory card
+	// database and rendered straight into the page (no lookup endpoint). --
+	if wrong := r.FormValue("fixwrong"); wrong != "" {
+		if card, candidates := overrideFixCandidates(wrong); card != nil {
+			pageVars.OverrideFixStore = r.FormValue("fixstore")
+			pageVars.OverrideFixKind = r.FormValue("fixkind")
+			pageVars.OverrideWrongCard = card
+			pageVars.OverrideCandidates = candidates
+		}
+	}
+
 	// -- Dashboard: Retail Scrapers --
 	var sellerTable [][]string
 	for _, seller := range GetSellers() {

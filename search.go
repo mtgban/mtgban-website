@@ -90,6 +90,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.Nav = filterNavForMobile(pageVars.Nav)
 	}
 
+	// Admins get a per-result "Fix" toggle that surfaces a Fix link on every
+	// store, deep-linking into the overrides builder.
+	canAdmin, _ := strconv.ParseBool(GetParamFromSig(sig, "Admin"))
+	pageVars.CanFixSearch = canAdmin || (DevMode && !SigCheck)
+
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
 	query := strings.TrimSpace(r.FormValue("q"))

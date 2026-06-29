@@ -44,6 +44,7 @@
         <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="switchTab(this,'people')">People</button>
         <button class="admin-tab{{if eq .Page "config"}} active{{end}}" onclick="switchTab(this,'config')">Config</button>
         <button class="admin-tab{{if eq .Page "checkpoints"}} active{{end}}" onclick="switchTab(this,'checkpoints')">Checkpoints</button>
+        <button class="admin-tab{{if eq .Page "overrides"}} active{{end}}" onclick="switchTab(this,'overrides')">Key Overrides</button>
         <button class="admin-tab{{if eq .Page "tools"}} active{{end}}" onclick="switchTab(this,'tools')">Tools</button>
     </div>
 
@@ -193,7 +194,7 @@
     </div>
 
     <!-- CodeMirror — shared by Config and Checkpoints editors -->
-    {{if or .CleanSearchQuery .CheckpointsText}}
+    {{if or .CleanSearchQuery .CheckpointsText .KeyOverridesText}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css" integrity="sha512-uf06llspW44/LZpHzHT6qBOIVODjWtv4MxCricRxkzvopAlSWnTf6hpZTFxuuZcuNE9CBQhqE0Seu1CoRk84nQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/dracula.min.css" integrity="sha512-gFMl3u9d0xt3WR8ZeW05MWm3yZ+ZfgsBVXLSOiFz2xeVrZ8Neg0+V1kkRIo9LikyA/T9HuS91kDfc2XWse0K0A==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js" integrity="sha512-6cPYokihlrofMNApz7OXVQNObWjLiKGIBBb7+UB+AuMiRCLKmFKgrwms21sHq3bdFFZWpfHYRJBJvMFMPj1S9g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -214,7 +215,7 @@
                 <div class="config-actions">
                     <button class="cfg-btn cfg-format" onclick="formatEditorByName('config')">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
-                    <button class="cfg-btn cfg-primary" onclick="document.getElementById('configForm').requestSubmit()">Update</button>
+                    <button class="cfg-btn cfg-primary" data-update-for="config" onclick="document.getElementById('configForm').requestSubmit()">Update</button>
                 </div>
             </div>
             <form id="configForm" action="/admin?page=config" method="post">
@@ -237,12 +238,80 @@
                 <div class="config-actions">
                     <button class="cfg-btn cfg-format" onclick="formatEditorByName('checkpoints')">Format JSON</button>
                     <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
-                    <button class="cfg-btn cfg-primary" onclick="document.getElementById('checkpointsForm').requestSubmit()">Update</button>
+                    <button class="cfg-btn cfg-primary" data-update-for="checkpoints" onclick="document.getElementById('checkpointsForm').requestSubmit()">Update</button>
                 </div>
             </div>
             <form id="checkpointsForm" action="/admin?page=checkpoints" method="post">
                 <textarea id="checkpointsTextArea" name="checkpointsTextArea" style="display:none;">{{.CheckpointsText}}</textarea>
                 <div id="checkpointsEditor"></div>
+            </form>
+        </div>
+        {{end}}
+    </div>
+
+    <!-- ═══════════════════════
+         KEY OVERRIDES
+         ═══════════════════════ -->
+    <div class="admin-panel{{if eq .Page "overrides"}} active{{end}}" id="panel-overrides">
+        {{if .KeyOverridesText}}
+        <div class="admin-config-wrap">
+            <div class="admin-config-header">
+                <h2>Key Overrides Editor</h2>
+                <span class="warn-tag">B2-backed</span>
+                <div class="config-actions">
+                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('overrides')">Format JSON</button>
+                    <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
+                    <button class="cfg-btn cfg-primary" data-update-for="overrides" onclick="document.getElementById('overridesForm').requestSubmit()">Update</button>
+                </div>
+            </div>
+            <p class="admin-hint">Per-store UUID remaps applied when a scraper (re)loads, split by section: <code>{"SELLER": {"retail": {"wrong-uuid": "correct-uuid"}, "buylist": {…}}}</code>. Use <code>""</code> as the target to drop a listing. Saving validates the target UUIDs and reloads the affected sellers. Open the builder from a <strong>Fix</strong> link on a search result.</p>
+            {{if .OverrideWrongCard}}
+            <div class="uuid-builder">
+                <div class="uuid-builder-row">
+                    <div class="uuid-field uuid-field-store">
+                        <label>Store</label>
+                        <select id="ovrStore" class="uuid-store">
+                            <option value="" disabled {{if not .OverrideFixStore}}selected{{end}}>Store…</option>
+                            {{range .OverrideStores}}<option value="{{.}}"{{if eq . $.OverrideFixStore}} selected{{end}}>{{.}}</option>{{end}}
+                        </select>
+                    </div>
+                    <div class="uuid-field uuid-field-store">
+                        <label>Section</label>
+                        {{$kind := or .OverrideFixKind "retail"}}
+                        <input type="hidden" id="ovrKind" value="{{$kind}}">
+                        <span class="uuid-kind-badge {{$kind}}">{{if eq $kind "buylist"}}Buylist{{else}}Retail{{end}}</span>
+                    </div>
+                    <div class="uuid-field">
+                        <label>Wrong card (current match)</label>
+                        <div class="uuid-selected">
+                            <div class="uuid-result" id="ovrWrong" data-uuid="{{.OverrideWrongCard.UUID}}">
+                                {{if .OverrideWrongCard.Image}}<img class="uuid-thumb" src="{{.OverrideWrongCard.Image}}" alt="">{{end}}
+                                <div class="uuid-result-text"><code>{{.OverrideWrongCard.UUID}}</code><span>{{.OverrideWrongCard.Label}}</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="uuid-field">
+                    <label>Correct card — pick the right printing</label>
+                    {{if .OverrideCandidates}}
+                    <ul class="uuid-candidates" id="ovrCandidates">
+                        {{range .OverrideCandidates}}
+                        <li class="uuid-result" data-uuid="{{.UUID}}" title="Click to select">
+                            {{if .Image}}<img class="uuid-thumb" src="{{.Image}}" alt="">{{end}}
+                            <div class="uuid-result-text"><code>{{.UUID}}</code><span>{{.Label}}</span></div>
+                        </li>
+                        {{end}}
+                    </ul>
+                    {{else}}
+                    <p class="admin-hint">No other printings share this card's name — edit the JSON below directly to set a cross-name target.</p>
+                    {{end}}
+                </div>
+                <button type="button" id="ovrAdd" class="cfg-btn cfg-primary uuid-add">Add to overrides</button>
+            </div>
+            {{end}}
+            <form id="overridesForm" action="/admin?page=overrides" method="post">
+                <textarea id="keyOverridesTextArea" name="keyOverridesTextArea" style="display:none;">{{.KeyOverridesText}}</textarea>
+                <div id="overridesEditor"></div>
             </form>
         </div>
         {{end}}
@@ -390,8 +459,23 @@ function initJSONEditor(opts) {
     });
     editor.setSize("100%", "600px");
 
+    // Dirty tracking: enable the matching Update button only when the editor
+    // differs from the last-saved baseline, and feed the unsaved-changes guard.
+    var baseline = editor.getValue();
+    var updateBtn = opts.name ? document.querySelector('[data-update-for="' + opts.name + '"]') : null;
+    function refreshDirty() {
+        editor.__dirty = editor.getValue() !== baseline;
+        if (updateBtn) updateBtn.disabled = !editor.__dirty;
+    }
+    editor.on("change", refreshDirty);
+    refreshDirty();
+
     form.addEventListener("submit", function() {
         textarea.value = editor.getValue();
+        // Submitting saves this editor; clear its dirty flag so the
+        // beforeunload guard does not fire on the resulting reload.
+        baseline = editor.getValue();
+        editor.__dirty = false;
     });
 
     new MutationObserver(function() {
@@ -401,6 +485,19 @@ function initJSONEditor(opts) {
 
     return editor;
 }
+
+// Warn before leaving the page (navigation, refresh, close) when any editor
+// has unsaved changes. Applies to every JSON editor on the page.
+window.addEventListener("beforeunload", function(e) {
+    var dirty = Object.keys(window.__jsonEditors).some(function(k) {
+        var ed = window.__jsonEditors[k];
+        return ed && ed.__dirty;
+    });
+    if (dirty) {
+        e.preventDefault();
+        e.returnValue = "";
+    }
+});
 
 // Render UTC timestamps in the browser's local time; click toggles to UTC.
 (function() {
@@ -457,14 +554,84 @@ function initJSONEditor(opts) {
 })();
 </script>
 
-{{if or .CleanSearchQuery .CheckpointsText}}
+{{if or .CleanSearchQuery .CheckpointsText .KeyOverridesText}}
 <script>
 (function() {
-    var cfg = initJSONEditor({ textareaId: "textArea", editorId: "configEditor", formId: "configForm" });
+    var cfg = initJSONEditor({ name: "config", textareaId: "textArea", editorId: "configEditor", formId: "configForm" });
     if (cfg) window.__jsonEditors["config"] = cfg;
 
-    var ckpt = initJSONEditor({ textareaId: "checkpointsTextArea", editorId: "checkpointsEditor", formId: "checkpointsForm" });
+    var ckpt = initJSONEditor({ name: "checkpoints", textareaId: "checkpointsTextArea", editorId: "checkpointsEditor", formId: "checkpointsForm" });
     if (ckpt) window.__jsonEditors["checkpoints"] = ckpt;
+
+    var ovr = initJSONEditor({ name: "overrides", textareaId: "keyOverridesTextArea", editorId: "overridesEditor", formId: "overridesForm" });
+    if (ovr) window.__jsonEditors["overrides"] = ovr;
+
+    // Key Overrides builder: store, section (retail/buylist), the wrong card and
+    // the candidate printings are all rendered server-side from the search Fix
+    // link. Here we track which correct printing is clicked and merge the entry
+    // into the JSON editor under store → kind — no card-search endpoint involved.
+    var storeSel = document.getElementById("ovrStore");
+    var kindEl = document.getElementById("ovrKind");
+    var addBtn = document.getElementById("ovrAdd");
+    var wrongEl = document.getElementById("ovrWrong");
+    var candidates = document.getElementById("ovrCandidates");
+    if (storeSel && kindEl && addBtn && wrongEl && candidates) {
+        var selected = null;
+        // Enable Add only once both a store and a printing are chosen, so the
+        // requirement is visible instead of surfacing as an easily-missed alert.
+        function updateAddState() {
+            addBtn.disabled = !(storeSel.value && selected);
+            addBtn.title = addBtn.disabled ? "Pick a store and a printing first" : "";
+        }
+        candidates.querySelectorAll(".uuid-result").forEach(function(li) {
+            li.addEventListener("click", function() {
+                if (selected) selected.classList.remove("selected");
+                selected = li;
+                li.classList.add("selected");
+                updateAddState();
+            });
+        });
+        storeSel.addEventListener("change", updateAddState);
+        updateAddState();
+
+        addBtn.addEventListener("click", function() {
+            var store = storeSel.value;
+            if (!store) { alert("Pick a store first."); return; }
+            if (!selected) { alert("Pick the correct printing."); return; }
+            var kind = kindEl.value || "retail";
+            var wrongUuid = wrongEl.getAttribute("data-uuid");
+            var correctUuid = selected.getAttribute("data-uuid");
+            var editor = window.__jsonEditors["overrides"];
+            if (!editor) return;
+            var obj;
+            try { obj = JSON.parse(editor.getValue() || "{}"); }
+            catch (e) { alert("The JSON is currently invalid; fix it before adding."); return; }
+            if (typeof obj !== "object" || obj === null || Array.isArray(obj)) obj = {};
+            if (typeof obj[store] !== "object" || obj[store] === null || Array.isArray(obj[store])) obj[store] = {};
+            if (typeof obj[store][kind] !== "object" || obj[store][kind] === null || Array.isArray(obj[store][kind])) obj[store][kind] = {};
+            var kindMap = obj[store][kind];
+            // Warn on chains within this store+section: the wrong card is already
+            // a target (X → wrong), or the correct card is itself remapped
+            // (correct → Y). Both are ambiguous when applied at load.
+            var chain = null;
+            if (Object.prototype.hasOwnProperty.call(kindMap, correctUuid)) {
+                chain = "the correct card " + correctUuid + " is itself remapped (→ " + kindMap[correctUuid] + ") in " + store + "/" + kind;
+            } else {
+                for (var k in kindMap) {
+                    if (kindMap[k] === wrongUuid) {
+                        chain = "the wrong card " + wrongUuid + " is already the target of " + k + " → " + wrongUuid + " in " + store + "/" + kind;
+                        break;
+                    }
+                }
+            }
+            if (chain && !confirm("Chained override: " + chain + ".\nThis is ambiguous at load. Add anyway?")) return;
+            kindMap[wrongUuid] = correctUuid;
+            editor.setValue(JSON.stringify(obj, null, 4));
+            // Persist immediately: submitting saves to B2 (validating targets)
+            // and reloads the affected scrapers, then reloads this page.
+            document.getElementById("overridesForm").requestSubmit();
+        });
+    }
 })();
 </script>
 {{end}}

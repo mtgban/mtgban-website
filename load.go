@@ -185,7 +185,7 @@ func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, f
 }
 
 func updateSellers(scraper mtgban.Scraper) {
-	seller := scraper.(mtgban.Seller)
+	seller := applyInventoryOverrides(scraper.(mtgban.Seller))
 
 	scrapersWriteMu.Lock()
 	defer scrapersWriteMu.Unlock()
@@ -245,7 +245,7 @@ func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]m
 }
 
 func updateVendors(scraper mtgban.Scraper) {
-	vendor := scraper.(mtgban.Vendor)
+	vendor := applyBuylistOverrides(scraper.(mtgban.Vendor))
 
 	scrapersWriteMu.Lock()
 	defer scrapersWriteMu.Unlock()
