@@ -69,6 +69,8 @@ type ScreenerResult struct {
 	UUID      string
 	IsFoil    bool
 	IsEtched  bool
+	SetCode   string
+	Edition   string
 	Current   float64
 	Prior     float64
 	PctChange float64 // fraction: 0.20 == +20%
@@ -93,8 +95,8 @@ func (r ScreenerResult) FieldValue(name string) string {
 type screenerFilter struct {
 	Metric   int
 	Window   int
-	Kind     string  // singles | sealed | both
-	Move     string  // up | down | either
+	Kind     string // singles | sealed | both
+	Move     string // up | down | either
 	MinPrice float64
 	MinPct   float64 // whole percent, e.g. 20
 	MaxPct   float64 // whole percent, 0 == off
@@ -153,6 +155,8 @@ func filterScreenerRows(rows []screenerRow, f screenerFilter) []ScreenerResult {
 			UUID:      row.MtgjsonUUID,
 			IsFoil:    row.IsFoil,
 			IsEtched:  row.IsEtched,
+			SetCode:   row.SetCode,
+			Edition:   row.Edition,
 			Current:   row.Current,
 			Prior:     row.Prior,
 			PctChange: pct,
@@ -183,9 +187,70 @@ func sortScreenerRows(rows []ScreenerResult, field, dir string) {
 	})
 }
 
+type EditionFacet struct {
+	Code  string
+	Name  string
+	Count int
+}
+
+// Facets are computed before the edition filter is applied, so checking one
+// edition does not remove the others from the list.
+func screenerEditions(results []ScreenerResult) []EditionFacet {
+	counts := map[string]int{}
+	names := map[string]string{}
+	var order []string
+	for _, r := range results {
+		if r.SetCode == "" {
+			continue
+		}
+		if _, ok := counts[r.SetCode]; !ok {
+			order = append(order, r.SetCode)
+			names[r.SetCode] = r.Edition
+		}
+		counts[r.SetCode]++
+	}
+	facets := make([]EditionFacet, 0, len(order))
+	for _, code := range order {
+		facets = append(facets, EditionFacet{Code: code, Name: names[code], Count: counts[code]})
+	}
+	sort.SliceStable(facets, func(i, j int) bool {
+		if facets[i].Count != facets[j].Count {
+			return facets[i].Count > facets[j].Count
+		}
+		return facets[i].Name < facets[j].Name
+	})
+	return facets
+}
+
+func filterByEditions(results []ScreenerResult, selected map[string]bool) []ScreenerResult {
+	if len(selected) == 0 {
+		return results
+	}
+	var out []ScreenerResult
+	for _, r := range results {
+		if selected[r.SetCode] {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+var screenerPageSizes = []int{25, 50, 100}
+
+func validPageSize(n int) int {
+	for _, s := range screenerPageSizes {
+		if s == n {
+			return n
+		}
+	}
+	return 25
+}
+
 type screenerRow struct {
 	timeseries.MoverRow
-	Sealed bool
+	Sealed  bool
+	SetCode string
+	Edition string
 }
 
 type screenerCacheEntry struct {
@@ -212,13 +277,19 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice float
 	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice)
 }
 
+type screenerMeta struct {
+	Sealed  bool
+	SetCode string
+	Edition string
+}
+
 // Classification is static, so resolve once at cache build, not per request; overridable in tests.
-var screenerClassify = func(uuid string) (sealed, ok bool) {
+var screenerClassify = func(uuid string) (screenerMeta, bool) {
 	co, err := mtgmatcher.GetUUID(uuid)
 	if err != nil {
-		return false, false
+		return screenerMeta{}, false
 	}
-	return co.Sealed, true
+	return screenerMeta{Sealed: co.Sealed, SetCode: co.SetCode, Edition: co.Edition}, true
 }
 
 func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]screenerRow, error) {
@@ -237,8 +308,8 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]
 	}
 	rows := make([]screenerRow, 0, len(raw))
 	for _, row := range raw {
-		if sealed, ok := screenerClassify(row.MtgjsonUUID); ok {
-			rows = append(rows, screenerRow{MoverRow: row, Sealed: sealed})
+		if meta, ok := screenerClassify(row.MtgjsonUUID); ok {
+			rows = append(rows, screenerRow{MoverRow: row, Sealed: meta.Sealed, SetCode: meta.SetCode, Edition: meta.Edition})
 		}
 	}
 
@@ -261,16 +332,21 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]
 }
 
 type ScreenerVars struct {
-	Metrics   []ScreenerMetric
-	Windows   []ScreenerWindow
-	SelMetric int
-	SelWindow int
-	SelKind   string
-	Move      string
-	MinPrice  float64
-	MinPct    float64
-	MaxPct    float64
-	Rows      []ScreenerResult
+	Metrics       []ScreenerMetric
+	Windows       []ScreenerWindow
+	SelMetric     int
+	SelWindow     int
+	SelKind       string
+	Move          string
+	MinPrice      float64
+	MinPct        float64
+	MaxPct        float64
+	Editions      []EditionFacet
+	SelEditions   []string
+	SelEditionSet map[string]bool
+	PageSizes     []int
+	SelSize       int
+	Rows          []ScreenerResult
 }
 
 func atoiDefault(s string, def int) int {
@@ -326,6 +402,12 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	minPrice, _ := strconv.ParseFloat(r.FormValue("min_price"), 64)
 	minPct, _ := strconv.ParseFloat(r.FormValue("min_pct"), 64)
 	maxPct, _ := strconv.ParseFloat(r.FormValue("max_pct"), 64)
+	size := validPageSize(atoiDefault(r.FormValue("size"), 25))
+	selEditions := r.Form["edition"]
+	editionSet := map[string]bool{}
+	for _, code := range selEditions {
+		editionSet[code] = true
+	}
 	sorting := r.FormValue("sort")
 	dir := r.FormValue("dir")
 	pageIndex, _ := strconv.Atoi(r.FormValue("index"))
@@ -340,15 +422,19 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
 	sv := &ScreenerVars{
-		Metrics:   screenerMetrics,
-		Windows:   screenerWindows,
-		SelMetric: metric,
-		SelWindow: window,
-		SelKind:   kind,
-		Move:      move,
-		MinPrice:  minPrice,
-		MinPct:    minPct,
-		MaxPct:    maxPct,
+		Metrics:       screenerMetrics,
+		Windows:       screenerWindows,
+		SelMetric:     metric,
+		SelWindow:     window,
+		SelKind:       kind,
+		Move:          move,
+		MinPrice:      minPrice,
+		MinPct:        minPct,
+		MaxPct:        maxPct,
+		SelEditions:   selEditions,
+		SelEditionSet: editionSet,
+		PageSizes:     screenerPageSizes,
+		SelSize:       size,
 	}
 	pageVars.Screener = sv
 
@@ -364,6 +450,10 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 		MinPrice: minPrice, MinPct: minPct, MaxPct: maxPct,
 	})
 
+	// Facet the edition list before narrowing, then apply the edition filter.
+	sv.Editions = screenerEditions(results)
+	results = filterByEditions(results, editionSet)
+
 	if sorting == "" {
 		sorting = "pct"
 		if dir == "" {
@@ -376,7 +466,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 
 	// Cached rows are already resolvable, so resolve only the visible page.
 	var paged []ScreenerResult
-	paged, pageVars.Pagination = Paginate(results, pageIndex, DefaultPageSize, len(results))
+	paged, pageVars.Pagination = Paginate(results, pageIndex, size, len(results))
 	sv.Rows = paged
 
 	for _, res := range paged {

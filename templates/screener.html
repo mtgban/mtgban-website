@@ -84,6 +84,34 @@
                     <input type="text" name="min_pct" {{if .MinPct}}value="{{.MinPct}}"{{end}} placeholder="Min %">
                     <input type="text" name="max_pct" {{if .MaxPct}}value="{{.MaxPct}}"{{end}} placeholder="Max %">
                 </div>
+                <span class="toolbar-sep"></span>
+
+                {{if .Editions}}
+                <div class="news-fg">
+                    <details class="screener-editions">
+                        <summary>Editions{{if .SelEditions}} ({{len .SelEditions}}){{end}}</summary>
+                        <div class="screener-editions-menu">
+                            {{range .Editions}}
+                                <label class="screener-edition-item">
+                                    <input type="checkbox" name="edition" value="{{.Code}}" {{if index $.Screener.SelEditionSet .Code}}checked{{end}} onchange="this.form.submit()">
+                                    <span class="screener-edition-name">{{.Name}}</span>
+                                    <span class="screener-edition-count">{{.Count}}</span>
+                                </label>
+                            {{end}}
+                        </div>
+                    </details>
+                </div>
+                <span class="toolbar-sep"></span>
+                {{end}}
+
+                <div class="news-fg">
+                    <span class="news-fl">Per page</span>
+                    <select name="size" onchange="this.form.submit()">
+                        {{range .PageSizes}}
+                            <option value="{{.}}" {{if eq . $.Screener.SelSize}}selected{{end}}>{{.}}</option>
+                        {{end}}
+                    </select>
+                </div>
 
                 <input type="submit" value="Apply" class="screener-apply">
             </div>
@@ -127,12 +155,12 @@
 
             <div class="news-pagination">
                 {{if ne .CurrentIndex 1}}
-                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
+                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
                 {{end}}
                 <span class="cur">{{.CurrentIndex}}</span>
                 <span class="pg-info">/ {{.TotalIndex}}</span>
                 {{if ne .CurrentIndex .TotalIndex}}
-                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
+                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
                 {{end}}
             </div>
 
@@ -154,7 +182,7 @@
 {{define "screener-sort"}}
     {{$s := .Vars.Screener}}
     <span class="sort-links">
-        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&sort={{.Field}}&dir=desc">&#9660;</a>
-        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&sort={{.Field}}&dir=asc">&#9650;</a>
+        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=desc">&#9660;</a>
+        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&size={{$s.SelSize}}{{range $s.SelEditions}}&edition={{.}}{{end}}&sort={{.Field}}&dir=asc">&#9650;</a>
     </span>
 {{end}}

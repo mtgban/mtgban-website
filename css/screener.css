@@ -16,3 +16,50 @@
     padding: 0 1em;
     height: 2em;
 }
+
+.screener-editions {
+    position: relative;
+    display: inline-block;
+}
+
+.screener-editions > summary {
+    cursor: pointer;
+    height: 2em;
+    line-height: 2em;
+    padding: 0 0.75em;
+    border: 1px solid var(--border, #444);
+    border-radius: 0.25em;
+    user-select: none;
+}
+
+.screener-editions-menu {
+    position: absolute;
+    z-index: 20;
+    margin-top: 0.25em;
+    max-height: 50vh;
+    overflow-y: auto;
+    min-width: 16em;
+    padding: 0.5em;
+    background: var(--background, #1c1c1c);
+    border: 1px solid var(--border, #444);
+    border-radius: 0.25em;
+    box-shadow: 0 0.25em 1em rgba(0, 0, 0, 0.4);
+}
+
+.screener-edition-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.2em 0.3em;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.screener-edition-name {
+    flex: 1;
+}
+
+.screener-edition-count {
+    opacity: 0.6;
+    font-size: var(--text-sm, 0.85em);
+}

@@ -105,6 +105,44 @@ func TestFilterScreenerRowsKind(t *testing.T) {
 	}
 }
 
+func TestScreenerEditionsAndFilter(t *testing.T) {
+	results := []ScreenerResult{
+		{UUID: "a", SetCode: "STX", Edition: "Strixhaven"},
+		{UUID: "b", SetCode: "STX", Edition: "Strixhaven"},
+		{UUID: "c", SetCode: "NEO", Edition: "Kamigawa"},
+		{UUID: "d", SetCode: "", Edition: ""},
+	}
+	facets := screenerEditions(results)
+	if len(facets) != 2 {
+		t.Fatalf("expected 2 editions (blank skipped), got %d", len(facets))
+	}
+	if facets[0].Code != "STX" || facets[0].Count != 2 {
+		t.Errorf("expected STX count 2 first, got %+v", facets[0])
+	}
+	if facets[1].Code != "NEO" || facets[1].Count != 1 {
+		t.Errorf("expected NEO count 1 second, got %+v", facets[1])
+	}
+
+	if got := filterByEditions(results, nil); len(got) != 4 {
+		t.Errorf("nil selection should keep all, got %d", len(got))
+	}
+	got := filterByEditions(results, map[string]bool{"NEO": true})
+	if len(got) != 1 || got[0].SetCode != "NEO" {
+		t.Errorf("expected only NEO row, got %v", got)
+	}
+}
+
+func TestValidPageSize(t *testing.T) {
+	for _, n := range []int{25, 50, 100} {
+		if validPageSize(n) != n {
+			t.Errorf("validPageSize(%d) should be %d", n, n)
+		}
+	}
+	if validPageSize(0) != 25 || validPageSize(37) != 25 || validPageSize(1000) != 25 {
+		t.Error("invalid sizes should fall back to 25")
+	}
+}
+
 func TestSortScreenerRows(t *testing.T) {
 	rows := []ScreenerResult{
 		{UUID: "a", PctChange: 1.0},
@@ -168,14 +206,14 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 			{MtgjsonUUID: "good1"}, {MtgjsonUUID: "bad"}, {MtgjsonUUID: "box"},
 		}, nil
 	}
-	screenerClassify = func(uuid string) (bool, bool) {
+	screenerClassify = func(uuid string) (screenerMeta, bool) {
 		switch uuid {
 		case "bad":
-			return false, false
+			return screenerMeta{}, false
 		case "box":
-			return true, true
+			return screenerMeta{Sealed: true, SetCode: "BOX", Edition: "Box Set"}, true
 		default:
-			return false, true
+			return screenerMeta{SetCode: "STX", Edition: "Strixhaven"}, true
 		}
 	}
 
@@ -211,7 +249,7 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCache = map[string]screenerCacheEntry{}
 	screenerCacheMu.Unlock()
 
-	screenerClassify = func(uuid string) (bool, bool) { return false, true }
+	screenerClassify = func(uuid string) (screenerMeta, bool) { return screenerMeta{}, true }
 	screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
 		calls[screenerCacheKey(metric, window, minPrice)]++
 		return []timeseries.MoverRow{{MtgjsonUUID: "x"}}, nil
