@@ -93,13 +93,14 @@ func (r ScreenerResult) FieldValue(name string) string {
 type screenerFilter struct {
 	Metric   int
 	Window   int
+	Kind     string  // singles | sealed | both
 	Move     string  // up | down | either
 	MinPrice float64
 	MinPct   float64 // whole percent, e.g. 20
 	MaxPct   float64 // whole percent, 0 == off
 }
 
-func filterScreenerRows(rows []timeseries.MoverRow, f screenerFilter) []ScreenerResult {
+func filterScreenerRows(rows []screenerRow, f screenerFilter) []ScreenerResult {
 	type key struct {
 		uuid   string
 		foil   bool
@@ -108,6 +109,16 @@ func filterScreenerRows(rows []timeseries.MoverRow, f screenerFilter) []Screener
 	seen := map[key]bool{}
 	var out []ScreenerResult
 	for _, row := range rows {
+		switch f.Kind {
+		case "sealed":
+			if !row.Sealed {
+				continue
+			}
+		case "singles":
+			if row.Sealed {
+				continue
+			}
+		}
 		if row.Prior <= 0 || row.Current <= 0 {
 			continue
 		}
@@ -172,8 +183,13 @@ func sortScreenerRows(rows []ScreenerResult, field, dir string) {
 	})
 }
 
+type screenerRow struct {
+	timeseries.MoverRow
+	Sealed bool
+}
+
 type screenerCacheEntry struct {
-	rows    []timeseries.MoverRow
+	rows    []screenerRow
 	fetched time.Time
 }
 
@@ -196,13 +212,16 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice float
 	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice)
 }
 
-// Resolvability is static, so filter once at cache build, not per request; overridable in tests.
-var screenerResolvable = func(uuid string) bool {
-	_, err := mtgmatcher.GetUUID(uuid)
-	return err == nil
+// Classification is static, so resolve once at cache build, not per request; overridable in tests.
+var screenerClassify = func(uuid string) (sealed, ok bool) {
+	co, err := mtgmatcher.GetUUID(uuid)
+	if err != nil {
+		return false, false
+	}
+	return co.Sealed, true
 }
 
-func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
+func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]screenerRow, error) {
 	key := screenerCacheKey(metric, window, minPrice)
 
 	screenerCacheMu.Lock()
@@ -216,10 +235,10 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice float64) ([]
 	if err != nil {
 		return nil, err
 	}
-	rows := make([]timeseries.MoverRow, 0, len(raw))
+	rows := make([]screenerRow, 0, len(raw))
 	for _, row := range raw {
-		if screenerResolvable(row.MtgjsonUUID) {
-			rows = append(rows, row)
+		if sealed, ok := screenerClassify(row.MtgjsonUUID); ok {
+			rows = append(rows, screenerRow{MoverRow: row, Sealed: sealed})
 		}
 	}
 
@@ -246,6 +265,7 @@ type ScreenerVars struct {
 	Windows   []ScreenerWindow
 	SelMetric int
 	SelWindow int
+	SelKind   string
 	Move      string
 	MinPrice  float64
 	MinPct    float64
@@ -299,6 +319,10 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	if move != "up" && move != "down" && move != "either" {
 		move = "up"
 	}
+	kind := r.FormValue("kind")
+	if kind != "sealed" && kind != "both" {
+		kind = "singles"
+	}
 	minPrice, _ := strconv.ParseFloat(r.FormValue("min_price"), 64)
 	minPct, _ := strconv.ParseFloat(r.FormValue("min_pct"), 64)
 	maxPct, _ := strconv.ParseFloat(r.FormValue("max_pct"), 64)
@@ -320,6 +344,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 		Windows:   screenerWindows,
 		SelMetric: metric,
 		SelWindow: window,
+		SelKind:   kind,
 		Move:      move,
 		MinPrice:  minPrice,
 		MinPct:    minPct,
@@ -335,7 +360,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	}
 
 	results := filterScreenerRows(rows, screenerFilter{
-		Metric: metric, Window: window, Move: move,
+		Metric: metric, Window: window, Kind: kind, Move: move,
 		MinPrice: minPrice, MinPct: minPct, MaxPct: maxPct,
 	})
 

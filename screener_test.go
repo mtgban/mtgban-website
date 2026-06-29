@@ -7,12 +7,12 @@ import (
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
-func sampleMovers() []timeseries.MoverRow {
-	return []timeseries.MoverRow{
-		{MtgjsonUUID: "a", Current: 100, Prior: 50},  // +100%
-		{MtgjsonUUID: "b", Current: 60, Prior: 50},   // +20%
-		{MtgjsonUUID: "c", Current: 40, Prior: 80},   // -50%
-		{MtgjsonUUID: "d", Current: 3, Prior: 1},      // +200% but below $5 floor
+func sampleMovers() []screenerRow {
+	return []screenerRow{
+		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "a", Current: 100, Prior: 50}}, // +100%
+		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "b", Current: 60, Prior: 50}},  // +20%
+		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "c", Current: 40, Prior: 80}},  // -50%
+		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "d", Current: 3, Prior: 1}},    // +200% but below $5 floor
 	}
 }
 
@@ -62,7 +62,7 @@ func TestFilterScreenerRowsEitherAndMaxPct(t *testing.T) {
 }
 
 func TestFilterScreenerRowsComputesChange(t *testing.T) {
-	got := filterScreenerRows([]timeseries.MoverRow{{MtgjsonUUID: "a", Current: 60, Prior: 50}}, screenerFilter{Move: "up", MinPct: 0})
+	got := filterScreenerRows([]screenerRow{{MoverRow: timeseries.MoverRow{MtgjsonUUID: "a", Current: 60, Prior: 50}}}, screenerFilter{Move: "up", MinPct: 0})
 	if len(got) != 1 {
 		t.Fatalf("expected 1 row, got %d", len(got))
 	}
@@ -76,13 +76,32 @@ func TestFilterScreenerRowsComputesChange(t *testing.T) {
 
 func TestFilterScreenerRowsDedup(t *testing.T) {
 	// Same (uuid, foil, etched) twice (e.g. is_alt variants): keep one.
-	rows := []timeseries.MoverRow{
-		{MtgjsonUUID: "a", Current: 100, Prior: 50},
-		{MtgjsonUUID: "a", Current: 100, Prior: 50},
+	rows := []screenerRow{
+		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "a", Current: 100, Prior: 50}},
+		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "a", Current: 100, Prior: 50}},
 	}
 	got := filterScreenerRows(rows, screenerFilter{Move: "up", MinPct: 0})
 	if len(got) != 1 {
 		t.Errorf("expected dedup to 1 row, got %d", len(got))
+	}
+}
+
+func TestFilterScreenerRowsKind(t *testing.T) {
+	rows := []screenerRow{
+		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "single", Current: 100, Prior: 50}, Sealed: false},
+		{MoverRow: timeseries.MoverRow{MtgjsonUUID: "box", Current: 100, Prior: 50}, Sealed: true},
+	}
+	singles := uuidSet(filterScreenerRows(rows, screenerFilter{Kind: "singles", Move: "up", MinPct: 0}))
+	if !singles["single"] || singles["box"] {
+		t.Errorf("singles should keep only the single, got %v", singles)
+	}
+	sealed := uuidSet(filterScreenerRows(rows, screenerFilter{Kind: "sealed", Move: "up", MinPct: 0}))
+	if !sealed["box"] || sealed["single"] {
+		t.Errorf("sealed should keep only the box, got %v", sealed)
+	}
+	both := uuidSet(filterScreenerRows(rows, screenerFilter{Kind: "both", Move: "up", MinPct: 0}))
+	if !both["single"] || !both["box"] {
+		t.Errorf("both should keep all, got %v", both)
 	}
 }
 
@@ -132,10 +151,10 @@ func TestValidMetricAndWindow(t *testing.T) {
 
 func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 	prevFetch := screenerFetch
-	prevResolvable := screenerResolvable
+	prevClassify := screenerClassify
 	t.Cleanup(func() {
 		screenerFetch = prevFetch
-		screenerResolvable = prevResolvable
+		screenerClassify = prevClassify
 		screenerCacheMu.Lock()
 		screenerCache = map[string]screenerCacheEntry{}
 		screenerCacheMu.Unlock()
@@ -146,10 +165,19 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 
 	screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
 		return []timeseries.MoverRow{
-			{MtgjsonUUID: "good1"}, {MtgjsonUUID: "bad"}, {MtgjsonUUID: "good2"},
+			{MtgjsonUUID: "good1"}, {MtgjsonUUID: "bad"}, {MtgjsonUUID: "box"},
 		}, nil
 	}
-	screenerResolvable = func(uuid string) bool { return uuid != "bad" }
+	screenerClassify = func(uuid string) (bool, bool) {
+		switch uuid {
+		case "bad":
+			return false, false
+		case "box":
+			return true, true
+		default:
+			return false, true
+		}
+	}
 
 	rows, err := cachedMovers(context.Background(), 2, 30, 5)
 	if err != nil {
@@ -162,16 +190,19 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 		if r.MtgjsonUUID == "bad" {
 			t.Errorf("unresolvable UUID not filtered: %s", r.MtgjsonUUID)
 		}
+		if r.MtgjsonUUID == "box" && !r.Sealed {
+			t.Errorf("box should be flagged sealed")
+		}
 	}
 }
 
 func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	calls := map[string]int{}
 	prevFetch := screenerFetch
-	prevResolvable := screenerResolvable
+	prevClassify := screenerClassify
 	t.Cleanup(func() {
 		screenerFetch = prevFetch
-		screenerResolvable = prevResolvable
+		screenerClassify = prevClassify
 		screenerCacheMu.Lock()
 		screenerCache = map[string]screenerCacheEntry{}
 		screenerCacheMu.Unlock()
@@ -180,7 +211,7 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCache = map[string]screenerCacheEntry{}
 	screenerCacheMu.Unlock()
 
-	screenerResolvable = func(uuid string) bool { return true }
+	screenerClassify = func(uuid string) (bool, bool) { return false, true }
 	screenerFetch = func(ctx context.Context, metric, window int, minPrice float64) ([]timeseries.MoverRow, error) {
 		calls[screenerCacheKey(metric, window, minPrice)]++
 		return []timeseries.MoverRow{{MtgjsonUUID: "x"}}, nil

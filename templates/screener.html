@@ -54,6 +54,16 @@
                 <span class="toolbar-sep"></span>
 
                 <div class="news-fg">
+                    <span class="news-fl">Type</span>
+                    <select name="kind" onchange="this.form.submit()">
+                        <option value="singles" {{if eq .SelKind "singles"}}selected{{end}}>Singles</option>
+                        <option value="sealed" {{if eq .SelKind "sealed"}}selected{{end}}>Sealed</option>
+                        <option value="both" {{if eq .SelKind "both"}}selected{{end}}>Both</option>
+                    </select>
+                </div>
+                <span class="toolbar-sep"></span>
+
+                <div class="news-fg">
                     <span class="news-fl">Move</span>
                     <select name="move" onchange="this.form.submit()">
                         <option value="up" {{if eq .Move "up"}}selected{{end}}>Up</option>
@@ -117,12 +127,12 @@
 
             <div class="news-pagination">
                 {{if ne .CurrentIndex 1}}
-                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
+                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.PrevIndex}}">&lt;</a>
                 {{end}}
                 <span class="cur">{{.CurrentIndex}}</span>
                 <span class="pg-info">/ {{.TotalIndex}}</span>
                 {{if ne .CurrentIndex .TotalIndex}}
-                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
+                    <a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&sort={{.SortOption}}&dir={{.SortDir}}&index={{.NextIndex}}">&gt;</a>
                 {{end}}
             </div>
 
@@ -144,7 +154,7 @@
 {{define "screener-sort"}}
     {{$s := .Vars.Screener}}
     <span class="sort-links">
-        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&sort={{.Field}}&dir=desc">&#9660;</a>
-        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&sort={{.Field}}&dir=asc">&#9650;</a>
+        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&sort={{.Field}}&dir=desc">&#9660;</a>
+        <a href="/screener?metric={{$s.SelMetric}}&window={{$s.SelWindow}}&kind={{$s.SelKind}}&move={{$s.Move}}&min_price={{$s.MinPrice}}&min_pct={{$s.MinPct}}&max_pct={{$s.MaxPct}}&sort={{.Field}}&dir=asc">&#9650;</a>
     </span>
 {{end}}
