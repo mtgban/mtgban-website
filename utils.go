@@ -77,6 +77,8 @@ type GenericCard struct {
 	CKRestockURL      string
 	SourceSealed      []string
 	HotlistStore      string
+	GoodBuylist       float64
+	HighestBuylist    float64
 	Newspaper         bool
 	HasContentWarning bool
 	CropURL           string
@@ -598,6 +600,8 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	if found {
 		hotlistStore = "CK"
 	}
+	goodBuylist := getGoodBuylistPrice(cardId)
+	highestBuylist := getHighestBuylistPrice(cardId)
 
 	return GenericCard{
 		UUID:         co.UUID,
@@ -637,6 +641,8 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		CKRestockURL:      restockURL,
 		SourceSealed:      sourceSealed,
 		HotlistStore:      hotlistStore,
+		GoodBuylist:       goodBuylist,
+		HighestBuylist:    highestBuylist,
 		Newspaper:         newspaper,
 		HasContentWarning: co.Card.HasContentWarning,
 		CropURL:           cropURL,

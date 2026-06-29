@@ -150,6 +150,14 @@ var funcMap = template.FuncMap{
 	"tcg_market_price": func(s string) float64 {
 		return getTCGMarketPrice(s)
 	},
+	// buylist_badge renders Card Kingdom's 3-month hotlist star next to the store
+	// name when the store is the card's hotlist store, otherwise "".
+	"buylist_badge": func(shorthand, hotlistStore string) template.HTML {
+		if shorthand == hotlistStore {
+			return template.HTML(` <span class="emoji" title="Highest price in 3 months">&#127775;</span>`)
+		}
+		return ""
+	},
 	"base64enc": func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))
 	},
