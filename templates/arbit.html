@@ -364,7 +364,9 @@
                 <thead>
                 <tr>
                     <th><a href="javascript:sortBy('alpha', '{{.Name}}')">Card</a> / <a href="javascript:sortBy('edition', '{{.Name}}')">Edition</a></th>
-                    <th class="c"></th>
+                    {{if not $.GlobalMode}}
+                        <th>INFO</th>
+                    {{end}}
                     {{if not .HasNoConds}}
                         <th class="c">Cond</th>
                     {{end}}
@@ -425,14 +427,14 @@
                                 {{end}}
                                 <span class="card-name-line">
                                     <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
-                                    {{if eq $.ScraperShort $card.HotlistStore}}
-                                        <span class="emoji" title="Highest price in 3 months">🌟</span>
-                                    {{end}}
+                                    {{buylist_badge $.ScraperShort $card.HotlistStore}}
                                 </span>
                                 <span class="card-edition">{{$card.Edition}}{{if not $sealedSource}} · #{{$card.Number}}{{end}}{{if $card.Sealed}} · <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>{{else if $card.HasDeck}} · Decklist{{else if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}</span>
                             </div>
                         </td>
-                        <td></td>
+                        {{if not $.GlobalMode}}
+                            <td>{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true}}</td>
+                        {{end}}
                         {{if not $save.HasNoConds}}
                             <td>
                                 {{.InventoryEntry.Conditions}}

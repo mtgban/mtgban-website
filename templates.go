@@ -158,6 +158,29 @@ var funcMap = template.FuncMap{
 		}
 		return ""
 	},
+	// buylist_detail renders a card's precomputed Card Kingdom "Good" (P90) and
+	// "Highest" (90-day) buylist prices (passed in) as small, labeled prices for a
+	// dedicated column — the badge emoji itself lives next to the card name (see
+	// buylist_badge). With always=false it returns "" unless the entry carries a
+	// badge (store is the hotlist store, or the offer meets good); with always=true
+	// it shows the prices whenever they exist.
+	"buylist_detail": func(shorthand, hotlistStore string, price, good, highest float64, always bool) template.HTML {
+		hasBadge := shorthand == hotlistStore || (good > 0 && price >= good)
+		if !hasBadge && !always {
+			return ""
+		}
+		prices := ""
+		if good > 0 {
+			prices += fmt.Sprintf(`<span title="Card Kingdom's latest P90">Good: $ %.2f</span>`, good)
+		}
+		if highest > 0 {
+			prices += fmt.Sprintf(`<span title="90-day high">Highest: $ %.2f</span>`, highest)
+		}
+		if prices == "" {
+			return ""
+		}
+		return template.HTML(fmt.Sprintf(`<span class="bl-prices">%s</span>`, prices))
+	},
 	"base64enc": func(s string) string {
 		return base64.StdEncoding.EncodeToString([]byte(s))
 	},
