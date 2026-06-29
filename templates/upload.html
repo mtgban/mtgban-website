@@ -1144,6 +1144,7 @@
                         <thead><tr>
                             <th>Card</th>
                             <th>Set</th>
+                            <th data-sort-method="none">INFO</th>
                             <th class="c">Offer</th>
                             <th class="c">Loaded</th>
                             <th>Spread</th>
@@ -1152,18 +1153,19 @@
                         <tbody>
                         {{range $entries}}
                             {{$card := (index $.Metadata .CardId)}}
+                            {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
+                            {{$price := (index $scraperEntries $scraperKey)}}
                             <tr data-opt-id="{{.CardId}}" data-opt-qty="{{.Quantity}}" data-opt-cond="{{.Condition}}" data-opt-name="{{(index $.Metadata .CardId).Name}}" data-opt-ckid="{{uuid2ckid .CardId}}" onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                                 <td class="opt-name">
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
-                                    <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                    <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{buylist_badge $scraperKey $card.HotlistStore}}
                                     {{if not (or (eq .Condition "") (eq .Condition "NM"))}} ({{.Condition}}){{end}}
                                 </td>
                                 <td class="opt-set">
                                     <i class="ss {{$card.Keyrune}} ss-1x ss-fw"></i> {{$card.SetCode}} #{{$card.Number}}{{if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}
                                 </td>
-                                {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
-                                {{$price := (index $scraperEntries $scraperKey)}}
-                                <td class="opt-offer"><span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardId}}" target="_blank">{{printf "%.2f" $price}}</a></span><span class="opt-icons">{{if eq $scraperKey $card.HotlistStore}}<span class="emoji" title="Highest buylist price in 3 months">&#127775;</span>{{end}}</span></td>
+                                <td>{{buylist_detail $scraperKey $card.HotlistStore $price $card.GoodBuylist $card.HighestBuylist true}}</td>
+                                <td class="opt-offer"><span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardId}}" target="_blank">{{printf "%.2f" $price}}</a></span></td>
                                 <td class="opt-loaded"><span class="loaded-wrap">{{if .Price}}<span class="loaded">$ <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}<span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
                                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}">
                                     {{if .Price}}

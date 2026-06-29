@@ -171,7 +171,17 @@ var funcMap = template.FuncMap{
 		}
 		prices := ""
 		if good > 0 {
-			prices += fmt.Sprintf(`<span title="Card Kingdom's latest P90">Good: $ %.2f</span>`, good)
+			// In always-show (optimizer) mode, tint Good by how the offer compares
+			// to it: green well above the latest P90, red well below.
+			goodClass := ""
+			if always {
+				if price > good*1.10 {
+					goodClass = ` class="bl-good-high"`
+				} else if price < good*0.80 {
+					goodClass = ` class="bl-good-low"`
+				}
+			}
+			prices += fmt.Sprintf(`<span%s title="Card Kingdom's latest P90">Good: $ %.2f</span>`, goodClass, good)
 		}
 		if highest > 0 {
 			prices += fmt.Sprintf(`<span title="90-day high">Highest: $ %.2f</span>`, highest)

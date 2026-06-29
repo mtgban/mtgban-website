@@ -899,6 +899,9 @@ span.emoji {
     text-align: left;
     white-space: nowrap;
 }
+/* Optimizer: tint Good by how the row's offer compares to the P90 (reusing search's price colors). */
+.bl-prices .bl-good-high { color: var(--asuccess); }
+.bl-prices .bl-good-low { color: var(--adanger); }
 
 table.tiers {
     margin: 10px;
