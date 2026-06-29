@@ -1,0 +1,18 @@
+/* Screener-specific filter controls. Table styling is inherited from news.css. */
+
+.screener-filter-bar select,
+.screener-filter-bar input[type="text"] {
+    height: 2em;
+    font-size: var(--text-md);
+}
+
+.screener-filter-bar input[type="text"] {
+    width: 6em;
+    text-align: center;
+}
+
+.screener-apply {
+    margin-left: 0.5em;
+    padding: 0 1em;
+    height: 2em;
+}

@@ -1,0 +1,151 @@
+{{define "extra-css"}}
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="/css/news.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/screener.css?hash={{.Hash}}">
+{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+{{end}}
+
+{{define "title"}}{{.Title}}{{end}}
+
+{{define "content"}}
+{{if .ErrorMessage}}
+    <div class="news-wrap"><div class="page-compact"><h1>{{.Title}}</h1><p>{{.ErrorMessage}}</p></div></div>
+{{else}}
+<div class="news-wrap">
+    <div id="hoverWrap" class="foil-wrap hoverWrap">
+        <img id="hoverImage" class="hoverImage" src=""/>
+    </div>
+    <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
+
+    <div class="page-wide news-data">
+        <div class="page-header news-data-header">
+            <div>
+                <h1>Price Movers Screener</h1>
+                <p class="page-subtitle">{{.InfoMessage}}</p>
+            </div>
+        </div>
+
+        {{with .Screener}}
+        <form action="/screener" method="GET">
+            <input type="hidden" name="sort" value="{{$.SortOption}}">
+            <input type="hidden" name="dir" value="{{$.SortDir}}">
+            <div class="news-filter-bar screener-filter-bar">
+                <div class="news-fg">
+                    <span class="news-fl">Metric</span>
+                    <select name="metric" onchange="this.form.submit()">
+                        {{range .Metrics}}
+                            <option value="{{.Index}}" {{if eq .Index $.Screener.SelMetric}}selected{{end}}>{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <span class="toolbar-sep"></span>
+
+                <div class="news-fg">
+                    <span class="news-fl">Window</span>
+                    <select name="window" onchange="this.form.submit()">
+                        {{range .Windows}}
+                            <option value="{{.Days}}" {{if eq .Days $.Screener.SelWindow}}selected{{end}}>{{.Label}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <span class="toolbar-sep"></span>
+
+                <div class="news-fg">
+                    <span class="news-fl">Move</span>
+                    <select name="move" onchange="this.form.submit()">
+                        <option value="up" {{if eq .Move "up"}}selected{{end}}>Up</option>
+                        <option value="down" {{if eq .Move "down"}}selected{{end}}>Down</option>
+                        <option value="either" {{if eq .Move "either"}}selected{{end}}>Either</option>
+                    </select>
+                </div>
+                <span class="toolbar-sep"></span>
+
+                <div class="news-fg">
+                    <span class="news-fl">Price</span>
+                    <input type="text" name="min_price" {{if .MinPrice}}value="{{.MinPrice}}"{{end}} placeholder="Min $">
+                </div>
+                <span class="toolbar-sep"></span>
+
+                <div class="news-fg">
+                    <span class="news-fl">Change</span>
+                    <input type="text" name="min_pct" {{if .MinPct}}value="{{.MinPct}}"{{end}} placeholder="Min %">
+                    <input type="text" name="max_pct" {{if .MaxPct}}value="{{.MaxPct}}"{{end}} placeholder="Max %">
+                </div>
+
+                <input type="submit" value="Apply" class="screener-apply">
+            </div>
+        </form>
+        {{end}}
+
+        <div class="news-table-wrap">
+            <table class="table-data news-table" id="screenerTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
+                <thead>
+                    <tr>
+                        <th class="news-th-card">Card</th>
+                        <th class="r">Current {{template "screener-sort" (dict "Field" "current" "Vars" $)}}</th>
+                        <th class="r">Was {{template "screener-sort" (dict "Field" "prior" "Vars" $)}}</th>
+                        <th class="r">% Change {{template "screener-sort" (dict "Field" "pct" "Vars" $)}}</th>
+                        <th class="r">$ Change {{template "screener-sort" (dict "Field" "abs" "Vars" $)}}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range $j, $row := .Screener.Rows}}
+                        {{$card := (index $.Cards $j)}}
+                        <tr onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                            <td class="news-td-card">
+                                <div class="news-cc">
+                                    {{if $card.Keyrune}}
+                                        <i class="ss {{$card.Keyrune}} ss-1x ss-fw set-icon"></i>
+                                    {{end}}
+                                    <div class="card-detail">
+                                        <span class="card-name"><a href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}" lang="{{$card.LangTag}}">{{$card.Name}}</a></span>
+                                        <span class="set-sub">{{$card.Edition}} &bull; #{{$card.Number}}{{if $card.FinishTag}} &bull; {{$card.FinishTag}}{{end}}</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="news-num">{{print_price ($row.FieldValue "current")}}</td>
+                            <td class="news-num">{{print_price ($row.FieldValue "prior")}}</td>
+                            <td class="news-num"><span class="news-perc {{perc_class ($row.FieldValue "pct")}}">{{print_perc ($row.FieldValue "pct")}}</span></td>
+                            <td class="news-num">{{print_price ($row.FieldValue "abs")}}</td>
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>
+
+            <div class="news-pagination">
+                {{$q := printf "metric=%d&window=%d&move=%s&min_price=%v&min_pct=%v&max_pct=%v&sort=%s&dir=%s" .Screener.SelMetric .Screener.SelWindow .Screener.Move .Screener.MinPrice .Screener.MinPct .Screener.MaxPct .SortOption .SortDir}}
+                {{if ne .CurrentIndex 1}}
+                    <a href="/screener?{{$q}}&index={{.PrevIndex}}">&lt;</a>
+                {{end}}
+                <span class="cur">{{.CurrentIndex}}</span>
+                <span class="pg-info">/ {{.TotalIndex}}</span>
+                {{if ne .CurrentIndex .TotalIndex}}
+                    <a href="/screener?{{$q}}&index={{.NextIndex}}">&gt;</a>
+                {{end}}
+            </div>
+
+            <div class="news-upload-row">
+                <form action="/upload" method="post">
+                    <input type="hidden" name="mode" value="false"/>
+                    {{range .CardHashes}}
+                        <input type="hidden" name="hashes" value="{{.}}"/>
+                    {{end}}
+                    <button type="submit" class="news-upload-btn">Load this page in the Uploader</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+{{end}}
+
+{{define "screener-sort"}}
+    {{$q := printf "metric=%d&window=%d&move=%s&min_price=%v&min_pct=%v&max_pct=%v" .Vars.Screener.SelMetric .Vars.Screener.SelWindow .Vars.Screener.Move .Vars.Screener.MinPrice .Vars.Screener.MinPct .Vars.Screener.MaxPct}}
+    <span class="sort-links">
+        <a href="/screener?{{$q}}&sort={{.Field}}&dir=desc">&#9660;</a>
+        <a href="/screener?{{$q}}&sort={{.Field}}&dir=asc">&#9650;</a>
+    </span>
+{{end}}
