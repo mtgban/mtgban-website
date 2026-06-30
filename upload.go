@@ -1174,6 +1174,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Assign the resulting optimized data to the page variables
 	if len(optimizedResults) > 0 {
+		// When prices are ignored, the loaded price IS the alternate source, so
+		// it can be linked directly; otherwise it's the user's uploaded price
+		// and only a separate symbol should link out to the alternate source.
+		pageVars.IgnorePrices = skipPrices
 		pageVars.Optimized = optimizedResults
 		pageVars.OptimizedTotals = optimizedTotals
 		pageVars.HighestTotal = highestTotal

@@ -1210,6 +1210,10 @@
 .opt-offer .offer { display: inline-block; min-width: 5em; text-align: right; color: var(--asuccess); }
 .opt-loaded .loaded-wrap { display: inline-block; text-align: right; }
 .opt-loaded .loaded { display: inline-block; min-width: 5em; text-align: right; color: var(--activetext); }
+/* When prices aren't ignored the loaded value is the uploaded price (not a
+   linkable page); this small symbol still opens the alternate source. */
+.opt-loaded .opt-altlink { margin-left: 4px; font-size: var(--text-xs); text-decoration: none; opacity: 0.6; }
+.opt-loaded .opt-altlink:hover { opacity: 1; }
 .opt-offer .opt-icons,
 .opt-loaded .opt-icons { display: inline-block; width: 2em; text-align: left; padding-left: 6px; }
 .opt-spread { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-base); font-weight: 600; text-align: right; white-space: nowrap; }

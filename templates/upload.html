@@ -1166,7 +1166,7 @@
                                 </td>
                                 <td>{{buylist_detail $scraperKey $card.HotlistStore $price $card.GoodBuylist $card.HighestBuylist true}}</td>
                                 <td class="opt-offer"><span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardId}}" target="_blank">{{printf "%.2f" $price}}</a></span></td>
-                                <td class="opt-loaded"><span class="loaded-wrap">{{if .Price}}<span class="loaded">$ <a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a></span>{{end}}<span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
+                                <td class="opt-loaded"><span class="loaded-wrap">{{if .Price}}<span class="loaded">$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}{{printf "%.2f" .Price}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}</span>{{end}}<span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
                                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}">
                                     {{if .Price}}
                                         {{printf "%.2f" .Spread}}%
