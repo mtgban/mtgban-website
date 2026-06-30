@@ -68,15 +68,19 @@
     table-layout: fixed;
 }
 #screenerTable th {
-    width: 15%;
+    width: 16%;
 }
 #screenerTable th.news-th-card {
-    width: 40%;
+    width: 36%;
 }
 
-/* Right-align dollar columns with tabular figures so decimal points line up. */
-#screenerTable .screener-dollar {
+/* All numeric columns right-align uniformly so headers sit over values. */
+#screenerTable .screener-dollar,
+#screenerTable .screener-pct {
     text-align: right;
+    padding-right: 1.6em;
+}
+#screenerTable .screener-dollar {
     font-variant-numeric: tabular-nums;
 }
 
