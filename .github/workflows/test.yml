@@ -12,6 +12,12 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # MTGJSON AllPrintings is public, so the URL is inlined here. It used to
+      # come from the org-level vars.DATASTORE_MAGIC, but GitHub does not expose
+      # variables to pull_request runs from forks (it resolved empty, leaving an
+      # empty curl URL and failing every fork PR).
+      DATASTORE_URL: https://mtgjson.com/api/v5/AllPrintings.json.xz
     steps:
       - uses: actions/checkout@v6
 
@@ -24,8 +30,8 @@ jobs:
       - name: Compute datastore cache key
         id: ds
         run: |
-          etag=$(curl -sI "${{ vars.DATASTORE_MAGIC }}" | grep -i etag | tr -d '\r"' | cut -f 2 -d " ")
-          base=$(basename "${{ vars.DATASTORE_MAGIC }}" | cut -d? -f1)
+          etag=$(curl -sI "$DATASTORE_URL" | grep -i etag | tr -d '\r"' | cut -f 2 -d " ")
+          base=$(basename "$DATASTORE_URL" | cut -d? -f1)
           echo "key=$base-$etag" >> "$GITHUB_OUTPUT"
           echo "filepath=datastore/$base" >> "$GITHUB_OUTPUT"
 
@@ -40,7 +46,7 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p datastore/
-          curl -L "${{ vars.DATASTORE_MAGIC }}" -o "${{ steps.ds.outputs.filepath }}"
+          curl -L "$DATASTORE_URL" -o "${{ steps.ds.outputs.filepath }}"
 
       - name: Decompress datastore
         run: xz -dc "${{ steps.ds.outputs.filepath }}" > allprintings5.json
