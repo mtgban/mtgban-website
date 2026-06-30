@@ -463,7 +463,7 @@
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price">$ {{printf "%.2f" $entry.Price}}</span>
+                                            <span class="m-vendor-price{{if and (ne $entry.Shorthand "SYP") (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
                                             <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                             <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
@@ -497,7 +497,7 @@
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price">$ {{printf "%.2f" $entry.Price}}</span>
+                                        <span class="m-vendor-price{{if and (ne $entry.Shorthand "SYP") (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
                                         <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                     </span>
                                 </div>

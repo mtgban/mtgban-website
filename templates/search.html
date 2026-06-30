@@ -842,7 +842,7 @@
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
                                                 {{$aboveP90 := false}}
-                                                {{if and (ne .Shorthand "SYP") (gt $card.GoodBuylist 0.0) (gt .Price $card.GoodBuylist)}}{{$aboveP90 = true}}{{end}}
+                                                {{if and (ne .Shorthand "SYP") (gt $card.GoodBuylist 0.0) (ge .Price $card.GoodBuylist)}}{{$aboveP90 = true}}{{end}}
                                                 <span class="price-right has-buylist-extra">
                                                 <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if $aboveP90}} price-best{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if gt $card.GoodBuylist 0.0}}title="Card Kingdom P90 $ {{printf "%.2f" $card.GoodBuylist}}{{if gt $card.HighestBuylist 0.0}}; 90-day high $ {{printf "%.2f" $card.HighestBuylist}}{{end}}"{{end}}>
                                                     {{if ne .Shorthand "SYP"}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>

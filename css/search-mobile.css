@@ -547,6 +547,11 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Buylist offer at or above Card Kingdom's P90 (mirrors desktop .price-best) */
+.m-vendor-price.m-price-best {
+    color: var(--asuccess);
+}
+
 /* Official "Available at Amazon" badge shown in the INDEX price slot.
    Two theme variants are swapped via the .dark-theme class. */
 .m-vendor-price .amzn-badge {
