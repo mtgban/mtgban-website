@@ -1153,6 +1153,33 @@
 }
 .opt-table th:hover { color: var(--activetext); }
 .opt-table th[aria-sort] { color: var(--ainfo); }
+
+/* Sort-direction arrows. The shared arrow (main.css) floats at the top of
+   the header, where it gets hidden under the sticky .opt-store-header these
+   sticky columns tuck beneath while scrolling. Render it as an absolutely-
+   positioned, vertically-centered glyph (clear of that overlap) that turns
+   accent-coloured on the active column. */
+.opt-table th:not([data-sort-method='none']) { padding-right: 22px; }
+.opt-table th:not([data-sort-method='none'])::after {
+    content: '';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    margin: -3px 0 0;
+    float: none;
+    border-style: solid;
+    border-width: 0 5px 6px;
+    border-color: var(--normal) transparent;
+    opacity: 0.35;
+}
+.opt-table th[aria-sort=ascending]:not([data-sort-method='none'])::after {
+    border-width: 6px 5px 0;
+}
+.opt-table th[aria-sort]:not([data-sort-method='none'])::after {
+    opacity: 0.9;
+    border-color: var(--ainfo) transparent;
+}
+
 .opt-table th:nth-child(1) { width: 34%; }
 .opt-table th:nth-child(2) { width: 14%; }
 .opt-table th:nth-child(3) { width: 11%; }
