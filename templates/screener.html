@@ -114,7 +114,10 @@
                     </select>
                 </div>
 
-                <input type="submit" value="Apply" class="screener-apply">
+                <div class="screener-actions">
+                    <a href="/screener" class="screener-reset" title="Reset filters" aria-label="Reset filters"><i data-lucide="rotate-ccw"></i></a>
+                    <input type="submit" value="Apply" class="screener-apply">
+                </div>
             </div>
         </form>
         {{end}}
@@ -134,9 +137,10 @@
             var form = document.querySelector('form[action="/screener"]');
             if (form) form.addEventListener('submit', show);
             document.addEventListener('click', function (e) {
-                var a = e.target.closest && e.target.closest('a[href^="/screener?"]');
+                var a = e.target.closest && e.target.closest('a[href^="/screener"]');
                 if (a) show();
             });
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
         })();
         </script>
 

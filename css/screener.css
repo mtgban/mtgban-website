@@ -1,8 +1,9 @@
 /* Editions dropdown and Apply button; other controls inherit news.css. */
 
-/* Match the editions summary and apply button to the shared news-filter-bar pills. */
+/* Match the editions summary, reset, and apply controls to the shared pills. */
 .screener-editions > summary,
-.screener-apply {
+.screener-apply,
+.screener-reset {
     padding: 6px 10px;
     border-radius: 5px;
     border: 1px solid var(--border-moderate);
@@ -13,7 +14,49 @@
     transition: border-color 0.12s;
 }
 .screener-editions > summary:hover,
-.screener-apply:hover { border-color: var(--ainfo); }
+.screener-apply:hover,
+.screener-reset:hover { border-color: var(--ainfo); }
+
+/* Compact the bar so all controls plus the right-aligned actions fit one row. */
+.screener-filter-bar {
+    gap: 5px;
+}
+.screener-filter-bar .news-fg {
+    gap: 4px;
+}
+.screener-filter-bar .news-fl {
+    padding-right: 0;
+    letter-spacing: 0.03em;
+}
+.screener-filter-bar input[type="text"] {
+    width: 50px;
+}
+.screener-filter-bar select {
+    padding: 6px 8px;
+}
+.screener-editions > summary,
+.screener-apply,
+.screener-reset {
+    padding: 6px 9px;
+}
+
+/* Push the reset/apply pair to the right edge of the filter bar. */
+.screener-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+.screener-reset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: var(--text-dim);
+}
+.screener-reset:hover { color: var(--normal); }
+.screener-reset i { width: 1.1em; height: 1.1em; }
+.screener-reset svg { width: 1.1em; height: 1.1em; display: block; }
 
 .screener-editions {
     position: relative;
