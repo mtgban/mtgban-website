@@ -162,7 +162,7 @@
                                     {{end}}
                                     <div class="card-detail">
                                         <div class="screener-name-row">
-                                            <a class="card-name" href="search?q={{$card.Name}} s:{{$card.SetCode}} cn:{{$card.Number}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
+                                            <a class="card-name" href="{{$card.SearchURL}}" lang="{{$card.LangTag}}">{{$card.Name}}</a>
                                             {{if $card.FinishTag}}<span class="result-badge {{$card.FinishClass}}">{{$card.FinishTag}}</span>{{end}}
                                         </div>
                                         <span class="set-sub">{{$card.Edition}} &bull; #{{$card.Number}}</span>
