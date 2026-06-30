@@ -35,7 +35,7 @@
             <div class="news-filter-bar screener-filter-bar">
                 <div class="news-fg">
                     <span class="news-fl">Metric</span>
-                    <select name="metric" onchange="this.form.submit()">
+                    <select name="metric" onchange="screenerGo(this.form)">
                         {{range .Metrics}}
                             <option value="{{.Index}}" {{if eq .Index $.Screener.SelMetric}}selected{{end}}>{{.Name}}</option>
                         {{end}}
@@ -45,7 +45,7 @@
 
                 <div class="news-fg">
                     <span class="news-fl">Window</span>
-                    <select name="window" onchange="this.form.submit()">
+                    <select name="window" onchange="screenerGo(this.form)">
                         {{range .Windows}}
                             <option value="{{.Days}}" {{if eq .Days $.Screener.SelWindow}}selected{{end}}>{{.Label}}</option>
                         {{end}}
@@ -55,7 +55,7 @@
 
                 <div class="news-fg">
                     <span class="news-fl">Type</span>
-                    <select name="kind" onchange="this.form.submit()">
+                    <select name="kind" onchange="screenerGo(this.form)">
                         <option value="singles" {{if eq .SelKind "singles"}}selected{{end}}>Singles</option>
                         <option value="sealed" {{if eq .SelKind "sealed"}}selected{{end}}>Sealed</option>
                         <option value="both" {{if eq .SelKind "both"}}selected{{end}}>Both</option>
@@ -65,7 +65,7 @@
 
                 <div class="news-fg">
                     <span class="news-fl">Move</span>
-                    <select name="move" onchange="this.form.submit()">
+                    <select name="move" onchange="screenerGo(this.form)">
                         <option value="up" {{if eq .Move "up"}}selected{{end}}>Up</option>
                         <option value="down" {{if eq .Move "down"}}selected{{end}}>Down</option>
                         <option value="either" {{if eq .Move "either"}}selected{{end}}>Either</option>
@@ -107,7 +107,7 @@
 
                 <div class="news-fg">
                     <span class="news-fl">Per page</span>
-                    <select name="size" onchange="this.form.submit()">
+                    <select name="size" onchange="screenerGo(this.form)">
                         {{range .PageSizes}}
                             <option value="{{.}}" {{if eq . $.Screener.SelSize}}selected{{end}}>{{.}}</option>
                         {{end}}
@@ -118,6 +118,27 @@
             </div>
         </form>
         {{end}}
+
+        <div id="screenerLoading" class="screener-loading-overlay"><div class="screener-spinner"></div></div>
+        <script>
+        function screenerGo(form) {
+            var o = document.getElementById('screenerLoading');
+            if (o) o.classList.add('active');
+            if (form.requestSubmit) form.requestSubmit(); else form.submit();
+        }
+        (function () {
+            var show = function () {
+                var o = document.getElementById('screenerLoading');
+                if (o) o.classList.add('active');
+            };
+            var form = document.querySelector('form[action="/screener"]');
+            if (form) form.addEventListener('submit', show);
+            document.addEventListener('click', function (e) {
+                var a = e.target.closest && e.target.closest('a[href^="/screener?"]');
+                if (a) show();
+            });
+        })();
+        </script>
 
         <div class="news-table-wrap">
             <table class="table-data news-table" id="screenerTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">

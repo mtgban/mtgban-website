@@ -93,8 +93,40 @@
     gap: 0.4em;
     min-width: 0;
 }
-.screener-name-row .card-name {
+#screenerTable .card-name {
     min-width: 0;
+    color: var(--normal);
+}
+#screenerTable .card-name:hover {
+    color: var(--ainfo);
+    text-decoration: underline;
+}
+
+/* Loading overlay shown during a filter reload. */
+.screener-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+}
+.screener-loading-overlay.active {
+    display: flex;
+}
+.screener-spinner {
+    width: 2.5em;
+    height: 2.5em;
+    border: 0.3em solid var(--border-moderate);
+    border-top-color: var(--ainfo);
+    border-radius: 50%;
+    animation: screener-spin 0.7s linear infinite;
+}
+@keyframes screener-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .result-badge {
