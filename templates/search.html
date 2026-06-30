@@ -247,6 +247,33 @@
                     container.appendChild(dropdown);
                 }
 
+                // The sidebar follows the result under the pointer via mouseover.
+                // Pressing a modifier (Cmd/Ctrl) makes the browser re-hit-test
+                // under the still cursor and fire a phantom `mouseover` — and
+                // with the stacked sticky headers that resolves to the pinned
+                // first card, snapping the panel to the wrong result. Chrome
+                // fires it with no preceding mousemove; Firefox re-emits a
+                // same-position mousemove first. Guard against both: require a
+                // recent *real* (position-changing) move or scroll, and ignore
+                // any hover glued to a keystroke (the phantom's actual cause).
+                var __lastMove = 0, __mx = null, __my = null, __lastKey = 0;
+                document.addEventListener('mousemove', function(e) {
+                    if (e.clientX !== __mx || e.clientY !== __my) {
+                        __mx = e.clientX; __my = e.clientY; __lastMove = performance.now();
+                    }
+                }, true);
+                ['wheel', 'scroll'].forEach(function(ev) {
+                    document.addEventListener(ev, function() { __lastMove = performance.now(); }, true);
+                });
+                ['keydown', 'keyup'].forEach(function(ev) {
+                    document.addEventListener(ev, function() { __lastKey = performance.now(); }, true);
+                });
+                function hoverSidebar() {
+                    var now = performance.now();
+                    if (now - __lastMove > 100 || now - __lastKey < 120) return;
+                    updateSidebar.apply(null, arguments);
+                }
+
                 function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning) {
                     document.getElementById('cardImage').src=src;
                     var wrapper = document.getElementById('cardImageWrapper');
@@ -592,7 +619,7 @@
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
-                                 onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                                 onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -671,7 +698,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="updateSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
