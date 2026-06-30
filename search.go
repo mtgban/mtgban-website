@@ -333,11 +333,30 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanShowAll = canShowAll
 	pageVars.CleanSearchQuery = config.CleanQuery
 
+	// CardHashes carries the full result list (with the per-copy repeats that
+	// decklist/hashing searches produce) so transferring to the Uploader keeps
+	// the quantities. Rendering shows each unique card once, so dedupe the keys
+	// used for display — otherwise a 4-of card is drawn (and linked) 4 times.
+	// Only multi-result hashing searches can repeat a key (hashing also serves
+	// single-uuid lookups), so skip the work for everything else.
+	pageVars.CardHashes = allKeys
+	if config.SearchMode == "hashing" && len(allKeys) > 1 {
+		if uniqueKeys := dedupeKeys(allKeys); len(uniqueKeys) < len(allKeys) {
+			if pageVars.TotalCards == 0 {
+				pageVars.TotalCards = len(allKeys)
+			}
+			// Record how many copies each card had so the deduped block can show it.
+			quantities := make(map[string]int, len(uniqueKeys))
+			for _, k := range allKeys {
+				quantities[k]++
+			}
+			pageVars.CardQuantities = quantities
+			allKeys = uniqueKeys
+		}
+	}
+
 	// Save stats
 	pageVars.TotalUnique = len(allKeys)
-
-	// Needed to load search in Upload
-	pageVars.CardHashes = allKeys
 
 	if pageVars.IsMobile && !pageVars.IsSealed {
 		pageVars.EditionFilterList = editionsForSearch(allKeys)
@@ -1040,6 +1059,22 @@ func searchCustomBuylist(r *http.Request, cardIds []string, foundVendors map[str
 			})
 		}
 	}
+}
+
+// dedupeKeys returns the keys with duplicates removed, preserving first-seen
+// order. It allocates a new slice so the caller's original (e.g. CardHashes)
+// keeps its repeats.
+func dedupeKeys(keys []string) []string {
+	seen := make(map[string]struct{}, len(keys))
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		out = append(out, k)
+	}
+	return out
 }
 
 func searchAndFilter(config SearchConfig) ([]string, error) {

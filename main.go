@@ -70,22 +70,23 @@ type PageVars struct {
 	WarningMessage string
 	InfoMessage    string
 
-	AllKeys      []string
-	SearchQuery  string
-	SearchBest   bool
-	SearchSort   string
-	CondKeys     []string
-	FoundSellers map[string]map[string][]SearchEntry
-	FoundVendors map[string]map[string][]SearchEntry
-	Metadata     map[string]GenericCard
-	PromoTags    []string
-	SetKeyrunes  map[string]string
-	NoSort       bool
-	NoSettings   bool
-	HasSettings  bool
-	HasAvailable bool
-	CardBackURL  string
-	ShowUpsell   bool
+	AllKeys        []string
+	CardQuantities map[string]int
+	SearchQuery    string
+	SearchBest     bool
+	SearchSort     string
+	CondKeys       []string
+	FoundSellers   map[string]map[string][]SearchEntry
+	FoundVendors   map[string]map[string][]SearchEntry
+	Metadata       map[string]GenericCard
+	PromoTags      []string
+	SetKeyrunes    map[string]string
+	NoSort         bool
+	NoSettings     bool
+	HasSettings    bool
+	HasAvailable   bool
+	CardBackURL    string
+	ShowUpsell     bool
 
 	PopularSearches []PopularSearch
 

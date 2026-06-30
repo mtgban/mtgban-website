@@ -628,6 +628,11 @@
     border-radius: var(--radius-sm, 6px);
     font-weight: 600;
 }
+.result-badge.qty {
+    background: var(--accent-muted, rgba(91,141,239,0.12));
+    color: var(--ainfo, var(--search-link));
+    font-variant-numeric: tabular-nums;
+}
 .result-badge.rl {
     background: rgba(210,153,34,0.1);
     color: var(--awarning);
