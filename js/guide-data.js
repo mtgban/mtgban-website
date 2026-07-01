@@ -965,6 +965,35 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'feature-screener',
+            category: 'Tools',
+            requiresNav: 'Screener',
+            title: 'Screener',
+            icon: 'sliders-horizontal',
+            summary: 'Find cards whose price moved by a threshold you set - every filter is editable.',
+            snippets: [],
+            keywords: ['screener', 'movers', 'price change', 'percent', 'threshold', 'gainers', 'losers', 'trending', 'filter', 'tcglow', 'tcg low', 'window', 'floor', 'was', 'now', 'up', 'down', 'sealed', 'edition', 'per page'],
+            content: {
+                description: '<p>The Screener finds cards whose price has moved by a threshold you choose. Where the Newspaper is a fixed daily snapshot, every filter here is editable - so you can ask arbitrary questions like "TCGplayer Low $50 or more, up 20% or more over the last 30 days."</p><p><strong>How it works:</strong> pick a price <strong>metric</strong> and a <strong>window</strong>, choose whether you want cards moving <strong>up</strong>, <strong>down</strong>, or <strong>either</strong>, then set your floors and percent threshold. Results are every card matching all of it, sortable by current price, prior price, percent change, or dollar change.</p><p><strong>Two price floors:</strong> <em>Now $</em> filters on the current price; <em>Was $</em> filters on the price at the start of the window. They combine, so you can screen for cards that <em>were</em> $100+ and have since moved, regardless of where they sit now.</p><p>The <strong>Type</strong> toggle switches between singles, sealed products, or both. The <strong>Editions</strong> dropdown narrows to specific sets (checkboxes populated from the current results). Set <strong>Per page</strong> and press <strong>Apply</strong>; <strong>Reset</strong> returns everything to defaults.</p>',
+                table: [
+                    { value: 'Metric',                short: 'Which price to track (TCG Low/Market, CK/SCG/ABU/CSI buylist, Cardmarket, Sealed EV)' },
+                    { value: 'Window',                short: 'Lookback period: 1, 7, 14, 30, or 90 days' },
+                    { value: 'Type',                  short: 'Singles, Sealed, or Both' },
+                    { value: 'Move',                  short: 'Up, Down, or Either direction' },
+                    { value: 'Now $ / Was $',         short: 'Floor on the current price and/or the price at the start of the window' },
+                    { value: 'Change (Min / Max %)',  short: 'Minimum move to qualify; optional cap to hide outliers' },
+                    { value: 'Editions',              short: 'Restrict to specific sets (checkboxes from the current results)' },
+                    { value: 'Per page',              short: '25, 50, or 100 rows per page' }
+                ],
+                examples: [
+                    { query: 'TCG Low, +20%, 30d, Now $50', desc: 'Cards $50+ that rose 20% or more in the last month', palette: true },
+                    { query: 'Was $100, up, 7d', desc: 'Cards that were $100+ and have climbed over the last week', palette: true },
+                    { query: 'CK Buylist, down, 14d', desc: 'Buylist offers that fell over the last two weeks', palette: true }
+                ]
+            }
+        },
+
+        {
             id: 'feature-sleepers',
             category: 'Tools',
             requiresNav: 'Sleepers',

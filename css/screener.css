@@ -1,0 +1,208 @@
+/* Editions dropdown and Apply button; other controls inherit news.css. */
+
+/* Match the editions summary, reset, and apply controls to the shared pills. */
+.screener-editions > summary,
+.screener-apply,
+.screener-reset {
+    padding: 6px 10px;
+    border-radius: 5px;
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition: border-color 0.12s;
+}
+.screener-editions > summary:hover,
+.screener-apply:hover,
+.screener-reset:hover { border-color: var(--ainfo); }
+
+/* Compact the bar so all controls plus the right-aligned actions fit one row. */
+.screener-filter-bar {
+    gap: 5px;
+}
+.screener-filter-bar .news-fg {
+    gap: 4px;
+}
+.screener-filter-bar .news-fl {
+    padding-right: 0;
+    letter-spacing: 0.03em;
+}
+.screener-filter-bar input[type="text"] {
+    width: 50px;
+}
+.screener-filter-bar select {
+    padding: 6px 8px;
+}
+.screener-editions > summary,
+.screener-apply,
+.screener-reset {
+    padding: 6px 9px;
+}
+
+/* Push the reset/apply pair to the right edge of the filter bar. */
+.screener-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+}
+.screener-reset {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: var(--text-dim);
+}
+.screener-reset:hover { color: var(--normal); }
+.screener-reset i { width: 1.1em; height: 1.1em; }
+.screener-reset svg { width: 1.1em; height: 1.1em; display: block; }
+
+.screener-editions {
+    position: relative;
+    display: inline-block;
+}
+.screener-editions > summary {
+    list-style: none;
+    white-space: nowrap;
+    user-select: none;
+}
+.screener-editions > summary::-webkit-details-marker { display: none; }
+.screener-editions > summary::after { content: " \25BE"; opacity: 0.7; }
+
+/* Anchor right so a right-edge control does not run off-screen. */
+.screener-editions-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    z-index: 30;
+    width: 22em;
+    max-width: 80vw;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 6px;
+    background: var(--surface-1);
+    border: 1px solid var(--border-moderate);
+    border-radius: 8px;
+    box-shadow: 0 0.5em 1.5em rgba(0, 0, 0, 0.4);
+}
+
+.screener-edition-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 6px;
+    cursor: pointer;
+    font-size: var(--text-base);
+}
+.screener-edition-item:hover { background: var(--surface-2); }
+
+.screener-edition-name {
+    flex: 1;
+}
+
+.screener-edition-count {
+    opacity: 0.6;
+    font-size: var(--text-xs);
+}
+
+/* Lock column widths so re-sorting does not reflow them. */
+#screenerTable {
+    table-layout: fixed;
+}
+#screenerTable th {
+    width: 16%;
+}
+#screenerTable th.news-th-card {
+    width: 36%;
+}
+
+/* All numeric columns right-align uniformly so headers sit over values. */
+#screenerTable .screener-dollar,
+#screenerTable .screener-pct {
+    text-align: right;
+    padding-right: 1.6em;
+}
+#screenerTable .screener-dollar {
+    font-variant-numeric: tabular-nums;
+}
+
+/* A bit more row height so finish chips are not clipped. */
+#screenerTable td {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+/* Name ellipsizes on its own; the finish chip stays a free sibling so it is not clipped. */
+.screener-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    min-width: 0;
+}
+#screenerTable .card-name {
+    min-width: 0;
+    color: var(--normal);
+}
+#screenerTable .card-name:hover {
+    color: var(--ainfo);
+    text-decoration: underline;
+}
+
+/* Loading overlay shown during a filter reload. */
+.screener-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+}
+.screener-loading-overlay.active {
+    display: flex;
+}
+.screener-spinner {
+    width: 2.5em;
+    height: 2.5em;
+    border: 0.3em solid var(--border-moderate);
+    border-top-color: var(--ainfo);
+    border-radius: 50%;
+    animation: screener-spin 0.7s linear infinite;
+}
+@keyframes screener-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.result-badge {
+    font-size: var(--text-xs, 0.7em);
+    padding: 0.1em 0.4em;
+    border-radius: var(--radius-sm, 0.35em);
+    font-weight: 600;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.result-badge.foil {
+    background: rgba(253, 239, 138, 0.15);
+    color: #fdef8a;
+    border: 1px solid rgba(253, 239, 138, 0.3);
+}
+
+.result-badge.etched {
+    background: linear-gradient(135deg, #a6dced, #c9b1ff);
+    color: #222;
+}
+
+.result-badge.altfoil {
+    background: linear-gradient(135deg, #ea8d66, #fdef8a, #8bcc93, #a6dced);
+    color: #222;
+}
+
+.result-badge.treatment {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--search-text-dim, #aaa);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
