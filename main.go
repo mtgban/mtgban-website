@@ -789,6 +789,12 @@ func openDBs() (err error) {
 			log.Println("error creating a SQL client:", err)
 			return err
 		}
+		// Best-effort: create the multi-game tcg_prices table if it's missing.
+		// Non-fatal so a read-only or unprivileged DB user can't block startup;
+		// TCGCSV ingestion re-checks the schema before it runs.
+		if serr := PricesArchiveDB.EnsureTCGSchema(context.Background()); serr != nil {
+			log.Println("warning: could not ensure tcg_prices schema:", serr)
+		}
 	}
 
 	if Config.UserStateConfig == nil {
