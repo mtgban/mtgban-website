@@ -987,8 +987,8 @@ window.__BAN_GUIDE = {
                 ],
                 examples: [
                     { query: 'TCG Low, +20%, 30d, Now $50', desc: 'Cards $50+ that rose 20% or more in the last month' },
-                    { query: 'Was $100, up, 6 days', desc: 'Cards that were $100+ and have climbed over the last week' },
-                    { query: 'CK Buylist, down, 7d', desc: 'Buylist offers that fell over the last week' }
+                    { query: 'Was $100, up, 7d', desc: 'Cards that were $100+ and have climbed over the last week' },
+                    { query: 'CK Buylist, down, 14d', desc: 'Buylist offers that fell over the last two weeks' }
                 ]
             }
         },
