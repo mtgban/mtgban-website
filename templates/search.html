@@ -97,7 +97,7 @@
             <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
         {{end}}
         <span class="search-sort-actions">
-            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
+            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}{{if .ModalMode}}?chart={{.ChartIDsCSV}}&modal=1{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
         </span>
     </div>
     {{if .TotalUnique}}
