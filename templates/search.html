@@ -462,18 +462,18 @@
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
                                     <a class="btn default chart-add-btn" href="javascript:openChartAddModal()" title="Add another card to this chart">&#10133; Add card</a>
                                 </p>
-                                {{if and .IsMultiChart .ChartReferences}}
-                                <p class="chart-ref-picker" style="margin: 0.25em 0 0 0;">
-                                    {{range .ChartReferences}}
-                                        <a class="btn default ref-picker-btn" data-ref="{{.}}" href="javascript:void(0)" onclick="selectReference({{.}}); return false;">{{.}}</a>
-                                    {{end}}
-                                </p>
-                                {{end}}
                                 {{if .Checkpoints}}
                                 <p class="chart-checkpoint-toggles">
                                     <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
                                     <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
                                     <label class="cp-pill cp-pill-ban"><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>
+                                </p>
+                                {{end}}
+                                {{if and .IsMultiChart .ChartReferences}}
+                                <p class="chart-ref-picker">
+                                    {{range .ChartReferences}}
+                                        <a class="btn default ref-picker-btn" data-ref="{{.}}" href="javascript:void(0)" onclick="selectReference({{.}}); return false;">{{.}}</a>
+                                    {{end}}
                                 </p>
                                 {{end}}
                             </div>
