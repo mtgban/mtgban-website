@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -133,17 +132,21 @@ func (c *Client) tcgBoundaryDate(ctx context.Context, agg string, categoryID int
 
 // UpsertTCGPrice inserts or overwrites a single price row.
 func (c *Client) UpsertTCGPrice(ctx context.Context, row TCGPriceRow) error {
-	if c.readOnly {
-		return nil
-	}
-	_, err := c.upsertTCGBatch(ctx, []TCGPriceRow{row})
+	_, err := c.UpsertTCGPrices(ctx, []TCGPriceRow{row}, 0)
 	return err
 }
 
-// UpsertTCGPrices inserts or overwrites price rows in batches, each kept under
-// Postgres's parameter limit. Returns the number of rows affected. It is a
-// no-op on a read-only client. Re-running the same rows overwrites in place
-// (no duplicates), so backfilling a date range is idempotent.
+// UpsertTCGPrices inserts or overwrites price rows, splitting them into batches
+// kept under Postgres's parameter limit but committing every batch in a single
+// transaction. Returns the number of rows affected. It is a no-op on a
+// read-only client. Re-running the same rows overwrites in place (no
+// duplicates), so backfilling a date range is idempotent.
+//
+// The write is all-or-nothing: a partial multi-batch commit would advance the
+// per-category MAX(date) cursor that the daily ingest gates on, silently
+// stranding an incomplete day that the freshness gate would then never revisit.
+// Wrapping the batches in one transaction keeps a failed run safe to retry in
+// full.
 func (c *Client) UpsertTCGPrices(ctx context.Context, rows []TCGPriceRow, batchSize int) (int, error) {
 	if c.readOnly {
 		return 0, nil
@@ -152,26 +155,26 @@ func (c *Client) UpsertTCGPrices(ctx context.Context, rows []TCGPriceRow, batchS
 		return 0, nil
 	}
 
-	var total int
-	var errs []error
-	for _, b := range tcgBatchBounds(len(rows), batchSize) {
-		n, err := c.upsertTCGBatch(ctx, rows[b[0]:b[1]])
-		total += n
-		if err != nil {
-			errs = append(errs, fmt.Errorf("batch starting at row %d: %w", b[0], err))
-		}
-	}
-	return total, errors.Join(errs...)
-}
-
-func (c *Client) upsertTCGBatch(ctx context.Context, batch []TCGPriceRow) (int, error) {
-	q, args := buildTCGUpsertQuery(batch)
-	res, err := c.db.ExecContext(ctx, q, args...)
+	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
-	n, _ := res.RowsAffected()
-	return int(n), nil
+	defer tx.Rollback() // no-op once Commit succeeds
+
+	var total int
+	for _, b := range tcgBatchBounds(len(rows), batchSize) {
+		q, args := buildTCGUpsertQuery(rows[b[0]:b[1]])
+		res, err := tx.ExecContext(ctx, q, args...)
+		if err != nil {
+			return 0, fmt.Errorf("batch starting at row %d: %w", b[0], err)
+		}
+		n, _ := res.RowsAffected()
+		total += int(n)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 // clampTCGBatchSize resolves a requested batch size to a safe one: a
