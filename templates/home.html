@@ -17,16 +17,27 @@
 {{end}}
 
 {{define "content"}}
+{{if .ModalMode}}
+<style>
+/* Compact, chrome-free homepage when embedded as the chart "Add a card" modal. */
+body.modal-embed { margin: 0; }
+body.modal-embed .landing { min-height: 100%; justify-content: center; padding: 4vh 0; }
+body.modal-embed .landing-main { max-width: 560px; justify-content: flex-start; padding-top: 8vh; }
+body.modal-embed .landing-brand { margin-bottom: 18px; }
+</style>
+{{end}}
 <div class="landing">
     <div class="landing-main">
         <div class="landing-brand">
             <img src="/img/logo/ban-stroop.png" alt="BAN">
             <span class="landing-brand-text">MTG<span class="ban">BAN</span></span>
         </div>
+        {{if not .ModalMode}}
         {{if .PatreonLogin}}
         <p class="landing-blurb">MTGBAN compares prices and availability for {{game_title}} singles and sealed products across major retailers. We partner with several data providers to offer the most accurate pricing information on the market, with a wide offer of trading tools.<br><br>As an Amazon Associate, we earn from qualifying purchases &mdash; and with Prime&rsquo;s fast, free shipping, <a href="{{amazon_search_url}}" target="_blank" rel="sponsored noopener">Amazon</a> is a convenient way to get what you need. Take a look at our vast search catalog for <a href="/sets">singles</a> and <a href="/sealed">sealed</a> to find the best deals (or pick a <a href="/random">random card</a>).</p>
         {{else}}
         <div class="landing-tagline"><br></div>
+        {{end}}
         {{end}}
 
         <div class="landing-search-wrap">
@@ -35,6 +46,8 @@
                        placeholder="Search for a card or product..."
                        maxlength="1000" autofocus autocapitalize="none"
                        onFocus="this.setSelectionRange(0, this.value.length)">
+                {{if .ChartIDsCSV}}<input type="hidden" name="chart" value="{{.ChartIDsCSV}}">{{end}}
+                {{if .ModalMode}}<input type="hidden" name="modal" value="1">{{end}}
             </form>
             <div class="landing-actions">
                 <button class="landing-action-btn" type="submit" form="searchform" title="Search"><i data-lucide="search"></i></button>
@@ -45,6 +58,7 @@
             autocomplete(document.getElementById("searchform"), document.getElementById("searchbox"), "false");
         </script>
 
+        {{if not .ModalMode}}
         <div class="landing-tools">
             {{range .Nav}}
                 {{if and (ne .Name "Home") (ne .Class "beta")}}
@@ -54,6 +68,7 @@
                 {{end}}
             {{end}}
         </div>
+        {{end}}
     </div>
     <script>lucide.createIcons();</script>
 
@@ -61,6 +76,7 @@
         <div class="landing-error">{{.ErrorMessage}}</div>
     {{end}}
 
+    {{if not .ModalMode}}
     <div class="landing-footer">
         <div class="landing-divider"></div>
 
@@ -126,5 +142,6 @@
 
         <div class="landing-copyright">&copy; 2019&ndash;2026 MTGBAN Inc &middot; <a href="/privacy">Privacy</a></div>
     </div>
+    {{end}}
 </div>
 {{end}}

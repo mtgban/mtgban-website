@@ -723,8 +723,10 @@
                                 var overlay = document.getElementById('chartAddOverlay');
                                 var frame = document.getElementById('chartAddFrame');
                                 if (!overlay || !frame) return;
-                                var base = '/search?chart={{.ChartIDsCSV}}&modal=1';
-                                {{if .IsSealed}}base = '/sealed?chart={{.ChartIDsCSV}}&modal=1';{{end}}
+                                // Reuse the homepage (it owns the search box now) as the
+                                // picker; it carries the roster + modal flag so a search from
+                                // it returns to the results page still in modal context.
+                                var base = '/?chart={{.ChartIDsCSV}}&modal=1';
                                 // Always reload on open so the iframe picks up
                                 // the latest localStorage theme (and any other
                                 // parent-side state) instead of reusing the

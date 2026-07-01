@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -32,6 +33,13 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pageVars.PopularSearches = getPopularSearches()
+
+	// The chart "add a card" modal loads the homepage in an iframe with
+	// ?modal=1&chart=<roster>. In that mode we render chrome-free and carry the
+	// roster forward so a search from here lands back on the results page still
+	// in modal context (with the add-to-chart affordance).
+	pageVars.ModalMode = r.FormValue("modal") == "1"
+	pageVars.ChartIDsCSV = strings.Join(parseChartIDs(r.FormValue("chart")), ",")
 
 	render(w, "home.html", pageVars)
 }
