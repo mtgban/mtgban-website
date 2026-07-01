@@ -130,8 +130,9 @@
             if (form.requestSubmit) form.requestSubmit(); else form.submit();
         }
         (function () {
+            var overlay = function () { return document.getElementById('screenerLoading'); };
             var show = function () {
-                var o = document.getElementById('screenerLoading');
+                var o = overlay();
                 if (o) o.classList.add('active');
             };
             var form = document.querySelector('form[action="/screener"]');
@@ -139,6 +140,11 @@
             document.addEventListener('click', function (e) {
                 var a = e.target.closest && e.target.closest('a[href^="/screener"]');
                 if (a) show();
+            });
+            // Clear the overlay when the page is restored from bfcache (browser back/forward).
+            window.addEventListener('pageshow', function () {
+                var o = overlay();
+                if (o) o.classList.remove('active');
             });
             if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
         })();
