@@ -3,7 +3,6 @@ package timeseries
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"fmt"
 	"strings"
 )
@@ -47,8 +46,10 @@ func (c *Client) EnsureTCGProductsSchema(ctx context.Context) error {
 	return nil
 }
 
-// UpsertTCGProducts inserts or overwrites catalog rows in parameter-limited
-// batches, refreshing synced_at. No-op on a read-only client.
+// UpsertTCGProducts inserts or overwrites catalog rows, splitting them into
+// parameter-limited batches committed in a single transaction, and refreshing
+// synced_at. No-op on a read-only client. The transaction keeps a sync
+// all-or-nothing so a mid-batch failure can't leave a half-updated catalog.
 func (c *Client) UpsertTCGProducts(ctx context.Context, products []TCGProduct, batchSize int) (int, error) {
 	if c.readOnly {
 		return 0, nil
@@ -57,26 +58,26 @@ func (c *Client) UpsertTCGProducts(ctx context.Context, products []TCGProduct, b
 		return 0, nil
 	}
 
-	var total int
-	var errs []error
-	for _, b := range tcgProductBatchBounds(len(products), batchSize) {
-		n, err := c.upsertTCGProductBatch(ctx, products[b[0]:b[1]])
-		total += n
-		if err != nil {
-			errs = append(errs, fmt.Errorf("batch starting at row %d: %w", b[0], err))
-		}
-	}
-	return total, errors.Join(errs...)
-}
-
-func (c *Client) upsertTCGProductBatch(ctx context.Context, batch []TCGProduct) (int, error) {
-	q, args := buildTCGProductsUpsertQuery(batch)
-	res, err := c.db.ExecContext(ctx, q, args...)
+	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
-	n, _ := res.RowsAffected()
-	return int(n), nil
+	defer tx.Rollback() // no-op once Commit succeeds
+
+	var total int
+	for _, b := range tcgProductBatchBounds(len(products), batchSize) {
+		q, args := buildTCGProductsUpsertQuery(products[b[0]:b[1]])
+		res, err := tx.ExecContext(ctx, q, args...)
+		if err != nil {
+			return 0, fmt.Errorf("batch starting at row %d: %w", b[0], err)
+		}
+		n, _ := res.RowsAffected()
+		total += int(n)
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 // GetTCGProduct returns a single catalog row, or sql.ErrNoRows if absent.

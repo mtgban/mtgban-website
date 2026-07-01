@@ -76,6 +76,10 @@
                 <span class="m-act-title">Take Snapshot</span>
                 {{if .DisableChart}}<span class="m-act-warn">⚠️</span>{{end}}
             </a>
+            <a class="m-admin-action" href="?reboot=tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
+                <span class="m-act-icon">🃏</span>
+                <span class="m-act-title">Ingest TCGCSV Prices</span>
+            </a>
             <a class="m-admin-action m-admin-danger" href="?reboot=server" onclick="return confirm('Restart server?')">
                 <span class="m-act-icon">⚠️</span>
                 <span class="m-act-title">Restart Server</span>
