@@ -915,6 +915,11 @@ func main() {
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 	offline := flag.String("offline", "", "API key to run in offline mode")
 
+	tcgcsvBackfill := flag.Bool("tcgcsv-backfill", false, "Backfill tcg_prices from tcgcsv archives, then exit")
+	tcgcsvFrom := flag.String("tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08)")
+	tcgcsvTo := flag.String("tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
+	tcgcsvForce := flag.Bool("tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")
+
 	flag.Parse()
 
 	// Initial state
@@ -935,6 +940,18 @@ func main() {
 		} else {
 			log.Fatalln("unable to load config file:", err)
 		}
+	}
+
+	// Maintenance mode: backfill historical tcgcsv prices, then exit without
+	// standing up the web server. Needs only the config and the price DB.
+	if *tcgcsvBackfill {
+		if err := openDBs(); err != nil {
+			log.Fatalln("error opening databases:", err)
+		}
+		if err := runTCGCSVBackfill(context.Background(), *tcgcsvFrom, *tcgcsvTo, *tcgcsvForce); err != nil {
+			log.Fatalln("tcgcsv backfill:", err)
+		}
+		os.Exit(0)
 	}
 
 	// Load the per-seller UUID overrides applied when scrapers (re)load.

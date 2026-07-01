@@ -70,3 +70,44 @@ func TestTCGCSVLive(t *testing.T) {
 	}
 	t.Logf("group %d: %d products", withPrices, len(products))
 }
+
+func TestFetchPriceArchiveLive(t *testing.T) {
+	if os.Getenv("TCGCSV_LIVE") == "" {
+		t.Skip("TCGCSV_LIVE not set; skipping live tcgcsv.com archive test")
+	}
+	c := NewClient(Config{UserAgent: "mtgban-website-test/1.0 (+https://mtgban.com)"})
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+
+	// The epoch archive exists and contains Lorcana prices; the category filter
+	// must exclude every other game's prices.
+	byCat, found, err := c.FetchPriceArchive(ctx, ArchiveEpoch, map[int]bool{CategoryLorcana: true})
+	if err != nil {
+		t.Fatalf("FetchPriceArchive(epoch): %v", err)
+	}
+	if !found {
+		t.Fatal("epoch archive reported not found")
+	}
+	for cat := range byCat {
+		if cat != CategoryLorcana {
+			t.Errorf("category filter leaked category %d", cat)
+		}
+	}
+	prices := byCat[CategoryLorcana]
+	if len(prices) == 0 {
+		t.Fatal("no Lorcana prices in epoch archive")
+	}
+	for _, p := range prices {
+		if p.ProductID == 0 || p.SubTypeName == "" {
+			t.Errorf("archive price missing join key: %+v", p)
+		}
+	}
+	t.Logf("epoch Lorcana archive prices: %d", len(prices))
+
+	// A date before the epoch has no archive: found=false, not an error.
+	if _, found, err := c.FetchPriceArchive(ctx, ArchiveEpoch.AddDate(0, 0, -1), nil); err != nil {
+		t.Fatalf("pre-epoch FetchPriceArchive: %v", err)
+	} else if found {
+		t.Error("expected no archive before the epoch")
+	}
+}

@@ -174,9 +174,12 @@ func (c *Client) Prices(ctx context.Context, categoryID, groupID int) ([]Price, 
 // gate a sync on this so we only pull when the upstream data is newer than what
 // we already stored.
 func (c *Client) LastUpdated(ctx context.Context) (time.Time, error) {
-	body, err := c.do(ctx, c.baseURL+"/last-updated.txt")
+	body, status, err := c.do(ctx, c.baseURL+"/last-updated.txt")
 	if err != nil {
 		return time.Time{}, err
+	}
+	if status != http.StatusOK {
+		return time.Time{}, fmt.Errorf("tcgcsv: last-updated -> %d: %s", status, snippet(body))
 	}
 	s := strings.TrimSpace(string(body))
 	// e.g. "2026-06-30T20:05:27+0000" — offset has no colon.
@@ -190,29 +193,40 @@ func (c *Client) LastUpdated(ctx context.Context) (time.Time, error) {
 // getResults fetches a path and decodes the standard envelope. It is a free
 // function because Go methods cannot take type parameters.
 func getResults[T any](ctx context.Context, c *Client, path string) ([]T, error) {
-	body, err := c.do(ctx, c.baseURL+path)
+	body, status, err := c.do(ctx, c.baseURL+path)
 	if err != nil {
 		return nil, err
 	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("tcgcsv: %s -> %d: %s", path, status, snippet(body))
+	}
+	return decodeResults[T](body, path)
+}
+
+// decodeResults unmarshals an envelope and returns its results. Shared by the
+// live endpoints and the historical archive reader.
+func decodeResults[T any](data []byte, label string) ([]T, error) {
 	var env envelope[T]
-	if err := json.Unmarshal(body, &env); err != nil {
-		return nil, fmt.Errorf("tcgcsv: decode %s: %w", path, err)
+	if err := json.Unmarshal(data, &env); err != nil {
+		return nil, fmt.Errorf("tcgcsv: decode %s: %w", label, err)
 	}
 	if !env.Success {
-		return nil, fmt.Errorf("tcgcsv: %s: unsuccessful response: %v", path, env.Errors)
+		return nil, fmt.Errorf("tcgcsv: %s: unsuccessful response: %v", label, env.Errors)
 	}
 	return env.Results, nil
 }
 
 // do issues a throttled GET, retrying transient failures (transport errors,
-// 429, and 5xx) with a linear backoff bounded by maxRetries.
-func (c *Client) do(ctx context.Context, url string) ([]byte, error) {
+// 429, and 5xx) with a linear backoff bounded by maxRetries. It returns the
+// body and HTTP status for any final non-retryable response; callers decide how
+// to treat a non-200 (e.g. the archive reader maps 404 to "no data that day").
+func (c *Client) do(ctx context.Context, url string) (body []byte, status int, err error) {
 	var lastErr error
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():
-				return nil, ctx.Err()
+				return nil, 0, ctx.Err()
 			case <-time.After(c.retryWait * time.Duration(attempt)):
 			}
 		}
@@ -220,7 +234,7 @@ func (c *Client) do(ctx context.Context, url string) ([]byte, error) {
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		req.Header.Set("User-Agent", c.userAgent)
 
@@ -229,7 +243,7 @@ func (c *Client) do(ctx context.Context, url string) ([]byte, error) {
 			lastErr = err
 			continue
 		}
-		body, readErr := io.ReadAll(resp.Body)
+		b, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		if readErr != nil {
 			lastErr = readErr
@@ -239,12 +253,9 @@ func (c *Client) do(ctx context.Context, url string) ([]byte, error) {
 			lastErr = fmt.Errorf("tcgcsv: %s -> %s", url, resp.Status)
 			continue
 		}
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("tcgcsv: %s -> %s: %s", url, resp.Status, snippet(body))
-		}
-		return body, nil
+		return b, resp.StatusCode, nil
 	}
-	return nil, fmt.Errorf("tcgcsv: %s: giving up after %d attempts: %w", url, c.maxRetries+1, lastErr)
+	return nil, 0, fmt.Errorf("tcgcsv: %s: giving up after %d attempts: %w", url, c.maxRetries+1, lastErr)
 }
 
 // wait enforces the minimum interval between requests, serializing callers so
