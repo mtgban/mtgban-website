@@ -217,6 +217,51 @@ func setReleaseCheckpoints(earliest time.Time) []ChartCheckpoint {
 	return out
 }
 
+// multiCardCheckpoints builds the shared checkpoint timeline for a multi-card
+// chart by merging every card's relevant checkpoints into one axis: the union
+// of bans/unbans and reprints across all cards, plus set releases. When cards
+// resolve the same set on the same day, a reprint (a card was actually
+// reprinted there) takes precedence over a plain release marker.
+func multiCardCheckpoints(cardNames []string, earliest time.Time) []ChartCheckpoint {
+	rank := func(t string) int {
+		if t == "reprint" {
+			return 1
+		}
+		return 0
+	}
+	setIdx := map[string]int{} // "date|title" -> index in out, collapses release/reprint dupes
+	seen := map[string]bool{}  // full-identity dedup for bans/unbans/format
+	var out []ChartCheckpoint
+
+	for _, name := range cardNames {
+		for _, cp := range relevantCheckpoints(name, earliest) {
+			if cp.Type == "release" || cp.Type == "reprint" {
+				key := cp.Date + "|" + cp.Title
+				if i, ok := setIdx[key]; ok {
+					if rank(cp.Type) > rank(out[i].Type) {
+						out[i] = cp
+					}
+					continue
+				}
+				setIdx[key] = len(out)
+				out = append(out, cp)
+				continue
+			}
+			key := cp.Type + "|" + cp.Date + "|" + cp.Title + "|" + cp.Detail
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, cp)
+		}
+	}
+
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Date < out[j].Date
+	})
+	return out
+}
+
 func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 	checkpointsMu.RLock()
 	events := checkpointsLoaded
