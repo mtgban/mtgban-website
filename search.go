@@ -716,11 +716,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// Union of date ranges: pick the oldest earliest so every card's
 			// available history shows up, with NaN gaps for dates predating it.
 			var earliest time.Time
+			var chartNames []string
 			for _, id := range chartIds {
 				co, gerr := mtgmatcher.GetUUID(id)
 				if gerr != nil {
 					continue
 				}
+				chartNames = append(chartNames, co.Name)
 				e, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 				if e.IsZero() {
 					continue
@@ -736,9 +738,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				datasets, refs := getDatasetsForMulti(r.Context(), chartIds, pageVars.AxisLabels, lb)
 				pageVars.Datasets = datasets
 				pageVars.ChartReferences = refs
-				// Multi-card mode: only set-release markers make sense as a
-				// shared timeline (no per-card bans/unbans/reprints).
-				pageVars.Checkpoints = setReleaseCheckpoints(earliest)
+				// Shared timeline across the roster: the union of every card's
+				// releases, reprints and bans/unbans, deduped onto one axis.
+				pageVars.Checkpoints = multiCardCheckpoints(chartNames, earliest)
 				if len(datasets) == 0 {
 					pageVars.InfoMessage = "No chart data available"
 				}
