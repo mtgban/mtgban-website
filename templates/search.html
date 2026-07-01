@@ -718,23 +718,57 @@
                                 document.body.appendChild(overlay);
                             })();
 
+                            // The pending roster (the chart plus everything batched but not yet
+                            // committed) lives in localStorage so it survives the iframe
+                            // navigating between the search box and result pages, and is shared
+                            // with the iframe (same origin).
+                            function chartPending() {
+                                return (localStorage.getItem('chartAddPending') || '').split(',').filter(Boolean);
+                            }
+                            function refreshBatchButton() {
+                                var btn = document.getElementById('chartBatchCommit');
+                                if (!btn) return;
+                                var orig = '{{.ChartIDsCSV}}'.split(',').filter(Boolean);
+                                var pend = chartPending();
+                                var os = {}; orig.forEach(function(x){ os[x] = 1; });
+                                var ps = {}; pend.forEach(function(x){ ps[x] = 1; });
+                                var changed = pend.filter(function(x){ return !os[x]; }).length +
+                                              orig.filter(function(x){ return !ps[x]; }).length;
+                                btn.disabled = changed === 0;
+                                btn.style.opacity = changed ? '1' : '0.5';
+                                btn.style.cursor = changed ? 'pointer' : 'default';
+                                btn.textContent = changed ? ('Update chart (' + changed + ')') : 'Update chart';
+                            }
                             function openChartAddModal() {
                                 var overlay = document.getElementById('chartAddOverlay');
                                 var frame = document.getElementById('chartAddFrame');
                                 if (!overlay || !frame) return;
-                                // Reuse the homepage (it owns the search box now) as the
-                                // picker; it carries the roster + modal flag so a search from
-                                // it returns to the results page still in modal context.
-                                var base = '/?chart={{.ChartIDsCSV}}&modal=1';
-                                // Always reload on open so the iframe picks up
-                                // the latest localStorage theme (and any other
-                                // parent-side state) instead of reusing the
-                                // body class it was first rendered with.
-                                frame.src = base;
+                                // Seed the batch with the chart's current roster.
+                                localStorage.setItem('chartAddPending', '{{.ChartIDsCSV}}');
+                                refreshBatchButton();
+                                // Reuse the homepage (it owns the search box now) as the picker;
+                                // it carries the roster + modal flag so a search from it returns
+                                // to the results page still in modal context.
+                                frame.src = '/?chart={{.ChartIDsCSV}}&modal=1';
                                 overlay.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;justify-content:center;align-items:center;padding:4vh 4vw;';
                                 overlay.classList.add('open');
                                 document.body.classList.add('chart-add-open');
                                 document.body.style.overflow = 'hidden';
+                            }
+                            // Send the iframe back to the search box, carrying whatever's been
+                            // batched so far so already-added cards render as added.
+                            function newChartSearch() {
+                                var frame = document.getElementById('chartAddFrame');
+                                if (frame) frame.src = '/?chart=' + encodeURIComponent(chartPending().join(',')) + '&modal=1';
+                            }
+                            // Commit the batch: reload the chart with the pending roster.
+                            function commitChartBatch() {
+                                var pend = chartPending();
+                                var url = new URL(window.location.href);
+                                if (pend.length) url.searchParams.set('chart', pend.join(','));
+                                else url.searchParams.delete('chart');
+                                url.searchParams.delete('q');
+                                window.location = url.toString();
                             }
                             function closeChartAddModal() {
                                 var overlay = document.getElementById('chartAddOverlay');
@@ -754,28 +788,10 @@
                             });
                             window.addEventListener('message', function(e) {
                                 if (e.origin !== window.location.origin) return;
-                                if (!e.data) return;
-                                var t = e.data.type;
-                                if (t !== 'mtgban-add-to-chart' && t !== 'mtgban-remove-from-chart') return;
-                                var cardId = e.data.cardId;
-                                if (!cardId) return;
-                                var existing = '{{.ChartIDsCSV}}'.split(',').filter(Boolean);
-                                var idx = existing.indexOf(cardId);
-                                if (t === 'mtgban-add-to-chart') {
-                                    if (idx !== -1) { closeChartAddModal(); return; }
-                                    existing.push(cardId);
-                                } else {
-                                    if (idx === -1) { closeChartAddModal(); return; }
-                                    existing.splice(idx, 1);
-                                }
-                                var url = new URL(window.location.href);
-                                if (existing.length) {
-                                    url.searchParams.set('chart', existing.join(','));
-                                } else {
-                                    url.searchParams.delete('chart');
-                                }
-                                url.searchParams.delete('q');
-                                window.location = url.toString();
+                                if (!e.data || e.data.type !== 'chart-batch-changed') return;
+                                // The iframe already updated the pending roster in localStorage;
+                                // just refresh the commit button's count.
+                                refreshBatchButton();
                             });
                         </script>
 
@@ -784,9 +800,15 @@
                                  style="width:92vw;max-width:1400px;height:92vh;background:var(--background,#fff);border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:14px;box-shadow:0 24px 72px rgba(0,0,0,0.45);display:flex;flex-direction:column;overflow:hidden;">
                                 <div class="chart-add-header"
                                      style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-subtle,rgba(0,0,0,0.08));flex-shrink:0;background:var(--navbackground,var(--background,#fff));">
-                                    <span class="chart-add-title" style="font-size:14px;font-weight:600;color:var(--normal);">&#10133; Add a card to this chart</span>
-                                    <button class="chart-add-close" type="button" onclick="closeChartAddModal()" aria-label="Close"
-                                            style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:var(--normal);padding:0 6px;">&times;</button>
+                                    <span class="chart-add-title" style="font-size:14px;font-weight:600;color:var(--normal);">&#10133; Add cards to this chart</span>
+                                    <span style="display:flex;align-items:center;gap:8px;">
+                                        <button type="button" onclick="newChartSearch()" title="Search for another card"
+                                                style="background:var(--surface-2,rgba(0,0,0,0.05));border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:6px;font-size:13px;line-height:1;cursor:pointer;color:var(--normal);padding:7px 12px;">New search</button>
+                                        <button id="chartBatchCommit" type="button" onclick="commitChartBatch()" disabled title="Apply the batched cards and view the chart"
+                                                style="background:var(--search-link,#3b6fd4);border:1px solid var(--search-link,#3b6fd4);border-radius:6px;font-size:13px;font-weight:600;line-height:1;color:#fff;padding:7px 12px;opacity:0.5;cursor:default;">Update chart</button>
+                                        <button class="chart-add-close" type="button" onclick="closeChartAddModal()" aria-label="Close"
+                                                style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:var(--normal);padding:0 6px;">&times;</button>
+                                    </span>
                                 </div>
                                 <iframe id="chartAddFrame" class="chart-add-frame" title="Search for a card to add"
                                         style="flex:1;width:100%;border:0;background:var(--background,#fff);"></iframe>
@@ -1422,16 +1444,61 @@ body.modal-embed .cp-overlay { display: none !important; }
     decorate();
     new MutationObserver(decorate).observe(document.body, { childList: true, subtree: true });
 
+    // Clicking a card's chart +/- batches it instead of committing immediately:
+    // update the shared pending roster, flip the row control, toast, and let the
+    // parent refresh its "Update chart" counter. The user commits from there.
+    function setChartRowState(a, added) {
+        if (added) {
+            a.classList.remove('chart-add-link');
+            a.classList.add('chart-remove-link');
+            a.title = 'Remove from this chart';
+            a.innerHTML = '&#128200;&#10134;';
+        } else {
+            a.classList.remove('chart-remove-link');
+            a.classList.add('chart-add-link');
+            a.title = 'Add to this chart';
+            a.innerHTML = '&#128200;&#10133;';
+        }
+    }
+    var chartToastEl;
+    function showChartToast(msg) {
+        if (!chartToastEl) {
+            chartToastEl = document.createElement('div');
+            chartToastEl.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:8px 16px;border-radius:999px;font-size:13px;z-index:99999;pointer-events:none;opacity:0;transition:opacity 0.2s;';
+            document.body.appendChild(chartToastEl);
+        }
+        chartToastEl.textContent = msg;
+        chartToastEl.style.opacity = '1';
+        clearTimeout(chartToastEl._t);
+        chartToastEl._t = setTimeout(function(){ chartToastEl.style.opacity = '0'; }, 1500);
+    }
     document.addEventListener('click', function(e) {
         var add = e.target.closest('a.chart-add-link');
         var rm = e.target.closest('a.chart-remove-link');
         var a = add || rm;
         if (!a) return;
         var cardId = a.getAttribute('data-card-id');
-        if (!cardId || !window.parent || window.parent === window) return;
+        if (!cardId) return;
         e.preventDefault();
-        var type = add ? 'mtgban-add-to-chart' : 'mtgban-remove-from-chart';
-        window.parent.postMessage({ type: type, cardId: cardId }, window.location.origin);
+
+        var pending = (localStorage.getItem('chartAddPending') || '').split(',').filter(Boolean);
+        var idx = pending.indexOf(cardId);
+        var added = !!add;
+        if (added) {
+            if (idx === -1) pending.push(cardId);
+        } else if (idx !== -1) {
+            pending.splice(idx, 1);
+        }
+        localStorage.setItem('chartAddPending', pending.join(','));
+        setChartRowState(a, added);
+
+        var row = a.closest('[data-card-name]');
+        var name = row ? (row.getAttribute('data-card-name') || 'Card') : 'Card';
+        showChartToast(name + (added ? ' added to chart batch' : ' removed from chart batch'));
+
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'chart-batch-changed' }, window.location.origin);
+        }
     });
 })();
 </script>
