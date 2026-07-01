@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/mtgban-website/tcgcsv"
@@ -139,5 +140,94 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, force bool) error {
 	}
 
 	log.Printf("tcgcsv backfill complete: %d rows over %d days", totalRows, daysWithData)
+	return nil
+}
+
+// tcgcsvStashing gates concurrent runs of the daily ingest (cron + admin
+// button), mirroring stashInTimeseries.
+var tcgcsvStashing atomic.Bool
+
+// IsTCGCSVStashing reports whether a daily TCGCSV ingest is currently running.
+func IsTCGCSVStashing() bool { return tcgcsvStashing.Load() }
+
+// stashTCGCSVPrices pulls tcgcsv's current snapshot for every configured game
+// into tcg_prices. It is the cron/admin entry point: only one run proceeds at a
+// time, and it no-ops when the current snapshot is already stored.
+func stashTCGCSVPrices() {
+	if !tcgcsvStashing.CompareAndSwap(false, true) {
+		log.Println("stashTCGCSVPrices: another ingest is already running, skipping")
+		return
+	}
+	defer tcgcsvStashing.Store(false)
+
+	if err := ingestTCGCSVLatest(context.Background()); err != nil {
+		log.Println("tcgcsv daily ingest:", err)
+		ServerNotify("tcgcsv", fmt.Sprintf("daily ingest error: %s", err))
+	}
+}
+
+// ingestTCGCSVLatest fetches tcgcsv's current prices for every configured game
+// and upserts them under the snapshot's date. It gates on tcgcsv's last-updated
+// timestamp so the full catalog is pulled at most once per new snapshot (per
+// the once-per-24h etiquette); a category already holding that date is skipped.
+// The row date is taken from last-updated so a live pull and the eventual
+// archive for the same snapshot land on the same date.
+func ingestTCGCSVLatest(ctx context.Context) error {
+	client, err := tcgcsvClient()
+	if err != nil {
+		return err
+	}
+	if err := PricesArchiveDB.EnsureTCGSchema(ctx); err != nil {
+		return err
+	}
+
+	updated, err := client.LastUpdated(ctx)
+	if err != nil {
+		return fmt.Errorf("tcgcsv: last-updated: %w", err)
+	}
+	snapshot := updated.UTC().Truncate(24 * time.Hour)
+	dateStr := snapshot.Format("2006-01-02")
+
+	var totalRows int
+	for _, g := range Config.TCGCSVConfig.Games {
+		latest, ok, err := PricesArchiveDB.GetTCGLatestDate(ctx, g.CategoryID)
+		if err != nil {
+			return fmt.Errorf("tcgcsv: latest date for category %d: %w", g.CategoryID, err)
+		}
+		if ok && !snapshot.After(latest) {
+			log.Printf("tcgcsv daily %s: category %d already current", dateStr, g.CategoryID)
+			continue
+		}
+
+		groups, err := client.Groups(ctx, g.CategoryID)
+		if err != nil {
+			return fmt.Errorf("tcgcsv: groups for category %d: %w", g.CategoryID, err)
+		}
+		var rows []timeseries.TCGPriceRow
+		for _, grp := range groups {
+			prices, err := client.Prices(ctx, g.CategoryID, grp.GroupID)
+			if err != nil {
+				return fmt.Errorf("tcgcsv: prices for %d/%d: %w", g.CategoryID, grp.GroupID, err)
+			}
+			for _, p := range prices {
+				rows = append(rows, priceToRow(dateStr, g.CategoryID, p))
+			}
+		}
+		if len(rows) == 0 {
+			continue
+		}
+
+		n, err := PricesArchiveDB.UpsertTCGPrices(ctx, rows, 0)
+		if err != nil {
+			return fmt.Errorf("tcgcsv: upsert category %d: %w", g.CategoryID, err)
+		}
+		totalRows += n
+		log.Printf("tcgcsv daily %s: category %d, %d rows (%d groups)", dateStr, g.CategoryID, n, len(groups))
+	}
+
+	if totalRows > 0 {
+		ServerNotify("tcgcsv", fmt.Sprintf("daily ingest %s: %d rows", dateStr, totalRows))
+	}
+	log.Printf("tcgcsv daily ingest complete: %d rows for %s", totalRows, dateStr)
 	return nil
 }

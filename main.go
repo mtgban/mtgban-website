@@ -919,6 +919,7 @@ func main() {
 	tcgcsvFrom := flag.String("tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08)")
 	tcgcsvTo := flag.String("tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
 	tcgcsvForce := flag.Bool("tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")
+	tcgcsvDaily := flag.Bool("tcgcsv-daily", false, "Run the daily tcgcsv ingest once, then exit")
 
 	flag.Parse()
 
@@ -942,14 +943,20 @@ func main() {
 		}
 	}
 
-	// Maintenance mode: backfill historical tcgcsv prices, then exit without
-	// standing up the web server. Needs only the config and the price DB.
-	if *tcgcsvBackfill {
+	// Maintenance mode: ingest tcgcsv prices, then exit without standing up the
+	// web server. Needs only the config and the price DB.
+	if *tcgcsvBackfill || *tcgcsvDaily {
 		if err := openDBs(); err != nil {
 			log.Fatalln("error opening databases:", err)
 		}
-		if err := runTCGCSVBackfill(context.Background(), *tcgcsvFrom, *tcgcsvTo, *tcgcsvForce); err != nil {
-			log.Fatalln("tcgcsv backfill:", err)
+		if *tcgcsvBackfill {
+			if err := runTCGCSVBackfill(context.Background(), *tcgcsvFrom, *tcgcsvTo, *tcgcsvForce); err != nil {
+				log.Fatalln("tcgcsv backfill:", err)
+			}
+		} else {
+			if err := ingestTCGCSVLatest(context.Background()); err != nil {
+				log.Fatalln("tcgcsv daily ingest:", err)
+			}
 		}
 		os.Exit(0)
 	}
@@ -1036,6 +1043,13 @@ func main() {
 
 		// Reload DB Newspaper every 3 hours
 		c.AddFunc("33 */3 * * *", cacheNewspaper)
+
+		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
+		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
+		// newer snapshot regardless of the exact fire time.
+		if Config.TCGCSVConfig != nil {
+			c.AddFunc("0 21 * * *", stashTCGCSVPrices)
+		}
 
 		c.Start()
 	}
