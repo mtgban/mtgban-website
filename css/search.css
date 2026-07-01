@@ -1332,9 +1332,11 @@ html.admin-fix-mode .store-fix { display: inline-block; }
  * Card Kingdom Buy, etc.) — clicking switches which reference all charted
  * cards display. Mirrors the chart-event toggle box for visual consistency. */
 .chart-ref-picker {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     flex-wrap: wrap;
+    /* Own full-width row under the actions/events line (like single-card) */
+    flex-basis: 100%;
     gap: 8px;
     padding: 6px 10px;
     margin: 8px 0 0;
