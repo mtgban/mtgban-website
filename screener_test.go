@@ -191,6 +191,13 @@ func TestScreenerResultFieldValue(t *testing.T) {
 }
 
 func TestValidMetricAndWindow(t *testing.T) {
+	prev := Config.TimeseriesConfig
+	t.Cleanup(func() { Config.TimeseriesConfig = prev })
+	Config.TimeseriesConfig = TimeseriesConfig{Datasets: []DatasetConfig{
+		{Index: 2, PublicName: "TCGplayer Low"},
+		{Index: 3, PublicName: "TCGplayer Market"},
+	}}
+
 	if !validMetric(2) {
 		t.Error("metric 2 (TCG Low) should be valid")
 	}

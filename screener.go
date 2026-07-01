@@ -20,18 +20,12 @@ type ScreenerMetric struct {
 	Name  string
 }
 
-// Order mirrors config.json datasets; TCG Low first as the default.
-var screenerMetrics = []ScreenerMetric{
-	{2, "TCGplayer Low"},
-	{3, "TCGplayer Market"},
-	{0, "Card Kingdom Retail"},
-	{1, "Card Kingdom Buylist"},
-	{4, "Cardmarket Low"},
-	{5, "Cardmarket Trend"},
-	{6, "Star City Games Buylist"},
-	{7, "ABU Games Buylist"},
-	{9, "Cool Stuff Inc Buylist"},
-	{8, "Sealed EV (TCG Low)"},
+func screenerMetricList() []ScreenerMetric {
+	out := make([]ScreenerMetric, 0, len(Config.TimeseriesConfig.Datasets))
+	for _, d := range Config.TimeseriesConfig.Datasets {
+		out = append(out, ScreenerMetric{Index: d.Index, Name: d.PublicName})
+	}
+	return out
 }
 
 type ScreenerWindow struct {
@@ -48,8 +42,8 @@ var screenerWindows = []ScreenerWindow{
 }
 
 func validMetric(index int) bool {
-	for _, m := range screenerMetrics {
-		if m.Index == index {
+	for _, d := range Config.TimeseriesConfig.Datasets {
+		if d.Index == index {
 			return true
 		}
 	}
@@ -426,7 +420,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
 	sv := &ScreenerVars{
-		Metrics:       screenerMetrics,
+		Metrics:       screenerMetricList(),
 		Windows:       screenerWindows,
 		SelMetric:     metric,
 		SelWindow:     window,
