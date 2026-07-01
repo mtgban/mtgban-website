@@ -986,9 +986,9 @@ window.__BAN_GUIDE = {
                     { value: 'Per page',              short: '25, 50, or 100 rows per page' }
                 ],
                 examples: [
-                    { query: 'TCG Low, +20%, 30d, Now $50', desc: 'Cards $50+ that rose 20% or more in the last month' },
-                    { query: 'Was $100, up, 7d', desc: 'Cards that were $100+ and have climbed over the last week' },
-                    { query: 'CK Buylist, down, 14d', desc: 'Buylist offers that fell over the last two weeks' }
+                    { query: 'TCG Low, +20%, 30d, Now $50', desc: 'Cards $50+ that rose 20% or more in the last month', palette: true },
+                    { query: 'Was $100, up, 7d', desc: 'Cards that were $100+ and have climbed over the last week', palette: true },
+                    { query: 'CK Buylist, down, 14d', desc: 'Buylist offers that fell over the last two weeks', palette: true }
                 ]
             }
         },
