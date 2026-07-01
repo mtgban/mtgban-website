@@ -76,6 +76,9 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, force bool) error {
 	if err != nil {
 		return err
 	}
+	if err := tcgcsv.CheckArchiveTooling(); err != nil {
+		return err
+	}
 	if err := PricesArchiveDB.EnsureTCGSchema(ctx); err != nil {
 		return err
 	}
@@ -98,7 +101,7 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, force bool) error {
 	log.Printf("tcgcsv backfill: %s..%s across %d game(s), force=%v",
 		from.Format("2006-01-02"), to.Format("2006-01-02"), len(Config.TCGCSVConfig.Games), force)
 
-	var totalRows, daysWithData int
+	var totalRows, daysWithData, daysFailed int
 	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
 		// Which categories still need this day?
 		need := make(map[int]bool)
@@ -113,7 +116,12 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, force bool) error {
 
 		byCat, ok, err := client.FetchPriceArchive(ctx, day, need)
 		if err != nil {
-			return fmt.Errorf("tcgcsv backfill %s: %w", day.Format("2006-01-02"), err)
+			// A single bad or unreachable archive shouldn't halt a multi-year
+			// backfill; log it, count it, and move on. The day can be retried
+			// with -tcgcsv-force later.
+			daysFailed++
+			log.Printf("tcgcsv backfill %s: skipped: %v", day.Format("2006-01-02"), err)
+			continue
 		}
 		if !ok {
 			continue // no archive published for that day
@@ -139,7 +147,10 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, force bool) error {
 		log.Printf("tcgcsv backfill %s: %d rows (%d categories)", dateStr, n, len(byCat))
 	}
 
-	log.Printf("tcgcsv backfill complete: %d rows over %d days", totalRows, daysWithData)
+	log.Printf("tcgcsv backfill complete: %d rows over %d days (%d days failed)", totalRows, daysWithData, daysFailed)
+	if daysFailed > 0 {
+		return fmt.Errorf("tcgcsv backfill: %d day(s) failed; re-run with -tcgcsv-force to retry them", daysFailed)
+	}
 	return nil
 }
 
