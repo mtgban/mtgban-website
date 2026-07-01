@@ -797,6 +797,9 @@ func openDBs() (err error) {
 		if serr := PricesArchiveDB.EnsureTCGSchema(context.Background()); serr != nil {
 			log.Println("warning: could not ensure tcg_prices schema:", serr)
 		}
+		if serr := PricesArchiveDB.EnsureTCGProductsSchema(context.Background()); serr != nil {
+			log.Println("warning: could not ensure tcg_products schema:", serr)
+		}
 	}
 
 	if Config.UserStateConfig == nil {
@@ -920,6 +923,7 @@ func main() {
 	tcgcsvTo := flag.String("tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
 	tcgcsvForce := flag.Bool("tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")
 	tcgcsvDaily := flag.Bool("tcgcsv-daily", false, "Run the daily tcgcsv ingest once, then exit")
+	tcgcsvProducts := flag.Bool("tcgcsv-products", false, "Sync the tcgcsv product catalog once, then exit")
 
 	flag.Parse()
 
@@ -945,17 +949,22 @@ func main() {
 
 	// Maintenance mode: ingest tcgcsv prices, then exit without standing up the
 	// web server. Needs only the config and the price DB.
-	if *tcgcsvBackfill || *tcgcsvDaily {
+	if *tcgcsvBackfill || *tcgcsvDaily || *tcgcsvProducts {
 		if err := openDBs(); err != nil {
 			log.Fatalln("error opening databases:", err)
 		}
-		if *tcgcsvBackfill {
+		switch {
+		case *tcgcsvBackfill:
 			if err := runTCGCSVBackfill(context.Background(), *tcgcsvFrom, *tcgcsvTo, *tcgcsvForce); err != nil {
 				log.Fatalln("tcgcsv backfill:", err)
 			}
-		} else {
+		case *tcgcsvDaily:
 			if err := ingestTCGCSVLatest(context.Background()); err != nil {
 				log.Fatalln("tcgcsv daily ingest:", err)
+			}
+		case *tcgcsvProducts:
+			if err := syncTCGProducts(context.Background()); err != nil {
+				log.Fatalln("tcgcsv product sync:", err)
 			}
 		}
 		os.Exit(0)
@@ -1049,6 +1058,8 @@ func main() {
 		// newer snapshot regardless of the exact fire time.
 		if Config.TCGCSVConfig != nil {
 			c.AddFunc("0 21 * * *", stashTCGCSVPrices)
+			// Product metadata changes rarely; refresh the catalog weekly.
+			c.AddFunc("0 22 * * 1", stashTCGCSVProducts)
 		}
 
 		c.Start()
