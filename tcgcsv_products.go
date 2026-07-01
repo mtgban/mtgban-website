@@ -42,6 +42,7 @@ func stashTCGCSVProducts() {
 
 	if err := syncTCGProducts(context.Background()); err != nil {
 		log.Println("tcgcsv product sync:", err)
+		ServerNotify("tcgcsv", fmt.Sprintf("product sync error: %s", err))
 	}
 }
 
