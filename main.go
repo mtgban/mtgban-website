@@ -27,6 +27,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 	"github.com/mtgban/mtgban-website/observability"
+	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
 
@@ -542,6 +543,7 @@ type ConfigType struct {
 	UserStateConfig     *userstate.SqlConfig  `json:"user_state_config"`
 	ObservabilityConfig *timeseries.SqlConfig `json:"observability_config"`
 	InstanceName        string                `json:"instance_name"`
+	TCGCSVConfig        *tcgcsv.Config        `json:"tcgcsv_config"`
 }
 
 var DevMode bool
