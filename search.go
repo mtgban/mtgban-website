@@ -81,6 +81,37 @@ func isSame(a, b SearchEntry) bool {
 
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 
+// parseChartIDs splits a chart=... param (comma-separated UUIDs) into a
+// validated, de-duplicated list. Pieces that don't resolve via mtgmatcher are
+// dropped silently, mirroring how single-UUID chart= used to be handled.
+func parseChartIDs(chartParam string) []string {
+	if chartParam == "" {
+		return nil
+	}
+	var ids []string
+	for _, part := range strings.Split(chartParam, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if _, err := mtgmatcher.GetUUID(part); err != nil {
+			continue
+		}
+		if slices.Contains(ids, part) {
+			continue
+		}
+		ids = append(ids, part)
+		// Cap the roster at the palette size: the multi-card chart can only
+		// render that many distinguishable lines, and it bounds the per-UUID
+		// DB fan-out (GetEarliestDate + timeseries fetch) triggered on this
+		// public handler by a crafted many-UUID chart= URL.
+		if len(ids) >= len(multiCardPalette) {
+			break
+		}
+	}
+	return ids
+}
+
 func Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
@@ -185,19 +216,39 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chartId := r.FormValue("chart")
-	// Check if query is a valid ID
-	co, err := mtgmatcher.GetUUID(chartId)
-	if err != nil || pageVars.DisableChart {
+	chartParam := r.FormValue("chart")
+	pageVars.ModalMode = r.FormValue("modal") == "1"
+
+	chartIds := parseChartIDs(chartParam)
+
+	chartId := ""
+	if len(chartIds) > 0 && !pageVars.DisableChart {
+		// Always expose the chart roster so the "add to chart" affordance on
+		// result rows can target it even when we're rendering a regular search
+		// (e.g. the user typed a query while on a chart page).
+		pageVars.ChartIDs = chartIds
+		pageVars.ChartIDsCSV = strings.Join(chartIds, ",")
+
+		// Only enter chart-render mode when chart= is alone (no q=). With both
+		// present the user is searching for cards to add to the chart, so we
+		// keep the chart roster as context but render the search results page.
+		// In modal mode the iframe is the add-to-chart picker, so never render
+		// a chart inside it even when no query is set yet.
+		if query == "" && !pageVars.ModalMode {
+			chartId = chartIds[0]
+			// Drive the results table off the same trimmed/validated IDs the
+			// chart plots (not the raw chartParam), so a URL like
+			// ?chart=uuidA,%20uuidB doesn't leave card B off the results/remove
+			// controls just because fixupIDs won't trim the leading space.
+			query = strings.Join(chartIds, ",")
+			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
+		}
+	} else {
 		// Stay on the same probable query page
 		if query == "" {
-			query = chartId
+			query = chartParam
 		}
-		chartId = ""
-	} else {
-		// Override the query when chart is requested
-		query = chartId
-		pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
+		chartIds = nil
 	}
 
 	// If query is empty there is nothing to do
@@ -636,20 +687,23 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// CHART ALL THE THINGS
 	if chartId != "" {
+		isMultiChart := len(chartIds) > 1
+
 		chartEditions := GetEditions()
 		pageVars.EditionSort = chartEditions.SealedEditionsSorted
 		pageVars.EditionList = chartEditions.SealedEditionsList
 
-		// Rebuild the search query by faking a uuid lookup
+		// Rebuild a display query from the (first) chart card
 		cfg := parseSearchOptionsNG(chartId, nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
 		pageVars.ChartID = chartId
+		pageVars.IsMultiChart = isMultiChart
 
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
-		} else {
+		} else if !isMultiChart {
 			co, err := mtgmatcher.GetUUID(chartId)
 			if err != nil {
 				fmt.Println("Search: Failed to GetUUID: %w", err)
@@ -666,29 +720,68 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			if len(pageVars.Datasets) == 0 {
 				pageVars.InfoMessage = "No chart data available"
 			}
+		} else {
+			lb := chartLookback(sig)
+			pageVars.MaxLookbackDays = lb.Days()
+
+			// Union of date ranges: pick the oldest earliest so every card's
+			// available history shows up, with NaN gaps for dates predating it.
+			var earliest time.Time
+			var chartNames []string
+			for _, id := range chartIds {
+				co, gerr := mtgmatcher.GetUUID(id)
+				if gerr != nil {
+					continue
+				}
+				chartNames = append(chartNames, co.Name)
+				e, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
+				if e.IsZero() {
+					continue
+				}
+				if earliest.IsZero() || e.Before(earliest) {
+					earliest = e
+				}
+			}
+			if earliest.IsZero() {
+				pageVars.InfoMessage = "No chart data available"
+			} else {
+				pageVars.AxisLabels = getDateAxisValues(earliest)
+				datasets, refs := getDatasetsForMulti(r.Context(), chartIds, pageVars.AxisLabels, lb)
+				pageVars.Datasets = datasets
+				pageVars.ChartReferences = refs
+				// Shared timeline across the roster: the union of every card's
+				// releases, reprints and bans/unbans, deduped onto one axis.
+				pageVars.Checkpoints = multiCardCheckpoints(chartNames, earliest)
+				if len(datasets) == 0 {
+					pageVars.InfoMessage = "No chart data available"
+				}
+			}
 		}
 
-		// Foil/etched alternates and the MTGStocks link only apply to
-		// singles; leave them empty for a sealed product so the sidebar's
-		// self-checks hide them.
-		if !co.Sealed {
-			altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
-				Id:   chartId,
-				Foil: !co.Foil,
-			})
-			if err == nil && altId != chartId {
-				pageVars.Alternative = altId
-			}
+		// Sidebar foil/etched switch and Stocks link are inherently per-card,
+		// and sealed products have no foil/etched variants, so leave them empty
+		// and let the sidebar's self-checks hide them.
+		if !isMultiChart {
+			co, gerr := mtgmatcher.GetUUID(chartId)
+			if gerr == nil && !co.Sealed {
+				altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
+					Id:   chartId,
+					Foil: !co.Foil,
+				})
+				if err == nil && altId != chartId {
+					pageVars.Alternative = altId
+				}
 
-			altId, err = mtgmatcher.Match(&mtgmatcher.InputCard{
-				Id:        chartId,
-				Variation: "Etched",
-			})
-			if err == nil && altId != chartId {
-				pageVars.AltEtchedId = altId
-			}
+				altId, err = mtgmatcher.Match(&mtgmatcher.InputCard{
+					Id:        chartId,
+					Variation: "Etched",
+				})
+				if err == nil && altId != chartId {
+					pageVars.AltEtchedId = altId
+				}
 
-			pageVars.StocksURL = pageVars.Metadata[chartId].StocksURL
+				pageVars.StocksURL = pageVars.Metadata[chartId].StocksURL
+			}
 		}
 	}
 

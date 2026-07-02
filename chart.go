@@ -33,6 +33,34 @@ type Dataset struct {
 	Color  string
 	AxisID string
 	Sealed bool
+
+	// CardID is the stable per-card identity on a multi-card chart — the same
+	// roster id the result rows use for data-card-id. The front-end groups
+	// datasets by this instead of the display Name (so two printings sharing a
+	// "Name (SET)" label stay separate lines) and matches a legend entry back
+	// to its result row so hovering it can drive the sidebar preview.
+	CardID string
+
+	// Reference identifies which price source this dataset belongs to
+	// (e.g. "TCG Low", "Card Kingdom Buy"). In single-card charts it equals
+	// Name; in multi-card charts it's the grouping key the reference picker
+	// switches on while Name carries the card name for the legend.
+	Reference string
+}
+
+// multiCardPalette assigns a distinct color per card when several cards share
+// one chart. Picked to be distinguishable in both light and dark themes.
+var multiCardPalette = []string{
+	"rgb(54, 162, 235)",
+	"rgb(255, 99, 132)",
+	"rgb(75, 192, 192)",
+	"rgb(255, 159, 64)",
+	"rgb(153, 102, 255)",
+	"rgb(40, 167, 69)",
+	"rgb(220, 53, 69)",
+	"rgb(23, 162, 184)",
+	"rgb(255, 205, 86)",
+	"rgb(108, 117, 125)",
 }
 
 // getDateAxisValues generates daily date labels from today back to earliest.
@@ -125,10 +153,94 @@ func buildDataset(results map[string]timeseries.PriceRow, labels []string, confi
 		}
 	}
 	return Dataset{
-		Name:  config.PublicName,
-		Data:  data,
-		Color: config.Color,
+		Name:      config.PublicName,
+		Data:      data,
+		Color:     config.Color,
+		Reference: config.PublicName,
 	}
+}
+
+// multiCardInput is one card's contribution to a multi-card chart: the
+// display name to render in the legend, and the raw datasets returned by
+// getDatasets for that card.
+type multiCardInput struct {
+	CardID   string
+	Name     string
+	Datasets []Dataset
+}
+
+// mergeMultiCardDatasets flattens per-card datasets into the (card × reference)
+// list a multi-card chart renders. Each card's datasets get a palette color
+// (round-robin, wrap-around past multiCardPalette's length) and the supplied
+// card Name, replacing whatever getDatasets put there. Datasets with no data
+// are dropped so reference names that a card doesn't support don't pollute the
+// reference picker. The returned reference order is the first-seen order
+// across all cards — a card later in the list that introduces a new reference
+// appends; one that repeats a reference already seen does not.
+func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
+	var datasets []Dataset
+	refSeen := map[string]bool{}
+	var refOrder []string
+
+	for i, card := range cards {
+		color := multiCardPalette[i%len(multiCardPalette)]
+		for _, ds := range card.Datasets {
+			if len(ds.Data) == 0 {
+				continue
+			}
+
+			ds.Name = card.Name
+			ds.CardID = card.CardID
+			ds.Color = color
+			datasets = append(datasets, ds)
+
+			if !refSeen[ds.Reference] {
+				refSeen[ds.Reference] = true
+				refOrder = append(refOrder, ds.Reference)
+			}
+		}
+	}
+
+	return datasets, refOrder
+}
+
+// getDatasetsForMulti returns one dataset per (card × reference) pair for a
+// multi-card chart, plus the list of distinct reference names that have at
+// least one non-empty dataset. UUIDs that fail to resolve are skipped so a
+// single bad input doesn't take the whole chart down.
+func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
+	cards := make([]multiCardInput, 0, len(cardIds))
+	for _, cardId := range cardIds {
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		cardName := co.Name
+		if !co.Sealed {
+			cardName = fmt.Sprintf("%s (%s)", co.Name, co.SetCode)
+			// Collector number disambiguates two printings that share a
+			// set+finish (e.g. a regular and a borderless), so the legend at
+			// the top of a multi-card chart tells them apart.
+			if co.Number != "" {
+				cardName += " #" + co.Number
+			}
+			if co.Foil {
+				cardName += " Foil"
+			} else if co.Etched {
+				cardName += " Etched"
+			}
+		}
+
+		cards = append(cards, multiCardInput{
+			CardID:   cardId,
+			Name:     cardName,
+			Datasets: getDatasets(ctx, cardId, co.Sealed, labels, lb),
+		})
+	}
+
+	return mergeMultiCardDatasets(cards)
 }
 
 // A default scale for converting non-NM prices to NM

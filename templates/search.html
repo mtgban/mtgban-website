@@ -97,7 +97,7 @@
             <a class="search-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="search-sort-dir {{if .ReverseMode}}desc{{else}}asc{{end}}" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
         {{end}}
         <span class="search-sort-actions">
-            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
+            <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}{{if .ModalMode}}?chart={{.ChartIDsCSV}}&modal=1{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
         </span>
     </div>
     {{if .TotalUnique}}
@@ -442,13 +442,14 @@
                         <p class="search-results-blurb">Compare prices and availability for {{game_title}} singles and sealed products across markets below. On the left sidebar you can refine your search or expand it looking for products containing your search results. You may tweak sorting as needed.</p>
                     {{end}}
 
-                    {{if .ChartID}}
+                    {{if and .ChartID .Datasets}}
                         <div class="chart-container">
                             <div class="chart-legend" id="chartLegend"></div>
                             <canvas id="cardChart" width="760" height="480"></canvas>
                             <div class="chart-controls">
                                 <p class="chart-controls-actions">
                                     <select id="dateRange" onchange="changeRange(parseInt(this.value))">
+                                        {{if .IsMultiChart}}<option value="0">All</option>{{end}}
                                         <option value="30">1 Month</option>
                                         <option value="90" {{if lt $.MaxLookbackDays 90}} disabled {{end}}>3 Months{{if lt $.MaxLookbackDays 90}} (Standard+){{end}}</option>
                                         <option value="180" {{if ge $.MaxLookbackDays 180}} selected {{end}} {{if lt $.MaxLookbackDays 180}} disabled {{end}}>6 Months{{if lt $.MaxLookbackDays 180}} (Standard+){{end}}</option>
@@ -459,12 +460,20 @@
                                     </select>
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
+                                    <a class="btn default chart-add-btn" href="javascript:openChartAddModal()" title="Add another card to this chart">&#10133; Add card</a>
                                 </p>
                                 {{if .Checkpoints}}
                                 <p class="chart-checkpoint-toggles">
                                     <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
                                     <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
                                     <label class="cp-pill cp-pill-ban"><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>
+                                </p>
+                                {{end}}
+                                {{if and .IsMultiChart .ChartReferences}}
+                                <p class="chart-ref-picker">
+                                    {{range .ChartReferences}}
+                                        <a class="btn default ref-picker-btn" data-ref="{{.}}" href="javascript:void(0)" onclick="selectReference({{.}}); return false;">{{.}}</a>
+                                    {{end}}
                                 </p>
                                 {{end}}
                             </div>
@@ -490,8 +499,18 @@
                                 };
                             }
 
-                            // Apply saved or default date range before chart creation
-                            var savedRange = localStorage.getItem('chartDateRange');
+                            // Apply saved or default date range before chart creation.
+                            // Multi-card charts remember their range under a separate key and
+                            // default to the full union of every card's history, so the longest
+                            // timeline is visible at once; shorter-history cards just begin
+                            // partway along the shared axis instead of clamping the whole chart.
+                            var rangeKey = {{if .IsMultiChart}}'chartMultiDateRange'{{else}}'chartDateRange'{{end}};
+                            var savedRange = localStorage.getItem(rangeKey);
+                            {{if .IsMultiChart}}
+                            if (savedRange === null) {
+                                savedRange = '0';
+                            }
+                            {{end}}
                             if (savedRange !== null) {
                                 document.getElementById('dateRange').value = savedRange;
                             }
@@ -511,8 +530,10 @@
                                         {{range .Datasets}}
                                             {
                                                 label: {{.Name}},
+                                                cardId: {{.CardID}},
                                                 data: {{.Data}},
                                                 borderColor: {{.Color}},
+                                                referenceKey: {{.Reference}},
                                                 fill: 'origin',
                                             },
                                         {{end}}
@@ -525,11 +546,127 @@
                             window.cardChart = cardChart;
                             checkpointChartRef.chart = cardChart;
 
+                            {{if .IsMultiChart}}
+                            // Multi-card mode: keep one persistent line per card and swap its
+                            // data array when the reference changes. Chart.js then animates the
+                            // value transition (TCG Low → TCG Market morphs in place) instead
+                            // of fading datasets in/out, which feels choppy and makes the Y
+                            // axis snap.
+                            var chartReferences = {{.ChartReferences}};
+                            var savedRef = localStorage.getItem('chartMultiRef');
+                            var currentReference = (savedRef && chartReferences.indexOf(savedRef) >= 0)
+                                ? savedRef : chartReferences[0];
+
+                            // Reshape the server-rendered (card × reference) datasets into a
+                            // cardId -> { label, color, references: { ref: data } } lookup, then
+                            // collapse the chart down to one dataset per card. Keyed by cardId
+                            // (the UUID), not the display label, so two printings that share a
+                            // "Name (SET)" label stay distinct lines instead of merging.
+                            var cardLines = {};
+                            var cardOrder = [];
+                            cardChart.data.datasets.forEach(function(ds) {
+                                if (!cardLines[ds.cardId]) {
+                                    cardLines[ds.cardId] = { label: ds.label, color: ds.borderColor, references: {} };
+                                    cardOrder.push(ds.cardId);
+                                }
+                                cardLines[ds.cardId].references[ds.referenceKey] = ds.data;
+                            });
+                            cardChart.data.datasets = cardOrder.map(function(id) {
+                                var cl = cardLines[id];
+                                return {
+                                    cardId: id,
+                                    label: cl.label,
+                                    data: cl.references[currentReference] || [],
+                                    borderColor: cl.color,
+                                    fill: 'origin',
+                                };
+                            });
+                            cardChart.update('none');
+
+                            function selectReference(ref) {
+                                currentReference = ref;
+
+                                var newById = {};
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    var cl = cardLines[ds.cardId];
+                                    newById[ds.cardId] = cl ? (cl.references[ref] || []) : [];
+                                });
+
+                                // Pre-bridge: for positions that are NaN in current data but
+                                // have a value in the new reference, plant the nearest valid
+                                // neighbor's value as the starting point. update('none') commits
+                                // that state instantly, then the second update() animates from
+                                // it to the real new data — newly-appearing points slide out of
+                                // the existing line instead of popping in at their final spot.
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    var newData = newById[ds.cardId];
+                                    var oldData = ds.data;
+                                    var bridged = oldData.map(function(v, i) {
+                                        var oldNum = parseFloat(v);
+                                        if (!isNaN(oldNum)) return oldNum;
+                                        var newNum = parseFloat(newData[i]);
+                                        if (isNaN(newNum)) return NaN;
+                                        for (var k = 1; k < oldData.length; k++) {
+                                            if (i - k >= 0) {
+                                                var leftVal = parseFloat(oldData[i - k]);
+                                                if (!isNaN(leftVal)) return leftVal;
+                                            }
+                                            if (i + k < oldData.length) {
+                                                var rightVal = parseFloat(oldData[i + k]);
+                                                if (!isNaN(rightVal)) return rightVal;
+                                            }
+                                        }
+                                        return newNum;
+                                    });
+                                    ds.data = bridged;
+                                });
+                                cardChart.update('none');
+
+                                cardChart.data.datasets.forEach(function(ds) {
+                                    ds.data = newById[ds.cardId];
+                                });
+                                cardChart.update();
+
+                                renderChartLegend(cardChart, 'chartLegend');
+                                document.querySelectorAll('.ref-picker-btn').forEach(function(btn) {
+                                    btn.classList.toggle('active', btn.getAttribute('data-ref') === ref);
+                                });
+                                localStorage.setItem('chartMultiRef', ref);
+                            }
+                            document.querySelectorAll('.ref-picker-btn').forEach(function(btn) {
+                                btn.classList.toggle('active', btn.getAttribute('data-ref') === currentReference);
+                            });
+
+                            // Hovering a legend entry drives the sidebar preview to that
+                            // card by replaying its result row's hover, so the image,
+                            // printings and products all update together (setting just the
+                            // image left the printings list mismatched). Delegated on the
+                            // container so it keeps working after the legend re-renders.
+                            (function() {
+                                var legendEl = document.getElementById('chartLegend');
+                                if (!legendEl) return;
+                                var lastHoverId = null;
+                                legendEl.addEventListener('mouseover', function(e) {
+                                    var item = e.target.closest('.chart-legend-item[data-card-id]');
+                                    if (!item) return;
+                                    var cardId = item.getAttribute('data-card-id');
+                                    if (cardId === lastHoverId) return;
+                                    lastHoverId = cardId;
+                                    var row = document.querySelector('.result-header[data-card-id="' + cardId + '"]');
+                                    if (row && typeof row.onmouseover === 'function') row.onmouseover();
+                                });
+                                legendEl.addEventListener('mouseleave', function() { lastHoverId = null; });
+                            })();
+                            {{else}}
                             // Load state from local storage
                             applySavedLegendState(cardChart, legendStorageKey);
+                            {{end}}
 
-                            // Build custom HTML legend (clicks persist via legendStorageKey)
-                            renderChartLegend(cardChart, 'chartLegend', legendStorageKey);
+                            // Build custom HTML legend (single-card clicks persist via
+                            // legendStorageKey). Multi mode passes no key: its legend is a
+                            // per-card index, and writing that into the per-price-source
+                            // BANChart key would corrupt every single-card chart's saved state.
+                            renderChartLegend(cardChart, 'chartLegend'{{if not .IsMultiChart}}, legendStorageKey{{end}});
 
                             // Apply theme (light/dark)
                             rethemeFirstAxes(cardChart);
@@ -556,7 +693,7 @@
                                 }
                                 setReleasesSuppressedByRange(rangeDays);
                                 cardChart.update();
-                                localStorage.setItem('chartDateRange', rangeDays.toString());
+                                localStorage.setItem(rangeKey, rangeDays.toString());
                             }
                             function toggleGaps() {
                                 cardChart.options.spanGaps = !cardChart.options.spanGaps;
@@ -574,8 +711,12 @@
                             }
                             function downloadAsImg() {
                                 var chartImg = document.createElement('a');
+                                {{if .IsMultiChart}}
+                                chartImg.download = 'mtgban-chart.png';
+                                {{else}}
                                 {{$card := (index $.Metadata .ChartID)}}
                                 chartImg.download = '{{$card.Name}}{{if not $card.Sealed}} [{{$card.SetCode}}] ({{$card.Number}}) {{if $card.Foil}}foil{{else}}{{if $card.Etched}}etched{{else}}nonfoil{{end}}{{end}}{{end}}.png';
+                                {{end}}
 
                                 var scaleFactor = 2;
                                 var border = 10;
@@ -592,7 +733,115 @@
                                 chartImg.href = exportCanvas.toDataURL("image/png");
                                 chartImg.click();
                             }
+
+                            // Hoist the overlay to <body> so no ancestor's
+                            // transform/filter/backdrop-filter can trap its
+                            // position: fixed inside a containing block, and
+                            // apply the critical positioning styles inline so
+                            // the modal renders correctly even if css/search.css
+                            // is serving a stale browser-cached copy.
+                            (function() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                if (!overlay || overlay.parentNode === document.body) return;
+                                document.body.appendChild(overlay);
+                            })();
+
+                            // The pending roster (the chart plus everything batched but not yet
+                            // committed) lives in localStorage so it survives the iframe
+                            // navigating between the search box and result pages, and is shared
+                            // with the iframe (same origin).
+                            function chartPending() {
+                                return (localStorage.getItem('chartAddPending') || '').split(',').filter(Boolean);
+                            }
+                            function refreshBatchButton() {
+                                var btn = document.getElementById('chartBatchCommit');
+                                if (!btn) return;
+                                var orig = '{{.ChartIDsCSV}}'.split(',').filter(Boolean);
+                                var pend = chartPending();
+                                var os = {}; orig.forEach(function(x){ os[x] = 1; });
+                                var ps = {}; pend.forEach(function(x){ ps[x] = 1; });
+                                var changed = pend.filter(function(x){ return !os[x]; }).length +
+                                              orig.filter(function(x){ return !ps[x]; }).length;
+                                btn.disabled = changed === 0;
+                                btn.style.opacity = changed ? '1' : '0.5';
+                                btn.style.cursor = changed ? 'pointer' : 'default';
+                                btn.textContent = changed ? ('Update chart (' + changed + ')') : 'Update chart';
+                            }
+                            function openChartAddModal() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                var frame = document.getElementById('chartAddFrame');
+                                if (!overlay || !frame) return;
+                                // Seed the batch with the chart's current roster.
+                                localStorage.setItem('chartAddPending', '{{.ChartIDsCSV}}');
+                                refreshBatchButton();
+                                // Reuse the homepage (it owns the search box now) as the picker;
+                                // it carries the roster + modal flag so a search from it returns
+                                // to the results page still in modal context.
+                                frame.src = '/?chart={{.ChartIDsCSV}}&modal=1';
+                                overlay.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;justify-content:center;align-items:center;padding:4vh 4vw;';
+                                overlay.classList.add('open');
+                                document.body.classList.add('chart-add-open');
+                                document.body.style.overflow = 'hidden';
+                            }
+                            // Send the iframe back to the search box, carrying whatever's been
+                            // batched so far so already-added cards render as added.
+                            function newChartSearch() {
+                                var frame = document.getElementById('chartAddFrame');
+                                if (frame) frame.src = '/?chart=' + encodeURIComponent(chartPending().join(',')) + '&modal=1';
+                            }
+                            // Commit the batch: reload the chart with the pending roster.
+                            function commitChartBatch() {
+                                var pend = chartPending();
+                                var url = new URL(window.location.href);
+                                if (pend.length) url.searchParams.set('chart', pend.join(','));
+                                else url.searchParams.delete('chart');
+                                url.searchParams.delete('q');
+                                window.location = url.toString();
+                            }
+                            function closeChartAddModal() {
+                                var overlay = document.getElementById('chartAddOverlay');
+                                if (!overlay) return;
+                                overlay.style.display = 'none';
+                                overlay.classList.remove('open');
+                                document.body.classList.remove('chart-add-open');
+                                document.body.style.overflow = '';
+                            }
+                            document.addEventListener('keydown', function(e) {
+                                if (e.key === 'Escape') {
+                                    var overlay = document.getElementById('chartAddOverlay');
+                                    if (overlay && overlay.classList.contains('open')) {
+                                        closeChartAddModal();
+                                    }
+                                }
+                            });
+                            window.addEventListener('message', function(e) {
+                                if (e.origin !== window.location.origin) return;
+                                if (!e.data || e.data.type !== 'chart-batch-changed') return;
+                                // The iframe already updated the pending roster in localStorage;
+                                // just refresh the commit button's count.
+                                refreshBatchButton();
+                            });
                         </script>
+
+                        <div id="chartAddOverlay" class="chart-add-overlay" style="display:none;" onclick="if(event.target===this)closeChartAddModal()">
+                            <div class="chart-add-dialog" role="dialog" aria-label="Add card to chart"
+                                 style="width:92vw;max-width:1400px;height:92vh;background:var(--background,#fff);border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:14px;box-shadow:0 24px 72px rgba(0,0,0,0.45);display:flex;flex-direction:column;overflow:hidden;">
+                                <div class="chart-add-header"
+                                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-subtle,rgba(0,0,0,0.08));flex-shrink:0;background:var(--navbackground,var(--background,#fff));">
+                                    <span class="chart-add-title" style="font-size:14px;font-weight:600;color:var(--normal);">&#10133; Add cards to this chart</span>
+                                    <span style="display:flex;align-items:center;gap:8px;">
+                                        <button type="button" onclick="newChartSearch()" title="Search for another card"
+                                                style="background:var(--surface-2,rgba(0,0,0,0.05));border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:6px;font-size:13px;line-height:1;cursor:pointer;color:var(--normal);padding:7px 12px;">New search</button>
+                                        <button id="chartBatchCommit" type="button" onclick="commitChartBatch()" disabled title="Apply the batched cards and view the chart"
+                                                style="background:var(--search-link,#3b6fd4);border:1px solid var(--search-link,#3b6fd4);border-radius:6px;font-size:13px;font-weight:600;line-height:1;color:#fff;padding:7px 12px;opacity:0.5;cursor:default;">Update chart</button>
+                                        <button class="chart-add-close" type="button" onclick="closeChartAddModal()" aria-label="Close"
+                                                style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:var(--normal);padding:0 6px;">&times;</button>
+                                    </span>
+                                </div>
+                                <iframe id="chartAddFrame" class="chart-add-frame" title="Search for a card to add"
+                                        style="flex:1;width:100%;border:0;background:var(--background,#fff);"></iframe>
+                            </div>
+                        </div>
                     {{end}}
 
                     <svg height="0" width="0" xmlns="http://www.w3.org/2000/svg">
@@ -696,8 +945,21 @@
                                     {{if $card.TCGId}}
                                         <a href="https://store.tcgplayer.com/admin/product/manage/{{$card.TCGId}}" title="Manage your TCGplayer inventory" target=_blank><img width=22 src="/img/logo/tcgapp.png"></a>
                                     {{end}}
-                                    {{if and (not $.DisableChart) (eq $.ChartID "")}}
-                                        <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
+                                    {{if not $.DisableChart}}
+                                        {{if eq $.ChartIDsCSV ""}}
+                                            <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
+                                        {{else if in_list $.ChartIDs $cardId}}
+                                            {{if or $.ModalMode (gt (len $.ChartIDs) 1)}}
+                                            <a class="chart-remove-link" data-card-id="{{$cardId}}" href="?chart={{csv_without $.ChartIDsCSV $cardId}}" title="Remove from this chart">&#128200;&#10134;</a>
+                                            {{else}}
+                                            {{/* Sole card on a non-modal chart page: a remove link would
+                                                 point at ?chart= and dump the user on a blank landing, so
+                                                 show a static "charted" glyph with nothing to remove to. */}}
+                                            <span class="emoji" title="The only card on this chart">&#128200;</span>
+                                            {{end}}
+                                        {{else}}
+                                            <a class="chart-add-link" data-card-id="{{$cardId}}" href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
+                                        {{end}}
                                     {{end}}
                                     {{/* Shown only when the screen is narrow enough that the sidebar
                                          preview is hidden; opens the card art in a lightbox. */}}
@@ -1161,6 +1423,124 @@
         if (e.key === 'Escape') hideCardImage();
     });
 </script>
+{{if .ModalMode}}
+<style>
+/* Inline so the iframe content sheds page chrome even when css/search.css is
+ * serving a stale browser-cached copy without the body.modal-embed rules. */
+body.modal-embed { margin: 0 !important; }
+body.modal-embed .page-content { padding-top: 0 !important; min-height: auto !important; }
+body.modal-embed .search-bar-sticky { top: 0 !important; }
+body.modal-embed .search-layout { margin-top: 0 !important; min-height: auto !important; }
+body.modal-embed .ban-confirm-dialog-host,
+body.modal-embed .cp-overlay { display: none !important; }
+</style>
+<script>
+(function() {
+    var chartCtx = {{.ChartIDsCSV}};
+
+    // Mirror localStorage.theme into the iframe body. The 'storage' event fires
+    // in other same-origin documents when the parent's nightmode.js writes a
+    // new value, so toggling the navbar moon button while the modal is open
+    // flips the iframe content with it.
+    function applyTheme() {
+        // Resolve 'light' | 'dark' | 'system' the same way base-landing and
+        // nightmode.js do — a bare truthiness check treats 'system' as light,
+        // so a system-theme user on a dark OS would get a light iframe.
+        var v = localStorage.getItem('theme');
+        var pref = (v === 'light' || v === 'dark' || v === 'system') ? v : 'system';
+        var dark = pref === 'dark' || (pref === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.body.classList.toggle('dark-theme', dark);
+        document.body.classList.toggle('light-theme', !dark);
+    }
+    applyTheme();
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'theme' || e.key === null) applyTheme();
+    });
+
+    // Tag every same-origin link to /search or /sealed (including bare ?q=...)
+    // with modal=1 and the active chart roster, so clicking around inside the
+    // modal keeps the iframe in modal mode instead of escaping to a full page.
+    function decorate() {
+        document.querySelectorAll('a[href]').forEach(function(a) {
+            if (a.dataset.modalDecorated === '1') return;
+            var raw = a.getAttribute('href');
+            if (!raw) return;
+            if (raw.charAt(0) === '#' || raw.indexOf('javascript:') === 0) return;
+            if (a.target === '_blank') return;
+            var url;
+            try { url = new URL(raw, window.location.href); } catch (e) { return; }
+            if (url.origin !== window.location.origin) return;
+            if (!/^\/(search|sealed)\/?$/.test(url.pathname)) return;
+            if (chartCtx && !url.searchParams.has('chart')) {
+                url.searchParams.set('chart', chartCtx);
+            }
+            url.searchParams.set('modal', '1');
+            a.href = url.toString();
+            a.dataset.modalDecorated = '1';
+        });
+    }
+    decorate();
+    new MutationObserver(decorate).observe(document.body, { childList: true, subtree: true });
+
+    // Clicking a card's chart +/- batches it instead of committing immediately:
+    // update the shared pending roster, flip the row control, toast, and let the
+    // parent refresh its "Update chart" counter. The user commits from there.
+    function setChartRowState(a, added) {
+        if (added) {
+            a.classList.remove('chart-add-link');
+            a.classList.add('chart-remove-link');
+            a.title = 'Remove from this chart';
+            a.innerHTML = '&#128200;&#10134;';
+        } else {
+            a.classList.remove('chart-remove-link');
+            a.classList.add('chart-add-link');
+            a.title = 'Add to this chart';
+            a.innerHTML = '&#128200;&#10133;';
+        }
+    }
+    var chartToastEl;
+    function showChartToast(msg) {
+        if (!chartToastEl) {
+            chartToastEl = document.createElement('div');
+            chartToastEl.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:rgba(0,0,0,0.85);color:#fff;padding:8px 16px;border-radius:999px;font-size:13px;z-index:99999;pointer-events:none;opacity:0;transition:opacity 0.2s;';
+            document.body.appendChild(chartToastEl);
+        }
+        chartToastEl.textContent = msg;
+        chartToastEl.style.opacity = '1';
+        clearTimeout(chartToastEl._t);
+        chartToastEl._t = setTimeout(function(){ chartToastEl.style.opacity = '0'; }, 1500);
+    }
+    document.addEventListener('click', function(e) {
+        var add = e.target.closest('a.chart-add-link');
+        var rm = e.target.closest('a.chart-remove-link');
+        var a = add || rm;
+        if (!a) return;
+        var cardId = a.getAttribute('data-card-id');
+        if (!cardId) return;
+        e.preventDefault();
+
+        var pending = (localStorage.getItem('chartAddPending') || '').split(',').filter(Boolean);
+        var idx = pending.indexOf(cardId);
+        var added = !!add;
+        if (added) {
+            if (idx === -1) pending.push(cardId);
+        } else if (idx !== -1) {
+            pending.splice(idx, 1);
+        }
+        localStorage.setItem('chartAddPending', pending.join(','));
+        setChartRowState(a, added);
+
+        var row = a.closest('[data-card-name]');
+        var name = row ? (row.getAttribute('data-card-name') || 'Card') : 'Card';
+        showChartToast(name + (added ? ' added to chart batch' : ' removed from chart batch'));
+
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'chart-batch-changed' }, window.location.origin);
+        }
+    });
+})();
+</script>
+{{end}}
 {{end}}
 
 {{define "settings-content"}}

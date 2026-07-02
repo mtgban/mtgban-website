@@ -178,6 +178,11 @@ type PageVars struct {
 	Datasets        []Dataset
 	Checkpoints     []ChartCheckpoint
 	ChartID         string
+	ChartIDs        []string
+	ChartIDsCSV     string
+	IsMultiChart    bool
+	ChartReferences []string
+	ModalMode       bool
 	Alternative     string
 	StocksURL       string
 	AltEtchedId     string
