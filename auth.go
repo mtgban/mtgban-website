@@ -435,6 +435,7 @@ func enforceSigning(next http.Handler) http.Handler {
 				}) {
 					_, noAuth := Config.ACL["Any"][nav.Name]
 					if noAuth {
+						recordPageHit(r)
 						noSigning(next).ServeHTTP(w, r)
 						return
 					}
@@ -577,6 +578,7 @@ func enforceSigning(next http.Handler) http.Handler {
 			}
 		}
 
+		recordPageHit(r)
 		gziphandler.GzipHandler(next).ServeHTTP(w, r)
 	})
 }
