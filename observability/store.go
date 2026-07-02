@@ -33,9 +33,12 @@ func (c *Client) InsertBatch(ctx context.Context, evs []Event) error {
 	return err
 }
 
-// RefreshRollup recomputes usage_daily without locking it against readers.
+// RefreshRollup recomputes usage_daily. Non-concurrent: it takes a brief
+// ACCESS EXCLUSIVE lock, acceptable for a tiny hourly rollup on an admin-only
+// dashboard, and avoids needing the TEMPORARY database privilege that a
+// CONCURRENTLY refresh requires.
 func (c *Client) RefreshRollup(ctx context.Context) error {
-	_, err := c.db.ExecContext(ctx, "REFRESH MATERIALIZED VIEW CONCURRENTLY usage_daily")
+	_, err := c.db.ExecContext(ctx, "REFRESH MATERIALIZED VIEW usage_daily")
 	return err
 }
 
