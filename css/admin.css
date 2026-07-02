@@ -145,6 +145,8 @@
     white-space: nowrap;
 }
 .admin-table th.c { text-align: center; }
+.admin-table th.num, .admin-table td.num { text-align: right; }
+.admin-table th.num { width: 6em; }
 .admin-table td {
     padding: 7px 12px;
     border-bottom: 1px solid var(--border-subtle);
