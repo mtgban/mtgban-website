@@ -12,7 +12,7 @@ import (
 //go:embed schema_tcg.sql
 var tcgSchemaSQL string
 
-// TCGPriceRow is a single row of the tcg_prices table: one game's price for a
+// TCGPriceRow is a single row of the tcgplayer_nonmagic_product_prices table: one game's price for a
 // TCGplayer product and printing sub-type on a given day. Unlike PriceRow,
 // which is keyed by mtgjson uuid, this is keyed by TCGplayer product id so it
 // can hold games (Lorcana, Pokemon, ...) whose cards have no mtgjson uuid.
@@ -43,15 +43,41 @@ const tcgSelectColumns = `
 	date, category_id, product_id, sub_type_name,
 	low_price, mid_price, high_price, market_price, direct_low_price`
 
-// EnsureTCGSchema creates the tcg_prices table and its indexes if they do not
-// already exist. It is idempotent and a no-op on a read-only client. Callers
-// that ingest into tcg_prices should invoke this once at startup.
+// EnsureTCGSchema creates the tcgplayer_nonmagic_product_prices parent table, its default partition,
+// and its indexes if they do not already exist. tcgplayer_nonmagic_product_prices is LIST-partitioned
+// by category_id; this creates only the parent and the catch-all default
+// partition. Call EnsureTCGCategoryPartition for each configured game to give it
+// a dedicated partition. It is idempotent and a no-op on a read-only client.
+// Callers that ingest into tcgplayer_nonmagic_product_prices should invoke this once at startup.
 func (c *Client) EnsureTCGSchema(ctx context.Context) error {
 	if c.readOnly {
 		return nil
 	}
 	if _, err := c.db.ExecContext(ctx, tcgSchemaSQL); err != nil {
 		return fmt.Errorf("timeseries: ensure tcg schema: %w", err)
+	}
+	return nil
+}
+
+// EnsureTCGCategoryPartition creates the LIST partition of tcgplayer_nonmagic_product_prices that holds
+// a single TCGplayer category, if it does not already exist. Games never share
+// rows and every query is category-scoped, so each configured game gets its own
+// partition, keeping vacuum, analyze, and planner statistics per-game. It is
+// idempotent and a no-op on a read-only client. Call it for a category before
+// upserting that category's rows; otherwise the rows route to the default
+// partition. Requires EnsureTCGSchema to have created the parent first.
+func (c *Client) EnsureTCGCategoryPartition(ctx context.Context, categoryID int) error {
+	if c.readOnly {
+		return nil
+	}
+	// categoryID is a positive TCGplayer id from the trusted game config, so it
+	// is safe to interpolate into the partition name and bound.
+	q := fmt.Sprintf(
+		`CREATE TABLE IF NOT EXISTS tcgplayer_nonmagic_product_prices_cat_%d PARTITION OF tcgplayer_nonmagic_product_prices FOR VALUES IN (%d)`,
+		categoryID, categoryID,
+	)
+	if _, err := c.db.ExecContext(ctx, q); err != nil {
+		return fmt.Errorf("timeseries: ensure tcg partition for category %d: %w", categoryID, err)
 	}
 	return nil
 }
@@ -74,7 +100,7 @@ func scanTCGRow(scanner interface{ Scan(...any) error }) (TCGPriceRow, error) {
 // newest first.
 func (c *Client) GetTCGPriceHistory(ctx context.Context, categoryID, productID int, subTypeName string) ([]TCGPriceRow, error) {
 	q := `SELECT` + tcgSelectColumns + `
-		FROM tcg_prices
+		FROM tcgplayer_nonmagic_product_prices
 		WHERE category_id = $1 AND product_id = $2 AND sub_type_name = $3
 		ORDER BY date DESC`
 	rows, err := c.db.QueryContext(ctx, q, categoryID, productID, subTypeName)
@@ -98,7 +124,7 @@ func (c *Client) GetTCGPriceHistory(ctx context.Context, categoryID, productID i
 // sub-type. It returns sql.ErrNoRows when the product has no history.
 func (c *Client) GetLatestTCGPrice(ctx context.Context, categoryID, productID int, subTypeName string) (TCGPriceRow, error) {
 	q := `SELECT` + tcgSelectColumns + `
-		FROM tcg_prices
+		FROM tcgplayer_nonmagic_product_prices
 		WHERE category_id = $1 AND product_id = $2 AND sub_type_name = $3
 		ORDER BY date DESC LIMIT 1`
 	return scanTCGRow(c.db.QueryRowContext(ctx, q, categoryID, productID, subTypeName))
@@ -119,7 +145,7 @@ func (c *Client) GetTCGLatestDate(ctx context.Context, categoryID int) (time.Tim
 
 func (c *Client) tcgBoundaryDate(ctx context.Context, agg string, categoryID int) (time.Time, bool, error) {
 	// agg is a hard-coded "MIN"/"MAX" from the two callers above; safe to interpolate.
-	q := fmt.Sprintf(`SELECT %s(date) FROM tcg_prices WHERE category_id = $1`, agg)
+	q := fmt.Sprintf(`SELECT %s(date) FROM tcgplayer_nonmagic_product_prices WHERE category_id = $1`, agg)
 	var d sql.NullTime
 	if err := c.db.QueryRowContext(ctx, q, categoryID).Scan(&d); err != nil {
 		return time.Time{}, false, err
@@ -227,7 +253,7 @@ func buildTCGUpsertQuery(batch []TCGPriceRow) (string, []any) {
 		)
 	}
 
-	q := `INSERT INTO tcg_prices (
+	q := `INSERT INTO tcgplayer_nonmagic_product_prices (
 			date, category_id, product_id, sub_type_name,
 			low_price, mid_price, high_price, market_price, direct_low_price
 		) VALUES ` + strings.Join(valueClauses, ",") + `
