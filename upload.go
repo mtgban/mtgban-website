@@ -1727,7 +1727,20 @@ func parseRow(indexMap map[string]int, record []string) (UploadEntry, error) {
 	var err error
 
 	if cardId == "" {
+		// Match might mutate the input card, keep a copy of the name for the sealed fallback below
+		ogName := res.Card.Name
+
 		cardId, err = mtgmatcher.Match(&res.Card)
+
+		// When the lookup fails, retry against the sealed pool for a 1:1 match
+		if err != nil {
+			hits, _ := mtgmatcher.SearchSealedEquals(ogName)
+			if len(hits) > 0 {
+				cardId = hits[0]
+				err = nil
+			}
+		}
+
 	}
 
 	var alias *mtgmatcher.AliasingError
