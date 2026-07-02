@@ -518,7 +518,7 @@ type ConfigType struct {
 	// The location of the configuation file
 	sourcePath string
 
-	SqlConfig       *timeseries.SqlConfig `json:"sql_config"`
+	SqlConfig           *timeseries.SqlConfig `json:"sql_config"`
 	UserStateConfig     *userstate.SqlConfig  `json:"user_state_config"`
 	ObservabilityConfig *timeseries.SqlConfig `json:"observability_config"`
 }
