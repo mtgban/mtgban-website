@@ -8,9 +8,10 @@ import (
 )
 
 type fakeStore struct {
-	mu       sync.Mutex
-	inserted int
-	refresh  int
+	mu           sync.Mutex
+	inserted     int
+	refresh      int
+	refreshBlock chan struct{}
 }
 
 func (f *fakeStore) InsertBatch(ctx context.Context, evs []Event) error {
@@ -20,6 +21,10 @@ func (f *fakeStore) InsertBatch(ctx context.Context, evs []Event) error {
 	return nil
 }
 func (f *fakeStore) RefreshRollup(ctx context.Context) error {
+	// Block outside the lock so count() is never deadlocked by a held refresh.
+	if f.refreshBlock != nil {
+		<-f.refreshBlock
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.refresh++
@@ -104,4 +109,20 @@ func TestDoubleCloseNoPanic(t *testing.T) {
 	if err := r.Close(); err != nil {
 		t.Fatalf("second Close: %v", err)
 	}
+}
+
+func TestRefreshDoesNotStallFlush(t *testing.T) {
+	block := make(chan struct{})
+	fs := &fakeStore{refreshBlock: block}
+	r := newRecorder(fs, recorderCfg{bufferSize: 16, batchSize: 1, flushInterval: time.Hour, refreshInterval: 10 * time.Millisecond})
+	r.start()
+	defer func() {
+		close(block) // unblock the held refresh so Close can drain
+		r.Close()
+	}()
+	// Give the refresh ticker time to fire and block inside RefreshRollup.
+	time.Sleep(50 * time.Millisecond)
+	// Even with refresh blocked, a recorded event must still flush.
+	r.Record(Event{Path: "p"})
+	waitFor(t, 1, fs.count)
 }

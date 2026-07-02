@@ -10,6 +10,7 @@ import (
 
 // InsertBatch writes events in one multi-row INSERT. ts uses the column default.
 // An empty Visitor is stored as NULL so count(DISTINCT visitor) ignores anon hits.
+// Each event binds 5 params; callers must keep len(evs)*5 below Postgres's 65535 param limit (256 events = 1280 params).
 func (c *Client) InsertBatch(ctx context.Context, evs []Event) error {
 	if len(evs) == 0 {
 		return nil

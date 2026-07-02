@@ -24,7 +24,7 @@ type recorderCfg struct {
 func defaultRecorderCfg() recorderCfg {
 	return recorderCfg{
 		bufferSize:      4096,
-		batchSize:       256,
+		batchSize:       256, // batchSize * 5 must stay < 65535 (Postgres param limit)
 		flushInterval:   5 * time.Second,
 		refreshInterval: time.Hour,
 	}
@@ -51,8 +51,9 @@ func newRecorder(s store, cfg recorderCfg) *Recorder {
 }
 
 func (r *Recorder) start() {
-	r.wg.Add(1)
-	go r.run()
+	r.wg.Add(2)
+	go r.runFlush()
+	go r.runRefresh()
 }
 
 // NewRecorder builds a Recorder with default config and starts its goroutine.
@@ -92,12 +93,10 @@ func (r *Recorder) Close() error {
 	return nil
 }
 
-func (r *Recorder) run() {
+func (r *Recorder) runFlush() {
 	defer r.wg.Done()
 	flushTicker := time.NewTicker(r.cfg.flushInterval)
-	refreshTicker := time.NewTicker(r.cfg.refreshInterval)
 	defer flushTicker.Stop()
-	defer refreshTicker.Stop()
 
 	batch := make([]Event, 0, r.cfg.batchSize)
 	flush := func() {
@@ -131,6 +130,29 @@ func (r *Recorder) run() {
 			if d := atomic.LoadInt64(&r.dropped); d > 0 {
 				log.Printf("observability: dropped %d events (buffer full)", d)
 			}
+		case <-r.done:
+			for {
+				select {
+				case ev := <-r.ch:
+					batch = append(batch, ev)
+					if len(batch) >= r.cfg.batchSize {
+						flush()
+					}
+				default:
+					flush()
+					return
+				}
+			}
+		}
+	}
+}
+
+func (r *Recorder) runRefresh() {
+	defer r.wg.Done()
+	refreshTicker := time.NewTicker(r.cfg.refreshInterval)
+	defer refreshTicker.Stop()
+	for {
+		select {
 		case <-refreshTicker.C:
 			func() {
 				defer func() {
@@ -145,18 +167,7 @@ func (r *Recorder) run() {
 				}
 			}()
 		case <-r.done:
-			for {
-				select {
-				case ev := <-r.ch:
-					batch = append(batch, ev)
-					if len(batch) >= r.cfg.batchSize {
-						flush()
-					}
-				default:
-					flush()
-					return
-				}
-			}
+			return
 		}
 	}
 }
