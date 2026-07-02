@@ -40,6 +40,16 @@ import (
 	_ "net/http/pprof"
 )
 
+// UsageDashboard holds the telemetry aggregates rendered on /admin?page=usage.
+type UsageDashboard struct {
+	Since       time.Time
+	IncludeBots bool
+	TopPages    []observability.PathAgg
+	ByTier      []observability.TierAgg
+	ByDevice    []observability.DeviceAgg
+	SubViews    []observability.PathAgg
+}
+
 type PageVars struct {
 	Pagination
 
@@ -70,6 +80,7 @@ type PageVars struct {
 	ErrorMessage   string
 	WarningMessage string
 	InfoMessage    string
+	UsageStats     *UsageDashboard
 
 	AllKeys        []string
 	CardQuantities map[string]int
@@ -1225,6 +1236,8 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 				"templates/partials/settings-modal.html",
 				"templates/partials/editions-picker.html",
 			)
+		case "admin.html":
+			files = append(files, "templates/partials/admin-usage.html")
 		}
 	}
 

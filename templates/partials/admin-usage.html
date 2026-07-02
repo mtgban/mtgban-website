@@ -1,0 +1,58 @@
+<!-- templates/partials/admin-usage.html -->
+{{define "admin-usage"}}
+<div class="admin-usage">
+    <h2>Usage (last 30 days{{if .UsageStats.IncludeBots}}, incl. bots{{end}})</h2>
+    <p>
+        <a href="/admin?page=usage">Humans only</a> |
+        <a href="/admin?page=usage&amp;bots=1">Include bots</a>
+    </p>
+
+    <h3>Top pages</h3>
+    <table class="admin-usage-table">
+        <thead><tr><th>Path</th><th>Hits</th><th>Uniques</th></tr></thead>
+        <tbody>
+        {{range .UsageStats.TopPages}}
+            <tr><td>{{.Path}}</td><td>{{.Hits}}</td><td>{{.Uniques}}</td></tr>
+        {{else}}
+            <tr><td colspan="3">No data yet</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+
+    <h3>Usage by tier</h3>
+    <table class="admin-usage-table">
+        <thead><tr><th>Tier</th><th>Hits</th><th>Uniques</th></tr></thead>
+        <tbody>
+        {{range .UsageStats.ByTier}}
+            <tr><td>{{.Tier}}</td><td>{{.Hits}}</td><td>{{.Uniques}}</td></tr>
+        {{else}}
+            <tr><td colspan="3">No data yet</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+
+    <h3>Mobile vs desktop by page</h3>
+    <table class="admin-usage-table">
+        <thead><tr><th>Path</th><th>Device</th><th>Hits</th><th>Uniques</th></tr></thead>
+        <tbody>
+        {{range .UsageStats.ByDevice}}
+            <tr><td>{{.Path}}</td><td>{{.Device}}</td><td>{{.Hits}}</td><td>{{.Uniques}}</td></tr>
+        {{else}}
+            <tr><td colspan="4">No data yet</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+
+    <h3>Newspaper &amp; sleepers sub-views</h3>
+    <table class="admin-usage-table">
+        <thead><tr><th>Path</th><th>Hits</th><th>Uniques</th></tr></thead>
+        <tbody>
+        {{range .UsageStats.SubViews}}
+            <tr><td>{{.Path}}</td><td>{{.Hits}}</td><td>{{.Uniques}}</td></tr>
+        {{else}}
+            <tr><td colspan="3">No data yet</td></tr>
+        {{end}}
+        </tbody>
+    </table>
+</div>
+{{end}}

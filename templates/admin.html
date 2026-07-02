@@ -38,6 +38,8 @@
         <div class="admin-stat"><span class="sl">Stash</span><span class="sv">{{if .LastStash.IsZero}}not set{{else}}<time class="admin-localtime" datetime="{{.LastStash.UTC.Format "2006-01-02T15:04:05Z"}}">{{.LastStash.Format "Jan 02 15:04"}}</time>{{end}}</span></div>
     </div>
 
+    {{if .UsageStats}}{{template "admin-usage" .}}{{end}}
+
     <!-- Tabs -->
     <div class="admin-tabs">
         <button class="admin-tab{{if or (eq .Page "") (eq .Page "dashboard")}} active{{end}}" onclick="switchTab(this,'dashboard')">Dashboard</button>
