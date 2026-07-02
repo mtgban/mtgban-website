@@ -12,10 +12,6 @@ import (
 	"time"
 )
 
-func inList(haystack []string, needle string) bool {
-	return slices.Contains(haystack, needle)
-}
-
 // csvWithout returns csv with `drop` and any empty entries removed. Used by
 // the templates to build "remove this card" URLs that strip one entry from the
 // chart roster while keeping the rest in order.
@@ -34,7 +30,6 @@ var funcMap = template.FuncMap{
 	"inc": func(i, j int) int {
 		return i + j
 	},
-	"in_list":     inList,
 	"csv_without": csvWithout,
 	"dec": func(i, j int) int {
 		return i - j

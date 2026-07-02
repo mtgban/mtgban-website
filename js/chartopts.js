@@ -439,7 +439,10 @@ var RELEASES_LONG_RANGE_KEY = 'chartReleasesLongRange';
 var currentRangeDays = 0;
 
 function isLongChartRange(rangeDays) {
-    return typeof rangeDays === 'number' && rangeDays >= RELEASE_LONG_RANGE_DAYS;
+    // 0 is the multi-card "All" range (the full union of every card's history),
+    // which is by definition the longest possible span, so it counts as long
+    // and gets the same release-badge suppression as any multi-year window.
+    return typeof rangeDays === 'number' && (rangeDays === 0 || rangeDays >= RELEASE_LONG_RANGE_DAYS);
 }
 
 function getReleasesLongRangePref() {

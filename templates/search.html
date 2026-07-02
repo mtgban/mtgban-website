@@ -734,18 +734,6 @@
                                 chartImg.click();
                             }
 
-                            // Hoist the overlay to <body> so no ancestor's
-                            // transform/filter/backdrop-filter can trap its
-                            // position: fixed inside a containing block, and
-                            // apply the critical positioning styles inline so
-                            // the modal renders correctly even if css/search.css
-                            // is serving a stale browser-cached copy.
-                            (function() {
-                                var overlay = document.getElementById('chartAddOverlay');
-                                if (!overlay || overlay.parentNode === document.body) return;
-                                document.body.appendChild(overlay);
-                            })();
-
                             // The pending roster (the chart plus everything batched but not yet
                             // committed) lives in localStorage so it survives the iframe
                             // navigating between the search box and result pages, and is shared
@@ -771,6 +759,13 @@
                                 var overlay = document.getElementById('chartAddOverlay');
                                 var frame = document.getElementById('chartAddFrame');
                                 if (!overlay || !frame) return;
+                                // Hoist the overlay to <body> so no ancestor's transform/filter/
+                                // backdrop-filter traps its position:fixed inside a containing
+                                // block. Done here (not at script-parse time) because the overlay
+                                // element is rendered further down the page than this script.
+                                if (overlay.parentNode !== document.body) {
+                                    document.body.appendChild(overlay);
+                                }
                                 // Seed the batch with the chart's current roster.
                                 localStorage.setItem('chartAddPending', '{{.ChartIDsCSV}}');
                                 refreshBatchButton();
@@ -816,7 +811,13 @@
                             });
                             window.addEventListener('message', function(e) {
                                 if (e.origin !== window.location.origin) return;
-                                if (!e.data || e.data.type !== 'chart-batch-changed') return;
+                                if (!e.data) return;
+                                // A second Escape inside the iframe asks us to close the modal.
+                                if (e.data.type === 'chart-modal-close') {
+                                    closeChartAddModal();
+                                    return;
+                                }
+                                if (e.data.type !== 'chart-batch-changed') return;
                                 // The iframe already updated the pending roster in localStorage;
                                 // just refresh the commit button's count.
                                 refreshBatchButton();
@@ -948,7 +949,7 @@
                                     {{if not $.DisableChart}}
                                         {{if eq $.ChartIDsCSV ""}}
                                             <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
-                                        {{else if in_list $.ChartIDs $cardId}}
+                                        {{else if slice_has $.ChartIDs $cardId}}
                                             {{if or $.ModalMode (gt (len $.ChartIDs) 1)}}
                                             <a class="chart-remove-link" data-card-id="{{$cardId}}" href="?chart={{csv_without $.ChartIDsCSV $cardId}}" title="Remove from this chart">&#128200;&#10134;</a>
                                             {{else}}
@@ -1281,9 +1282,18 @@
                 }
             }
 
-            // Escape: blur the input
+            // Escape: blur the search input. Inside the chart "Add a card"
+            // modal, a second Escape (input already blurred) asks the parent
+            // page to close the modal — keydown events don't cross the iframe
+            // boundary, so the modal can only be dismissed from in here.
             if (e.key === 'Escape' && searchbox) {
-                searchbox.blur();
+                if (document.activeElement === searchbox) {
+                    searchbox.blur();
+                    return;
+                }
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({ type: 'chart-modal-close' }, window.location.origin);
+                }
                 return;
             }
 

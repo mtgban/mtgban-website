@@ -202,21 +202,6 @@ func relevantCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint 
 	return out
 }
 
-// setReleaseCheckpoints returns only set-release markers in the window, with
-// no per-card context (no reprints, bans, unbans, or format events). Used in
-// multi-card chart mode where per-card annotations don't apply but a shared
-// set-release timeline is still useful context.
-func setReleaseCheckpoints(earliest time.Time) []ChartCheckpoint {
-	// Passing an empty printingSet means nothing is treated as a reprint, so
-	// setCheckpointsFromEditions naturally emits only "release" markers with
-	// its existing one-per-day dedup logic intact.
-	out := setCheckpointsFromEditions("", earliest, nil)
-	sort.SliceStable(out, func(i, j int) bool {
-		return out[i].Date < out[j].Date
-	})
-	return out
-}
-
 // multiCardCheckpoints builds the shared checkpoint timeline for a multi-card
 // chart by merging every card's relevant checkpoints into one axis: the union
 // of bans/unbans and reprints across all cards, plus set releases. When cards
