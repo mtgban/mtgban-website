@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// TestTCGPricesLive exercises the tcg_prices code paths end to end against a
+// TestTCGPricesLive exercises the tcgplayer_nonmagic_product_prices code paths end to end against a
 // real Postgres, verifying the exact production flow: EnsureTCGSchema's
 // multi-statement DDL via lib/pq, the batched upsert, the read helpers, and the
 // per-category date cursors.
@@ -61,7 +61,7 @@ func TestTCGPricesLive(t *testing.T) {
 
 	// Start clean and delete our sentinel rows when the test finishes.
 	clear := func() {
-		if _, err := c.db.ExecContext(ctx, `DELETE FROM tcg_prices WHERE category_id = $1`, liveSentinelCategory); err != nil {
+		if _, err := c.db.ExecContext(ctx, `DELETE FROM tcgplayer_nonmagic_product_prices WHERE category_id = $1`, liveSentinelCategory); err != nil {
 			t.Errorf("cleanup delete: %v", err)
 		}
 	}

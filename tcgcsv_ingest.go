@@ -28,6 +28,23 @@ func priceToRow(date string, categoryID int, p tcgcsv.Price) timeseries.TCGPrice
 	}
 }
 
+// ensureTCGPartitions makes sure tcg_prices has a dedicated partition for every
+// configured game's category before any upsert. tcg_prices is LIST-partitioned
+// by category_id (games never share rows), so each game needs its own partition;
+// without one, that game's rows route to the catch-all default partition instead
+// of a per-game partition. EnsureTCGSchema already pre-creates partitions for the
+// known TCGplayer categories, so this is a no-op for them and mainly covers a
+// configured category not yet listed in the schema. Call it after EnsureTCGSchema,
+// before ingesting.
+func ensureTCGPartitions(ctx context.Context) error {
+	for _, g := range Config.TCGCSVConfig.Games {
+		if err := PricesArchiveDB.EnsureTCGCategoryPartition(ctx, g.CategoryID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // tcgcsvClient builds a client from the configured registry, or an error if
 // ingestion isn't configured.
 func tcgcsvClient() (*tcgcsv.Client, error) {
@@ -80,6 +97,9 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, force bool) error {
 		return err
 	}
 	if err := PricesArchiveDB.EnsureTCGSchema(ctx); err != nil {
+		return err
+	}
+	if err := ensureTCGPartitions(ctx); err != nil {
 		return err
 	}
 
@@ -189,6 +209,9 @@ func ingestTCGCSVLatest(ctx context.Context) error {
 		return err
 	}
 	if err := PricesArchiveDB.EnsureTCGSchema(ctx); err != nil {
+		return err
+	}
+	if err := ensureTCGPartitions(ctx); err != nil {
 		return err
 	}
 
