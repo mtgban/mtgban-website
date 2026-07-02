@@ -41,8 +41,14 @@ create table if not exists public.tcgplayer_nonmagic_product_prices_default
 create table if not exists public.tcgplayer_nonmagic_product_prices_cat_1  partition of public.tcgplayer_nonmagic_product_prices for values in (1);   -- Magic
 create table if not exists public.tcgplayer_nonmagic_product_prices_cat_2  partition of public.tcgplayer_nonmagic_product_prices for values in (2);   -- Yu-Gi-Oh!
 create table if not exists public.tcgplayer_nonmagic_product_prices_cat_3  partition of public.tcgplayer_nonmagic_product_prices for values in (3);   -- Pokemon
+create table if not exists public.tcgplayer_nonmagic_product_prices_cat_16 partition of public.tcgplayer_nonmagic_product_prices for values in (16);  -- Cardfight Vanguard
+create table if not exists public.tcgplayer_nonmagic_product_prices_cat_27 partition of public.tcgplayer_nonmagic_product_prices for values in (27);  -- Dragon Ball Super CCG
+create table if not exists public.tcgplayer_nonmagic_product_prices_cat_62 partition of public.tcgplayer_nonmagic_product_prices for values in (62);  -- Flesh & Blood
+create table if not exists public.tcgplayer_nonmagic_product_prices_cat_63 partition of public.tcgplayer_nonmagic_product_prices for values in (63);  -- Digimon
 create table if not exists public.tcgplayer_nonmagic_product_prices_cat_68 partition of public.tcgplayer_nonmagic_product_prices for values in (68);  -- One Piece
 create table if not exists public.tcgplayer_nonmagic_product_prices_cat_71 partition of public.tcgplayer_nonmagic_product_prices for values in (71);  -- Disney Lorcana
+create table if not exists public.tcgplayer_nonmagic_product_prices_cat_79 partition of public.tcgplayer_nonmagic_product_prices for values in (79);  -- Star Wars Unlimited
+create table if not exists public.tcgplayer_nonmagic_product_prices_cat_89 partition of public.tcgplayer_nonmagic_product_prices for values in (89);  -- Riftbound
 
 -- Product/sub-type history and latest-price lookups (WHERE category_id,
 -- product_id, sub_type_name ORDER BY date). Declared on the partitioned parent so

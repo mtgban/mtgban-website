@@ -28,11 +28,17 @@ const defaultUserAgent = "mtgban-website (+https://mtgban.com)"
 // Known TCGplayer category ids, for reference and config. Categories 21, 69,
 // and 70 are junk per the tcgcsv FAQ and should not be ingested.
 const (
-	CategoryMagic    = 1
-	CategoryYuGiOh   = 2
-	CategoryPokemon  = 3
-	CategoryOnePiece = 68
-	CategoryLorcana  = 71
+	CategoryMagic             = 1
+	CategoryYuGiOh            = 2
+	CategoryPokemon           = 3
+	CategoryVanguard          = 16
+	CategoryDragonBallSuper   = 27
+	CategoryFleshAndBlood     = 62
+	CategoryDigimon           = 63
+	CategoryOnePiece          = 68
+	CategoryLorcana           = 71
+	CategoryStarWarsUnlimited = 79
+	CategoryRiftbound         = 89
 )
 
 // GameConfig names a single game to ingest and the TCGplayer category it maps
