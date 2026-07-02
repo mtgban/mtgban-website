@@ -202,6 +202,13 @@
     text-align: center;
     font-style: italic;
 }
+.admin-usage-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+    align-items: start;
+}
+.admin-usage-grid .admin-section { margin-bottom: 0; }
 /* ── Tools Tab ── */
 .tools-grid {
     display: grid;
@@ -527,7 +534,7 @@
 
 /* ── Responsive ── */
 @media (max-width: 900px) {
-    .tools-grid, .people-grid { grid-template-columns: 1fr; }
+    .tools-grid, .people-grid, .admin-usage-grid { grid-template-columns: 1fr; }
     .admin-status-bar { gap: 10px; }
 }
 @media (max-width: 640px) {
