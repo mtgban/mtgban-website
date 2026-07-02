@@ -245,6 +245,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 			go stashInTimeseries()
 		}
 
+	case "tcgcsv":
+		v = url.Values{}
+		v.Set("msg", "Ingesting latest TCGCSV prices in the background...")
+		doReboot = true
+
+		if IsTCGCSVStashing() {
+			v.Set("msg", "TCGCSV ingestion is already in progress")
+		} else {
+			go stashTCGCSVPrices()
+		}
+
 	case "server":
 		v = url.Values{}
 		v.Set("msg", "Restarting the server...")

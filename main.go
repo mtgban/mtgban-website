@@ -25,6 +25,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
+	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
 
@@ -519,6 +520,7 @@ type ConfigType struct {
 
 	SqlConfig       *timeseries.SqlConfig `json:"sql_config"`
 	UserStateConfig *userstate.SqlConfig  `json:"user_state_config"`
+	TCGCSVConfig    *tcgcsv.Config        `json:"tcgcsv_config"`
 }
 
 var DevMode bool
@@ -801,6 +803,15 @@ func openDBs() (err error) {
 			log.Println("error creating a SQL client:", err)
 			return err
 		}
+		// Best-effort: create the multi-game tcg_prices table if it's missing.
+		// Non-fatal so a read-only or unprivileged DB user can't block startup;
+		// TCGCSV ingestion re-checks the schema before it runs.
+		if serr := PricesArchiveDB.EnsureTCGSchema(context.Background()); serr != nil {
+			log.Println("warning: could not ensure tcg_prices schema:", serr)
+		}
+		if serr := PricesArchiveDB.EnsureTCGProductsSchema(context.Background()); serr != nil {
+			log.Println("warning: could not ensure tcg_products schema:", serr)
+		}
 	}
 
 	if Config.UserStateConfig == nil {
@@ -919,6 +930,13 @@ func main() {
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
 	offline := flag.String("offline", "", "API key to run in offline mode")
 
+	tcgcsvBackfill := flag.Bool("tcgcsv-backfill", false, "Backfill tcg_prices from tcgcsv archives, then exit")
+	tcgcsvFrom := flag.String("tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08)")
+	tcgcsvTo := flag.String("tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
+	tcgcsvForce := flag.Bool("tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")
+	tcgcsvDaily := flag.Bool("tcgcsv-daily", false, "Run the daily tcgcsv ingest once, then exit")
+	tcgcsvProducts := flag.Bool("tcgcsv-products", false, "Sync the tcgcsv product catalog once, then exit")
+
 	flag.Parse()
 
 	// Initial state
@@ -939,6 +957,29 @@ func main() {
 		} else {
 			log.Fatalln("unable to load config file:", err)
 		}
+	}
+
+	// Maintenance mode: ingest tcgcsv prices, then exit without standing up the
+	// web server. Needs only the config and the price DB.
+	if *tcgcsvBackfill || *tcgcsvDaily || *tcgcsvProducts {
+		if err := openDBs(); err != nil {
+			log.Fatalln("error opening databases:", err)
+		}
+		switch {
+		case *tcgcsvBackfill:
+			if err := runTCGCSVBackfill(context.Background(), *tcgcsvFrom, *tcgcsvTo, *tcgcsvForce); err != nil {
+				log.Fatalln("tcgcsv backfill:", err)
+			}
+		case *tcgcsvDaily:
+			if err := ingestTCGCSVLatest(context.Background()); err != nil {
+				log.Fatalln("tcgcsv daily ingest:", err)
+			}
+		case *tcgcsvProducts:
+			if err := syncTCGProducts(context.Background()); err != nil {
+				log.Fatalln("tcgcsv product sync:", err)
+			}
+		}
+		os.Exit(0)
 	}
 
 	// Load the per-seller UUID overrides applied when scrapers (re)load.
@@ -1023,6 +1064,15 @@ func main() {
 
 		// Reload DB Newspaper every 3 hours
 		c.AddFunc("33 */3 * * *", cacheNewspaper)
+
+		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
+		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
+		// newer snapshot regardless of the exact fire time.
+		if Config.TCGCSVConfig != nil {
+			c.AddFunc("0 21 * * *", stashTCGCSVPrices)
+			// Product metadata changes rarely; refresh the catalog weekly.
+			c.AddFunc("0 22 * * 1", stashTCGCSVProducts)
+		}
 
 		c.Start()
 	}

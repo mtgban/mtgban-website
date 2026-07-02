@@ -354,6 +354,9 @@
                         <span class="act-icon">📸</span> Take Snapshot
                         {{if .DisableChart}}<span title="Stashing in progress">⚠️</span>{{end}}
                     </a>
+                    <a class="admin-action" href="?reboot=tcgcsv" onclick="return confirm('Ingest the latest TCGCSV prices?')">
+                        <span class="act-icon">🃏</span> Ingest TCGCSV Prices
+                    </a>
                     <a class="admin-action danger" href="?reboot=server" onclick="return confirm('Restart server?')">
                         <span class="act-icon">⚠️</span> Restart Server
                         {{if .DisableChart}}<span title="Stashing in progress">⚠️</span>{{end}}
