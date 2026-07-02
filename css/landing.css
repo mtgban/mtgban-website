@@ -257,9 +257,9 @@
 }
 .landing-login-btn.patreon:hover { background: rgba(255,66,77,0.2); text-decoration: none; }
 .landing-login-btn.discord {
-    background: rgba(88,101,242,0.1); border-color: rgba(88,101,242,0.25); color: #5865f2;
+    background: rgba(79,195,247,0.12); border-color: rgba(79,195,247,0.35); color: #29b6f6;
 }
-.landing-login-btn.discord:hover { background: rgba(88,101,242,0.2); text-decoration: none; }
+.landing-login-btn.discord:hover { background: rgba(79,195,247,0.22); text-decoration: none; }
 
 .landing-copyright {
     font-size: 11px; color: var(--text-dim);
