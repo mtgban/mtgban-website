@@ -162,6 +162,44 @@
     font-family: var(--font-mono);
     font-size: var(--text-sm);
 }
+/* ── Usage Tab ── */
+.admin-usage-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.admin-usage-range {
+    font-size: var(--text-base);
+    color: var(--text-dim);
+}
+.admin-usage-toggle {
+    display: inline-flex;
+    margin-left: auto;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+.admin-usage-toggle a {
+    padding: 5px 14px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--activetext);
+    text-decoration: none;
+    background: var(--surface-1);
+    transition: color 0.12s;
+}
+.admin-usage-toggle a:hover { color: var(--normal); }
+.admin-usage-toggle a.active {
+    color: var(--ainfo);
+    background: var(--surface-2);
+}
+.admin-usage-toggle a + a { border-left: 1px solid var(--border-subtle); }
+.admin-table td.admin-usage-empty {
+    color: var(--text-dim);
+    text-align: center;
+    font-style: italic;
+}
 /* ── Tools Tab ── */
 .tools-grid {
     display: grid;

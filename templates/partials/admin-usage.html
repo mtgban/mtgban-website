@@ -1,58 +1,88 @@
-<!-- templates/partials/admin-usage.html -->
 {{define "admin-usage"}}
-<div class="admin-usage">
-    <h2>Usage (last 30 days{{if .UsageStats.IncludeBots}}, incl. bots{{end}})</h2>
-    <p>
-        <a href="/admin?page=usage">Humans only</a> |
-        <a href="/admin?page=usage&amp;bots=1">Include bots</a>
-    </p>
+{{if .UsageStats}}
+<div class="admin-usage-bar">
+    <span class="admin-usage-range">Last 30 days{{if .UsageStats.IncludeBots}} &middot; including bots{{end}}</span>
+    <div class="admin-usage-toggle">
+        <a href="?page=usage"{{if not .UsageStats.IncludeBots}} class="active"{{end}}>Humans</a>
+        <a href="?page=usage&amp;bots=1"{{if .UsageStats.IncludeBots}} class="active"{{end}}>Include bots</a>
+    </div>
+</div>
 
-    <h3>Top pages</h3>
-    <table class="admin-usage-table">
-        <thead><tr><th>Path</th><th>Hits</th><th>Uniques</th></tr></thead>
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Top pages</h2>
+        <span class="count">{{len .UsageStats.TopPages}} paths</span>
+    </div>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Path</th><th class="c">Hits</th><th class="c">Uniques</th></tr></thead>
         <tbody>
         {{range .UsageStats.TopPages}}
-            <tr><td>{{.Path}}</td><td>{{.Hits}}</td><td>{{.Uniques}}</td></tr>
+            <tr><td class="admin-mono">{{.Path}}</td><td class="c admin-mono">{{.Hits}}</td><td class="c admin-mono">{{.Uniques}}</td></tr>
         {{else}}
-            <tr><td colspan="3">No data yet</td></tr>
+            <tr><td colspan="3" class="admin-usage-empty">No data yet</td></tr>
         {{end}}
         </tbody>
     </table>
+    </div>
+</div>
 
-    <h3>Usage by tier</h3>
-    <table class="admin-usage-table">
-        <thead><tr><th>Tier</th><th>Hits</th><th>Uniques</th></tr></thead>
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Usage by tier</h2>
+        <span class="count">{{len .UsageStats.ByTier}} tiers</span>
+    </div>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Tier</th><th class="c">Hits</th><th class="c">Uniques</th></tr></thead>
         <tbody>
         {{range .UsageStats.ByTier}}
-            <tr><td>{{.Tier}}</td><td>{{.Hits}}</td><td>{{.Uniques}}</td></tr>
+            <tr><td>{{.Tier}}</td><td class="c admin-mono">{{.Hits}}</td><td class="c admin-mono">{{.Uniques}}</td></tr>
         {{else}}
-            <tr><td colspan="3">No data yet</td></tr>
+            <tr><td colspan="3" class="admin-usage-empty">No data yet</td></tr>
         {{end}}
         </tbody>
     </table>
+    </div>
+</div>
 
-    <h3>Mobile vs desktop by page</h3>
-    <table class="admin-usage-table">
-        <thead><tr><th>Path</th><th>Device</th><th>Hits</th><th>Uniques</th></tr></thead>
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Mobile vs desktop by page</h2>
+    </div>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Path</th><th>Device</th><th class="c">Hits</th><th class="c">Uniques</th></tr></thead>
         <tbody>
         {{range .UsageStats.ByDevice}}
-            <tr><td>{{.Path}}</td><td>{{.Device}}</td><td>{{.Hits}}</td><td>{{.Uniques}}</td></tr>
+            <tr><td class="admin-mono">{{.Path}}</td><td>{{.Device}}</td><td class="c admin-mono">{{.Hits}}</td><td class="c admin-mono">{{.Uniques}}</td></tr>
         {{else}}
-            <tr><td colspan="4">No data yet</td></tr>
+            <tr><td colspan="4" class="admin-usage-empty">No data yet</td></tr>
         {{end}}
         </tbody>
     </table>
+    </div>
+</div>
 
-    <h3>Newspaper &amp; sleepers sub-views</h3>
-    <table class="admin-usage-table">
-        <thead><tr><th>Path</th><th>Hits</th><th>Uniques</th></tr></thead>
+<div class="admin-section">
+    <div class="admin-section-header">
+        <h2>Newspaper &amp; sleepers sub-views</h2>
+        <span class="count">{{len .UsageStats.SubViews}} views</span>
+    </div>
+    <div class="admin-table-wrap">
+    <table class="table-data admin-table">
+        <thead><tr><th>Path</th><th class="c">Hits</th><th class="c">Uniques</th></tr></thead>
         <tbody>
         {{range .UsageStats.SubViews}}
-            <tr><td>{{.Path}}</td><td>{{.Hits}}</td><td>{{.Uniques}}</td></tr>
+            <tr><td class="admin-mono">{{.Path}}</td><td class="c admin-mono">{{.Hits}}</td><td class="c admin-mono">{{.Uniques}}</td></tr>
         {{else}}
-            <tr><td colspan="3">No data yet</td></tr>
+            <tr><td colspan="3" class="admin-usage-empty">No data yet</td></tr>
         {{end}}
         </tbody>
     </table>
+    </div>
 </div>
+{{else}}
+<div class="admin-msg">Observability telemetry is not enabled.</div>
+{{end}}
 {{end}}
