@@ -25,6 +25,25 @@ body.modal-embed .landing { min-height: 100%; justify-content: center; padding: 
 body.modal-embed .landing-main { max-width: 560px; justify-content: flex-start; padding-top: 8vh; }
 body.modal-embed .landing-brand { margin-bottom: 18px; }
 </style>
+<script>
+(function() {
+    // First Escape drops focus from the (autofocused) search box; a second
+    // Escape asks the parent page to close the "Add a card" modal. keydown
+    // events don't cross the iframe boundary, so the parent's own Escape
+    // handler never sees them once focus is in here.
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== 'Escape') return;
+        var ae = document.activeElement;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
+            ae.blur();
+            return;
+        }
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'chart-modal-close' }, window.location.origin);
+        }
+    });
+})();
+</script>
 {{end}}
 <div class="landing">
     <div class="landing-main">

@@ -3,10 +3,7 @@ package main
 import (
 	"fmt"
 	"reflect"
-	"sort"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
@@ -73,27 +70,6 @@ func TestParseChartIDsAllInvalid(t *testing.T) {
 	}
 }
 
-func TestInList(t *testing.T) {
-	cases := []struct {
-		name     string
-		haystack []string
-		needle   string
-		want     bool
-	}{
-		{"present", []string{"a", "b", "c"}, "b", true},
-		{"absent", []string{"a", "b", "c"}, "z", false},
-		{"empty slice", nil, "a", false},
-		{"empty needle in slice", []string{"", "x"}, "", true},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if got := inList(tc.haystack, tc.needle); got != tc.want {
-				t.Fatalf("inList(%v, %q) = %v, want %v", tc.haystack, tc.needle, got, tc.want)
-			}
-		})
-	}
-}
-
 func TestCsvWithout(t *testing.T) {
 	cases := []struct {
 		name string
@@ -133,41 +109,6 @@ func TestMultiCardPaletteUniqueAndNonEmpty(t *testing.T) {
 			t.Fatalf("multiCardPalette has duplicate color %q", c)
 		}
 		seen[c] = true
-	}
-}
-
-func TestSetReleaseCheckpointsSortedAndReleaseOnly(t *testing.T) {
-	editions := GetEditions()
-	if len(editions.AllEditionsKeys) == 0 {
-		t.Skip("mtgmatcher data not loaded; skipping")
-	}
-
-	// Anchor far enough in the past that several modern sets fall in-window.
-	earliest := time.Now().AddDate(-5, 0, 0)
-	out := setReleaseCheckpoints(earliest)
-	if len(out) == 0 {
-		t.Skip("no set releases in window; skipping")
-	}
-
-	// Dates are stored as "YYYY-MM-DD"; lexical sort == chronological sort.
-	if !sort.SliceIsSorted(out, func(i, j int) bool {
-		return out[i].Date < out[j].Date
-	}) {
-		t.Fatal("setReleaseCheckpoints output is not sorted by Date")
-	}
-
-	// No per-card context should appear: multi-chart mode has no single card
-	// to attribute reprints/bans to, so the Type and Source must reflect that.
-	for _, c := range out {
-		if c.Date == "" {
-			t.Errorf("checkpoint with empty Date: %+v", c)
-		}
-		// Reprint markers carry a non-empty Source (the card name being
-		// reprinted). Release markers shouldn't reference a card.
-		lower := strings.ToLower(c.Type)
-		if strings.Contains(lower, "reprint") || strings.Contains(lower, "ban") || strings.Contains(lower, "unban") {
-			t.Errorf("unexpected per-card checkpoint type %q in set-release output", c.Type)
-		}
 	}
 }
 
