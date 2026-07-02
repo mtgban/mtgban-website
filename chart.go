@@ -34,6 +34,13 @@ type Dataset struct {
 	AxisID string
 	Sealed bool
 
+	// CardID is the stable per-card identity on a multi-card chart — the same
+	// roster id the result rows use for data-card-id. The front-end groups
+	// datasets by this instead of the display Name (so two printings sharing a
+	// "Name (SET)" label stay separate lines) and matches a legend entry back
+	// to its result row so hovering it can drive the sidebar preview.
+	CardID string
+
 	// Reference identifies which price source this dataset belongs to
 	// (e.g. "TCG Low", "Card Kingdom Buy"). In single-card charts it equals
 	// Name; in multi-card charts it's the grouping key the reference picker
@@ -157,6 +164,7 @@ func buildDataset(results map[string]timeseries.PriceRow, labels []string, confi
 // display name to render in the legend, and the raw datasets returned by
 // getDatasets for that card.
 type multiCardInput struct {
+	CardID   string
 	Name     string
 	Datasets []Dataset
 }
@@ -182,6 +190,7 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 			}
 
 			ds.Name = card.Name
+			ds.CardID = card.CardID
 			ds.Color = color
 			datasets = append(datasets, ds)
 
@@ -211,6 +220,12 @@ func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string,
 		cardName := co.Name
 		if !co.Sealed {
 			cardName = fmt.Sprintf("%s (%s)", co.Name, co.SetCode)
+			// Collector number disambiguates two printings that share a
+			// set+finish (e.g. a regular and a borderless), so the legend at
+			// the top of a multi-card chart tells them apart.
+			if co.Number != "" {
+				cardName += " #" + co.Number
+			}
 			if co.Foil {
 				cardName += " Foil"
 			} else if co.Etched {
@@ -219,6 +234,7 @@ func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string,
 		}
 
 		cards = append(cards, multiCardInput{
+			CardID:   cardId,
 			Name:     cardName,
 			Datasets: getDatasets(ctx, cardId, co.Sealed, labels, lb),
 		})

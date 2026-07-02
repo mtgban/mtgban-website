@@ -284,7 +284,14 @@ function renderChartLegend(chart, containerId, storageKey) {
     chart.data.datasets.forEach(function(ds, i) {
         var visible = chart.isDatasetVisible(i);
         var color = ds.borderColor || ds.backgroundColor || '#888';
-        html += '<button class="chart-legend-item' + (visible ? '' : ' hidden') + '" data-index="' + i + '" style="border-color:' + color + '">';
+        html += '<button class="chart-legend-item' + (visible ? '' : ' hidden') + '" data-index="' + i + '"';
+        // Multi-card legend entries tag their card id so the page can match an
+        // entry back to its result row and drive the sidebar preview on hover.
+        // Single-card entries are price sources and carry none.
+        if (ds.cardId) {
+            html += ' data-card-id="' + ds.cardId + '"';
+        }
+        html += ' style="border-color:' + color + '">';
         html += '<span class="chart-legend-dot" style="background:' + color + '"></span>';
         html += ds.label;
         html += '</button>';

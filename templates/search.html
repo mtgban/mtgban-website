@@ -442,7 +442,7 @@
                         <p class="search-results-blurb">Compare prices and availability for {{game_title}} singles and sealed products across markets below. On the left sidebar you can refine your search or expand it looking for products containing your search results. You may tweak sorting as needed.</p>
                     {{end}}
 
-                    {{if .ChartID}}
+                    {{if and .ChartID .Datasets}}
                         <div class="chart-container">
                             <div class="chart-legend" id="chartLegend"></div>
                             <canvas id="cardChart" width="760" height="480"></canvas>
@@ -530,6 +530,7 @@
                                         {{range .Datasets}}
                                             {
                                                 label: {{.Name}},
+                                                cardId: {{.CardID}},
                                                 data: {{.Data}},
                                                 borderColor: {{.Color}},
                                                 referenceKey: {{.Reference}},
@@ -557,21 +558,24 @@
                                 ? savedRef : chartReferences[0];
 
                             // Reshape the server-rendered (card × reference) datasets into a
-                            // cardName -> { color, references: { ref: data } } lookup, then
-                            // collapse the chart down to one dataset per card.
+                            // cardId -> { label, color, references: { ref: data } } lookup, then
+                            // collapse the chart down to one dataset per card. Keyed by cardId
+                            // (the UUID), not the display label, so two printings that share a
+                            // "Name (SET)" label stay distinct lines instead of merging.
                             var cardLines = {};
                             var cardOrder = [];
                             cardChart.data.datasets.forEach(function(ds) {
-                                if (!cardLines[ds.label]) {
-                                    cardLines[ds.label] = { color: ds.borderColor, references: {} };
-                                    cardOrder.push(ds.label);
+                                if (!cardLines[ds.cardId]) {
+                                    cardLines[ds.cardId] = { label: ds.label, color: ds.borderColor, references: {} };
+                                    cardOrder.push(ds.cardId);
                                 }
-                                cardLines[ds.label].references[ds.referenceKey] = ds.data;
+                                cardLines[ds.cardId].references[ds.referenceKey] = ds.data;
                             });
-                            cardChart.data.datasets = cardOrder.map(function(name) {
-                                var cl = cardLines[name];
+                            cardChart.data.datasets = cardOrder.map(function(id) {
+                                var cl = cardLines[id];
                                 return {
-                                    label: name,
+                                    cardId: id,
+                                    label: cl.label,
                                     data: cl.references[currentReference] || [],
                                     borderColor: cl.color,
                                     fill: 'origin',
@@ -582,10 +586,10 @@
                             function selectReference(ref) {
                                 currentReference = ref;
 
-                                var newByLabel = {};
+                                var newById = {};
                                 cardChart.data.datasets.forEach(function(ds) {
-                                    var cl = cardLines[ds.label];
-                                    newByLabel[ds.label] = cl ? (cl.references[ref] || []) : [];
+                                    var cl = cardLines[ds.cardId];
+                                    newById[ds.cardId] = cl ? (cl.references[ref] || []) : [];
                                 });
 
                                 // Pre-bridge: for positions that are NaN in current data but
@@ -595,7 +599,7 @@
                                 // it to the real new data — newly-appearing points slide out of
                                 // the existing line instead of popping in at their final spot.
                                 cardChart.data.datasets.forEach(function(ds) {
-                                    var newData = newByLabel[ds.label];
+                                    var newData = newById[ds.cardId];
                                     var oldData = ds.data;
                                     var bridged = oldData.map(function(v, i) {
                                         var oldNum = parseFloat(v);
@@ -619,7 +623,7 @@
                                 cardChart.update('none');
 
                                 cardChart.data.datasets.forEach(function(ds) {
-                                    ds.data = newByLabel[ds.label];
+                                    ds.data = newById[ds.cardId];
                                 });
                                 cardChart.update();
 
@@ -632,13 +636,37 @@
                             document.querySelectorAll('.ref-picker-btn').forEach(function(btn) {
                                 btn.classList.toggle('active', btn.getAttribute('data-ref') === currentReference);
                             });
+
+                            // Hovering a legend entry drives the sidebar preview to that
+                            // card by replaying its result row's hover, so the image,
+                            // printings and products all update together (setting just the
+                            // image left the printings list mismatched). Delegated on the
+                            // container so it keeps working after the legend re-renders.
+                            (function() {
+                                var legendEl = document.getElementById('chartLegend');
+                                if (!legendEl) return;
+                                var lastHoverId = null;
+                                legendEl.addEventListener('mouseover', function(e) {
+                                    var item = e.target.closest('.chart-legend-item[data-card-id]');
+                                    if (!item) return;
+                                    var cardId = item.getAttribute('data-card-id');
+                                    if (cardId === lastHoverId) return;
+                                    lastHoverId = cardId;
+                                    var row = document.querySelector('.result-header[data-card-id="' + cardId + '"]');
+                                    if (row && typeof row.onmouseover === 'function') row.onmouseover();
+                                });
+                                legendEl.addEventListener('mouseleave', function() { lastHoverId = null; });
+                            })();
                             {{else}}
                             // Load state from local storage
                             applySavedLegendState(cardChart, legendStorageKey);
                             {{end}}
 
-                            // Build custom HTML legend (clicks persist via legendStorageKey)
-                            renderChartLegend(cardChart, 'chartLegend', legendStorageKey);
+                            // Build custom HTML legend (single-card clicks persist via
+                            // legendStorageKey). Multi mode passes no key: its legend is a
+                            // per-card index, and writing that into the per-price-source
+                            // BANChart key would corrupt every single-card chart's saved state.
+                            renderChartLegend(cardChart, 'chartLegend'{{if not .IsMultiChart}}, legendStorageKey{{end}});
 
                             // Apply theme (light/dark)
                             rethemeFirstAxes(cardChart);
@@ -921,7 +949,14 @@
                                         {{if eq $.ChartIDsCSV ""}}
                                             <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
                                         {{else if in_list $.ChartIDs $cardId}}
+                                            {{if or $.ModalMode (gt (len $.ChartIDs) 1)}}
                                             <a class="chart-remove-link" data-card-id="{{$cardId}}" href="?chart={{csv_without $.ChartIDsCSV $cardId}}" title="Remove from this chart">&#128200;&#10134;</a>
+                                            {{else}}
+                                            {{/* Sole card on a non-modal chart page: a remove link would
+                                                 point at ?chart= and dump the user on a blank landing, so
+                                                 show a static "charted" glyph with nothing to remove to. */}}
+                                            <span class="emoji" title="The only card on this chart">&#128200;</span>
+                                            {{end}}
                                         {{else}}
                                             <a class="chart-add-link" data-card-id="{{$cardId}}" href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
                                         {{end}}
@@ -1408,9 +1443,12 @@ body.modal-embed .cp-overlay { display: none !important; }
     // new value, so toggling the navbar moon button while the modal is open
     // flips the iframe content with it.
     function applyTheme() {
-        var t = localStorage.getItem('theme');
-        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        var dark = t ? (t === 'dark') : prefersDark;
+        // Resolve 'light' | 'dark' | 'system' the same way base-landing and
+        // nightmode.js do — a bare truthiness check treats 'system' as light,
+        // so a system-theme user on a dark OS would get a light iframe.
+        var v = localStorage.getItem('theme');
+        var pref = (v === 'light' || v === 'dark' || v === 'system') ? v : 'system';
+        var dark = pref === 'dark' || (pref === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
         document.body.classList.toggle('dark-theme', dark);
         document.body.classList.toggle('light-theme', !dark);
     }

@@ -101,6 +101,13 @@ func parseChartIDs(chartParam string) []string {
 			continue
 		}
 		ids = append(ids, part)
+		// Cap the roster at the palette size: the multi-card chart can only
+		// render that many distinguishable lines, and it bounds the per-UUID
+		// DB fan-out (GetEarliestDate + timeseries fetch) triggered on this
+		// public handler by a crafted many-UUID chart= URL.
+		if len(ids) >= len(multiCardPalette) {
+			break
+		}
 	}
 	return ids
 }
@@ -229,7 +236,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// a chart inside it even when no query is set yet.
 		if query == "" && !pageVars.ModalMode {
 			chartId = chartIds[0]
-			query = chartParam
+			// Drive the results table off the same trimmed/validated IDs the
+			// chart plots (not the raw chartParam), so a URL like
+			// ?chart=uuidA,%20uuidB doesn't leave card B off the results/remove
+			// controls just because fixupIDs won't trim the leading space.
+			query = strings.Join(chartIds, ",")
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
 		}
 	} else {

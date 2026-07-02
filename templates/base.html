@@ -39,7 +39,7 @@
 </head>
 
 <body class="light-theme{{if .ModalMode}} modal-embed{{end}}">
-<script>(function(){try{var t=localStorage.getItem('theme');var dark=t?(t==='dark'):(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark){document.body.classList.remove('light-theme');document.body.classList.add('dark-theme');}}catch(e){}})();</script>
+<script>(function(){try{var v=localStorage.getItem('theme');var pref=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark){document.body.classList.remove('light-theme');document.body.classList.add('dark-theme');}}catch(e){}})();</script>
 {{if not .ModalMode}}{{template "navbar" .}}{{end}}
 
 <div class="page-content">
