@@ -95,3 +95,13 @@ func TestNilRecorderSafe(t *testing.T) {
 		t.Fatal("nil Dropped must be 0")
 	}
 }
+
+func TestDoubleCloseNoPanic(t *testing.T) {
+	r := NewRecorder(&fakeStore{})
+	if err := r.Close(); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+	if err := r.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
+}

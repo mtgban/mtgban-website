@@ -38,6 +38,7 @@ type Recorder struct {
 	dropped int64
 	done    chan struct{}
 	wg      sync.WaitGroup
+	once    sync.Once
 }
 
 func newRecorder(s store, cfg recorderCfg) *Recorder {
@@ -86,7 +87,7 @@ func (r *Recorder) Close() error {
 	if r == nil {
 		return nil
 	}
-	close(r.done)
+	r.once.Do(func() { close(r.done) })
 	r.wg.Wait()
 	return nil
 }
@@ -115,7 +116,7 @@ func (r *Recorder) run() {
 				log.Println("observability: insert batch:", err)
 			}
 		}()
-		batch = batch[:0]
+		batch = batch[:0:0]
 	}
 
 	for {
