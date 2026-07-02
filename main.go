@@ -25,6 +25,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
+	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
 
@@ -518,7 +519,8 @@ type ConfigType struct {
 	sourcePath string
 
 	SqlConfig       *timeseries.SqlConfig `json:"sql_config"`
-	UserStateConfig *userstate.SqlConfig  `json:"user_state_config"`
+	UserStateConfig     *userstate.SqlConfig  `json:"user_state_config"`
+	ObservabilityConfig *timeseries.SqlConfig `json:"observability_config"`
 }
 
 var DevMode bool
@@ -562,6 +564,9 @@ var NewNewspaperDB *sql.DB
 var PricesArchiveDB *timeseries.Client
 
 var UserStateDB *userstate.Client
+
+var ObservabilityDB *observability.Client
+var ObservabilityRecorder *observability.Recorder
 
 var GoogleDocsClient *http.Client
 
@@ -811,6 +816,16 @@ func openDBs() (err error) {
 			log.Println("error creating a user_state SQL client:", err)
 			return err
 		}
+	}
+
+	if Config.ObservabilityConfig == nil {
+		log.Println("no observability configuration set, telemetry won't be recorded")
+	} else if obsDB, oerr := observability.NewClient(*Config.ObservabilityConfig); oerr != nil {
+		log.Println("observability disabled, init failed:", oerr)
+	} else {
+		ObservabilityDB = obsDB
+		ObservabilityRecorder = observability.NewRecorder(obsDB)
+		log.Println("observability telemetry enabled")
 	}
 
 	if Config.NewNewspaperConfigLine == "" {
@@ -1142,6 +1157,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		ServerNotify("shutdown", "Server cleaning up...")
+		ObservabilityRecorder.Close()
 		cleanupDiscord()
 		cancel()
 	}()
