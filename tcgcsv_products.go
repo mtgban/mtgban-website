@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -58,38 +59,60 @@ func syncTCGProducts(ctx context.Context) error {
 		return err
 	}
 
+	// Sync each game independently so one game's failure doesn't strand the rest;
+	// collect the failures and report them together.
 	var total int
-	for _, g := range Config.TCGCSVConfig.Games {
-		groups, err := client.Groups(ctx, g.CategoryID)
+	var errs []error
+	games := Config.TCGCSVConfig.Games
+	for _, g := range games {
+		n, err := syncTCGProductsForGame(ctx, client, g.CategoryID)
 		if err != nil {
-			return fmt.Errorf("tcgcsv: groups for category %d: %w", g.CategoryID, err)
-		}
-
-		var rows []timeseries.TCGProduct
-		for _, grp := range groups {
-			products, err := client.Products(ctx, g.CategoryID, grp.GroupID)
-			if err != nil {
-				return fmt.Errorf("tcgcsv: products for %d/%d: %w", g.CategoryID, grp.GroupID, err)
-			}
-			for _, p := range products {
-				rows = append(rows, productToRow(g.CategoryID, p))
-			}
-		}
-		if len(rows) == 0 {
+			log.Printf("tcgcsv products: category %d failed: %v", g.CategoryID, err)
+			errs = append(errs, fmt.Errorf("category %d: %w", g.CategoryID, err))
 			continue
 		}
-
-		n, err := PricesArchiveDB.UpsertTCGProducts(ctx, rows, 0)
-		if err != nil {
-			return fmt.Errorf("tcgcsv: upsert products for category %d: %w", g.CategoryID, err)
-		}
 		total += n
-		log.Printf("tcgcsv products: category %d, %d products (%d groups)", g.CategoryID, n, len(groups))
-		logTCGProductMatchReport(g.CategoryID, rows)
 	}
 
+	if len(errs) > 0 {
+		log.Printf("tcgcsv product sync: %d products, %d of %d game(s) failed",
+			total, len(errs), len(games))
+		return fmt.Errorf("tcgcsv product sync: %d of %d game(s) failed: %w",
+			len(errs), len(games), errors.Join(errs...))
+	}
 	log.Printf("tcgcsv product sync complete: %d products", total)
 	return nil
+}
+
+// syncTCGProductsForGame pulls and upserts one game's catalog, returning the
+// number of products written (0 when the game reports none).
+func syncTCGProductsForGame(ctx context.Context, client *tcgcsv.Client, categoryID int) (int, error) {
+	groups, err := client.Groups(ctx, categoryID)
+	if err != nil {
+		return 0, fmt.Errorf("groups: %w", err)
+	}
+
+	var rows []timeseries.TCGProduct
+	for _, grp := range groups {
+		products, err := client.Products(ctx, categoryID, grp.GroupID)
+		if err != nil {
+			return 0, fmt.Errorf("products for group %d: %w", grp.GroupID, err)
+		}
+		for _, p := range products {
+			rows = append(rows, productToRow(categoryID, p))
+		}
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+
+	n, err := PricesArchiveDB.UpsertTCGProducts(ctx, rows, 0)
+	if err != nil {
+		return 0, fmt.Errorf("upsert: %w", err)
+	}
+	log.Printf("tcgcsv products: category %d, %d products (%d groups)", categoryID, n, len(groups))
+	logTCGProductMatchReport(categoryID, rows)
+	return n, nil
 }
 
 // logTCGProductMatchReport reports how many synced products resolve to a loaded
