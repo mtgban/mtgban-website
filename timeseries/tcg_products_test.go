@@ -7,31 +7,6 @@ import (
 	"testing"
 )
 
-func TestTCGProductBatchBounds(t *testing.T) {
-	if b := tcgProductBatchBounds(0, 0); b != nil {
-		t.Errorf("expected nil bounds for 0 rows, got %v", b)
-	}
-	// Split past one max batch: contiguous, non-overlapping, under the cap.
-	total := tcgProductMaxBatch*2 + 11
-	bounds := tcgProductBatchBounds(total, 0)
-	if len(bounds) != 3 {
-		t.Fatalf("expected 3 batches for %d rows, got %d: %v", total, len(bounds), bounds)
-	}
-	prevEnd := 0
-	for i, b := range bounds {
-		if b[0] != prevEnd {
-			t.Errorf("batch %d starts at %d, expected %d", i, b[0], prevEnd)
-		}
-		if size := b[1] - b[0]; size*tcgProductColsPerRow > 65535 {
-			t.Errorf("batch %d uses %d params, exceeds 65535", i, size*tcgProductColsPerRow)
-		}
-		prevEnd = b[1]
-	}
-	if prevEnd != total {
-		t.Errorf("batches cover %d rows, expected %d", prevEnd, total)
-	}
-}
-
 func TestBuildTCGProductsUpsertQuery(t *testing.T) {
 	products := []TCGProduct{
 		{ProductID: 454229, CategoryID: 71, GroupID: 17690, Name: "Cruella De Vil", Number: "4", Rarity: "Promo"},
@@ -50,6 +25,24 @@ func TestBuildTCGProductsUpsertQuery(t *testing.T) {
 	last := fmt.Sprintf("$%d", len(products)*tcgProductColsPerRow)
 	if !strings.Contains(q, last) {
 		t.Errorf("query missing final placeholder %s:\n%s", last, q)
+	}
+}
+
+func TestDedupeTCGProducts(t *testing.T) {
+	products := []TCGProduct{
+		{ProductID: 454229, Name: "Cruella De Vil"},
+		{ProductID: 454231, Name: "Genie"},
+		{ProductID: 454229, Name: "Cruella De Vil (corrected)"}, // dup product_id: last wins
+	}
+	got := dedupeTCGProducts(products)
+	if len(got) != 2 {
+		t.Fatalf("got %d products, want 2: %+v", len(got), got)
+	}
+	if got[0].ProductID != 454229 || got[0].Name != "Cruella De Vil (corrected)" {
+		t.Errorf("row 0 = %+v, want product 454229 with the last name", got[0])
+	}
+	if got[1].ProductID != 454231 {
+		t.Errorf("row 1 = %+v, want product 454231", got[1])
 	}
 }
 

@@ -33,10 +33,10 @@ type TCGPriceRow struct {
 }
 
 // tcgColsPerRow is the number of bind parameters one row contributes to a
-// bulk upsert; tcgMaxBatch keeps a batch under Postgres's 65535 parameter cap.
+// bulk upsert; tcgMaxBatch keeps a batch under Postgres's parameter cap.
 const (
 	tcgColsPerRow = 9
-	tcgMaxBatch   = 65535 / tcgColsPerRow // ~7281
+	tcgMaxBatch   = pgMaxParams / tcgColsPerRow // ~7281
 )
 
 const tcgSelectColumns = `
@@ -180,6 +180,7 @@ func (c *Client) UpsertTCGPrices(ctx context.Context, rows []TCGPriceRow, batchS
 	if len(rows) == 0 {
 		return 0, nil
 	}
+	rows = dedupeTCGPriceRows(rows)
 
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -188,7 +189,7 @@ func (c *Client) UpsertTCGPrices(ctx context.Context, rows []TCGPriceRow, batchS
 	defer tx.Rollback() // no-op once Commit succeeds
 
 	var total int
-	for _, b := range tcgBatchBounds(len(rows), batchSize) {
+	for _, b := range batchBounds(len(rows), batchSize, tcgMaxBatch) {
 		q, args := buildTCGUpsertQuery(rows[b[0]:b[1]])
 		res, err := tx.ExecContext(ctx, q, args...)
 		if err != nil {
@@ -203,31 +204,33 @@ func (c *Client) UpsertTCGPrices(ctx context.Context, rows []TCGPriceRow, batchS
 	return total, nil
 }
 
-// clampTCGBatchSize resolves a requested batch size to a safe one: a
-// non-positive or oversized request falls back to the parameter-limited max.
-func clampTCGBatchSize(batchSize int) int {
-	if batchSize <= 0 || batchSize > tcgMaxBatch {
-		return tcgMaxBatch
+// dedupeTCGPriceRows collapses rows that share the primary key
+// (date, category_id, product_id, sub_type_name) down to their last occurrence,
+// preserving first-seen order. A single INSERT ... ON CONFLICT DO UPDATE
+// statement errors ("cannot affect row a second time") if two proposed rows
+// carry the same conflict key, so an input containing a duplicate — e.g. a
+// product tcgcsv happens to list under two of a category's groups on the same
+// day — would otherwise fail the whole (transactional) upsert and, in the
+// backfill, abort the run. Last wins, matching the overwrite-in-place semantics.
+func dedupeTCGPriceRows(rows []TCGPriceRow) []TCGPriceRow {
+	type key struct {
+		date        string
+		categoryID  int
+		productID   int
+		subTypeName string
 	}
-	return batchSize
-}
-
-// tcgBatchBounds splits total rows into contiguous [start, end) ranges, each no
-// larger than the resolved batch size. Returns nil for zero rows.
-func tcgBatchBounds(total, batchSize int) [][2]int {
-	if total <= 0 {
-		return nil
-	}
-	batchSize = clampTCGBatchSize(batchSize)
-	var bounds [][2]int
-	for start := 0; start < total; start += batchSize {
-		end := start + batchSize
-		if end > total {
-			end = total
+	seen := make(map[key]int, len(rows))
+	out := make([]TCGPriceRow, 0, len(rows))
+	for _, r := range rows {
+		k := key{r.Date, r.CategoryID, r.ProductID, r.SubTypeName}
+		if idx, ok := seen[k]; ok {
+			out[idx] = r
+			continue
 		}
-		bounds = append(bounds, [2]int{start, end})
+		seen[k] = len(out)
+		out = append(out, r)
 	}
-	return bounds
+	return out
 }
 
 // buildTCGUpsertQuery builds a multi-VALUES upsert for one batch. Price columns

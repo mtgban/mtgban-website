@@ -7,63 +7,6 @@ import (
 	"testing"
 )
 
-func TestClampTCGBatchSize(t *testing.T) {
-	cases := []struct{ in, want int }{
-		{0, tcgMaxBatch},
-		{-5, tcgMaxBatch},
-		{500, 500},
-		{tcgMaxBatch, tcgMaxBatch},
-		{tcgMaxBatch + 1, tcgMaxBatch},
-		{1_000_000, tcgMaxBatch},
-	}
-	for _, tc := range cases {
-		if got := clampTCGBatchSize(tc.in); got != tc.want {
-			t.Errorf("clampTCGBatchSize(%d) = %d, want %d", tc.in, got, tc.want)
-		}
-	}
-}
-
-func TestTCGBatchBounds(t *testing.T) {
-	if b := tcgBatchBounds(0, 0); b != nil {
-		t.Errorf("expected nil bounds for 0 rows, got %v", b)
-	}
-
-	// Fewer rows than a batch collapse to a single batch.
-	if b := tcgBatchBounds(500, 0); len(b) != 1 || b[0] != [2]int{0, 500} {
-		t.Errorf("unexpected bounds for 500 rows: %v", b)
-	}
-
-	// More than one max batch must split, covering every row exactly once and
-	// never exceeding the parameter limit.
-	total := tcgMaxBatch*2 + 37
-	bounds := tcgBatchBounds(total, 0)
-	if len(bounds) != 3 {
-		t.Fatalf("expected 3 batches for %d rows, got %d: %v", total, len(bounds), bounds)
-	}
-	prevEnd := 0
-	for i, b := range bounds {
-		if b[0] != prevEnd {
-			t.Errorf("batch %d starts at %d, expected %d", i, b[0], prevEnd)
-		}
-		size := b[1] - b[0]
-		if size > tcgMaxBatch {
-			t.Errorf("batch %d has %d rows, exceeds max %d", i, size, tcgMaxBatch)
-		}
-		if size*tcgColsPerRow > 65535 {
-			t.Errorf("batch %d uses %d params, exceeds 65535", i, size*tcgColsPerRow)
-		}
-		prevEnd = b[1]
-	}
-	if prevEnd != total {
-		t.Errorf("batches cover %d rows, expected %d", prevEnd, total)
-	}
-
-	// An explicit small batch size is honored.
-	if b := tcgBatchBounds(10, 4); len(b) != 3 || b[0] != [2]int{0, 4} || b[2] != [2]int{8, 10} {
-		t.Errorf("unexpected bounds for batchSize 4 over 10 rows: %v", b)
-	}
-}
-
 func TestBuildTCGUpsertQuery(t *testing.T) {
 	price := 1.23
 	rows := make([]TCGPriceRow, 3)
@@ -95,6 +38,34 @@ func TestBuildTCGUpsertQuery(t *testing.T) {
 	}
 	if strings.Contains(q, fmt.Sprintf("$%d", len(rows)*tcgColsPerRow+1)) {
 		t.Errorf("query has more placeholders than args:\n%s", q)
+	}
+}
+
+func TestDedupeTCGPriceRows(t *testing.T) {
+	first, last := 1.00, 2.00
+	other := 3.00
+	rows := []TCGPriceRow{
+		{Date: "2024-02-08", CategoryID: 71, ProductID: 100, SubTypeName: "Normal", MarketPrice: &first},
+		{Date: "2024-02-08", CategoryID: 71, ProductID: 200, SubTypeName: "Normal", MarketPrice: &other},
+		// Same key as the first row (e.g. a product listed under two groups): last wins.
+		{Date: "2024-02-08", CategoryID: 71, ProductID: 100, SubTypeName: "Normal", MarketPrice: &last},
+		// Same product/date but a different sub-type is a distinct key, kept.
+		{Date: "2024-02-08", CategoryID: 71, ProductID: 100, SubTypeName: "Foil", MarketPrice: &other},
+	}
+
+	got := dedupeTCGPriceRows(rows)
+	if len(got) != 3 {
+		t.Fatalf("got %d rows, want 3: %+v", len(got), got)
+	}
+	// First-seen order preserved: (100,Normal), (200,Normal), (100,Foil).
+	if got[0].ProductID != 100 || got[0].SubTypeName != "Normal" {
+		t.Errorf("row 0 = %+v, want product 100 Normal", got[0])
+	}
+	if got[0].MarketPrice == nil || *got[0].MarketPrice != last {
+		t.Errorf("dedup kept first, not last: market = %v, want %v", got[0].MarketPrice, last)
+	}
+	if got[1].ProductID != 200 || got[2].SubTypeName != "Foil" {
+		t.Errorf("unexpected order/keys: %+v", got)
 	}
 }
 
