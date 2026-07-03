@@ -41,6 +41,8 @@ func NewClient(cfg SqlConfig) (*Client, error) {
 	db.SetMaxOpenConns(maxOpen)
 	db.SetMaxIdleConns(maxIdle)
 	db.SetConnMaxLifetime(lifetime)
+	// Recycle idle conns before a NAT or firewall can silently drop them.
+	db.SetConnMaxIdleTime(time.Minute)
 
 	if err := db.Ping(); err != nil {
 		db.Close()
