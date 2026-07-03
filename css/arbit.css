@@ -290,16 +290,18 @@
 
 .arb-section-name:hover { color: var(--ainfo); }
 
-.arb-section-nav { display: flex; gap: 4px; }
+.arb-section-nav { display: flex; flex-direction: column; gap: 2px; }
 
-.arb-section-nav a {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
+.arb-section-nav a,
+.arb-section-nav span {
+    width: 20px;
+    height: 13px;
+    border-radius: 3px;
     background: var(--surface-2);
     border: 1px solid var(--border-subtle);
     color: var(--text-dim);
-    font-size: var(--text-md);
+    font-size: 8px;
+    line-height: 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -307,6 +309,8 @@
     transition: all 0.1s;
 }
 
+/* Disabled placeholder at either end, keeping both arrows in a fixed spot */
+.arb-section-nav span { opacity: 0.25; }
 .arb-section-nav a:hover { border-color: var(--accent-border); color: var(--ainfo); }
 
 .arb-load-btns { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }

@@ -222,19 +222,23 @@
             <div class="arb-section">
             <span class="anchor" id="{{.Name}}"></span>
             <div class="arb-section-header">
-                <a class="arb-section-name" href="#top">{{.Name}}</a>
                 <div class="arb-section-nav">
-                    {{if lt (inc $i 1) (len $.Arb)}}
-                        {{$nextIndex := inc $i 1}}
-                        {{$next := index $.Arb $nextIndex}}
-                        <a href="#{{$next.Name}}" title="Next">&#9660;</a>
-                    {{end}}
                     {{if gt $i 0}}
                         {{$prevIndex := dec $i 1}}
                         {{$prev := index $.Arb $prevIndex}}
                         <a href="#{{$prev.Name}}" title="Previous">&#9650;</a>
+                    {{else}}
+                        <span>&#9650;</span>
+                    {{end}}
+                    {{if lt (inc $i 1) (len $.Arb)}}
+                        {{$nextIndex := inc $i 1}}
+                        {{$next := index $.Arb $nextIndex}}
+                        <a href="#{{$next.Name}}" title="Next">&#9660;</a>
+                    {{else}}
+                        <span>&#9660;</span>
                     {{end}}
                 </div>
+                <a class="arb-section-name" href="#top">{{.Name}}</a>
 
                 <div class="arb-load-btns">
                     {{$scraperKey := $arb.Key}}
