@@ -194,6 +194,7 @@ type PageVars struct {
 	ChartID         string
 	ChartIDs        []string
 	ChartIDsCSV     string
+	MaxChartCards   int
 	IsMultiChart    bool
 	ChartReferences []string
 	ModalMode       bool
