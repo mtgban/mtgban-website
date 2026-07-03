@@ -3,36 +3,44 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-// twoRealUUIDs returns two distinct UUIDs from the loaded mtgmatcher pool, or
-// skips the test if fewer than two are available. parseChartIDs is the only
-// branch that requires real UUIDs to exercise the validation path; everything
-// else in this file is data-independent.
-func twoRealUUIDs(t *testing.T) (string, string) {
+// nRealUUIDs returns n distinct UUIDs from the loaded mtgmatcher pool, or skips
+// the test when fewer are available. parseChartIDs is the only branch that
+// requires real UUIDs to exercise the validation path; everything else in this
+// file is data-independent.
+func nRealUUIDs(t *testing.T, n int) []string {
 	t.Helper()
 	uuids := mtgmatcher.GetUUIDs()
-	if len(uuids) < 2 {
-		t.Skip("mtgmatcher data not loaded; skipping")
+	if len(uuids) < n {
+		t.Skipf("mtgmatcher data not loaded (need %d UUIDs); skipping", n)
 	}
-	return uuids[0], uuids[1]
+	return uuids[:n]
+}
+
+// twoRealUUIDs is the common two-card case of nRealUUIDs.
+func twoRealUUIDs(t *testing.T) (string, string) {
+	t.Helper()
+	ids := nRealUUIDs(t, 2)
+	return ids[0], ids[1]
 }
 
 func TestParseChartIDsEmpty(t *testing.T) {
-	if got := parseChartIDs(""); got != nil {
-		t.Fatalf("expected nil for empty input, got %v", got)
+	if got, truncated := parseChartIDs(""); got != nil || truncated {
+		t.Fatalf("expected (nil, false) for empty input, got (%v, %v)", got, truncated)
 	}
-	if got := parseChartIDs(",,"); got != nil {
-		t.Fatalf("expected nil for all-empty parts, got %v", got)
+	if got, truncated := parseChartIDs(",,"); got != nil || truncated {
+		t.Fatalf("expected (nil, false) for all-empty parts, got (%v, %v)", got, truncated)
 	}
 }
 
 func TestParseChartIDsSingle(t *testing.T) {
 	a, _ := twoRealUUIDs(t)
-	got := parseChartIDs(a)
+	got, _ := parseChartIDs(a)
 	if !reflect.DeepEqual(got, []string{a}) {
 		t.Fatalf("expected [%s], got %v", a, got)
 	}
@@ -40,7 +48,7 @@ func TestParseChartIDsSingle(t *testing.T) {
 
 func TestParseChartIDsTrimsWhitespaceAndSkipsEmpty(t *testing.T) {
 	a, b := twoRealUUIDs(t)
-	got := parseChartIDs("  " + a + " , ," + b + "  ")
+	got, _ := parseChartIDs("  " + a + " , ," + b + "  ")
 	want := []string{a, b}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
@@ -49,7 +57,7 @@ func TestParseChartIDsTrimsWhitespaceAndSkipsEmpty(t *testing.T) {
 
 func TestParseChartIDsDedupesPreservingOrder(t *testing.T) {
 	a, b := twoRealUUIDs(t)
-	got := parseChartIDs(a + "," + b + "," + a)
+	got, _ := parseChartIDs(a + "," + b + "," + a)
 	want := []string{a, b}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
@@ -58,15 +66,41 @@ func TestParseChartIDsDedupesPreservingOrder(t *testing.T) {
 
 func TestParseChartIDsDropsInvalid(t *testing.T) {
 	a, _ := twoRealUUIDs(t)
-	got := parseChartIDs("not-a-real-uuid," + a + ",also-bogus")
+	got, _ := parseChartIDs("not-a-real-uuid," + a + ",also-bogus")
 	if !reflect.DeepEqual(got, []string{a}) {
 		t.Fatalf("expected only [%s], got %v", a, got)
 	}
 }
 
 func TestParseChartIDsAllInvalid(t *testing.T) {
-	if got := parseChartIDs("not-a-real-uuid,nope"); got != nil {
-		t.Fatalf("expected nil when nothing validates, got %v", got)
+	if got, truncated := parseChartIDs("not-a-real-uuid,nope"); got != nil || truncated {
+		t.Fatalf("expected (nil, false) when nothing validates, got (%v, %v)", got, truncated)
+	}
+}
+
+func TestParseChartIDsCapsRoster(t *testing.T) {
+	maxCards := len(multiCardPalette)
+	ids := nRealUUIDs(t, maxCards+2)
+
+	// More distinct valid ids than the chart can render: keep the first
+	// maxCards in order and flag the drop.
+	got, truncated := parseChartIDs(strings.Join(ids, ","))
+	if !reflect.DeepEqual(got, ids[:maxCards]) {
+		t.Fatalf("expected first %d ids in order, got %v", maxCards, got)
+	}
+	if !truncated {
+		t.Fatal("expected truncated=true when more than the cap resolve")
+	}
+
+	// Exactly the cap: full roster, nothing dropped.
+	if got, truncated := parseChartIDs(strings.Join(ids[:maxCards], ",")); len(got) != maxCards || truncated {
+		t.Fatalf("expected (%d ids, false) at the cap, got (%d ids, %v)", maxCards, len(got), truncated)
+	}
+
+	// A duplicate past the cap is skipped before the cap check, so it doesn't
+	// count as dropping a renderable card.
+	if got, truncated := parseChartIDs(strings.Join(ids[:maxCards], ",") + "," + ids[0]); len(got) != maxCards || truncated {
+		t.Fatalf("expected a trailing duplicate not to flag truncation, got (%d ids, %v)", len(got), truncated)
 	}
 }
 

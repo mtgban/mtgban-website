@@ -39,7 +39,8 @@ func Home(w http.ResponseWriter, r *http.Request) {
 	// roster forward so a search from here lands back on the results page still
 	// in modal context (with the add-to-chart affordance).
 	pageVars.ModalMode = r.FormValue("modal") == "1"
-	pageVars.ChartIDsCSV = strings.Join(parseChartIDs(r.FormValue("chart")), ",")
+	chartIDs, _ := parseChartIDs(r.FormValue("chart"))
+	pageVars.ChartIDsCSV = strings.Join(chartIDs, ",")
 
 	render(w, "home.html", pageVars)
 }

@@ -97,11 +97,17 @@ func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (strin
 // parseChartIDs splits a chart=... param (comma-separated UUIDs) into a
 // validated, de-duplicated list. Pieces that don't resolve via mtgmatcher are
 // dropped silently, mirroring how single-UUID chart= used to be handled.
-func parseChartIDs(chartParam string) []string {
+//
+// The roster is capped at the palette size: the multi-card chart can only
+// render that many distinguishable lines, and it bounds the per-UUID DB
+// fan-out (GetEarliestDate + timeseries fetch) triggered on this public
+// handler by a crafted many-UUID chart= URL. truncated reports whether at
+// least one otherwise-valid, distinct card was dropped for exceeding the cap,
+// so the caller can tell the user instead of silently swallowing it.
+func parseChartIDs(chartParam string) (ids []string, truncated bool) {
 	if chartParam == "" {
-		return nil
+		return nil, false
 	}
-	var ids []string
 	for _, part := range strings.Split(chartParam, ",") {
 		part = strings.TrimSpace(part)
 		if part == "" {
@@ -113,16 +119,13 @@ func parseChartIDs(chartParam string) []string {
 		if slices.Contains(ids, part) {
 			continue
 		}
-		ids = append(ids, part)
-		// Cap the roster at the palette size: the multi-card chart can only
-		// render that many distinguishable lines, and it bounds the per-UUID
-		// DB fan-out (GetEarliestDate + timeseries fetch) triggered on this
-		// public handler by a crafted many-UUID chart= URL.
 		if len(ids) >= len(multiCardPalette) {
+			truncated = true
 			break
 		}
+		ids = append(ids, part)
 	}
-	return ids
+	return ids, truncated
 }
 
 func Search(w http.ResponseWriter, r *http.Request) {
@@ -232,10 +235,20 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	chartParam := r.FormValue("chart")
 	pageVars.ModalMode = r.FormValue("modal") == "1"
 
-	chartIds := parseChartIDs(chartParam)
+	// The front-end enforces the same cap when batching cards, so let the JS
+	// disable the affordance at the boundary instead of dropping silently.
+	pageVars.MaxChartCards = len(multiCardPalette)
+
+	chartIds, chartTruncated := parseChartIDs(chartParam)
 
 	chartId := ""
 	if len(chartIds) > 0 && !pageVars.DisableChart {
+		// A crafted or over-long chart= URL that names more cards than the chart
+		// can render lands here; say so rather than silently dropping the tail.
+		if chartTruncated {
+			pageVars.InfoMessage = fmt.Sprintf("Charts show up to %d cards; the extras were left off.", len(multiCardPalette))
+		}
+
 		// Always expose the chart roster so the "add to chart" affordance on
 		// result rows can target it even when we're rendering a regular search
 		// (e.g. the user typed a query while on a chart page).

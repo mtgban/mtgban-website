@@ -773,10 +773,11 @@
                                 // it carries the roster + modal flag so a search from it returns
                                 // to the results page still in modal context.
                                 frame.src = '/?chart={{.ChartIDsCSV}}&modal=1';
-                                overlay.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;justify-content:center;align-items:center;padding:4vh 4vw;';
+                                // Styling lives entirely in .chart-add-overlay / .open
+                                // (css/search.css) so the three copies can't drift; just
+                                // toggle the classes here.
                                 overlay.classList.add('open');
                                 document.body.classList.add('chart-add-open');
-                                document.body.style.overflow = 'hidden';
                             }
                             // Send the iframe back to the search box, carrying whatever's been
                             // batched so far so already-added cards render as added.
@@ -796,10 +797,8 @@
                             function closeChartAddModal() {
                                 var overlay = document.getElementById('chartAddOverlay');
                                 if (!overlay) return;
-                                overlay.style.display = 'none';
                                 overlay.classList.remove('open');
                                 document.body.classList.remove('chart-add-open');
-                                document.body.style.overflow = '';
                             }
                             document.addEventListener('keydown', function(e) {
                                 if (e.key === 'Escape') {
@@ -824,23 +823,19 @@
                             });
                         </script>
 
-                        <div id="chartAddOverlay" class="chart-add-overlay" style="display:none;" onclick="if(event.target===this)closeChartAddModal()">
-                            <div class="chart-add-dialog" role="dialog" aria-label="Add card to chart"
-                                 style="width:92vw;max-width:1400px;height:92vh;background:var(--background,#fff);border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:14px;box-shadow:0 24px 72px rgba(0,0,0,0.45);display:flex;flex-direction:column;overflow:hidden;">
-                                <div class="chart-add-header"
-                                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border-subtle,rgba(0,0,0,0.08));flex-shrink:0;background:var(--navbackground,var(--background,#fff));">
-                                    <span class="chart-add-title" style="font-size:14px;font-weight:600;color:var(--normal);">&#10133; Add cards to this chart</span>
+                        <div id="chartAddOverlay" class="chart-add-overlay" onclick="if(event.target===this)closeChartAddModal()">
+                            <div class="chart-add-dialog" role="dialog" aria-label="Add card to chart">
+                                <div class="chart-add-header">
+                                    <span class="chart-add-title">&#10133; Add cards to this chart</span>
                                     <span style="display:flex;align-items:center;gap:8px;">
                                         <button type="button" onclick="newChartSearch()" title="Search for another card"
                                                 style="background:var(--surface-2,rgba(0,0,0,0.05));border:1px solid var(--border-moderate,rgba(0,0,0,0.12));border-radius:6px;font-size:13px;line-height:1;cursor:pointer;color:var(--normal);padding:7px 12px;">New search</button>
                                         <button id="chartBatchCommit" type="button" onclick="commitChartBatch()" disabled title="Apply the batched cards and view the chart"
                                                 style="background:var(--search-link,#3b6fd4);border:1px solid var(--search-link,#3b6fd4);border-radius:6px;font-size:13px;font-weight:600;line-height:1;color:#fff;padding:7px 12px;opacity:0.5;cursor:default;">Update chart</button>
-                                        <button class="chart-add-close" type="button" onclick="closeChartAddModal()" aria-label="Close"
-                                                style="background:none;border:none;font-size:26px;line-height:1;cursor:pointer;color:var(--normal);padding:0 6px;">&times;</button>
+                                        <button class="chart-add-close" type="button" onclick="closeChartAddModal()" aria-label="Close">&times;</button>
                                     </span>
                                 </div>
-                                <iframe id="chartAddFrame" class="chart-add-frame" title="Search for a card to add"
-                                        style="flex:1;width:100%;border:0;background:var(--background,#fff);"></iframe>
+                                <iframe id="chartAddFrame" class="chart-add-frame" title="Search for a card to add"></iframe>
                             </div>
                         </div>
                     {{end}}
@@ -1540,7 +1535,15 @@ body.modal-embed .cp-overlay { display: none !important; }
         var idx = pending.indexOf(cardId);
         var added = !!add;
         if (added) {
-            if (idx === -1) pending.push(cardId);
+            if (idx === -1) {
+                // Match the server-side cap so an over-cap card isn't silently
+                // dropped on commit: refuse the add here and say why.
+                if (pending.length >= {{.MaxChartCards}}) {
+                    showChartToast('Charts hold up to {{.MaxChartCards}} cards');
+                    return;
+                }
+                pending.push(cardId);
+            }
         } else if (idx !== -1) {
             pending.splice(idx, 1);
         }
