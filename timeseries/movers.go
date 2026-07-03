@@ -22,8 +22,11 @@ func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int
 
 	// Resolve both dates first so the join can use literal-date index equality;
 	// folding the date lookups into the join degrades to a ~40x slower plan.
+	// Anchor to the selected column: a lagging metric (e.g. sealed EV, filled a
+	// day after singles) has no data on the global latest date.
 	var latest sql.NullTime
-	if err := c.db.QueryRowContext(ctx, `SELECT max(date) FROM product_prices`).Scan(&latest); err != nil {
+	if err := c.db.QueryRowContext(ctx,
+		fmt.Sprintf(`SELECT max(date) FROM product_prices WHERE %s > 0`, column)).Scan(&latest); err != nil {
 		return nil, err
 	}
 	if !latest.Valid {
@@ -34,7 +37,7 @@ func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int
 
 	var prior sql.NullTime
 	if err := c.db.QueryRowContext(ctx,
-		`SELECT max(date) FROM product_prices WHERE date <= $1::date`, targetStr).Scan(&prior); err != nil {
+		fmt.Sprintf(`SELECT max(date) FROM product_prices WHERE date <= $1::date AND %s > 0`, column), targetStr).Scan(&prior); err != nil {
 		return nil, err
 	}
 	if !prior.Valid {
