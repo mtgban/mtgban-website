@@ -1064,6 +1064,35 @@ func main() {
 	http.HandleFunc("/js/", ServeFile)
 	http.HandleFunc("/favicon.ico", ServeFile)
 
+	// Keep crawlers away from the (expensive) dynamic pages, and
+	// AI/SEO scrapers away from everything
+	const robotsTxt = `User-agent: *
+Disallow: /search
+Disallow: /sealed
+Disallow: /sets
+
+# AI training crawlers
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: CCBot
+User-agent: Google-Extended
+User-agent: PerplexityBot
+User-agent: Bytespider
+User-agent: meta-externalagent
+Disallow: /
+
+# SEO tool crawlers
+User-agent: AhrefsBot
+User-agent: SemrushBot
+User-agent: MJ12bot
+User-agent: DotBot
+Disallow: /
+`
+	http.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		fmt.Fprint(w, robotsTxt)
+	})
+
 	// custom redirector
 	http.HandleFunc("/go/", Redirect)
 	http.HandleFunc("/http:/", UploadURLRedirect)
