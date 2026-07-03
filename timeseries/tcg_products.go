@@ -27,7 +27,7 @@ type TCGProduct struct {
 
 const (
 	tcgProductColsPerRow = 10
-	tcgProductMaxBatch   = 65535 / tcgProductColsPerRow // ~6553
+	tcgProductMaxBatch   = pgMaxParams / tcgProductColsPerRow // ~6553
 )
 
 const tcgProductColumns = `
@@ -57,6 +57,7 @@ func (c *Client) UpsertTCGProducts(ctx context.Context, products []TCGProduct, b
 	if len(products) == 0 {
 		return 0, nil
 	}
+	products = dedupeTCGProducts(products)
 
 	tx, err := c.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -65,7 +66,7 @@ func (c *Client) UpsertTCGProducts(ctx context.Context, products []TCGProduct, b
 	defer tx.Rollback() // no-op once Commit succeeds
 
 	var total int
-	for _, b := range tcgProductBatchBounds(len(products), batchSize) {
+	for _, b := range batchBounds(len(products), batchSize, tcgProductMaxBatch) {
 		q, args := buildTCGProductsUpsertQuery(products[b[0]:b[1]])
 		res, err := tx.ExecContext(ctx, q, args...)
 		if err != nil {
@@ -80,46 +81,22 @@ func (c *Client) UpsertTCGProducts(ctx context.Context, products []TCGProduct, b
 	return total, nil
 }
 
-// GetTCGProduct returns a single catalog row, or sql.ErrNoRows if absent.
-func (c *Client) GetTCGProduct(ctx context.Context, productID int) (TCGProduct, error) {
-	q := `SELECT` + tcgProductColumns + ` FROM tcg_products WHERE product_id = $1`
-	var p TCGProduct
-	err := c.db.QueryRowContext(ctx, q, productID).Scan(
-		&p.ProductID, &p.CategoryID, &p.GroupID, &p.Name, &p.CleanName,
-		&p.Number, &p.Rarity, &p.ImageURL, &p.URL, &p.ModifiedOn,
-	)
-	return p, err
-}
-
-// CountTCGProducts returns how many catalog rows a category has.
-func (c *Client) CountTCGProducts(ctx context.Context, categoryID int) (int, error) {
-	var n int
-	err := c.db.QueryRowContext(ctx,
-		`SELECT count(*) FROM tcg_products WHERE category_id = $1`, categoryID).Scan(&n)
-	return n, err
-}
-
-func clampTCGProductBatchSize(batchSize int) int {
-	if batchSize <= 0 || batchSize > tcgProductMaxBatch {
-		return tcgProductMaxBatch
-	}
-	return batchSize
-}
-
-func tcgProductBatchBounds(total, batchSize int) [][2]int {
-	if total <= 0 {
-		return nil
-	}
-	batchSize = clampTCGProductBatchSize(batchSize)
-	var bounds [][2]int
-	for start := 0; start < total; start += batchSize {
-		end := start + batchSize
-		if end > total {
-			end = total
+// dedupeTCGProducts collapses products sharing a product_id (the conflict key)
+// down to their last occurrence, preserving first-seen order, so a single
+// INSERT ... ON CONFLICT DO UPDATE never sees the same key twice and errors with
+// "cannot affect row a second time". Last wins.
+func dedupeTCGProducts(products []TCGProduct) []TCGProduct {
+	seen := make(map[int]int, len(products))
+	out := make([]TCGProduct, 0, len(products))
+	for _, p := range products {
+		if idx, ok := seen[p.ProductID]; ok {
+			out[idx] = p
+			continue
 		}
-		bounds = append(bounds, [2]int{start, end})
+		seen[p.ProductID] = len(out)
+		out = append(out, p)
 	}
-	return bounds
+	return out
 }
 
 // buildTCGProductsUpsertQuery builds a multi-VALUES upsert for one batch, with
