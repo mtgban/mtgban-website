@@ -62,7 +62,8 @@ func tcgcsvClient() (*tcgcsv.Client, error) {
 // -tcgcsv-backfill maintenance flag.
 func runTCGCSVBackfill(ctx context.Context, fromStr, toStr string, force bool) error {
 	from := tcgcsv.ArchiveEpoch
-	if fromStr != "" {
+	explicitFrom := fromStr != ""
+	if explicitFrom {
 		d, err := time.Parse("2006-01-02", fromStr)
 		if err != nil {
 			return fmt.Errorf("tcgcsv: bad -tcgcsv-from %q: %w", fromStr, err)
@@ -80,15 +81,23 @@ func runTCGCSVBackfill(ctx context.Context, fromStr, toStr string, force bool) e
 	if from.Before(tcgcsv.ArchiveEpoch) {
 		from = tcgcsv.ArchiveEpoch
 	}
-	return backfillTCGCSV(ctx, from, to, force)
+	// The resume cursor (per-category MAX(date) high-water mark) auto-advances the
+	// default, no-argument backfill so re-runs are cheap. An explicit start date
+	// or -tcgcsv-force means "fetch this whole range", so bypass the cursor —
+	// otherwise a range aimed below the high-water mark (e.g. to fill a gap left
+	// by an earlier daily ingest) would be silently skipped. The upsert is
+	// idempotent, so re-covering already-stored days just overwrites them in place.
+	resume := !explicitFrom && !force
+	return backfillTCGCSV(ctx, from, to, resume)
 }
 
 // backfillTCGCSV fills tcg_prices from tcgcsv's daily archives for every
-// configured game, one day at a time. It resumes from where each category left
-// off: unless force is set, a day is skipped for a category once that category
-// already has data on or after it. Archives are downloaded only for days that
-// at least one category still needs, so re-runs are cheap.
-func backfillTCGCSV(ctx context.Context, from, to time.Time, force bool) error {
+// configured game, one day at a time. When resume is set it skips a day for a
+// category once that category already has data on or after it (the default
+// backfill's per-category high-water mark); when resume is false it fetches
+// every day in [from, to]. Archives are downloaded only for days that at least
+// one category still needs, so resumed re-runs are cheap.
+func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error {
 	client, err := tcgcsvClient()
 	if err != nil {
 		return err
@@ -103,30 +112,30 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, force bool) error {
 		return err
 	}
 
-	// Resume cursor: the newest date already stored per category.
+	// Resume cursor: the newest date already stored per category. Consulted only
+	// when resuming; an explicit range or force fetches every day in [from, to].
 	latest := make(map[int]time.Time)
-	for _, g := range Config.TCGCSVConfig.Games {
-		if force {
-			continue
-		}
-		d, ok, err := PricesArchiveDB.GetTCGLatestDate(ctx, g.CategoryID)
-		if err != nil {
-			return fmt.Errorf("tcgcsv: latest date for category %d: %w", g.CategoryID, err)
-		}
-		if ok {
-			latest[g.CategoryID] = d
+	if resume {
+		for _, g := range Config.TCGCSVConfig.Games {
+			d, ok, err := PricesArchiveDB.GetTCGLatestDate(ctx, g.CategoryID)
+			if err != nil {
+				return fmt.Errorf("tcgcsv: latest date for category %d: %w", g.CategoryID, err)
+			}
+			if ok {
+				latest[g.CategoryID] = d
+			}
 		}
 	}
 
-	log.Printf("tcgcsv backfill: %s..%s across %d game(s), force=%v",
-		from.Format("2006-01-02"), to.Format("2006-01-02"), len(Config.TCGCSVConfig.Games), force)
+	log.Printf("tcgcsv backfill: %s..%s across %d game(s), resume=%v",
+		from.Format("2006-01-02"), to.Format("2006-01-02"), len(Config.TCGCSVConfig.Games), resume)
 
 	var totalRows, daysWithData, daysFailed int
 	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
 		// Which categories still need this day?
 		need := make(map[int]bool)
 		for _, g := range Config.TCGCSVConfig.Games {
-			if force || day.After(latest[g.CategoryID]) {
+			if !resume || day.After(latest[g.CategoryID]) {
 				need[g.CategoryID] = true
 			}
 		}
@@ -222,46 +231,74 @@ func ingestTCGCSVLatest(ctx context.Context) error {
 	snapshot := updated.UTC().Truncate(24 * time.Hour)
 	dateStr := snapshot.Format("2006-01-02")
 
+	// Ingest each game independently: one game's failure (a flaky endpoint, a bad
+	// group) is logged and collected, not fatal, so the remaining games still get
+	// pulled. A game is all-or-nothing — its rows land in a single upsert only
+	// after every group fetched cleanly — so a failed game writes nothing and its
+	// freshness cursor doesn't advance, leaving it safe to retry next run.
 	var totalRows int
-	for _, g := range Config.TCGCSVConfig.Games {
-		latest, ok, err := PricesArchiveDB.GetTCGLatestDate(ctx, g.CategoryID)
+	var errs []error
+	games := Config.TCGCSVConfig.Games
+	for _, g := range games {
+		n, err := ingestTCGCSVGame(ctx, client, g.CategoryID, snapshot, dateStr)
 		if err != nil {
-			return fmt.Errorf("tcgcsv: latest date for category %d: %w", g.CategoryID, err)
-		}
-		if ok && !snapshot.After(latest) {
-			log.Printf("tcgcsv daily %s: category %d already current", dateStr, g.CategoryID)
+			log.Printf("tcgcsv daily %s: category %d failed: %v", dateStr, g.CategoryID, err)
+			errs = append(errs, fmt.Errorf("category %d: %w", g.CategoryID, err))
 			continue
-		}
-
-		groups, err := client.Groups(ctx, g.CategoryID)
-		if err != nil {
-			return fmt.Errorf("tcgcsv: groups for category %d: %w", g.CategoryID, err)
-		}
-		var rows []timeseries.TCGPriceRow
-		for _, grp := range groups {
-			prices, err := client.Prices(ctx, g.CategoryID, grp.GroupID)
-			if err != nil {
-				return fmt.Errorf("tcgcsv: prices for %d/%d: %w", g.CategoryID, grp.GroupID, err)
-			}
-			for _, p := range prices {
-				rows = append(rows, priceToRow(dateStr, g.CategoryID, p))
-			}
-		}
-		if len(rows) == 0 {
-			continue
-		}
-
-		n, err := PricesArchiveDB.UpsertTCGPrices(ctx, rows, 0)
-		if err != nil {
-			return fmt.Errorf("tcgcsv: upsert category %d: %w", g.CategoryID, err)
 		}
 		totalRows += n
-		log.Printf("tcgcsv daily %s: category %d, %d rows (%d groups)", dateStr, g.CategoryID, n, len(groups))
 	}
 
 	if totalRows > 0 {
 		ServerNotify("tcgcsv", fmt.Sprintf("daily ingest %s: %d rows", dateStr, totalRows))
 	}
+	if len(errs) > 0 {
+		log.Printf("tcgcsv daily ingest %s: %d rows, %d of %d game(s) failed",
+			dateStr, totalRows, len(errs), len(games))
+		return fmt.Errorf("tcgcsv daily ingest: %d of %d game(s) failed: %w",
+			len(errs), len(games), errors.Join(errs...))
+	}
 	log.Printf("tcgcsv daily ingest complete: %d rows for %s", totalRows, dateStr)
 	return nil
+}
+
+// ingestTCGCSVGame pulls one game's current snapshot and upserts it under
+// dateStr. It returns the number of rows written, which is 0 when the category
+// already holds the snapshot date (the freshness gate) or the game reports no
+// prices. All of a game's rows are written in one upsert, so a mid-fetch failure
+// leaves the category untouched and safe to retry.
+func ingestTCGCSVGame(ctx context.Context, client *tcgcsv.Client, categoryID int, snapshot time.Time, dateStr string) (int, error) {
+	latest, ok, err := PricesArchiveDB.GetTCGLatestDate(ctx, categoryID)
+	if err != nil {
+		return 0, fmt.Errorf("latest date: %w", err)
+	}
+	if ok && !snapshot.After(latest) {
+		log.Printf("tcgcsv daily %s: category %d already current", dateStr, categoryID)
+		return 0, nil
+	}
+
+	groups, err := client.Groups(ctx, categoryID)
+	if err != nil {
+		return 0, fmt.Errorf("groups: %w", err)
+	}
+	var rows []timeseries.TCGPriceRow
+	for _, grp := range groups {
+		prices, err := client.Prices(ctx, categoryID, grp.GroupID)
+		if err != nil {
+			return 0, fmt.Errorf("prices for group %d: %w", grp.GroupID, err)
+		}
+		for _, p := range prices {
+			rows = append(rows, priceToRow(dateStr, categoryID, p))
+		}
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+
+	n, err := PricesArchiveDB.UpsertTCGPrices(ctx, rows, 0)
+	if err != nil {
+		return 0, fmt.Errorf("upsert: %w", err)
+	}
+	log.Printf("tcgcsv daily %s: category %d, %d rows (%d groups)", dateStr, categoryID, n, len(groups))
+	return n, nil
 }
