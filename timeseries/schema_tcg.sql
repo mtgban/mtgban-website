@@ -1,8 +1,9 @@
 -- tcgplayer_nonmagic_product_prices holds multi-game price history sourced from TCGCSV (tcgcsv.com),
 -- keyed by TCGplayer product id and printing sub-type rather than mtgjson uuid.
--- This is the game-agnostic counterpart to product_prices: one row per
--- (date, category, product, sub-type), where category_id is the TCGplayer
--- category (e.g. 71 = Disney Lorcana, 1 = Magic).
+-- This is the counterpart to product_prices for games without an mtgjson uuid:
+-- one row per (date, category, product, sub-type), where category_id is the
+-- TCGplayer category (e.g. 71 = Disney Lorcana). Magic (category 1) is not
+-- ingested here; its prices are keyed by mtgjson uuid in product_prices.
 --
 -- The table is LIST-partitioned by category_id. Games never share rows and every
 -- query is category-scoped, so each game lives in its own partition: vacuum,
@@ -38,7 +39,6 @@ create table if not exists public.tcgplayer_nonmagic_product_prices_default
 -- later need moving to attach one. Categories 21, 69, 70 are junk per tcgcsv and
 -- intentionally omitted. Adding a game is one line here plus a config entry; the
 -- names match EnsureTCGCategoryPartition's tcgplayer_nonmagic_product_prices_cat_<id> so it no-ops here.
-create table if not exists public.tcgplayer_nonmagic_product_prices_cat_1  partition of public.tcgplayer_nonmagic_product_prices for values in (1);   -- Magic
 create table if not exists public.tcgplayer_nonmagic_product_prices_cat_2  partition of public.tcgplayer_nonmagic_product_prices for values in (2);   -- Yu-Gi-Oh!
 create table if not exists public.tcgplayer_nonmagic_product_prices_cat_3  partition of public.tcgplayer_nonmagic_product_prices for values in (3);   -- Pokemon
 create table if not exists public.tcgplayer_nonmagic_product_prices_cat_16 partition of public.tcgplayer_nonmagic_product_prices for values in (16);  -- Cardfight Vanguard

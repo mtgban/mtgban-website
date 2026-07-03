@@ -25,10 +25,11 @@ const DefaultBaseURL = "https://tcgcsv.com"
 
 const defaultUserAgent = "mtgban-website (+https://mtgban.com)"
 
-// Known TCGplayer category ids, for reference and config. Categories 21, 69,
-// and 70 are junk per the tcgcsv FAQ and should not be ingested.
+// Known TCGplayer category ids, for reference and config. Magic (category 1) is
+// intentionally absent: its prices are keyed by mtgjson uuid in product_prices,
+// not here. Categories 21, 69, and 70 are junk per the tcgcsv FAQ and should not
+// be ingested.
 const (
-	CategoryMagic             = 1
 	CategoryYuGiOh            = 2
 	CategoryPokemon           = 3
 	CategoryVanguard          = 16
