@@ -1013,7 +1013,7 @@
             {{end}}
         </div>
 
-        {{range .AllScraperKeys}}
+        {{range $i, $key := .OptimizedKeys}}
             {{$scraperKey := .}}
             {{$sourceKey := .}}
             {{$entries := index $.Optimized .}}
@@ -1021,6 +1021,18 @@
                 {{$total := index $.OptimizedTotals .}}
                 <div class="opt-store" id="opt-{{.}}">
                     <div class="opt-store-header">
+                        <div class="opt-section-nav">
+                            {{if gt $i 0}}
+                                <a href="#opt-{{index $.OptimizedKeys (dec $i 1)}}" title="Previous">&#9650;</a>
+                            {{else}}
+                                <span>&#9650;</span>
+                            {{end}}
+                            {{if lt (inc $i 1) (len $.OptimizedKeys)}}
+                                <a href="#opt-{{index $.OptimizedKeys (inc $i 1)}}" title="Next">&#9660;</a>
+                            {{else}}
+                                <span>&#9660;</span>
+                            {{end}}
+                        </div>
                         <h3>{{scraper_name .}}</h3>
                         <div class="opt-header-actions">
                         {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}

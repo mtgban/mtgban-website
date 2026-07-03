@@ -1179,6 +1179,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		// and only a separate symbol should link out to the alternate source.
 		pageVars.IgnorePrices = skipPrices
 		pageVars.Optimized = optimizedResults
+		// Only the stores that render a results section, in display order,
+		// so that the template can link each section to the previous/next one
+		for _, key := range activeTotalStores {
+			if len(optimizedResults[key]) > 0 {
+				pageVars.OptimizedKeys = append(pageVars.OptimizedKeys, key)
+			}
+		}
 		pageVars.OptimizedTotals = optimizedTotals
 		pageVars.HighestTotal = highestTotal
 		uploadEditions := GetEditions()

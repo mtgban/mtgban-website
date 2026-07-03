@@ -233,6 +233,7 @@ type PageVars struct {
 	RemoteLinkURL        string
 	TotalQuantity        int
 	Optimized            map[string][]OptimizedUploadEntry
+	OptimizedKeys        []string
 	IgnorePrices         bool
 	OptimizedTotals      map[string]float64
 	HighestTotal         float64
