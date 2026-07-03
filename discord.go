@@ -397,6 +397,15 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 			return "Your search"
 		},
 	},
+	{
+		Trigger:       "/a.co/",
+		Name:          "Amazon",
+		Handle:        "AMZN",
+		DefaultFields: []string{"tag"},
+		TitleFunc: func(u *url.URL) string {
+			return "Your search"
+		},
+	},
 }
 
 // Check if a essage contains well-known links that can be tagged with BAN's links
