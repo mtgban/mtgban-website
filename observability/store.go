@@ -34,15 +34,6 @@ func (c *Client) InsertBatch(ctx context.Context, evs []Event) error {
 	return err
 }
 
-// RefreshRollup recomputes usage_daily. Non-concurrent: it takes a brief
-// ACCESS EXCLUSIVE lock, acceptable for a tiny hourly rollup on an admin-only
-// dashboard, and avoids needing the TEMPORARY database privilege that a
-// CONCURRENTLY refresh requires.
-func (c *Client) RefreshRollup(ctx context.Context) error {
-	_, err := c.db.ExecContext(ctx, "REFRESH MATERIALIZED VIEW usage_daily")
-	return err
-}
-
 // PathAgg is a per-path aggregate. Uniques is the true distinct-visitor count
 // over the range (anonymous NULL visitors are excluded).
 type PathAgg struct {

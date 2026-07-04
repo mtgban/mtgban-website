@@ -11,22 +11,19 @@ import (
 // store is the subset of *Client the recorder needs (lets tests fake it).
 type store interface {
 	InsertBatch(ctx context.Context, evs []Event) error
-	RefreshRollup(ctx context.Context) error
 }
 
 type recorderCfg struct {
-	bufferSize      int
-	batchSize       int
-	flushInterval   time.Duration
-	refreshInterval time.Duration
+	bufferSize    int
+	batchSize     int
+	flushInterval time.Duration
 }
 
 func defaultRecorderCfg() recorderCfg {
 	return recorderCfg{
-		bufferSize:      4096,
-		batchSize:       256, // batchSize * 6 must stay < 65535 (Postgres param limit)
-		flushInterval:   5 * time.Second,
-		refreshInterval: time.Hour,
+		bufferSize:    4096,
+		batchSize:     256, // batchSize * 6 must stay < 65535 (Postgres param limit)
+		flushInterval: 5 * time.Second,
 	}
 }
 
@@ -51,9 +48,8 @@ func newRecorder(s store, cfg recorderCfg) *Recorder {
 }
 
 func (r *Recorder) start() {
-	r.wg.Add(2)
+	r.wg.Add(1)
 	go r.runFlush()
-	go r.runRefresh()
 }
 
 // NewRecorder builds a Recorder with default config and starts its goroutine.
@@ -143,31 +139,6 @@ func (r *Recorder) runFlush() {
 					return
 				}
 			}
-		}
-	}
-}
-
-func (r *Recorder) runRefresh() {
-	defer r.wg.Done()
-	refreshTicker := time.NewTicker(r.cfg.refreshInterval)
-	defer refreshTicker.Stop()
-	for {
-		select {
-		case <-refreshTicker.C:
-			func() {
-				defer func() {
-					if p := recover(); p != nil {
-						log.Println("observability: refresh panic:", p)
-					}
-				}()
-				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-				defer cancel()
-				if err := r.store.RefreshRollup(ctx); err != nil {
-					log.Println("observability: refresh rollup:", err)
-				}
-			}()
-		case <-r.done:
-			return
 		}
 	}
 }
