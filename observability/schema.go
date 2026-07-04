@@ -13,8 +13,10 @@ var schemaStatements = []string{
     tier     text        NOT NULL,
     device   text        NOT NULL,
     visitor  text,
-    is_bot   boolean     NOT NULL DEFAULT false
+    is_bot   boolean     NOT NULL DEFAULT false,
+    instance text
 )`,
+	`ALTER TABLE events ADD COLUMN IF NOT EXISTS instance text`,
 	`CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts)`,
 	`CREATE INDEX IF NOT EXISTS idx_events_path_ts ON events (path, ts)`,
 	`CREATE MATERIALIZED VIEW IF NOT EXISTS usage_daily AS

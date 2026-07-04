@@ -533,6 +533,7 @@ type ConfigType struct {
 	SqlConfig           *timeseries.SqlConfig `json:"sql_config"`
 	UserStateConfig     *userstate.SqlConfig  `json:"user_state_config"`
 	ObservabilityConfig *timeseries.SqlConfig `json:"observability_config"`
+	InstanceName        string                `json:"instance_name"`
 }
 
 var DevMode bool
@@ -829,6 +830,8 @@ func openDBs() (err error) {
 			return err
 		}
 	}
+
+	observabilityInstance = resolveInstanceName(Config.InstanceName)
 
 	if Config.ObservabilityConfig == nil {
 		log.Println("no observability configuration set, telemetry won't be recorded")
