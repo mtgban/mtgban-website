@@ -24,7 +24,7 @@ type recorderCfg struct {
 func defaultRecorderCfg() recorderCfg {
 	return recorderCfg{
 		bufferSize:      4096,
-		batchSize:       256, // batchSize * 5 must stay < 65535 (Postgres param limit)
+		batchSize:       256, // batchSize * 6 must stay < 65535 (Postgres param limit)
 		flushInterval:   5 * time.Second,
 		refreshInterval: time.Hour,
 	}

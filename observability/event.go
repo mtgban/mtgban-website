@@ -12,12 +12,13 @@ import (
 
 // Event is one recorded page hit. Ts is left zero and filled by the DB default.
 type Event struct {
-	Ts      time.Time
-	Path    string
-	Tier    string
-	Device  string // "mobile" | "desktop"
-	Visitor string // sha256 of email, or "" for anonymous (stored NULL)
-	IsBot   bool
+	Ts       time.Time
+	Path     string
+	Tier     string
+	Device   string // "mobile" | "desktop"
+	Visitor  string // sha256 of email, or "" for anonymous (stored NULL)
+	IsBot    bool
+	Instance string // deployment instance (main/beta/lorcana)
 }
 
 // pageSubviews lists the recognized ?page= values per route. Anything else

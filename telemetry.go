@@ -3,10 +3,27 @@ package main
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/mtgban/mtgban-website/observability"
 )
+
+// observabilityInstance is this deployment's instance label, resolved once at
+// startup and stamped on every recorded event.
+var observabilityInstance string
+
+// resolveInstanceName returns the configured instance name, else the OS
+// hostname, else "unknown". Never empty.
+func resolveInstanceName(configured string) string {
+	if configured != "" {
+		return configured
+	}
+	if h, err := os.Hostname(); err == nil && h != "" {
+		return h
+	}
+	return "unknown"
+}
 
 // recordablePath reports whether a request path should produce a telemetry
 // event. API routes are excluded: some are wired through enforceSigning but
@@ -37,10 +54,11 @@ func recordPageHit(r *http.Request) {
 		tier = "Any"
 	}
 	ObservabilityRecorder.Record(observability.Event{
-		Path:    observability.NormalizePath(strings.Trim(r.URL.Path, "/"), r.FormValue("page")),
-		Tier:    tier,
-		Device:  device,
-		Visitor: observability.HashVisitor(GetParamFromSig(sig, "UserEmail")),
-		IsBot:   observability.IsBot(r.UserAgent()),
+		Path:     observability.NormalizePath(strings.Trim(r.URL.Path, "/"), r.FormValue("page")),
+		Tier:     tier,
+		Device:   device,
+		Visitor:  observability.HashVisitor(GetParamFromSig(sig, "UserEmail")),
+		IsBot:    observability.IsBot(r.UserAgent()),
+		Instance: observabilityInstance,
 	})
 }

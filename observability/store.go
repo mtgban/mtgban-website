@@ -10,25 +10,25 @@ import (
 
 // InsertBatch writes events in one multi-row INSERT. ts uses the column default.
 // An empty Visitor is stored as NULL so count(DISTINCT visitor) ignores anon hits.
-// Each event binds 5 params; callers must keep len(evs)*5 below Postgres's 65535 param limit (256 events = 1280 params).
+// Each event binds 6 params; keep len(evs)*6 below Postgres's 65535 param limit.
 func (c *Client) InsertBatch(ctx context.Context, evs []Event) error {
 	if len(evs) == 0 {
 		return nil
 	}
 	var b strings.Builder
-	b.WriteString("INSERT INTO events (path, tier, device, visitor, is_bot) VALUES ")
-	args := make([]any, 0, len(evs)*5)
+	b.WriteString("INSERT INTO events (path, tier, device, visitor, is_bot, instance) VALUES ")
+	args := make([]any, 0, len(evs)*6)
 	for i, ev := range evs {
 		if i > 0 {
 			b.WriteString(",")
 		}
-		n := i * 5
-		fmt.Fprintf(&b, "($%d,$%d,$%d,$%d,$%d)", n+1, n+2, n+3, n+4, n+5)
+		n := i * 6
+		fmt.Fprintf(&b, "($%d,$%d,$%d,$%d,$%d,$%d)", n+1, n+2, n+3, n+4, n+5, n+6)
 		var visitor any
 		if ev.Visitor != "" {
 			visitor = ev.Visitor
 		}
-		args = append(args, ev.Path, ev.Tier, ev.Device, visitor, ev.IsBot)
+		args = append(args, ev.Path, ev.Tier, ev.Device, visitor, ev.IsBot, ev.Instance)
 	}
 	_, err := c.db.ExecContext(ctx, b.String(), args...)
 	return err
