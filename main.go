@@ -44,6 +44,7 @@ import (
 type UsageDashboard struct {
 	Since       time.Time
 	IncludeBots bool
+	Instance    string
 	TopPages    []observability.PathAgg
 	ByTier      []observability.TierAgg
 	ByDevice    []observability.DeviceAgg

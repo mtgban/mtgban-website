@@ -617,11 +617,11 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		since := time.Now().AddDate(0, 0, -30)
 		includeBots := r.FormValue("bots") == "1"
 		ctx := r.Context()
-		dash := &UsageDashboard{Since: since, IncludeBots: includeBots}
-		dash.TopPages, _ = ObservabilityDB.TopPages(ctx, since, includeBots)
-		dash.ByTier, _ = ObservabilityDB.UsageByTier(ctx, since, includeBots)
-		dash.ByDevice, _ = ObservabilityDB.DeviceSplit(ctx, since, includeBots)
-		dash.SubViews, _ = ObservabilityDB.SubViewBreakdown(ctx, since, includeBots)
+		dash := &UsageDashboard{Since: since, IncludeBots: includeBots, Instance: observabilityInstance}
+		dash.TopPages, _ = ObservabilityDB.TopPages(ctx, since, includeBots, observabilityInstance)
+		dash.ByTier, _ = ObservabilityDB.UsageByTier(ctx, since, includeBots, observabilityInstance)
+		dash.ByDevice, _ = ObservabilityDB.DeviceSplit(ctx, since, includeBots, observabilityInstance)
+		dash.SubViews, _ = ObservabilityDB.SubViewBreakdown(ctx, since, includeBots, observabilityInstance)
 		pageVars.UsageStats = dash
 	}
 

@@ -43,8 +43,8 @@ func (c *Client) RefreshRollup(ctx context.Context) error {
 	return err
 }
 
-// PathAgg is a per-path aggregate. Uniques is summed daily uniques (a
-// visitor-days approximation of range uniques), acceptable for the dashboard.
+// PathAgg is a per-path aggregate. Uniques is the true distinct-visitor count
+// over the range (anonymous NULL visitors are excluded).
 type PathAgg struct {
 	Path    string
 	Hits    int64
@@ -64,13 +64,13 @@ type DeviceAgg struct {
 	Uniques int64
 }
 
-// TopPages returns paths ordered by hits since the given day.
-func (c *Client) TopPages(ctx context.Context, since time.Time, includeBots bool) ([]PathAgg, error) {
-	const q = `SELECT path, sum(hits), sum(uniques)
-FROM usage_daily
-WHERE day >= $1::date AND ($2 OR NOT is_bot)
-GROUP BY path ORDER BY sum(hits) DESC`
-	rows, err := c.db.QueryContext(ctx, q, since, includeBots)
+// TopPages returns paths for one instance ordered by hits since the given time.
+func (c *Client) TopPages(ctx context.Context, since time.Time, includeBots bool, instance string) ([]PathAgg, error) {
+	const q = `SELECT path, count(*), count(DISTINCT visitor)
+FROM events
+WHERE ts >= $1 AND instance = $2 AND ($3 OR NOT is_bot)
+GROUP BY path ORDER BY count(*) DESC`
+	rows, err := c.db.QueryContext(ctx, q, since, instance, includeBots)
 	if err != nil {
 		return nil, err
 	}
@@ -86,13 +86,13 @@ GROUP BY path ORDER BY sum(hits) DESC`
 	return out, rows.Err()
 }
 
-// UsageByTier returns hits/uniques grouped by membership tier.
-func (c *Client) UsageByTier(ctx context.Context, since time.Time, includeBots bool) ([]TierAgg, error) {
-	const q = `SELECT tier, sum(hits), sum(uniques)
-FROM usage_daily
-WHERE day >= $1::date AND ($2 OR NOT is_bot)
-GROUP BY tier ORDER BY sum(hits) DESC`
-	rows, err := c.db.QueryContext(ctx, q, since, includeBots)
+// UsageByTier returns hits/uniques for one instance grouped by membership tier.
+func (c *Client) UsageByTier(ctx context.Context, since time.Time, includeBots bool, instance string) ([]TierAgg, error) {
+	const q = `SELECT tier, count(*), count(DISTINCT visitor)
+FROM events
+WHERE ts >= $1 AND instance = $2 AND ($3 OR NOT is_bot)
+GROUP BY tier ORDER BY count(*) DESC`
+	rows, err := c.db.QueryContext(ctx, q, since, instance, includeBots)
 	if err != nil {
 		return nil, err
 	}
@@ -108,13 +108,13 @@ GROUP BY tier ORDER BY sum(hits) DESC`
 	return out, rows.Err()
 }
 
-// DeviceSplit returns hits/uniques grouped by path and device.
-func (c *Client) DeviceSplit(ctx context.Context, since time.Time, includeBots bool) ([]DeviceAgg, error) {
-	const q = `SELECT path, device, sum(hits), sum(uniques)
-FROM usage_daily
-WHERE day >= $1::date AND ($2 OR NOT is_bot)
+// DeviceSplit returns hits/uniques for one instance grouped by path and device.
+func (c *Client) DeviceSplit(ctx context.Context, since time.Time, includeBots bool, instance string) ([]DeviceAgg, error) {
+	const q = `SELECT path, device, count(*), count(DISTINCT visitor)
+FROM events
+WHERE ts >= $1 AND instance = $2 AND ($3 OR NOT is_bot)
 GROUP BY path, device ORDER BY path, device`
-	rows, err := c.db.QueryContext(ctx, q, since, includeBots)
+	rows, err := c.db.QueryContext(ctx, q, since, instance, includeBots)
 	if err != nil {
 		return nil, err
 	}
@@ -130,14 +130,14 @@ GROUP BY path, device ORDER BY path, device`
 	return out, rows.Err()
 }
 
-// SubViewBreakdown returns only newspaper/ and sleepers/ sub-view rows.
-func (c *Client) SubViewBreakdown(ctx context.Context, since time.Time, includeBots bool) ([]PathAgg, error) {
-	const q = `SELECT path, sum(hits), sum(uniques)
-FROM usage_daily
-WHERE day >= $1::date AND ($2 OR NOT is_bot)
+// SubViewBreakdown returns only newspaper/ and sleepers/ sub-view rows for one instance.
+func (c *Client) SubViewBreakdown(ctx context.Context, since time.Time, includeBots bool, instance string) ([]PathAgg, error) {
+	const q = `SELECT path, count(*), count(DISTINCT visitor)
+FROM events
+WHERE ts >= $1 AND instance = $2 AND ($3 OR NOT is_bot)
   AND (path LIKE 'newspaper/%' OR path LIKE 'sleepers/%')
-GROUP BY path ORDER BY sum(hits) DESC`
-	rows, err := c.db.QueryContext(ctx, q, since, includeBots)
+GROUP BY path ORDER BY count(*) DESC`
+	rows, err := c.db.QueryContext(ctx, q, since, instance, includeBots)
 	if err != nil {
 		return nil, err
 	}
