@@ -1005,7 +1005,7 @@ func main() {
 	}
 
 	// Parse templates once in production
-	templateCache, err = buildTemplateCache()
+	TemplateCache, err = buildTemplateCache()
 	if err != nil {
 		log.Fatalln("template cache:", err)
 	}
@@ -1219,9 +1219,9 @@ Disallow: /
 	ServerNotify("shutdown", "Server shutdown correctly")
 }
 
-// templateCache holds pre-parsed templates keyed by their base name.
+// TemplateCache holds pre-parsed templates keyed by their base name.
 // Populated at startup in production; nil in DevMode (re-parsed per request).
-var templateCache map[string]*template.Template
+var TemplateCache map[string]*template.Template
 
 func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []string) {
 	name := path.Base(tmpl)
@@ -1342,7 +1342,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	if pageVars.IsMobile {
 		key = "mobile/" + name
 	}
-	t, found := templateCache[key]
+	t, found := TemplateCache[key]
 	if !found {
 		log.Printf("template cache: %q not found", key)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
