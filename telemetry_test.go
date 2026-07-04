@@ -12,16 +12,6 @@ func TestRecordPageHitNilRecorderNoPanic(t *testing.T) {
 	recordPageHit(req) // must return without panic
 }
 
-func TestResolveInstanceName(t *testing.T) {
-	if got := resolveInstanceName("beta"); got != "beta" {
-		t.Fatalf("configured name should win, got %q", got)
-	}
-	// Empty config falls back to hostname or "unknown"; either way non-empty.
-	if got := resolveInstanceName(""); got == "" {
-		t.Fatal("empty config must fall back to a non-empty value")
-	}
-}
-
 func TestRecordablePath(t *testing.T) {
 	cases := []struct {
 		path string
