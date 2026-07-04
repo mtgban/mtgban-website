@@ -817,8 +817,7 @@ func openDBs() (err error) {
 	} else {
 		PricesArchiveDB, err = timeseries.NewClient(*Config.SqlConfig)
 		if err != nil {
-			log.Println("error creating a SQL client:", err)
-			return err
+			return fmt.Errorf("error opening the timeseries SQL client: %w", err)
 		}
 	}
 
@@ -827,8 +826,7 @@ func openDBs() (err error) {
 	} else {
 		UserStateDB, err = userstate.NewClient(*Config.UserStateConfig)
 		if err != nil {
-			log.Println("error creating a user_state SQL client:", err)
-			return err
+			return fmt.Errorf("error opening the user_state SQL client: %w", err)
 		}
 	}
 
@@ -851,7 +849,7 @@ func openDBs() (err error) {
 	} else {
 		NewNewspaperDB, err = sql.Open("postgres", Config.NewNewspaperConfigLine)
 		if err != nil {
-			return err
+			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
 		}
 	}
 
