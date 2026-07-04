@@ -8,26 +8,14 @@ import (
 )
 
 type fakeStore struct {
-	mu           sync.Mutex
-	inserted     int
-	refresh      int
-	refreshBlock chan struct{}
+	mu       sync.Mutex
+	inserted int
 }
 
 func (f *fakeStore) InsertBatch(ctx context.Context, evs []Event) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.inserted += len(evs)
-	return nil
-}
-func (f *fakeStore) RefreshRollup(ctx context.Context) error {
-	// Block outside the lock so count() is never deadlocked by a held refresh.
-	if f.refreshBlock != nil {
-		<-f.refreshBlock
-	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.refresh++
 	return nil
 }
 func (f *fakeStore) count() int {
@@ -50,7 +38,7 @@ func waitFor(t *testing.T, want int, get func() int) {
 
 func TestRecordNonBlockingWhenFull(t *testing.T) {
 	// Build without starting the goroutine so nothing drains the channel.
-	r := newRecorder(&fakeStore{}, recorderCfg{bufferSize: 2, batchSize: 10, flushInterval: time.Hour, refreshInterval: time.Hour})
+	r := newRecorder(&fakeStore{}, recorderCfg{bufferSize: 2, batchSize: 10, flushInterval: time.Hour})
 	r.ch <- Event{}
 	r.ch <- Event{} // channel now full
 	done := make(chan struct{})
@@ -67,7 +55,7 @@ func TestRecordNonBlockingWhenFull(t *testing.T) {
 
 func TestFlushOnBatchSize(t *testing.T) {
 	fs := &fakeStore{}
-	r := newRecorder(fs, recorderCfg{bufferSize: 16, batchSize: 3, flushInterval: time.Hour, refreshInterval: time.Hour})
+	r := newRecorder(fs, recorderCfg{bufferSize: 16, batchSize: 3, flushInterval: time.Hour})
 	r.start()
 	defer r.Close()
 	for i := 0; i < 3; i++ {
@@ -78,7 +66,7 @@ func TestFlushOnBatchSize(t *testing.T) {
 
 func TestCloseDrainsAndFlushes(t *testing.T) {
 	fs := &fakeStore{}
-	r := newRecorder(fs, recorderCfg{bufferSize: 16, batchSize: 100, flushInterval: time.Hour, refreshInterval: time.Hour})
+	r := newRecorder(fs, recorderCfg{bufferSize: 16, batchSize: 100, flushInterval: time.Hour})
 	r.start()
 	r.Record(Event{Path: "a"})
 	r.Record(Event{Path: "b"})
@@ -109,20 +97,4 @@ func TestDoubleCloseNoPanic(t *testing.T) {
 	if err := r.Close(); err != nil {
 		t.Fatalf("second Close: %v", err)
 	}
-}
-
-func TestRefreshDoesNotStallFlush(t *testing.T) {
-	block := make(chan struct{})
-	fs := &fakeStore{refreshBlock: block}
-	r := newRecorder(fs, recorderCfg{bufferSize: 16, batchSize: 1, flushInterval: time.Hour, refreshInterval: 10 * time.Millisecond})
-	r.start()
-	defer func() {
-		close(block) // unblock the held refresh so Close can drain
-		r.Close()
-	}()
-	// Give the refresh ticker time to fire and block inside RefreshRollup.
-	time.Sleep(50 * time.Millisecond)
-	// Even with refresh blocked, a recorded event must still flush.
-	r.Record(Event{Path: "p"})
-	waitFor(t, 1, fs.count)
 }
