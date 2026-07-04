@@ -3,27 +3,14 @@ package main
 
 import (
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/mtgban/mtgban-website/observability"
 )
 
-// observabilityInstance is this deployment's instance label, resolved once at
-// startup and stamped on every recorded event.
+// observabilityInstance is this deployment's instance label, set from config at
+// startup. Empty means instance_name is unset and telemetry is disabled.
 var observabilityInstance string
-
-// resolveInstanceName returns the configured instance name, else the OS
-// hostname, else "unknown". Never empty.
-func resolveInstanceName(configured string) string {
-	if configured != "" {
-		return configured
-	}
-	if h, err := os.Hostname(); err == nil && h != "" {
-		return h
-	}
-	return "unknown"
-}
 
 // recordablePath reports whether a request path should produce a telemetry
 // event. API routes are excluded: some are wired through enforceSigning but

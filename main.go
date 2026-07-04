@@ -832,10 +832,12 @@ func openDBs() (err error) {
 		}
 	}
 
-	observabilityInstance = resolveInstanceName(Config.InstanceName)
+	observabilityInstance = Config.InstanceName
 
 	if Config.ObservabilityConfig == nil {
 		log.Println("no observability configuration set, telemetry won't be recorded")
+	} else if observabilityInstance == "" {
+		log.Println("observability disabled: instance_name not set in config")
 	} else if obsDB, oerr := observability.NewClient(*Config.ObservabilityConfig); oerr != nil {
 		log.Println("observability disabled, init failed:", oerr)
 	} else {
