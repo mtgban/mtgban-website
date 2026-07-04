@@ -44,36 +44,51 @@ func getenv(k, def string) string {
 	return def
 }
 
-func TestIntegrationInsertRefreshRead(t *testing.T) {
+func TestIntegrationInstanceFilterAndUniques(t *testing.T) {
 	c := testClient(t)
 	ctx := context.Background()
 
+	// One visitor hitting two paths across "days" plus an anon and a bot hit,
+	// all for instance "__inst_a__"; one hit for a different instance.
+	v := HashVisitor("x@y.com")
 	evs := []Event{
-		{Path: "__test__/a", Tier: "Vintage", Device: "desktop", Visitor: HashVisitor("x@y.com")},
-		{Path: "__test__/a", Tier: "Vintage", Device: "desktop", Visitor: HashVisitor("x@y.com")},
-		{Path: "__test__/a", Tier: "Any", Device: "mobile"},
-		{Path: "__test__/a", Tier: "Any", Device: "mobile", IsBot: true},
+		{Path: "__test__/a", Tier: "Vintage", Device: "desktop", Visitor: v, Instance: "__inst_a__"},
+		{Path: "__test__/a", Tier: "Vintage", Device: "desktop", Visitor: v, Instance: "__inst_a__"},
+		{Path: "__test__/b", Tier: "Vintage", Device: "desktop", Visitor: v, Instance: "__inst_a__"},
+		{Path: "__test__/a", Tier: "Any", Device: "mobile", Instance: "__inst_a__"},
+		{Path: "__test__/a", Tier: "Any", Device: "mobile", IsBot: true, Instance: "__inst_a__"},
+		{Path: "__test__/a", Tier: "Vintage", Device: "desktop", Visitor: HashVisitor("z@z.com"), Instance: "__inst_b__"},
 	}
 	if err := c.InsertBatch(ctx, evs); err != nil {
 		t.Fatalf("InsertBatch: %v", err)
 	}
-	if err := c.RefreshRollup(ctx); err != nil {
-		t.Fatalf("RefreshRollup: %v", err)
-	}
 
 	since := time.Now().AddDate(0, 0, -1)
-	pages, err := c.TopPages(ctx, since, false)
+	pages, err := c.TopPages(ctx, since, false, "__inst_a__")
 	if err != nil {
 		t.Fatalf("TopPages: %v", err)
 	}
-	var hits int64
+	got := map[string]PathAgg{}
 	for _, p := range pages {
-		if p.Path == "__test__/a" {
-			hits = p.Hits
-		}
+		got[p.Path] = p
 	}
-	// 3 human hits (bot excluded by default).
-	if hits != 3 {
-		t.Fatalf("expected 3 human hits for __test__/a, got %d", hits)
+	// instance filter excludes __inst_b__; bot excluded by default.
+	// __test__/a: 3 human hits (2 by v, 1 anon), 1 distinct visitor (anon NULL not counted).
+	if a := got["__test__/a"]; a.Hits != 3 || a.Uniques != 1 {
+		t.Fatalf("__test__/a: got hits=%d uniques=%d, want 3/1", a.Hits, a.Uniques)
+	}
+	if _, ok := got["__test__/b"]; !ok {
+		t.Fatal("__test__/b missing for __inst_a__")
+	}
+
+	// The other instance's rows must not appear.
+	pagesB, err := c.TopPages(ctx, since, false, "__inst_b__")
+	if err != nil {
+		t.Fatalf("TopPages inst_b: %v", err)
+	}
+	for _, p := range pagesB {
+		if p.Path == "__test__/b" {
+			t.Fatal("__inst_b__ should not see __inst_a__'s __test__/b")
+		}
 	}
 }

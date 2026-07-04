@@ -1,7 +1,7 @@
 {{define "admin-usage"}}
 {{if .UsageStats}}
 <div class="admin-usage-bar">
-    <span class="admin-usage-range">Last 30 days{{if .UsageStats.IncludeBots}} &middot; including bots{{end}}</span>
+    <span class="admin-usage-range">{{.UsageStats.Instance}} &middot; last 30 days{{if .UsageStats.IncludeBots}} &middot; including bots{{end}}</span>
     <div class="admin-usage-toggle">
         <a href="?page=usage"{{if not .UsageStats.IncludeBots}} class="active"{{end}}>Humans</a>
         <a href="?page=usage&amp;bots=1"{{if .UsageStats.IncludeBots}} class="active"{{end}}>Include bots</a>
