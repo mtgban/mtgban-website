@@ -55,7 +55,7 @@ func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
 
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
-	if err := UUID2TCGCSV(w, ids, qtys, conds, false); err != nil {
+	if err := UUID2TCGCSV(w, ids, qtys, conds); err != nil {
 		t.Fatalf("UUID2TCGCSV: %v", err)
 	}
 	w.Flush()
