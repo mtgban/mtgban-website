@@ -1,100 +1,25 @@
 package main
 
 import (
-	"errors"
-	"io"
-	"log"
-	"reflect"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-func TestPartitionEntries(t *testing.T) {
-	errEntry := UploadEntry{MismatchError: errors.New("not found")}
-	s1 := UploadEntry{CardId: "single1"}
-	s2 := UploadEntry{CardId: "single2"}
-	sealed1 := UploadEntry{CardId: "sealed1"}
-	sealedIds := []string{"sealed1", "sealed2"}
-
-	tests := []struct {
-		name         string
-		entries      []UploadEntry
-		wantSingles  []UploadEntry
-		wantSealed   []UploadEntry
-		wantNotFound []UploadEntry
-	}{
-		{
-			name:        "mixed splits by membership",
-			entries:     []UploadEntry{s1, sealed1},
-			wantSingles: []UploadEntry{s1},
-			wantSealed:  []UploadEntry{sealed1},
-		},
-		{
-			name:        "singles only",
-			entries:     []UploadEntry{s1, s2},
-			wantSingles: []UploadEntry{s1, s2},
-		},
-		{
-			name:         "errors go to notFound with sealed",
-			entries:      []UploadEntry{sealed1, errEntry},
-			wantSealed:   []UploadEntry{sealed1},
-			wantNotFound: []UploadEntry{errEntry},
-		},
-		{
-			name:         "errors go to notFound with singles",
-			entries:      []UploadEntry{s1, errEntry},
-			wantSingles:  []UploadEntry{s1},
-			wantNotFound: []UploadEntry{errEntry},
-		},
-		{
-			name:         "only errors go to notFound",
-			entries:      []UploadEntry{errEntry},
-			wantNotFound: []UploadEntry{errEntry},
-		},
-		{
-			name:         "mixed with errors",
-			entries:      []UploadEntry{s1, sealed1, errEntry},
-			wantSingles:  []UploadEntry{s1},
-			wantSealed:   []UploadEntry{sealed1},
-			wantNotFound: []UploadEntry{errEntry},
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			gotSingles, gotSealed, gotNotFound := partitionEntries(tc.entries, sealedIds)
-			if !reflect.DeepEqual(gotSingles, tc.wantSingles) {
-				t.Errorf("singles = %v, want %v", gotSingles, tc.wantSingles)
-			}
-			if !reflect.DeepEqual(gotSealed, tc.wantSealed) {
-				t.Errorf("sealed = %v, want %v", gotSealed, tc.wantSealed)
-			}
-			if !reflect.DeepEqual(gotNotFound, tc.wantNotFound) {
-				t.Errorf("notFound = %v, want %v", gotNotFound, tc.wantNotFound)
-			}
-		})
-	}
-}
-
 // The mtgban inventory/cart CSV export must round-trip through the uploader:
 // the Key column resolves directly by uuid, and with no usable id the sealed
 // name fallback must handle punctuation loss and parenthesized variants.
+// Relies on the datastore loaded in TestMain, which is why it lives here
+// rather than in internal/docparse.
 func TestUploadSealedCSV(t *testing.T) {
 	if len(mtgmatcher.GetSealedUUIDs()) == 0 {
 		t.Skip("mtgmatcher data not loaded; skipping")
 	}
-	if LogPages == nil {
-		LogPages = map[string]*log.Logger{}
-	}
-	if LogPages["Upload"] == nil {
-		LogPages["Upload"] = log.New(io.Discard, "", 0)
-	}
 
 	header := []string{"Key", "Name", "Edition", "Finish", "Number", "Rarity", "Conditions", "Price", "Quantity", "URL", "Seller", "Bundle", "Original Id", "Instance Id"}
-	indexMap, err := parseHeader(header)
+	indexMap, err := uploadParser.ParseHeader(header)
 	if err != nil {
-		t.Fatalf("parseHeader: %v", err)
+		t.Fatalf("ParseHeader: %v", err)
 	}
 	if idx, found := indexMap["id"]; !found || idx != 0 {
 		t.Fatalf("Key column not mapped to id: %v", indexMap)
@@ -112,9 +37,9 @@ func TestUploadSealedCSV(t *testing.T) {
 			t.Logf("uuid %s not in local datastore, skipping id check", row[0])
 			continue
 		}
-		res, err := parseRow(indexMap, append([]string{}, row...))
+		res, err := uploadParser.ParseRow(indexMap, append([]string{}, row...))
 		if err != nil {
-			t.Fatalf("parseRow(%s): %v", row[1], err)
+			t.Fatalf("ParseRow(%s): %v", row[1], err)
 		}
 		if res.MismatchError != nil {
 			t.Errorf("id path %q: MismatchError = %v", row[1], res.MismatchError)
@@ -128,9 +53,9 @@ func TestUploadSealedCSV(t *testing.T) {
 	for _, row := range rows {
 		nameOnly := append([]string{}, row...)
 		nameOnly[0] = ""
-		res, err := parseRow(indexMap, nameOnly)
+		res, err := uploadParser.ParseRow(indexMap, nameOnly)
 		if err != nil {
-			t.Fatalf("parseRow(%s): %v", row[1], err)
+			t.Fatalf("ParseRow(%s): %v", row[1], err)
 		}
 		if res.MismatchError != nil {
 			t.Errorf("name path %q: MismatchError = %v", row[1], res.MismatchError)
