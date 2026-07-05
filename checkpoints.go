@@ -1,21 +1,19 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/url"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/simplecloud"
+
+	"github.com/mtgban/mtgban-website/internal/bucketstore"
 )
 
 // CheckpointEvent is one record as authored in checkpoints.json. A single event
@@ -62,119 +60,57 @@ type ChartCheckpoint struct {
 	KeyruneCode string `json:"keyruneCode,omitempty"`
 }
 
-var (
-	checkpointsMu     sync.RWMutex
-	checkpointsLoaded []CheckpointEvent
-)
-
-// newCheckpointsBucket builds a fresh bucket client for the checkpoints
-// document. Mirrors loadDatastore's URL-scheme switch and uses
-// Config.Datastore credentials, since the document lives on the same bucket
-// as the datastore. Called per operation rather than hoisted to a global —
-// reload/save are infrequent enough that the extra B2 auth round-trip is
-// not worth a long-lived client.
-func newCheckpointsBucket(ctx context.Context) (simplecloud.ReadWriter, error) {
-	if Config.Datastore.CheckpointsPath == "" {
-		return nil, errors.New("checkpoints_path not configured")
-	}
-	u, err := url.Parse(Config.Datastore.CheckpointsPath)
-	if err != nil {
-		return nil, err
-	}
-	switch u.Scheme {
-	case "":
-		return &simplecloud.FileBucket{}, nil
-	case "b2":
-		return simplecloud.NewB2Client(ctx, Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
-	default:
-		return nil, fmt.Errorf("unsupported checkpoints path scheme: %s", u.Scheme)
-	}
+// checkpointsStore holds the checkpoints document. The bucket is built per
+// operation, mirroring loadDatastore's URL-scheme switch with the datastore
+// credentials, since the document lives on the same bucket as the datastore —
+// reload/save are infrequent enough that the extra B2 auth round-trip is not
+// worth a long-lived client.
+var checkpointsStore = &bucketstore.Store[checkpointsFile]{
+	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
+		cpPath := Config.Datastore.CheckpointsPath
+		if cpPath == "" {
+			return nil, "", errors.New("checkpoints_path not configured")
+		}
+		u, err := url.Parse(cpPath)
+		if err != nil {
+			return nil, "", err
+		}
+		switch u.Scheme {
+		case "":
+			return &simplecloud.FileBucket{}, cpPath, nil
+		case "b2":
+			bucket, err := simplecloud.NewB2Client(ctx, Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
+			return bucket, cpPath, err
+		default:
+			return nil, "", fmt.Errorf("unsupported checkpoints path scheme: %s", u.Scheme)
+		}
+	},
 }
 
 func reloadCheckpoints() error {
-	ctx := context.Background()
-	bucket, err := newCheckpointsBucket(ctx)
-	if err != nil {
+	if err := checkpointsStore.Load(context.Background()); err != nil {
 		return err
 	}
 	cpPath := Config.Datastore.CheckpointsPath
-	reader, err := simplecloud.InitReader(ctx, bucket, cpPath)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	var parsed checkpointsFile
-	if err := json.NewDecoder(reader).Decode(&parsed); err != nil {
-		return err
-	}
-	checkpointsMu.Lock()
-	checkpointsLoaded = parsed.Events
-	checkpointsMu.Unlock()
 	source := "disk"
 	if strings.HasPrefix(cpPath, "b2://") {
 		source = "B2"
 	}
-	log.Printf("checkpoints: loaded %d events from %s (%s)", len(parsed.Events), cpPath, source)
+	log.Printf("checkpoints: loaded %d events from %s (%s)", len(checkpointsStore.Get().Events), cpPath, source)
 	return nil
 }
 
-// writeCheckpointsFile serializes events to writer using the same pretty-print
-// settings as writeConfigFile (4-space indent, no HTML escaping) so manual
-// diffs stay readable.
-func writeCheckpointsFile(events []CheckpointEvent, w io.Writer) error {
-	e := json.NewEncoder(w)
-	e.SetEscapeHTML(false)
-	e.SetIndent("", "  ")
-	return e.Encode(&checkpointsFile{Events: events})
-}
-
-// saveCheckpoints pushes events to B2 and, on success, atomically swaps the
-// in-memory cache. We serialize into a buffer first so JSON encoding errors
-// don't leave a half-written object on B2.
+// saveCheckpoints pushes events to the bucket and, on success, atomically
+// swaps the in-memory cache.
 func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
-	bucket, err := newCheckpointsBucket(ctx)
-	if err != nil {
-		return err
-	}
-
-	var buf bytes.Buffer
-	if err := writeCheckpointsFile(events, &buf); err != nil {
-		return err
-	}
-
-	cpPath := Config.Datastore.CheckpointsPath
-	writer, err := simplecloud.InitWriter(ctx, bucket, cpPath)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(writer, &buf); err != nil {
-		_ = writer.Close()
-		return err
-	}
-	if err := writer.Close(); err != nil {
-		return err
-	}
-
-	checkpointsMu.Lock()
-	checkpointsLoaded = events
-	checkpointsMu.Unlock()
-	return nil
+	return checkpointsStore.Save(ctx, checkpointsFile{Events: events})
 }
 
 // currentCheckpointsJSON returns the in-memory document serialized as JSON,
-// for display in the admin editor. Never returns nil — an empty store still
-// produces a valid `{"events": []}` document.
+// for display in the admin editor. An empty store still produces a valid
+// `{"events": []}` document.
 func currentCheckpointsJSON() (string, error) {
-	checkpointsMu.RLock()
-	events := checkpointsLoaded
-	checkpointsMu.RUnlock()
-
-	var buf bytes.Buffer
-	if err := writeCheckpointsFile(events, &buf); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
+	return checkpointsStore.JSON()
 }
 
 // relevantCheckpoints returns the checkpoint markers that apply to a chart for
@@ -248,9 +184,7 @@ func multiCardCheckpoints(cardNames []string, earliest time.Time) []ChartCheckpo
 }
 
 func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
-	checkpointsMu.RLock()
-	events := checkpointsLoaded
-	checkpointsMu.RUnlock()
+	events := checkpointsStore.Get().Events
 
 	earliestStr := earliest.Format("2006-01-02")
 	var out []ChartCheckpoint

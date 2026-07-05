@@ -13,8 +13,8 @@ func TestApplyOverridesByKind(t *testing.T) {
 			overrideKindBuylist: {"wrongB": "rightB"},
 		},
 	}
-	keyOverridesPtr.Store(&ov)
-	t.Cleanup(func() { empty := KeyOverrides{}; keyOverridesPtr.Store(&empty) })
+	keyOverridesStore.Set(ov)
+	t.Cleanup(func() { keyOverridesStore.Set(KeyOverrides{}) })
 
 	// Retail overrides apply to a seller's inventory.
 	inv := mtgban.InventoryRecord{"wrongR": {{Price: 1}}, "wrongB": {{Price: 9}}}

@@ -2,15 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
-	"sync/atomic"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/simplecloud"
+
+	"github.com/mtgban/mtgban-website/internal/bucketstore"
 )
 
 // keyOverridesFile is the name of the overrides object, stored as a sibling of
@@ -33,16 +32,21 @@ const (
 //	{ "CK": { "retail": { "wrong-uuid": "correct-uuid" }, "buylist": { ... } } }
 type KeyOverrides map[string]map[string]map[string]string
 
-var keyOverridesPtr atomic.Pointer[KeyOverrides]
+// keyOverridesStore holds the overrides document, stored in the config bucket
+// as a sibling of the main config file. A missing or unreadable file is not
+// fatal: overrides are simply treated as empty, mirroring how a missing main
+// config falls back to safe defaults.
+var keyOverridesStore = &bucketstore.Store[KeyOverrides]{
+	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
+		return ConfigBucket, keyOverridesPath(), nil
+	},
+	MissingOK: true,
+}
 
 // GetKeyOverrides returns the currently loaded overrides, or nil when none are
 // configured.
 func GetKeyOverrides() KeyOverrides {
-	p := keyOverridesPtr.Load()
-	if p == nil {
-		return nil
-	}
-	return *p
+	return keyOverridesStore.Get()
 }
 
 // keyOverridesPath returns the bucket path of the overrides file: a sibling of
@@ -55,45 +59,16 @@ func keyOverridesPath() string {
 	return keyOverridesFile
 }
 
-// loadKeyOverrides (re)reads the overrides file from the config bucket. A
-// missing or unreadable file is not fatal: overrides are simply treated as
-// empty, mirroring how a missing main config falls back to safe defaults.
+// loadKeyOverrides (re)reads the overrides file from the config bucket.
 func loadKeyOverrides() error {
-	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, keyOverridesPath())
-	if err != nil {
-		log.Println("no key overrides loaded:", err)
-		empty := KeyOverrides{}
-		keyOverridesPtr.Store(&empty)
-		return nil
-	}
-	defer reader.Close()
-
-	var overrides KeyOverrides
-	if err := json.NewDecoder(reader).Decode(&overrides); err != nil {
-		return err
-	}
-	keyOverridesPtr.Store(&overrides)
-	return nil
+	return keyOverridesStore.Load(context.Background())
 }
 
 // saveKeyOverrides writes the overrides to the config bucket and publishes them
 // for subsequent loads. It does not itself re-apply them to already-loaded
 // scrapers; callers reload the affected shorthands for that.
 func saveKeyOverrides(overrides KeyOverrides) error {
-	writer, err := simplecloud.InitWriter(context.Background(), ConfigBucket, keyOverridesPath())
-	if err != nil {
-		return err
-	}
-	defer writer.Close()
-
-	enc := json.NewEncoder(writer)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(overrides); err != nil {
-		return err
-	}
-
-	keyOverridesPtr.Store(&overrides)
-	return nil
+	return keyOverridesStore.Save(context.Background(), overrides)
 }
 
 // validateKeyOverrides returns a list of human-readable problems with the
@@ -201,15 +176,7 @@ func overrideFixCandidates(wrongUUID string) (wrong *OverrideCard, candidates []
 // currentKeyOverridesJSON returns the loaded overrides as pretty JSON, for the
 // admin editor. An empty/unloaded set renders as "{}".
 func currentKeyOverridesJSON() (string, error) {
-	overrides := GetKeyOverrides()
-	if overrides == nil {
-		overrides = KeyOverrides{}
-	}
-	out, err := json.MarshalIndent(overrides, "", "  ")
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
+	return keyOverridesStore.JSON()
 }
 
 // reloadOverriddenScrapers re-reads from the data bucket every scraper whose
