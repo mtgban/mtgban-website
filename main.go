@@ -25,6 +25,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
+	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/tcgcsv"
@@ -595,6 +596,32 @@ var GoogleDocsClient *http.Client
 
 var ConfigBucket simplecloud.ReadWriter
 
+// paletteService wires the command-palette endpoints to the live scraper lists,
+// the newspaper page registry, and the arbit filter options.
+var paletteService = &palette.Service{
+	Sellers: GetSellers,
+	Vendors: GetVendors,
+	NewspaperPages: func() []palette.NewspaperPage {
+		pages := GetNewspaperPages()
+		out := make([]palette.NewspaperPage, 0, len(pages))
+		for _, page := range pages {
+			out = append(out, palette.NewspaperPage{Title: page.Title, Option: page.Option})
+		}
+		return out
+	},
+	ArbitFilters: func() []palette.ArbitFilter {
+		out := make([]palette.ArbitFilter, 0, len(FilterOptKeys))
+		for _, key := range FilterOptKeys {
+			cfg, ok := FilterOptConfig[key]
+			if !ok {
+				continue
+			}
+			out = append(out, palette.ArbitFilter{Key: key, Title: cfg.Title, ArbitOnly: cfg.ArbitOnly})
+		}
+		return out
+	},
+}
+
 // External address from which server is reachable, loaded at the first request
 var ServerURL string
 
@@ -957,7 +984,7 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 	SetLastDatastoreUpdate(time.Now())
 	go updateStaticData()
 	go cacheNewspaper()
-	go buildPaletteSetsCache()
+	go paletteService.BuildSetsCache()
 
 	return nil
 }
@@ -1204,10 +1231,10 @@ func main() {
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
-	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(PaletteCardMeta)))
-	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(PaletteSealed)))
-	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(PaletteSets)))
-	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(PaletteStores)))
+	http.Handle("/api/palette/card/", noSigning(http.HandlerFunc(paletteService.CardMeta)))
+	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(paletteService.Sealed)))
+	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(paletteService.Sets)))
+	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(paletteService.Stores)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
 

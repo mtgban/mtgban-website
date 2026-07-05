@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
 // csvWithout returns csv with `drop` and any empty entries removed. Used by
@@ -249,11 +251,11 @@ var funcMap = template.FuncMap{
 		}
 		return true
 	},
-	"palette_newspaper_targets": paletteNewspaperTargetsJSON,
-	"palette_sleepers_targets":  paletteSleepersTargetsJSON,
-	"palette_arbit_targets":     func() template.JS { return paletteArbitTargetsJSON("arbit") },
-	"palette_reverse_targets":   func() template.JS { return paletteArbitTargetsJSON("reverse") },
-	"palette_global_targets":    func() template.JS { return paletteArbitTargetsJSON("global") },
+	"palette_newspaper_targets": func() template.JS { return paletteService.NewspaperTargetsJSON() },
+	"palette_sleepers_targets":  palette.SleepersTargetsJSON,
+	"palette_arbit_targets":     func() template.JS { return paletteService.ArbitTargetsJSON("arbit") },
+	"palette_reverse_targets":   func() template.JS { return paletteService.ArbitTargetsJSON("reverse") },
+	"palette_global_targets":    func() template.JS { return paletteService.ArbitTargetsJSON("global") },
 	"guide_stores":              guideStoresJSON,
 	"dict": func(values ...interface{}) (map[string]interface{}, error) {
 		if len(values)%2 != 0 {

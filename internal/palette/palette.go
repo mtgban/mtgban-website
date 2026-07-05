@@ -1,4 +1,7 @@
-package main
+// Package palette serves the command-palette data endpoints and nav-target
+// lists: set/store/card/sealed metadata the palette's filter builder and
+// jump actions are built from.
+package palette
 
 import (
 	"encoding/json"
@@ -9,10 +12,43 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-type PaletteSet struct {
+// NewspaperPage is the slice of a newspaper page the palette needs to build
+// a jump target.
+type NewspaperPage struct {
+	Title  string
+	Option string
+}
+
+// ArbitFilter is one arbitrage filter option offered as a palette target.
+type ArbitFilter struct {
+	Key       string
+	Title     string
+	ArbitOnly bool
+}
+
+// Service exposes the palette endpoints, wired to the host's live scraper
+// and page registries via callbacks so it always reflects current state.
+type Service struct {
+	// Sellers and Vendors return the live scraper lists for the stores
+	// endpoint.
+	Sellers func() []mtgban.Seller
+	Vendors func() []mtgban.Vendor
+
+	// NewspaperPages returns the newspaper views offered as jump targets.
+	NewspaperPages func() []NewspaperPage
+
+	// ArbitFilters returns the arbitrage filter options, in display order.
+	ArbitFilters func() []ArbitFilter
+
+	setsCache   []byte
+	setsCacheMu sync.RWMutex
+}
+
+type Set struct {
 	Code     string   `json:"code"`
 	Name     string   `json:"name"`
 	Released string   `json:"released,omitempty"`
@@ -21,22 +57,16 @@ type PaletteSet struct {
 	Colors   []string `json:"colors,omitempty"`
 }
 
-var (
-	paletteSetsCache     []byte
-	paletteSetsCacheMu   sync.RWMutex
-	paletteStoresCacheMu sync.RWMutex
-)
-
-// buildPaletteSetsCache rebuilds the JSON-serialized sets cache from mtgmatcher.
+// BuildSetsCache rebuilds the JSON-serialized sets cache from mtgmatcher.
 // Called on datastore load.
-func buildPaletteSetsCache() {
-	sets := []PaletteSet{}
+func (s *Service) BuildSetsCache() {
+	sets := []Set{}
 	for _, code := range mtgmatcher.GetAllSets() {
 		set, err := mtgmatcher.GetSet(code)
 		if err != nil || set == nil {
 			continue
 		}
-		entry := PaletteSet{
+		entry := Set{
 			Code:     set.Code,
 			Name:     set.Name,
 			Released: set.ReleaseDate,
@@ -68,12 +98,12 @@ func buildPaletteSetsCache() {
 	if err != nil {
 		return
 	}
-	paletteSetsCacheMu.Lock()
-	paletteSetsCache = data
-	paletteSetsCacheMu.Unlock()
+	s.setsCacheMu.Lock()
+	s.setsCache = data
+	s.setsCacheMu.Unlock()
 }
 
-type PaletteCardMetaResponse struct {
+type CardMetaResponse struct {
 	Name      string   `json:"name"`
 	Found     bool     `json:"found"`
 	Printings []string `json:"printings,omitempty"`
@@ -82,15 +112,15 @@ type PaletteCardMetaResponse struct {
 	Types     []string `json:"types,omitempty"`
 }
 
-// PaletteCardMeta returns metadata (printings, rarities, colors, types)
-// for a card name, used by the chip-based filter builder.
-func PaletteCardMeta(w http.ResponseWriter, r *http.Request) {
+// CardMeta returns metadata (printings, rarities, colors, types) for a card
+// name, used by the chip-based filter builder.
+func (s *Service) CardMeta(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 
 	escaped := strings.TrimPrefix(r.URL.EscapedPath(), "/api/palette/card/")
 	if escaped == "" {
-		json.NewEncoder(w).Encode(PaletteCardMetaResponse{Found: false})
+		json.NewEncoder(w).Encode(CardMetaResponse{Found: false})
 		return
 	}
 	decoded, err := url.PathUnescape(escaped)
@@ -99,7 +129,7 @@ func PaletteCardMeta(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.ReplaceAll(decoded, "+", " ")
 
-	resp := PaletteCardMetaResponse{Name: name}
+	resp := CardMetaResponse{Name: name}
 
 	printings, err := mtgmatcher.Printings4Card(name)
 	if err != nil || len(printings) == 0 {
@@ -147,12 +177,12 @@ func PaletteCardMeta(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// PaletteSets returns all known set codes with display metadata.
-func PaletteSets(w http.ResponseWriter, r *http.Request) {
+// Sets returns all known set codes with display metadata.
+func (s *Service) Sets(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	paletteSetsCacheMu.RLock()
-	data := paletteSetsCache
-	paletteSetsCacheMu.RUnlock()
+	s.setsCacheMu.RLock()
+	data := s.setsCache
+	s.setsCacheMu.RUnlock()
 	// cache not warm - dont serve [] for an hour
 	if len(data) == 0 {
 		w.Header().Set("Cache-Control", "no-store")
@@ -163,38 +193,38 @@ func PaletteSets(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-type PaletteStore struct {
+type Store struct {
 	Shorthand string `json:"shorthand"`
 	Name      string `json:"name"`
 	Country   string `json:"country,omitempty"`
 	Sealed    bool   `json:"sealed,omitempty"`
 }
 
-type PaletteStoresResponse struct {
-	Sellers []PaletteStore `json:"sellers"`
-	Vendors []PaletteStore `json:"vendors"`
+type StoresResponse struct {
+	Sellers []Store `json:"sellers"`
+	Vendors []Store `json:"vendors"`
 }
 
-// PaletteStores returns seller and vendor shorthand lists.
-func PaletteStores(w http.ResponseWriter, r *http.Request) {
+// Stores returns seller and vendor shorthand lists.
+func (s *Service) Stores(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=600")
 
-	out := PaletteStoresResponse{
-		Sellers: []PaletteStore{},
-		Vendors: []PaletteStore{},
+	out := StoresResponse{
+		Sellers: []Store{},
+		Vendors: []Store{},
 	}
 	seen := map[string]bool{}
-	for _, s := range GetSellers() {
-		if s == nil {
+	for _, seller := range s.Sellers() {
+		if seller == nil {
 			continue
 		}
-		info := s.Info()
+		info := seller.Info()
 		if seen["s:"+info.Shorthand] {
 			continue
 		}
 		seen["s:"+info.Shorthand] = true
-		out.Sellers = append(out.Sellers, PaletteStore{
+		out.Sellers = append(out.Sellers, Store{
 			Shorthand: info.Shorthand,
 			Name:      info.Name,
 			Country:   info.CountryFlag,
@@ -202,16 +232,16 @@ func PaletteStores(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	seen = map[string]bool{}
-	for _, v := range GetVendors() {
-		if v == nil {
+	for _, vendor := range s.Vendors() {
+		if vendor == nil {
 			continue
 		}
-		info := v.Info()
+		info := vendor.Info()
 		if seen["v:"+info.Shorthand] {
 			continue
 		}
 		seen["v:"+info.Shorthand] = true
-		out.Vendors = append(out.Vendors, PaletteStore{
+		out.Vendors = append(out.Vendors, Store{
 			Shorthand: info.Shorthand,
 			Name:      info.Name,
 			Country:   info.CountryFlag,
@@ -224,24 +254,24 @@ func PaletteStores(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
-type PaletteNavTarget struct {
+type NavTarget struct {
 	Value string `json:"value"`
 	Label string `json:"label"`
 	Group string `json:"group,omitempty"`
 }
 
-type PaletteArbitTargets struct {
-	Filters []PaletteNavTarget `json:"filters"`
-	Sorts   []PaletteNavTarget `json:"sorts"`
+type ArbitTargets struct {
+	Filters []NavTarget `json:"filters"`
+	Sorts   []NavTarget `json:"sorts"`
 }
 
-// paletteNewspaperTargetsJSON returns JSON for all newspaper page views.
-func paletteNewspaperTargetsJSON() template.JS {
-	out := []PaletteNavTarget{}
+// NewspaperTargetsJSON returns JSON for all newspaper page views.
+func (s *Service) NewspaperTargetsJSON() template.JS {
+	out := []NavTarget{}
 	titleCounts := map[string]int{}
 
 	// First pass: count title occurrences so we know which need disambiguation.
-	newspaperPages := GetNewspaperPages()
+	newspaperPages := s.NewspaperPages()
 	for _, p := range newspaperPages {
 		if p.Option == "" || p.Option == "options" {
 			continue
@@ -270,17 +300,17 @@ func paletteNewspaperTargetsJSON() template.JS {
 		// CK-sourced options:   buylist_*, stock_*, ck_buy*
 		label := p.Title
 		if titleCounts[p.Title] > 1 {
-			label = label + " " + paletteNewspaperSourceSuffix(p.Option)
+			label = label + " " + newspaperSourceSuffix(p.Option)
 		}
 
-		out = append(out, PaletteNavTarget{
+		out = append(out, NavTarget{
 			Value: p.Option,
 			Label: label,
 			Group: group,
 		})
 	}
 	// Include Newspaper SubPages from the nav tree that aren't in NewspaperPages
-	out = append(out, PaletteNavTarget{
+	out = append(out, NavTarget{
 		Value: "syp",
 		Label: "TCG Syp List",
 		Group: "Other",
@@ -289,9 +319,9 @@ func paletteNewspaperTargetsJSON() template.JS {
 	return template.JS(data)
 }
 
-// paletteNewspaperSourceSuffix returns "(TCG)" or "(CK)" based on the option key.
+// newspaperSourceSuffix returns "(TCG)" or "(CK)" based on the option key.
 // Falls back to "(<option>)" for novel keys so duplicates always render distinctly.
-func paletteNewspaperSourceSuffix(option string) string {
+func newspaperSourceSuffix(option string) string {
 	switch {
 	case strings.HasPrefix(option, "greatest_"),
 		strings.HasSuffix(option, "_buylist"),
@@ -306,8 +336,9 @@ func paletteNewspaperSourceSuffix(option string) string {
 	}
 }
 
-func paletteSleepersTargetsJSON() template.JS {
-	out := []PaletteNavTarget{
+// SleepersTargetsJSON returns the static sleepers page views.
+func SleepersTargetsJSON() template.JS {
+	out := []NavTarget{
 		{Value: "bulk", Label: "Bulk Me Up"},
 		{Value: "reprint", Label: "Long Time No Reprint"},
 		{Value: "mismatch", Label: "Market Mismatch"},
@@ -318,13 +349,13 @@ func paletteSleepersTargetsJSON() template.JS {
 	return template.JS(data)
 }
 
-// paletteArbitTargetsJSON produces targets for /arbit. variant adjusts
-// visibility: "reverse" hides ArbitOnly filters; "global" shows only those
-// relevant to the global view.
-func paletteArbitTargetsJSON(variant string) template.JS {
-	out := PaletteArbitTargets{
-		Filters: []PaletteNavTarget{},
-		Sorts: []PaletteNavTarget{
+// ArbitTargetsJSON produces targets for /arbit. variant adjusts visibility:
+// "reverse" hides ArbitOnly filters; "global" shows only those relevant to
+// the global view.
+func (s *Service) ArbitTargetsJSON(variant string) template.JS {
+	out := ArbitTargets{
+		Filters: []NavTarget{},
+		Sorts: []NavTarget{
 			{Value: "profitability", Label: "Profitability"},
 			{Value: "spread", Label: "Spread %"},
 			{Value: "diff", Label: "Price Difference"},
@@ -335,24 +366,20 @@ func paletteArbitTargetsJSON(variant string) template.JS {
 			{Value: "alpha", Label: "Alphabetical"},
 		},
 	}
-	for _, key := range FilterOptKeys {
-		cfg, ok := FilterOptConfig[key]
-		if !ok {
+	for _, filter := range s.ArbitFilters() {
+		if variant == "global" && filter.ArbitOnly {
 			continue
 		}
-		if variant == "global" && cfg.ArbitOnly {
-			continue
-		}
-		out.Filters = append(out.Filters, PaletteNavTarget{
-			Value: key,
-			Label: cfg.Title,
+		out.Filters = append(out.Filters, NavTarget{
+			Value: filter.Key,
+			Label: filter.Title,
 		})
 	}
 	data, _ := json.Marshal(out)
 	return template.JS(data)
 }
 
-type PaletteSealedMetaResponse struct {
+type SealedMetaResponse struct {
 	Name        string `json:"name"`
 	Found       bool   `json:"found"`
 	UUID        string `json:"uuid,omitempty"`
@@ -361,15 +388,15 @@ type PaletteSealedMetaResponse struct {
 	HasPicks    bool   `json:"hasPicks"`
 }
 
-// PaletteSealed reports availability of contents-mode and pack-pull-mode searches
+// Sealed reports availability of contents-mode and pack-pull-mode searches
 // for a sealed product, used by the palette to gate action rows.
-func PaletteSealed(w http.ResponseWriter, r *http.Request) {
+func (s *Service) Sealed(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "public, max-age=300")
 
 	escaped := strings.TrimPrefix(r.URL.EscapedPath(), "/api/palette/sealed/")
 	if escaped == "" {
-		json.NewEncoder(w).Encode(PaletteSealedMetaResponse{Found: false})
+		json.NewEncoder(w).Encode(SealedMetaResponse{Found: false})
 		return
 	}
 	decoded, err := url.PathUnescape(escaped)
@@ -378,7 +405,7 @@ func PaletteSealed(w http.ResponseWriter, r *http.Request) {
 	}
 	name := strings.ReplaceAll(decoded, "+", " ")
 
-	resp := PaletteSealedMetaResponse{Name: name}
+	resp := SealedMetaResponse{Name: name}
 
 	// Direct UUID lookup first; fall back to name resolution via the sealed-name index.
 	co, err := mtgmatcher.GetUUID(name)
@@ -409,4 +436,14 @@ func PaletteSealed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(resp)
+}
+
+// sealedname2uuid resolves a sealed product name to its uuid, or "".
+func sealedname2uuid(name string) string {
+	name = strings.TrimSpace(strings.Trim(name, "\""))
+	res, err := mtgmatcher.SearchSealedEquals(name)
+	if err != nil {
+		return ""
+	}
+	return res[0]
 }
