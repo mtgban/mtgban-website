@@ -878,7 +878,7 @@ func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = loadDatastore(Config.DatastorePath)
+	err = loadDatastore(DatastoreBucket, Config.DatastorePath)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "Failed to reload datastore: "+err.Error())
 		return

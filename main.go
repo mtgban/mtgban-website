@@ -886,37 +886,38 @@ func loadGoogleCredentials() (*http.Client, error) {
 	return conf.Client(context.Background()), nil
 }
 
-func loadDatastore(ds string) error {
-	log.Println("Loading datastore from", ds)
+// Bucket serving the datastore and any other file living alongside it,
+// created once at startup
+var DatastoreBucket simplecloud.Reader
 
-	u, err := url.Parse(ds)
+// newReadBucket returns a bucket able to serve the given path according to
+// its scheme, using the datastore credentials for remote ones.
+func newReadBucket(path string) (simplecloud.Reader, error) {
+	u, err := url.Parse(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	var bucket simplecloud.Reader
 
 	switch u.Scheme {
 	case "":
-		bucket = &simplecloud.FileBucket{}
+		return &simplecloud.FileBucket{}, nil
 	case "b2":
 		b2Bucket, err := simplecloud.NewB2Client(context.Background(), Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		b2Bucket.ConcurrentDownloads = 20
 
-		bucket = b2Bucket
+		return b2Bucket, nil
 	case "http", "https":
-		httpBucket, err := simplecloud.NewHTTPBucket(cleanhttp.DefaultClient(), ds)
-		if err != nil {
-			return err
-		}
-
-		bucket = httpBucket
-	default:
-		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
+		return simplecloud.NewHTTPBucket(cleanhttp.DefaultClient(), path)
 	}
+
+	return nil, fmt.Errorf("unsupported path scheme %s", u.Scheme)
+}
+
+func loadDatastore(bucket simplecloud.Reader, ds string) error {
+	log.Println("Loading datastore from", ds)
 
 	reader, err := simplecloud.InitReader(context.Background(), bucket, ds)
 	if err != nil {
@@ -1009,8 +1010,12 @@ func main() {
 	}
 
 	// load website up
+	DatastoreBucket, err = newReadBucket(Config.DatastorePath)
+	if err != nil {
+		log.Fatalln("error creating the datastore bucket:", err)
+	}
 	go func() {
-		err := loadDatastore(Config.DatastorePath)
+		err := loadDatastore(DatastoreBucket, Config.DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
