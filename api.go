@@ -117,7 +117,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
 		csvWriter := csv.NewWriter(w)
-		err = UUID2TCGCSV(csvWriter, data.([]string), nil, nil, true)
+		err = UUID2TCGCSV(csvWriter, data.([]string), nil, nil)
 		if err != nil {
 			errorResponse(w, http.StatusInternalServerError, err.Error())
 			return
@@ -290,12 +290,13 @@ var tcgConditionMap = map[string]string{
 // If absent, quantity will be computed on the fly and entries will be merged
 // in a single entry (tcgplayer does not support csv operations with identical
 // items) and conditions will be set to NM.
-// UUID2TCGCSV writes a TCGplayer-importable CSV. The edition and display-name
-// columns are normally left blank: TCGplayer skips its name-match check when
-// they're empty, and our names don't always match theirs exactly (see commit
-// 1e39d5d). Pass withNames=true to restore them — used by the decklist
-// endpoint, where the human-readable name/edition is wanted in the output.
-func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error {
+// UUID2TCGCSV writes a TCGplayer-importable CSV. The edition, display-name,
+// number, and rarity columns come from the tcg catalog snapshot, i.e. from
+// TCGplayer's own catalog, so they always pass TCGplayer's name-match check
+// (our names don't always match theirs exactly, see commit 1e39d5d). Cards
+// missing from the catalog keep these columns blank - TCGplayer skips the
+// check when they're empty.
+func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 	market, err := findSellerInventory("TCGPlayer")
 	if err != nil {
 		return err
@@ -303,6 +304,9 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 	direct, _ := findSellerInventory("TCGDirectLow")
 	low, _ := findSellerInventory("TCGLow")
 	sealed, _ := findSellerInventory("TCGSealed")
+
+	// TCGplayer's own identifiers, from the catalog dump
+	productLine, tcgProducts := GetTCGCatalog()
 
 	err = w.Write(tcgcsvHeader)
 	if err != nil {
@@ -372,27 +376,16 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string, withNames bool) error
 			condLong += " Foil"
 		}
 
-		record := make([]string, 0, len(tcgcsvHeader))
+		tcgEntry := tcgProducts[findTCGproductId(id)]
 
+		record := make([]string, 0, len(tcgcsvHeader))
 		record = append(record, tcgSkuId)
-		switch Config.Game {
-		case "magic":
-			record = append(record, "Magic")
-		case "lorcana":
-			record = append(record, "Lorcana")
-		default:
-			panic("not implemented")
-		}
-		if withNames {
-			record = append(record, co.Edition)
-			record = append(record, co.Name)
-		} else {
-			record = append(record, "")
-			record = append(record, "")
-		}
+		record = append(record, productLine)
+		record = append(record, tcgEntry.Edition)
+		record = append(record, tcgEntry.Name)
 		record = append(record, "")
-		record = append(record, co.Number)
-		record = append(record, strings.ToUpper(co.Rarity[:1]))
+		record = append(record, tcgEntry.Number)
+		record = append(record, tcgEntry.Rarity)
 		record = append(record, condLong)
 		record = append(record, fmt.Sprintf("%0.2f", prices[0]))
 		record = append(record, fmt.Sprintf("%0.2f", prices[1]))

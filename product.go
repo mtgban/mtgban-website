@@ -11,7 +11,9 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/internal/tcgcatalog"
 	"github.com/mtgban/mtgban-website/timeseries"
+	"github.com/mtgban/simplecloud"
 )
 
 type EditionEntry struct {
@@ -63,6 +65,26 @@ func GetInfos() map[string]mtgban.InventoryRecord {
 		return nil
 	}
 	return *p
+}
+
+// TCGplayer's own identifiers from the tcgdumper catalog dump, published
+// together as a single immutable snapshot.
+type tcgCatalogSnapshot struct {
+	CategoryName string
+	Products     map[string]tcgcatalog.Entry
+}
+
+var tcgCatalogPtr atomic.Pointer[tcgCatalogSnapshot]
+
+// GetTCGCatalog returns TCGplayer's own name of the configured game and its
+// product entries keyed by product id, both zero when no catalog is loaded.
+// The returned map is shared and MUST NOT be modified by callers.
+func GetTCGCatalog() (string, map[string]tcgcatalog.Entry) {
+	p := tcgCatalogPtr.Load()
+	if p == nil {
+		return "", nil
+	}
+	return p.CategoryName, p.Products
 }
 
 // EditionsSnapshot bundles every piece of edition-derived state produced by
@@ -679,6 +701,31 @@ func bulkBuylist(co *mtgmatcher.CardObject) float64 {
 	return price
 }
 
+// The tcgdumper catalog dump for the configured game, refreshed nightly
+const tcgCatalogFile = "tcgplayer-catalog.json.xz"
+
+// tcgCatalogPath returns the bucket path of the catalog dump: a sibling of
+// the datastore file, so it lives in the same place and bucket.
+func tcgCatalogPath() string {
+	p := Config.DatastorePath
+	if i := strings.LastIndex(p, "/"); i >= 0 {
+		return p[:i+1] + tcgCatalogFile
+	}
+	return tcgCatalogFile
+}
+
+// loadTCGCatalog streams the catalog dump living alongside the datastore,
+// served by the same bucket.
+func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, string, error) {
+	reader, err := simplecloud.InitReader(context.Background(), DatastoreBucket, path)
+	if err != nil {
+		return nil, "", err
+	}
+	defer reader.Close()
+
+	return tcgcatalog.Load(reader)
+}
+
 func runSealedAnalysis() {
 	log.Println("Running set analysis")
 
@@ -723,6 +770,17 @@ func runSealedAnalysis() {
 	infos["tcgskuid"] = skuIndex
 
 	infosPtr.Store(&infos)
+
+	// Index TCGplayer's own identifiers for every product, used to report
+	// values TCGplayer always recognizes in exported CSVs. A missing dump
+	// is not fatal, the CSV columns simply stay blank.
+	products, categoryName, err := loadTCGCatalog(tcgCatalogPath())
+	if err != nil {
+		log.Println("tcg catalog:", err)
+	} else {
+		log.Println("Loaded tcg catalog for", categoryName+",", len(products), "products")
+		tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryName: categoryName, Products: products})
+	}
 }
 
 // buylistReducer maps a card's 90-day buying-day price stats and its current
