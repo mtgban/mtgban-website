@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,10 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/go-cleanhttp"
-
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/internal/notify"
 )
 
 var Country2flag = map[string]string{
@@ -724,11 +722,6 @@ func genSealedPrintings(co *mtgmatcher.CardObject) string {
 	return b.String()
 }
 
-type Notification struct {
-	Username string `json:"username"`
-	Content  string `json:"content"`
-}
-
 // Log and send the notification for a user action
 func ServerNotify(kind, message string, flags ...bool) {
 	log.Println(message)
@@ -738,7 +731,7 @@ func ServerNotify(kind, message string, flags ...bool) {
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 	}
-	go notify(kind, message, Config.DiscordNotifHook)
+	go notify.Post(Config.DiscordNotifHook, kind, message, DevMode)
 }
 
 // Only send the notification for a user action
@@ -750,7 +743,7 @@ func UserNotify(kind, message string, flags ...bool) {
 		message = "@here " + message
 		log.Println(kind, "-", message)
 	}
-	go notify(kind, message, Config.DiscordHook)
+	go notify.Post(Config.DiscordHook, kind, message, DevMode)
 }
 
 // Only send the notification for a user action
@@ -763,29 +756,7 @@ func APINotify(message string, flags ...bool) {
 	if len(flags) > 0 && flags[0] {
 		message = "@here " + message
 	}
-	go notify(kind, message, Config.DiscordAPINotifHook)
-}
-
-func notify(kind, message, hook string) {
-	var payload Notification
-	payload.Username = kind
-	if DevMode {
-		payload.Content = "[DEV] "
-	}
-	payload.Content += message
-
-	reqBody, err := json.Marshal(&payload)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	resp, err := cleanhttp.DefaultClient().Post(hook, "application/json", bytes.NewReader(reqBody))
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	resp.Body.Close()
+	go notify.Post(Config.DiscordAPINotifHook, kind, message, DevMode)
 }
 
 // Read the query parameter, if present set a cookie that will be
