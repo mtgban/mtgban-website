@@ -145,6 +145,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	switch reboot {
 	case "datastore", "datastore-backup":
 		dsPath := Config.DatastorePath
+		bucket := DatastoreBucket
 		if reboot == "datastore-backup" {
 			dsPath = Config.Datastore.BackupPath
 			if dsPath == "" {
@@ -152,8 +153,13 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				v.Set("msg", "No BackupPath set in config")
 				doReboot = true
 			}
+			// The backup may live somewhere else entirely
+			backupBucket, err := newReadBucket(dsPath)
+			if err == nil {
+				bucket = backupBucket
+			}
 		}
-		loadDatastore(dsPath)
+		loadDatastore(bucket, dsPath)
 		pageVars.InfoMessage = "Datastore reloaded..."
 
 	case "update":

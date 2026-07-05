@@ -18,7 +18,12 @@ func TestMain(m *testing.M) {
 	Config.DatastorePath = "allprintings5.json"
 	Config.Game = DefaultGame
 
-	err := loadDatastore(Config.DatastorePath)
+	var err error
+	DatastoreBucket, err = newReadBucket(Config.DatastorePath)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	err = loadDatastore(DatastoreBucket, Config.DatastorePath)
 	if err != nil {
 		log.Fatalln(err)
 	}
