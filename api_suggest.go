@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/internal/embed"
 )
 
 func SuggestAPI(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +35,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(name, prefix) {
 			suggestions = append(suggestions, AllNames[i])
 			printings, _ := mtgmatcher.Printings4Card(name)
-			results = append(results, printings2line(printings))
+			results = append(results, embed.PrintingsLine(printings))
 			links = append(links, ServerURL+"/search?q="+url.QueryEscape(AllNames[i]))
 		}
 	}

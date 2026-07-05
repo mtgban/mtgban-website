@@ -17,6 +17,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/starcitygames"
 	"github.com/mtgban/go-mtgban/tcgplayer"
+	"github.com/mtgban/mtgban-website/internal/embed"
 )
 
 var poweredByFooter = discordgo.MessageEmbedFooter{
@@ -31,8 +32,8 @@ var squareBracketsRE = regexp.MustCompile(`\[\[.*?\]\]?`)
 var curlyBracketsRE = regexp.MustCompile(`\{\{.*?\}\}?`)
 
 const (
-	// Avoid making messages overly long
-	MaxPrintings = 12
+	// Timeout before giving up on a last sold price request
+	LastSoldTimeout = 30
 
 	// IDs of the channels on the main server
 	DevChannelID   = "769323295526748160"
@@ -189,7 +190,7 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 			msg := fmt.Sprintf("No card found named \"%s\" in %s", query, set.Name)
 			printings, err := mtgmatcher.Printings4Card(query)
 			if err == nil {
-				msg = fmt.Sprintf("%s\n\"%s\" is printed in %s.", msg, query, printings2line(printings))
+				msg = fmt.Sprintf("%s\n\"%s\" is printed in %s.", msg, query, embed.PrintingsLine(printings))
 			}
 			return nil, msg
 		}
@@ -620,14 +621,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(foundSellers, false)
 		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(foundVendors)
 
-		ogFields = FormatEmbedSearchResult(searchRes)
+		ogFields = embedService.FormatSearchResult(searchRes)
 	} else if lastSold {
 		// Since grabLastSold is slow, spawn a goroutine and wait for the real
 		// results later, after posting a "please wait" message
 		go func() {
 			channel = make(chan *discordgo.MessageEmbed)
 			var errMsg string
-			ogFields, err = grabLastSold(searchRes.CardId, co.Language)
+			ogFields, err = embedService.LastSoldFields(searchRes.CardId, co.Language)
 			if err != nil {
 				if errors.Is(err, ErrMissingTCGId) {
 					errMsg = fmt.Sprintf("\"%s\" does not have any identifier set, I don't know what to do %s", content, emoteShurg)
@@ -676,14 +677,6 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func printings2line(printings []string) string {
-	line := strings.Join(printings, ", ")
-	if len(printings) > MaxPrintings {
-		line = strings.Join(printings[:MaxPrintings], ", ") + " and more"
-	}
-	return line
-}
-
 func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId string, lastSold bool) *discordgo.MessageEmbed {
 	// Convert search results into proper fields
 	var fields []*discordgo.MessageEmbedField
@@ -712,7 +705,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	card := uuid2card(searchRes.CardId, true, false, false)
 	co, _ := mtgmatcher.GetUUID(searchRes.CardId)
 
-	printings := printings2line(co.Printings)
+	printings := embed.PrintingsLine(co.Printings)
 	if searchRes.EditionSearched != "" && len(co.Variations) > 0 {
 		cn := []string{co.Number}
 		for _, varid := range co.Variations {

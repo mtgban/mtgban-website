@@ -21,6 +21,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
+	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 
@@ -546,7 +547,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	embed := GenerateEmbed(allKeys, foundSellers, foundVendors)
+	preview := embedService.Generate(allKeys, ProcessEmbedSearchResultsSellers(foundSellers, true))
 	if oembed {
 		if len(allKeys) == 0 {
 			w.WriteHeader(http.StatusNotFound)
@@ -554,7 +555,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		payload, err := json.Marshal(embed)
+		payload, err := json.Marshal(preview)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(`Internal Server Error`))
@@ -564,16 +565,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		w.Write(payload)
 		return
 	}
-	pageVars.Embed.Title = embed.Title
-	pageVars.Embed.Contents = embed.HTML
-	pageVars.Embed.Description = embed.HTML
+	pageVars.Embed.Title = preview.Title
+	pageVars.Embed.Contents = preview.HTML
+	pageVars.Embed.Description = preview.HTML
 	if len(allKeys) > 0 {
 		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].ImageURL
 		pageVars.Embed.ImageCropURL = pageVars.Embed.ImageURL
 
 		co, err := mtgmatcher.GetUUID(allKeys[0])
 		if err == nil && len(co.Printings) > 0 {
-			pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", printings2line(co.Printings))
+			pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", embed.PrintingsLine(co.Printings))
 			imgCrop := co.Images["crop"]
 			if imgCrop != "" {
 				pageVars.Embed.ImageCropURL = imgCrop
