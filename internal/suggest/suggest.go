@@ -1,4 +1,6 @@
-package main
+// Package suggest builds "did you mean..." and alternative-search hints for
+// queries that return no results.
+package suggest
 
 import (
 	"slices"
@@ -20,9 +22,9 @@ var sealedTypeKeywords = []string{
 	"tournament", "spellbook",
 }
 
-// closestCardName returns the canonical card (or sealed product) name
-// closest to query, used to power "did you mean..." suggestions.
-func closestCardName(query string, sealed bool) string {
+// Closest returns the canonical card (or sealed product) name closest to
+// query, used to power "did you mean..." suggestions.
+func Closest(query string, sealed bool) string {
 	return fuzzy.Closest(query, mtgmatcher.AllNames("canonical", sealed))
 }
 
@@ -31,6 +33,21 @@ func closestCardName(query string, sealed bool) string {
 type AltSearch struct {
 	Label string
 	Query string
+}
+
+// Params describes the failed search a suggestion is being built for.
+type Params struct {
+	// RawQuery is the query as the user typed it.
+	RawQuery string
+	// CleanQuery is the query with all filters stripped.
+	CleanQuery string
+	// SearchMode is the parsed search mode; hashing (UUID) searches are
+	// skipped since they aren't user-typed names.
+	SearchMode string
+	// AppliedFilters lists the filter tokens found in RawQuery.
+	AppliedFilters []string
+	// Sealed is true when the search ran against sealed products.
+	Sealed bool
 }
 
 // collapseSpaces trims and squeezes runs of whitespace into single spaces.
@@ -137,25 +154,24 @@ func sealedQuerySuggestion(rawQuery string) *AltSearch {
 	return &AltSearch{Label: label, Query: query}
 }
 
-// buildSearchSuggestions returns a "did you mean..." card name and a list
-// of alternative searches to show when a query returns nothing. Hashing
-// (UUID) searches are skipped since they aren't user-typed names.
-func buildSearchSuggestions(rawQuery string, config SearchConfig, sealed bool) (string, []AltSearch) {
-	if config.SearchMode == "hashing" {
+// Build returns a "did you mean..." card name and a list of alternative
+// searches to show when a query returns nothing.
+func Build(p Params) (string, []AltSearch) {
+	if p.SearchMode == "hashing" {
 		return "", nil
 	}
 
 	var didYouMean string
-	if config.CleanQuery != "" {
-		didYouMean = closestCardName(config.CleanQuery, sealed)
+	if p.CleanQuery != "" {
+		didYouMean = Closest(p.CleanQuery, p.Sealed)
 	}
 
-	alts := relaxedSearches(rawQuery, config.CleanQuery, config.AppliedFilters)
+	alts := relaxedSearches(p.RawQuery, p.CleanQuery, p.AppliedFilters)
 
 	// For a free-text sealed search (no filters typed) that found nothing,
 	// offer a decomposed set + product-type query as the first suggestion.
-	if sealed && len(config.AppliedFilters) == 0 {
-		if s := sealedQuerySuggestion(rawQuery); s != nil {
+	if p.Sealed && len(p.AppliedFilters) == 0 {
+		if s := sealedQuerySuggestion(p.RawQuery); s != nil {
 			alts = append([]AltSearch{*s}, alts...)
 		}
 	}

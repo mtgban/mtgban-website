@@ -25,6 +25,7 @@ import (
 	"github.com/NYTimes/gziphandler"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
+	"github.com/mtgban/mtgban-website/internal/suggest"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
@@ -116,7 +117,7 @@ type PageVars struct {
 
 	// Suggestions shown when a search returns no results
 	DidYouMean  string
-	AltSearches []AltSearch
+	AltSearches []suggest.AltSearch
 
 	ScraperShort   string
 	HasAffiliate   bool

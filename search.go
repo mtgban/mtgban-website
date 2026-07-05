@@ -21,6 +21,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
+	"github.com/mtgban/mtgban-website/internal/suggest"
 )
 
 const (
@@ -80,6 +81,18 @@ func isSame(a, b SearchEntry) bool {
 }
 
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
+
+// searchSuggestions adapts a parsed search that found nothing into the
+// suggest package's inputs.
+func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (string, []suggest.AltSearch) {
+	return suggest.Build(suggest.Params{
+		RawQuery:       rawQuery,
+		CleanQuery:     config.CleanQuery,
+		SearchMode:     config.SearchMode,
+		AppliedFilters: config.AppliedFilters,
+		Sealed:         sealed,
+	})
+}
 
 func Search(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
@@ -285,7 +298,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.InfoMessage = NoCardsMessage
 		pageVars.PopularSearches = getPopularSearches()
 		pageVars.CleanSearchQuery = config.CleanQuery
-		pageVars.DidYouMean, pageVars.AltSearches = buildSearchSuggestions(query, config, pageVars.IsSealed)
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
@@ -317,7 +330,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 		pageVars.PopularSearches = getPopularSearches()
 		pageVars.CleanSearchQuery = config.CleanQuery
-		pageVars.DidYouMean, pageVars.AltSearches = buildSearchSuggestions(query, config, pageVars.IsSealed)
+		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(query, config, pageVars.IsSealed)
 		render(w, "search.html", pageVars)
 		return
 	}
