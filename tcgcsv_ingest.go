@@ -285,6 +285,13 @@ func ingestTCGCSVLatest(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("tcgcsv: last-updated: %w", err)
 	}
+	// tcgcsv names each day's archive (prices-YYYY-MM-DD) for the UTC date of
+	// this same last-updated stamp, verified against the live service:
+	// last-updated 2026-07-05T20:05Z is served by prices-2026-07-05, and the
+	// refresh runs at a steady ~20:05 UTC, well clear of midnight. Truncating to
+	// the UTC day therefore yields the archive's filename date, so a live pull
+	// and a later backfill of the same snapshot key the same row instead of
+	// recording it under two adjacent dates.
 	snapshot := updated.UTC().Truncate(24 * time.Hour)
 	dateStr := snapshot.Format("2006-01-02")
 
