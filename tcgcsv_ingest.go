@@ -130,7 +130,7 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 	log.Printf("tcgcsv backfill: %s..%s across %d game(s), resume=%v",
 		from.Format("2006-01-02"), to.Format("2006-01-02"), len(Config.TCGCSVConfig.Games), resume)
 
-	var totalRows, daysWithData, daysFailed int
+	var totalRows, daysWithData, daysEmpty, daysFailed int
 	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
 		// Which categories still need this day?
 		need := make(map[int]bool)
@@ -153,7 +153,7 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 			continue
 		}
 		if !ok {
-			continue // no archive published for that day
+			continue // no archive published for that day (HTTP 404)
 		}
 
 		dateStr := day.Format("2006-01-02")
@@ -164,6 +164,12 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 			}
 		}
 		if len(rows) == 0 {
+			// The archive existed and extracted cleanly but held no rows for the
+			// wanted categories. Expected for days before a game launched, but
+			// also the signature of a broken extraction (e.g. a 7z variant that
+			// silently unpacks nothing). Track it so an all-empty run is caught
+			// below instead of being reported as a clean success.
+			daysEmpty++
 			continue
 		}
 
@@ -176,9 +182,17 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 		log.Printf("tcgcsv backfill %s: %d rows (%d categories)", dateStr, n, len(byCat))
 	}
 
-	log.Printf("tcgcsv backfill complete: %d rows over %d days (%d days failed)", totalRows, daysWithData, daysFailed)
+	log.Printf("tcgcsv backfill complete: %d rows over %d days (%d empty, %d failed)",
+		totalRows, daysWithData, daysEmpty, daysFailed)
 	if daysFailed > 0 {
 		return fmt.Errorf("tcgcsv backfill: %d day(s) failed; re-run with -tcgcsv-force to retry them", daysFailed)
+	}
+	// Fetching archives but storing nothing anywhere is not a real "complete":
+	// it is almost always broken extraction tooling or a category filter that
+	// never matches, not a range that genuinely predates every configured game.
+	// Fail loudly rather than exit 0 on silent data loss.
+	if daysWithData == 0 && daysEmpty > 0 {
+		return fmt.Errorf("tcgcsv backfill: fetched %d archive(s) but extracted 0 rows; check the 7z tooling and configured categories", daysEmpty)
 	}
 	return nil
 }
