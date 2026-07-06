@@ -25,6 +25,15 @@ const DefaultBaseURL = "https://tcgcsv.com"
 
 const defaultUserAgent = "mtgban-website (+https://mtgban.com)"
 
+// Per-request timeouts. These bound a single attempt (connect through reading
+// the full body), applied via the request context; the daily price archive is
+// far larger than the JSON endpoints and needs a much more generous ceiling so
+// a slow-but-progressing download isn't cut off and retried into failure.
+const (
+	requestTimeout = 30 * time.Second
+	archiveTimeout = 5 * time.Minute
+)
+
 // Known TCGplayer category ids, for reference and config. Magic (category 1) is
 // intentionally absent: its prices are keyed by mtgjson uuid in product_prices,
 // not here. Categories 21, 69, and 70 are junk per the tcgcsv FAQ and should not
@@ -77,9 +86,12 @@ func NewClient(cfg Config) *Client {
 		ua = defaultUserAgent
 	}
 	return &Client{
-		baseURL:    DefaultBaseURL,
-		userAgent:  ua,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		baseURL:   DefaultBaseURL,
+		userAgent: ua,
+		// No client-level Timeout: each request is bounded by its own context
+		// deadline (requestTimeout / archiveTimeout) so the small JSON calls and
+		// the large archive download don't share one ceiling.
+		httpClient: &http.Client{},
 		throttle:   150 * time.Millisecond,
 		retryWait:  500 * time.Millisecond,
 		maxRetries: 3,
@@ -181,7 +193,7 @@ func (c *Client) Prices(ctx context.Context, categoryID, groupID int) ([]Price, 
 // gate a sync on this so we only pull when the upstream data is newer than what
 // we already stored.
 func (c *Client) LastUpdated(ctx context.Context) (time.Time, error) {
-	body, status, err := c.do(ctx, c.baseURL+"/last-updated.txt")
+	body, status, err := c.do(ctx, c.baseURL+"/last-updated.txt", requestTimeout)
 	if err != nil {
 		return time.Time{}, err
 	}
@@ -200,7 +212,7 @@ func (c *Client) LastUpdated(ctx context.Context) (time.Time, error) {
 // getResults fetches a path and decodes the standard envelope. It is a free
 // function because Go methods cannot take type parameters.
 func getResults[T any](ctx context.Context, c *Client, path string) ([]T, error) {
-	body, status, err := c.do(ctx, c.baseURL+path)
+	body, status, err := c.do(ctx, c.baseURL+path, requestTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -224,10 +236,11 @@ func decodeResults[T any](data []byte, label string) ([]T, error) {
 }
 
 // do issues a throttled GET, retrying transient failures (transport errors,
-// 429, and 5xx) with a linear backoff bounded by maxRetries. It returns the
-// body and HTTP status for any final non-retryable response; callers decide how
-// to treat a non-200 (e.g. the archive reader maps 404 to "no data that day").
-func (c *Client) do(ctx context.Context, url string) (body []byte, status int, err error) {
+// 429, and 5xx) with a linear backoff bounded by maxRetries. Each attempt is
+// bounded by timeout via the request context. It returns the body and HTTP
+// status for any final non-retryable response; callers decide how to treat a
+// non-200 (e.g. the archive reader maps 404 to "no data that day").
+func (c *Client) do(ctx context.Context, url string, timeout time.Duration) (body []byte, status int, err error) {
 	var lastErr error
 	for attempt := 0; attempt <= c.maxRetries; attempt++ {
 		if attempt > 0 {
@@ -239,30 +252,48 @@ func (c *Client) do(ctx context.Context, url string) (body []byte, status int, e
 		}
 		c.wait()
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		if err != nil {
-			return nil, 0, err
-		}
-		req.Header.Set("User-Agent", c.userAgent)
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			lastErr = err
+		b, statusCode, retryable, reqErr := c.doOnce(ctx, url, timeout)
+		if reqErr != nil {
+			lastErr = reqErr
 			continue
 		}
-		b, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if readErr != nil {
-			lastErr = readErr
+		if retryable {
+			lastErr = fmt.Errorf("tcgcsv: %s -> %d", url, statusCode)
 			continue
 		}
-		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
-			lastErr = fmt.Errorf("tcgcsv: %s -> %s", url, resp.Status)
-			continue
-		}
-		return b, resp.StatusCode, nil
+		return b, statusCode, nil
 	}
 	return nil, 0, fmt.Errorf("tcgcsv: %s: giving up after %d attempts: %w", url, c.maxRetries+1, lastErr)
+}
+
+// doOnce performs a single throttled GET bounded by timeout. retryable is true
+// for a 429 or 5xx response, which the caller should back off and retry.
+func (c *Client) doOnce(ctx context.Context, url string, timeout time.Duration) (body []byte, status int, retryable bool, err error) {
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	req.Header.Set("User-Agent", c.userAgent)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, false, err
+	}
+	b, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return nil, 0, false, err
+	}
+	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500 {
+		return nil, resp.StatusCode, true, nil
+	}
+	return b, resp.StatusCode, false, nil
 }
 
 // wait enforces the minimum interval between requests, serializing callers so

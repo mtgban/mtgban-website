@@ -51,7 +51,7 @@ func (c *Client) FetchPriceArchive(ctx context.Context, date time.Time, wantCate
 
 	dateStr := date.Format("2006-01-02")
 	url := fmt.Sprintf("%s/archive/tcgplayer/prices-%s.ppmd.7z", c.baseURL, dateStr)
-	body, status, err := c.do(ctx, url)
+	body, status, err := c.do(ctx, url, archiveTimeout)
 	if err != nil {
 		return nil, false, err
 	}
