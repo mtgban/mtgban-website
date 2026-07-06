@@ -40,7 +40,7 @@ func (c *Client) EnsureTCGProductsSchema(ctx context.Context) error {
 	if c.readOnly {
 		return nil
 	}
-	if _, err := c.db.ExecContext(ctx, tcgProductsSchemaSQL); err != nil {
+	if err := c.execTCGDDL(ctx, tcgProductsSchemaSQL); err != nil {
 		return fmt.Errorf("timeseries: ensure tcg_products schema: %w", err)
 	}
 	return nil
