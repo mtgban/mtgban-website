@@ -828,14 +828,19 @@ func openDBs() (err error) {
 		if err != nil {
 			return fmt.Errorf("error opening the timeseries SQL client: %w", err)
 		}
-		// Best-effort: create the multi-game tcg_prices table if it's missing.
-		// Non-fatal so a read-only or unprivileged DB user can't block startup;
-		// TCGCSV ingestion re-checks the schema before it runs.
-		if serr := PricesArchiveDB.EnsureTCGSchema(context.Background()); serr != nil {
-			log.Println("warning: could not ensure tcg_prices schema:", serr)
-		}
-		if serr := PricesArchiveDB.EnsureTCGProductsSchema(context.Background()); serr != nil {
-			log.Println("warning: could not ensure tcg_products schema:", serr)
+		// Best-effort: create the multi-game tcg_prices/tcg_products tables if
+		// they're missing. Only when TCGCSV ingestion is configured, so plain
+		// chart deployments don't pay two startup DDL round-trips and materialize
+		// a dozen tables/partitions they never use. Non-fatal so a read-only or
+		// unprivileged DB user can't block startup; ingestion re-checks the
+		// schema before it runs.
+		if Config.TCGCSVConfig != nil {
+			if serr := PricesArchiveDB.EnsureTCGSchema(context.Background()); serr != nil {
+				log.Println("warning: could not ensure tcg_prices schema:", serr)
+			}
+			if serr := PricesArchiveDB.EnsureTCGProductsSchema(context.Background()); serr != nil {
+				log.Println("warning: could not ensure tcg_products schema:", serr)
+			}
 		}
 	}
 
