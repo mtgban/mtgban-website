@@ -170,24 +170,13 @@ func (c *Client) UpsertRows(ctx context.Context, rows []PriceRow, batchSize int)
 		return 0, nil
 	}
 
-	maxBatch := 65535 / colsPerRow // ~4096
-	if batchSize <= 0 || batchSize > maxBatch {
-		batchSize = maxBatch
-	}
-
 	var totalUpserted int
 	var errs []error
-	for start := 0; start < len(rows); start += batchSize {
-		end := start + batchSize
-		if end > len(rows) {
-			end = len(rows)
-		}
-		batch := rows[start:end]
-
-		n, err := c.upsertBatch(ctx, batch)
+	for _, b := range batchBounds(len(rows), batchSize, pgMaxParams/colsPerRow) {
+		n, err := c.upsertBatch(ctx, rows[b[0]:b[1]])
 		totalUpserted += n
 		if err != nil {
-			errs = append(errs, fmt.Errorf("batch starting at row %d: %w", start, err))
+			errs = append(errs, fmt.Errorf("batch starting at row %d: %w", b[0], err))
 		}
 	}
 	return totalUpserted, errors.Join(errs...)
