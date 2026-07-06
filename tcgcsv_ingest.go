@@ -102,6 +102,9 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 	if err != nil {
 		return err
 	}
+	if PricesArchiveDB.ReadOnly() {
+		return errors.New("tcgcsv: price database is read-only; nothing would be written")
+	}
 	if err := tcgcsv.CheckArchiveTooling(); err != nil {
 		return err
 	}
@@ -230,6 +233,9 @@ func ingestTCGCSVLatest(ctx context.Context) error {
 	client, err := tcgcsvClient()
 	if err != nil {
 		return err
+	}
+	if PricesArchiveDB.ReadOnly() {
+		return errors.New("tcgcsv: price database is read-only; nothing would be written")
 	}
 	if err := PricesArchiveDB.EnsureTCGSchema(ctx); err != nil {
 		return err

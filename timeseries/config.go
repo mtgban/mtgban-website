@@ -77,6 +77,12 @@ func NewClient(cfg SqlConfig) (*Client, error) {
 	return &Client{db: db, readOnly: cfg.ReadOnly}, nil
 }
 
+// ReadOnly reports whether the client was opened against a read-only database.
+// Every write method is a silent no-op in that case, so callers that must
+// persist data (e.g. a one-shot backfill) can check this up front and fail
+// loudly instead of reporting success while writing nothing.
+func (c *Client) ReadOnly() bool { return c.readOnly }
+
 // Close shuts down the connection pool.
 func (c *Client) Close() error {
 	if c.db != nil {
