@@ -43,6 +43,25 @@ const tcgSelectColumns = `
 	date, category_id, product_id, sub_type_name,
 	low_price, mid_price, high_price, market_price, direct_low_price`
 
+// tcgDDLLockKey is the Postgres advisory-lock key that serializes concurrent
+// creation of the tcg schema across processes. CREATE ... IF NOT EXISTS is not
+// safe to run concurrently against the shared catalog (racing creators can
+// raise "tuple concurrently updated" or a duplicate pg_type unique violation),
+// which is reachable here because a manual backfill, the daily cron, and every
+// server instance can all ensure the schema at once.
+const tcgDDLLockKey = 0x7463675f_64646c // "tcg_ddl"
+
+// execTCGDDL runs one or more idempotent DDL statements behind a
+// transaction-scoped advisory lock so concurrent creators serialize instead of
+// racing the catalog. Multiple statements in a single unparameterized Exec run
+// as one implicit transaction (lib/pq simple protocol), so the lock taken by
+// the leading statement is held through the DDL and released when it commits.
+func (c *Client) execTCGDDL(ctx context.Context, ddl string) error {
+	q := fmt.Sprintf("SELECT pg_advisory_xact_lock(%d);\n%s", tcgDDLLockKey, ddl)
+	_, err := c.db.ExecContext(ctx, q)
+	return err
+}
+
 // EnsureTCGSchema creates the tcgplayer_nonmagic_product_prices parent table, its default partition,
 // and its indexes if they do not already exist. tcgplayer_nonmagic_product_prices is LIST-partitioned
 // by category_id; this creates only the parent and the catch-all default
@@ -53,7 +72,7 @@ func (c *Client) EnsureTCGSchema(ctx context.Context) error {
 	if c.readOnly {
 		return nil
 	}
-	if _, err := c.db.ExecContext(ctx, tcgSchemaSQL); err != nil {
+	if err := c.execTCGDDL(ctx, tcgSchemaSQL); err != nil {
 		return fmt.Errorf("timeseries: ensure tcg schema: %w", err)
 	}
 	return nil
@@ -76,7 +95,7 @@ func (c *Client) EnsureTCGCategoryPartition(ctx context.Context, categoryID int)
 		`CREATE TABLE IF NOT EXISTS tcgplayer_nonmagic_product_prices_cat_%d PARTITION OF tcgplayer_nonmagic_product_prices FOR VALUES IN (%d)`,
 		categoryID, categoryID,
 	)
-	if _, err := c.db.ExecContext(ctx, q); err != nil {
+	if err := c.execTCGDDL(ctx, q); err != nil {
 		return fmt.Errorf("timeseries: ensure tcg partition for category %d: %w", categoryID, err)
 	}
 	return nil
