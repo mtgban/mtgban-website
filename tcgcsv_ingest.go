@@ -207,6 +207,41 @@ var tcgcsvStashing atomic.Bool
 // IsTCGCSVStashing reports whether a daily TCGCSV ingest is currently running.
 func IsTCGCSVStashing() bool { return tcgcsvStashing.Load() }
 
+// tcgcsvCrawlLockKey coordinates tcgcsv crawls across server instances. The
+// daily/weekly crons are registered in every process, and the per-process
+// atomic guards above can't see other instances, so without this every instance
+// would crawl tcgcsv.com at once, N times the request volume against a service
+// whose etiquette is one full sync per 24h. Only the instance that holds this
+// Postgres advisory lock crawls; the rest skip.
+const tcgcsvCrawlLockKey = 0x7463675f_63726177 // "tcg_craw"
+
+// withTCGCSVCrawlLock runs fn only if this instance can take the shared
+// cross-instance crawl lock, so concurrent instances don't all hit tcgcsv.com.
+// A read-only instance can't ingest, so it skips without taking the lock (else
+// it could win the lock and starve the writable instance). With no price DB
+// there is nothing to coordinate on, so fn runs and surfaces its own error.
+func withTCGCSVCrawlLock(job string, fn func()) {
+	if PricesArchiveDB == nil {
+		fn()
+		return
+	}
+	if PricesArchiveDB.ReadOnly() {
+		log.Printf("%s: price database is read-only, skipping", job)
+		return
+	}
+	acquired, release, err := PricesArchiveDB.TryAdvisoryLock(context.Background(), tcgcsvCrawlLockKey)
+	if err != nil {
+		log.Printf("%s: could not acquire crawl lock: %v", job, err)
+		return
+	}
+	if !acquired {
+		log.Printf("%s: another instance holds the tcgcsv crawl lock, skipping", job)
+		return
+	}
+	defer release()
+	fn()
+}
+
 // stashTCGCSVPrices pulls tcgcsv's current snapshot for every configured game
 // into tcg_prices. It is the cron/admin entry point: only one run proceeds at a
 // time, and it no-ops when the current snapshot is already stored.
@@ -217,10 +252,12 @@ func stashTCGCSVPrices() {
 	}
 	defer tcgcsvStashing.Store(false)
 
-	if err := ingestTCGCSVLatest(context.Background()); err != nil {
-		log.Println("tcgcsv daily ingest:", err)
-		ServerNotify("tcgcsv", fmt.Sprintf("daily ingest error: %s", err))
-	}
+	withTCGCSVCrawlLock("stashTCGCSVPrices", func() {
+		if err := ingestTCGCSVLatest(context.Background()); err != nil {
+			log.Println("tcgcsv daily ingest:", err)
+			ServerNotify("tcgcsv", fmt.Sprintf("daily ingest error: %s", err))
+		}
+	})
 }
 
 // ingestTCGCSVLatest fetches tcgcsv's current prices for every configured game

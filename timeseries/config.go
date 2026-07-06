@@ -1,6 +1,7 @@
 package timeseries
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -82,6 +83,36 @@ func NewClient(cfg SqlConfig) (*Client, error) {
 // persist data (e.g. a one-shot backfill) can check this up front and fail
 // loudly instead of reporting success while writing nothing.
 func (c *Client) ReadOnly() bool { return c.readOnly }
+
+// TryAdvisoryLock attempts to acquire the session-level Postgres advisory lock
+// for key without blocking. On success it pins a dedicated connection for the
+// lock's lifetime and returns a release func that unlocks and returns the
+// connection to the pool; the caller must invoke it. When another session
+// already holds the lock, acquired is false and release is a no-op. Use it to
+// make a job single-flight across processes (e.g. so N server instances don't
+// all run the same crawl at once).
+func (c *Client) TryAdvisoryLock(ctx context.Context, key int64) (acquired bool, release func(), err error) {
+	conn, err := c.db.Conn(ctx)
+	if err != nil {
+		return false, nil, err
+	}
+	var ok bool
+	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", key).Scan(&ok); err != nil {
+		conn.Close()
+		return false, nil, err
+	}
+	if !ok {
+		conn.Close()
+		return false, func() {}, nil
+	}
+	return true, func() {
+		// Unlock on the same pinned connection (session locks are per-connection),
+		// then return it to the pool. Closing the connection would release the
+		// lock regardless, so the unlock is best-effort.
+		_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock($1)", key)
+		conn.Close()
+	}, nil
+}
 
 // Close shuts down the connection pool.
 func (c *Client) Close() error {

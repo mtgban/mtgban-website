@@ -41,10 +41,12 @@ func stashTCGCSVProducts() {
 	}
 	defer tcgcsvProductsStashing.Store(false)
 
-	if err := syncTCGProducts(context.Background()); err != nil {
-		log.Println("tcgcsv product sync:", err)
-		ServerNotify("tcgcsv", fmt.Sprintf("product sync error: %s", err))
-	}
+	withTCGCSVCrawlLock("stashTCGCSVProducts", func() {
+		if err := syncTCGProducts(context.Background()); err != nil {
+			log.Println("tcgcsv product sync:", err)
+			ServerNotify("tcgcsv", fmt.Sprintf("product sync error: %s", err))
+		}
+	})
 }
 
 // syncTCGProducts refreshes the tcg_products catalog for every configured game
