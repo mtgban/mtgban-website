@@ -73,6 +73,14 @@ func (c *Client) FetchPriceArchive(ctx context.Context, date time.Time, wantCate
 		return nil, false, err
 	}
 	extractDir := filepath.Join(tmpDir, "x")
+	// 7z only creates the output directory when it extracts at least one file.
+	// When the include filter matches nothing (a category that didn't exist yet
+	// that day) it exits 0 without ever creating extractDir, and the WalkDir
+	// below would then fail on the missing root. Create it up front so a
+	// zero-match extraction is walked as an empty tree instead of erroring.
+	if err := os.MkdirAll(extractDir, 0o700); err != nil {
+		return nil, false, err
+	}
 
 	// Include only the wanted categories' subtrees (e.g. "2024-04-21/71/*"). An
 	// empty want set extracts the whole archive. A pattern that matches nothing
