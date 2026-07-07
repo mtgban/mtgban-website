@@ -2,6 +2,7 @@ package userstate
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -57,6 +58,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string) 
 		}
 		st, err := db.Get(ctx, hash)
 		if err != nil {
+			log.Printf("userstate: GET failed for %.10s: %v", hash, err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "read failed"})
 			return
 		}
@@ -75,6 +77,7 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string) 
 		}
 		result, conflict, err := db.Put(ctx, hash, body, body.Version)
 		if err != nil {
+			log.Printf("userstate: PUT failed for %.10s: %v", hash, err)
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "write failed"})
 			return
 		}
@@ -89,6 +92,10 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string) 
 			http.Error(w, "404 not found", http.StatusNotFound)
 			return
 		}
+		if !validSections[section] {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown section"})
+			return
+		}
 		var body struct {
 			Data    json.RawMessage `json:"data"`
 			Version int64           `json:"version"`
@@ -99,7 +106,8 @@ func ServeAPI(w http.ResponseWriter, r *http.Request, db *Client, email string) 
 		}
 		result, conflict, err := db.Patch(ctx, hash, section, body.Data, body.Version)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			log.Printf("userstate: PATCH %s failed for %.10s: %v", section, hash, err)
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "write failed"})
 			return
 		}
 		if conflict {
