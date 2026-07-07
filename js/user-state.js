@@ -31,6 +31,25 @@
     var DIRTY_KEY = 'mtgban_userstate_dirty';
     var SYNCED_KEY = 'mtgban_userstate_synced';
 
+    // Fingerprints of the last payload synced per section, to skip no-op writes.
+    var FP_KEY = 'mtgban_userstate_fp';
+    function hashStr(s) {
+        var h = 5381;
+        for (var i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+        return String(h);
+    }
+    function readFPs() {
+        try { return JSON.parse(readLocal(FP_KEY, '{}')); } catch (e) { return {}; }
+    }
+    function writeFP(section, payloadJSON) {
+        try {
+            var f = readFPs();
+            f[section] = hashStr(payloadJSON);
+            rawSetItem(FP_KEY, JSON.stringify(f));
+        } catch (e) {}
+    }
+    function fpMatches(section, payloadJSON) { return readFPs()[section] === hashStr(payloadJSON); }
+
     var version = 0;
     var rawSetItem = localStorage.setItem.bind(localStorage);
     var pending = {}; // section -> true
@@ -84,8 +103,26 @@
     function applyState(state) {
         if (!state) return;
         try {
-            if (state.favorites) rawSetItem(FAVORITES_KEY, JSON.stringify(state.favorites));
-            if (state.recents) rawSetItem(RECENTS_KEY, JSON.stringify(state.recents));
+            if (state.favorites) {
+                var localBy = {};
+                localFavorites().forEach(function(f) { if (f && f.id != null) localBy[f.id] = f; });
+                var favs = state.favorites.map(function(f) {
+                    var prev = f && f.id != null ? localBy[f.id] : null;
+                    if (prev && !f.del) {
+                        // Prices and refresh times are local-only; keep them across hydrates.
+                        if (f.sellPrice == null && prev.sellPrice != null) { f.sellPrice = prev.sellPrice; f.sellVendor = prev.sellVendor; }
+                        if (f.buyPrice == null && prev.buyPrice != null) { f.buyPrice = prev.buyPrice; f.buyVendor = prev.buyVendor; }
+                        if (prev.refreshedAt) f.refreshedAt = prev.refreshedAt;
+                    }
+                    return f;
+                });
+                rawSetItem(FAVORITES_KEY, JSON.stringify(favs));
+                writeFP('favorites', JSON.stringify(favs.map(trimFavorite)));
+            }
+            if (state.recents) {
+                rawSetItem(RECENTS_KEY, JSON.stringify(state.recents));
+                writeFP('recents', JSON.stringify(state.recents));
+            }
             if (state.preferences) {
                 Object.keys(state.preferences).forEach(function(k) {
                     if (PREF_KEYS.indexOf(k) >= 0) rawSetItem(k, String(state.preferences[k]));
@@ -105,7 +142,10 @@
     // PATCH one section; keepalive lets it outlive navigation.
     // Resolves true when the write (or its reconcile) landed.
     function patchSection(section, keepalive) {
-        var body = JSON.stringify({ data: payloadForSection(section), version: version });
+        var payloadJSON = JSON.stringify(payloadForSection(section));
+        // Content already on the server: succeed without a request.
+        if (fpMatches(section, payloadJSON)) return Promise.resolve(true);
+        var body = '{"data":' + payloadJSON + ',"version":' + version + '}';
         return fetch(BASE + section, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -119,6 +159,7 @@
             }
             return r.json().then(function(res) {
                 if (res && typeof res.version === 'number') { version = res.version; writeMarker(version); }
+                writeFP(section, payloadJSON);
                 return true;
             });
         }).catch(function() {
@@ -183,6 +224,9 @@
 
         // Nothing new to push: adopt version, skip the write.
         if (!localHasNew(mergedFavs, mergedRecents, mergedPrefs, serverState)) {
+            writeFP('favorites', JSON.stringify(mergedFavs.map(trimFavorite)));
+            writeFP('recents', JSON.stringify(mergedRecents));
+            writeFP('preferences', JSON.stringify(mergedPrefs));
             markClean();
             writeMarker(version);
             return Promise.resolve(true);
@@ -209,6 +253,9 @@
             return r.json().then(function(res) {
                 if (res && typeof res.version === 'number') version = res.version;
                 writeMarker(version);
+                writeFP('favorites', JSON.stringify(mergedFavs.map(trimFavorite)));
+                writeFP('recents', JSON.stringify(mergedRecents));
+                writeFP('preferences', JSON.stringify(mergedPrefs));
                 markClean();
                 return true;
             });
