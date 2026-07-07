@@ -1,6 +1,11 @@
 // Favorites — localStorage-backed card favorites for mobile
 (function() {
     var STORAGE_KEY = 'mtgban_favorites';
+    var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+    var TOMB_CAP = 50;
+    function isLive(f) { return !f.del; }
+    function mtime(f) { return f.m || f.t || 0; }
+    function getLiveFavorites() { return getFavorites().filter(isLive); }
 
     function getFavorites() {
         try {
@@ -14,10 +19,13 @@
     function saveFavorites(favs) {
         try {
             var MAX_FAVORITES = 50;
-            if (favs.length > MAX_FAVORITES) {
-                favs = favs.slice(0, MAX_FAVORITES);
-            }
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
+            var now = Date.now();
+            var live = favs.filter(isLive);
+            var tombs = favs.filter(function(f) { return !isLive(f) && (now - mtime(f)) <= TOMB_TTL_MS; });
+            if (live.length > MAX_FAVORITES) live = live.slice(0, MAX_FAVORITES);
+            tombs.sort(function(a, b) { return mtime(b) - mtime(a); });
+            if (tombs.length > TOMB_CAP) tombs = tombs.slice(0, TOMB_CAP);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(live.concat(tombs)));
         } catch (e) {}
     }
 
@@ -199,12 +207,15 @@
         }
 
         var active;
-        if (idx >= 0) {
-            favs.splice(idx, 1);
+        if (idx >= 0 && !favs[idx].del) {
+            favs[idx].del = favs[idx].m = Date.now();
             active = false;
         } else {
             var data = extractCardData(btn);
             if (!data) return;
+            data.m = data.t;
+            // A fresh add replaces any old tombstone for the same card.
+            if (idx >= 0) favs.splice(idx, 1);
             favs.unshift(data);
             active = true;
         }
@@ -221,7 +232,7 @@
 
     // Mark stars on page load for already-favorited cards
     function markExistingFavorites() {
-        var favs = getFavorites();
+        var favs = getLiveFavorites();
         if (favs.length === 0) return;
 
         var favIds = {};
@@ -246,7 +257,7 @@
 
     function renderFavoritesInto(container, mode) {
         if (!container) return;
-        var favs = pinnedFirst(sortFavs(getFavorites()));
+        var favs = pinnedFirst(sortFavs(getLiveFavorites()));
 
         var containerId = container.id;
         if (!paginationState[containerId]) paginationState[containerId] = { page: 0 };
@@ -506,7 +517,11 @@
     window.deleteFavorite = function(cardId, ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         if (!cardId) return;
-        var favs = getFavorites().filter(function(f) { return f.id !== cardId; });
+        var favs = getFavorites();
+        var now = Date.now();
+        favs.forEach(function(f) {
+            if (f.id === cardId && !f.del) { f.del = now; f.m = now; }
+        });
         saveFavorites(favs);
         renderFavorites();
         // Clear active state on any star buttons for this card on the same page.
@@ -521,12 +536,13 @@
         var favs = getFavorites();
         var changed = false;
         for (var i = 0; i < favs.length; i++) {
-            if (favs[i].id === cardId) {
+            if (favs[i].id === cardId && !favs[i].del) {
                 if (favs[i].pinned) {
                     delete favs[i].pinned;
                 } else {
                     favs[i].pinned = Date.now();
                 }
+                favs[i].m = Date.now();
                 changed = true;
                 break;
             }
@@ -551,7 +567,12 @@
 
     window.clearFavorites = function(trigger) {
         var doClear = function() {
-            localStorage.removeItem(STORAGE_KEY);
+            var now = Date.now();
+            var favs = getFavorites();
+            favs.forEach(function(f) {
+                if (!f.del) { f.del = now; f.m = now; }
+            });
+            saveFavorites(favs);
             var mobile = document.getElementById('m-favorites');
             if (mobile) mobile.innerHTML = '';
             var desktop = document.getElementById('desktop-favorites');
@@ -580,7 +601,7 @@
         return '';
     }
     window.downloadFavoritesCSV = function() {
-        var favs = getFavorites();
+        var favs = getLiveFavorites();
         if (!favs.length) return;
         var rows = [['UUID', 'Name', 'Edition', 'Set', 'Number', 'Finish', 'Best Sell', 'Sell Store', 'Best Buy', 'Buy Store']];
         favs.forEach(function(f) {
@@ -604,7 +625,7 @@
     // Hand the favorites off to the uploader exactly like the search
     // sidebar does: POST one "hashes" input per card plus the mode.
     window.sendFavoritesToUploader = function(mode) {
-        var favs = getFavorites();
+        var favs = getLiveFavorites();
         if (!favs.length) return;
         var form = document.createElement('form');
         form.method = 'post';
@@ -694,6 +715,7 @@
             var buy = parseFloat(c[8]);
 
             var prev = byId[id];
+            var live = prev && !prev.del ? prev : null;
             var fav = {
                 id: id,
                 name: name,
@@ -713,10 +735,12 @@
                 img: prev ? (prev.img || '') : '',
                 cw: prev ? !!prev.cw : false,
                 // Preserve pin + original add-time for cards already saved.
-                pinned: prev ? prev.pinned : false,
-                t: prev ? prev.t : Date.now()
+                pinned: live ? live.pinned : false,
+                t: live ? live.t : Date.now(),
+                m: live ? (live.m || live.t) : Date.now()
             };
             if (!prev) { order.push(id); added++; }
+            else if (!live) { added++; }
             byId[id] = fav;
         }
 
@@ -754,7 +778,7 @@
     var lastRefreshAttempt = 0;
 
     function refreshFavorites() {
-        var favs = getFavorites();
+        var favs = getLiveFavorites();
         if (favs.length === 0) return;
 
         // Refresh if any entry is older than STALE_MS, or if any entry is missing
@@ -781,7 +805,7 @@
     }
 
     function doRefresh(showNotification) {
-        var favs = getFavorites();
+        var favs = getLiveFavorites();
         if (favs.length === 0) return;
 
         // Chunk into batches of 50
@@ -810,6 +834,7 @@
             var updated = false;
 
             favs.forEach(function(f) {
+                if (f.del) return;
                 var prices = merged[f.id];
                 if (!prices) return;
 
