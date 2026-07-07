@@ -5,6 +5,11 @@
     var FETCH_KEY = 'mtgban_userstate_fetch'; // sessionStorage: {v, ts}
     var TTL_MS = 90 * 1000;
 
+    // Tombstones: entries with a del timestamp. Newest intent (m) wins merges.
+    var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+    var TOMB_CAP = 50;
+    function mtime(x) { return x.m || x.t || 0; }
+
     // Keys that map to dedicated server columns.
     var FAVORITES_KEY = 'mtgban_favorites';
     var RECENTS_KEY = 'mtgban_recent_searches';
@@ -191,48 +196,61 @@
         }).catch(function() {});
     }
 
-    // True when local has a favorite/recent/pref the server lacks.
+    // True when local has an entry the server lacks or a newer copy of one.
     function localHasNew(favs, recents, prefs, server) {
-        var sf = {};
-        (server.favorites || []).forEach(function(f) { if (f && f.id != null) sf[f.id] = true; });
-        for (var i = 0; i < favs.length; i++) { if (!sf[favs[i].id]) return true; }
-        var sr = {};
-        (server.recents || []).forEach(function(s) { if (s && s.q != null) sr[('' + s.q).toLowerCase()] = true; });
-        for (var j = 0; j < recents.length; j++) { if (!sr[('' + recents[j].q).toLowerCase()]) return true; }
+        function newer(localList, serverList, idOf) {
+            var sv = {};
+            (serverList || []).forEach(function(x) {
+                var id = idOf(x);
+                if (id != null) sv[id] = mtime(x);
+            });
+            for (var i = 0; i < localList.length; i++) {
+                var lid = idOf(localList[i]);
+                if (lid == null) continue;
+                if (!(lid in sv) || mtime(localList[i]) > sv[lid]) return true;
+            }
+            return false;
+        }
+        if (newer(favs, server.favorites, function(f) { return f.id; })) return true;
+        if (newer(recents, server.recents, function(s) { return ('' + (s.q || '')).toLowerCase(); })) return true;
         var sp = server.preferences || {};
         var keys = Object.keys(prefs);
         for (var k = 0; k < keys.length; k++) { if (String(sp[keys[k]]) !== String(prefs[keys[k]])) return true; }
         return false;
     }
 
-    // Union by id, newer timestamp wins; dedupe and cap (render reapplies pin order).
+    // Merge by id: the copy with newer intent (m, fallback t) wins wholesale,
+    // including its del and pinned state. Ties keep the local copy.
     function mergeList(local, server, idOf, cap) {
+        var now = Date.now();
         var byId = {};
         var order = [];
         function add(item) {
             var id = idOf(item);
             if (id == null) return;
-            if (byId[id]) {
-                var existing = byId[id];
-                var et = existing.t || 0, it = item.t || 0;
-                if (it >= et) byId[id] = item; // newer wins
-                if (existing.pinned && !byId[id].pinned) byId[id].pinned = existing.pinned;
-            } else {
+            var cur = byId[id];
+            if (!cur) {
                 byId[id] = item;
                 order.push(id);
+            } else if (mtime(item) > mtime(cur)) {
+                byId[id] = item;
             }
         }
         (local || []).forEach(add);
         (server || []).forEach(add);
         var merged = order.map(function(id) { return byId[id]; });
-        merged.sort(function(a, b) { return (b.t || 0) - (a.t || 0); });
-        if (cap && merged.length > cap) {
+        var live = merged.filter(function(x) { return !x.del; });
+        var tombs = merged.filter(function(x) { return x.del && (now - mtime(x)) <= TOMB_TTL_MS; });
+        live.sort(function(a, b) { return (b.t || 0) - (a.t || 0); });
+        if (cap && live.length > cap) {
             // Keep pinned even when old; fill the rest with newest unpinned.
-            var pinned = merged.filter(function(x) { return x.pinned; });
-            var unpinned = merged.filter(function(x) { return !x.pinned; });
-            merged = pinned.concat(unpinned).slice(0, cap);
+            var pinned = live.filter(function(x) { return x.pinned; });
+            var unpinned = live.filter(function(x) { return !x.pinned; });
+            live = pinned.concat(unpinned).slice(0, cap);
         }
-        return merged;
+        tombs.sort(function(a, b) { return mtime(b) - mtime(a); });
+        if (tombs.length > TOMB_CAP) tombs = tombs.slice(0, TOMB_CAP);
+        return live.concat(tombs);
     }
 
     // Preferences: last-write-wins per key (local wins on first merge).
@@ -250,6 +268,7 @@
     function trimFavorite(f) {
         return {
             id: f.id, query: f.query, t: f.t, pinned: f.pinned,
+            m: f.m, del: f.del,
             name: f.name, set: f.set, edition: f.edition, number: f.number,
             foil: f.foil, etched: f.etched,
             finishTag: f.finishTag, finishClass: f.finishClass,
