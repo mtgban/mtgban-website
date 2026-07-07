@@ -2,6 +2,11 @@
 (function() {
     var STORAGE_KEY = 'mtgban_recent_searches';
     var MAX_ENTRIES = 15;
+    var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+    var TOMB_CAP = 50;
+    function isLive(s) { return !s.del; }
+    function mtime(s) { return s.m || s.t || 0; }
+    function getLiveSearches() { return getRecentSearches().filter(isLive); }
 
     // Parse a query for set tokens. Returns {set, keyrune} only when the query is
     // a "pure set search" - the first token is s:/e:/ee:. A query like "Birds s:7ed"
@@ -41,7 +46,13 @@
 
     function saveRecentSearches(searches) {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(searches));
+            var now = Date.now();
+            var live = searches.filter(isLive);
+            var tombs = searches.filter(function(s) { return !isLive(s) && (now - mtime(s)) <= TOMB_TTL_MS; });
+            if (live.length > MAX_ENTRIES) live = live.slice(0, MAX_ENTRIES);
+            tombs.sort(function(a, b) { return mtime(b) - mtime(a); });
+            if (tombs.length > TOMB_CAP) tombs = tombs.slice(0, TOMB_CAP);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(live.concat(tombs)));
         } catch (e) {
             // localStorage full or unavailable - silently fail
         }
@@ -70,24 +81,27 @@
 
         var token = parseSetToken(query);
 
+        var t = Date.now();
         searches.unshift({
             q: query,
-            t: Date.now(),
+            t: t,
+            m: t,
             img: '',
             set: token.set,
             keyrune: token.keyrune
         });
-
-        if (searches.length > MAX_ENTRIES) {
-            searches = searches.slice(0, MAX_ENTRIES);
-        }
 
         saveRecentSearches(searches);
     }
 
     function clearRecentSearches(trigger) {
         var doClear = function() {
-            localStorage.removeItem(STORAGE_KEY);
+            var now = Date.now();
+            var searches = getRecentSearches();
+            searches.forEach(function(s) {
+                if (!s.del) { s.del = now; s.m = now; }
+            });
+            saveRecentSearches(searches);
             var mobile = document.getElementById('m-recent-searches');
             if (mobile) mobile.innerHTML = '';
             var desktop = document.getElementById('desktop-recent-searches');
@@ -111,7 +125,7 @@
         if (!container) return;
         var oldBody = container.querySelector('.landing-pane-body');
         var savedScroll = oldBody ? oldBody.scrollTop : 0;
-        var searches = pinnedFirst(getRecentSearches());
+        var searches = pinnedFirst(getLiveSearches());
 
         if (searches.length === 0) {
             if (mode === 'desktop') {
@@ -187,7 +201,11 @@
     window.deleteRecentSearch = function(query, ev) {
         if (ev) { ev.preventDefault(); ev.stopPropagation(); }
         if (!query) return;
-        var searches = getRecentSearches().filter(function(s) { return s.q !== query; });
+        var searches = getRecentSearches();
+        var now = Date.now();
+        searches.forEach(function(s) {
+            if (s.q === query && !s.del) { s.del = now; s.m = now; }
+        });
         saveRecentSearches(searches);
         renderRecentSearches();
     };
@@ -198,12 +216,13 @@
         var searches = getRecentSearches();
         var changed = false;
         for (var i = 0; i < searches.length; i++) {
-            if (searches[i].q === query) {
+            if (searches[i].q === query && !searches[i].del) {
                 if (searches[i].pinned) {
                     delete searches[i].pinned;
                 } else {
                     searches[i].pinned = Date.now();
                 }
+                searches[i].m = Date.now();
                 changed = true;
                 break;
             }
@@ -249,7 +268,7 @@
         var qLower = q.toLowerCase();
         var changed = false;
         for (var i = 0; i < searches.length; i++) {
-            if (searches[i].q.toLowerCase() === qLower) {
+            if (searches[i].q.toLowerCase() === qLower && !searches[i].del) {
                 if (!searches[i].img) {
                     searches[i].img = img;
                     changed = true;
