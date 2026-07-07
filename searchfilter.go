@@ -1471,6 +1471,17 @@ var specialTags = map[string]string{
 	"Bleachbone Verge":     "vergeland",
 	"Riverpyre Verge":      "vergeland",
 	"Wastewood Verge":      "vergeland",
+
+	"Indatha Triome":           "triome",
+	"Ketria Triome":            "triome",
+	"Raugrin Triome":           "triome",
+	"Savai Triome":             "triome",
+	"Zagoth Triome":            "triome",
+	"Jetmir's Garden":          "triome",
+	"Raffine's Tower":          "triome",
+	"Spara's Headquarters":     "triome",
+	"Xander's Lounge":          "triome",
+	"Ziatora's Proving Ground": "triome",
 }
 
 var specialEditionTags = map[string]string{

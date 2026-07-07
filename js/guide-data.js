@@ -692,7 +692,7 @@ window.__BAN_GUIDE = {
             icon: 'mountain',
             summary: 'Filter land cycles (is:fetchland, is:dual) and special sets (is:power9, is:abu4h).',
             snippets: ['is:fetchland', 'is:dual', 'is:shockland', 'is:power9', 'is:abu4h'],
-            keywords: ['land', 'cycle', 'fetchland', 'fetch', 'dual', 'shockland', 'shock', 'painland', 'pain', 'checkland', 'check', 'fastland', 'fast', 'filterland', 'surveilland', 'vergeland', 'power9', 'p9', 'abu4h', 'alpha', 'beta', 'unlimited'],
+            keywords: ['land', 'cycle', 'fetchland', 'fetch', 'dual', 'shockland', 'shock', 'painland', 'pain', 'checkland', 'check', 'fastland', 'fast', 'filterland', 'surveilland', 'vergeland', 'triome', 'power9', 'p9', 'abu4h', 'alpha', 'beta', 'unlimited'],
             content: {
                 description: 'Filter by well-known land cycles and set groupings using <code>is:VALUE</code>:',
                 table: [
@@ -705,6 +705,7 @@ window.__BAN_GUIDE = {
                     { value: 'is:filterland', short: 'Filter lands' },
                     { value: 'is:surveilland', short: 'Surveil lands' },
                     { value: 'is:vergeland', short: 'Verge lands' },
+                    { value: 'is:triome', short: 'Triome lands' },
                     { value: 'is:power9 / is:p9', short: 'The Power Nine' },
                     { value: 'is:abu4h', short: 'Alpha/Beta/Unlimited + first 4 expansions' }
                 ],
