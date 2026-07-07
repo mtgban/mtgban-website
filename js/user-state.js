@@ -103,6 +103,7 @@
     }
 
     // PATCH one section; keepalive lets it outlive navigation.
+    // Resolves true when the write (or its reconcile) landed.
     function patchSection(section, keepalive) {
         var body = JSON.stringify({ data: payloadForSection(section), version: version });
         return fetch(BASE + section, {
@@ -112,23 +113,36 @@
             keepalive: keepalive === true
         }).then(function(r) {
             if (r.status === 409) return r.json().then(function(cur) { return reconcile(cur); });
-            if (!r.ok) return null;
+            if (!r.ok) {
+                console.warn('mtgban sync: ' + section + ' write failed (' + r.status + ')');
+                return false;
+            }
             return r.json().then(function(res) {
                 if (res && typeof res.version === 'number') { version = res.version; writeMarker(version); }
+                return true;
             });
-        }).catch(function() {});
+        }).catch(function() {
+            console.warn('mtgban sync: ' + section + ' write failed (network)');
+            return false;
+        });
     }
 
     function flush() {
         timer = null;
         var sections = Object.keys(pending);
         pending = {};
+        var allOk = true;
         // Chain sequentially so version stays consistent across sections.
         sections.reduce(function(p, section) {
-            return p.then(function() { return patchSection(section); });
+            return p.then(function() {
+                return patchSection(section).then(function(ok) {
+                    // Re-queue failures so the next flush retries them.
+                    if (!ok) { allOk = false; pending[section] = true; }
+                });
+            });
         }, Promise.resolve()).then(function() {
-            // Clear dirty only if no new writes were scheduled while flushing.
-            if (!timer && Object.keys(pending).length === 0) markClean();
+            // Clear dirty only if everything synced and no new writes were scheduled.
+            if (allOk && !timer && Object.keys(pending).length === 0) markClean();
         });
     }
 
@@ -151,7 +165,7 @@
     var MAX_RECONCILE_ATTEMPTS = 5;
     function reconcile(serverState, attempt) {
         attempt = attempt || 0;
-        if (!serverState) return Promise.resolve();
+        if (!serverState) return Promise.resolve(false);
         var mergedFavs = mergeList(localFavorites(), serverState.favorites || [], function(f) { return f.id; }, 50);
         var mergedRecents = mergeList(localRecents(), serverState.recents || [], function(s) { return (s.q || '').toLowerCase(); }, 15);
         var mergedPrefs = mergePrefs(buildPreferences(), serverState.preferences || {});
@@ -170,7 +184,8 @@
         // Nothing new to push: adopt version, skip the write.
         if (!localHasNew(mergedFavs, mergedRecents, mergedPrefs, serverState)) {
             markClean();
-            return Promise.resolve();
+            writeMarker(version);
+            return Promise.resolve(true);
         }
 
         var body = JSON.stringify({
@@ -184,16 +199,23 @@
         }).then(function(r) {
             if (r.status === 409) {
                 // Someone else wrote; merge again, up to the retry budget.
-                if (attempt >= MAX_RECONCILE_ATTEMPTS) return null;
+                if (attempt >= MAX_RECONCILE_ATTEMPTS) return false;
                 return r.json().then(function(s) { return reconcile(s, attempt + 1); });
             }
-            if (!r.ok) return null;
+            if (!r.ok) {
+                console.warn('mtgban sync: reconcile write failed (' + r.status + ')');
+                return false;
+            }
             return r.json().then(function(res) {
                 if (res && typeof res.version === 'number') version = res.version;
                 writeMarker(version);
                 markClean();
+                return true;
             });
-        }).catch(function() {});
+        }).catch(function() {
+            console.warn('mtgban sync: reconcile write failed (network)');
+            return false;
+        });
     }
 
     // True when local has an entry the server lacks or a newer copy of one.
