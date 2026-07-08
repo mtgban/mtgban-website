@@ -57,6 +57,13 @@ func syncTCGProducts(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// Fail loudly rather than report success while writing nothing: the upsert is
+	// a silent no-op on a read-only client, so a -tcgcsv-products run against a
+	// read-only replica would otherwise exit 0 having synced nothing. Mirrors the
+	// guard in ingestTCGCSVLatest and backfillTCGCSV.
+	if PricesArchiveDB.ReadOnly() {
+		return errors.New("tcgcsv: price database is read-only; nothing would be written")
+	}
 	if err := PricesArchiveDB.EnsureTCGProductsSchema(ctx); err != nil {
 		return err
 	}
