@@ -1116,10 +1116,10 @@ func main() {
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
 		// newer snapshot regardless of the exact fire time.
-		// Gate on a configured game too: with a present-but-empty games list
+		// Gate on a configured game and a price DB too: without either,
 		// tcgcsvClient() errors on every fire, so registering the crons would
 		// only post a recurring spurious failure to the notification channel.
-		if Config.TCGCSVConfig != nil && len(Config.TCGCSVConfig.Games) > 0 {
+		if Config.TCGCSVConfig != nil && len(Config.TCGCSVConfig.Games) > 0 && PricesArchiveDB != nil {
 			c.AddFunc("0 21 * * *", stashTCGCSVPrices)
 			// Product metadata changes rarely; refresh the catalog weekly.
 			c.AddFunc("0 22 * * 1", stashTCGCSVProducts)
