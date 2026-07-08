@@ -160,11 +160,7 @@
             html += '</div>';
             html += '<div class="landing-pane-body">';
             searches.forEach(function(s) {
-                // Prefer the card crop; fall back to the first result's full
-                // image so image-heavy queries (sealed "Set of N" products with
-                // no crop) render as a fixed-height background instead of the
-                // taller thumbnail row.
-                var cropSrc = s.crop || s.img || '';
+                var cropSrc = s.crop || '';
                 var token = parseSetToken(s.q);
                 html += '<a class="landing-item landing-item-recent' + (cropSrc ? ' has-crop' : '') + '"' + (cropSrc ? ' style="background-image:url(\'' + escapeAttr(cropSrc) + '\')"' : '') + ' href="?q=' + encodeURIComponent(s.q) + '">';
                 if (!cropSrc) {
