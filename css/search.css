@@ -1459,8 +1459,13 @@ body.chart-add-open {
 body.modal-embed .page-content {
     padding-top: 0;
 }
-body.modal-embed .search-bar-sticky {
-    top: 0;
+/* The nav isn't rendered inside the modal iframe, so zero its height: every
+   sticky offset in the search UI (the sidebar, the result headers, and the
+   opaque cover band that hides rows as they scroll up) is measured from
+   --nav-height. Left unzeroed they stick a nav-height below the top, opening a
+   gap where scrolled content shows above the cover band. */
+body.modal-embed {
+    --nav-height: 0px;
 }
 body.modal-embed .ban-confirm-dialog-host,
 body.modal-embed .cp-overlay {
