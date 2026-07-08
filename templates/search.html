@@ -727,15 +727,91 @@
 
                                 var scaleFactor = 2;
                                 var border = 10;
+                                var chartW = cardChart.width * scaleFactor;
+                                var chartH = cardChart.height * scaleFactor;
+
+                                // Lay out a legend strip mirroring the on-screen legend (same
+                                // labels, colours, and hidden state) so the exported PNG is
+                                // self-describing. Read it from the datasets — the HTML legend
+                                // is a sibling div, not part of the canvas.
+                                var datasets = cardChart.data.datasets || [];
+                                var fontSize = 13 * scaleFactor;
+                                var dotR = 5 * scaleFactor;
+                                var swatchGap = 7 * scaleFactor;
+                                var itemGap = 22 * scaleFactor;
+                                var rowH = fontSize + 12 * scaleFactor;
+                                var pad = border * scaleFactor;
+                                var textColor = readVar('--normal') || '#000000';
+
+                                var measureCtx = document.createElement('canvas').getContext('2d');
+                                measureCtx.font = fontSize + 'px sans-serif';
+                                var items = datasets.map(function (ds, i) {
+                                    var label = ds.label || '';
+                                    var textW = measureCtx.measureText(label).width;
+                                    return {
+                                        label: label,
+                                        color: ds.borderColor || ds.backgroundColor || '#888888',
+                                        hidden: !cardChart.isDatasetVisible(i),
+                                        width: dotR * 2 + swatchGap + textW,
+                                        textW: textW,
+                                    };
+                                });
+
+                                // Wrap items into rows no wider than the chart.
+                                var rows = [];
+                                var row = [];
+                                var rowW = 0;
+                                items.forEach(function (it) {
+                                    var w = it.width + itemGap;
+                                    if (row.length && rowW + w > chartW) {
+                                        rows.push(row);
+                                        row = [];
+                                        rowW = 0;
+                                    }
+                                    row.push(it);
+                                    rowW += w;
+                                });
+                                if (row.length) rows.push(row);
+                                var legendH = items.length ? rows.length * rowH + pad : 0;
 
                                 var exportCanvas = document.createElement('canvas');
-                                exportCanvas.width = cardChart.width * scaleFactor;
-                                exportCanvas.height = cardChart.height * scaleFactor;
+                                exportCanvas.width = chartW;
+                                exportCanvas.height = chartH + legendH;
 
                                 var exportCtx = exportCanvas.getContext('2d');
                                 exportCtx.fillStyle = readVar('--background');
                                 exportCtx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
-                                exportCtx.drawImage(cardChart.canvas, border, border, exportCanvas.width - border * 3, exportCanvas.height - border * 2);
+                                exportCtx.drawImage(cardChart.canvas, border, border, chartW - border * 3, chartH - border * 2);
+
+                                // Draw the legend strip under the chart, rows centred.
+                                exportCtx.font = fontSize + 'px sans-serif';
+                                exportCtx.textBaseline = 'middle';
+                                var y = chartH + rowH / 2;
+                                rows.forEach(function (r) {
+                                    var totalW = r.reduce(function (s, it) { return s + it.width + itemGap; }, 0) - itemGap;
+                                    var x = Math.max(pad, (chartW - totalW) / 2);
+                                    r.forEach(function (it) {
+                                        exportCtx.globalAlpha = it.hidden ? 0.4 : 1;
+                                        exportCtx.fillStyle = it.color;
+                                        exportCtx.beginPath();
+                                        exportCtx.arc(x + dotR, y, dotR, 0, Math.PI * 2);
+                                        exportCtx.fill();
+                                        var labelX = x + dotR * 2 + swatchGap;
+                                        exportCtx.fillStyle = textColor;
+                                        exportCtx.fillText(it.label, labelX, y);
+                                        if (it.hidden) {
+                                            exportCtx.strokeStyle = textColor;
+                                            exportCtx.lineWidth = Math.max(1, scaleFactor);
+                                            exportCtx.beginPath();
+                                            exportCtx.moveTo(labelX, y);
+                                            exportCtx.lineTo(labelX + it.textW, y);
+                                            exportCtx.stroke();
+                                        }
+                                        x += it.width + itemGap;
+                                    });
+                                    y += rowH;
+                                });
+                                exportCtx.globalAlpha = 1;
 
                                 chartImg.href = exportCanvas.toDataURL("image/png");
                                 chartImg.click();
