@@ -463,7 +463,11 @@
                                     </select>
                                     <a class="btn normal" href="javascript:toggleGaps()">Toggle gaps</a>
                                     <a class="btn success" href="javascript:downloadAsImg()">Download</a>
+                                    {{if lt (len .ChartIDs) .MaxChartCards}}
                                     <a class="btn default chart-add-btn" href="javascript:openChartAddModal()" title="Add another card to this chart">&#10133; Add card</a>
+                                    {{else}}
+                                    <span class="btn default chart-add-btn chart-add-full" title="Charts hold up to {{.MaxChartCards}} cards &mdash; remove one to add another">&#10133; Add card</span>
+                                    {{end}}
                                 </p>
                                 {{if .Checkpoints}}
                                 <p class="chart-checkpoint-toggles">

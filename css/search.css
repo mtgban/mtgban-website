@@ -1145,6 +1145,12 @@ html.admin-fix-mode .store-fix { display: inline-block; }
     padding: 5px 8px;
     line-height: 1.2;
 }
+/* At the card cap the Add-card button is inert but stays hoverable so its title
+   explains why — deliberately no pointer-events:none, which would kill the tip. */
+.chart-add-btn.chart-add-full {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
 .chart-controls select {
     padding: 5px 30px 5px 12px;
     border-radius: var(--radius-sm, 6px);
