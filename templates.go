@@ -15,6 +15,19 @@ import (
 // csvWithout returns csv with `drop` and any empty entries removed. Used by
 // the templates to build "remove this card" URLs that strip one entry from the
 // chart roster while keeping the rest in order.
+// firstCSV joins the first n elements of keys into a comma-separated string,
+// capping n at len(keys). Used to build the "chart the top results" link from
+// the ordered result keys (AllKeys).
+func firstCSV(keys []string, n int) string {
+	if n > len(keys) {
+		n = len(keys)
+	}
+	if n <= 0 {
+		return ""
+	}
+	return strings.Join(keys[:n], ",")
+}
+
 func csvWithout(csv, drop string) string {
 	parts := strings.Split(csv, ",")
 	out := parts[:0]
@@ -31,6 +44,7 @@ var funcMap = template.FuncMap{
 		return i + j
 	},
 	"csv_without": csvWithout,
+	"first_csv":   firstCSV,
 	"dec": func(i, j int) int {
 		return i - j
 	},
