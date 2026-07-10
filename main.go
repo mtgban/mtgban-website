@@ -545,6 +545,9 @@ type ConfigType struct {
 	ObservabilityConfig *timeseries.SqlConfig `json:"observability_config"`
 	InstanceName        string                `json:"instance_name"`
 	TCGCSVConfig        *tcgcsv.Config        `json:"tcgcsv_config"`
+
+	// Structured form of new_newspaper_config_line; wins when both are set
+	NewNewspaperSqlConfig *timeseries.SqlConfig `json:"new_newspaper_sql_config"`
 }
 
 var DevMode bool
@@ -894,7 +897,12 @@ func openDBs() (err error) {
 		log.Println("observability telemetry enabled")
 	}
 
-	if Config.NewNewspaperConfigLine == "" {
+	if Config.NewNewspaperSqlConfig != nil {
+		NewNewspaperDB, err = Config.NewNewspaperSqlConfig.OpenDB()
+		if err != nil {
+			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
+		}
+	} else if Config.NewNewspaperConfigLine == "" {
 		log.Println("no DB address set, Newspaper won't be loaded")
 	} else {
 		NewNewspaperDB, err = sql.Open("postgres", Config.NewNewspaperConfigLine)

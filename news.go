@@ -1045,7 +1045,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	pageVars.PickerID = "news-editions-picker"
 
 	// Check if any DB connection was made
-	if Config.NewNewspaperConfigLine == "" {
+	if NewNewspaperDB == nil {
 		pageVars.Title = "This feature is not enabled"
 		pageVars.ErrorMessage = ErrMsgDenied
 

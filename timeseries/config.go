@@ -39,33 +39,45 @@ type Client struct {
 	readOnly bool
 }
 
-// NewClient opens a connection pool to the Postgres database described by cfg.
-func NewClient(cfg SqlConfig) (*Client, error) {
-	db, err := sql.Open("postgres", cfg.DSN())
+// OpenDB opens a raw Postgres pool for the database described by the config,
+// with its pool settings applied.
+//
+// The pool is capped so concurrent traffic can't exhaust Postgres's
+// max_connections. Idle matches open so bursts don't churn through fresh TCP
+// handshakes, and connections recycle periodically so stale ones behind load
+// balancers / failovers get dropped. Defaults apply when the corresponding
+// config field is zero.
+func (c SqlConfig) OpenDB() (*sql.DB, error) {
+	db, err := sql.Open("postgres", c.DSN())
 	if err != nil {
-		return nil, fmt.Errorf("timeseries: open: %w", err)
+		return nil, err
 	}
 
-	// Cap the pool so concurrent chart traffic can't exhaust Postgres's
-	// max_connections. Match idle to open so bursts don't churn through
-	// fresh TCP handshakes, and recycle periodically so stale conns
-	// behind load balancers / failovers get dropped. Defaults apply when
-	// the corresponding config field is zero.
-	maxOpen := cfg.MaxOpenConns
+	maxOpen := c.MaxOpenConns
 	if maxOpen <= 0 {
 		maxOpen = 25
 	}
-	maxIdle := cfg.MaxIdleConns
+	maxIdle := c.MaxIdleConns
 	if maxIdle <= 0 {
 		maxIdle = maxOpen
 	}
-	lifetime := time.Duration(cfg.ConnMaxLifetimeSeconds) * time.Second
+	lifetime := time.Duration(c.ConnMaxLifetimeSeconds) * time.Second
 	if lifetime <= 0 {
 		lifetime = 30 * time.Minute
 	}
 	db.SetMaxOpenConns(maxOpen)
 	db.SetMaxIdleConns(maxIdle)
 	db.SetConnMaxLifetime(lifetime)
+
+	return db, nil
+}
+
+// NewClient opens a connection pool to the Postgres database described by cfg.
+func NewClient(cfg SqlConfig) (*Client, error) {
+	db, err := cfg.OpenDB()
+	if err != nil {
+		return nil, fmt.Errorf("timeseries: open: %w", err)
+	}
 
 	if err := db.Ping(); err != nil {
 		dbCloseErr := db.Close()
