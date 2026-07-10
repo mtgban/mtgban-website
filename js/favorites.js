@@ -337,6 +337,11 @@
             html += '<button class="landing-pane-btn landing-pane-btn-icon landing-pane-btn-buylist" onclick="window.sendFavoritesToUploader(\'buylist\')" title="Send to uploader (buylist)" aria-label="Send to uploader (buylist)"><i data-lucide="upload"></i></button>';
             html += '</span>';
             html += '</span>';
+            // Charts are login-gated server-side, so only offer the button
+            // when the pane was rendered for a logged-in user.
+            if (favs.length > 1 && container.dataset.loggedIn === 'true') {
+                html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.chartFavorites()" title="Chart favorites" aria-label="Chart favorites"><i data-lucide="chart-line"></i></button>';
+            }
             html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.manualRefreshFavorites()" title="Update prices" aria-label="Update prices"><i data-lucide="refresh-cw"></i></button>';
             html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.clearFavorites(this)" title="Clear favorites" aria-label="Clear favorites"><i data-lucide="trash-2"></i></button>';
             html += '</span>';
@@ -621,6 +626,15 @@
         a.click();
         document.body.removeChild(a);
         setTimeout(function() { URL.revokeObjectURL(url); }, 0);
+    };
+    // Open the multi-card chart seeded with the favorites, in the order
+    // shown (pinned first). The server caps the roster at the palette
+    // size, so send at most that many rather than truncating silently.
+    window.chartFavorites = function() {
+        var favs = pinnedFirst(sortFavs(getLiveFavorites()));
+        var ids = favs.slice(0, 10).map(function(f) { return f.id; });
+        if (ids.length < 2) return;
+        window.location = '/search?chart=' + ids.join(',');
     };
     // Hand the favorites off to the uploader exactly like the search
     // sidebar does: POST one "hashes" input per card plus the mode.
