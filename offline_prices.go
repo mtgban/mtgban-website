@@ -117,10 +117,22 @@ func serveOfflinePrices(w http.ResponseWriter, r *http.Request, email, rest stri
 	retail := getSellerPrices("", stores, set.Code, nil, "", true, true, false, "")
 	buylist := getVendorPrices("", stores, set.Code, nil, "", true, true, false, "")
 	for id, m := range getSellerPrices("", stores, set.Code, nil, "", true, true, true, "") {
-		retail[id] = m
+		if retail[id] == nil {
+			retail[id] = m
+			continue
+		}
+		for store, entry := range m {
+			retail[id][store] = entry
+		}
 	}
 	for id, m := range getVendorPrices("", stores, set.Code, nil, "", true, true, true, "") {
-		buylist[id] = m
+		if buylist[id] == nil {
+			buylist[id] = m
+			continue
+		}
+		for store, entry := range m {
+			buylist[id][store] = entry
+		}
 	}
 
 	snapshot := time.Now().UTC()
