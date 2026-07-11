@@ -1,6 +1,7 @@
-package main
+package offlineapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,31 +13,30 @@ import (
 	"github.com/mtgban/simplecloud"
 )
 
-func setupOfflineImagesDir(t *testing.T) string {
+func newTestService(t *testing.T) (*Service, string) {
 	t.Helper()
 	dir := filepath.ToSlash(t.TempDir())
-	old := Config.Datastore.OfflineImagesPath
-	Config.Datastore.OfflineImagesPath = dir
-	// Pre-seed the bucket cache so offlineImagesBucket returns a FileBucket
-	// without going through path parsing (which rejects Windows drive letters).
-	offlineImagesBucketMu.Lock()
-	oldBucket, oldBase := offlineImagesBucketCur, offlineImagesBucketBase
-	offlineImagesBucketCur, offlineImagesBucketBase = &simplecloud.FileBucket{}, dir
-	offlineImagesBucketMu.Unlock()
-	t.Cleanup(func() {
-		Config.Datastore.OfflineImagesPath = old
-		offlineImagesBucketMu.Lock()
-		offlineImagesBucketCur, offlineImagesBucketBase = oldBucket, oldBase
-		offlineImagesBucketMu.Unlock()
+	s := NewService(Deps{
+		ImagesBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
+			return &simplecloud.FileBucket{}, dir, nil
+		},
+		ImagesManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
+			return &simplecloud.FileBucket{}, joinBucketPath(dir, "images-manifest.json"), nil
+		},
+		ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
+			return &simplecloud.FileBucket{}, joinBucketPath(dir, "offline-manifest.json"), nil
+		},
+		ManifestPathConfigured: func() bool { return false },
+		ImagesPathConfigured:   func() bool { return true },
 	})
-	return dir
+	return s, dir
 }
 
 func TestServeOfflineImage(t *testing.T) {
-	dir := setupOfflineImagesDir(t)
-	os.MkdirAll(filepath.Join(dir, "images"), 0755)
-	os.WriteFile(filepath.Join(dir, "images", "uuid-aaa.webp"), []byte("webpdata"), 0644)
-	os.WriteFile(filepath.Join(dir, "images", "uuid-jpg.jpg"), []byte("jpegdata"), 0644)
+	s, dir := newTestService(t)
+	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "images"), 0755)
+	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "images", "uuid-aaa.webp"), []byte("webpdata"), 0644)
+	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "images", "uuid-jpg.jpg"), []byte("jpegdata"), 0644)
 
 	tests := []struct {
 		rest string
@@ -54,7 +54,7 @@ func TestServeOfflineImage(t *testing.T) {
 	for _, tt := range tests {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest("GET", "/api/offline/images/"+tt.rest, nil)
-		serveOfflineImage(w, r, tt.rest)
+		s.serveImage(w, r, tt.rest)
 		if w.Code != tt.code {
 			t.Errorf("%s: code = %d, want %d", tt.rest, w.Code, tt.code)
 			continue
@@ -75,14 +75,14 @@ func TestServeOfflineImage(t *testing.T) {
 }
 
 func TestServeOfflineImageBundle(t *testing.T) {
-	dir := setupOfflineImagesDir(t)
-	os.MkdirAll(filepath.Join(dir, "bundles"), 0755)
-	os.WriteFile(filepath.Join(dir, "bundles", "NEO-abc123.zip"), []byte("zipdata"), 0644)
-	offlineImagesManifestStore.Set(ImagesManifest{"NEO": {Hash: "abc123", Count: 1, Bytes: 7}})
-	t.Cleanup(func() { offlineImagesManifestStore.Set(nil) })
+	s, dir := newTestService(t)
+	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "bundles"), 0755)
+	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "bundles", "NEO-abc123.zip"), []byte("zipdata"), 0644)
+	s.imagesStore.Set(ImagesManifest{"NEO": {Hash: "abc123", Count: 1, Bytes: 7}})
+	t.Cleanup(func() { s.imagesStore.Set(nil) })
 
 	w := httptest.NewRecorder()
-	serveOfflineImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil), "NEO.zip")
+	s.serveImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil), "NEO.zip")
 	if w.Code != 200 || w.Body.String() != "zipdata" {
 		t.Fatalf("bundle fetch: code %d body %q", w.Code, w.Body.String())
 	}
@@ -96,7 +96,7 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	r := httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
 	r.Header.Set("If-None-Match", `"abc123"`)
 	w = httptest.NewRecorder()
-	serveOfflineImageBundle(w, r, "NEO.zip")
+	s.serveImageBundle(w, r, "NEO.zip")
 	if w.Code != http.StatusNotModified {
 		t.Fatalf("conditional get: code = %d, want 304", w.Code)
 	}
@@ -104,7 +104,7 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
 	r.Header.Set("If-None-Match", "*")
 	w = httptest.NewRecorder()
-	serveOfflineImageBundle(w, r, "NEO.zip")
+	s.serveImageBundle(w, r, "NEO.zip")
 	if w.Code != http.StatusNotModified {
 		t.Fatalf("conditional get with *: code = %d, want 304", w.Code)
 	}
@@ -113,26 +113,27 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
 	r.Header.Set("If-None-Match", `W/"abc123"`)
 	w = httptest.NewRecorder()
-	serveOfflineImageBundle(w, r, "NEO.zip")
+	s.serveImageBundle(w, r, "NEO.zip")
 	if w.Code != http.StatusNotModified {
 		t.Fatalf("weak etag: code = %d, want 304", w.Code)
 	}
 
 	w = httptest.NewRecorder()
-	serveOfflineImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/XXX.zip", nil), "XXX.zip")
+	s.serveImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/XXX.zip", nil), "XXX.zip")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("unknown set: code = %d, want 404", w.Code)
 	}
 }
 
 func TestOfflineManifestIncludesImages(t *testing.T) {
-	offlineImagesManifestStore.Set(ImagesManifest{
+	s, _ := newTestService(t)
+	s.imagesStore.Set(ImagesManifest{
 		"NEO": {Hash: "abc123", Count: 302, Bytes: 24800000},
 	})
-	t.Cleanup(func() { offlineImagesManifestStore.Set(nil) })
+	t.Cleanup(func() { s.imagesStore.Set(nil) })
 
 	w := httptest.NewRecorder()
-	serveOfflineManifest(w, httptest.NewRequest("GET", "/api/offline/manifest.json", nil))
+	s.serveManifest(w, httptest.NewRequest("GET", "/api/offline/manifest.json", nil))
 
 	var doc struct {
 		Images map[string]struct {
@@ -151,10 +152,11 @@ func TestOfflineManifestIncludesImages(t *testing.T) {
 }
 
 func TestOfflineManifestOmitsEmptyImages(t *testing.T) {
-	offlineImagesManifestStore.Set(nil)
+	s, _ := newTestService(t)
+	s.imagesStore.Set(nil)
 
 	w := httptest.NewRecorder()
-	serveOfflineManifest(w, httptest.NewRequest("GET", "/api/offline/manifest.json", nil))
+	s.serveManifest(w, httptest.NewRequest("GET", "/api/offline/manifest.json", nil))
 	if strings.Contains(w.Body.String(), `"images"`) {
 		t.Errorf("empty images map should be omitted: %s", w.Body.String())
 	}

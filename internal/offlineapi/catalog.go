@@ -1,4 +1,4 @@
-package main
+package offlineapi
 
 import (
 	"bytes"
@@ -10,12 +10,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"sync/atomic"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-type offlineCatalogCard struct {
+type catalogCard struct {
 	Name     string   `json:"n"`
 	Number   string   `json:"num,omitempty"`
 	Rarity   string   `json:"r,omitempty"`
@@ -26,13 +25,13 @@ type offlineCatalogCard struct {
 	Products []string `json:"p,omitempty"`
 }
 
-type offlineCatalogSet struct {
+type catalogSet struct {
 	Name    string `json:"n"`
 	Keyrune string `json:"k,omitempty"`
 	Date    string `json:"d,omitempty"`
 }
 
-type offlineCatalogStore struct {
+type catalogStore struct {
 	Name    string `json:"n"`
 	Country string `json:"c,omitempty"`
 	Sealed  bool   `json:"s,omitempty"`
@@ -40,23 +39,21 @@ type offlineCatalogStore struct {
 	Buylist bool   `json:"b,omitempty"`
 }
 
-type offlineCatalogCache struct {
+type catalogCache struct {
 	version string
 	gz      []byte
 }
 
-var offlineCatalog atomic.Pointer[offlineCatalogCache]
-
-// refreshOfflineCatalog rebuilds the gzipped catalog document from the
-// current mtgmatcher datastore and scraper list.
-func refreshOfflineCatalog() {
-	cards := map[string]offlineCatalogCard{}
+// refreshCatalog rebuilds the gzipped catalog document from the current
+// mtgmatcher datastore and scraper list.
+func (s *Service) refreshCatalog() {
+	cards := map[string]catalogCard{}
 	for _, uuid := range mtgmatcher.GetUUIDs() {
 		co, err := mtgmatcher.GetUUID(uuid)
 		if err != nil {
 			continue
 		}
-		cards[uuid] = offlineCatalogCard{
+		cards[uuid] = catalogCard{
 			Name:     co.Name,
 			Number:   co.Number,
 			Rarity:   co.Rarity,
@@ -64,45 +61,48 @@ func refreshOfflineCatalog() {
 			Foil:     co.Foil,
 			Etched:   co.Etched,
 			Sealed:   co.Sealed,
-			Products: cardobject2sources(co),
+			Products: s.deps.CardObjectSources(co),
 		}
 	}
 
-	sets := map[string]offlineCatalogSet{}
+	sets := map[string]catalogSet{}
 	for _, code := range mtgmatcher.GetAllSets() {
 		set, err := mtgmatcher.GetSet(code)
 		if err != nil {
 			continue
 		}
-		sets[code] = offlineCatalogSet{
+		sets[code] = catalogSet{
 			Name:    set.Name,
 			Keyrune: strings.ToLower(set.KeyruneCode),
 			Date:    set.ReleaseDate,
 		}
 	}
 
-	stores := map[string]offlineCatalogStore{}
-	for _, seller := range GetSellers() {
+	retailBlock := s.deps.RetailBlockList()
+	buylistBlock := s.deps.BuylistBlockList()
+
+	stores := map[string]catalogStore{}
+	for _, seller := range s.deps.Sellers() {
 		info := seller.Info()
-		if slices.Contains(Config.SearchRetailBlockList, info.Shorthand) {
+		if slices.Contains(retailBlock, info.Shorthand) {
 			continue
 		}
-		stores[info.Shorthand] = offlineCatalogStore{
-			Name:    scraperName(info.Shorthand),
+		stores[info.Shorthand] = catalogStore{
+			Name:    s.deps.ScraperName(info.Shorthand),
 			Country: info.CountryFlag,
 			Sealed:  info.SealedMode,
 			Index:   info.MetadataOnly,
 		}
 	}
-	for _, vendor := range GetVendors() {
+	for _, vendor := range s.deps.Vendors() {
 		info := vendor.Info()
-		if slices.Contains(Config.SearchBuylistBlockList, info.Shorthand) {
+		if slices.Contains(buylistBlock, info.Shorthand) {
 			continue
 		}
 		entry, found := stores[info.Shorthand]
 		if !found {
-			entry = offlineCatalogStore{
-				Name:    scraperName(info.Shorthand),
+			entry = catalogStore{
+				Name:    s.deps.ScraperName(info.Shorthand),
 				Country: info.CountryFlag,
 				Sealed:  info.SealedMode,
 				Index:   info.MetadataOnly,
@@ -132,21 +132,21 @@ func refreshOfflineCatalog() {
 		return
 	}
 
-	offlineCatalog.Store(&offlineCatalogCache{version: version, gz: buf.Bytes()})
+	s.catalog.Store(&catalogCache{version: version, gz: buf.Bytes()})
 	log.Printf("offline: catalog rebuilt, %d cards, %d sets, %d stores, %d KiB gz", len(cards), len(sets), len(stores), buf.Len()/1024)
 }
 
-func offlineCatalogVersion() string {
-	c := offlineCatalog.Load()
+func (s *Service) catalogVersion() string {
+	c := s.catalog.Load()
 	if c == nil {
 		return ""
 	}
 	return c.version
 }
 
-// serveOfflineCatalog serves the cached gzipped catalog with ETag support.
-func serveOfflineCatalog(w http.ResponseWriter, r *http.Request) {
-	c := offlineCatalog.Load()
+// serveCatalog serves the cached gzipped catalog with ETag support.
+func (s *Service) serveCatalog(w http.ResponseWriter, r *http.Request) {
+	c := s.catalog.Load()
 	if c == nil {
 		http.Error(w, "catalog not ready", http.StatusServiceUnavailable)
 		return
