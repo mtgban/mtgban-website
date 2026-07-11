@@ -178,6 +178,72 @@ test('html is escaped', () => {
     expect(html).toContain('&lt;img');
 });
 
+test('products link appears in result-set-title when card.p is set', () => {
+    const r = result();
+    r.card = Object.assign({}, r.card, {p: ['sealed-uuid-1', 'sealed-uuid-2', 'sealed-uuid-3']});
+    const html = R.buildHTML([r], CTX);
+    expect(html).toContain('Found in 3 products');
+    expect(html).toContain('/sealed?q=container:uuid-1');
+    expect(html).toContain('class="result-set-title"');
+});
+
+test('products link singular when card.p has one entry', () => {
+    const r = result();
+    r.card = Object.assign({}, r.card, {p: ['sealed-uuid-1']});
+    const html = R.buildHTML([r], CTX);
+    expect(html).toContain('Found in 1 product</a>');
+    expect(html).not.toContain('Found in 1 products');
+});
+
+test('no products link when card.p is absent', () => {
+    const html = R.buildHTML([result()], CTX);
+    expect(html).not.toContain('Found in');
+    expect(html).not.toContain('/sealed?q=container:');
+});
+
+test('SYP buyer row appears before condition headers showing hash-qty', () => {
+    const ctx = Object.assign({}, CTX, {
+        stores: Object.assign({}, CTX.stores, {
+            SYP: {n: 'TCGplayer SYP', i: true, b: true},
+        }),
+    });
+    const r = result();
+    r.buylist = {
+        SYP: {regular: 1.79, qty: 48, conditions: {NM: 1.79}, quantities: {NM: 48}},
+        CK: {regular: 20, conditions: {NM: 20}, quantities: {NM: 8}},
+    };
+    const html = R.buildHTML([r], ctx);
+    // SYP renders # qty not $ price.
+    expect(html).toContain('<span class="cur">#</span><span class="amt">48</span>');
+    expect(html).not.toContain('1.79');
+    // SYP appears before the NM condition header in the buyers column.
+    const buyers = html.slice(html.indexOf('class="result-col-header">Buyers'));
+    const sypPos = buyers.indexOf('TCGplayer SYP');
+    const nmPos = buyers.indexOf('Condition: NM');
+    expect(sypPos).toBeGreaterThan(-1);
+    expect(nmPos).toBeGreaterThan(-1);
+    expect(sypPos).toBeLessThan(nmPos);
+});
+
+test('MetadataOnly buyer without SYP shorthand renders price before condition headers', () => {
+    const ctx = Object.assign({}, CTX, {
+        stores: Object.assign({}, CTX.stores, {
+            MINDEX: {n: 'Meta Index', i: true, b: true},
+        }),
+    });
+    const r = result();
+    r.buylist = {
+        MINDEX: {regular: 5.00},
+        CK: {regular: 20, conditions: {NM: 20}},
+    };
+    const html = R.buildHTML([r], ctx);
+    const buyers = html.slice(html.indexOf('class="result-col-header">Buyers'));
+    const idxPos = buyers.indexOf('Meta Index');
+    const nmPos = buyers.indexOf('Condition: NM');
+    expect(idxPos).toBeGreaterThan(-1);
+    expect(idxPos).toBeLessThan(nmPos);
+});
+
 test('notices: unsupported, missing set, empty', () => {
     const ctx = CTX;
     let html = R.noticesHTML({results: [], unsupported: ['date>2020'], missingSets: [], truncated: false}, ctx);

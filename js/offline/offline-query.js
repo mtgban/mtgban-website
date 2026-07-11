@@ -138,10 +138,13 @@
             uuids.push(id);
         }
         (await env.lookupName(needle)).forEach(push);
-        var list = await nameList(env);
-        for (var i = 0; i < list.length && uuids.length < MAX_TOTAL; i++) {
-            if (list[i].key !== needle && list[i].key.indexOf(needle) !== -1) {
-                list[i].uuids.forEach(push);
+        // Skip substring scan for short needles to avoid a full-index walk.
+        if (needle.length >= 3) {
+            var list = await nameList(env);
+            for (var i = 0; i < list.length && uuids.length < MAX_TOTAL; i++) {
+                if (list[i].key !== needle && list[i].key.indexOf(needle) !== -1) {
+                    list[i].uuids.forEach(push);
+                }
             }
         }
         return uuids;
