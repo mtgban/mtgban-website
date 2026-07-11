@@ -2,6 +2,19 @@ import { test, expect } from 'bun:test';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+// fflate.min.js needs self in scope before import
+globalThis.self = globalThis.self || globalThis;
+const fflate = await import('../../js/vendor/fflate.min.js');
+
+// Bun rejects relative URL strings in Request; remap /path -> http://localhost/path.
+const _NativeRequest = globalThis.Request;
+globalThis.Request = class Request extends _NativeRequest {
+    constructor(input, init) {
+        if (typeof input === 'string' && input.startsWith('/')) input = 'http://localhost' + input;
+        super(input, init);
+    }
+};
+
 // The shipped file is a plain script attaching to self; load it into a sandbox.
 function loadOfflineImages() {
     const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-images.js'), 'utf8');
@@ -70,4 +83,176 @@ test('estimateSelection sums manifest counts and bytes', () => {
     expect(est.count).toBe(702);
     expect(est.missing).toEqual(['NOPE']);
     expect(OfflineImages.estimateSelection(images, []).bytes).toBe(0);
+});
+
+// --- syncImages tests (DI fakes) ---
+
+// Load a fresh module instance with extra sandbox properties injected as globals.
+function loadWithExtras(extras) {
+    const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-images.js'), 'utf8');
+    const sandbox = Object.assign({}, extras);
+    new Function('self', src)(sandbox);
+    return sandbox.OfflineImages;
+}
+
+// Build a zip from a name -> bytes map using the vendored fflate.
+function makeZip(files) {
+    const entries = {};
+    for (const [name, data] of Object.entries(files)) {
+        entries[name] = data instanceof Uint8Array ? data : new Uint8Array(data);
+    }
+    return fflate.zipSync(entries);
+}
+
+// Minimal fake cache that records put calls; returns caches wrapper.
+function makeFakeCache() {
+    const store = [];
+    const cache = { store, put: async (req, resp) => store.push({ req, resp }) };
+    const caches = { open: async () => cache };
+    return { cache, caches };
+}
+
+test('syncImages returns immediately when no work is needed', async () => {
+    const mod = loadWithExtras({ fflate });
+    const result = await mod.syncImages({
+        images: { TST: { h: 'h1', n: 1, b: 100 } },
+        sel: ['TST'],
+        states: { TST: { code: 'TST', hash: 'h1', done: true } },
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async () => {},
+    });
+    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false });
+});
+
+test('syncImages downloads, unpacks, and marks done', async () => {
+    const zip = makeZip({ 'uuid-aaa.webp': [82, 73, 70, 70], 'uuid-bbb.jpg': [255, 216], 'notes.txt': [104, 105] });
+    const { cache, caches } = makeFakeCache();
+    const posts = [];
+    const states = [];
+    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
+    const result = await mod.syncImages({
+        images: { TST: { h: 'h1', n: 2, b: zip.byteLength } },
+        sel: ['TST'],
+        states: {},
+        post: m => posts.push(m),
+        cancelled: () => false,
+        putImgState: async r => states.push({ ...r }),
+    });
+    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false });
+    expect(posts).toHaveLength(2);
+    expect(posts[0]).toMatchObject({ type: 'progress', stage: 'images', done: 0, total: 1, code: 'TST', bytes: 0 });
+    expect(posts[1]).toMatchObject({ type: 'progress', stage: 'images', done: 1, total: 1, bytes: zip.byteLength });
+    // webp and jpg entries stored (.txt skipped); jpg keyed as .webp URL
+    expect(cache.store).toHaveLength(2);
+    expect(states).toEqual([
+        { code: 'TST', hash: 'h1', done: false },
+        { code: 'TST', hash: 'h1', done: true },
+    ]);
+});
+
+test('syncImages resumes a bundle left done:false by a previous interrupted run', async () => {
+    const zip = makeZip({ 'uuid-aaa.webp': [1, 2, 3] });
+    const { cache, caches } = makeFakeCache();
+    const states = [];
+    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
+    const result = await mod.syncImages({
+        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
+        sel: ['TST'],
+        states: { TST: { code: 'TST', hash: 'h1', done: false } },
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async r => states.push({ ...r }),
+    });
+    expect(result.done).toBe(1);
+    expect(result.paused).toBe(false);
+    expect(cache.store).toHaveLength(1);
+    expect(states).toEqual([
+        { code: 'TST', hash: 'h1', done: false },
+        { code: 'TST', hash: 'h1', done: true },
+    ]);
+});
+
+test('syncImages refuses when projected bytes exceed 90pct of free storage', async () => {
+    const fakeNavigator = { storage: { estimate: async () => ({ quota: 1000, usage: 500 }) } };
+    // totalBytes = 600 > (1000 - 500) * 0.9 = 450 -> should throw
+    const { caches } = makeFakeCache();
+    const mod = loadWithExtras({ fflate, navigator: fakeNavigator, caches, fetch: async () => new Response(new Uint8Array(0)) });
+    await expect(mod.syncImages({
+        images: { TST: { h: 'h1', n: 1, b: 600 } },
+        sel: ['TST'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async () => {},
+    })).rejects.toThrow('not enough storage');
+});
+
+test('syncImages stops cleanly on QuotaExceededError; imgstate stays done:false', async () => {
+    const zip = makeZip({ 'uuid-aaa.webp': [1, 2, 3] });
+    const quotaErr = Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
+    const fakeCache = { put: async () => { throw quotaErr; } };
+    const fakeCaches = { open: async () => fakeCache };
+    const states = [];
+    const posts = [];
+    const mod = loadWithExtras({ fflate, caches: fakeCaches, fetch: async () => new Response(zip) });
+    await expect(mod.syncImages({
+        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
+        sel: ['TST'],
+        states: {},
+        post: m => posts.push(m),
+        cancelled: () => false,
+        putImgState: async r => states.push({ ...r }),
+    })).rejects.toThrow('storage quota exceeded');
+    // imgstate written done:false before unpack; never updated to done:true (errored-lane guard)
+    expect(states).toEqual([{ code: 'TST', hash: 'h1', done: false }]);
+    // only one progress post (pre-bundle); nothing posted after error (errored-lane guard)
+    expect(posts).toHaveLength(1);
+});
+
+test('syncImages throws forbidden on 403 and writes no imgstate', async () => {
+    const { caches } = makeFakeCache();
+    const states = [];
+    const posts = [];
+    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(null, { status: 403 }) });
+    await expect(mod.syncImages({
+        images: { TST: { h: 'h1', n: 1, b: 100 } },
+        sel: ['TST'],
+        states: {},
+        post: m => posts.push(m),
+        cancelled: () => false,
+        putImgState: async r => states.push(r),
+    })).rejects.toThrow('forbidden');
+    // fetch failed before putImgState; no imgstate written (errored-lane guard)
+    expect(states).toHaveLength(0);
+    // only pre-bundle progress post; nothing after 403 (errored-lane guard)
+    expect(posts).toHaveLength(1);
+});
+
+test('syncImages pauses between bundles when cancelled', async () => {
+    const zip = makeZip({ 'uuid-aaa.webp': [1, 2, 3] });
+    const { cache, caches } = makeFakeCache();
+    const posts = [];
+    let callCount = 0;
+    // false on first cancelled() check (processes AAA), true on second (skips BBB)
+    const cancelled = () => callCount++ > 0;
+    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
+    const result = await mod.syncImages({
+        images: {
+            AAA: { h: 'h1', n: 1, b: zip.byteLength },
+            BBB: { h: 'h2', n: 1, b: zip.byteLength },
+        },
+        sel: ['AAA', 'BBB'],
+        states: {},
+        post: m => posts.push(m),
+        cancelled,
+        putImgState: async () => {},
+    });
+    expect(result).toEqual({ done: 1, total: 2, bytes: zip.byteLength, paused: true });
+    // AAA processed (1 cache entry); BBB skipped
+    expect(cache.store).toHaveLength(1);
+    // AAA's two posts; BBB cancel before any post for BBB
+    expect(posts).toHaveLength(2);
+    expect(posts[0]).toMatchObject({ code: 'AAA', done: 0 });
+    expect(posts[1]).toMatchObject({ code: 'AAA', done: 1 });
 });

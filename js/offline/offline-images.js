@@ -56,11 +56,67 @@
         return { bytes: bytes, count: count, missing: missing };
     }
 
+    // Downloads and unpacks each stale bundle; imgstate rows are the resume point.
+    async function syncImages(deps) {
+        var plan = computeWorkList(deps.images, deps.sel, deps.states);
+        var total = plan.work.length;
+        var done = 0;
+        var bytes = 0;
+        if (total === 0) return { done: 0, total: 0, bytes: 0, paused: false };
+
+        if (self.navigator && self.navigator.storage && self.navigator.storage.estimate) {
+            var est = await self.navigator.storage.estimate();
+            var free = ((est.quota || 0) - (est.usage || 0)) * 0.9;
+            if (plan.totalBytes > free) {
+                throw new Error('not enough storage: need ' + formatBytes(plan.totalBytes) +
+                    ', safe free space ' + formatBytes(free));
+            }
+        }
+
+        var cache = await self.caches.open(IMAGE_CACHE);
+        for (var i = 0; i < plan.work.length; i++) {
+            if (deps.cancelled()) return { done: done, total: total, bytes: bytes, paused: true };
+            var item = plan.work[i];
+            deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
+
+            var resp = await self.fetch('/api/offline/imagebundles/' + item.code + '.zip',
+                { credentials: 'same-origin' });
+            if (resp.status === 403) throw new Error('forbidden');
+            if (!resp.ok) throw new Error('bundle ' + item.code + ': HTTP ' + resp.status);
+            var buf = new Uint8Array(await resp.arrayBuffer());
+            bytes += buf.byteLength;
+
+            // Mark in progress first so an interrupted unpack retries next sync.
+            await deps.putImgState({ code: item.code, hash: item.hash, done: false });
+            var entries = self.fflate.unzipSync(buf);
+            var names = Object.keys(entries);
+            for (var j = 0; j < names.length; j++) {
+                var meta = entryMeta(names[j]);
+                if (!meta) continue;
+                try {
+                    await cache.put(new Request(meta.url), new Response(entries[names[j]], {
+                        headers: { 'Content-Type': meta.contentType },
+                    }));
+                } catch (err) {
+                    if (err && err.name === 'QuotaExceededError') {
+                        throw new Error('storage quota exceeded while unpacking ' + item.code);
+                    }
+                    throw err;
+                }
+            }
+            await deps.putImgState({ code: item.code, hash: item.hash, done: true });
+            done++;
+            deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
+        }
+        return { done: done, total: total, bytes: bytes, paused: false };
+    }
+
     self.OfflineImages = {
         IMAGE_CACHE: IMAGE_CACHE,
         formatBytes: formatBytes,
         entryMeta: entryMeta,
         computeWorkList: computeWorkList,
         estimateSelection: estimateSelection,
+        syncImages: syncImages,
     };
 })();
