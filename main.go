@@ -504,6 +504,7 @@ type ConfigType struct {
 		BucketSecretKey     string `json:"bucket_access_secret"`
 		CheckpointsPath     string `json:"checkpoints_path"`
 		OfflineManifestPath string `json:"offline_manifest_path"`
+		OfflineImagesPath   string `json:"offline_images_path"`
 	} `json:"datastore"`
 	Game                   string             `json:"game"`
 	CardBackImage          string             `json:"card_back_image"`
