@@ -1,4 +1,4 @@
-package main
+package offlineapi
 
 import (
 	"net/url"
@@ -15,8 +15,12 @@ type ImageInfo struct {
 // ImagesManifest is the images-manifest.json document, keyed by set code.
 type ImagesManifest map[string]ImageInfo
 
-// joinBucketPath appends elements to a bucket base path, preserving the
+// JoinBucketPath appends elements to a bucket base path, preserving the
 // scheme and host of remote bases. One letter schemes are Windows drive paths.
+func JoinBucketPath(base string, elems ...string) string {
+	return joinBucketPath(base, elems...)
+}
+
 func joinBucketPath(base string, elems ...string) string {
 	u, err := url.Parse(base)
 	if err != nil || u.Scheme == "" || len(u.Scheme) == 1 {
