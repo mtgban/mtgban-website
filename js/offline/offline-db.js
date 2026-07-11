@@ -89,6 +89,14 @@
         });
     }
 
+    // Cheap count without fetching blobs.
+    function countSets() {
+        return withTx(['sets'], 'readonly', function(tx, out) {
+            var req = tx.objectStore('sets').count();
+            req.onsuccess = function() { out.result = req.result; };
+        });
+    }
+
     // Cursor walk keeps only one blob resident at a time.
     function listSetVersions() {
         return withTx(['sets'], 'readonly', function(tx, out) {
@@ -185,6 +193,7 @@
         putSet: putSet,
         getSet: getSet,
         hasSet: hasSet,
+        countSets: countSets,
         listSetVersions: listSetVersions,
         putCards: putCards,
         getCard: getCard,

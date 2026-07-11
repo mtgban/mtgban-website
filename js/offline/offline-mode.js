@@ -10,7 +10,7 @@
         offline_img_editions: 'imgEditionsSel'
     };
 
-    var state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false };
+    var state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false, authLapsed: false };
 
     function readPref(k) {
         try { return localStorage.getItem(k); } catch (e) { return null; }
@@ -64,7 +64,8 @@
     function refreshStatus() {
         var ops = [
             OfflineDB.getMeta('lastSync').then(function(v) { state.lastSync = v || null; }),
-            OfflineDB.listSetVersions().then(function(rows) { state.setCount = rows.length; })
+            OfflineDB.countSets().then(function(n) { state.setCount = n; }),
+            OfflineDB.getMeta('authLapsed').then(function(v) { state.authLapsed = !!v; })
         ];
         if (navigator.storage && navigator.storage.estimate) {
             ops.push(navigator.storage.estimate().then(function(est) { state.bytes = est.usage || 0; }));
