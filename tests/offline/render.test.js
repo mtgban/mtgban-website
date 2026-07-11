@@ -1,5 +1,8 @@
 import { test, expect } from 'bun:test';
-import './offline-render.js';
+
+// Shared modules attach to self; give bun one.
+globalThis.self = globalThis.self || globalThis;
+await import('../../js/offline/offline-render.js');
 
 const R = globalThis.OfflineRender;
 
