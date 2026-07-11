@@ -1,5 +1,6 @@
-// Offline price sync worker: manifest diff, catalog rebuild, encrypted set blobs.
+// Offline price sync worker: manifest diff, catalog rebuild, encrypted set blobs, image bundles.
 importScripts('/js/offline/offline-util.js', '/js/offline/offline-db.js', '/js/offline/offline-format.js');
+importScripts('/js/vendor/fflate.min.js', '/js/offline/offline-images.js');
 
 var cancelled = false;
 
@@ -32,6 +33,27 @@ function fetchChecked(url, stage) {
         }
         return resp;
     });
+}
+
+// Images stage: runs after prices within the same sync message.
+async function runImagesStage(manifest, imgEditions, isCancelled) {
+    if (!Array.isArray(imgEditions) || imgEditions.length === 0) return 0;
+    var rows = await OfflineDB.getAllRows('imgstate');
+    var states = {};
+    rows.forEach(function (r) { states[r.code] = r; });
+    var res = await OfflineImages.syncImages({
+        images: (manifest && manifest.images) || {},
+        sel: imgEditions,
+        states: states,
+        cancelled: isCancelled,
+        putImgState: function (row) { return OfflineDB.putRow('imgstate', row); },
+        post: function (msg) { self.postMessage(msg); },
+    });
+    // Refresh the status snapshot: imgCount is the finished-bundle count.
+    var after = await OfflineDB.getAllRows('imgstate');
+    var imgCount = after.filter(function (r) { return r.done; }).length;
+    await OfflineDB.setMeta('imgCount', imgCount);
+    return res.bytes;
 }
 
 async function runSync(msg) {
@@ -104,6 +126,12 @@ async function runSync(msg) {
             if (editions.length === 0) await self.OfflineDB.setMeta('storesKey', storesKey);
             await self.OfflineDB.setMeta('manifest', manifest);
             await self.OfflineDB.setMeta('authLapsed', false);
+        }
+        try {
+            state.bytes += await runImagesStage(manifest, msg.imgEditions, function() { return cancelled; });
+        } catch (err) {
+            self.postMessage({ type: 'error', stage: 'images', message: err.message });
+            return;
         }
         post({ type: 'done', changedSets: state.done, bytes: state.bytes });
     } catch (err) {
