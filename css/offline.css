@@ -1,0 +1,56 @@
+/* Offline search shell chrome. Result markup is styled by search.css. */
+
+.offline-searchbar {
+    padding: 0.5em 0 0.75em;
+}
+.offline-searchbar input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6em 0.9em;
+    font-size: var(--text-md);
+    color: var(--normal);
+    background: var(--surface-2, rgba(0, 0, 0, 0.05));
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 0.5em;
+}
+.offline-searchbar input:focus {
+    outline: none;
+    border-color: var(--search-link, #3b6fd4);
+}
+
+/* phase 7 replaces this block; keep the class name */
+.offline-banner {
+    margin: 0.75em auto 0;
+    max-width: 60em;
+    padding: 0.5em 1em;
+    font-size: var(--text-sm);
+    text-align: center;
+    color: var(--normal);
+    background: var(--surface-2, rgba(0, 0, 0, 0.05));
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-radius: 0.5em;
+}
+
+.offline-notice {
+    margin: 1em 0;
+    padding: 0.6em 1em;
+    font-size: var(--text-sm);
+    color: var(--normal);
+    background: var(--surface-2, rgba(0, 0, 0, 0.05));
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-left: 0.25em solid var(--search-link, #3b6fd4);
+    border-radius: 0.4em;
+}
+.offline-notice-warn {
+    border-left-color: var(--warning, #d4a03b);
+}
+.offline-notice-missing {
+    border-left-color: var(--error, #d43b3b);
+}
+
+.offline-empty {
+    padding-top: 2em;
+    color: var(--activetext);
+    font-size: var(--text-3xl);
+    text-align: center;
+}
