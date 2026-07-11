@@ -76,13 +76,19 @@ async function runSync(msg) {
         }).sort();
 
         var state = { done: 0, bytes: 0, idx: 0 };
+        var errored = false;
         var pump = async function() {
             for (;;) {
-                if (cancelled) return;
+                if (cancelled || errored) return;
                 var i = state.idx++;
                 if (i >= changed.length) return;
                 var code = changed[i];
-                state.bytes += await syncSet(code, manifest.sets[code], stores, key);
+                try {
+                    state.bytes += await syncSet(code, manifest.sets[code], stores, key);
+                } catch (e) {
+                    errored = true;
+                    throw e;
+                }
                 state.done++;
                 post({ type: 'progress', stage: 'prices', done: state.done, total: changed.length, code: code });
             }
