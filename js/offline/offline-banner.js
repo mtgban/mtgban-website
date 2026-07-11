@@ -15,7 +15,7 @@
     var authEl = document.getElementById('offline-banner-auth');
     var backEl = document.getElementById('offline-banner-back');
 
-    // Raw read against the pinned IDB schema (contract section 4).
+    // Raw read of the offline-db meta row shape {k, v}; safe before offline-db.js loads.
     // Versionless open may create an empty DB; offline-db.js ghost recovery handles it.
     function metaGet(key) {
         return new Promise(function (resolve) {

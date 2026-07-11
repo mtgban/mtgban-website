@@ -66,7 +66,7 @@ self.addEventListener('fetch', function (e) {
     // Health probes must always hit the network.
     if (url.pathname === '/healthz') return;
 
-    // Card images: cache-first with network fallback (phase 6 fills the cache).
+    // Card images: cache-first with network fallback (the image sync fills the cache).
     if (url.pathname.indexOf('/api/offline/images/') === 0) {
         e.respondWith(caches.open(IMAGE_CACHE).then(function (c) {
             return c.match(req).then(function (hit) { return hit || fetch(req); });

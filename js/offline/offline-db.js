@@ -1,4 +1,4 @@
-// IndexedDB wrapper for offline mode (contract sec 4 schema).
+// IndexedDB wrapper for offline mode.
 // Plain script: attaches to self so pages and workers can both load it.
 (function() {
     'use strict';
@@ -47,7 +47,7 @@
         return dbPromise;
     }
 
-    // Phase 7's opt-out closes the handle before indexedDB.deleteDatabase.
+    // disable() closes the handle before indexedDB.deleteDatabase.
     function close() {
         if (!dbPromise) return Promise.resolve();
         var p = dbPromise;
@@ -147,7 +147,7 @@
         });
     }
 
-    // Full name-index scan for the phase 4 fuzzy matcher.
+    // Full name-index scan backing the offline search substring matcher.
     function allNames() {
         return withTx(['names'], 'readonly', function(tx, out) {
             out.result = [];
@@ -167,7 +167,7 @@
         }
     }
 
-    // Generic row access for stores without dedicated helpers (phase 6: imgstate).
+    // Generic row access for stores without dedicated helpers (imgstate).
     function getAllRows(store) {
         checkStore(store);
         return withTx([store], 'readonly', function(tx, out) {

@@ -183,7 +183,7 @@ async function rebuildCatalog(catalog) {
         await self.OfflineDB.putCards({ cards: [], names: nameRows.slice(j, j + CHUNK) });
     }
 
-    // Display dictionaries for phase 4 (OfflineUtil.loadCatalogDicts reads these).
+    // Display dictionaries for the offline shell (OfflineUtil.loadCatalogDicts reads these).
     await self.OfflineDB.setMeta('catalogSets', catalog.sets || {});
     await self.OfflineDB.setMeta('catalogStores', catalog.stores || {});
 }

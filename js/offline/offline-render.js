@@ -1,16 +1,16 @@
-// Offline result renderer mirroring templates/search.html markup (contract sec 12).
+// Offline result renderer mirroring templates/search.html markup.
 (function (root) {
     'use strict';
 
     var CONDITIONS = ['NM', 'SP', 'MP', 'HP', 'PO'];
     // Mirror of Country2flag (utils.go:23).
     var FLAGS = {EU: '\u{1F1EA}\u{1F1FA}', JP: '\u{1F1EF}\u{1F1F5}'};
-    // Static index pairing rules (contract sec 12, search.go:605-606).
+    // Static index pairing rules, mirroring search.go defaultSellerPriorityOpt.
     var INDEX_PAIRS = [
         {low: 'TCGLow', high: 'TCGMarket', label: 'TCG (Low / Market)'},
         {low: 'MKMLow', high: 'MKMTrend', label: 'CM (Low / Trend)'}
     ];
-    // Reference stores for the buylist ratio (contract sec 12).
+    // Reference stores for the buylist ratio, matching the online page.
     var REF_STORES = ['CK', 'TCGPlayer', 'TCGLow', 'TCGMarket'];
 
     function esc(s) {
@@ -151,7 +151,7 @@
             '</div>';
     }
 
-    // refRetail finds the best CK-or-TCG retail for the ratio (contract sec 12).
+    // refRetail finds the best CK-or-TCG retail for the ratio.
     function refRetail(res, cond) {
         var best = 0;
         for (var i = 0; i < REF_STORES.length; i++) {
