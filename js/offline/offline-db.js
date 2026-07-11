@@ -1,66 +1,198 @@
-// Minimal IndexedDB wrapper for offline mode. The full v1 schema is created
-// here; phase 3 adds sets/cards/names helpers without a version bump.
-(function (root) {
+// IndexedDB wrapper for offline mode (contract sec 4 schema).
+// Plain script: attaches to self so pages and workers can both load it.
+(function() {
     'use strict';
 
     var DB_NAME = 'mtgban-offline';
     var DB_VERSION = 1;
 
-    // Memoized shared connection; only close() may tear it down.
+    // keyPath per object store, fixed by the interface contract.
+    var STORES = { meta: 'k', sets: 'code', cards: 'uuid', names: 'key', imgstate: 'code' };
+
     var dbPromise = null;
 
     function open() {
-        if (dbPromise) return dbPromise;
-        dbPromise = new Promise(function (resolve, reject) {
-            var req = indexedDB.open(DB_NAME, DB_VERSION);
-            req.onupgradeneeded = function () {
-                var db = req.result;
-                if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'k' });
-                if (!db.objectStoreNames.contains('sets')) db.createObjectStore('sets', { keyPath: 'code' });
-                if (!db.objectStoreNames.contains('cards')) db.createObjectStore('cards', { keyPath: 'uuid' });
-                if (!db.objectStoreNames.contains('names')) db.createObjectStore('names', { keyPath: 'key' });
-                if (!db.objectStoreNames.contains('imgstate')) db.createObjectStore('imgstate', { keyPath: 'code' });
-            };
-            req.onsuccess = function () {
-                var db = req.result;
-                db.onversionchange = function () { db.close(); dbPromise = null; };
-                resolve(db);
-            };
-            req.onerror = function () { dbPromise = null; reject(req.error); };
-        });
+        if (!dbPromise) {
+            dbPromise = new Promise(function(resolve, reject) {
+                var req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = function() {
+                    var db = req.result;
+                    Object.keys(STORES).forEach(function(name) {
+                        if (!db.objectStoreNames.contains(name)) {
+                            db.createObjectStore(name, { keyPath: STORES[name] });
+                        }
+                    });
+                };
+                req.onsuccess = function() {
+                    var db = req.result;
+                    db.onversionchange = function() { db.close(); dbPromise = null; };
+                    resolve(db);
+                };
+                req.onerror = function() { dbPromise = null; reject(req.error); };
+            });
+        }
         return dbPromise;
     }
 
+    // Phase 7's opt-out closes the handle before indexedDB.deleteDatabase.
     function close() {
         if (!dbPromise) return Promise.resolve();
         var p = dbPromise;
         dbPromise = null;
-        return p.then(function (db) { db.close(); }, function () {});
+        return p.then(function(db) { db.close(); }, function() {});
+    }
+
+    // One transaction; resolves with out.result once the whole tx commits.
+    function withTx(storeNames, mode, fn) {
+        return open().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                var tx = db.transaction(storeNames, mode);
+                var out = { result: undefined };
+                tx.oncomplete = function() { resolve(out.result); };
+                tx.onerror = function() { reject(tx.error); };
+                tx.onabort = function() { reject(tx.error || new Error('transaction aborted')); };
+                fn(tx, out);
+            });
+        });
     }
 
     function getMeta(k) {
-        return open().then(function (db) {
-            return new Promise(function (resolve, reject) {
-                var tx = db.transaction('meta');
-                tx.onabort = function () { reject(tx.error || new Error('transaction aborted')); };
-                var req = tx.objectStore('meta').get(k);
-                req.onsuccess = function () { resolve(req.result ? req.result.v : undefined); };
-                req.onerror = function () { reject(req.error); };
-            });
+        return withTx(['meta'], 'readonly', function(tx, out) {
+            var req = tx.objectStore('meta').get(k);
+            req.onsuccess = function() { out.result = req.result ? req.result.v : undefined; };
         });
     }
 
     function setMeta(k, v) {
-        return open().then(function (db) {
-            return new Promise(function (resolve, reject) {
-                var tx = db.transaction('meta', 'readwrite');
-                tx.objectStore('meta').put({ k: k, v: v });
-                tx.oncomplete = function () { resolve(); };
-                tx.onerror = function () { reject(tx.error); };
-                tx.onabort = function () { reject(tx.error || new Error('transaction aborted')); };
-            });
+        return withTx(['meta'], 'readwrite', function(tx) {
+            tx.objectStore('meta').put({ k: k, v: v });
         });
     }
 
-    root.OfflineDB = { open: open, getMeta: getMeta, setMeta: setMeta, close: close, DB_NAME: DB_NAME };
-})(self);
+    function putSet(row) {
+        return withTx(['sets'], 'readwrite', function(tx) {
+            tx.objectStore('sets').put(row);
+        });
+    }
+
+    function getSet(code) {
+        return withTx(['sets'], 'readonly', function(tx, out) {
+            var req = tx.objectStore('sets').get(code);
+            req.onsuccess = function() { out.result = req.result; };
+        });
+    }
+
+    function hasSet(code) {
+        return withTx(['sets'], 'readonly', function(tx, out) {
+            var req = tx.objectStore('sets').count(code);
+            req.onsuccess = function() { out.result = req.result > 0; };
+        });
+    }
+
+    // Cursor walk keeps only one blob resident at a time.
+    function listSetVersions() {
+        return withTx(['sets'], 'readonly', function(tx, out) {
+            out.result = [];
+            var req = tx.objectStore('sets').openCursor();
+            req.onsuccess = function() {
+                var cur = req.result;
+                if (!cur) return;
+                out.result.push({ code: cur.value.code, version: cur.value.version });
+                cur.continue();
+            };
+        });
+    }
+
+    function putCards(batch) {
+        return withTx(['cards', 'names'], 'readwrite', function(tx) {
+            var cards = tx.objectStore('cards');
+            (batch.cards || []).forEach(function(row) { cards.put(row); });
+            var names = tx.objectStore('names');
+            (batch.names || []).forEach(function(row) { names.put(row); });
+        });
+    }
+
+    function getCard(uuid) {
+        return withTx(['cards'], 'readonly', function(tx, out) {
+            var req = tx.objectStore('cards').get(uuid);
+            req.onsuccess = function() { out.result = req.result; };
+        });
+    }
+
+    function lookupName(normKey) {
+        return withTx(['names'], 'readonly', function(tx, out) {
+            var req = tx.objectStore('names').get(normKey);
+            req.onsuccess = function() { out.result = req.result ? req.result.uuids : []; };
+        });
+    }
+
+    // Full name-index scan for the phase 4 fuzzy matcher.
+    function allNames() {
+        return withTx(['names'], 'readonly', function(tx, out) {
+            out.result = [];
+            var req = tx.objectStore('names').openCursor();
+            req.onsuccess = function() {
+                var cur = req.result;
+                if (!cur) return;
+                out.result.push({ key: cur.value.key, uuids: cur.value.uuids });
+                cur.continue();
+            };
+        });
+    }
+
+    function checkStore(store) {
+        if (!Object.prototype.hasOwnProperty.call(STORES, store)) {
+            throw new Error('unknown store ' + store);
+        }
+    }
+
+    // Generic row access for stores without dedicated helpers (phase 6: imgstate).
+    function getAllRows(store) {
+        checkStore(store);
+        return withTx([store], 'readonly', function(tx, out) {
+            var req = tx.objectStore(store).getAll();
+            req.onsuccess = function() { out.result = req.result; };
+        });
+    }
+
+    function putRow(store, row) {
+        checkStore(store);
+        return withTx([store], 'readwrite', function(tx) {
+            tx.objectStore(store).put(row);
+        });
+    }
+
+    // Drops card metadata ahead of a catalog version swap; sets stay intact.
+    function clearCatalog() {
+        return withTx(['cards', 'names'], 'readwrite', function(tx) {
+            tx.objectStore('cards').clear();
+            tx.objectStore('names').clear();
+        });
+    }
+
+    function clearAll() {
+        return withTx(Object.keys(STORES), 'readwrite', function(tx) {
+            Object.keys(STORES).forEach(function(name) { tx.objectStore(name).clear(); });
+        });
+    }
+
+    self.OfflineDB = {
+        DB_NAME: DB_NAME,
+        open: open,
+        close: close,
+        getMeta: getMeta,
+        setMeta: setMeta,
+        putSet: putSet,
+        getSet: getSet,
+        hasSet: hasSet,
+        listSetVersions: listSetVersions,
+        putCards: putCards,
+        getCard: getCard,
+        lookupName: lookupName,
+        allNames: allNames,
+        getAllRows: getAllRows,
+        putRow: putRow,
+        clearCatalog: clearCatalog,
+        clearAll: clearAll,
+    };
+})();
