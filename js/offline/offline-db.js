@@ -21,7 +21,11 @@
                 if (!db.objectStoreNames.contains('names')) db.createObjectStore('names', { keyPath: 'key' });
                 if (!db.objectStoreNames.contains('imgstate')) db.createObjectStore('imgstate', { keyPath: 'code' });
             };
-            req.onsuccess = function () { resolve(req.result); };
+            req.onsuccess = function () {
+                var db = req.result;
+                db.onversionchange = function () { db.close(); dbPromise = null; };
+                resolve(db);
+            };
             req.onerror = function () { dbPromise = null; reject(req.error); };
         });
         return dbPromise;
@@ -37,7 +41,9 @@
     function getMeta(k) {
         return open().then(function (db) {
             return new Promise(function (resolve, reject) {
-                var req = db.transaction('meta').objectStore('meta').get(k);
+                var tx = db.transaction('meta');
+                tx.onabort = function () { reject(tx.error || new Error('transaction aborted')); };
+                var req = tx.objectStore('meta').get(k);
                 req.onsuccess = function () { resolve(req.result ? req.result.v : undefined); };
                 req.onerror = function () { reject(req.error); };
             });
@@ -51,6 +57,7 @@
                 tx.objectStore('meta').put({ k: k, v: v });
                 tx.oncomplete = function () { resolve(); };
                 tx.onerror = function () { reject(tx.error); };
+                tx.onabort = function () { reject(tx.error || new Error('transaction aborted')); };
             });
         });
     }
