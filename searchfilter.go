@@ -447,6 +447,10 @@ func price4vendor(cardId, shorthand string) float64 {
 
 var re *regexp.Regexp
 
+// Collector-number shapes accepted by the bare "<set> <number>" shorthand:
+// plain numbers ("148", "32★") or prefixed numbers ("c16-177", "2002-1")
+var reBareNumber = regexp.MustCompile(`^(?:[0-9]+[a-z★†]*|[a-z0-9]{2,5}-[0-9]+[a-z]*|[0-9]+-[0-9]+)$`)
+
 var FilterOperations = map[string][]string{
 	"format":    []string{":"},
 	"legal":     []string{":"},
@@ -1095,6 +1099,20 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		}
 		extraConfig := parseSearchOptionsNG(extraQuery, nil, nil, miscSearchOpts)
 		filters = append(filters, extraConfig.CardFilters...)
+	}
+
+	// Rewrite bare "<set code> <number>" queries, eg "neo 234" or "plst c16-177"
+	if config.SearchMode == "" {
+		tokens := strings.Fields(query)
+		if len(tokens) == 2 && reBareNumber.MatchString(strings.ToLower(tokens[1])) {
+			set, err := mtgmatcher.GetSet(tokens[0])
+			if err == nil {
+				extraConfig := parseSearchOptionsNG("s:"+set.Code+" cn:"+tokens[1], nil, nil, nil)
+				filters = append(filters, extraConfig.CardFilters...)
+				config.AppliedFilters = append(config.AppliedFilters, extraConfig.AppliedFilters...)
+				query = ""
+			}
+		}
 	}
 
 	// Apply any search not coming from the query itself
