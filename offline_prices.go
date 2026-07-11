@@ -2,6 +2,7 @@ package main
 
 import (
 	"compress/gzip"
+	"log"
 	"net/http"
 	"os"
 	"slices"
@@ -143,7 +144,11 @@ func serveOfflinePrices(w http.ResponseWriter, r *http.Request, email, rest stri
 	}
 
 	payload := banprice2offline(set.Code, snapshot, retail, buylist)
-	offline.Watermark([]byte(os.Getenv("BAN_SECRET")), email, payload)
+	secret := os.Getenv("BAN_SECRET")
+	if secret == "" {
+		log.Println("offline: BAN_SECRET empty, watermark not attributable")
+	}
+	offline.Watermark([]byte(secret), email, payload)
 
 	data, err := offline.Encode(payload)
 	if err != nil {
