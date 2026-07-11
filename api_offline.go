@@ -18,10 +18,11 @@ func OfflineAPI(w http.ResponseWriter, r *http.Request) {
 
 	endpoint := strings.TrimPrefix(r.URL.Path, "/api/offline/")
 	switch {
+	case endpoint == "manifest.json":
+		serveOfflineManifest(w, r)
 	default:
 		http.NotFound(w, r)
 	}
-	_ = endpoint
 }
 
 // offlineModeAllowed authenticates the caller and checks the SearchOfflineMode
