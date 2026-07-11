@@ -11,11 +11,21 @@
     <script type="text/javascript" src="/js/offline/offline-util.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/offline/offline-query.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/offline/offline-render.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-age.js?hash={{.Hash}}"></script>
 {{end}}
 
 {{define "content"}}
 <div class="offline-shell">
-    <div id="offline-banner" class="offline-banner" hidden></div>
+    <div id="offline-banner" class="offline-banner" role="status">
+        <span class="offline-banner-dot" aria-hidden="true"></span>
+        <span id="offline-banner-age">Offline data: checking</span>
+        <span id="offline-banner-auth" class="offline-banner-auth" hidden>
+            Subscription lapsed: saved prices stay browsable, syncing is paused.
+        </span>
+        <a id="offline-banner-back" class="offline-banner-back" href="/search" hidden>
+            Back online. Return to live search
+        </a>
+    </div>
     <div class="search-layout">
         <div class="search-sidebar">
             <div class="sidebar-search">
@@ -52,6 +62,7 @@
 {{end}}
 
 {{define "extra-scripts"}}
+<script type="text/javascript" src="/js/offline/offline-banner.js?hash={{.Hash}}"></script>
 <script type="text/javascript">
 (function () {
     'use strict';
