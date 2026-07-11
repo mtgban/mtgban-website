@@ -34,6 +34,9 @@ var SHELL_URLS = [
     '/js/offline/offline-util.js?hash=' + BUILD,
     '/js/offline/offline-query.js?hash=' + BUILD,
     '/js/offline/offline-render.js?hash=' + BUILD,
+    '/js/offline/offline-age.js?hash=' + BUILD,
+    '/js/offline/offline-banner.js?hash=' + BUILD,
+    '/js/offline/offline-watch.js?hash=' + BUILD,
     '/img/logo/ban-stroop.png',
     '/img/favicon/favicon-32x32.png',
     '/img/favicon/site.webmanifest'
@@ -59,6 +62,9 @@ self.addEventListener('fetch', function (e) {
     if (req.method !== 'GET') return;
     var url = new URL(req.url);
     if (url.origin !== self.location.origin) return;
+
+    // Health probes must always hit the network.
+    if (url.pathname === '/healthz') return;
 
     // Card images: cache-first with network fallback (phase 6 fills the cache).
     if (url.pathname.indexOf('/api/offline/images/') === 0) {
