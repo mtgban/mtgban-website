@@ -1,0 +1,96 @@
+{
+  "buylist": {
+    "uuid-0001": {
+      "ABU": {
+        "cond": "NM",
+        "conditions": {
+          "NM": 0.27
+        },
+        "qty": 4,
+        "qtyEtched": 0,
+        "qtyFoil": 0,
+        "qtySealed": 0,
+        "regular": 0.27
+      }
+    },
+    "uuid-0004": {
+      "CK": {
+        "regular": 0.55
+      }
+    }
+  },
+  "retail": {
+    "uuid-0001": {
+      "CK": {
+        "cond": "NM",
+        "conditions": {
+          "NM": 0.99,
+          "SP": 0.79
+        },
+        "qty": 5,
+        "qtyEtched": 0,
+        "qtyFoil": 0,
+        "qtySealed": 0,
+        "quantities": {
+          "NM": 5,
+          "SP": 2
+        },
+        "regular": 0.99
+      },
+      "TCGLow": {
+        "regular": 0.41
+      }
+    },
+    "uuid-0002_f": {
+      "CK": {
+        "cond": "NM",
+        "conditions": {
+          "NM_foil": 1.23
+        },
+        "foil": 1.23,
+        "qty": 0,
+        "qtyEtched": 0,
+        "qtyFoil": 2,
+        "qtySealed": 0
+      }
+    },
+    "uuid-0003_e": {
+      "SCG": {
+        "etched": 20,
+        "qty": 0,
+        "qtyEtched": 1,
+        "qtyFoil": 0,
+        "qtySealed": 0
+      }
+    },
+    "uuid-0004": {
+      "CK": {
+        "foil": 2.5,
+        "regular": 1
+      }
+    },
+    "uuid-0005": {
+      "CK": {
+        "regular": 12345.67
+      }
+    },
+    "uuid-0006": {
+      "TCGLow": {
+        "quantities": {
+          "NM": 7
+        }
+      }
+    },
+    "uuid-sealed-box": {
+      "CK": {
+        "qty": 0,
+        "qtyEtched": 0,
+        "qtyFoil": 0,
+        "qtySealed": 3,
+        "sealed": 129.99
+      }
+    }
+  },
+  "setCode": "NEO",
+  "snapshotUnix": 1770000000
+}
