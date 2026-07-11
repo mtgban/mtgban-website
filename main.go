@@ -1603,7 +1603,13 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	// Include settings-modal partial only for desktop pages that define a "settings-content" block.
 	if !isMobile {
 		switch name {
-		case "search.html", "arbit.html":
+		case "search.html":
+			files = append(files,
+				"templates/partials/settings-modal.html",
+				"templates/partials/settings-stores-grouped.html",
+				"templates/partials/editions-picker.html",
+			)
+		case "arbit.html":
 			files = append(files,
 				"templates/partials/settings-modal.html",
 				"templates/partials/settings-stores-grouped.html",

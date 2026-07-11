@@ -63,6 +63,7 @@
         var done = 0;
         var bytes = 0;
         if (total === 0) return { done: 0, total: 0, bytes: 0, paused: false };
+        if (deps.cancelled()) return { done: 0, total: total, bytes: 0, paused: true };
 
         if (self.navigator && self.navigator.storage && self.navigator.storage.estimate) {
             var est = await self.navigator.storage.estimate();
@@ -105,6 +106,9 @@
                 }
             }
             await deps.putImgState({ code: item.code, hash: item.hash, done: true });
+            // two bundles must not be co-resident across the next await
+            buf = null;
+            entries = null;
             done++;
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
         }

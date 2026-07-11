@@ -168,5 +168,6 @@
         load: loadFromCookie,
         save: saveToCookie,
         serialize: serialize,
+        refresh: refresh,
     };
 })();
