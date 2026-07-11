@@ -90,6 +90,7 @@
 
     function startSync() {
         if (syncing) return;
+        if (!window.OfflineMode.enabled()) { labelEl.textContent = 'Enable offline mode first.'; return; }
         var codes = selectedCodes();
         if (!codes.length) return;
         // Explicit save: pref roams via userstate, IDB mirror is what the worker reads.
@@ -121,6 +122,11 @@
                 ? 'Syncing ' + plan.work.length + ' bundles (' + fmt(plan.totalBytes) + ')...'
                 : 'Images already up to date.';
             window.OfflineMode.sync();
+        }).catch(function (err) {
+            syncing = false;
+            labelEl.textContent = 'Image sync failed: ' + (err && err.message || err);
+            /* reset pause button visibility */
+            pauseBtn.hidden = true;
         });
     }
 
