@@ -8,7 +8,7 @@ import (
 
 // OfflineAPI dispatches /api/offline/ endpoints for the offline PWA mode.
 func OfflineAPI(w http.ResponseWriter, r *http.Request) {
-	_, ok := offlineModeAllowed(r)
+	email, ok := offlineModeAllowed(r)
 	if !ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
@@ -22,6 +22,8 @@ func OfflineAPI(w http.ResponseWriter, r *http.Request) {
 		serveOfflineManifest(w, r)
 	case endpoint == "catalog.json":
 		serveOfflineCatalog(w, r)
+	case strings.HasPrefix(endpoint, "prices/"):
+		serveOfflinePrices(w, r, email, strings.TrimPrefix(endpoint, "prices/"))
 	default:
 		http.NotFound(w, r)
 	}
