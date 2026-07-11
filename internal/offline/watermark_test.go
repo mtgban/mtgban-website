@@ -89,7 +89,7 @@ func TestWatermarkRateAndDelta(t *testing.T) {
 
 func TestWatermarkSkipsCheapAndStaysConsistent(t *testing.T) {
 	p := &SetPayload{SetCode: "TST", Snapshot: time.Unix(0, 0),
-		Retail: map[string]map[string]*PriceEntry{},
+		Retail:  map[string]map[string]*PriceEntry{},
 		Buylist: map[string]map[string]*PriceEntry{}}
 	for i := 0; i < 2000; i++ {
 		id := fmt.Sprintf("uuid-%04d", i)

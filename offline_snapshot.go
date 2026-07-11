@@ -142,4 +142,3 @@ func serveOfflineManifest(w http.ResponseWriter, r *http.Request) {
 		"sets":      sets,
 	})
 }
-
