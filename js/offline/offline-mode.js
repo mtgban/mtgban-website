@@ -74,6 +74,17 @@
         return Promise.all(ops).catch(function() {});
     }
 
+    function updateAuthNotice() {
+        var el = document.getElementById('offline-auth-notice');
+        if (el) el.hidden = !state.authLapsed;
+    }
+
+    function setAuthLapsed(flag) {
+        state.authLapsed = flag;
+        updateAuthNotice();
+        return OfflineDB.setMeta('authLapsed', flag);
+    }
+
     // Filter helper: only our SW's registrations.
     function isOurSW(r) {
         var s = r.active || r.waiting || r.installing;
@@ -180,6 +191,7 @@
         var m = ev.data || {};
         document.dispatchEvent(new CustomEvent('offline:sync-message', { detail: m }));
         if (m.type === 'progress') {
+            if (m.stage !== 'manifest' && state.authLapsed) setAuthLapsed(false);
             var label = m.stage + ' ' + m.done + '/' + m.total;
             if (m.code) label += ' (' + m.code + ')';
             setSyncStatus('syncing: ' + label);
@@ -187,11 +199,13 @@
             syncing = false;
             state.bytes = m.bytes || 0;
             OfflineDB.setMeta('lastSync', new Date().toISOString()).then(refreshStatus).then(function() {
+                updateAuthNotice();
                 setSyncStatus('synced, ' + m.changedSets + ' sets updated');
             });
         } else if (m.type === 'error') {
             syncing = false;
             if (m.message === 'forbidden') {
+                setAuthLapsed(true);
                 setSyncStatus('sync stopped: offline access expired');
             } else {
                 setSyncStatus('sync error at ' + m.stage + ': ' + m.message);
@@ -280,6 +294,11 @@
             .then(function () { return ensureKey(); })
             .then(function () { return reconcileSelections(); })
             .then(refreshStatus)
+            .then(function () {
+                updateAuthNotice();
+                // Auth lapse pauses background refresh; manual sync() still retries.
+                if (!state.authLapsed) sync();
+            })
             .catch(function () {});
     }
 
