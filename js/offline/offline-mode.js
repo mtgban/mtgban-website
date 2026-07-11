@@ -65,7 +65,8 @@
         var ops = [
             OfflineDB.getMeta('lastSync').then(function(v) { state.lastSync = v || null; }),
             OfflineDB.countSets().then(function(n) { state.setCount = n; }),
-            OfflineDB.getMeta('authLapsed').then(function(v) { state.authLapsed = !!v; })
+            OfflineDB.getMeta('authLapsed').then(function(v) { state.authLapsed = !!v; }),
+            OfflineDB.getMeta('imgCount').then(function(n) { state.imgCount = n || 0; })
         ];
         if (navigator.storage && navigator.storage.estimate) {
             ops.push(navigator.storage.estimate().then(function(est) { state.bytes = est.usage || 0; }));
@@ -177,7 +178,7 @@
 
     function onSyncMessage(ev) {
         var m = ev.data || {};
-        document.dispatchEvent(new CustomEvent('offline:sync-message', { detail: m }));
+        window.dispatchEvent(new CustomEvent('offline:sync-message', { detail: m }));
         if (m.type === 'progress') {
             var label = m.stage + ' ' + m.done + '/' + m.total;
             if (m.code) label += ' (' + m.code + ')';
