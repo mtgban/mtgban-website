@@ -86,7 +86,7 @@
     }
 
     async function setup() {
-        // Warm the shared connection and fail fast if the DB is absent.
+        // Warm the shared connection; rejects when IndexedDB is unavailable.
         await OfflineDB.open();
         dicts = await OfflineUtil.loadCatalogDicts();
         env = {

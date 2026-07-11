@@ -7,8 +7,7 @@ import { resolve } from 'path';
  *
  * The production IIFE (js/offline/offline-watch.js) cannot be imported
  * directly because it self-executes in a browser environment. These tests
- * mirror the state machine transitions described in the task brief using an
- * equivalent in-process model.
+ * mirror offline-watch.js's state machine transitions using an equivalent in-process model.
  */
 
 // ---------------------------------------------------------------------------

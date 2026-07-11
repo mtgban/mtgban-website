@@ -6,7 +6,7 @@
     var DB_NAME = 'mtgban-offline';
     var DB_VERSION = 1;
 
-    // keyPath per object store, fixed by the interface contract.
+    // keyPath per object store; the sync worker and page code rely on these key names.
     var STORES = { meta: 'k', sets: 'code', cards: 'uuid', names: 'key', imgstate: 'code' };
 
     var dbPromise = null;
@@ -47,7 +47,7 @@
         return dbPromise;
     }
 
-    // disable() closes the handle before indexedDB.deleteDatabase.
+    // Callers close the handle before indexedDB.deleteDatabase.
     function close() {
         if (!dbPromise) return Promise.resolve();
         var p = dbPromise;

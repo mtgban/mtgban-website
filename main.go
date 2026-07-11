@@ -607,8 +607,7 @@ var GoogleDocsClient *http.Client
 
 var ConfigBucket simplecloud.ReadWriter
 
-// offlineImagesBucket returns the cached bucket and base path for the image tree.
-// The client is cached because image requests are hot.
+// Cache for offlineImagesFactory: the bucket client is reused because image requests are hot.
 var (
 	offlineImagesBucketMu   sync.Mutex
 	offlineImagesBucketCur  simplecloud.ReadWriter
