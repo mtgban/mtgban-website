@@ -79,6 +79,34 @@
         return Promise.all(ops).catch(function () {});
     }
 
+    // Filter helper: only our SW's registrations.
+    function isOurSW(r) {
+        var s = r.active || r.waiting || r.installing;
+        return s && s.scriptURL.endsWith('/sw.js');
+    }
+
+    // Device-local teardown; does not touch prefs.
+    function cleanupLocal() {
+        var unreg = navigator.serviceWorker
+            ? navigator.serviceWorker.getRegistrations().then(function (regs) {
+                return Promise.all(regs.filter(isOurSW).map(function (r) { return r.unregister(); }));
+              }) : Promise.resolve();
+        return unreg.then(function () {
+            return caches.keys();
+        }).then(function (names) {
+            return Promise.all(names.filter(function (n) {
+                return n.indexOf('mtgban-shell-') === 0 || n === 'mtgban-images-v1';
+            }).map(function (n) { return caches.delete(n); }));
+        }).then(function () {
+            return OfflineDB.close();
+        }).then(function () {
+            return new Promise(function (resolve) {
+                var req = indexedDB.deleteDatabase(OfflineDB.DB_NAME);
+                req.onsuccess = req.onerror = req.onblocked = function () { resolve(); };
+            });
+        });
+    }
+
     function enable() {
         if (!available() || !supported()) {
             return Promise.reject(new Error('offline mode not available'));
@@ -100,37 +128,23 @@
         }).catch(function (err) {
             if (registered) {
                 navigator.serviceWorker.getRegistrations()
-                    .then(function (regs) { regs.forEach(function (r) { r.unregister(); }); })
+                    .then(function (regs) {
+                        return Promise.all(regs.filter(isOurSW).map(function (r) { return r.unregister(); }));
+                    })
                     .catch(function () {});
+                removePref(PREF);
             }
             throw err;
         });
     }
 
     function disable() {
-        // Remove selections first, offline_mode last: one userstate PATCH carries all.
-        removePref('offline_stores');
-        removePref('offline_editions');
-        removePref('offline_img_editions');
-        writePref(PREF, 'false');
-        var unreg = navigator.serviceWorker
-            ? navigator.serviceWorker.getRegistrations().then(function (regs) {
-                return Promise.all(regs.map(function (r) { return r.unregister(); }));
-            }) : Promise.resolve();
-        return unreg.then(function () {
-            return caches.keys();
-        }).then(function (names) {
-            return Promise.all(names.filter(function (n) {
-                return n.indexOf('mtgban-shell-') === 0 || n === 'mtgban-images-v1';
-            }).map(function (n) { return caches.delete(n); }));
-        }).then(function () {
-            return OfflineDB.close();
-        }).then(function () {
-            return new Promise(function (resolve) {
-                var req = indexedDB.deleteDatabase(OfflineDB.DB_NAME);
-                req.onsuccess = req.onerror = req.onblocked = function () { resolve(); };
-            });
-        }).then(function () {
+        return cleanupLocal().then(function () {
+            // Remove selections first, offline_mode last: one userstate PATCH carries all.
+            removePref('offline_stores');
+            removePref('offline_editions');
+            removePref('offline_img_editions');
+            writePref(PREF, 'false');
             state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false };
         });
     }
@@ -199,8 +213,18 @@
 
     if (available() && enabled() && supported()) {
         // Re-register heals a browser-evicted SW; no-op when installed.
-        navigator.serviceWorker.register('/sw.js').catch(function () {});
-        reconcileSelections().then(refreshStatus);
+        navigator.serviceWorker.register('/sw.js')
+            .then(function () { return ensureKey(); })
+            .then(function () { return reconcileSelections(); })
+            .then(refreshStatus)
+            .catch(function () {});
+    }
+
+    if (supported() && !enabled()) {
+        // Clean up this device when opt-out was roamed from another device.
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+            if (regs.some(isOurSW)) { cleanupLocal().catch(function () {}); }
+        }).catch(function () {});
     }
 
     if (document.readyState === 'loading') {
