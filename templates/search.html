@@ -1439,6 +1439,8 @@
 {{end}}
 
 {{define "extra-scripts"}}
+<script type="text/javascript" src="/js/offline/offline-images.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-images-ui.js?hash={{.Hash}}"></script>
 <script>lucide.createIcons();</script>
 <script>
 (function () {
