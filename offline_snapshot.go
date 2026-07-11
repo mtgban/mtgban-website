@@ -117,12 +117,13 @@ func refreshOfflineManifest() {
 		changed++
 	}
 
+	refreshOfflineCatalog()
+
 	err := offlineManifestStore.Save(context.Background(), next)
 	if err != nil {
 		log.Println("offline: manifest save failed:", err)
 		return
 	}
-	refreshOfflineCatalog()
 	log.Printf("offline: manifest refreshed in %v, %d/%d sets changed", time.Since(start), changed, len(next.Sets))
 }
 
