@@ -87,6 +87,19 @@ func openOfflineImageObject(ctx context.Context, dir, name string) (io.ReadClose
 	return simplecloud.InitReader(ctx, bucket, imgmirror.JoinPath(Config.Datastore.OfflineImagesPath, dir, name))
 }
 
+// etagMatches reports whether an If-None-Match header matches etag.
+func etagMatches(header, etag string) bool {
+	if strings.TrimSpace(header) == "*" {
+		return true
+	}
+	for _, part := range strings.Split(header, ",") {
+		if strings.TrimSpace(part) == etag {
+			return true
+		}
+	}
+	return false
+}
+
 // serveOfflineImage streams one mirrored image, webp first, jpg fallback.
 func serveOfflineImage(w http.ResponseWriter, r *http.Request, rest string) {
 	uuid := strings.TrimSuffix(rest, ".webp")
@@ -127,7 +140,9 @@ func serveOfflineImageBundle(w http.ResponseWriter, r *http.Request, rest string
 	}
 
 	etag := `"` + info.Hash + `"`
-	if r.Header.Get("If-None-Match") == etag {
+	inm := r.Header.Get("If-None-Match")
+	if inm != "" && etagMatches(inm, etag) {
+		w.Header().Set("ETag", etag)
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}

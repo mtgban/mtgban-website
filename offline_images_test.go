@@ -35,7 +35,8 @@ func TestServeOfflineImage(t *testing.T) {
 		{"uuid-jpg.webp", 200, "jpegdata", "image/jpeg"},
 		{"uuid-none.webp", 404, "", ""},
 		{"uuid-aaa", 404, "", ""},
-		{"..%2fimages%2fuuid-aaa.webp", 404, "", ""},
+		{"../images/uuid-aaa.webp", 404, "", ""},
+		{"..\\uuid-aaa.webp", 404, "", ""},
 	}
 	for _, tt := range tests {
 		w := httptest.NewRecorder()
@@ -85,6 +86,14 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	serveOfflineImageBundle(w, r, "NEO.zip")
 	if w.Code != http.StatusNotModified {
 		t.Fatalf("conditional get: code = %d, want 304", w.Code)
+	}
+
+	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
+	r.Header.Set("If-None-Match", "*")
+	w = httptest.NewRecorder()
+	serveOfflineImageBundle(w, r, "NEO.zip")
+	if w.Code != http.StatusNotModified {
+		t.Fatalf("conditional get with *: code = %d, want 304", w.Code)
 	}
 
 	w = httptest.NewRecorder()
