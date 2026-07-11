@@ -73,3 +73,22 @@ test('empty and whitespace input', () => {
 test('last occurrence wins', () => {
     expect(p('s:NEO s:MH2').set).toBe('MH2');
 });
+
+test('garbage inputs never throw', () => {
+    expect(p('').names).toEqual([]);
+    expect(p(null).names).toEqual([]);
+    expect(p(undefined).names).toEqual([]);
+    expect(p('\u{1F525}').names).toEqual(['\u{1F525}']);
+    expect(p('""').names).toEqual([]);
+});
+
+test('unterminated quote degrades to plain tokens', () => {
+    expect(p('"fury sliver').names).toEqual(['"fury', 'sliver']);
+});
+
+test('remaining rarity and finish aliases', () => {
+    expect(p('r:common').rarity).toBe('common');
+    expect(p('r:u').rarity).toBe('uncommon');
+    expect(p('r:rare').rarity).toBe('rare');
+    expect(p('f:premium').unsupported).toEqual(['f:premium']);
+});
