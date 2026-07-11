@@ -145,6 +145,10 @@ test('syncImages downloads, unpacks, and marks done', async () => {
     expect(posts[1]).toMatchObject({ type: 'progress', stage: 'images', done: 1, total: 1, bytes: zip.byteLength });
     // webp and jpg entries stored (.txt skipped); jpg keyed as .webp URL
     expect(cache.store).toHaveLength(2);
+    const webpEntry = cache.store.find(e => e.req.url.endsWith('uuid-aaa.webp'));
+    const jpgEntry = cache.store.find(e => e.req.url.endsWith('uuid-bbb.webp'));
+    expect(webpEntry.resp.headers.get('Content-Type')).toBe('image/webp');
+    expect(jpgEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
     expect(states).toEqual([
         { code: 'TST', hash: 'h1', done: false },
         { code: 'TST', hash: 'h1', done: true },
@@ -177,7 +181,8 @@ test('syncImages refuses when projected bytes exceed 90pct of free storage', asy
     const fakeNavigator = { storage: { estimate: async () => ({ quota: 1000, usage: 500 }) } };
     // totalBytes = 600 > (1000 - 500) * 0.9 = 450 -> should throw
     const { caches } = makeFakeCache();
-    const mod = loadWithExtras({ fflate, navigator: fakeNavigator, caches, fetch: async () => new Response(new Uint8Array(0)) });
+    let fetched = false;
+    const mod = loadWithExtras({ fflate, navigator: fakeNavigator, caches, fetch: async () => { fetched = true; return new Response(new Uint8Array(0)); } });
     await expect(mod.syncImages({
         images: { TST: { h: 'h1', n: 1, b: 600 } },
         sel: ['TST'],
@@ -186,6 +191,7 @@ test('syncImages refuses when projected bytes exceed 90pct of free storage', asy
         cancelled: () => false,
         putImgState: async () => {},
     })).rejects.toThrow('not enough storage');
+    expect(fetched).toBe(false);
 });
 
 test('syncImages stops cleanly on QuotaExceededError; imgstate stays done:false', async () => {
