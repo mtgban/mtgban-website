@@ -92,3 +92,120 @@ test('remaining rarity and finish aliases', () => {
     expect(p('r:rare').rarity).toBe('rare');
     expect(p('f:premium').unsupported).toEqual(['f:premium']);
 });
+
+// ---- execute ----
+
+function fakeEnv() {
+    var cards = {
+        'u-neo-1':  {uuid: 'u-neo-1',  n: 'Boseiju Reaches',  num: '177', r: 'rare',   set: 'NEO', f: false, e: false, s: false},
+        'u-neo-1f': {uuid: 'u-neo-1f', n: 'Boseiju Reaches',  num: '177', r: 'rare',   set: 'NEO', f: true,  e: false, s: false},
+        'u-mh2-1':  {uuid: 'u-mh2-1',  n: 'Boseiju Whisper',  num: '12',  r: 'mythic', set: 'MH2', f: false, e: false, s: false},
+        'u-old-1':  {uuid: 'u-old-1',  n: 'Boseiju Elder',    num: '9',   r: 'rare',   set: 'OLD', f: false, e: false, s: false},
+    };
+    var names = [
+        {key: 'boseiju reaches', uuids: ['u-neo-1', 'u-neo-1f']},
+        {key: 'boseiju whisper', uuids: ['u-mh2-1']},
+        {key: 'boseiju elder',   uuids: ['u-old-1']},
+    ];
+    var payloads = {
+        NEO: {setCode: 'NEO', retail: {'u-neo-1': {CK: {regular: 1.5}}, 'u-neo-1f': {CK: {foil: 3}}}, buylist: {'u-neo-1': {CK: {regular: 0.8}}}},
+        MH2: {setCode: 'MH2', retail: {'u-mh2-1': {CK: {regular: 20}}}, buylist: {}},
+    };
+    var env = {
+        loads: [],
+        normName: function (s) {
+            return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
+                .replace(/\s+/g, ' ').trim();
+        },
+        lookupName: async function (key) {
+            for (var i = 0; i < names.length; i++) {
+                if (names[i].key === key) return names[i].uuids.slice();
+            }
+            return [];
+        },
+        allNames: async function () { return names; },
+        getCard: async function (uuid) { return cards[uuid] || null; },
+        hasSet: async function (code) { return !!payloads[code]; },
+        loadSetPayload: async function (code) {
+            env.loads.push(code);
+            return payloads[code];
+        },
+    };
+    return env;
+}
+
+test('exact name lookup plus substring scan', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    const out = await Q.execute(Q.parse('boseiju'), env);
+    const uuids = out.results.map(r => r.uuid).sort();
+    expect(uuids).toEqual(['u-mh2-1', 'u-neo-1', 'u-neo-1f']);
+    expect(out.missingSets).toEqual(['OLD']);
+});
+
+test('results carry payload slices', async () => {
+    Q.resetCaches();
+    const out = await Q.execute(Q.parse('"boseiju reaches" f:nf'), fakeEnv());
+    expect(out.results.length).toBe(1);
+    expect(out.results[0].retail.CK.regular).toBe(1.5);
+    expect(out.results[0].buylist.CK.regular).toBe(0.8);
+});
+
+test('finish, rarity, set, and number filters', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    expect((await Q.execute(Q.parse('boseiju f:foil'), env)).results.map(r => r.uuid)).toEqual(['u-neo-1f']);
+    expect((await Q.execute(Q.parse('boseiju r:mythic'), env)).results.map(r => r.uuid)).toEqual(['u-mh2-1']);
+    expect((await Q.execute(Q.parse('boseiju s:MH2'), env)).results.map(r => r.uuid)).toEqual(['u-mh2-1']);
+    expect((await Q.execute(Q.parse('boseiju cn:12'), env)).results.map(r => r.uuid)).toEqual(['u-mh2-1']);
+});
+
+test('set-only query walks the payload uuids', async () => {
+    Q.resetCaches();
+    const out = await Q.execute(Q.parse('s:NEO'), fakeEnv());
+    expect(out.results.map(r => r.uuid).sort()).toEqual(['u-neo-1', 'u-neo-1f']);
+});
+
+test('set-only query on an unsynced set reports missing', async () => {
+    Q.resetCaches();
+    const out = await Q.execute(Q.parse('s:OLD'), fakeEnv());
+    expect(out.results).toEqual([]);
+    expect(out.missingSets).toEqual(['OLD']);
+});
+
+test('payload LRU avoids reloading within the cap', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    await Q.execute(Q.parse('boseiju s:NEO'), env);
+    await Q.execute(Q.parse('boseiju s:NEO'), env);
+    expect(env.loads).toEqual(['NEO']);
+});
+
+test('unsupported tokens pass through execute', async () => {
+    Q.resetCaches();
+    const out = await Q.execute(Q.parse('boseiju date>2020'), fakeEnv());
+    expect(out.unsupported).toEqual(['date>2020']);
+});
+
+// ---- sortResults ----
+
+test('sortResults modes', () => {
+    const sets = {NEO: {d: '2022-02-18'}, MH2: {d: '2021-06-18'}};
+    const rs = [
+        {uuid: 'a', card: {n: 'Zeta', num: '2', set: 'MH2'}, retail: {CK: {regular: 5}}, buylist: {}},
+        {uuid: 'b', card: {n: 'Alpha', num: '10', set: 'NEO'}, retail: {CK: {regular: 1}}, buylist: {CK: {regular: 9}}},
+    ];
+    Q.sortResults(rs, 'alpha', false, sets);
+    expect(rs[0].uuid).toBe('b');
+    Q.sortResults(rs, 'chrono', false, sets);
+    expect(rs[0].uuid).toBe('b'); // NEO is newer
+    Q.sortResults(rs, 'number', false, sets);
+    expect(rs[0].uuid).toBe('a'); // 2 before 10 numerically
+    Q.sortResults(rs, 'retail', false, sets);
+    expect(rs[0].uuid).toBe('a'); // highest retail first
+    Q.sortResults(rs, 'buylist', false, sets);
+    expect(rs[0].uuid).toBe('b'); // highest buylist first
+    Q.sortResults(rs, 'alpha', true, sets);
+    expect(rs[0].uuid).toBe('a'); // reverse flips
+});
