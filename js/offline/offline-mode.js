@@ -139,12 +139,13 @@
     }
 
     function disable() {
+        // Remove selections first, offline_mode last: one userstate PATCH carries all.
+        removePref('offline_stores');
+        removePref('offline_editions');
+        removePref('offline_img_editions');
+        writePref(PREF, 'false');
+        // Prefs record the opt-out first; the boot path retries cleanup if this fails.
         return cleanupLocal().then(function () {
-            // Remove selections first, offline_mode last: one userstate PATCH carries all.
-            removePref('offline_stores');
-            removePref('offline_editions');
-            removePref('offline_img_editions');
-            writePref(PREF, 'false');
             state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false };
         });
     }
