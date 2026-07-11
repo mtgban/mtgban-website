@@ -88,7 +88,7 @@ func refreshOfflineCatalog() {
 			continue
 		}
 		stores[info.Shorthand] = offlineCatalogStore{
-			Name:    info.Name,
+			Name:    scraperName(info.Shorthand),
 			Country: info.CountryFlag,
 			Sealed:  info.SealedMode,
 			Index:   info.MetadataOnly,
@@ -102,7 +102,7 @@ func refreshOfflineCatalog() {
 		entry, found := stores[info.Shorthand]
 		if !found {
 			entry = offlineCatalogStore{
-				Name:    info.Name,
+				Name:    scraperName(info.Shorthand),
 				Country: info.CountryFlag,
 				Sealed:  info.SealedMode,
 				Index:   info.MetadataOnly,
