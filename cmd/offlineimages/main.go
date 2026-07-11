@@ -79,11 +79,13 @@ func run(configPath, setsCSV string, dryRun bool) error {
 	}
 
 	crawler := newCrawler(mirror, base, state)
-	if err := crawler.fetchAll(ctx, fetches, want); err != nil {
+	fetchErr := crawler.fetchAll(ctx, fetches, want)
+	// Complete bundle/manifest work before surfacing fetch failures so cron
+	// gets a consistent tree even on a partial run.
+	if err := rebuildBundles(ctx, mirror, base, crawler.state, want, manifest); err != nil {
 		return err
 	}
-
-	return rebuildBundles(ctx, mirror, base, crawler.state, want, manifest)
+	return fetchErr
 }
 
 // loadCardDatastore loads mtgmatcher the way the website does, minus the

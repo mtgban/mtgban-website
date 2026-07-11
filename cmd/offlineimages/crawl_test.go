@@ -114,6 +114,23 @@ func TestFetchOneJpegFallback(t *testing.T) {
 	}
 }
 
+func TestFetchAllReturnsErrorOnFailures(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "gone", http.StatusGone)
+	}))
+	defer srv.Close()
+
+	c := testCrawler(t)
+	want := map[string]imgmirror.Card{
+		"uuid-fail": {URL: srv.URL + "/img.jpg", SetCode: "TST"},
+		"uuid-bad":  {URL: "://bad url", SetCode: "TST"},
+	}
+	err := c.fetchAll(context.Background(), []string{"uuid-fail", "uuid-bad"}, want)
+	if err == nil {
+		t.Fatal("expected non-nil error when fetches fail")
+	}
+}
+
 func TestRebuildBundlesMergesManifest(t *testing.T) {
 	base := filepath.ToSlash(t.TempDir())
 	os.MkdirAll(filepath.Join(base, "images"), 0755)

@@ -38,6 +38,12 @@ func TestLoadWorkerConfig(t *testing.T) {
 		t.Error("missing offline_images_path should error")
 	}
 
+	winAbsolute := filepath.Join(dir, "winabs.json")
+	os.WriteFile(winAbsolute, []byte(`{"datastore_path": "x", "datastore": {"offline_images_path": "C:/mirror"}}`), 0644)
+	if _, err := loadWorkerConfig(winAbsolute); err == nil {
+		t.Error("Windows absolute path should error")
+	}
+
 	if _, err := loadWorkerConfig(filepath.Join(dir, "absent.json")); err == nil {
 		t.Error("missing file should error")
 	}
