@@ -49,9 +49,12 @@ async function runImagesStage(manifest, imgEditions, isCancelled) {
         putImgState: function (row) { return OfflineDB.putRow('imgstate', row); },
         post: function (msg) { self.postMessage(msg); },
     });
-    // Refresh the status snapshot: imgCount is the finished-bundle count.
+    // Refresh the status snapshot: imgCount is per-image, summed from manifest.
     var after = await OfflineDB.getAllRows('imgstate');
-    var imgCount = after.filter(function (r) { return r.done; }).length;
+    var imgMap = (manifest && manifest.images) || {};
+    var imgCount = after.filter(function (r) { return r.done; }).reduce(function (sum, r) {
+        return sum + (imgMap[r.code] ? imgMap[r.code].n : 1);
+    }, 0);
     await OfflineDB.setMeta('imgCount', imgCount);
     return res.bytes;
 }
@@ -130,7 +133,10 @@ async function runSync(msg) {
         try {
             state.bytes += await runImagesStage(manifest, msg.imgEditions, function() { return cancelled; });
         } catch (err) {
-            self.postMessage({ type: 'error', stage: 'images', message: err.message });
+            if (err && err.message === 'forbidden') {
+                try { await self.OfflineDB.setMeta('authLapsed', true); } catch (e) {}
+            }
+            post({ type: 'error', stage: 'images', message: err.message });
             return;
         }
         post({ type: 'done', changedSets: state.done, bytes: state.bytes });

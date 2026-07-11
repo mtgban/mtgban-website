@@ -235,13 +235,45 @@ test('syncImages throws forbidden on 403 and writes no imgstate', async () => {
     expect(posts).toHaveLength(1);
 });
 
+// --- imgCount math (mirrors runImagesStage in offline-sync.js) ---
+// done rows sum manifest[r.code].n; fall back to +1 when code is absent.
+function computeImgCount(doneRows, imgMap) {
+    return doneRows.filter(function (r) { return r.done; }).reduce(function (sum, r) {
+        return sum + (imgMap[r.code] ? imgMap[r.code].n : 1);
+    }, 0);
+}
+
+test('imgCount sums per-image counts from manifest for done rows', () => {
+    const imgMap = { NEO: { n: 302 }, MID: { n: 400 } };
+    const rows = [
+        { code: 'NEO', done: true },
+        { code: 'MID', done: true },
+        { code: 'VOW', done: false }, // not done: excluded
+    ];
+    expect(computeImgCount(rows, imgMap)).toBe(702);
+});
+
+test('imgCount falls back to 1 per row when code is absent from manifest', () => {
+    const imgMap = { NEO: { n: 302 } };
+    const rows = [
+        { code: 'NEO', done: true },
+        { code: 'UNKNOWN', done: true }, // absent: counts as 1
+    ];
+    expect(computeImgCount(rows, imgMap)).toBe(303);
+});
+
+test('imgCount returns 0 when no done rows', () => {
+    expect(computeImgCount([], {})).toBe(0);
+    expect(computeImgCount([{ code: 'NEO', done: false }], { NEO: { n: 302 } })).toBe(0);
+});
+
 test('syncImages pauses between bundles when cancelled', async () => {
     const zip = makeZip({ 'uuid-aaa.webp': [1, 2, 3] });
     const { cache, caches } = makeFakeCache();
     const posts = [];
     let callCount = 0;
-    // false on first cancelled() check (processes AAA), true on second (skips BBB)
-    const cancelled = () => callCount++ > 0;
+    // false on first two cancelled() checks (pre-loop + AAA iteration), true on third (skips BBB)
+    const cancelled = () => callCount++ > 1;
     const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
     const result = await mod.syncImages({
         images: {
