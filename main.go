@@ -515,6 +515,7 @@ type ConfigType struct {
 		BucketSecretKey     string `json:"bucket_access_secret"`
 		CheckpointsPath     string `json:"checkpoints_path"`
 		OfflineManifestPath string `json:"offline_manifest_path"`
+		OfflineImagesPath   string `json:"offline_images_path"`
 	} `json:"datastore"`
 	Game                   string             `json:"game"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
@@ -1137,6 +1138,7 @@ func main() {
 			log.Println("offline: manifest load failed:", err)
 		}
 	}
+	refreshOfflineImagesManifest()
 
 	// Parse templates once in production
 	TemplateCache, err = buildTemplateCache()
