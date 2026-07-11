@@ -11,7 +11,12 @@
 
     var dbPromise = null;
 
-    function open() {
+    // Returns true if the DB opened with no stores; symptom of a blocked delete.
+    function isGhostDb(db) {
+        return !db.objectStoreNames.contains('meta');
+    }
+
+    function open(retried) {
         if (!dbPromise) {
             dbPromise = new Promise(function(resolve, reject) {
                 var req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -25,6 +30,14 @@
                 };
                 req.onsuccess = function() {
                     var db = req.result;
+                    if (!retried && isGhostDb(db)) {
+                        db.close();
+                        dbPromise = null;
+                        var del = indexedDB.deleteDatabase(DB_NAME);
+                        var reopen = function() { open(true).then(resolve, reject); };
+                        del.onsuccess = del.onerror = del.onblocked = reopen;
+                        return;
+                    }
                     db.onversionchange = function() { db.close(); dbPromise = null; };
                     resolve(db);
                 };
@@ -188,6 +201,7 @@
         DB_NAME: DB_NAME,
         open: open,
         close: close,
+        isGhostDb: isGhostDb,
         getMeta: getMeta,
         setMeta: setMeta,
         putSet: putSet,
