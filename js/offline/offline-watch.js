@@ -12,7 +12,7 @@
 
     self.OfflineWatch = { buildOfflineHref: buildOfflineHref };
 
-    if (location.pathname === '/offline') return;
+    if (location.pathname === '/offline' || document.getElementById('offline-banner')) return;
 
     // Single pref check; opted-out users pay nothing further (no timers).
     var enabled = false;
@@ -90,6 +90,7 @@
     }
 
     window.addEventListener('offline', check);
+    window.addEventListener('online', check);
     setInterval(function () {
         // Visibility gate: background tabs stay quiet.
         if (document.hidden) return;

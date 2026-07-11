@@ -16,6 +16,7 @@
     var backEl = document.getElementById('offline-banner-back');
 
     // Raw read against the pinned IDB schema (contract section 4).
+    // Versionless open may create an empty DB; offline-db.js ghost recovery handles it.
     function metaGet(key) {
         return new Promise(function (resolve) {
             var req = indexedDB.open('mtgban-offline');
@@ -73,7 +74,7 @@
             .then(function (ok) { clearTimeout(timer); return ok; });
     }
 
-    var pollTimer;
+    var pollTimer = null;
 
     // Affordance only, never auto-navigate: auto-jumping would lose mid-browse context.
     function poll() {
@@ -82,8 +83,12 @@
             var up = ok && navigator.onLine;
             if (up) {
                 clearInterval(pollTimer);
+                pollTimer = null;
                 var q = new URLSearchParams(location.search).get('q');
                 backEl.href = q ? '/search?q=' + encodeURIComponent(q) : '/search';
+            } else if (!pollTimer) {
+                // Cleared after back-online but server down again; re-arm.
+                pollTimer = setInterval(poll, POLL_MS);
             }
             backEl.hidden = !up;
         });

@@ -157,7 +157,8 @@
         writePref(PREF, 'false');
         // Prefs record the opt-out first; the boot path retries cleanup if this fails.
         return cleanupLocal().then(function () {
-            state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false };
+            state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false, authLapsed: false };
+            updateAuthNotice();
         });
     }
 
@@ -296,8 +297,14 @@
             .then(refreshStatus)
             .then(function () {
                 updateAuthNotice();
-                // Auth lapse pauses background refresh; manual sync() still retries.
-                if (!state.authLapsed) sync();
+                if (!state.authLapsed) {
+                    sync();
+                } else {
+                    // a restored subscription self-heals at next page load
+                    fetch('/api/offline/manifest.json', { credentials: 'same-origin' })
+                        .then(function (resp) { if (resp.ok) { setAuthLapsed(false); sync(); } })
+                        .catch(function () {});
+                }
             })
             .catch(function () {});
     }
