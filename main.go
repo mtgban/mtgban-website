@@ -1244,6 +1244,9 @@ func main() {
 	// Public privacy policy (cookie + Amazon Associates disclosures)
 	http.Handle("/privacy", noSigning(http.HandlerFunc(Privacy)))
 
+	// Offline shell page, precached by the service worker
+	http.Handle("/offline", noSigning(http.HandlerFunc(OfflinePage)))
+
 	// Mobile/desktop view toggle
 	http.HandleFunc("/toggle-mobile", toggleMobileView)
 
