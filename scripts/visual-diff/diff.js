@@ -3,11 +3,14 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const { PNG } = require('pngjs');
-const pixelmatch = require('pixelmatch');
+// pixelmatch v6 is ESM-only; unwrap the default export under CJS.
+const pixelmatchMod = require('pixelmatch');
+const pixelmatch = pixelmatchMod.default || pixelmatchMod;
 
 const BASE = process.env.BASE_URL || 'http://localhost:8080';
 const FIXTURE = process.env.FIXTURE || 'sol ring s:C21';
 const COOKIE = process.env.MTGBAN_COOKIE || '';
+const EDITIONS = process.env.EDITIONS || '';
 const THRESHOLD_PCT = 2.0;
 
 // shoot clips the first result-header plus its result-body.
@@ -43,6 +46,10 @@ function crop(png, width, height) {
 
     // Prime offline data in this fresh profile: opt in and wait for sync.
     await page.goto(BASE + '/offline');
+    if (EDITIONS) {
+        // Restrict the sync to a small set list; empty means all editions.
+        await page.evaluate((sel) => localStorage.setItem('offline_editions', sel), EDITIONS);
+    }
     await page.evaluate(() => window.OfflineMode.enable());
     await page.waitForFunction(() => {
         const s = window.OfflineMode.status();
