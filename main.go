@@ -1224,6 +1224,8 @@ func main() {
 	http.HandleFunc("/js/", ServeFile)
 	http.HandleFunc("/favicon.ico", ServeFile)
 	http.HandleFunc("/robots.txt", ServeFile)
+	// Dedicated handler: the service worker must revalidate on every deploy
+	http.HandleFunc("/sw.js", ServeServiceWorker)
 
 	// custom redirector
 	http.HandleFunc("/go/", Redirect)
