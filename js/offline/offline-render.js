@@ -124,6 +124,18 @@
             '</div>';
     }
 
+    // sypBuyerRow mirrors the SYP-specific branch (search.html:1247).
+    function sypBuyerRow(name, qty) {
+        return '<div class="price-row">' +
+            '<span class="store-cell"><a class="store-name dim">' + esc(name) + '</a></span>' +
+            '<span class="price-right has-buylist-extra">' +
+            '<span class="price"><span class="cur">#</span><span class="amt">' + qty + '</span></span>' +
+            '<span class="buylist-extra" data-ratio="" data-credit="" data-marketcredit=""></span>' +
+            '<span class="qty"></span>' +
+            '</span>' +
+            '</div>';
+    }
+
     // buyerRow mirrors the vendor branch (search.html:1216-1262).
     function buyerRow(name, price, qty, ratio, isNM) {
         var title = (ratio > 0 && isNM) ? ' title="Ratio: ' + ratio.toFixed(2) + '%"' : '';
@@ -234,8 +246,23 @@
             return ctx.hiddenVendors.indexOf(s) === -1;
         });
 
+        // Index (MetadataOnly) vendor rows come before condition headers,
+        // mirroring the INDEX group in search.go:1079 / search.html:1210-1213.
+        var indexHtml = '';
+        var indexShorts = shorts.filter(function (s) { return isIndex(ctx, s); });
+        indexShorts.forEach(function (s) {
+            var name = storeName(ctx, s);
+            var entry = res.buylist[s];
+            if (s === 'SYP') {
+                indexHtml += sypBuyerRow(name, entry.qty || 0);
+            } else {
+                indexHtml += buyerRow(name, finishPrice(entry, card), 0, 0, false);
+            }
+        });
+
         var groups = {};
         shorts.forEach(function (s) {
+            if (isIndex(ctx, s)) return;
             var per = condPrices(res.buylist[s], card);
             for (var cond in per) {
                 (groups[cond] = groups[cond] || []).push({
@@ -246,7 +273,7 @@
             }
         });
 
-        var rowsMain = '';
+        var rowsMain = indexHtml;
         CONDITIONS.forEach(function (cond) {
             var rows = groups[cond];
             if (!rows) return;
@@ -301,6 +328,14 @@
         var setQuery = '?q=' + encodeURIComponent('s:' + card.set);
         var nameQuery = '?q=' + encodeURIComponent('"' + card.n + '"');
 
+        // Products link mirrors search.html:991-993.
+        var productsLink = '';
+        if (card.p && card.p.length > 0) {
+            var n = card.p.length;
+            productsLink = ' - <a href="/sealed?q=container:' + encodeURIComponent(res.uuid) + '">' +
+                'Found in ' + n + ' product' + (n > 1 ? 's' : '') + '</a>';
+        }
+
         return '<div class="result-header-cover" style="z-index: ' + i + '"></div>' +
             '<div class="result-header' + (i === 0 ? ' result-first' : '') + '"' +
             ' style="z-index: ' + (i + 100) + '"' +
@@ -315,7 +350,7 @@
             '<a class="result-card-name" href="' + nameQuery + '" title="' + esc(card.n) + '">' + esc(card.n) + '</a>' +
             '<div class="result-badges">' + badge + '</div>' +
             '</div>' +
-            '<span class="result-set-title"><a href="' + setQuery + '">' + esc(titleLine(card, set)) + '</a></span>' +
+            '<span class="result-set-title"><a href="' + setQuery + '">' + esc(titleLine(card, set)) + '</a>' + productsLink + '</span>' +
             '</div>' +
             '</div>';
     }

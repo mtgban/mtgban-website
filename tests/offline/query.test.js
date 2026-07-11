@@ -258,6 +258,44 @@ test('LRU eviction on 9 sets (size=8)', async () => {
     expect(s9LoadCountAfter).toBe(1);
 });
 
+test('2-char needle: exact match returns, substring scan skipped', async () => {
+    Q.resetCaches();
+    var allNamesCalls = 0;
+    var cards = {
+        'u-bo-1':  {uuid: 'u-bo-1',  n: 'Bo',        num: '1', r: 'common', set: 'TST', f: false, e: false, s: false},
+        'u-bog-1': {uuid: 'u-bog-1', n: 'Bog Wraith', num: '2', r: 'common', set: 'TST', f: false, e: false, s: false},
+    };
+    var names = [
+        {key: 'bo',         uuids: ['u-bo-1']},
+        {key: 'bog wraith', uuids: ['u-bog-1']},
+    ];
+    var payloads = {
+        TST: {setCode: 'TST', retail: {'u-bo-1': {CK: {regular: 0.5}}, 'u-bog-1': {CK: {regular: 0.3}}}, buylist: {}},
+    };
+    const env = {
+        normName: function (s) {
+            return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
+                .replace(/\s+/g, ' ').trim();
+        },
+        lookupName: async function (key) {
+            for (var i = 0; i < names.length; i++) {
+                if (names[i].key === key) return names[i].uuids.slice();
+            }
+            return [];
+        },
+        allNames: async function () { allNamesCalls++; return names; },
+        getCard: async function (uuid) { return cards[uuid] || null; },
+        hasSet: async function (code) { return !!payloads[code]; },
+        loadSetPayload: async function (code) { return payloads[code]; },
+    };
+    const out = await Q.execute(Q.parse('bo'), env);
+    // Exact match still returned despite short needle.
+    expect(out.results.map(r => r.uuid)).toEqual(['u-bo-1']);
+    // allNames not called: substring scan is skipped for needles under 3 chars.
+    expect(allNamesCalls).toBe(0);
+});
+
 test('rejection degradation: one set fails, others succeed', async () => {
     Q.resetCaches();
     var cards = {
