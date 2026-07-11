@@ -142,7 +142,3 @@ func serveOfflineManifest(w http.ResponseWriter, r *http.Request) {
 		"sets":      sets,
 	})
 }
-
-// Stubs replaced in the catalog task.
-func refreshOfflineCatalog()        {}
-func offlineCatalogVersion() string { return "" }
