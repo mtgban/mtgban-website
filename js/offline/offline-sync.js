@@ -43,10 +43,12 @@ async function runSync(msg) {
         post({ type: 'progress', stage: 'manifest', done: 1, total: 1 });
 
         // Opt-in provisions the key; regenerate defensively if it is missing.
+        var fullResync = false;
         var key = await self.OfflineDB.getMeta('aesKey');
         if (!key) {
             key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
             await self.OfflineDB.setMeta('aesKey', key);
+            fullResync = true; // Regenerated key cannot decrypt existing blobs.
         }
 
         stage = 'catalog';
@@ -65,7 +67,7 @@ async function runSync(msg) {
         var editions = msg.editions || [];
         // A different store subset changes payload content: resync everything.
         var storesKey = stores.slice().sort().join(',');
-        var fullResync = storesKey !== await self.OfflineDB.getMeta('storesKey');
+        fullResync = fullResync || storesKey !== await self.OfflineDB.getMeta('storesKey');
 
         var have = {};
         (await self.OfflineDB.listSetVersions()).forEach(function(row) { have[row.code] = row.version; });
@@ -89,6 +91,7 @@ async function runSync(msg) {
                     errored = true;
                     throw e;
                 }
+                if (errored) return;
                 state.done++;
                 post({ type: 'progress', stage: 'prices', done: state.done, total: changed.length, code: code });
             }
@@ -97,11 +100,14 @@ async function runSync(msg) {
         await Promise.all([pump(), pump()]);
 
         if (!cancelled) {
-            await self.OfflineDB.setMeta('storesKey', storesKey);
+            // Filtered runs must not claim the whole subset synced.
+            if (editions.length === 0) await self.OfflineDB.setMeta('storesKey', storesKey);
             await self.OfflineDB.setMeta('manifest', manifest);
+            await self.OfflineDB.setMeta('authLapsed', false);
         }
         post({ type: 'done', changedSets: state.done, bytes: state.bytes });
     } catch (err) {
+        if (err && err.message === 'forbidden') await self.OfflineDB.setMeta('authLapsed', true);
         post({ type: 'error', stage: (err && err.stage) || stage, message: (err && err.message) || String(err) });
     }
 }
