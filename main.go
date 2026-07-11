@@ -359,6 +359,7 @@ var OptionalFields = []string{
 	"AnySpread",
 	"APImode",
 	"SleepersCYOA",
+	"SearchOfflineMode",
 }
 
 // The key matches the query parameter of the permissions defined in sign()
@@ -1280,6 +1281,7 @@ func main() {
 	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(paletteService.Sealed)))
 	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(paletteService.Sets)))
 	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(paletteService.Stores)))
+	http.Handle("/api/offline/", noSigning(http.HandlerFunc(OfflineAPI)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
 
