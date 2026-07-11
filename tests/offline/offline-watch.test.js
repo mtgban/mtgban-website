@@ -1,4 +1,6 @@
 import { test, expect } from 'bun:test';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 /*
  * Pure-logic tests for the offline-watch toast state machine.
@@ -8,6 +10,23 @@ import { test, expect } from 'bun:test';
  * mirror the state machine transitions described in the task brief using an
  * equivalent in-process model.
  */
+
+// ---------------------------------------------------------------------------
+// Load buildOfflineHref from production module via sandbox
+// ---------------------------------------------------------------------------
+
+const offlineWatchSrc = readFileSync(
+    resolve(import.meta.dir, '../../js/offline/offline-watch.js'),
+    'utf-8'
+);
+
+const sandbox = {
+    self: {},
+    location: { pathname: '/offline', search: '' },
+};
+
+new Function('self', 'location', offlineWatchSrc)(sandbox.self, sandbox.location);
+const buildOfflineHref = sandbox.self.OfflineWatch.buildOfflineHref;
 
 // ---------------------------------------------------------------------------
 // Minimal in-process state machine matching offline-watch.js logic
@@ -283,30 +302,8 @@ test('false probe outcome never clears dismissed', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Probe timeout helper
-// ---------------------------------------------------------------------------
-
-test('probe timeout constant is 5000ms', () => {
-    // Documented contract: 5s abort timeout mirroring banner probe.
-    expect(5000).toBe(5000);
-});
-
-test('interval constant is 60000ms', () => {
-    // Documented contract: 60s visibility-gated interval.
-    expect(60000).toBe(60000);
-});
-
-// ---------------------------------------------------------------------------
 // buildOfflineHref: link carries current search query
 // ---------------------------------------------------------------------------
-
-// Mirrors the href logic described in the task brief: /offline, or
-// /offline?q=... when on /search with a q param.
-function buildOfflineHref(pathname, search) {
-    if (pathname !== '/search') return '/offline';
-    var q = new URLSearchParams(search).get('q');
-    return q ? '/offline?q=' + encodeURIComponent(q) : '/offline';
-}
 
 test('offline href on non-search page is /offline', () => {
     expect(buildOfflineHref('/', '')).toBe('/offline');
