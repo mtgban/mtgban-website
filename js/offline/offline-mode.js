@@ -132,6 +132,11 @@
     }
 
     function disable() {
+        if (syncWorker) {
+            syncWorker.terminate();
+            syncWorker = null;
+            syncing = false;
+        }
         // Remove selections first, offline_mode last: one userstate PATCH carries all.
         removePref('offline_stores');
         removePref('offline_editions');
@@ -163,6 +168,7 @@
         syncWorker.onmessage = onSyncMessage;
         syncWorker.onerror = function(e) {
             syncing = false;
+            syncWorker = null;
             setSyncStatus('sync failed: ' + (e.message || 'worker error'));
         };
         return syncWorker;
