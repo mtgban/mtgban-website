@@ -85,9 +85,11 @@
         }
         var persist = navigator.storage && navigator.storage.persist
             ? navigator.storage.persist() : Promise.resolve(false);
+        var registered = false;
         return persist.then(function () {
             return navigator.serviceWorker.register('/sw.js');
         }).then(function () {
+            registered = true;
             return ensureKey();
         }).then(function () {
             writePref(PREF, 'true');
@@ -95,6 +97,13 @@
         }).then(function () {
             sync();
             return refreshStatus();
+        }).catch(function (err) {
+            if (registered) {
+                navigator.serviceWorker.getRegistrations()
+                    .then(function (regs) { regs.forEach(function (r) { r.unregister(); }); })
+                    .catch(function () {});
+            }
+            throw err;
         });
     }
 
