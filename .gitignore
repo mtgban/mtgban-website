@@ -24,6 +24,9 @@ cache_*
 # Configuration files
 *.json
 
+# Offline-mode wire-format fixtures (exempt from the *.json ignore above)
+!tests/offline/fixtures/*.json
+
 # Logs directory
 logs/
 

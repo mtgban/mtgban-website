@@ -145,3 +145,44 @@ test("throws on tag index out of range", () => {
   );
   expect(() => decode(b)).toThrow("tag index out of range");
 });
+
+import { readFileSync } from "fs";
+import { join } from "path";
+
+const FIXTURES = join(import.meta.dir, "fixtures");
+
+function loadBin(name) {
+  const buf = readFileSync(join(FIXTURES, name + ".bin"));
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+}
+function loadExpected(name) {
+  return JSON.parse(readFileSync(join(FIXTURES, name + ".expected.json"), "utf8"));
+}
+// Comparable form: Date flattened back to unix seconds.
+function comparable(p) {
+  return { setCode: p.setCode, snapshotUnix: p.snapshot.getTime() / 1000, retail: p.retail, buylist: p.buylist };
+}
+
+test("sample fixture: JS decode equals the Go-encoded payload", () => {
+  expect(comparable(decode(loadBin("sample")))).toEqual(loadExpected("sample"));
+});
+
+test("sample fixture: header bytes are OFP1 v1 full", () => {
+  const b = new Uint8Array(loadBin("sample"));
+  expect([...b.slice(0, 6)]).toEqual([0x4f, 0x46, 0x50, 0x31, 1, 1]);
+});
+
+test("empty-sections fixture decodes to empty objects", () => {
+  const p = decode(loadBin("empty"));
+  expect(comparable(p)).toEqual(loadExpected("empty"));
+  expect(p.retail).toEqual({});
+  expect(p.buylist).toEqual({});
+});
+
+test("garbage rejection holds on real fixture bytes", () => {
+  const b = new Uint8Array(loadBin("sample"));
+  const v = b.slice(0); v[4] = 2;
+  expect(() => decode(v.buffer)).toThrow("unsupported format version");
+  const t = b.slice(0, Math.floor(b.length / 2));
+  expect(() => decode(t.buffer)).toThrow();
+});
