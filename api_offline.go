@@ -20,6 +20,8 @@ func OfflineAPI(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case endpoint == "manifest.json":
 		serveOfflineManifest(w, r)
+	case endpoint == "catalog.json":
+		serveOfflineCatalog(w, r)
 	default:
 		http.NotFound(w, r)
 	}
