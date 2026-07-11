@@ -4,7 +4,6 @@
 
     var PREF_KEY = 'offline_img_editions';
     var root, estimateEl, storageEl, syncBtn, pauseBtn, progressEl, fillEl, labelEl;
-    var manifestPromise = null;
     var imagesMap = null;
     var syncing = false;
     var pauseRequested = false;
@@ -25,16 +24,13 @@
     }
 
     function fetchManifest() {
-        if (!manifestPromise) {
-            manifestPromise = fetch('/api/offline/manifest.json', { credentials: 'same-origin' })
-                .then(function (r) { return r.ok ? r.json() : null; })
-                .then(function (m) {
-                    imagesMap = (m && m.images) || {};
-                    renderEstimates();
-                })
-                .catch(function () { imagesMap = {}; });
-        }
-        return manifestPromise;
+        return window.OfflineDB.getMeta('manifest').then(function (m) {
+            imagesMap = (m && m.images) || {};
+            renderEstimates();
+        }).catch(function () {
+            imagesMap = {};
+            renderEstimates();
+        });
     }
 
     function groupSizeSpan(group) {
@@ -50,6 +46,15 @@
 
     function renderEstimates() {
         if (!imagesMap) { fetchManifest(); return; }
+        // If no manifest data, show placeholder
+        if (Object.keys(imagesMap).length === 0) {
+            estimateEl.textContent = 'Run a price sync first to see image size estimates.';
+            root.querySelectorAll('.editions-group').forEach(function (group) {
+                groupSizeSpan(group).textContent = '';
+            });
+            syncBtn.disabled = syncing || selectedCodes().length === 0;
+            return;
+        }
         root.querySelectorAll('.editions-group').forEach(function (group) {
             var codes = [];
             group.querySelectorAll('.editions-grid input[type="checkbox"]:checked').forEach(function (cb) {
