@@ -10,7 +10,7 @@
         offline_img_editions: 'imgEditionsSel'
     };
 
-    var state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false };
+    var state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false, authLapsed: false };
 
     function readPref(k) {
         try { return localStorage.getItem(k); } catch (e) { return null; }
@@ -63,20 +63,14 @@
 
     function refreshStatus() {
         var ops = [
-            OfflineDB.getMeta('lastSync').then(function (v) { state.lastSync = v || null; }),
-            OfflineDB.open().then(function (db) {
-                return new Promise(function (resolve) {
-                    // The connection is shared; only OfflineDB.close() may close it.
-                    var req = db.transaction('sets').objectStore('sets').count();
-                    req.onsuccess = function () { state.setCount = req.result; resolve(); };
-                    req.onerror = function () { resolve(); };
-                });
-            })
+            OfflineDB.getMeta('lastSync').then(function(v) { state.lastSync = v || null; }),
+            OfflineDB.countSets().then(function(n) { state.setCount = n; }),
+            OfflineDB.getMeta('authLapsed').then(function(v) { state.authLapsed = !!v; })
         ];
         if (navigator.storage && navigator.storage.estimate) {
-            ops.push(navigator.storage.estimate().then(function (est) { state.bytes = est.usage || 0; }));
+            ops.push(navigator.storage.estimate().then(function(est) { state.bytes = est.usage || 0; }));
         }
-        return Promise.all(ops).catch(function () {});
+        return Promise.all(ops).catch(function() {});
     }
 
     // Filter helper: only our SW's registrations.
@@ -139,6 +133,11 @@
     }
 
     function disable() {
+        if (syncWorker) {
+            syncWorker.terminate();
+            syncWorker = null;
+            syncing = false;
+        }
         // Remove selections first, offline_mode last: one userstate PATCH carries all.
         removePref('offline_stores');
         removePref('offline_editions');
@@ -150,17 +149,78 @@
         });
     }
 
-    // Sync worker lands in phase 3; the entry point stays stable.
-    function sync() {}
+    // --- price sync worker plumbing (phase 3) ---
+    var syncWorker = null;
+    var syncing = false;
+
+    function setSyncStatus(text) {
+        var el = document.getElementById('offlineSyncStatus');
+        if (el) el.textContent = text;
+    }
 
     function status() {
-        return {
-            lastSync: state.lastSync,
-            setCount: state.setCount,
-            imgCount: state.imgCount,
-            bytes: state.bytes,
-            syncing: state.syncing
+        state.syncing = syncing;
+        return state;
+    }
+
+    function ensureWorker() {
+        if (syncWorker) return syncWorker;
+        syncWorker = new Worker('/js/offline/offline-sync.js');
+        syncWorker.onmessage = onSyncMessage;
+        syncWorker.onerror = function(e) {
+            syncing = false;
+            syncWorker = null;
+            setSyncStatus('sync failed: ' + (e.message || 'worker error'));
         };
+        return syncWorker;
+    }
+
+    function onSyncMessage(ev) {
+        var m = ev.data || {};
+        document.dispatchEvent(new CustomEvent('offline:sync-message', { detail: m }));
+        if (m.type === 'progress') {
+            var label = m.stage + ' ' + m.done + '/' + m.total;
+            if (m.code) label += ' (' + m.code + ')';
+            setSyncStatus('syncing: ' + label);
+        } else if (m.type === 'done') {
+            syncing = false;
+            state.bytes = m.bytes || 0;
+            OfflineDB.setMeta('lastSync', new Date().toISOString()).then(refreshStatus).then(function() {
+                setSyncStatus('synced, ' + m.changedSets + ' sets updated');
+            });
+        } else if (m.type === 'error') {
+            syncing = false;
+            if (m.message === 'forbidden') {
+                setSyncStatus('sync stopped: offline access expired');
+            } else {
+                setSyncStatus('sync error at ' + m.stage + ': ' + m.message);
+            }
+        }
+    }
+
+    function sync() {
+        if (syncing || !enabled()) return;
+        syncing = true;
+        setSyncStatus('syncing: starting');
+        Promise.all([
+            OfflineDB.getMeta('storesSel'),
+            OfflineDB.getMeta('editionsSel'),
+            OfflineDB.getMeta('imgEditionsSel'),
+        ]).then(function(sel) {
+            ensureWorker().postMessage({
+                type: 'sync',
+                stores: sel[0] || [],
+                editions: sel[1] || [],
+                imgEditions: sel[2] || [],
+            });
+        }).catch(function(err) {
+            syncing = false;
+            setSyncStatus('sync error: ' + err);
+        });
+    }
+
+    function cancelSync() {
+        if (syncWorker) syncWorker.postMessage({ type: 'cancel' });
     }
 
     function fmtBytes(n) {
@@ -209,6 +269,7 @@
         enable: enable,
         disable: disable,
         sync: sync,
+        cancelSync: cancelSync,
         status: status
     };
 
