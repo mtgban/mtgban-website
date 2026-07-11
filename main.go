@@ -1099,6 +1099,7 @@ func main() {
 			log.Println("offline: manifest load failed:", err)
 		}
 	}
+	refreshOfflineImagesManifest()
 
 	// Parse templates once in production
 	TemplateCache, err = buildTemplateCache()

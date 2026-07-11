@@ -118,6 +118,7 @@ func refreshOfflineManifest() {
 	}
 
 	refreshOfflineCatalog()
+	refreshOfflineImagesManifest()
 
 	err := offlineManifestStore.Save(context.Background(), next)
 	if err != nil {
@@ -134,12 +135,16 @@ func serveOfflineManifest(w http.ResponseWriter, r *http.Request) {
 	for code, sv := range manifest.Sets {
 		sets[code] = sv.Version
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "private, max-age=300")
-	json.NewEncoder(w).Encode(map[string]any{
+	doc := map[string]any{
 		"version":   1,
 		"generated": manifest.Generated,
 		"catalog":   offlineCatalogVersion(),
 		"sets":      sets,
-	})
+	}
+	if images := offlineImagesManifestStore.Get(); len(images) > 0 {
+		doc["images"] = images
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "private, max-age=300")
+	json.NewEncoder(w).Encode(doc)
 }
