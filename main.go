@@ -502,7 +502,8 @@ type ConfigType struct {
 		BackupPath      string `json:"backup_path"`
 		BucketAccessKey string `json:"bucket_access_key"`
 		BucketSecretKey string `json:"bucket_access_secret"`
-		CheckpointsPath string `json:"checkpoints_path"`
+		CheckpointsPath     string `json:"checkpoints_path"`
+		OfflineManifestPath string `json:"offline_manifest_path"`
 	} `json:"datastore"`
 	Game                   string             `json:"game"`
 	CardBackImage          string             `json:"card_back_image"`
@@ -1092,6 +1093,12 @@ func main() {
 		log.Printf("checkpoints: initial load failed: %v", err)
 	}
 
+	if Config.Datastore.OfflineManifestPath != "" {
+		if err := offlineManifestStore.Load(context.Background()); err != nil {
+			log.Println("offline: manifest load failed:", err)
+		}
+	}
+
 	// Parse templates once in production
 	TemplateCache, err = buildTemplateCache()
 	if err != nil {
@@ -1122,6 +1129,7 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
+			refreshOfflineManifest()
 		}()
 	} else {
 		go func() {
@@ -1133,6 +1141,7 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
+			refreshOfflineManifest()
 		}()
 	}
 
@@ -1148,6 +1157,9 @@ func main() {
 
 		// Reload DB Newspaper every 3 hours
 		c.AddFunc("33 */3 * * *", cacheNewspaper)
+
+		// Refresh offline manifest after the snapshot window
+		c.AddFunc("20 */12 * * *", refreshOfflineManifest)
 
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
