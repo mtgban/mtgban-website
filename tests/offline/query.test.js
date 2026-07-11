@@ -284,7 +284,7 @@ test('rejection degradation: one set fails, others succeed', async () => {
         },
         allNames: async function () { return names; },
         getCard: async function (uuid) { return cards[uuid] || null; },
-        hasSet: async function (code) { return !!payloads[code]; },
+        hasSet: async function (code) { return code === 'GOOD' || code === 'BAD'; },
         loadSetPayload: async function (code) {
             if (code === 'BAD') {
                 throw new Error('BAD set fails to load');
