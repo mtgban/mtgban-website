@@ -209,3 +209,91 @@ test('sortResults modes', () => {
     Q.sortResults(rs, 'alpha', true, sets);
     expect(rs[0].uuid).toBe('a'); // reverse flips
 });
+
+test('LRU eviction on 9 sets (size=8)', async () => {
+    Q.resetCaches();
+    var cards = {};
+    var names = [];
+    var payloads = {};
+    var setCodes = ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S9'];
+    setCodes.forEach((code, idx) => {
+        var uuid = 'u-' + code + '-1';
+        cards[uuid] = {uuid: uuid, n: 'Card' + code, num: '1', r: 'rare', set: code, f: false, e: false, s: false};
+        payloads[code] = {setCode: code, retail: {[uuid]: {CK: {regular: 1}}}, buylist: {}};
+    });
+    names.push({key: 'card', uuids: Object.keys(cards)});
+    var env = {
+        loads: [],
+        normName: function (s) {
+            return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
+                .replace(/\s+/g, ' ').trim();
+        },
+        lookupName: async function (key) {
+            for (var i = 0; i < names.length; i++) {
+                if (names[i].key === key) return names[i].uuids.slice();
+            }
+            return [];
+        },
+        allNames: async function () { return names; },
+        getCard: async function (uuid) { return cards[uuid] || null; },
+        hasSet: async function (code) { return !!payloads[code]; },
+        loadSetPayload: async function (code) {
+            env.loads.push(code);
+            return payloads[code];
+        },
+    };
+    await Q.execute(Q.parse('card'), env);
+    var s1LoadCount = env.loads.filter(c => c === 'S1').length;
+    var s8LoadCount = env.loads.filter(c => c === 'S8').length;
+    var s9LoadCount = env.loads.filter(c => c === 'S9').length;
+    expect(s1LoadCount).toBe(1);
+    expect(s8LoadCount).toBe(1);
+    expect(s9LoadCount).toBe(1);
+    expect(env.loads.length).toBe(9);
+    await Q.execute(Q.parse('card s:S1'), env);
+    s1LoadCount = env.loads.filter(c => c === 'S1').length;
+    expect(s1LoadCount).toBe(2);
+    var s9LoadCountAfter = env.loads.filter(c => c === 'S9').length;
+    expect(s9LoadCountAfter).toBe(1);
+});
+
+test('rejection degradation: one set fails, others succeed', async () => {
+    Q.resetCaches();
+    var cards = {
+        'u-good-1': {uuid: 'u-good-1', n: 'GoodCard', num: '1', r: 'rare', set: 'GOOD', f: false, e: false, s: false},
+        'u-bad-1': {uuid: 'u-bad-1', n: 'BadCard', num: '2', r: 'rare', set: 'BAD', f: false, e: false, s: false},
+    };
+    var names = [
+        {key: 'card', uuids: ['u-good-1', 'u-bad-1']},
+    ];
+    var payloads = {
+        GOOD: {setCode: 'GOOD', retail: {'u-good-1': {CK: {regular: 1}}}, buylist: {}},
+    };
+    var env = {
+        normName: function (s) {
+            return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
+                .replace(/\s+/g, ' ').trim();
+        },
+        lookupName: async function (key) {
+            for (var i = 0; i < names.length; i++) {
+                if (names[i].key === key) return names[i].uuids.slice();
+            }
+            return [];
+        },
+        allNames: async function () { return names; },
+        getCard: async function (uuid) { return cards[uuid] || null; },
+        hasSet: async function (code) { return !!payloads[code]; },
+        loadSetPayload: async function (code) {
+            if (code === 'BAD') {
+                throw new Error('BAD set fails to load');
+            }
+            return payloads[code];
+        },
+    };
+    var out = await Q.execute(Q.parse('card'), env);
+    expect(out.results.length).toBe(1);
+    expect(out.results[0].uuid).toBe('u-good-1');
+    expect(out.missingSets).toEqual(['BAD']);
+});
