@@ -52,6 +52,13 @@
     }
 
     function renderAuth() {
+        if (window.OfflineMode && typeof OfflineMode.status === 'function') {
+            var s = OfflineMode.status();
+            if (s && s.authLapsed) {
+                authEl.hidden = false;
+                return;
+            }
+        }
         metaGet('authLapsed').then(function (lapsed) {
             authEl.hidden = !lapsed;
         });
@@ -66,11 +73,15 @@
             .then(function (ok) { clearTimeout(timer); return ok; });
     }
 
+    var pollTimer;
+
     // Affordance only, never auto-navigate: auto-jumping would lose mid-browse context.
     function poll() {
+        if (document.hidden) return;
         probe().then(function (ok) {
             var up = ok && navigator.onLine;
             if (up) {
+                clearInterval(pollTimer);
                 var q = new URLSearchParams(location.search).get('q');
                 backEl.href = q ? '/search?q=' + encodeURIComponent(q) : '/search';
             }
@@ -81,8 +92,11 @@
     renderAge();
     renderAuth();
     poll();
-    setInterval(renderAge, AGE_TICK_MS);
-    setInterval(poll, POLL_MS);
+    setInterval(function () {
+        renderAge();
+        renderAuth();
+    }, AGE_TICK_MS);
+    pollTimer = setInterval(poll, POLL_MS);
     window.addEventListener('online', poll);
     window.addEventListener('offline', function () { backEl.hidden = true; });
 })();
