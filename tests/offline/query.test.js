@@ -1,5 +1,8 @@
 import { test, expect } from 'bun:test';
-import './offline-query.js';
+
+// Shared modules attach to self; give bun one.
+globalThis.self = globalThis.self || globalThis;
+await import('../../js/offline/offline-query.js');
 
 const Q = globalThis.OfflineQuery;
 
