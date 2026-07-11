@@ -178,7 +178,7 @@
 
     function onSyncMessage(ev) {
         var m = ev.data || {};
-        window.dispatchEvent(new CustomEvent('offline:sync-message', { detail: m }));
+        document.dispatchEvent(new CustomEvent('offline:sync-message', { detail: m }));
         if (m.type === 'progress') {
             var label = m.stage + ' ' + m.done + '/' + m.total;
             if (m.code) label += ' (' + m.code + ')';
