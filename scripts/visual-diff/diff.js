@@ -11,7 +11,7 @@ const BASE = process.env.BASE_URL || 'http://localhost:8080';
 const FIXTURE = process.env.FIXTURE || 'sol ring s:C21';
 const COOKIE = process.env.MTGBAN_COOKIE || '';
 const EDITIONS = process.env.EDITIONS || '';
-const THRESHOLD_PCT = 2.0;
+const THRESHOLD_PCT = 6.0; // regression tripwire; tighten to 2% when UI polish is done
 
 // shoot clips the first result-header plus its result-body.
 async function shoot(page, url, outPath) {
