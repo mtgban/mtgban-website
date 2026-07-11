@@ -63,20 +63,13 @@
 
     function refreshStatus() {
         var ops = [
-            OfflineDB.getMeta('lastSync').then(function (v) { state.lastSync = v || null; }),
-            OfflineDB.open().then(function (db) {
-                return new Promise(function (resolve) {
-                    // The connection is shared; only OfflineDB.close() may close it.
-                    var req = db.transaction('sets').objectStore('sets').count();
-                    req.onsuccess = function () { state.setCount = req.result; resolve(); };
-                    req.onerror = function () { resolve(); };
-                });
-            })
+            OfflineDB.getMeta('lastSync').then(function(v) { state.lastSync = v || null; }),
+            OfflineDB.listSetVersions().then(function(rows) { state.setCount = rows.length; })
         ];
         if (navigator.storage && navigator.storage.estimate) {
-            ops.push(navigator.storage.estimate().then(function (est) { state.bytes = est.usage || 0; }));
+            ops.push(navigator.storage.estimate().then(function(est) { state.bytes = est.usage || 0; }));
         }
-        return Promise.all(ops).catch(function () {});
+        return Promise.all(ops).catch(function() {});
     }
 
     // Filter helper: only our SW's registrations.
