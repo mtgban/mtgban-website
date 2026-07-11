@@ -1,5 +1,8 @@
 const { test, expect } = require('bun:test');
-require('./offline-age.js');
+
+// Shared modules attach to self; give bun one.
+globalThis.self = globalThis.self || globalThis;
+require('../../js/offline/offline-age.js');
 
 const OfflineAge = globalThis.OfflineAge;
 const NOW = Date.parse('2026-07-11T12:00:00Z');
