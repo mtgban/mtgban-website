@@ -15,12 +15,18 @@ Start the dev server with scrapers loaded, then:
 
     BASE_URL=http://localhost:8080 FIXTURE="sol ring s:C21" bun run diff
 
-- In DevMode with SigCheck off no cookie is needed (offlineModeAllowed
-  dev bypass). Against a signed instance, pass a session cookie:
-  MTGBAN_COOKIE=<value of your MTGBAN cookie>.
-- The fixture set must be inside the synced editions selection.
+- In DevMode with SigCheck off the API bypasses auth (offlineModeAllowed),
+  but the client opt-in still reads the MTGBAN cookie, so pass the
+  minimal unsigned one: MTGBAN_COOKIE="T2ZmbGluZU1vZGU9dHJ1ZQ%3D%3D"
+  (base64 of OfflineMode=true). Against a signed instance, pass the
+  value of your real MTGBAN session cookie instead.
+- The fixture set must be inside the synced editions selection. In a
+  fresh profile no selection means all editions; pass EDITIONS="C21"
+  (comma-separated set codes) to keep the first sync small and fast.
 - First run syncs offline data in the throwaway browser profile; allow a
   few minutes.
+- If chromium launch times out under bun (seen on Windows), run the same
+  command with node instead: node diff.js.
 
 ## Reading the result
 
