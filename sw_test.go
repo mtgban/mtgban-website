@@ -27,7 +27,11 @@ func TestServeServiceWorker(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.HasPrefix(string(body), "self.__BUILD = '") {
-		t.Errorf("body does not start with the build injection: %q", string(body[:40]))
+		n := len(body)
+		if n > 40 {
+			n = 40
+		}
+		t.Errorf("body does not start with the build injection: %q", string(body[:n]))
 	}
 	if !strings.Contains(string(body), "mtgban-shell-") {
 		t.Error("body does not contain the shell cache prefix (sw.js not appended)")
