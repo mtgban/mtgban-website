@@ -1821,6 +1821,7 @@ body.modal-embed .cp-overlay { display: none !important; }
         <div id="settings-offline-stores-mount"></div>
         <!-- phase 6: image corpus editions picker -->
         <div id="settings-offline-editions-mount">
+        {{if .PickerID}}
         <div class="offline-img-picker">
             <p class="section-desc">Checked editions have their card images downloaded for offline use.</p>
             {{template "editions-picker" .}}
@@ -1835,6 +1836,7 @@ body.modal-embed .cp-overlay { display: none !important; }
             </div>
             <div class="offline-img-storage" id="offline-img-storage"></div>
         </div>
+        {{end}}
         </div>
     </div>
 </section>
