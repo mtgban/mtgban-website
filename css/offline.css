@@ -20,6 +20,8 @@
 
 /* Offline banner: data age, auth notice, back-online affordance */
 .offline-banner {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
