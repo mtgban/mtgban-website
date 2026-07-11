@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/mtgban/mtgban-website/internal/imgmirror"
+	"github.com/mtgban/simplecloud"
 )
 
 func setupOfflineImagesDir(t *testing.T) string {
@@ -17,7 +18,18 @@ func setupOfflineImagesDir(t *testing.T) string {
 	dir := filepath.ToSlash(t.TempDir())
 	old := Config.Datastore.OfflineImagesPath
 	Config.Datastore.OfflineImagesPath = dir
-	t.Cleanup(func() { Config.Datastore.OfflineImagesPath = old })
+	// Pre-seed the bucket cache so offlineImagesBucket returns a FileBucket
+	// without going through path parsing (which rejects Windows drive letters).
+	offlineImagesBucketMu.Lock()
+	oldBucket, oldBase := offlineImagesBucketCur, offlineImagesBucketBase
+	offlineImagesBucketCur, offlineImagesBucketBase = &simplecloud.FileBucket{}, dir
+	offlineImagesBucketMu.Unlock()
+	t.Cleanup(func() {
+		Config.Datastore.OfflineImagesPath = old
+		offlineImagesBucketMu.Lock()
+		offlineImagesBucketCur, offlineImagesBucketBase = oldBucket, oldBase
+		offlineImagesBucketMu.Unlock()
+	})
 	return dir
 }
 
@@ -96,6 +108,15 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	serveOfflineImageBundle(w, r, "NEO.zip")
 	if w.Code != http.StatusNotModified {
 		t.Fatalf("conditional get with *: code = %d, want 304", w.Code)
+	}
+
+	// Weak ETag validators must also match.
+	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
+	r.Header.Set("If-None-Match", `W/"abc123"`)
+	w = httptest.NewRecorder()
+	serveOfflineImageBundle(w, r, "NEO.zip")
+	if w.Code != http.StatusNotModified {
+		t.Fatalf("weak etag: code = %d, want 304", w.Code)
 	}
 
 	w = httptest.NewRecorder()

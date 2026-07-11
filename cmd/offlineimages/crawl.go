@@ -36,6 +36,7 @@ type crawler struct {
 	cwebp   string
 
 	mu       sync.Mutex
+	saveMu   sync.Mutex // serializes saveState writes across concurrent domains
 	state    imgmirror.State
 	done     int
 	failures int
@@ -66,6 +67,9 @@ func (c *crawler) fetchAll(ctx context.Context, uuids []string, want map[string]
 		u, err := url.Parse(want[uuid].URL)
 		if err != nil {
 			log.Printf("%s: bad image URL %q", uuid, want[uuid].URL)
+			c.mu.Lock()
+			c.failures++
+			c.mu.Unlock()
 			continue
 		}
 		queues[u.Host] = append(queues[u.Host], uuid)
@@ -92,8 +96,12 @@ func (c *crawler) fetchAll(ctx context.Context, uuids []string, want map[string]
 		return err
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	log.Printf("fetched %d images, %d failures", c.done, c.failures)
+	failures := c.failures
+	c.mu.Unlock()
+	log.Printf("fetched %d images, %d failures", c.done, failures)
+	if failures > 0 {
+		return fmt.Errorf("%d fetches failed", failures)
+	}
 	return nil
 }
 
@@ -184,8 +192,14 @@ func (c *crawler) download(ctx context.Context, domain, srcURL string) ([]byte, 
 			}
 			delay := c.backoff(attempt)
 			if s := resp.Header.Get("Retry-After"); s != "" {
-				if secs, err := strconv.Atoi(s); err == nil && time.Duration(secs)*time.Second > delay {
-					delay = time.Duration(secs) * time.Second
+				if secs, err := strconv.Atoi(s); err == nil {
+					ra := time.Duration(secs) * time.Second
+					if ra > 5*time.Minute {
+						ra = 5 * time.Minute
+					}
+					if ra > delay {
+						delay = ra
+					}
 				}
 			}
 			time.Sleep(delay)
@@ -228,5 +242,7 @@ func (c *crawler) saveStateSnapshot(ctx context.Context) error {
 		snapshot[k] = v
 	}
 	c.mu.Unlock()
+	c.saveMu.Lock()
+	defer c.saveMu.Unlock()
 	return saveState(ctx, c.bucket, c.base, snapshot)
 }

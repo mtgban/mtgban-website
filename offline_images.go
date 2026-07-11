@@ -43,8 +43,11 @@ func offlineImagesBucket(ctx context.Context) (simplecloud.ReadWriter, error) {
 	}
 	var bucket simplecloud.ReadWriter
 	switch {
-	// A one letter scheme is a Windows drive path.
-	case u.Scheme == "" || len(u.Scheme) == 1:
+	// A one letter scheme is a Windows drive path; fail loud so misconfigured
+	// Windows absolute paths (broken by simplecloud v0.0.9) are caught early.
+	case len(u.Scheme) == 1:
+		return nil, errors.New("offline_images_path: Windows absolute paths are broken by simplecloud v0.0.9 (drive letter stripped); use a relative path until the upstream fix lands")
+	case u.Scheme == "":
 		bucket = &simplecloud.FileBucket{}
 	case u.Scheme == "b2":
 		bucket, err = simplecloud.NewB2Client(ctx, Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
@@ -88,12 +91,14 @@ func openOfflineImageObject(ctx context.Context, dir, name string) (io.ReadClose
 }
 
 // etagMatches reports whether an If-None-Match header matches etag.
+// Weak validators (W/"...") on the header side are accepted per RFC 7232 §3.2.
 func etagMatches(header, etag string) bool {
 	if strings.TrimSpace(header) == "*" {
 		return true
 	}
 	for _, part := range strings.Split(header, ",") {
-		if strings.TrimSpace(part) == etag {
+		p := strings.TrimPrefix(strings.TrimSpace(part), "W/")
+		if p == etag {
 			return true
 		}
 	}

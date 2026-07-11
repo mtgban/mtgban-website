@@ -38,6 +38,9 @@ func loadWorkerConfig(path string) (*workerConfig, error) {
 	if cfg.Datastore.OfflineImagesPath == "" {
 		return nil, errors.New("datastore.offline_images_path not configured")
 	}
+	if u, err := url.Parse(cfg.Datastore.OfflineImagesPath); err == nil && len(u.Scheme) == 1 {
+		return nil, errors.New("offline_images_path: Windows absolute paths are broken by simplecloud v0.0.9 (drive letter stripped); use a relative path until the upstream fix lands")
+	}
 	return &cfg, nil
 }
 
