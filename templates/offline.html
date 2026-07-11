@@ -134,62 +134,67 @@
         if (img && url) img.src = url;
     }
 
-    // Sidebar image follows the hovered result, like search.html.
-    document.getElementById('offline-results').addEventListener('mouseover', function (e) {
-        var row = e.target.closest('[data-image-url]');
-        if (row) showImage(row.getAttribute('data-image-url'));
-    });
-
-    // Failed offline images fall back to the neutral placeholder.
-    document.getElementById('cardImage').addEventListener('error', function () {
-        if (this.src !== PLACEHOLDER) this.src = PLACEHOLDER;
-    });
-
-    document.querySelectorAll('.search-sort-pill').forEach(function (b) {
-        b.addEventListener('click', function () {
-            var mode = b.getAttribute('data-sort');
-            reverse = (mode === sortMode) ? !reverse : false;
-            sortMode = mode;
-            if (exec) paint();
-        });
-    });
-
-    // Datalist suggestions from the in-memory name list, capped small.
-    var box = document.getElementById('offline-searchbox');
-    box.addEventListener('input', async function () {
-        var needle = OfflineUtil.normName(box.value);
-        if (needle.length < 3) return;
-        var list = await env.allNames();
-        var opts = [];
-        for (var i = 0; i < list.length && opts.length < 25; i++) {
-            if (list[i].key.indexOf(needle) !== -1) opts.push(list[i].key);
-        }
-        document.getElementById('offline-card-names').innerHTML =
-            opts.map(function (k) { return '<option value="' + k + '"></option>'; }).join('');
-    });
-
-    box.addEventListener('keydown', function (e) {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        var q = box.value.trim();
-        history.pushState(null, '', q ? '?q=' + encodeURIComponent(q) : location.pathname);
-        runQuery(q);
-    });
-
-    window.addEventListener('popstate', function () {
-        var q = new URLSearchParams(location.search).get('q') || '';
-        box.value = q;
-        runQuery(q);
-    });
-
-    setup().then(function () {
-        var q = new URLSearchParams(location.search).get('q') || '';
-        box.value = q;
-        return runQuery(q);
-    }).catch(function (err) {
+    function showErrorNotice(err) {
         document.getElementById('offline-results').innerHTML =
             '<div class="offline-notice offline-notice-warn">Offline data is not ready. Enable offline mode in Settings and let a sync finish.</div>';
         console.error('offline shell setup failed', err);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Sidebar image follows the hovered result, like search.html.
+        document.getElementById('offline-results').addEventListener('mouseover', function (e) {
+            var row = e.target.closest('[data-image-url]');
+            if (row) showImage(row.getAttribute('data-image-url'));
+        });
+
+        // Failed offline images fall back to the neutral placeholder.
+        document.getElementById('cardImage').addEventListener('error', function () {
+            if (this.src !== PLACEHOLDER) this.src = PLACEHOLDER;
+        });
+
+        document.querySelectorAll('.search-sort-pill').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var mode = b.getAttribute('data-sort');
+                reverse = (mode === sortMode) ? !reverse : false;
+                sortMode = mode;
+                if (exec) paint();
+            });
+        });
+
+        // Datalist suggestions from the in-memory name list, capped small.
+        var box = document.getElementById('offline-searchbox');
+        box.addEventListener('input', async function () {
+            if (!env) return;
+            var needle = OfflineUtil.normName(box.value);
+            if (needle.length < 3) return;
+            var list = await env.allNames();
+            var opts = [];
+            for (var i = 0; i < list.length && opts.length < 25; i++) {
+                if (list[i].key.indexOf(needle) !== -1) opts.push(list[i].key);
+            }
+            document.getElementById('offline-card-names').innerHTML =
+                opts.map(function (k) { return '<option value="' + k + '"></option>'; }).join('');
+        });
+
+        box.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            var q = box.value.trim();
+            history.pushState(null, '', q ? '?q=' + encodeURIComponent(q) : location.pathname);
+            runQuery(q).catch(showErrorNotice);
+        });
+
+        window.addEventListener('popstate', function () {
+            var q = new URLSearchParams(location.search).get('q') || '';
+            box.value = q;
+            runQuery(q).catch(showErrorNotice);
+        });
+
+        setup().then(function () {
+            var q = new URLSearchParams(location.search).get('q') || '';
+            box.value = q;
+            return runQuery(q);
+        }).catch(showErrorNotice);
     });
 })();
 </script>
