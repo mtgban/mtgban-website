@@ -104,8 +104,7 @@ func loadCardDatastore(ctx context.Context, cfg *workerConfig) error {
 	return mtgmatcher.LoadDatastore(reader)
 }
 
-// enumerateImages maps every uuid, sealed included, to its normal size
-// image URL, skipping printings with no image.
+// enumerateImages maps every uuid, sealed included, to its "full" image URL, skipping printings with no image.
 func enumerateImages(setsFilter map[string]bool) map[string]imgmirror.Card {
 	out := map[string]imgmirror.Card{}
 	skipped := 0

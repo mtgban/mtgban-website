@@ -28,7 +28,7 @@ website can serve them without hitting external hosts.
 ## Incremental contract
 
 A card's image is only re-fetched when its URL changes in the
-datastore. The mirror state tracks the SHA-256 of the stored bytes and
+datastore. The mirror state tracks the SHA-256 of the fetched source bytes and
 the source URL; a URL change is the refetch trigger.
 
 Bundle ZIPs are rebuilt only for sets whose per-image digest set has

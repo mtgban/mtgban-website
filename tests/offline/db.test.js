@@ -1,7 +1,6 @@
 const { test, expect } = require('bun:test');
 
-// Only isGhostDb is testable in bun (no IDB runtime); open() recovery is
-// covered by the E2E evidence in task-8-report.md.
+// Only isGhostDb is testable in bun (no IDB runtime); open()'s delete-and-reopen recovery needs a real browser.
 globalThis.self = globalThis.self || globalThis;
 require('../../js/offline/offline-db.js');
 

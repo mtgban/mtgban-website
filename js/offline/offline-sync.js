@@ -125,7 +125,7 @@ async function runSync(msg) {
         await Promise.all([pump(), pump()]);
 
         if (!cancelled) {
-            // Filtered runs must not claim the whole subset synced.
+            // Edition-filtered runs must not record storesKey as fully resynced.
             if (editions.length === 0) await self.OfflineDB.setMeta('storesKey', storesKey);
             await self.OfflineDB.setMeta('manifest', manifest);
             await self.OfflineDB.setMeta('authLapsed', false);

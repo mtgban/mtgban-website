@@ -93,7 +93,7 @@
         if (!window.OfflineMode.enabled()) { labelEl.textContent = 'Enable offline mode first.'; return; }
         var codes = selectedCodes();
         if (!codes.length) return;
-        // Explicit save: pref roams via userstate, IDB mirror is what the worker reads.
+        // Explicit save: pref roams via userstate; the IDB mirror is what sync() reads before messaging the worker.
         localStorage.setItem(PREF_KEY, codes.join(','));
         Promise.all([
             window.OfflineDB.setMeta('imgEditionsSel', codes),
@@ -125,7 +125,6 @@
         }).catch(function (err) {
             syncing = false;
             labelEl.textContent = 'Image sync failed: ' + (err && err.message || err);
-            /* reset pause button visibility */
             pauseBtn.hidden = true;
         });
     }

@@ -3,7 +3,7 @@
     'use strict';
 
     var PREF = 'offline_mode';
-    // Roaming csv pref -> IDB meta array key (the worker reads the IDB copy).
+    // Roaming csv pref -> IDB meta array key (sync() reads the IDB copy and passes it to the worker)
     var SEL_PREFS = {
         offline_stores: 'storesSel',
         offline_editions: 'editionsSel',
