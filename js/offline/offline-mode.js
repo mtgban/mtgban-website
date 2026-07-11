@@ -162,7 +162,7 @@
         });
     }
 
-    // --- price sync worker plumbing (phase 3) ---
+    // --- price sync worker plumbing ---
     var syncWorker = null;
     var syncing = false;
 

@@ -16,7 +16,7 @@ func offlineModeAllowed(r *http.Request) (string, bool) {
 	return email, GetParamFromSig(sig, "OfflineMode") == "true"
 }
 
-// OfflinePage renders the offline search shell stub (phase 4 fills the body).
+// OfflinePage renders the offline search shell.
 func OfflinePage(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 	pageVars := genPageNav("Offline", sig)

@@ -65,7 +65,7 @@ caused by online-only rows; thin text strokes are accepted rendering deltas.
 
 ## Deferred / backlog
 
-Phase 7 items:
+Backlog items:
 
 6. Stale in-page caches after a background re-sync: nameCache, LRU, and ctx
    should refresh when a sync-done event fires.
