@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/mtgban-website/internal/imgmirror"
@@ -100,5 +102,40 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	serveOfflineImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/XXX.zip", nil), "XXX.zip")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("unknown set: code = %d, want 404", w.Code)
+	}
+}
+
+func TestOfflineManifestIncludesImages(t *testing.T) {
+	offlineImagesManifestStore.Set(imgmirror.Manifest{
+		"NEO": {Hash: "abc123", Count: 302, Bytes: 24800000},
+	})
+	t.Cleanup(func() { offlineImagesManifestStore.Set(nil) })
+
+	w := httptest.NewRecorder()
+	serveOfflineManifest(w, httptest.NewRequest("GET", "/api/offline/manifest.json", nil))
+
+	var doc struct {
+		Images map[string]struct {
+			H string `json:"h"`
+			N int    `json:"n"`
+			B int64  `json:"b"`
+		} `json:"images"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	img, found := doc.Images["NEO"]
+	if !found || img.H != "abc123" || img.N != 302 || img.B != 24800000 {
+		t.Fatalf("images map mismatch: %+v", doc.Images)
+	}
+}
+
+func TestOfflineManifestOmitsEmptyImages(t *testing.T) {
+	offlineImagesManifestStore.Set(nil)
+
+	w := httptest.NewRecorder()
+	serveOfflineManifest(w, httptest.NewRequest("GET", "/api/offline/manifest.json", nil))
+	if strings.Contains(w.Body.String(), `"images"`) {
+		t.Errorf("empty images map should be omitted: %s", w.Body.String())
 	}
 }
