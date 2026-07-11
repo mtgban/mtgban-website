@@ -1,5 +1,5 @@
 // Visual parity diff: /search vs /offline rendering of one fixture query.
-// Manual run; see README.md. Threshold: under 2 percent differing pixels.
+// Manual run; see README.md for the threshold and accepted divergences.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const { PNG } = require('pngjs');
