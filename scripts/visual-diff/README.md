@@ -62,3 +62,13 @@ caused by online-only rows; thin text strokes are accepted rendering deltas.
 
 5. Treatment badges (border, extended-art, etc.) in the result header:
    online-only feature.
+
+## Deferred / backlog
+
+Phase 7 items:
+
+6. Stale in-page caches after a background re-sync: nameCache, LRU, and ctx
+   should refresh when a sync-done event fires.
+
+7. Keyrune CDN offline caching: set symbol glyphs should be pre-cached by
+   the service worker so they render without a network connection.

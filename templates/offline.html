@@ -67,6 +67,8 @@
     var sortMode = getCookie('SearchDefaultSort') || 'chrono';
     var reverse = false;
     if (sortMode === 'hybrid') sortMode = 'alpha';
+    var namesP = null;
+    var nameReq = 0;
 
     function hiddenList(name) {
         return (getCookie(name) || '').split(',').filter(Boolean);
@@ -167,7 +169,10 @@
             if (!env) return;
             var needle = OfflineUtil.normName(box.value);
             if (needle.length < 3) return;
-            var list = await env.allNames();
+            namesP = namesP || env.allNames();
+            var t = ++nameReq;
+            var list = await namesP;
+            if (t !== nameReq) return;
             var opts = [];
             for (var i = 0; i < list.length && opts.length < 25; i++) {
                 if (list[i].key.indexOf(needle) !== -1) opts.push(list[i].key);
@@ -177,6 +182,7 @@
         });
 
         box.addEventListener('keydown', function (e) {
+            if (!env) return;
             if (e.key !== 'Enter') return;
             e.preventDefault();
             var q = box.value.trim();
