@@ -24,6 +24,10 @@ func OfflineAPI(w http.ResponseWriter, r *http.Request) {
 		serveOfflineCatalog(w, r)
 	case strings.HasPrefix(endpoint, "prices/"):
 		serveOfflinePrices(w, r, email, strings.TrimPrefix(endpoint, "prices/"))
+	case strings.HasPrefix(endpoint, "images/"):
+		serveOfflineImage(w, r, strings.TrimPrefix(endpoint, "images/"))
+	case strings.HasPrefix(endpoint, "imagebundles/"):
+		serveOfflineImageBundle(w, r, strings.TrimPrefix(endpoint, "imagebundles/"))
 	default:
 		http.NotFound(w, r)
 	}
