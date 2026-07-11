@@ -360,6 +360,7 @@ var OptionalFields = []string{
 	"AnySpread",
 	"APImode",
 	"SleepersCYOA",
+	"SearchOfflineMode",
 }
 
 // The key matches the query parameter of the permissions defined in sign()
@@ -510,10 +511,11 @@ type ConfigType struct {
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
 	Datastore     struct {
-		BackupPath      string `json:"backup_path"`
-		BucketAccessKey string `json:"bucket_access_key"`
-		BucketSecretKey string `json:"bucket_access_secret"`
-		CheckpointsPath string `json:"checkpoints_path"`
+		BackupPath          string `json:"backup_path"`
+		BucketAccessKey     string `json:"bucket_access_key"`
+		BucketSecretKey     string `json:"bucket_access_secret"`
+		CheckpointsPath     string `json:"checkpoints_path"`
+		OfflineManifestPath string `json:"offline_manifest_path"`
 	} `json:"datastore"`
 	Game string `json:"game"`
 	// FormatEvents are the game-wide chart markers no ban list reports - a
@@ -1158,6 +1160,12 @@ func main() {
 		log.Printf("checkpoints: initial load failed: %v", err)
 	}
 
+	if Config.Datastore.OfflineManifestPath != "" {
+		if err := offlineManifestStore.Load(context.Background()); err != nil {
+			log.Println("offline: manifest load failed:", err)
+		}
+	}
+
 	// Parse templates once in production
 	TemplateCache, err = buildTemplateCache()
 	if err != nil {
@@ -1188,6 +1196,7 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
+			refreshOfflineManifest()
 		}()
 	} else {
 		go func() {
@@ -1199,6 +1208,7 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
+			refreshOfflineManifest()
 		}()
 	}
 
@@ -1214,6 +1224,9 @@ func main() {
 
 		// Reload DB Newspaper every 3 hours
 		c.AddFunc("33 */3 * * *", cacheNewspaper)
+
+		// Refresh offline manifest after the snapshot window
+		c.AddFunc("20 */12 * * *", refreshOfflineManifest)
 
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
@@ -1321,6 +1334,7 @@ func main() {
 	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(paletteService.Sets)))
 	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(paletteService.Stores)))
 	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(paletteService.Promos)))
+	http.Handle("/api/offline/", noSigning(http.HandlerFunc(OfflineAPI)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
 
