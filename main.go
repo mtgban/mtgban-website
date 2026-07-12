@@ -1331,6 +1331,9 @@ func main() {
 		}()
 	}
 
+	// Runtime manifest refreshes funnel through one debounced goroutine.
+	offlineService.StartRefresher()
+
 	if !DevMode {
 		// Set up new refreshes as needed
 		c := cron.New()
@@ -1344,8 +1347,8 @@ func main() {
 		// Reload DB Newspaper every 3 hours
 		c.AddFunc("33 */3 * * *", cacheNewspaper)
 
-		// Refresh offline manifest after the snapshot window
-		c.AddFunc("20 */12 * * *", offlineService.RefreshManifest)
+		// Backstop refresh; reloads normally drive this via RequestRefresh.
+		c.AddFunc("20 */12 * * *", offlineService.RequestRefresh)
 
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
