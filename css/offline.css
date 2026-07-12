@@ -18,17 +18,61 @@
     border-color: var(--search-link, #3b6fd4);
 }
 
-/* phase 7 replaces this block; keep the class name */
+/* The shared .search-layout tucks under the online navbar with a -40px margin;
+   on the offline page the banner sits above it, so cancel the pull to avoid overlap. */
+.offline-shell .search-layout {
+    margin-top: 0;
+}
+
+/* Offline banner: data age, auth notice, back-online affordance */
 .offline-banner {
-    margin: 0.75em auto 0;
-    max-width: 60em;
-    padding: 0.5em 1em;
-    font-size: var(--text-sm);
-    text-align: center;
-    color: var(--normal);
-    background: var(--surface-2, rgba(0, 0, 0, 0.05));
-    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
-    border-radius: 0.5em;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.55em var(--page-gutter, 3vw);
+    font-size: 0.9em;
+    background: var(--lightblack, #161616);
+    color: var(--darkgrey, #dddddd);
+    border-bottom: 1px solid var(--verydarkgrey, #393939);
+}
+.light-theme .offline-banner {
+    background: var(--lightgrey, #eaeaea);
+    color: var(--quasiblack, #292929);
+    border-bottom-color: var(--darkgrey, #dddddd);
+}
+.offline-banner-dot {
+    flex: none;
+    width: 0.6em;
+    height: 0.6em;
+    border-radius: 50%;
+    background: var(--orange, orange);
+}
+.offline-banner.offline-banner-stale {
+    background: #7c2d12;
+    color: var(--realwhite, #fcfcfc);
+}
+.light-theme .offline-banner.offline-banner-stale {
+    background: var(--lightyellow, #f2e9a2);
+    color: var(--quasiblack, #292929);
+}
+.offline-banner-stale .offline-banner-dot {
+    background: var(--red, red);
+}
+.offline-banner-auth {
+    font-weight: 600;
+}
+.offline-banner-back {
+    margin-left: auto;
+    padding: 0.3em 0.9em;
+    border-radius: 1em;
+    background: #22c55e;
+    color: var(--lightblack, #161616);
+    font-weight: 600;
+    text-decoration: none;
+}
+.offline-banner-back:hover {
+    filter: brightness(1.1);
 }
 
 .offline-notice {

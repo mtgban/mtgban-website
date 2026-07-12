@@ -34,10 +34,7 @@ Threshold is currently 6 percent. This is a regression tripwire, not a
 parity assertion. Tightening it back toward 2 percent is deferred UI
 polish for a later pass once the full feature is solid.
 
-Measured baseline (fixture: "sol ring s:C21", branch offline-mode-search-shell):
-- First run (before parity fixes): 4.231 percent, clip 904x959 vs 904x893
-- After fixes (products link, SYP placement, store names): 4.160 percent,
-  clip 904x1001 vs 904x935
+Measured baseline (fixture: "sol ring s:C21"): 4.160 percent, clip 904x1001 vs 904x935.
 
 ## Known and accepted divergences
 
@@ -65,7 +62,7 @@ caused by online-only rows; thin text strokes are accepted rendering deltas.
 
 ## Deferred / backlog
 
-Phase 7 items:
+Backlog items:
 
 6. Stale in-page caches after a background re-sync: nameCache, LRU, and ctx
    should refresh when a sync-done event fires.
