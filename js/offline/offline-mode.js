@@ -298,6 +298,11 @@
         if (settingsBtn) utility.insertBefore(btn, settingsBtn);
         else utility.appendChild(btn);
         paint();
+
+        // Keep the active state in sync when another tab flips the flag.
+        window.addEventListener('storage', function (e) {
+            if (window.OfflinePrefer && e.key === OfflinePrefer.KEY) paint();
+        });
     }
 
     // Settings modal glue: reveal the Offline section only when available().
