@@ -1953,10 +1953,22 @@ body.modal-embed .cp-overlay {
     row-gap: 0.5em;
 }
 
-.landing-pane-favorites .landing-item-fav .landing-item-delete {
+/* Pin/delete live in a bounded actions box at the tile's top-right (same
+ * pattern as the recents pane) so long names/badges never show through. */
+.landing-pane-favorites .landing-item-fav .landing-item-actions {
     position: absolute;
     top: 0.35em;
     right: 0.35em;
+    z-index: 1;
+    display: flex;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--surface-2);
+    opacity: 0;
+    transition: opacity 120ms;
+}
+.landing-pane-favorites .landing-item-fav:hover .landing-item-actions {
+    opacity: 1;
 }
 
 /* === Favorites empty state === */
@@ -2474,13 +2486,6 @@ body.modal-embed .cp-overlay {
 }
 .landing-pane-favorites .landing-item-fav:has(.landing-item-pin.pinned) {
     background: var(--surface-3);
-}
-
-/* Pin sits left of the trash button on favorite tiles (both absolutely positioned) */
-.landing-pane-favorites .landing-item-fav .landing-item-pin {
-    position: absolute;
-    top: 0.35em;
-    right: 2.2em;
 }
 
 /* === Favorites sort pills (inline in pane header next to action buttons) === */
