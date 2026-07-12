@@ -328,3 +328,24 @@
     focusSearch();
     window.addEventListener('pageshow', function (e) { if (e.persisted) focusSearch(); });
 })();
+
+// ── Keep search/sealed navigation in the offline shell while preferring ──
+(function() {
+    // Manual offline: reroute /search and /sealed navigations to the local
+    // shell so moving between pages does not drop back to the live site.
+    document.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (!(window.OfflinePrefer && OfflinePrefer.get())) return;
+        var a = e.target.closest ? e.target.closest('a[href]') : null;
+        if (!a || a.target === '_blank') return;
+        var url;
+        try { url = new URL(a.href, location.href); } catch (err) { return; }
+        if (url.origin !== location.origin) return;
+        if (url.pathname !== '/search' && url.pathname !== '/sealed') return;
+        var q = url.searchParams.get('q') || '';
+        // The offline shell has no container/sealed-contents query; leave it live.
+        if (q.indexOf('container:') === 0) return;
+        e.preventDefault();
+        location.href = '/offline' + (q ? '?q=' + encodeURIComponent(q) : '');
+    });
+})();
