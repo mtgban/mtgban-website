@@ -310,7 +310,10 @@
 
     var sealed = location.pathname.indexOf('/sealed') === 0;
     form.action = sealed ? '/sealed' : '/search';
-    autocomplete(form, input, sealed ? 'true' : 'false');
+    // On /offline the offline shell owns the navbar box with local suggestions.
+    if (location.pathname !== '/offline') {
+        autocomplete(form, input, sealed ? 'true' : 'false');
+    }
 
     // Keep the search bar focused on every page load so typing starts a
     // search immediately. The `autofocus` attribute covers fresh loads;
