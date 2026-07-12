@@ -258,6 +258,48 @@
             (s.lastSync ? ', last sync ' + new Date(s.lastSync).toLocaleString() : ', not synced yet');
     }
 
+    // Inline lucide cloud-off; conveys offline data at a glance.
+    var CLOUD_OFF_SVG =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="m2 2 20 20"/>' +
+        '<path d="M5.782 5.782A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.307-.193"/>' +
+        '<path d="M21.532 16.5A4.5 4.5 0 0 0 17.5 10h-1.79A7.008 7.008 0 0 0 10 5.07"/>' +
+        '</svg>';
+
+    // Navbar toggle: manually engage offline mode on this device. Shown only to
+    // opted-in, entitled users; flips OfflinePrefer and navigates.
+    function initNavToggle() {
+        if (!available() || !enabled()) return;
+        var utility = document.querySelector('.nav2-utility');
+        if (!utility || document.getElementById('nav-offline-toggle')) return;
+
+        var btn = document.createElement('button');
+        btn.id = 'nav-offline-toggle';
+        btn.type = 'button';
+        btn.className = 'nav2-icon-btn ban-offline-toggle';
+        btn.innerHTML = CLOUD_OFF_SVG;
+
+        function paint() {
+            var on = window.OfflinePrefer && OfflinePrefer.get();
+            btn.classList.toggle('is-active', !!on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            btn.title = on ? 'Offline mode on (tap to go back online)' : 'Switch to offline mode';
+        }
+
+        btn.addEventListener('click', function () {
+            var on = !(window.OfflinePrefer && OfflinePrefer.get());
+            if (window.OfflinePrefer) OfflinePrefer.set(on);
+            var q = new URLSearchParams(location.search).get('q');
+            var suffix = q ? '?q=' + encodeURIComponent(q) : '';
+            location.href = (on ? '/offline' : '/search') + suffix;
+        });
+
+        var settingsBtn = document.getElementById('nav-settings-btn');
+        if (settingsBtn) utility.insertBefore(btn, settingsBtn);
+        else utility.appendChild(btn);
+        paint();
+    }
+
     // Settings modal glue: reveal the Offline section only when available().
     function initSettingsUI() {
         var section = document.getElementById('settings-offline-section');
@@ -323,9 +365,14 @@
         }).catch(function () {});
     }
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSettingsUI);
-    } else {
+    function initUI() {
         initSettingsUI();
+        initNavToggle();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initUI);
+    } else {
+        initUI();
     }
 })();
