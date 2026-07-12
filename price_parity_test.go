@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -121,7 +122,7 @@ func TestPriceParityRetail(t *testing.T) {
 		if got := searchPrice(found, regular, tc.cond, "PARITYA"); got != tc.want {
 			t.Errorf("search %s = %v, want %v", tc.cond, got, tc.want)
 		}
-		if got := api[regular]["PARITYA"].Conditions[tc.cond]; got != tc.want {
+		if got := api[regular]["PARITYA"].Conditions.get(tc.cond); got != tc.want {
 			t.Errorf("api conditions[%s] = %v, want %v", tc.cond, got, tc.want)
 		}
 	}
@@ -155,7 +156,7 @@ func TestPriceParityRetail(t *testing.T) {
 	if got := searchPrice(found, regular, "PO", "PARITYA"); got != -1 {
 		t.Errorf("search PO row should be suppressed, got %v", got)
 	}
-	if got := api[regular]["PARITYA"].Conditions["PO"]; got != 2 {
+	if got := api[regular]["PARITYA"].Conditions.get("PO"); got != 2 {
 		t.Errorf("api conditions[PO] = %v, want 2", got)
 	}
 
@@ -181,7 +182,7 @@ func TestPriceParityBuylist(t *testing.T) {
 	if got := searchPrice(found, regular, "NM", "PARITYV"); got != 5 {
 		t.Errorf("search NM = %v, want 5", got)
 	}
-	if got := api[regular]["PARITYV"].Conditions["NM"]; got != 5 {
+	if got := api[regular]["PARITYV"].Conditions.get("NM"); got != 5 {
 		t.Errorf("api conditions[NM] = %v, want 5", got)
 	}
 	if got := api[regular]["PARITYV"].Regular; got != 5 {
@@ -234,5 +235,35 @@ func TestFinishPredicateDivergence(t *testing.T) {
 	}
 	if !checkFinish(coRegular, "foil") || !searchFinish([]string{"foil"}, coRegular) {
 		t.Error("regular card should be dropped by a foil filter on both sides")
+	}
+}
+
+// TestBanPriceWireFormat guards the JSON shape of the conditions/quantities
+// structs: identical keys to the former maps, zeros omitted, and an unset
+// group omitted entirely.
+func TestBanPriceWireFormat(t *testing.T) {
+	price := &BanPrice{Regular: 10}
+	price.Conditions = &BanConditions{}
+	price.Conditions.set("NM", 10)
+	price.Conditions.set("SP_foil", 7.5)
+	price.Quantities = &BanQuantities{}
+	price.Quantities.set("NM", 3)
+
+	out, err := json.Marshal(price)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"regular":10,"conditions":{"NM":10,"SP_foil":7.5},"quantities":{"NM":3}}`
+	if string(out) != want {
+		t.Errorf("wire format changed:\n got %s\nwant %s", out, want)
+	}
+
+	// No conditions written at all: the field disappears, like an empty map.
+	bare, err := json.Marshal(&BanPrice{Foil: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(bare) != `{"foil":2}` {
+		t.Errorf("bare wire format changed: %s", bare)
 	}
 }

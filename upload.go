@@ -1290,11 +1290,11 @@ func getPrice(banPrice *BanPrice, conds string) float64 {
 			}
 		}
 	} else {
-		price = banPrice.Conditions[conds]
+		price = banPrice.Conditions.get(conds)
 		if price == 0 {
-			price = banPrice.Conditions[conds+"_foil"]
+			price = banPrice.Conditions.get(conds + "_foil")
 			if price == 0 {
-				price = banPrice.Conditions[conds+"_etched"]
+				price = banPrice.Conditions.get(conds + "_etched")
 			}
 		}
 		// MetadataOnly sources (TCGLow / TCGMarket / MKM*) never
@@ -1304,7 +1304,7 @@ func getPrice(banPrice *BanPrice, conds string) float64 {
 		// Sources that DO have per-condition data (real sellers and
 		// vendors) keep the original "return 0 if this specific
 		// condition isn't listed" semantic.
-		if price == 0 && len(banPrice.Conditions) == 0 {
+		if price == 0 && banPrice.Conditions == nil {
 			price = banPrice.Regular
 			if price == 0 {
 				price = banPrice.Foil
