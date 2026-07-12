@@ -6,6 +6,24 @@
     margin-top: 0;
 }
 
+/* Sort pills show a direction arrow on the active pill: green asc, red desc (rotated). */
+.offline-shell .search-sort-dir {
+    display: none;
+    align-items: center;
+}
+.offline-shell .search-sort-dir svg {
+    width: 14px;
+    height: 14px;
+}
+.offline-shell .search-sort-pill.active .search-sort-dir {
+    display: inline-flex;
+    color: #22c55e;
+}
+.offline-shell .search-sort-pill.active.reversed .search-sort-dir {
+    color: #ef4444;
+    transform: rotate(180deg);
+}
+
 /* Offline banner: data age, auth notice, back-online affordance */
 .offline-banner {
     display: flex;
