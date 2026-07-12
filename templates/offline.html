@@ -11,6 +11,7 @@
     <script type="text/javascript" src="/js/offline/offline-util.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/offline/offline-query.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/offline/offline-render.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-search.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/offline/offline-age.js?hash={{.Hash}}"></script>
 {{end}}
 
@@ -29,12 +30,6 @@
     <div class="search-layout">
         <div class="search-sidebar">
             <div class="sidebar-search">
-                <div class="offline-searchbar">
-                    <input id="offline-searchbox" type="text" list="offline-card-names"
-                           placeholder="Search offline prices..." maxlength="1000"
-                           autocapitalize="none" autocomplete="off" spellcheck="false" autofocus>
-                    <datalist id="offline-card-names"></datalist>
-                </div>
                 <div class="search-sort-row">
                     <span class="search-sort-label">Sort</span>
                     <button class="search-sort-pill" data-sort="chrono" title="Chronological" type="button">Time</button>
@@ -78,9 +73,6 @@
     var sortMode = getCookie('SearchDefaultSort') || 'chrono';
     var reverse = false;
     if (sortMode === 'hybrid') sortMode = 'alpha';
-    var namesP = null;
-    var nameReq = 0;
-
     function hiddenList(name) {
         return (getCookie(name) || '').split(',').filter(Boolean);
     }
@@ -174,32 +166,8 @@
             });
         });
 
-        // Datalist suggestions from the in-memory name list, capped small.
-        var box = document.getElementById('offline-searchbox');
-        box.addEventListener('input', async function () {
-            if (!env) return;
-            var needle = OfflineUtil.normName(box.value);
-            if (needle.length < 3) return;
-            namesP = namesP || env.allNames();
-            var t = ++nameReq;
-            var list = await namesP;
-            if (t !== nameReq) return;
-            var opts = [];
-            for (var i = 0; i < list.length && opts.length < 25; i++) {
-                if (list[i].key.indexOf(needle) !== -1) opts.push(list[i].key);
-            }
-            document.getElementById('offline-card-names').innerHTML =
-                opts.map(function (k) { return '<option value="' + k + '"></option>'; }).join('');
-        });
-
-        box.addEventListener('keydown', function (e) {
-            if (!env) return;
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            var q = box.value.trim();
-            history.pushState(null, '', q ? '?q=' + encodeURIComponent(q) : location.pathname);
-            runQuery(q).catch(showErrorNotice);
-        });
+        var box = document.getElementById('nav-searchbox');
+        var form = document.getElementById('nav-searchform');
 
         window.addEventListener('popstate', function () {
             var q = new URLSearchParams(location.search).get('q') || '';
@@ -208,6 +176,20 @@
         });
 
         setup().then(function () {
+            OfflineSearch.mount({
+                input: box,
+                form: form,
+                deps: {
+                    normName: OfflineUtil.normName,
+                    allNames: OfflineDB.allNames,
+                    getCard: OfflineDB.getCard,
+                    sets: dicts.sets
+                },
+                onSubmit: function (q) {
+                    history.pushState(null, '', q ? '?q=' + encodeURIComponent(q) : location.pathname);
+                    runQuery(q).catch(showErrorNotice);
+                }
+            });
             var q = new URLSearchParams(location.search).get('q') || '';
             box.value = q;
             return runQuery(q);
