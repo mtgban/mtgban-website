@@ -670,9 +670,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return strings.ToLower(tmp[i].ScraperName) < strings.ToLower(tmp[j].ScraperName)
 		})
 
-		// Amazon search-by-name link (no price or condition); added to every
-		// INDEX section for singles and sealed alike, unless index data was skipped.
-		if !skipIndex {
+		// Amazon search-by-name link (no price or condition); shown only on
+		// sealed products, where marketplace availability is most relevant —
+		// singles link to the dedicated card stores instead.
+		if !skipIndex && pageVars.Metadata[cardId].Sealed {
 			tmp = append([]SearchEntry{{
 				ScraperName: "Search on AMAZON",
 				URL:         "https://www.amazon.com/s?k=" + url.QueryEscape(pageVars.Metadata[cardId].Name) + "&tag=" + Config.Affiliate["AMZN"],
