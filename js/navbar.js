@@ -310,8 +310,14 @@
 
     var sealed = location.pathname.indexOf('/sealed') === 0;
     form.action = sealed ? '/sealed' : '/search';
+    var preferOffline = location.pathname !== '/offline' &&
+        window.OfflinePrefer && OfflinePrefer.get();
+    if (preferOffline) {
+        // Keep the user in the fast local flow; the offline shell owns suggestions.
+        form.action = '/offline';
+    }
     // On /offline the offline shell owns the navbar box with local suggestions.
-    if (location.pathname !== '/offline') {
+    if (location.pathname !== '/offline' && !preferOffline) {
         autocomplete(form, input, sealed ? 'true' : 'false');
     }
 
