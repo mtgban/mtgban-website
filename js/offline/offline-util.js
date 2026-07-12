@@ -3,7 +3,7 @@
 (function() {
     'use strict';
 
-    // Exact normalization shared with the phase 4 query parser (contract sec 4).
+    // Exact normalization shared by the sync worker index build and offline-query.js.
     function normName(s) {
         return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
             .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
@@ -20,7 +20,7 @@
         return new Response(stream).arrayBuffer();
     }
 
-    // Decrypt + gunzip + decode one stored set; null when absent (phase 4 entry point).
+    // Decrypt + gunzip + decode one stored set; null when absent.
     function loadSetPayload(code) {
         return Promise.all([
             self.OfflineDB.getSet(code),
@@ -34,7 +34,7 @@
         });
     }
 
-    // Catalog display dictionaries persisted by the sync worker (contract sec 4).
+    // Catalog display dictionaries persisted by the sync worker.
     function loadCatalogDicts() {
         return Promise.all([
             self.OfflineDB.getMeta('catalogSets'),

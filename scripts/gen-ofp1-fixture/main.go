@@ -12,7 +12,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/offline"
 )
 
-// samplePayload exercises every flag combination the encoder can emit.
+// samplePayload exercises every flag the encoder can emit.
 func samplePayload() *offline.SetPayload {
 	return &offline.SetPayload{
 		SetCode:  "NEO",

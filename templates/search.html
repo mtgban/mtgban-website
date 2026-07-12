@@ -1865,11 +1865,15 @@ body.modal-embed .cp-overlay { display: none !important; }
 
 <!-- Offline Mode - revealed by offline-mode.js only when the account has the flag -->
 <section class="settings-section expanded" id="settings-offline-section" style="display:none">
-    <div class="settings-section-header" data-role="section-toggle">        <h3>Offline Mode</h3>
-
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Offline Mode</h3>
         <i class="settings-section-chevron" data-lucide="chevron-right"></i>
     </div>
     <div class="settings-section-body">
+        <p id="offline-auth-notice" class="offline-auth-notice" hidden>
+            Offline mode is not part of your current subscription. Your saved
+            prices stay browsable, but syncing is paused until access is restored.
+        </p>
         <p class="section-desc">Keep card prices available when the site is unreachable. Data syncs in the background while you browse; applies immediately, no Save needed.</p>
         <label class="settings-toggle">
             <input type="checkbox" id="settings-offline-toggle">
@@ -1878,9 +1882,9 @@ body.modal-embed .cp-overlay { display: none !important; }
         </label>
         <div id="offlineSyncStatus" class="offline-sync-status" aria-live="polite"></div>
         <p class="section-desc" id="settings-offline-usage"></p>
-        <!-- reserved for the deferred store subset picker (see Interfaces NOTE) -->
+        <!-- reserved for a future store subset picker -->
         <div id="settings-offline-stores-mount"></div>
-        <!-- phase 6: image corpus editions picker -->
+        <!-- image corpus editions picker -->
         <div id="settings-offline-editions-mount">
         {{if .PickerID}}
         <div class="offline-img-picker">

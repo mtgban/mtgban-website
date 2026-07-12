@@ -1,16 +1,16 @@
-// Offline result renderer mirroring templates/search.html markup (contract sec 12).
+// Offline result renderer mirroring templates/search.html markup.
 (function (root) {
     'use strict';
 
     var CONDITIONS = ['NM', 'SP', 'MP', 'HP', 'PO'];
     // Mirror of Country2flag (utils.go:23).
     var FLAGS = {EU: '\u{1F1EA}\u{1F1FA}', JP: '\u{1F1EF}\u{1F1F5}'};
-    // Static index pairing rules (contract sec 12, search.go:605-606).
+    // Static index pairing rules, mirroring the collapseIndex calls (search.go:613-614).
     var INDEX_PAIRS = [
         {low: 'TCGLow', high: 'TCGMarket', label: 'TCG (Low / Market)'},
         {low: 'MKMLow', high: 'MKMTrend', label: 'CM (Low / Trend)'}
     ];
-    // Reference stores for the buylist ratio (contract sec 12).
+    // Reference stores approximating the online ratio (online shows scraper-provided PriceRatio).
     var REF_STORES = ['CK', 'TCGPlayer', 'TCGLow', 'TCGMarket'];
 
     function esc(s) {
@@ -151,7 +151,7 @@
             '</div>';
     }
 
-    // refRetail finds the best CK-or-TCG retail for the ratio (contract sec 12).
+    // refRetail finds the best CK-or-TCG retail for the ratio.
     function refRetail(res, cond) {
         var best = 0;
         for (var i = 0; i < REF_STORES.length; i++) {
@@ -200,7 +200,7 @@
             var label = storeName(ctx, s);
             idxRows.push({label: label, html: sellerRow(label, finishPrice(res.retail[s], card), 0)});
         });
-        // Alphabetical like the online collapse pass (search.go:668-670).
+        // Alphabetical like the online collapse pass (search.go:674-678).
         idxRows.sort(function (a, b) {
             return a.label.toLowerCase() < b.label.toLowerCase() ? -1 : 1;
         });
@@ -247,7 +247,7 @@
         });
 
         // Index (MetadataOnly) vendor rows come before condition headers,
-        // mirroring the INDEX group in search.go:1079 / search.html:1210-1213.
+        // mirroring the INDEX group in search.go:1088 / search.html:1210-1213.
         var indexHtml = '';
         var indexShorts = shorts.filter(function (s) { return isIndex(ctx, s); });
         indexShorts.forEach(function (s) {

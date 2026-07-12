@@ -210,9 +210,9 @@ test('syncImages stops cleanly on QuotaExceededError; imgstate stays done:false'
         cancelled: () => false,
         putImgState: async r => states.push({ ...r }),
     })).rejects.toThrow('storage quota exceeded');
-    // imgstate written done:false before unpack; never updated to done:true (errored-lane guard)
+    // imgstate written done:false before unpack; never updated to done:true
     expect(states).toEqual([{ code: 'TST', hash: 'h1', done: false }]);
-    // only one progress post (pre-bundle); nothing posted after error (errored-lane guard)
+    // only one progress post (pre-bundle); nothing posted after error
     expect(posts).toHaveLength(1);
 });
 
@@ -229,9 +229,9 @@ test('syncImages throws forbidden on 403 and writes no imgstate', async () => {
         cancelled: () => false,
         putImgState: async r => states.push(r),
     })).rejects.toThrow('forbidden');
-    // fetch failed before putImgState; no imgstate written (errored-lane guard)
+    // fetch failed before putImgState; no imgstate written
     expect(states).toHaveLength(0);
-    // only pre-bundle progress post; nothing after 403 (errored-lane guard)
+    // only pre-bundle progress post; nothing after 403
     expect(posts).toHaveLength(1);
 });
 
