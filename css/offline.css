@@ -18,10 +18,14 @@
     border-color: var(--search-link, #3b6fd4);
 }
 
+/* The shared .search-layout tucks under the online navbar with a -40px margin;
+   on the offline page the banner sits above it, so cancel the pull to avoid overlap. */
+.offline-shell .search-layout {
+    margin-top: 0;
+}
+
 /* Offline banner: data age, auth notice, back-online affordance */
 .offline-banner {
-    position: relative;
-    z-index: 2;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
