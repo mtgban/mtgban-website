@@ -209,7 +209,9 @@ func TestFinishPredicateDivergence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	searchFinish := FilterCardFuncs["finish"]
+	searchFinish := func(filters []string, co *mtgmatcher.CardObject) bool {
+		return applyCardFilter("finish", filters, co)
+	}
 
 	// API: sealed passes any finish filter.
 	for _, finish := range []string{"nonfoil", "foil", "etched"} {

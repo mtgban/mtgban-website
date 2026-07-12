@@ -7,9 +7,8 @@ import (
 )
 
 func TestFormatFilter(t *testing.T) {
-	skip := FilterCardFuncs["format"]
-	if skip == nil {
-		t.Fatal("format filter is not registered")
+	skip := func(filters []string, co *mtgmatcher.CardObject) bool {
+		return applyCardFilter("format", filters, co)
 	}
 
 	co := &mtgmatcher.CardObject{}
@@ -134,22 +133,22 @@ func TestCollectorNumberPLST(t *testing.T) {
 	if elem == nil {
 		t.Fatal("missing number filter")
 	}
-	if skip := FilterCardFuncs["number"](elem.Values, co); skip {
+	if skip := applyCardFilter("number", elem.Values, co); skip {
 		t.Error("cn:akh-127 should match a card numbered AKH-127")
 	}
-	if skip := FilterCardFuncs["number"](fixupNumberNG("akh-50"), co); !skip {
+	if skip := applyCardFilter("number", fixupNumberNG("akh-50"), co); !skip {
 		t.Error("cn:akh-50 should not match a card numbered AKH-127")
 	}
 
 	// Ranges compare the number embedded after the prefix (127), so the
 	// card falls outside 7000-7010 but within 100-200.
-	if skip := FilterCardFuncs["number_greater_than"]([]string{"7000"}, co); !skip {
+	if skip := applyCardFilter("number_greater_than", []string{"7000"}, co); !skip {
 		t.Error("AKH-127 should be excluded by cn>7000")
 	}
-	if skip := FilterCardFuncs["number_greater_than"]([]string{"100"}, co); skip {
+	if skip := applyCardFilter("number_greater_than", []string{"100"}, co); skip {
 		t.Error("AKH-127 should be kept by cn>100")
 	}
-	if skip := FilterCardFuncs["number_less_than"]([]string{"200"}, co); skip {
+	if skip := applyCardFilter("number_less_than", []string{"200"}, co); skip {
 		t.Error("AKH-127 should be kept by cn<200")
 	}
 }

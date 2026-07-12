@@ -1502,339 +1502,420 @@ var rarityMap = map[string]int{
 	"special":  4,
 }
 
-var FilterCardFuncs = map[string]func(filters []string, co *mtgmatcher.CardObject) bool{
-	"name": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return !mtgmatcher.Equals(filters[0], co.Name) && !mtgmatcher.Equals(filters[0], co.FlavorName)
-	},
-	"name_regexp": func(filters []string, co *mtgmatcher.CardObject) bool {
-		matched, _ := regexp.MatchString(filters[0], co.Name)
-		matchedFlavor, _ := regexp.MatchString(filters[0], co.FlavorName)
-		return !matched && !matchedFlavor
-	},
-	"edition": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return !slices.Contains(filters, co.SetCode)
-	},
-	"edition_regexp": func(filters []string, co *mtgmatcher.CardObject) bool {
-		matched, _ := regexp.MatchString(filters[0], co.Edition)
-		return !matched
-	},
-	"rarity": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return !slices.Contains(filters, co.Rarity)
-	},
-	"format": func(filters []string, co *mtgmatcher.CardObject) bool {
-		// Keep the card if it's legal (or restricted) in any requested format.
+// applyCardFilter dispatches a card filter by name through a switch of
+// named functions rather than a map of func values: shouldSkipCardNG calls
+// this once per filter per examined uuid, and calling through an opaque
+// func value forced the freshly copied CardObject to escape to the heap on
+// every card examined (the dominant allocation of pool-scanning searches).
+// Unknown names panic, preserving the old registry behavior.
+func applyCardFilter(name string, filters []string, co *mtgmatcher.CardObject) bool {
+	switch name {
+	case "name":
+		return cardFilterName(filters, co)
+	case "name_regexp":
+		return cardFilterNameRegexp(filters, co)
+	case "edition":
+		return cardFilterEdition(filters, co)
+	case "edition_regexp":
+		return cardFilterEditionRegexp(filters, co)
+	case "rarity":
+		return cardFilterRarity(filters, co)
+	case "format":
+		return cardFilterFormat(filters, co)
+	case "rarity_greater_than":
+		return cardFilterRarityGreaterThan(filters, co)
+	case "rarity_less_than":
+		return cardFilterRarityLessThan(filters, co)
+	case "type":
+		return cardFilterType(filters, co)
+	case "color":
+		return cardFilterColor(filters, co)
+	case "color_identity":
+		return cardFilterColorIdentity(filters, co)
+	case "idlookup":
+		return cardFilterIdlookup(filters, co)
+	case "contents":
+		return cardFilterContents(filters, co)
+	case "number":
+		return cardFilterNumber(filters, co)
+	case "number_regexp":
+		return cardFilterNumberRegexp(filters, co)
+	case "number_greater_than":
+		return cardFilterNumberGreaterThan(filters, co)
+	case "number_less_than":
+		return cardFilterNumberLessThan(filters, co)
+	case "finish":
+		return cardFilterFinish(filters, co)
+	case "date":
+		return cardFilterDate(filters, co)
+	case "date_greater_than":
+		return cardFilterDateGreaterThan(filters, co)
+	case "date_less_than":
+		return cardFilterDateLessThan(filters, co)
+	case "altname":
+		return cardFilterAltname(filters, co)
+	case "on":
+		return cardFilterOn(filters, co)
+	case "is":
+		return cardFilterIs(filters, co)
+	}
+	panic(name + " option not found")
+}
+
+func cardFilterName(filters []string, co *mtgmatcher.CardObject) bool {
+	return !mtgmatcher.Equals(filters[0], co.Name) && !mtgmatcher.Equals(filters[0], co.FlavorName)
+}
+
+func cardFilterNameRegexp(filters []string, co *mtgmatcher.CardObject) bool {
+	matched, _ := regexp.MatchString(filters[0], co.Name)
+	matchedFlavor, _ := regexp.MatchString(filters[0], co.FlavorName)
+	return !matched && !matchedFlavor
+}
+
+func cardFilterEdition(filters []string, co *mtgmatcher.CardObject) bool {
+	return !slices.Contains(filters, co.SetCode)
+}
+
+func cardFilterEditionRegexp(filters []string, co *mtgmatcher.CardObject) bool {
+	matched, _ := regexp.MatchString(filters[0], co.Edition)
+	return !matched
+}
+
+func cardFilterRarity(filters []string, co *mtgmatcher.CardObject) bool {
+	return !slices.Contains(filters, co.Rarity)
+}
+
+func cardFilterFormat(filters []string, co *mtgmatcher.CardObject) bool {
+	// Keep the card if it's legal (or restricted) in any requested format.
+	for _, value := range filters {
+		switch co.Legalities[value] {
+		case "Legal", "Restricted":
+			return false
+		}
+	}
+	return true
+}
+
+func cardFilterRarityGreaterThan(filters []string, co *mtgmatcher.CardObject) bool {
+	rarityIndex, found := rarityMap[filters[0]]
+	if !found {
+		return true
+	}
+	return rarityIndex >= rarityMap[co.Rarity]
+}
+
+func cardFilterRarityLessThan(filters []string, co *mtgmatcher.CardObject) bool {
+	rarityIndex, found := rarityMap[filters[0]]
+	if !found {
+		return true
+	}
+	return rarityIndex <= rarityMap[co.Rarity]
+}
+
+func cardFilterType(filters []string, co *mtgmatcher.CardObject) bool {
+	if co.Sealed {
 		for _, value := range filters {
-			switch co.Legalities[value] {
-			case "Legal", "Restricted":
+			value = strings.ToLower(strings.Replace(value, " ", "_", -1))
+			if strings.Contains(strings.ToLower(co.Layout), value) ||
+				strings.Contains(strings.ToLower(co.Side), value) ||
+				strings.Contains(strings.ToLower(co.Name), value) {
 				return false
 			}
 		}
-		return true
-	},
-	"rarity_greater_than": func(filters []string, co *mtgmatcher.CardObject) bool {
-		rarityIndex, found := rarityMap[filters[0]]
-		if !found {
+	} else {
+		for _, value := range filters {
+			if slices.Contains(co.Subtypes, value) ||
+				slices.Contains(co.Types, value) ||
+				slices.Contains(co.Supertypes, value) ||
+				co.PrintedType == value {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func cardFilterColor(filters []string, co *mtgmatcher.CardObject) bool {
+	if len(filters) == 0 {
+		return len(co.Colors) != 0
+	}
+	if len(filters) == 5 {
+		return len(co.Colors) <= 1
+	}
+	for _, value := range filters {
+		if !slices.Contains(co.Colors, strings.ToUpper(value)) && !slices.Contains(co.Colors, strings.ToLower(value)) {
 			return true
 		}
-		return rarityIndex >= rarityMap[co.Rarity]
-	},
-	"rarity_less_than": func(filters []string, co *mtgmatcher.CardObject) bool {
-		rarityIndex, found := rarityMap[filters[0]]
-		if !found {
+	}
+	return false
+}
+
+func cardFilterColorIdentity(filters []string, co *mtgmatcher.CardObject) bool {
+	if len(filters) == 0 {
+		return len(co.ColorIdentity) != 0
+	}
+	if len(filters) == 5 {
+		return len(co.ColorIdentity) <= 1
+	}
+	for _, value := range co.ColorIdentity {
+		if !slices.Contains(filters, value) {
 			return true
 		}
-		return rarityIndex <= rarityMap[co.Rarity]
-	},
-	"type": func(filters []string, co *mtgmatcher.CardObject) bool {
-		if co.Sealed {
-			for _, value := range filters {
-				value = strings.ToLower(strings.Replace(value, " ", "_", -1))
-				if strings.Contains(strings.ToLower(co.Layout), value) ||
-					strings.Contains(strings.ToLower(co.Side), value) ||
-					strings.Contains(strings.ToLower(co.Name), value) {
-					return false
-				}
-			}
-		} else {
-			for _, value := range filters {
-				if slices.Contains(co.Subtypes, value) ||
-					slices.Contains(co.Types, value) ||
-					slices.Contains(co.Supertypes, value) ||
-					co.PrintedType == value {
-					return false
-				}
-			}
-		}
-		return true
-	},
-	"color": func(filters []string, co *mtgmatcher.CardObject) bool {
-		if len(filters) == 0 {
-			return len(co.Colors) != 0
-		}
-		if len(filters) == 5 {
-			return len(co.Colors) <= 1
-		}
-		for _, value := range filters {
-			if !slices.Contains(co.Colors, strings.ToUpper(value)) && !slices.Contains(co.Colors, strings.ToLower(value)) {
-				return true
-			}
-		}
-		return false
-	},
-	"color_identity": func(filters []string, co *mtgmatcher.CardObject) bool {
-		if len(filters) == 0 {
-			return len(co.ColorIdentity) != 0
-		}
-		if len(filters) == 5 {
-			return len(co.ColorIdentity) <= 1
-		}
-		for _, value := range co.ColorIdentity {
-			if !slices.Contains(filters, value) {
-				return true
-			}
-		}
-		return false
-	},
-	"idlookup": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return !slices.Contains(filters, co.UUID)
-	},
-	"contents": func(filters []string, co *mtgmatcher.CardObject) bool {
-		values := cardobject2sources(co)
-		for _, filter := range filters {
-			if !slices.Contains(values, filter) {
-				return true
-			}
-		}
-		return false
-	},
-	"number": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return !slices.Contains(filters, strings.ToLower(co.Number))
-	},
-	"number_regexp": func(filters []string, co *mtgmatcher.CardObject) bool {
-		matched, _ := regexp.MatchString(filters[0], co.Number)
-		return !matched
-	},
-	"number_greater_than": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return compareCollectorNumber(filters, co, func(a, b int) bool {
-			return a > b
-		})
-	},
-	"number_less_than": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return compareCollectorNumber(filters, co, func(a, b int) bool {
-			return a < b
-		})
-	},
-	"finish": func(filters []string, co *mtgmatcher.CardObject) bool {
-		for _, value := range filters {
-			switch value {
-			case "etched", "e":
-				if co.Etched {
-					return false
-				}
-			case "foil", "f":
-				if co.Foil {
-					return false
-				}
-			case "nonfoil", "nf", "r":
-				if !co.Foil && !co.Etched {
-					return false
-				}
-			}
-		}
-		return true
-	},
-	"date": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return compareReleaseDate(filters, co, func(a, b time.Time) bool {
-			return !a.Equal(b)
-		})
-	},
-	"date_greater_than": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return compareReleaseDate(filters, co, func(a, b time.Time) bool {
-			return a.Before(b)
-		})
-	},
-	"date_less_than": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return compareReleaseDate(filters, co, func(a, b time.Time) bool {
-			return a.After(b)
-		})
-	},
-	"altname": func(filters []string, co *mtgmatcher.CardObject) bool {
-		return (co.FlavorName != "" && mtgmatcher.Normalize(co.FlavorName) != filters[0]) ||
-			(co.FaceFlavorName != "" && mtgmatcher.Normalize(co.FaceFlavorName) != filters[0])
-	},
-	"on": func(filters []string, co *mtgmatcher.CardObject) bool {
-		for _, value := range filters {
-			switch value {
-			case "mtgstocks":
-				inv, _ := findSellerInventory("STKS")
-				_, found := inv[co.UUID]
-				if found {
-					return false
-				}
-			case "tcgsyp", "syp":
-				bl, _ := findVendorBuylist("SYP")
-				_, found := bl[co.UUID]
-				if found {
-					return false
-				}
-			case "hotlist":
-				_, found := GetInfos()["hotlist"][co.UUID]
-				if found {
-					return false
-				}
-			case "ckp90":
-				// Cards whose current Card Kingdom buylist meets its latest P90.
-				if good := getGoodBuylistPrice(co.UUID); good > 0 {
-					if bl, err := findVendorBuylist("CK"); err == nil {
-						if entries, ok := bl[co.UUID]; ok && len(entries) > 0 && entries[0].BuyPrice >= good {
-							return false
-						}
-					}
-				}
-			case "newspaper":
-				if uuids := GetNewspaperUUIDs(); uuids != nil {
-					if _, found := uuids[co.UUID]; found {
-						return false
-					}
-				}
-			}
-		}
-		return true
-	},
-	"is": func(filters []string, co *mtgmatcher.CardObject) bool {
-		for _, value := range filters {
-			switch value {
-			case "foil":
-				if co.Foil || co.Etched {
-					return false
-				}
-			case "nonfoil":
-				if !co.Foil && !co.Etched {
-					return false
-				}
-			case "reserved":
-				if co.IsReserved {
-					return false
-				}
-			case "token":
-				if co.Layout == "token" {
-					return false
-				}
-			case "oversize", "oversized":
-				if co.IsOversized {
-					return false
-				}
-			case "funny":
-				if co.IsFunny {
-					return false
-				}
-			case "wcd", "gold":
-				if co.BorderColor == "gold" {
-					return false
-				}
-			case "fullart", "fa":
-				if co.IsFullArt {
-					return false
-				}
-			case "promo":
-				if co.IsPromo {
-					return false
-				}
-			case "gamechanger", "gc":
-				if co.IsGameChanger {
-					return false
-				}
-			case "extendedart", "ea":
-				if co.HasFrameEffect(mtgmatcher.FrameEffectExtendedArt) {
-					return false
-				}
-			case "showcase", "sc", "sh":
-				if co.HasFrameEffect(mtgmatcher.FrameEffectShowcase) {
-					return false
-				}
-			case "borderless", "bd", "bl":
-				if co.BorderColor == mtgmatcher.BorderColorBorderless {
-					return false
-				}
-			case "future":
-				if co.FrameVersion == "future" {
-					return false
-				}
-			case "retro", "old":
-				if co.FrameVersion == "1993" || co.FrameVersion == "1997" {
-					return false
-				}
-			case "reskin":
-				if co.FlavorName != "" {
-					return false
-				}
-			case "japanese", "jpn", "jp", "ja":
-				if co.Language == mtgmatcher.LanguageJapanese {
-					return false
-				}
-			case "phyrexian", "ph":
-				if co.Language == mtgmatcher.LanguagePhyrexian {
-					return false
-				}
-			case "commander":
-				values := cardobject2sources(co)
-				for _, sealedUUID := range values {
-					res := findInDeck(sealedUUID, "commander")
-					if slices.Contains(res, co.UUID) {
-						return false
-					}
-				}
-			case "productless":
-				if cardobject2sources(co) == nil {
-					return false
-				}
-			case "ampersand":
-				if co.SetCode != "PAFR" {
-					continue
-				}
-				if co.HasPromoType(mtgmatcher.PromoTypeEmbossed) {
-					return false
-				}
-			case "p9":
-				customTag, found := specialTags[co.Name]
-				if found && customTag == "power9" {
-					return false
-				}
-			case "altfoil":
-				for _, tag := range altFoilTags {
-					if co.HasPromoType(tag) {
-						return false
-					}
-				}
-			default:
-				// Adjust input for these known cases
-				newValue, found := isKnownPromo[value]
-				if found {
-					value = newValue
-				}
+	}
+	return false
+}
 
-				// Fall back to any promo type currently supported
-				if slices.Contains(mtgmatcher.AllPromoTypes(), value) {
-					if co.HasPromoType(value) {
+func cardFilterIdlookup(filters []string, co *mtgmatcher.CardObject) bool {
+	return !slices.Contains(filters, co.UUID)
+}
+
+func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
+	values := cardobject2sources(co)
+	for _, filter := range filters {
+		if !slices.Contains(values, filter) {
+			return true
+		}
+	}
+	return false
+}
+
+func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
+	return !slices.Contains(filters, strings.ToLower(co.Number))
+}
+
+func cardFilterNumberRegexp(filters []string, co *mtgmatcher.CardObject) bool {
+	matched, _ := regexp.MatchString(filters[0], co.Number)
+	return !matched
+}
+
+func cardFilterNumberGreaterThan(filters []string, co *mtgmatcher.CardObject) bool {
+	return compareCollectorNumber(filters, co, func(a, b int) bool {
+		return a > b
+	})
+}
+
+func cardFilterNumberLessThan(filters []string, co *mtgmatcher.CardObject) bool {
+	return compareCollectorNumber(filters, co, func(a, b int) bool {
+		return a < b
+	})
+}
+
+func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
+	for _, value := range filters {
+		switch value {
+		case "etched", "e":
+			if co.Etched {
+				return false
+			}
+		case "foil", "f":
+			if co.Foil {
+				return false
+			}
+		case "nonfoil", "nf", "r":
+			if !co.Foil && !co.Etched {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func cardFilterDate(filters []string, co *mtgmatcher.CardObject) bool {
+	return compareReleaseDate(filters, co, func(a, b time.Time) bool {
+		return !a.Equal(b)
+	})
+}
+
+func cardFilterDateGreaterThan(filters []string, co *mtgmatcher.CardObject) bool {
+	return compareReleaseDate(filters, co, func(a, b time.Time) bool {
+		return a.Before(b)
+	})
+}
+
+func cardFilterDateLessThan(filters []string, co *mtgmatcher.CardObject) bool {
+	return compareReleaseDate(filters, co, func(a, b time.Time) bool {
+		return a.After(b)
+	})
+}
+
+func cardFilterAltname(filters []string, co *mtgmatcher.CardObject) bool {
+	return (co.FlavorName != "" && mtgmatcher.Normalize(co.FlavorName) != filters[0]) ||
+		(co.FaceFlavorName != "" && mtgmatcher.Normalize(co.FaceFlavorName) != filters[0])
+}
+
+func cardFilterOn(filters []string, co *mtgmatcher.CardObject) bool {
+	for _, value := range filters {
+		switch value {
+		case "mtgstocks":
+			inv, _ := findSellerInventory("STKS")
+			_, found := inv[co.UUID]
+			if found {
+				return false
+			}
+		case "tcgsyp", "syp":
+			bl, _ := findVendorBuylist("SYP")
+			_, found := bl[co.UUID]
+			if found {
+				return false
+			}
+		case "hotlist":
+			_, found := GetInfos()["hotlist"][co.UUID]
+			if found {
+				return false
+			}
+		case "ckp90":
+			// Cards whose current Card Kingdom buylist meets its latest P90.
+			if good := getGoodBuylistPrice(co.UUID); good > 0 {
+				if bl, err := findVendorBuylist("CK"); err == nil {
+					if entries, ok := bl[co.UUID]; ok && len(entries) > 0 && entries[0].BuyPrice >= good {
 						return false
 					}
 				}
-
-				// Finally check any leftover tags
-				customTag, found := specialTags[co.Name]
-				if found && customTag == value {
-					return false
-				}
-
-				// same for set code tags
-				customTag, found = specialEditionTags[co.SetCode]
-				if found && customTag == value {
+			}
+		case "newspaper":
+			if uuids := GetNewspaperUUIDs(); uuids != nil {
+				if _, found := uuids[co.UUID]; found {
 					return false
 				}
 			}
 		}
-		return true
-	},
+	}
+	return true
+}
+
+func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
+	for _, value := range filters {
+		switch value {
+		case "foil":
+			if co.Foil || co.Etched {
+				return false
+			}
+		case "nonfoil":
+			if !co.Foil && !co.Etched {
+				return false
+			}
+		case "reserved":
+			if co.IsReserved {
+				return false
+			}
+		case "token":
+			if co.Layout == "token" {
+				return false
+			}
+		case "oversize", "oversized":
+			if co.IsOversized {
+				return false
+			}
+		case "funny":
+			if co.IsFunny {
+				return false
+			}
+		case "wcd", "gold":
+			if co.BorderColor == "gold" {
+				return false
+			}
+		case "fullart", "fa":
+			if co.IsFullArt {
+				return false
+			}
+		case "promo":
+			if co.IsPromo {
+				return false
+			}
+		case "gamechanger", "gc":
+			if co.IsGameChanger {
+				return false
+			}
+		case "extendedart", "ea":
+			if co.HasFrameEffect(mtgmatcher.FrameEffectExtendedArt) {
+				return false
+			}
+		case "showcase", "sc", "sh":
+			if co.HasFrameEffect(mtgmatcher.FrameEffectShowcase) {
+				return false
+			}
+		case "borderless", "bd", "bl":
+			if co.BorderColor == mtgmatcher.BorderColorBorderless {
+				return false
+			}
+		case "future":
+			if co.FrameVersion == "future" {
+				return false
+			}
+		case "retro", "old":
+			if co.FrameVersion == "1993" || co.FrameVersion == "1997" {
+				return false
+			}
+		case "reskin":
+			if co.FlavorName != "" {
+				return false
+			}
+		case "japanese", "jpn", "jp", "ja":
+			if co.Language == mtgmatcher.LanguageJapanese {
+				return false
+			}
+		case "phyrexian", "ph":
+			if co.Language == mtgmatcher.LanguagePhyrexian {
+				return false
+			}
+		case "commander":
+			values := cardobject2sources(co)
+			for _, sealedUUID := range values {
+				res := findInDeck(sealedUUID, "commander")
+				if slices.Contains(res, co.UUID) {
+					return false
+				}
+			}
+		case "productless":
+			if cardobject2sources(co) == nil {
+				return false
+			}
+		case "ampersand":
+			if co.SetCode != "PAFR" {
+				continue
+			}
+			if co.HasPromoType(mtgmatcher.PromoTypeEmbossed) {
+				return false
+			}
+		case "p9":
+			customTag, found := specialTags[co.Name]
+			if found && customTag == "power9" {
+				return false
+			}
+		case "altfoil":
+			for _, tag := range altFoilTags {
+				if co.HasPromoType(tag) {
+					return false
+				}
+			}
+		default:
+			// Adjust input for these known cases
+			newValue, found := isKnownPromo[value]
+			if found {
+				value = newValue
+			}
+
+			// Fall back to any promo type currently supported
+			if slices.Contains(mtgmatcher.AllPromoTypes(), value) {
+				if co.HasPromoType(value) {
+					return false
+				}
+			}
+
+			// Finally check any leftover tags
+			customTag, found := specialTags[co.Name]
+			if found && customTag == value {
+				return false
+			}
+
+			// same for set code tags
+			customTag, found = specialEditionTags[co.SetCode]
+			if found && customTag == value {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func shouldSkipCardNG(cardId string, filters []FilterElem) bool {
@@ -1854,11 +1935,7 @@ func shouldSkipCardNG(cardId string, filters []FilterElem) bool {
 			continue
 		}
 
-		f, found := FilterCardFuncs[filters[i].Name]
-		if !found {
-			panic(filters[i].Name + " option not found")
-		}
-		res := f(filters[i].Values, co)
+		res := applyCardFilter(filters[i].Name, filters[i].Values, co)
 		if filters[i].Negate {
 			res = !res
 		}
