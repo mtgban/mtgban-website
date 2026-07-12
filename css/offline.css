@@ -1,23 +1,5 @@
 /* Offline search shell chrome. Result markup is styled by search.css. */
 
-.offline-searchbar {
-    padding: 0.5em 0 0.75em;
-}
-.offline-searchbar input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.6em 0.9em;
-    font-size: var(--text-md);
-    color: var(--normal);
-    background: var(--surface-2, rgba(0, 0, 0, 0.05));
-    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
-    border-radius: 0.5em;
-}
-.offline-searchbar input:focus {
-    outline: none;
-    border-color: var(--search-link, #3b6fd4);
-}
-
 /* The shared .search-layout tucks under the online navbar with a -40px margin;
    on the offline page the banner sits above it, so cancel the pull to avoid overlap. */
 .offline-shell .search-layout {
