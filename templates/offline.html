@@ -11,6 +11,7 @@
     <script type="text/javascript" src="/js/offline/offline-util.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/offline/offline-query.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/offline/offline-render.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-search.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/offline/offline-age.js?hash={{.Hash}}"></script>
 {{end}}
 
@@ -29,19 +30,13 @@
     <div class="search-layout">
         <div class="search-sidebar">
             <div class="sidebar-search">
-                <div class="offline-searchbar">
-                    <input id="offline-searchbox" type="text" list="offline-card-names"
-                           placeholder="Search offline prices..." maxlength="1000"
-                           autocapitalize="none" autocomplete="off" spellcheck="false" autofocus>
-                    <datalist id="offline-card-names"></datalist>
-                </div>
                 <div class="search-sort-row">
                     <span class="search-sort-label">Sort</span>
-                    <button class="search-sort-pill" data-sort="chrono" title="Chronological" type="button">Time</button>
-                    <button class="search-sort-pill" data-sort="alpha" title="Alphabetical" type="button">A-Z</button>
-                    <button class="search-sort-pill" data-sort="number" title="Collector Number" type="button">#</button>
-                    <button class="search-sort-pill" data-sort="retail" title="Retail Price" type="button">$</button>
-                    <button class="search-sort-pill" data-sort="buylist" title="Buylist Price" type="button">BL</button>
+                    <button class="search-sort-pill" data-sort="chrono" title="Chronological" aria-label="Sort chronological" type="button"><svg class="lucide lucide-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                    <button class="search-sort-pill" data-sort="alpha" title="Alphabetical" aria-label="Sort alphabetical" type="button"><svg class="lucide lucide-a-large-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 14h-5"/><path d="M16 16v-3.5a2.5 2.5 0 0 1 5 0V16"/><path d="M4.5 13h6"/><path d="m3 16 4.5-9 4.5 9"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                    <button class="search-sort-pill" data-sort="number" title="Collector Number" aria-label="Sort by collector number" type="button"><svg class="lucide lucide-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                    <button class="search-sort-pill" data-sort="retail" title="Retail Price" aria-label="Sort by retail price" type="button"><svg class="lucide lucide-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                    <button class="search-sort-pill" data-sort="buylist" title="Buylist Price" aria-label="Sort by buylist price" type="button"><svg class="lucide lucide-shopping-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
                 </div>
                 <div class="search-result-divider">
                     <span class="search-result-count" id="offline-count"></span>
@@ -78,9 +73,6 @@
     var sortMode = getCookie('SearchDefaultSort') || 'chrono';
     var reverse = false;
     if (sortMode === 'hybrid') sortMode = 'alpha';
-    var namesP = null;
-    var nameReq = 0;
-
     function hiddenList(name) {
         return (getCookie(name) || '').split(',').filter(Boolean);
     }
@@ -174,32 +166,8 @@
             });
         });
 
-        // Datalist suggestions from the in-memory name list, capped small.
-        var box = document.getElementById('offline-searchbox');
-        box.addEventListener('input', async function () {
-            if (!env) return;
-            var needle = OfflineUtil.normName(box.value);
-            if (needle.length < 3) return;
-            namesP = namesP || env.allNames();
-            var t = ++nameReq;
-            var list = await namesP;
-            if (t !== nameReq) return;
-            var opts = [];
-            for (var i = 0; i < list.length && opts.length < 25; i++) {
-                if (list[i].key.indexOf(needle) !== -1) opts.push(list[i].key);
-            }
-            document.getElementById('offline-card-names').innerHTML =
-                opts.map(function (k) { return '<option value="' + k + '"></option>'; }).join('');
-        });
-
-        box.addEventListener('keydown', function (e) {
-            if (!env) return;
-            if (e.key !== 'Enter') return;
-            e.preventDefault();
-            var q = box.value.trim();
-            history.pushState(null, '', q ? '?q=' + encodeURIComponent(q) : location.pathname);
-            runQuery(q).catch(showErrorNotice);
-        });
+        var box = document.getElementById('nav-searchbox');
+        var form = document.getElementById('nav-searchform');
 
         window.addEventListener('popstate', function () {
             var q = new URLSearchParams(location.search).get('q') || '';
@@ -208,6 +176,20 @@
         });
 
         setup().then(function () {
+            OfflineSearch.mount({
+                input: box,
+                form: form,
+                deps: {
+                    normName: OfflineUtil.normName,
+                    allNames: OfflineDB.allNames,
+                    getCard: OfflineDB.getCard,
+                    sets: dicts.sets
+                },
+                onSubmit: function (q) {
+                    history.pushState(null, '', q ? '?q=' + encodeURIComponent(q) : location.pathname);
+                    runQuery(q).catch(showErrorNotice);
+                }
+            });
             var q = new URLSearchParams(location.search).get('q') || '';
             box.value = q;
             return runQuery(q);

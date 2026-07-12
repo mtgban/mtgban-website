@@ -1,27 +1,27 @@
 /* Offline search shell chrome. Result markup is styled by search.css. */
 
-.offline-searchbar {
-    padding: 0.5em 0 0.75em;
-}
-.offline-searchbar input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 0.6em 0.9em;
-    font-size: var(--text-md);
-    color: var(--normal);
-    background: var(--surface-2, rgba(0, 0, 0, 0.05));
-    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
-    border-radius: 0.5em;
-}
-.offline-searchbar input:focus {
-    outline: none;
-    border-color: var(--search-link, #3b6fd4);
-}
-
 /* The shared .search-layout tucks under the online navbar with a -40px margin;
    on the offline page the banner sits above it, so cancel the pull to avoid overlap. */
 .offline-shell .search-layout {
     margin-top: 0;
+}
+
+/* Sort pills show a direction arrow on the active pill: green asc, red desc (rotated). */
+.offline-shell .search-sort-dir {
+    display: none;
+    align-items: center;
+}
+.offline-shell .search-sort-dir svg {
+    width: 14px;
+    height: 14px;
+}
+.offline-shell .search-sort-pill.active .search-sort-dir {
+    display: inline-flex;
+    color: #22c55e;
+}
+.offline-shell .search-sort-pill.active.reversed .search-sort-dir {
+    color: #ef4444;
+    transform: rotate(180deg);
 }
 
 /* Offline banner: data age, auth notice, back-online affordance */
