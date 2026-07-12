@@ -202,6 +202,7 @@
             OfflineDB.setMeta('lastSync', new Date().toISOString()).then(refreshStatus).then(function() {
                 updateAuthNotice();
                 setSyncStatus('synced, ' + m.changedSets + ' sets updated');
+                paintUsage();
             });
         } else if (m.type === 'error') {
             syncing = false;
@@ -247,6 +248,16 @@
         return (i === 0 ? n : n.toFixed(1)) + ' ' + units[i];
     }
 
+    // Repaint the settings storage line from current status; safe to call anytime.
+    function paintUsage() {
+        var usage = document.getElementById('settings-offline-usage');
+        if (!usage) return;
+        if (!enabled()) { usage.textContent = ''; return; }
+        var s = status();
+        usage.textContent = 'Using ' + fmtBytes(s.bytes) +
+            (s.lastSync ? ', last sync ' + new Date(s.lastSync).toLocaleString() : ', not synced yet');
+    }
+
     // Settings modal glue: reveal the Offline section only when available().
     function initSettingsUI() {
         var section = document.getElementById('settings-offline-section');
@@ -258,12 +269,8 @@
 
         function paint() {
             toggle.checked = enabled();
-            if (!enabled()) { usage.textContent = ''; return; }
-            refreshStatus().then(function () {
-                var s = status();
-                usage.textContent = 'Using ' + fmtBytes(s.bytes) +
-                    (s.lastSync ? ', last sync ' + s.lastSync : ', not synced yet');
-            });
+            if (!enabled()) { paintUsage(); return; }
+            refreshStatus().then(paintUsage);
         }
 
         toggle.addEventListener('change', function () {
