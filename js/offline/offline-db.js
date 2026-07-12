@@ -1,4 +1,4 @@
-// IndexedDB wrapper for offline mode (contract sec 4 schema).
+// IndexedDB wrapper for offline mode.
 // Plain script: attaches to self so pages and workers can both load it.
 (function() {
     'use strict';
@@ -6,12 +6,17 @@
     var DB_NAME = 'mtgban-offline';
     var DB_VERSION = 1;
 
-    // keyPath per object store, fixed by the interface contract.
+    // keyPath per object store; the sync worker and page code rely on these key names.
     var STORES = { meta: 'k', sets: 'code', cards: 'uuid', names: 'key', imgstate: 'code' };
 
     var dbPromise = null;
 
-    function open() {
+    // Returns true if the DB opened with no stores; symptom of a blocked delete.
+    function isGhostDb(db) {
+        return !db.objectStoreNames.contains('meta');
+    }
+
+    function open(retried) {
         if (!dbPromise) {
             dbPromise = new Promise(function(resolve, reject) {
                 var req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -25,6 +30,14 @@
                 };
                 req.onsuccess = function() {
                     var db = req.result;
+                    if (!retried && isGhostDb(db)) {
+                        db.close();
+                        dbPromise = null;
+                        var del = indexedDB.deleteDatabase(DB_NAME);
+                        var reopen = function() { open(true).then(resolve, reject); };
+                        del.onsuccess = del.onerror = del.onblocked = reopen;
+                        return;
+                    }
                     db.onversionchange = function() { db.close(); dbPromise = null; };
                     resolve(db);
                 };
@@ -34,7 +47,7 @@
         return dbPromise;
     }
 
-    // Phase 7's opt-out closes the handle before indexedDB.deleteDatabase.
+    // Callers close the handle before indexedDB.deleteDatabase.
     function close() {
         if (!dbPromise) return Promise.resolve();
         var p = dbPromise;
@@ -134,7 +147,7 @@
         });
     }
 
-    // Full name-index scan for the phase 4 fuzzy matcher.
+    // Full name-index scan backing the offline search substring matcher.
     function allNames() {
         return withTx(['names'], 'readonly', function(tx, out) {
             out.result = [];
@@ -154,7 +167,7 @@
         }
     }
 
-    // Generic row access for stores without dedicated helpers (phase 6: imgstate).
+    // Generic row access for stores without dedicated helpers (imgstate).
     function getAllRows(store) {
         checkStore(store);
         return withTx([store], 'readonly', function(tx, out) {
@@ -188,6 +201,7 @@
         DB_NAME: DB_NAME,
         open: open,
         close: close,
+        isGhostDb: isGhostDb,
         getMeta: getMeta,
         setMeta: setMeta,
         putSet: putSet,

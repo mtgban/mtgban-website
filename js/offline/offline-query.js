@@ -1,4 +1,4 @@
-// Offline search query mini-parser and executor (contract sec 12).
+// Offline search query mini-parser and executor.
 (function (root) {
     'use strict';
 

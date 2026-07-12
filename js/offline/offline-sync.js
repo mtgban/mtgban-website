@@ -125,7 +125,7 @@ async function runSync(msg) {
         await Promise.all([pump(), pump()]);
 
         if (!cancelled) {
-            // Filtered runs must not claim the whole subset synced.
+            // Edition-filtered runs must not record storesKey as fully resynced.
             if (editions.length === 0) await self.OfflineDB.setMeta('storesKey', storesKey);
             await self.OfflineDB.setMeta('manifest', manifest);
             await self.OfflineDB.setMeta('authLapsed', false);
@@ -183,7 +183,7 @@ async function rebuildCatalog(catalog) {
         await self.OfflineDB.putCards({ cards: [], names: nameRows.slice(j, j + CHUNK) });
     }
 
-    // Display dictionaries for phase 4 (OfflineUtil.loadCatalogDicts reads these).
+    // Display dictionaries for the offline shell (OfflineUtil.loadCatalogDicts reads these).
     await self.OfflineDB.setMeta('catalogSets', catalog.sets || {});
     await self.OfflineDB.setMeta('catalogStores', catalog.stores || {});
 }

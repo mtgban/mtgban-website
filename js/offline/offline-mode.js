@@ -3,7 +3,7 @@
     'use strict';
 
     var PREF = 'offline_mode';
-    // Roaming csv pref -> IDB meta array key (the worker reads the IDB copy).
+    // Roaming csv pref -> IDB meta array key (sync() reads the IDB copy and passes it to the worker)
     var SEL_PREFS = {
         offline_stores: 'storesSel',
         offline_editions: 'editionsSel',
@@ -72,6 +72,17 @@
             ops.push(navigator.storage.estimate().then(function(est) { state.bytes = est.usage || 0; }));
         }
         return Promise.all(ops).catch(function() {});
+    }
+
+    function updateAuthNotice() {
+        var el = document.getElementById('offline-auth-notice');
+        if (el) el.hidden = !state.authLapsed;
+    }
+
+    function setAuthLapsed(flag) {
+        state.authLapsed = flag;
+        updateAuthNotice();
+        return OfflineDB.setMeta('authLapsed', flag);
     }
 
     // Filter helper: only our SW's registrations.
@@ -146,11 +157,12 @@
         writePref(PREF, 'false');
         // Prefs record the opt-out first; the boot path retries cleanup if this fails.
         return cleanupLocal().then(function () {
-            state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false };
+            state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false, authLapsed: false };
+            updateAuthNotice();
         });
     }
 
-    // --- price sync worker plumbing (phase 3) ---
+    // --- price sync worker plumbing ---
     var syncWorker = null;
     var syncing = false;
 
@@ -180,6 +192,7 @@
         var m = ev.data || {};
         document.dispatchEvent(new CustomEvent('offline:sync-message', { detail: m }));
         if (m.type === 'progress') {
+            if (m.stage !== 'manifest' && state.authLapsed) setAuthLapsed(false);
             var label = m.stage + ' ' + m.done + '/' + m.total;
             if (m.code) label += ' (' + m.code + ')';
             setSyncStatus('syncing: ' + label);
@@ -187,11 +200,14 @@
             syncing = false;
             state.bytes = m.bytes || 0;
             OfflineDB.setMeta('lastSync', new Date().toISOString()).then(refreshStatus).then(function() {
+                updateAuthNotice();
                 setSyncStatus('synced, ' + m.changedSets + ' sets updated');
+                paintUsage();
             });
         } else if (m.type === 'error') {
             syncing = false;
             if (m.message === 'forbidden') {
+                setAuthLapsed(true);
                 setSyncStatus('sync stopped: offline access expired');
             } else {
                 setSyncStatus('sync error at ' + m.stage + ': ' + m.message);
@@ -232,6 +248,16 @@
         return (i === 0 ? n : n.toFixed(1)) + ' ' + units[i];
     }
 
+    // Repaint the settings storage line from current status; safe to call anytime.
+    function paintUsage() {
+        var usage = document.getElementById('settings-offline-usage');
+        if (!usage) return;
+        if (!enabled()) { usage.textContent = ''; return; }
+        var s = status();
+        usage.textContent = 'Using ' + fmtBytes(s.bytes) +
+            (s.lastSync ? ', last sync ' + new Date(s.lastSync).toLocaleString() : ', not synced yet');
+    }
+
     // Settings modal glue: reveal the Offline section only when available().
     function initSettingsUI() {
         var section = document.getElementById('settings-offline-section');
@@ -243,12 +269,8 @@
 
         function paint() {
             toggle.checked = enabled();
-            if (!enabled()) { usage.textContent = ''; return; }
-            refreshStatus().then(function () {
-                var s = status();
-                usage.textContent = 'Using ' + fmtBytes(s.bytes) +
-                    (s.lastSync ? ', last sync ' + s.lastSync : ', not synced yet');
-            });
+            if (!enabled()) { paintUsage(); return; }
+            refreshStatus().then(paintUsage);
         }
 
         toggle.addEventListener('change', function () {
@@ -280,6 +302,17 @@
             .then(function () { return ensureKey(); })
             .then(function () { return reconcileSelections(); })
             .then(refreshStatus)
+            .then(function () {
+                updateAuthNotice();
+                if (!state.authLapsed) {
+                    sync();
+                } else {
+                    // a restored subscription self-heals at next page load
+                    fetch('/api/offline/manifest.json', { credentials: 'same-origin' })
+                        .then(function (resp) { if (resp.ok) { setAuthLapsed(false); sync(); } })
+                        .catch(function () {});
+                }
+            })
             .catch(function () {});
     }
 
