@@ -14,6 +14,9 @@
 
     if (location.pathname === '/offline' || document.getElementById('offline-banner')) return;
 
+    // Already choosing offline: the "unreachable" nudge would be redundant.
+    try { if (window.OfflinePrefer && OfflinePrefer.get()) return; } catch (e) {}
+
     // Single pref check; opted-out users pay nothing further (no timers).
     var enabled = false;
     try {
