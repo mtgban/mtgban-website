@@ -880,13 +880,22 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			arbit = arbit[:MaxArbitResults]
 		}
 
+		// The trade credit belongs to whichever side is the vendor: the
+		// per-table scraper normally, the shared source in reverse mode
+		// (there the scrapers are sellers and the trade-in happens at the
+		// source, so its credit policy applies to every table).
+		creditInfo := scraper.Info()
+		if pageVars.ReverseMode {
+			creditInfo = source.Info()
+		}
+
 		entry := Arbitrage{
 			Name:             scraperName(scraper.Info().Shorthand),
 			Key:              scraper.Info().Shorthand,
 			Arbit:            arbit,
-			HasNoCredit:      scraper.Info().CreditMultiplier == 0,
+			HasNoCredit:      creditInfo.CreditMultiplier == 0,
 			HasNoQty:         scraper.Info().MetadataOnly || scraper.Info().NoQuantityInventory,
-			CreditMultiplier: scraper.Info().CreditMultiplier,
+			CreditMultiplier: creditInfo.CreditMultiplier,
 			SussyList:        sussy,
 		}
 		if pageVars.GlobalMode {
