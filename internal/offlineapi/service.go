@@ -61,6 +61,9 @@ type Service struct {
 	manifestStore *bucketstore.Store[manifestFile]
 	imagesStore   *bucketstore.Store[ImagesManifest]
 	catalog       atomic.Pointer[catalogCache]
+	// refreshSignal wakes the background refresher; buffered so RequestRefresh
+	// never blocks and bursts coalesce.
+	refreshSignal chan struct{}
 }
 
 // NewService constructs a Service wired to the given Deps.
@@ -74,6 +77,7 @@ func NewService(deps Deps) *Service {
 		MissingOK: true,
 		Bucket:    deps.ImagesManifestBucket,
 	}
+	s.refreshSignal = make(chan struct{}, 1)
 	return s
 }
 

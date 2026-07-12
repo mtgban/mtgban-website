@@ -76,6 +76,12 @@
 
     var pollTimer = null;
 
+    // When the user manually prefers offline, "back online" means exit that
+    // choice; the server may be perfectly reachable.
+    function preferring() {
+        try { return window.OfflinePrefer && OfflinePrefer.get(); } catch (e) { return false; }
+    }
+
     // Affordance only, never auto-navigate: auto-jumping would lose mid-browse context.
     function poll() {
         if (document.hidden) return;
@@ -85,7 +91,14 @@
                 clearInterval(pollTimer);
                 pollTimer = null;
                 var q = new URLSearchParams(location.search).get('q');
-                backEl.href = q ? '/search?q=' + encodeURIComponent(q) : '/search';
+                var suffix = q ? '?q=' + encodeURIComponent(q) : '';
+                if (preferring()) {
+                    backEl.textContent = 'Exit offline mode';
+                    backEl.href = '/search' + suffix;
+                } else {
+                    backEl.textContent = 'Back online. Return to live search';
+                    backEl.href = '/search' + suffix;
+                }
             } else if (!pollTimer) {
                 // Cleared after back-online but server down again; re-arm.
                 pollTimer = setInterval(poll, POLL_MS);
@@ -104,4 +117,9 @@
     pollTimer = setInterval(poll, POLL_MS);
     window.addEventListener('online', poll);
     window.addEventListener('offline', function () { backEl.hidden = true; });
+
+    backEl.addEventListener('click', function () {
+        // Leaving via the banner is an explicit opt-out of manual offline.
+        try { if (window.OfflinePrefer) OfflinePrefer.set(false); } catch (e) {}
+    });
 })();
