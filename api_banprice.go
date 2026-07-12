@@ -520,50 +520,42 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&out)
 }
 
-func getIdFunc(mode string) func(co *mtgmatcher.CardObject) string {
+// getIdFromMode returns the id the given output mode uses for a card, or ""
+// when the card lacks one. This is a plain switch rather than a returned
+// closure on purpose: processEntry calls it once per (store, card), and the
+// former func-value call both allocated a closure per call and forced the
+// freshly copied CardObject to escape to the heap, dominating full-dump
+// allocations.
+func getIdFromMode(mode string, co *mtgmatcher.CardObject) string {
 	switch mode {
 	case "tcg":
-		return func(co *mtgmatcher.CardObject) string {
-			return findTCGproductId(co.UUID)
-		}
+		return findTCGproductId(co.UUID)
 	case "scryfall":
-		return func(co *mtgmatcher.CardObject) string {
-			return co.Identifiers["scryfallId"]
-		}
+		return co.Identifiers["scryfallId"]
 	case "mtgjson":
-		return func(co *mtgmatcher.CardObject) string {
-			if co.Sealed {
-				return co.UUID
-			}
-			return co.Identifiers["mtgjsonId"]
+		if co.Sealed {
+			return co.UUID
 		}
+		return co.Identifiers["mtgjsonId"]
 	case "name":
-		return func(co *mtgmatcher.CardObject) string {
-			if co.Sealed {
-				return co.Name
-			}
-			return fmt.Sprintf("%s|%s|%s", co.Name, co.SetCode, co.Number)
+		if co.Sealed {
+			return co.Name
 		}
+		return fmt.Sprintf("%s|%s|%s", co.Name, co.SetCode, co.Number)
 	case "mkm":
-		return func(co *mtgmatcher.CardObject) string {
-			return co.Identifiers["mcmId"]
-		}
+		return co.Identifiers["mcmId"]
 	case "ck":
-		return func(co *mtgmatcher.CardObject) string {
-			if co.Etched {
-				id, found := co.Identifiers["cardKingdomEtchedId"]
-				if found {
-					return id
-				}
-			} else if co.Foil {
-				return co.Identifiers["cardKingdomFoilId"]
+		if co.Etched {
+			id, found := co.Identifiers["cardKingdomEtchedId"]
+			if found {
+				return id
 			}
-			return co.Identifiers["cardKingdomId"]
+		} else if co.Foil {
+			return co.Identifiers["cardKingdomFoilId"]
 		}
+		return co.Identifiers["cardKingdomId"]
 	}
-	return func(co *mtgmatcher.CardObject) string {
-		return co.UUID
-	}
+	return co.UUID
 }
 
 func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
@@ -630,7 +622,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 	if err != nil {
 		return
 	}
-	id := getIdFunc(idMode)(co)
+	id := getIdFromMode(idMode, co)
 	if id == "" {
 		return
 	}
