@@ -514,3 +514,8 @@
     text-overflow: ellipsis;
     max-width: 180px;
 }
+
+/* Offline-mode navbar toggle: orange accent when engaged. */
+.ban-offline-toggle.is-active {
+    color: var(--orange, orange);
+}
