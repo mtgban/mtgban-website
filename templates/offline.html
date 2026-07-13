@@ -73,8 +73,19 @@
     var sortMode = getCookie('SearchDefaultSort') || 'chrono';
     var reverse = false;
     if (sortMode === 'hybrid') sortMode = 'alpha';
+    var sealedMode = new URLSearchParams(location.search).get('sealed') === '1';
+    // Suggestions read the current mode off this shared deps object.
+    var searchDeps = null;
     function hiddenList(name) {
         return (getCookie(name) || '').split(',').filter(Boolean);
+    }
+
+    // Compose a shell URL carrying the query and active mode.
+    function buildUrl(q) {
+        var parts = [];
+        if (q) parts.push('q=' + encodeURIComponent(q));
+        if (sealedMode) parts.push('sealed=1');
+        return parts.length ? '?' + parts.join('&') : location.pathname;
     }
 
     async function setup() {
@@ -130,7 +141,9 @@
             paintCount();
             return;
         }
-        exec = await OfflineQuery.execute(OfflineQuery.parse(q), env);
+        var parsed = OfflineQuery.parse(q);
+        parsed.sealed = sealedMode;
+        exec = await OfflineQuery.execute(parsed, env);
         paint();
     }
 
@@ -170,23 +183,28 @@
         var form = document.getElementById('nav-searchform');
 
         window.addEventListener('popstate', function () {
-            var q = new URLSearchParams(location.search).get('q') || '';
+            var params = new URLSearchParams(location.search);
+            var q = params.get('q') || '';
+            sealedMode = params.get('sealed') === '1';
+            if (searchDeps) searchDeps.sealed = sealedMode;
             box.value = q;
             runQuery(q).catch(showErrorNotice);
         });
 
         setup().then(function () {
+            searchDeps = {
+                normName: OfflineUtil.normName,
+                allNames: OfflineDB.allNames,
+                getCard: OfflineDB.getCard,
+                sets: dicts.sets,
+                sealed: sealedMode
+            };
             OfflineSearch.mount({
                 input: box,
                 form: form,
-                deps: {
-                    normName: OfflineUtil.normName,
-                    allNames: OfflineDB.allNames,
-                    getCard: OfflineDB.getCard,
-                    sets: dicts.sets
-                },
+                deps: searchDeps,
                 onSubmit: function (q) {
-                    history.pushState(null, '', q ? '?q=' + encodeURIComponent(q) : location.pathname);
+                    history.pushState(null, '', buildUrl(q));
                     runQuery(q).catch(showErrorNotice);
                 }
             });

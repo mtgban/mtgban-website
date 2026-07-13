@@ -23,6 +23,8 @@
             for (var j = 0; j < cards.length; j++) {
                 var c = cards[j];
                 if (!c) continue;
+                // Scope suggestions to the active mode when one is set.
+                if (deps.sealed != null && !!c.s !== deps.sealed) continue;
                 var set = deps.sets[c.set] || {};
                 rows.push({
                     uuid: c.uuid,

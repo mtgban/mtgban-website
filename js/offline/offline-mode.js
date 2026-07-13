@@ -289,15 +289,28 @@
         btn.addEventListener('click', function () {
             var on = !(window.OfflinePrefer && OfflinePrefer.get());
             if (window.OfflinePrefer) OfflinePrefer.set(on);
-            var q = new URLSearchParams(location.search).get('q');
-            var suffix = q ? '?q=' + encodeURIComponent(q) : '';
-            location.href = (on ? '/offline' : '/search') + suffix;
+            var params = new URLSearchParams(location.search);
+            var q = params.get('q');
+            var qs = q ? 'q=' + encodeURIComponent(q) : '';
+            // Preserve sealed context across the toggle.
+            var sealed = location.pathname === '/sealed' || params.get('sealed') === '1';
+            if (on) {
+                var parts = [qs, sealed ? 'sealed=1' : ''].filter(Boolean);
+                location.href = '/offline' + (parts.length ? '?' + parts.join('&') : '');
+            } else {
+                location.href = (sealed ? '/sealed' : '/search') + (qs ? '?' + qs : '');
+            }
         });
 
         var settingsBtn = document.getElementById('nav-settings-btn');
         if (settingsBtn) utility.insertBefore(btn, settingsBtn);
         else utility.appendChild(btn);
         paint();
+
+        // Keep the active state in sync when another tab flips the flag.
+        window.addEventListener('storage', function (e) {
+            if (window.OfflinePrefer && e.key === OfflinePrefer.KEY) paint();
+        });
     }
 
     // Settings modal glue: reveal the Offline section only when available().
