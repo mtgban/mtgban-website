@@ -30,7 +30,8 @@
 (function() {
     var grid = document.getElementById('tools-grid');
     var navSections = document.querySelector('.nav2-sections');
-    if (!grid || !navSections) return;
+    // Offline shows a fixed mode-selector nav; never mutate the saved layout there.
+    if (!grid || !navSections || location.pathname === '/offline') return;
 
     var MAX_SECTION_BUTTONS = 5;
 
@@ -351,4 +352,30 @@
         if (url.pathname === '/sealed') parts.push('sealed=1');
         location.href = '/offline' + (parts.length ? '?' + parts.join('&') : '');
     });
+})();
+
+// ── On /offline, the navbar is a Singles/Sealed mode switch ──
+(function() {
+    if (location.pathname !== '/offline') return;
+    var nav = document.querySelector('.navbar-v2');
+    var sections = nav && nav.querySelector('.nav2-sections');
+    if (!sections) return;
+    // Presentational only: the layout system is disabled here, so nothing persists.
+    nav.classList.add('offline-nav');
+
+    var sealed = new URLSearchParams(location.search).get('sealed') === '1';
+    var q = new URLSearchParams(location.search).get('q');
+    var suffix = q ? '&q=' + encodeURIComponent(q) : '';
+
+    function modeBtn(label, href, active) {
+        var a = document.createElement('a');
+        a.className = 'nav2-section-btn offline-mode-btn' + (active ? ' active' : '');
+        a.setAttribute('href', href);
+        a.textContent = label;
+        return a;
+    }
+
+    var wrap = sections.querySelector('.nav2-tools-wrap');
+    sections.insertBefore(modeBtn('Search', '/offline' + (q ? '?q=' + encodeURIComponent(q) : ''), !sealed), wrap);
+    sections.insertBefore(modeBtn('Sealed', '/offline?sealed=1' + suffix, sealed), wrap);
 })();
