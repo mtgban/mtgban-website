@@ -188,6 +188,58 @@ test('unsupported tokens pass through execute', async () => {
     expect(out.unsupported).toEqual(['date>2020']);
 });
 
+// A single and a sealed product that share a searchable name prefix.
+function sealedEnv() {
+    var cards = {
+        'u-fin-box': {uuid: 'u-fin-box', n: 'Final Fantasy Booster Box', num: '', r: '', set: 'FIN', f: false, e: false, s: true},
+        'u-fin-1':   {uuid: 'u-fin-1',   n: 'Final Fantasy Cloud',       num: '1', r: 'mythic', set: 'FIN', f: false, e: false, s: false},
+    };
+    var names = [
+        {key: 'final fantasy booster box', uuids: ['u-fin-box']},
+        {key: 'final fantasy cloud',       uuids: ['u-fin-1']},
+    ];
+    var payloads = {
+        FIN: {setCode: 'FIN', retail: {'u-fin-box': {CK: {sealed: 300}}, 'u-fin-1': {CK: {regular: 20}}}, buylist: {}},
+    };
+    return {
+        loads: [],
+        normName: function (s) {
+            return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+        },
+        lookupName: async function (key) {
+            for (var i = 0; i < names.length; i++) if (names[i].key === key) return names[i].uuids.slice();
+            return [];
+        },
+        allNames: async function () { return names; },
+        getCard: async function (uuid) { return cards[uuid] || null; },
+        hasSet: async function (code) { return !!payloads[code]; },
+        loadSetPayload: async function (code) { return payloads[code]; },
+    };
+}
+
+test('sealed=false mode excludes sealed products', async () => {
+    Q.resetCaches();
+    const parsed = Q.parse('final fantasy');
+    parsed.sealed = false;
+    const out = await Q.execute(parsed, sealedEnv());
+    expect(out.results.map(r => r.uuid)).toEqual(['u-fin-1']);
+});
+
+test('sealed=true mode shows only sealed products', async () => {
+    Q.resetCaches();
+    const parsed = Q.parse('final fantasy');
+    parsed.sealed = true;
+    const out = await Q.execute(parsed, sealedEnv());
+    expect(out.results.map(r => r.uuid)).toEqual(['u-fin-box']);
+});
+
+test('unset sealed mode returns singles and sealed mixed', async () => {
+    Q.resetCaches();
+    const out = await Q.execute(Q.parse('final fantasy'), sealedEnv());
+    expect(out.results.map(r => r.uuid).sort()).toEqual(['u-fin-1', 'u-fin-box']);
+});
+
 // ---- sortResults ----
 
 test('sortResults modes', () => {
