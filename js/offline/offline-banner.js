@@ -14,6 +14,9 @@
     var ageEl = document.getElementById('offline-banner-age');
     var authEl = document.getElementById('offline-banner-auth');
     var backEl = document.getElementById('offline-banner-back');
+    // The sync settings modal is server-rendered on /search, so it is unreachable
+    // while the server is down; hide the link until the backend answers.
+    var settingsEl = document.getElementById('offline-settings-link');
 
     // Raw read of the offline-db meta row shape {k, v}; safe before offline-db.js loads.
     // Versionless open may create an empty DB; offline-db.js ghost recovery handles it.
@@ -95,6 +98,7 @@
                 pollTimer = setInterval(poll, POLL_MS);
             }
             backEl.hidden = !up;
+            if (settingsEl) settingsEl.style.display = up ? '' : 'none';
         });
     }
 
