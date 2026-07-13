@@ -6,28 +6,6 @@
     margin-top: 0;
 }
 
-/* Singles/Sealed mode toggle above the sort pills. */
-.offline-mode-row {
-    display: flex;
-    gap: 0.4em;
-    margin-bottom: 0.6em;
-}
-.offline-mode-btn {
-    flex: 1;
-    padding: 0.35em 0.6em;
-    font-size: 0.85em;
-    color: var(--normal);
-    background: var(--surface-2, rgba(0, 0, 0, 0.05));
-    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
-    border-radius: 0.4em;
-    cursor: pointer;
-}
-.offline-mode-btn.active {
-    color: var(--realwhite, #fcfcfc);
-    background: var(--search-link, #3b6fd4);
-    border-color: var(--search-link, #3b6fd4);
-}
-
 /* Sort pills show a direction arrow on the active pill: green asc, red desc (rotated). */
 .offline-shell .search-sort-dir {
     display: none;

@@ -30,10 +30,6 @@
     <div class="search-layout">
         <div class="search-sidebar">
             <div class="sidebar-search">
-                <div class="offline-mode-row" role="tablist" aria-label="Search mode">
-                    <button class="offline-mode-btn" data-mode="singles" type="button" role="tab" aria-selected="true">Singles</button>
-                    <button class="offline-mode-btn" data-mode="sealed" type="button" role="tab" aria-selected="false">Sealed</button>
-                </div>
                 <div class="search-sort-row">
                     <span class="search-sort-label">Sort</span>
                     <button class="search-sort-pill" data-sort="chrono" title="Chronological" aria-label="Sort chronological" type="button"><svg class="lucide lucide-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
@@ -128,14 +124,6 @@
         });
     }
 
-    function paintMode() {
-        document.querySelectorAll('.offline-mode-btn').forEach(function (b) {
-            var on = (b.getAttribute('data-mode') === 'sealed') === sealedMode;
-            b.classList.toggle('active', on);
-            b.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-    }
-
     function paint() {
         OfflineQuery.sortResults(exec.results, sortMode, reverse, ctx.sets);
         var page = Object.assign({}, exec, {results: exec.results.slice(0, PAGE_SIZE)});
@@ -194,26 +182,12 @@
         var box = document.getElementById('nav-searchbox');
         var form = document.getElementById('nav-searchform');
 
-        document.querySelectorAll('.offline-mode-btn').forEach(function (b) {
-            b.addEventListener('click', function () {
-                var next = b.getAttribute('data-mode') === 'sealed';
-                if (next === sealedMode) return;
-                sealedMode = next;
-                if (searchDeps) searchDeps.sealed = sealedMode;
-                paintMode();
-                var q = box.value.trim();
-                history.pushState(null, '', buildUrl(q));
-                runQuery(q).catch(showErrorNotice);
-            });
-        });
-
         window.addEventListener('popstate', function () {
             var params = new URLSearchParams(location.search);
             var q = params.get('q') || '';
             sealedMode = params.get('sealed') === '1';
             if (searchDeps) searchDeps.sealed = sealedMode;
             box.value = q;
-            paintMode();
             runQuery(q).catch(showErrorNotice);
         });
 
@@ -234,7 +208,6 @@
                     runQuery(q).catch(showErrorNotice);
                 }
             });
-            paintMode();
             var q = new URLSearchParams(location.search).get('q') || '';
             box.value = q;
             return runQuery(q);
