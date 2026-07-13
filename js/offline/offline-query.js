@@ -151,6 +151,7 @@
     }
 
     function matchesFilters(card, parsed) {
+        if (parsed.sealed != null && !!card.s !== parsed.sealed) return false;
         if (parsed.set && card.set !== parsed.set) return false;
         if (parsed.number && card.num !== parsed.number) return false;
         if (parsed.rarity && card.r !== parsed.rarity) return false;

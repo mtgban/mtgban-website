@@ -30,7 +30,8 @@
 (function() {
     var grid = document.getElementById('tools-grid');
     var navSections = document.querySelector('.nav2-sections');
-    if (!grid || !navSections) return;
+    // Offline shows a fixed mode-selector nav; never mutate the saved layout there.
+    if (!grid || !navSections || location.pathname === '/offline') return;
 
     var MAX_SECTION_BUTTONS = 5;
 
@@ -327,4 +328,64 @@
     function focusSearch() { input.focus(); }
     focusSearch();
     window.addEventListener('pageshow', function (e) { if (e.persisted) focusSearch(); });
+})();
+
+// ── Keep search/sealed navigation in the offline shell while preferring ──
+(function() {
+    // Manual offline: reroute /search and /sealed navigations to the local
+    // shell so moving between pages does not drop back to the live site.
+    document.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (!(window.OfflinePrefer && OfflinePrefer.get())) return;
+        var a = e.target.closest ? e.target.closest('a[href]') : null;
+        if (!a || a.target === '_blank') return;
+        var url;
+        try { url = new URL(a.href, location.href); } catch (err) { return; }
+        if (url.origin !== location.origin) return;
+        if (url.pathname !== '/search' && url.pathname !== '/sealed') return;
+        var q = url.searchParams.get('q') || '';
+        // The offline shell has no container/sealed-contents query; leave it live.
+        if (q.indexOf('container:') === 0) return;
+        e.preventDefault();
+        var parts = [];
+        if (q) parts.push('q=' + encodeURIComponent(q));
+        if (url.pathname === '/sealed') parts.push('sealed=1');
+        location.href = '/offline' + (parts.length ? '?' + parts.join('&') : '');
+    });
+})();
+
+// ── On /offline, the navbar is a Singles/Sealed mode switch ──
+(function() {
+    if (location.pathname !== '/offline') return;
+    var nav = document.querySelector('.navbar-v2');
+    var sections = nav && nav.querySelector('.nav2-sections');
+    if (!sections) return;
+    // Presentational only: the layout system is disabled here, so nothing persists.
+    nav.classList.add('offline-nav');
+
+    var sealed = new URLSearchParams(location.search).get('sealed') === '1';
+    var q = new URLSearchParams(location.search).get('q');
+    var suffix = q ? '&q=' + encodeURIComponent(q) : '';
+
+    function modeBtn(label, href, active) {
+        var a = document.createElement('a');
+        a.className = 'nav2-section-btn offline-mode-btn' + (active ? ' active' : '');
+        a.setAttribute('href', href);
+        if (active) a.setAttribute('aria-current', 'page');
+        a.textContent = label;
+        return a;
+    }
+
+    var wrap = sections.querySelector('.nav2-tools-wrap');
+    sections.insertBefore(modeBtn('Search', '/offline' + (q ? '?q=' + encodeURIComponent(q) : ''), !sealed), wrap);
+    sections.insertBefore(modeBtn('Sealed', '/offline?sealed=1' + suffix, sealed), wrap);
+
+    // Match the CSS grey-out: keep the disabled tool nav out of the tab order.
+    function disable(el) {
+        el.setAttribute('aria-disabled', 'true');
+        el.setAttribute('tabindex', '-1');
+    }
+    sections.querySelectorAll('.nav2-section-btn:not(.offline-mode-btn):not(.is-tools)').forEach(disable);
+    var grid = document.getElementById('tools-grid');
+    if (grid) grid.querySelectorAll('.tools-tile').forEach(disable);
 })();
