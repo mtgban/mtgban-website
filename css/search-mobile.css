@@ -441,6 +441,34 @@
     box-shadow: 0 0 6px rgba(124, 58, 237, 0.3);
 }
 
+/* Mode toggle pill row in the mobile offline shell */
+.m-offline-mode-pills {
+    display: flex;
+    gap: 0.4em;
+    padding: 0.3em 0 0.1em;
+}
+
+.m-offline-mode-pills .m-cond-pill {
+    text-decoration: none;
+    flex: 1;
+    text-align: center;
+    font-size: 0.78rem;
+    padding: 0.3em 0.6em;
+    justify-content: center;
+}
+
+.m-offline-mode-pills .m-cond-pill.active {
+    background: var(--dodgerblue);
+    border-color: var(--dodgerblue);
+    color: white;
+    box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
+}
+
+/* Extra padding when the offline pill row is present; 52px is inherited from .m-search-bar-sticky rule above */
+.m-page:has(.m-offline-mode-pills) {
+    padding-top: calc(52px + 2.2em);
+}
+
 /* Condition groups (show/hide by active pill) */
 .m-cond-group {
     display: none;
