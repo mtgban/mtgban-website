@@ -346,6 +346,9 @@
         // The offline shell has no container/sealed-contents query; leave it live.
         if (q.indexOf('container:') === 0) return;
         e.preventDefault();
-        location.href = '/offline' + (q ? '?q=' + encodeURIComponent(q) : '');
+        var parts = [];
+        if (q) parts.push('q=' + encodeURIComponent(q));
+        if (url.pathname === '/sealed') parts.push('sealed=1');
+        location.href = '/offline' + (parts.length ? '?' + parts.join('&') : '');
     });
 })();
