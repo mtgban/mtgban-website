@@ -164,6 +164,7 @@ type PageVars struct {
 	EditionsCategories []string
 	EditionsByCategory map[string][]EditionEntry
 	PickerID           string
+	OfflineModeAllowed bool
 
 	CanFilterByPrice bool
 	FilterMinPrice   float64
