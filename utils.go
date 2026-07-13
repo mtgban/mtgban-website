@@ -363,6 +363,17 @@ func tcgSKU2UUID(sku string) string {
 	return entries[0].OriginalId
 }
 
+// tcgSKU2Condition resolves a TCGplayer SKU (instance id) to the condition it
+// encodes (NM/SP/MP/HP/PO) via the same "tcgskuid" index as tcgSKU2UUID, where
+// each entry's Conditions is preserved. Returns "" if the SKU is unknown.
+func tcgSKU2Condition(sku string) string {
+	entries := GetInfos()["tcgskuid"][sku]
+	if len(entries) == 0 {
+		return ""
+	}
+	return entries[0].Conditions
+}
+
 // Look for the original id (product id) of a card in a given inventory
 func findOriginalId(sellerName, cardId string) string {
 	tcgplayer, _ := findSellerInventory(sellerName)

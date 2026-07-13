@@ -110,3 +110,51 @@ func TestGetQuantity(t *testing.T) {
 		}
 	}
 }
+
+func TestParseRowInfersConditionFromSKU(t *testing.T) {
+	p := &Parser{
+		TCGSkuToUUID: func(sku string) string { return "uuid-" + sku },
+		TCGSkuToCondition: func(sku string) string {
+			if sku == "SKU-SP" {
+				return "SP"
+			}
+			return ""
+		},
+	}
+
+	tests := []struct {
+		name     string
+		indexMap map[string]int
+		record   []string
+		want     string
+	}{
+		{
+			"inferred from SKU when no condition column",
+			map[string]int{"cardName": 0, "tcgSku": 1},
+			[]string{"Some Card", "SKU-SP"},
+			"SP",
+		},
+		{
+			"explicit condition column wins over the SKU",
+			map[string]int{"cardName": 0, "tcgSku": 1, "conditions": 2},
+			[]string{"Some Card", "SKU-SP", "Heavily Played"},
+			"HP",
+		},
+		{
+			"unknown SKU leaves the condition blank",
+			map[string]int{"cardName": 0, "tcgSku": 1},
+			[]string{"Some Card", "SKU-UNKNOWN"},
+			"",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Card matching needs the datastore (not loaded here); the condition
+			// is inferred before Match, so the resolution error is irrelevant.
+			res, _ := p.ParseRow(tt.indexMap, tt.record)
+			if res.OriginalCondition != tt.want {
+				t.Errorf("OriginalCondition = %q, want %q", res.OriginalCondition, tt.want)
+			}
+		})
+	}
+}

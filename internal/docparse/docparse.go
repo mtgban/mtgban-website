@@ -66,6 +66,11 @@ type Parser struct {
 	// ignored.
 	TCGSkuToUUID func(sku string) string
 
+	// TCGSkuToCondition resolves a TCGplayer SKU to the condition it encodes
+	// (NM/SP/MP/HP/PO), returning "" when unknown. Optional; used to infer the
+	// condition for SKU uploads that carry no explicit condition column.
+	TCGSkuToCondition func(sku string) string
+
 	// PreferredPrinting orders alias candidates when a name matches several
 	// printings; the first in the resulting order wins. Optional; without it
 	// candidates keep the match order.
@@ -410,9 +415,11 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 	// Try looking up using the TCGSkuId if we found an id and it's not among
 	// the supported ones - this needs to happen before the normal Match
 	// or name matching might interfere with actual results
+	var tcgSkuId string
 	idx, found = indexMap["tcgSku"]
 	if found && idx < len(record) && p.TCGSkuToUUID != nil {
-		res.Card.Id = p.TCGSkuToUUID(record[idx])
+		tcgSkuId = record[idx]
+		res.Card.Id = p.TCGSkuToUUID(tcgSkuId)
 	}
 
 	res.Card.Name = record[indexMap["cardName"]]
@@ -473,6 +480,12 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 	case strings.Contains(conditions, "poor"), strings.Contains(conditions, "damage"),
 		strings.Contains(conditions, "po"), strings.Contains(conditions, "dmg"):
 		res.OriginalCondition = "PO"
+	}
+
+	// A TCGplayer SKU encodes its condition; when the source carried no
+	// condition column, infer it from the SKU rather than leaving it blank.
+	if res.OriginalCondition == "" && tcgSkuId != "" && p.TCGSkuToCondition != nil {
+		res.OriginalCondition = p.TCGSkuToCondition(tcgSkuId)
 	}
 
 	idx, found = indexMap["notes"]

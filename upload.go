@@ -87,6 +87,7 @@ var uploadParser = &docparse.Parser{
 		}
 	},
 	TCGSkuToUUID:      tcgSKU2UUID,
+	TCGSkuToCondition: tcgSKU2Condition,
 	PreferredPrinting: sortSets,
 }
 
