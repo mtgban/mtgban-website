@@ -371,6 +371,7 @@
         var a = document.createElement('a');
         a.className = 'nav2-section-btn offline-mode-btn' + (active ? ' active' : '');
         a.setAttribute('href', href);
+        if (active) a.setAttribute('aria-current', 'page');
         a.textContent = label;
         return a;
     }
