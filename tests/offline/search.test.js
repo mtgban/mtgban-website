@@ -81,3 +81,25 @@ test('missing card record is skipped, not thrown', async () => {
     const out = await OfflineSearch.suggest('sol ring', d);
     expect(out).toEqual([]);
 });
+
+test('sealed flag scopes suggestions to the active mode', async () => {
+    const names = [
+        { key: 'final fantasy booster box', uuids: ['u-box'] },
+        { key: 'final fantasy cloud', uuids: ['u-cloud'] },
+    ];
+    const cards = {
+        'u-box': { uuid: 'u-box', n: 'Final Fantasy Booster Box', num: '', set: 'FIN', s: true },
+        'u-cloud': { uuid: 'u-cloud', n: 'Final Fantasy Cloud', num: '1', set: 'FIN' },
+    };
+    const d = deps();
+    d.allNames = async function () { return names; };
+    d.getCard = async function (u) { return cards[u]; };
+    d.sets = { FIN: { n: 'Final Fantasy', k: 'fin' } };
+
+    d.sealed = false;
+    expect((await OfflineSearch.suggest('final fantasy', d)).map(r => r.uuid)).toEqual(['u-cloud']);
+    d.sealed = true;
+    expect((await OfflineSearch.suggest('final fantasy', d)).map(r => r.uuid)).toEqual(['u-box']);
+    delete d.sealed;
+    expect((await OfflineSearch.suggest('final fantasy', d)).map(r => r.uuid).sort()).toEqual(['u-box', 'u-cloud']);
+});
