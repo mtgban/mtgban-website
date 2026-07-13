@@ -343,11 +343,9 @@
         try { url = new URL(a.href, location.href); } catch (err) { return; }
         if (url.origin !== location.origin) return;
         if (url.pathname !== '/search' && url.pathname !== '/sealed') return;
-        // Utility links (settings, options, etc.) are not searches; let them through.
-        if (url.searchParams.has('settings')) return;
         var q = url.searchParams.get('q') || '';
-        // The offline shell has no container/sealed-contents query; leave it live.
-        if (q.indexOf('container:') === 0) return;
+        // Only reroute actual card/name searches; leave bare nav, settings, and operator deep-links on the live site.
+        if (!q || /^(container|contents|decklist|unpack):/.test(q)) return;
         e.preventDefault();
         var parts = [];
         if (q) parts.push('q=' + encodeURIComponent(q));
