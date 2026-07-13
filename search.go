@@ -1200,50 +1200,85 @@ func dedupeKeys(keys []string) []string {
 	return out
 }
 
+// editionSeedCodes returns the set codes of the first filter that exactly
+// bounds the result set: a non-negated edition filter that applies to every
+// set. Anything else (negations, ApplyTo-scoped filters) cannot seed.
+func editionSeedCodes(filters []FilterElem) ([]string, bool) {
+	for i := range filters {
+		if filters[i].Name == "edition" && !filters[i].Negate &&
+			filters[i].ApplyTo == nil && len(filters[i].Values) > 0 {
+			return filters[i].Values, true
+		}
+	}
+	return nil, false
+}
+
 func searchAndFilter(config SearchConfig) ([]string, error) {
 	query := config.CleanQuery
 	filters := config.CardFilters
 
 	var uuids []string
 	var err error
-	switch config.SearchMode {
-	case "exact":
-		uuids, err = mtgmatcher.SearchEquals(query)
-	case "any":
-		uuids, err = mtgmatcher.SearchContains(query)
-	case "prefix":
-		uuids, err = mtgmatcher.SearchHasPrefix(query)
-	case "hashing":
-		uuids = config.UUIDs
-	case "regexp":
-		uuids, err = mtgmatcher.SearchRegexp(query)
-	case "sealed":
-		uuids, err = mtgmatcher.SearchSealedEquals(query)
-		if err != nil {
-			uuids, err = mtgmatcher.SearchSealedContains(query)
-		}
-	case "scryfall":
-		uuids, err = searchScryfall(query)
-	case "mixed":
-		uuids, err = mtgmatcher.SearchSealedEquals(query)
-		if err != nil {
-			uuids, err = mtgmatcher.SearchSealedContains(query)
-		}
-		moreUUIDs, _ := mtgmatcher.SearchEquals(query)
-		uuids = append(uuids, moreUUIDs...)
-	default:
-		uuids, err = mtgmatcher.SearchEquals(query)
-		if err != nil {
-			uuids, err = mtgmatcher.SearchHasPrefix(query)
-			if err != nil {
-				uuids, err = mtgmatcher.SearchRegexp(query)
+
+	// With no text to search, the mode switch below degrades to seeding
+	// from the whole uuid pool. A positive edition filter names its exact
+	// result set, so seed from the set index instead: s:EXP,INV becomes
+	// the union of two set buckets. Only the modes whose empty-query
+	// fallback is the full pool are eligible, and the seeded uuids flow
+	// into the same filtering loop as every other search.
+	if query == "" {
+		if codes, ok := editionSeedCodes(filters); ok {
+			for _, code := range codes {
+				switch config.SearchMode {
+				case "", "prefix":
+					uuids = append(uuids, mtgmatcher.GetUUIDsInSet(code)...)
+				case "sealed":
+					uuids = append(uuids, mtgmatcher.GetSealedUUIDsInSet(code)...)
+				}
 			}
 		}
 	}
-	if err != nil {
-		uuids, err = attemptMatch(query)
+
+	if uuids == nil {
+		switch config.SearchMode {
+		case "exact":
+			uuids, err = mtgmatcher.SearchEquals(query)
+		case "any":
+			uuids, err = mtgmatcher.SearchContains(query)
+		case "prefix":
+			uuids, err = mtgmatcher.SearchHasPrefix(query)
+		case "hashing":
+			uuids = config.UUIDs
+		case "regexp":
+			uuids, err = mtgmatcher.SearchRegexp(query)
+		case "sealed":
+			uuids, err = mtgmatcher.SearchSealedEquals(query)
+			if err != nil {
+				uuids, err = mtgmatcher.SearchSealedContains(query)
+			}
+		case "scryfall":
+			uuids, err = searchScryfall(query)
+		case "mixed":
+			uuids, err = mtgmatcher.SearchSealedEquals(query)
+			if err != nil {
+				uuids, err = mtgmatcher.SearchSealedContains(query)
+			}
+			moreUUIDs, _ := mtgmatcher.SearchEquals(query)
+			uuids = append(uuids, moreUUIDs...)
+		default:
+			uuids, err = mtgmatcher.SearchEquals(query)
+			if err != nil {
+				uuids, err = mtgmatcher.SearchHasPrefix(query)
+				if err != nil {
+					uuids, err = mtgmatcher.SearchRegexp(query)
+				}
+			}
+		}
 		if err != nil {
-			return nil, err
+			uuids, err = attemptMatch(query)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

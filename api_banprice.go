@@ -558,8 +558,27 @@ func getIdFromMode(mode string, co *mtgmatcher.CardObject) string {
 	return co.UUID
 }
 
+// resolveEditionFilter turns an edition filter into the uuid list to walk:
+// scanning whole inventories and checking the set code per entry was the
+// dominant cost of edition dumps. The EntryRule edition check stays in place
+// downstream, passing by construction. Returns nil for an unknown set, which
+// callers treat as no results.
+func resolveEditionFilter(filterByEdition string, filterByHash []string, sealed bool) []string {
+	if filterByHash != nil || filterByEdition == "" {
+		return filterByHash
+	}
+	if sealed {
+		return mtgmatcher.GetSealedUUIDsInSet(filterByEdition)
+	}
+	return mtgmatcher.GetUUIDsInSet(filterByEdition)
+}
+
 func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
+	filterByHash = resolveEditionFilter(filterByEdition, filterByHash, sealed)
+	if filterByEdition != "" && filterByHash == nil {
+		return out
+	}
 	for _, seller := range GetSellers() {
 		// Only keep the right product type
 		if (!sealed && seller.Info().SealedMode) ||
@@ -738,6 +757,10 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 
 func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
+	filterByHash = resolveEditionFilter(filterByEdition, filterByHash, sealed)
+	if filterByEdition != "" && filterByHash == nil {
+		return out
+	}
 	for _, vendor := range GetVendors() {
 		// Only keep the right product type
 		if (!sealed && vendor.Info().SealedMode) ||
