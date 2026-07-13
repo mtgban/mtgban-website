@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -64,6 +65,7 @@ type Service struct {
 	// refreshSignal wakes the background refresher; buffered so RequestRefresh
 	// never blocks and bursts coalesce.
 	refreshSignal chan struct{}
+	mu            sync.Mutex
 }
 
 // NewService constructs a Service wired to the given Deps.
