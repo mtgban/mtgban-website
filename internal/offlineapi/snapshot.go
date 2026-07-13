@@ -67,6 +67,8 @@ func (s *Service) computeFingerprints() map[string]string {
 // refreshManifest recomputes fingerprints and bumps versions for changed sets,
 // persisting the result to the bucket.
 func (s *Service) refreshManifest() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if len(s.deps.Sellers()) == 0 && len(s.deps.Vendors()) == 0 {
 		log.Println("offline: no scrapers loaded, skipping manifest refresh")
 		return
