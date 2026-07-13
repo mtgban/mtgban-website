@@ -32,10 +32,11 @@
                     var db = req.result;
                     if (!retried && isGhostDb(db)) {
                         db.close();
-                        dbPromise = null;
-                        var del = indexedDB.deleteDatabase(DB_NAME);
-                        var reopen = function() { open(true).then(resolve, reject); };
-                        del.onsuccess = del.onerror = del.onblocked = reopen;
+                        dbPromise = new Promise(function(res2, rej2) {
+                            var del = indexedDB.deleteDatabase(DB_NAME);
+                            del.onsuccess = del.onerror = del.onblocked = function() { open(true).then(res2, rej2); };
+                        });
+                        dbPromise.then(resolve, reject);
                         return;
                     }
                     db.onversionchange = function() { db.close(); dbPromise = null; };
