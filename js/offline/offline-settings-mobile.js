@@ -49,13 +49,14 @@
         var enabling = !OfflineMode.enabled();
         var op = enabling ? OfflineMode.enable() : OfflineMode.disable();
         paintStatus(enabling ? 'Enabling...' : 'Disabling...');
-        op.catch(function (err) {
-            console.warn('offline:', err && err.message);
-            paintStatus('Error: ' + (err && err.message || 'unknown'));
-        }).then(function () {
+        op.then(function () {
             el.classList.remove('m-toggle-busy');
             repaint();
             if (OfflineMode.enabled()) paintStatus('Sync started');
+        }).catch(function (err) {
+            console.warn('offline:', err && err.message);
+            el.classList.remove('m-toggle-busy');
+            paintStatus('Error: ' + (err && err.message || 'unknown'));
         });
     }
 
