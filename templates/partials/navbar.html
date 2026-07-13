@@ -122,6 +122,14 @@
  * load — this script only handles initial restoration.
  */
 (function() {
+    // On /offline the navbar is a Singles/Sealed mode switch: mark it before first
+    // paint so the online nav is hidden immediately, and skip layout restoration
+    // (it would only rebuild buttons the CSS hides). Read-only: no layout write.
+    if (location.pathname === '/offline') {
+        var offNav = document.querySelector('.navbar-v2');
+        if (offNav) offNav.classList.add('offline-nav');
+        return;
+    }
     var saved;
     try { saved = JSON.parse(localStorage.getItem('mtgban_nav_layout_v1') || 'null'); } catch (e) { return; }
     if (!saved || !Array.isArray(saved.sections) || !Array.isArray(saved.grid)) return;
