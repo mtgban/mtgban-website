@@ -233,7 +233,7 @@
             first = false;
         });
         var right = hasIndex
-            ? '<span class="m-cond-pills-right"><button class="m-cond-pill" data-cond="INDEX" data-card="' + esc(uuid) + '">Index</button></span>'
+            ? '<span class="m-cond-pills-right"><button class="m-cond-pill' + (conds.length === 0 ? ' active' : '') + '" data-cond="INDEX" data-card="' + esc(uuid) + '">Index</button></span>'
             : '';
         return '<div class="m-cond-pills" data-card="' + esc(uuid) + '">' +
             '<span class="m-cond-pills-left">' + left + '</span>' + right + '</div>';
@@ -250,7 +250,8 @@
     function sellersPanel(uuid, data, ac, isSealed) {
         var html = '<div class="m-tab-panel active" id="sellers-' + esc(uuid) + '">';
         if (data.indexRows.length > 0) {
-            html += '<div class="m-cond-group" data-cond="INDEX" data-card="' + esc(uuid) + '">';
+            var idxActive = Object.keys(data.groups).length === 0 ? ' active' : '';
+            html += '<div class="m-cond-group' + idxActive + '" data-cond="INDEX" data-card="' + esc(uuid) + '">';
             data.indexRows.forEach(function (r) {
                 html += flatRow(r.name, r.price, 0);
             });
@@ -284,7 +285,8 @@
     function buyersPanel(uuid, data, ac, res, isSealed) {
         var html = '<div class="m-tab-panel" id="buyers-' + esc(uuid) + '">';
         if (data.indexRows.length > 0) {
-            html += '<div class="m-cond-group" data-cond="INDEX" data-card="' + esc(uuid) + '">';
+            var idxActive = Object.keys(data.groups).length === 0 ? ' active' : '';
+            html += '<div class="m-cond-group' + idxActive + '" data-cond="INDEX" data-card="' + esc(uuid) + '">';
             data.indexRows.forEach(function (r) {
                 if (r.syp) {
                     html += '<div class="m-vendor-row m-vendor-flat">' +
