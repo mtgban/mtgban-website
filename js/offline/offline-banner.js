@@ -91,8 +91,9 @@
                 pollTimer = null;
                 var q = new URLSearchParams(location.search).get('q');
                 var suffix = q ? '?q=' + encodeURIComponent(q) : '';
+                var sealed = new URLSearchParams(location.search).get('sealed') === '1';
                 backEl.textContent = 'Exit offline mode';
-                backEl.href = '/search' + suffix;
+                backEl.href = (sealed ? '/sealed' : '/search') + suffix;
             } else if (!pollTimer) {
                 // Cleared after back-online but server down again; re-arm.
                 pollTimer = setInterval(poll, POLL_MS);
@@ -111,7 +112,7 @@
     }, AGE_TICK_MS);
     pollTimer = setInterval(poll, POLL_MS);
     window.addEventListener('online', poll);
-    window.addEventListener('offline', function () { backEl.hidden = true; });
+    window.addEventListener('offline', function () { backEl.hidden = true; if (settingsEl) settingsEl.style.display = 'none'; });
 
     backEl.addEventListener('click', function () {
         // Leaving via the banner is an explicit opt-out of manual offline.
