@@ -1,0 +1,200 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/search-mobile.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/offline.css?hash={{.Hash}}">
+    <link href="//cdn.jsdelivr.net/npm/keyrune@latest/css/keyrune.css" rel="stylesheet" type="text/css" />
+{{end}}
+
+{{define "title"}}Offline Search{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/offline/offline-format.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-util.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-query.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-search.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-age.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-render-mobile.js?hash={{.Hash}}"></script>
+{{end}}
+
+{{define "content"}}
+<script>(function(){try{var v=localStorage.getItem('theme');var pref=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark){document.body.classList.remove('light-theme');document.body.classList.add('dark-theme');}}catch(e){}})();</script>
+<div class="m-page">
+    <div id="offline-banner" class="offline-banner" role="status">
+        <span class="offline-banner-dot" aria-hidden="true"></span>
+        <span id="offline-banner-age">Offline data: checking</span>
+        <span id="offline-banner-auth" class="offline-banner-auth" hidden>
+            Subscription lapsed: saved prices stay browsable, syncing is paused.
+        </span>
+        <a id="offline-banner-back" class="offline-banner-back" href="/search" hidden>
+            Back online. Return to live search
+        </a>
+    </div>
+
+    <div class="m-search-bar-sticky">
+        <div class="m-search-wrap">
+            {{/* M3 mounts OfflineSearch on the mobile navbar #navsearchbox/#navsearchform only. */}}
+            {{/* No inline search box here - the navbar input is the single search surface. */}}
+        </div>
+        <div class="m-offline-mode-pills" id="m-offline-mode-pills">
+            <a class="m-cond-pill" id="offline-pill-singles" href="/offline">Singles</a>
+            <a class="m-cond-pill" id="offline-pill-sealed" href="/offline?sealed=1">Sealed</a>
+        </div>
+    </div>
+
+    <div id="m-offline-results"></div>
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script type="text/javascript" src="/js/offline/offline-banner.js?hash={{.Hash}}"></script>
+<script type="text/javascript">
+(function () {
+    'use strict';
+
+    var PAGE_SIZE = 100;
+
+    var dicts = null;
+    var env = null;
+    var exec = null;
+    var ctx = null;
+    var sealedMode = new URLSearchParams(location.search).get('sealed') === '1';
+    var searchDeps = null;
+
+    function singlesUrl(q) {
+        return q ? '/offline?q=' + encodeURIComponent(q) : '/offline';
+    }
+
+    function paintModePills() {
+        var s = document.getElementById('offline-pill-singles');
+        var p = document.getElementById('offline-pill-sealed');
+        if (!s || !p) return;
+        var q = (document.getElementById('navsearchbox') || {}).value || '';
+        s.href = singlesUrl(q);
+        p.href = '/offline?sealed=1' + (q ? '&q=' + encodeURIComponent(q) : '');
+        s.classList.toggle('active', !sealedMode);
+        p.classList.toggle('active', sealedMode);
+    }
+
+    function hiddenList(name) {
+        return (getCookie(name) || '').split(',').filter(Boolean);
+    }
+
+    // Compose a shell URL carrying the query and active mode.
+    function buildUrl(q) {
+        var parts = [];
+        if (q) parts.push('q=' + encodeURIComponent(q));
+        if (sealedMode) parts.push('sealed=1');
+        return parts.length ? '?' + parts.join('&') : location.pathname;
+    }
+
+    async function setup() {
+        await OfflineDB.open();
+        dicts = await OfflineUtil.loadCatalogDicts();
+        env = {
+            normName: OfflineUtil.normName,
+            lookupName: OfflineDB.lookupName,
+            allNames: OfflineDB.allNames,
+            getCard: OfflineDB.getCard,
+            hasSet: OfflineDB.hasSet,
+            loadSetPayload: OfflineUtil.loadSetPayload
+        };
+        ctx = {
+            sets: dicts.sets,
+            stores: dicts.stores,
+            hiddenSellers: hiddenList('SearchSellersList'),
+            hiddenVendors: hiddenList('SearchVendorsList'),
+            byStore: getCookie('SearchListingPriority') === 'stores'
+        };
+    }
+
+    function paint() {
+        if (!exec) return;
+        var results = document.getElementById('m-offline-results');
+        var page = Object.assign({}, exec, {results: exec.results.slice(0, PAGE_SIZE)});
+        OfflineRenderMobile.render(results, page, ctx);
+        wireCardInteractions(results);
+    }
+
+    async function runQuery(q) {
+        var resultsEl = document.getElementById('m-offline-results');
+        if (!q) { resultsEl.innerHTML = ''; return; }
+        var parsed = OfflineQuery.parse(q);
+        parsed.sealed = sealedMode;
+        exec = await OfflineQuery.execute(parsed, env);
+        paint();
+    }
+
+    function showErrorNotice(err) {
+        document.getElementById('m-offline-results').innerHTML =
+            '<div class="offline-notice offline-notice-warn">Offline data is not ready. Enable offline mode in Settings and let a sync finish.</div>';
+        console.error('offline mobile shell setup failed', err);
+    }
+
+    // Wire tab/pill interactions on freshly rendered .m-card nodes; scoped to
+    // the results container so listeners never attach outside it.
+    function wireCardInteractions(root) {
+        root.querySelectorAll('.m-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                var card = this.closest('.m-card');
+                card.querySelectorAll('.m-tab').forEach(function (t) { t.classList.remove('active'); });
+                card.querySelectorAll('.m-tab-panel').forEach(function (p) { p.classList.remove('active'); });
+                this.classList.add('active');
+                var target = document.getElementById(this.getAttribute('data-target'));
+                if (target) target.classList.add('active');
+            });
+        });
+        root.querySelectorAll('.m-cond-pill').forEach(function (pill) {
+            pill.addEventListener('click', function () {
+                var cond = this.getAttribute('data-cond');
+                var card = this.closest('.m-card');
+                this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function (p) { p.classList.remove('active'); });
+                this.classList.add('active');
+                card.querySelectorAll('.m-cond-group').forEach(function (g) {
+                    g.classList.toggle('active', g.getAttribute('data-cond') === cond);
+                });
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        paintModePills();
+        var navBox = document.getElementById('navsearchbox');
+        var navForm = document.getElementById('navsearchform');
+
+        window.addEventListener('popstate', function () {
+            var params = new URLSearchParams(location.search);
+            var q = params.get('q') || '';
+            sealedMode = params.get('sealed') === '1';
+            paintModePills();
+            if (searchDeps) searchDeps.sealed = sealedMode;
+            if (navBox) navBox.value = q;
+            runQuery(q).catch(showErrorNotice);
+        });
+
+        setup().then(function () {
+            searchDeps = {
+                normName: OfflineUtil.normName,
+                allNames: OfflineDB.allNames,
+                getCard: OfflineDB.getCard,
+                sets: dicts.sets,
+                sealed: sealedMode
+            };
+            // Mount OfflineSearch on the mobile navbar input only (contract: #navsearchbox/#navsearchform).
+            OfflineSearch.mount({
+                input: navBox,
+                form: navForm,
+                deps: searchDeps,
+                onSubmit: function (q) {
+                    history.pushState(null, '', buildUrl(q));
+                    paintModePills();
+                    runQuery(q).catch(showErrorNotice);
+                }
+            });
+            paintModePills();
+            var q = new URLSearchParams(location.search).get('q') || '';
+            if (navBox) navBox.value = q;
+            return runQuery(q);
+        }).catch(showErrorNotice);
+    });
+})();
+</script>
+{{end}}

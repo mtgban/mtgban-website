@@ -441,6 +441,34 @@
     box-shadow: 0 0 6px rgba(124, 58, 237, 0.3);
 }
 
+/* Mode toggle pill row in the mobile offline shell */
+.m-offline-mode-pills {
+    display: flex;
+    gap: 0.4em;
+    padding: 0.3em 0 0.1em;
+}
+
+.m-offline-mode-pills .m-cond-pill {
+    text-decoration: none;
+    flex: 1;
+    text-align: center;
+    font-size: 0.78rem;
+    padding: 0.3em 0.6em;
+    justify-content: center;
+}
+
+.m-offline-mode-pills .m-cond-pill.active {
+    background: var(--dodgerblue);
+    border-color: var(--dodgerblue);
+    color: white;
+    box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
+}
+
+/* Extra padding when the offline pill row is present; 52px is inherited from .m-search-bar-sticky rule above */
+.m-page:has(.m-offline-mode-pills) {
+    padding-top: calc(52px + 2.2em);
+}
+
 /* Condition groups (show/hide by active pill) */
 .m-cond-group {
     display: none;
@@ -2451,3 +2479,39 @@ body.m-setpicker-lock {
 .m-fav-sort .fav-sort-pill svg { width: 16px; height: 16px; }
 .m-fav-sort .fav-sort-pill .fav-sort-dir.asc,
 .m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
+
+/* Offline mode section in the settings drawer */
+#m-offline-section .m-offline-auth-notice {
+    font-size: 0.85em;
+    color: var(--color-warn, #b45309);
+    margin: 0.4em 0 0.6em;
+    padding: 0.5em 0.75em;
+    background: var(--color-warn-bg, #fef3c7);
+    border-radius: 0.4em;
+}
+
+#m-offline-section .m-offline-desc {
+    font-size: 0.85em;
+    color: var(--text-muted, #666);
+    margin: 0 0 0.6em;
+    line-height: 1.4;
+}
+
+#m-offline-section .m-offline-status {
+    font-size: 0.8em;
+    color: var(--text-muted, #666);
+    min-height: 1.2em;
+    margin-top: 0.3em;
+}
+
+#m-offline-section .m-offline-usage {
+    font-size: 0.8em;
+    color: var(--text-muted, #666);
+    margin: 0.25em 0 0;
+}
+
+/* Busy state during async enable/disable */
+.m-toggle-busy {
+    opacity: 0.5;
+    pointer-events: none;
+}
