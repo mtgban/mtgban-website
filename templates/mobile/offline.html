@@ -89,9 +89,11 @@
     }
 
     function paint() {
+        if (!exec) return;
+        var results = document.getElementById('m-offline-results');
         var page = Object.assign({}, exec, {results: exec.results.slice(0, PAGE_SIZE)});
-        OfflineRenderMobile.render(document.getElementById('m-offline-results'), page, ctx);
-        wireCardInteractions();
+        OfflineRenderMobile.render(results, page, ctx);
+        wireCardInteractions(results);
     }
 
     async function runQuery(q) {
@@ -109,9 +111,10 @@
         console.error('offline mobile shell setup failed', err);
     }
 
-    // Wire tab/pill interactions on dynamically rendered .m-card nodes.
-    function wireCardInteractions() {
-        document.querySelectorAll('.m-tab').forEach(function (tab) {
+    // Wire tab/pill interactions on freshly rendered .m-card nodes; scoped to
+    // the results container so listeners never attach outside it.
+    function wireCardInteractions(root) {
+        root.querySelectorAll('.m-tab').forEach(function (tab) {
             tab.addEventListener('click', function () {
                 var card = this.closest('.m-card');
                 card.querySelectorAll('.m-tab').forEach(function (t) { t.classList.remove('active'); });
@@ -121,7 +124,7 @@
                 if (target) target.classList.add('active');
             });
         });
-        document.querySelectorAll('.m-cond-pill').forEach(function (pill) {
+        root.querySelectorAll('.m-cond-pill').forEach(function (pill) {
             pill.addEventListener('click', function () {
                 var cond = this.getAttribute('data-cond');
                 var card = this.closest('.m-card');
