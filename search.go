@@ -306,6 +306,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Image corpus picker: only populate for entitled users.
 	if _, ok := offlineModeAllowed(r); ok {
+		pageVars.OfflineModeAllowed = true
 		editions := GetEditions()
 		pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
 		pageVars.EditionsByCategory = editions.AllEditionsByCategory
