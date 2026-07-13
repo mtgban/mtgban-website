@@ -2451,3 +2451,39 @@ body.m-setpicker-lock {
 .m-fav-sort .fav-sort-pill svg { width: 16px; height: 16px; }
 .m-fav-sort .fav-sort-pill .fav-sort-dir.asc,
 .m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
+
+/* Offline mode section in the settings drawer */
+#m-offline-section .m-offline-auth-notice {
+    font-size: 0.85em;
+    color: var(--color-warn, #b45309);
+    margin: 0.4em 0 0.6em;
+    padding: 0.5em 0.75em;
+    background: var(--color-warn-bg, #fef3c7);
+    border-radius: 0.4em;
+}
+
+#m-offline-section .m-offline-desc {
+    font-size: 0.85em;
+    color: var(--text-muted, #666);
+    margin: 0 0 0.6em;
+    line-height: 1.4;
+}
+
+#m-offline-section .m-offline-status {
+    font-size: 0.8em;
+    color: var(--text-muted, #666);
+    min-height: 1.2em;
+    margin-top: 0.3em;
+}
+
+#m-offline-section .m-offline-usage {
+    font-size: 0.8em;
+    color: var(--text-muted, #666);
+    margin: 0.25em 0 0;
+}
+
+/* Busy state during async enable/disable */
+.m-toggle-busy {
+    opacity: 0.5;
+    pointer-events: none;
+}
