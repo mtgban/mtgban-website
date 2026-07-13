@@ -34,6 +34,10 @@ var SHELL_URLS = [
     '/js/offline/offline-util.js?hash=' + BUILD,
     '/js/offline/offline-query.js?hash=' + BUILD,
     '/js/offline/offline-render.js?hash=' + BUILD,
+    '/css/mobile.css?hash=' + BUILD,
+    '/css/search-mobile.css?hash=' + BUILD,
+    '/js/offline/offline-render-mobile.js?hash=' + BUILD,
+    '/js/offline/offline-search.js?hash=' + BUILD,
     '/js/offline/offline-age.js?hash=' + BUILD,
     '/js/offline/offline-banner.js?hash=' + BUILD,
     '/js/offline/offline-watch.js?hash=' + BUILD,
@@ -41,6 +45,7 @@ var SHELL_URLS = [
     '/img/favicon/favicon-32x32.png',
     '/img/favicon/site.webmanifest'
 ];
+// keyrune CDN is cross-origin and uncacheable; mobile renderer degrades to set-code span offline
 
 self.addEventListener('install', function (e) {
     // No skipWaiting: new shells activate after the old session's pages go away.
