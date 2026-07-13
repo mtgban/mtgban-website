@@ -379,4 +379,13 @@
     var wrap = sections.querySelector('.nav2-tools-wrap');
     sections.insertBefore(modeBtn('Search', '/offline' + (q ? '?q=' + encodeURIComponent(q) : ''), !sealed), wrap);
     sections.insertBefore(modeBtn('Sealed', '/offline?sealed=1' + suffix, sealed), wrap);
+
+    // Match the CSS grey-out: keep the disabled tool nav out of the tab order.
+    function disable(el) {
+        el.setAttribute('aria-disabled', 'true');
+        el.setAttribute('tabindex', '-1');
+    }
+    sections.querySelectorAll('.nav2-section-btn:not(.offline-mode-btn):not(.is-tools)').forEach(disable);
+    var grid = document.getElementById('tools-grid');
+    if (grid) grid.querySelectorAll('.tools-tile').forEach(disable);
 })();
