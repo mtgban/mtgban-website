@@ -68,19 +68,6 @@ type SearchEntry struct {
 	Locked bool
 }
 
-func isSame(a, b SearchEntry) bool {
-	if a.Shorthand != b.Shorthand {
-		return false
-	}
-	if a.Price != b.Price {
-		return false
-	}
-	if a.Quantity != b.Quantity {
-		return false
-	}
-	return true
-}
-
 var AllConditions = []string{"INDEX", "NM", "SP", "MP", "HP", "PO"}
 
 // searchSuggestions adapts a parsed search that found nothing into the
@@ -956,6 +943,11 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 	// Allocate memory
 	foundSellers = map[string]map[string][]SearchEntry{}
 
+	// Decklist/hashing searches repeat a key once per copy; the output is
+	// keyed by the unique card, so walking a repeated key could only append
+	// the same rows once more
+	cardIds = dedupeKeys(cardIds)
+
 	storeFilters := config.StoreFilters
 	priceFilters := config.PriceFilters
 	entryFilters := config.EntryFilters
@@ -1018,17 +1010,6 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 					res.Credit = entry.Price / seller.Info().CreditMultiplier
 				}
 
-				// Do not add the same data twice
-				skip := false
-				for i := range foundSellers[cardId][conditions] {
-					if isSame(foundSellers[cardId][conditions][i], res) {
-						skip = true
-					}
-				}
-				if skip {
-					continue
-				}
-
 				// Touchdown
 				foundSellers[cardId][conditions] = append(foundSellers[cardId][conditions], res)
 			}
@@ -1040,6 +1021,8 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 
 func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[string]map[string][]SearchEntry) {
 	foundVendors = map[string]map[string][]SearchEntry{}
+
+	cardIds = dedupeKeys(cardIds)
 
 	storeFilters := config.StoreFilters
 	priceFilters := config.PriceFilters
@@ -1090,16 +1073,6 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 					URL:          entry.URL,
 					BundleIcon:   icon,
 					Country:      Country2flag[vendor.Info().CountryFlag],
-				}
-
-				skip := false
-				for i := range foundVendors[cardId][conditions] {
-					if isSame(foundVendors[cardId][conditions][i], res) {
-						skip = true
-					}
-				}
-				if skip {
-					continue
 				}
 
 				foundVendors[cardId][conditions] = append(foundVendors[cardId][conditions], res)

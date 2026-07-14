@@ -166,6 +166,31 @@ func TestPriceParityRetail(t *testing.T) {
 	}
 }
 
+// Decklist/hashing searches repeat a uuid once per copy; the walks must
+// still produce one row per store entry, not one per copy (this used to be
+// guarded by the isSame dedup scan, now by deduping the ids up front).
+func TestWalkRepeatedIds(t *testing.T) {
+	regular, foil, _ := parityCards(t)
+	seedParityScrapers(t, regular, foil)
+
+	cardIds := []string{regular, regular, regular, regular}
+	config := parseSearchOptionsNG(regular, nil, nil, nil)
+
+	found := searchSellersNG(cardIds, config)
+	for _, cond := range []string{"NM", "SP", "PO"} {
+		if got := len(found[regular][cond]); got != 1 {
+			t.Errorf("sellers %s rows = %d, want 1", cond, got)
+		}
+	}
+
+	foundBl := searchVendorsNG(cardIds, config)
+	for _, cond := range []string{"NM", "SP"} {
+		if got := len(foundBl[regular][cond]); got != 1 {
+			t.Errorf("vendors %s rows = %d, want 1", cond, got)
+		}
+	}
+}
+
 func TestPriceParityBuylist(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
