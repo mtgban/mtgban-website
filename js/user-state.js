@@ -346,12 +346,25 @@
     }
 
     // setItem shim: write through, mark dirty, schedule a debounced sync.
+    // Override Storage.prototype.setItem, not the localStorage instance:
+    // `localStorage.setItem = fn` does not shadow the method in Firefox - the
+    // Storage named-property setter stores a "setItem" key instead - so the
+    // instance override silently never ran there and nothing ever synced.
     function installSetItemShim() {
-        localStorage.setItem = function(key, value) {
-            rawSetItem(key, value);
-            var section = sectionForKey(key);
-            if (section) { markDirty(); schedule(section); }
+        var proto = window.Storage && window.Storage.prototype;
+        if (!proto || proto._mtgbanSyncShim) return;
+        proto._mtgbanSyncShim = true;
+        var nativeSetItem = proto.setItem;
+        proto.setItem = function(key, value) {
+            nativeSetItem.call(this, key, value);
+            if (this === window.localStorage) {
+                var section = sectionForKey(key);
+                if (section) { markDirty(); schedule(section); }
+            }
         };
+        // Remove the stray "setItem" key the old instance assignment stored in
+        // localStorage on Firefox.
+        try { window.localStorage.removeItem('setItem'); } catch (e) {}
     }
 
     function hydrate() {
