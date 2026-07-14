@@ -150,18 +150,17 @@ func TestPriceParityRetail(t *testing.T) {
 		t.Errorf("api index cond = %q, want empty", got)
 	}
 
-	// Pin (documented divergence #3 in the plan): search suppresses PO rows
-	// when NM and SP rows exist; the API exports every condition. If either
-	// side changes, revisit todo/unify-price-pipelines.md.
-	if got := searchPrice(found, regular, "PO", "PARITYA"); got != -1 {
-		t.Errorf("search PO row should be suppressed, got %v", got)
+	// Parity (was divergence #3 in the plan): the walk exports every
+	// condition on both sides; hiding PO rows when NM and SP exist is a
+	// website display policy applied in CSS (search.css .cond-PO rule).
+	if got := searchPrice(found, regular, "PO", "PARITYA"); got != 2 {
+		t.Errorf("search PO = %v, want 2", got)
 	}
 	if got := api[regular]["PARITYA"].Conditions.get("PO"); got != 2 {
 		t.Errorf("api conditions[PO] = %v, want 2", got)
 	}
 
-	// Pin: the API sums quantities across every condition (PO included) even
-	// though the PO row is hidden on the search side.
+	// Pin: the API sums quantities across every condition, PO included.
 	if got := api[regular]["PARITYA"].Qty; got != 8 {
 		t.Errorf("api qty = %v, want 8", got)
 	}

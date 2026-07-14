@@ -1134,10 +1134,10 @@
                                         {{if not (and (eq $conditions "INDEX") $card.Sealed)}}
                                             {{$entries := (index $condsEntry $conditions)}}
                                             {{if and $entries (ne $conditions "INDEX")}}
-                                                <div class="price-cond-header">{{if $card.Sealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
+                                                <div class="price-cond-header cond-{{$conditions}}">{{if $card.Sealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
                                             {{end}}
                                             {{range $entries}}
-                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                                <div class="price-row cond-{{$conditions}}{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
                                                     {{if .Locked}}
                                                         <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                         <span class="locked-cta">

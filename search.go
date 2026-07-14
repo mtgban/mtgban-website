@@ -1000,11 +1000,6 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 					conditions = "INDEX"
 				}
 
-				// Only add Poor prices if there are no NM and SP entries
-				if conditions == "PO" && len(foundSellers[cardId]["NM"]) != 0 && len(foundSellers[cardId]["SP"]) != 0 {
-					continue
-				}
-
 				icon := Config.ScraperConfig.Icons[seller.Info().Shorthand]
 
 				// Prepare all the deets

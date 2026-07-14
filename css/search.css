@@ -1013,6 +1013,15 @@ html.admin-fix-mode .store-fix { display: inline-block; }
     border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
 }
 
+/* Hide Poor offers when both NM and SP are available (display policy: the
+   data stays in the DOM, and the sellers walk no longer filters it). Only
+   seller rows carry cond-* classes, so the buyers column is unaffected.
+   PO renders last in the column, keeping the nth-child zebra stripes of
+   the visible rows stable. */
+.rows-main:has(.cond-NM):has(.cond-SP) .cond-PO {
+    display: none;
+}
+
 /* Sealed INDEX: 4-column sub-header */
 .price-index-header {
     background: var(--search-surface-1);
