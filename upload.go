@@ -517,6 +517,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Load data
 	var uploadedData []UploadEntry
+	var uploadName string
 	if len(hashes) != 0 {
 		uploadedData, err = loadHashes(hashes, r.Form["hashesQtys"], r.Form["hashesCond"], r.Form["hashesPrice"])
 	} else if textArea != "" {
@@ -535,11 +536,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			switch u.Host {
 			case "store.tcgplayer.com":
-				uploadedData, err = loadCollection(r.Context(), gdocURL, maxRows)
+				uploadedData, uploadName, err = loadCollection(r.Context(), gdocURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
-				uploadedData, err = loadMoxfield(r.Context(), u.Path, maxRows)
+				uploadedData, uploadName, err = loadMoxfield(r.Context(), u.Path, maxRows)
 			case "docs.google.com":
-				uploadedData, err = loadSpreadsheet(u.Path, maxRows)
+				uploadedData, uploadName, err = loadSpreadsheet(u.Path, maxRows)
 			default:
 				err = errors.New("unsupported URL")
 			}
@@ -877,7 +878,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else if textArea != "" {
 		pageVars.UploadQuery = "pasted text"
 	} else if gdocURL != "" {
+		// Show the source's own name when the loader could retrieve one,
+		// and let the results header link back to it
 		pageVars.UploadQuery = "remote URL"
+		if uploadName != "" {
+			pageVars.UploadQuery = uploadName
+		}
+		pageVars.UploadSourceURL = gdocURL
 	} else {
 		pageVars.UploadQuery = handler.Filename
 	}
@@ -1362,12 +1369,12 @@ func loadHashes(hashes, qtys, cond, prices []string) ([]UploadEntry, error) {
 	return uploadEntries, nil
 }
 
-func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
+func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
 	var uploadEntries []UploadEntry
 
 	deckID := path.Base(link)
 	if deckID == "" {
-		return nil, errors.New("invalid Moxfield deck URL")
+		return nil, "", errors.New("invalid Moxfield deck URL")
 	}
 
 	// Build the request URL from the configured proxy base so the host
@@ -1376,18 +1383,18 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	// require a clean absolute path so it can't inject a scheme or host
 	// (e.g. via a leading "//" or an embedded "://").
 	if !strings.HasPrefix(link, "/") || strings.HasPrefix(link, "//") || strings.Contains(link, "://") {
-		return nil, errors.New("invalid Moxfield deck URL")
+		return nil, "", errors.New("invalid Moxfield deck URL")
 	}
 	base, err := url.Parse(Config.Uploader["moxfield"])
 	if err != nil {
-		return nil, errors.New("invalid Moxfield uploader configuration")
+		return nil, "", errors.New("invalid Moxfield uploader configuration")
 	}
 	base.Path = path.Join(base.Path, link)
 	moxURL := base.String()
 
-	items, err := moxfield.Load(ctx, moxURL, maxRows)
+	items, deckName, err := moxfield.Load(ctx, moxURL, maxRows)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch Moxfield deck: %w", err)
+		return nil, "", fmt.Errorf("failed to fetch Moxfield deck: %w", err)
 	}
 
 	for _, item := range items {
@@ -1403,7 +1410,7 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 		uploadEntries = append(uploadEntries, entry)
 	}
 
-	return uploadEntries, nil
+	return uploadEntries, deckName, nil
 }
 
 // resolveMoxItem resolves a Moxfield item to a uuid. Most items carry a
@@ -1422,35 +1429,41 @@ func resolveMoxItem(item moxfield.Item) (string, error) {
 	return mtgmatcher.MatchId(printings[0].UUID, item.IsFoil, item.IsEtched)
 }
 
-func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
+func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
 	// Re-validate the URL locally rather than trusting the caller's host
 	// switch: parse it here and require the exact TCGplayer store host so
 	// the request target can't be pointed at an arbitrary (e.g. internal)
 	// address. This also gives the static analyzer a sanitizer it can see.
 	u, err := url.Parse(link)
 	if err != nil {
-		return nil, errors.New("unsupported URL")
+		return nil, "", errors.New("unsupported URL")
 	}
 	if u.Scheme != "https" || u.Host != "store.tcgplayer.com" {
-		return nil, errors.New("unsupported URL")
+		return nil, "", errors.New("unsupported URL")
 	}
 	if !strings.Contains(u.Path, "/collection/view/") {
-		return nil, errors.New("unsupported URL")
+		return nil, "", errors.New("unsupported URL")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+
+	// The page title names the collection ("<owner>'s Collection")
+	collectionName := strings.TrimSpace(doc.Find("title").First().Text())
+	if idx := strings.Index(collectionName, "|"); idx > 0 {
+		collectionName = strings.TrimSpace(collectionName[:idx])
 	}
 
 	var header []string
@@ -1460,7 +1473,7 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 
 	indexMap, err := uploadParser.ParseHeader(header)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var uploadEntries []UploadEntry
@@ -1505,17 +1518,19 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 		return true
 	})
 
-	return uploadEntries, nil
+	return uploadEntries, collectionName, nil
 }
 
-func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
+func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, string, error) {
 	service := spreadsheet.NewServiceWithClient(GoogleDocsClient)
 
 	hash := path.Base(strings.TrimSuffix(urlPath, "/edit"))
 	spreadsheet, err := service.FetchSpreadsheet(hash)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
+
+	docName := spreadsheet.Properties.Title
 
 	sheetIndex := 0
 	for i := 0; i < len(spreadsheet.Sheets); i++ {
@@ -1527,11 +1542,11 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
 
 	sheet, err := spreadsheet.SheetByIndex(uint(sheetIndex))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if len(sheet.Rows) == 0 {
-		return nil, errors.New("empty xls file")
+		return nil, "", errors.New("empty xls file")
 	}
 
 	record := make([]string, len(sheet.Rows[0]))
@@ -1544,7 +1559,7 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
 	if errors.Is(err, ErrUploadDecklist) || errors.Is(err, ErrReloadFirstRow) {
 		i-- // Parse the first line again
 	} else if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var uploadEntries []UploadEntry
@@ -1571,7 +1586,7 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
 		uploadEntries = append(uploadEntries, res)
 	}
 
-	return uploadEntries, nil
+	return uploadEntries, docName, nil
 }
 
 func loadOldXls(reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {

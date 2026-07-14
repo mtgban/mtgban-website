@@ -34,6 +34,7 @@ func (i Item) sortKey() string {
 }
 
 type Deck struct {
+	Name   string `json:"name"`
 	Boards map[string]struct {
 		Count int `json:"count"`
 		Cards map[string]struct {
@@ -231,15 +232,19 @@ func getMoxCollection(ctx context.Context, collectionURL string, maxRows int) ([
 	return items, nil
 }
 
-func Load(ctx context.Context, link string, maxRows int) ([]Item, error) {
+// Load fetches a Moxfield deck or collection and returns its items plus the
+// source's display name when one is available (deck name; collections carry
+// none).
+func Load(ctx context.Context, link string, maxRows int) ([]Item, string, error) {
 	if !strings.Contains(link, "/decks/") {
-		return getMoxCollection(ctx, link, maxRows)
+		items, err := getMoxCollection(ctx, link, maxRows)
+		return items, "", err
 	}
 
 	deck, err := getMoxDeck(ctx, link)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return prepareDecklist(deck, maxRows), nil
+	return prepareDecklist(deck, maxRows), deck.Name, nil
 }

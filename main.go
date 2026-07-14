@@ -251,6 +251,9 @@ type PageVars struct {
 	MissingPrices        map[string]float64
 	ResultPrices         map[string]map[string]float64
 	UploadQuery          string
+	// Original link of a remote-URL upload, so the results header can
+	// point back at the source
+	UploadSourceURL string
 	// Upload singles/sealed/not-found split
 	SinglesEntries    []UploadEntry
 	SealedEntries     []UploadEntry

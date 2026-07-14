@@ -1472,3 +1472,16 @@ tr.opt-removed td:last-child { opacity: 1; }
 tr.opt-removed .opt-name a { text-decoration: line-through; }
 tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 .opt-row-check { cursor: pointer; }
+
+/* ── Results header source link ── */
+/* Remote-URL uploads name their source (deck/sheet title) and link back
+   to it; keep the heading's color so it reads as a title, not a nav link */
+.page-header h1 .upload-source-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--border-subtle, rgba(128,128,128,0.5));
+    text-underline-offset: 4px;
+}
+.page-header h1 .upload-source-link:hover {
+    text-decoration-color: currentColor;
+}

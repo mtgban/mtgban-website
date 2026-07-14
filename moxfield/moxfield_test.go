@@ -10,7 +10,7 @@ import (
 // expand to one item per printing (the source of "the uploader lumps my
 // land variations together").
 func TestPrepareDecklistExpandsPrintings(t *testing.T) {
-	blob := `{"boards":{"mainboard":{"count":8,"cards":{
+	blob := `{"name":"Galaxy Lands","boards":{"mainboard":{"count":8,"cards":{
 		"aaa":{"quantity":7,"finish":"nonFoil","card":{"scryfall_id":"scry-island","name":"Island"},
 			"printingData":[
 				{"quantity":2,"finish":"nonFoil","set":"unf","cn":"236"},
@@ -23,6 +23,9 @@ func TestPrepareDecklistExpandsPrintings(t *testing.T) {
 	var deck Deck
 	if err := json.Unmarshal([]byte(blob), &deck); err != nil {
 		t.Fatal(err)
+	}
+	if deck.Name != "Galaxy Lands" {
+		t.Errorf("deck name = %q, want Galaxy Lands", deck.Name)
 	}
 
 	items := prepareDecklist(&deck, 100)
