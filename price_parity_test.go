@@ -220,47 +220,52 @@ func TestPriceParityBuylist(t *testing.T) {
 	}
 }
 
-// TestFinishPredicateDivergence pins divergence #1 from the plan: the API's
-// checkFinish and the search finish FilterCardFunc disagree on sealed
-// products. checkFinish always keeps sealed regardless of the finish filter;
-// the search filter drops sealed under f:foil / f:etched (a sealed product is
-// neither). The unification (phase 1) replaces both with one predicate and
-// must flip this test into a parity assertion.
-func TestFinishPredicateDivergence(t *testing.T) {
+// TestFinishPredicateParity flips divergence #1 from the plan: checkFinish is
+// gone, and one finish predicate (the search's cardFilterFinish) applies
+// everywhere - filtered API requests inherit it through the funnel, full
+// dumps through EntryRule.Finish. Notable semantic changes from checkFinish:
+// sealed products now count as nonfoil (kept by finish=nonfoil, dropped by
+// foil/etched - checkFinish kept them under every value), and unknown finish
+// values drop everything instead of filtering nothing.
+func TestFinishPredicateParity(t *testing.T) {
 	regular, foil, sealed := parityCards(t)
+	seedParityScrapers(t, regular, foil)
 
+	cardIds := []string{regular, foil}
+	stores := []string{"PARITYA", "PARITYIDX"}
+
+	// Funnel path (hash filter): finish=foil keeps only the foil printing
+	api := getSellerPrices("", stores, "", cardIds, "foil", false, false, false, "")
+	if _, found := api[regular]; found {
+		t.Error("regular printing should be dropped by finish=foil")
+	}
+	if got := api[foil]["PARITYA"].Foil; got != 30 {
+		t.Errorf("foil = %v, want 30", got)
+	}
+
+	// Full dump path: the same predicate through EntryRule.Finish
+	api = getSellerPrices("", stores, "", nil, "foil", false, false, false, "")
+	if _, found := api[regular]; found {
+		t.Error("regular printing should be dropped by finish=foil in a full dump")
+	}
+	if got := api[foil]["PARITYA"].Foil; got != 30 {
+		t.Errorf("full dump foil = %v, want 30", got)
+	}
+
+	// Sealed products count as nonfoil under the shared predicate (neither
+	// Foil nor Etched is set) and are dropped by foil/etched filters - the
+	// old checkFinish kept them under every finish value
 	coSealed, err := mtgmatcher.GetUUID(sealed)
 	if err != nil {
 		t.Fatal(err)
 	}
-	searchFinish := func(filters []string, co *mtgmatcher.CardObject) bool {
-		return applyCardFilter("finish", filters, co)
+	if applyCardFilter("finish", []string{"nonfoil"}, coSealed) {
+		t.Error("finish(sealed, nonfoil) drops; want kept")
 	}
-
-	// API: sealed passes any finish filter.
-	for _, finish := range []string{"nonfoil", "foil", "etched"} {
-		if checkFinish(coSealed, finish) {
-			t.Errorf("checkFinish(sealed, %s) skips; pinned as kept", finish)
-		}
-	}
-	// Search: sealed is dropped by foil/etched filters.
 	for _, finish := range []string{"foil", "etched"} {
-		if !searchFinish([]string{finish}, coSealed) {
-			t.Errorf("search finish(sealed, %s) keeps; pinned as dropped", finish)
+		if !applyCardFilter("finish", []string{finish}, coSealed) {
+			t.Errorf("finish(sealed, %s) keeps; want dropped", finish)
 		}
-	}
-
-	// Where they agree already: plain singles.
-	coRegular, _ := mtgmatcher.GetUUID(regular)
-	coFoil, _ := mtgmatcher.GetUUID(foil)
-	if checkFinish(coRegular, "nonfoil") || searchFinish([]string{"nonfoil"}, coRegular) {
-		t.Error("regular card should pass a nonfoil filter on both sides")
-	}
-	if checkFinish(coFoil, "foil") || searchFinish([]string{"foil"}, coFoil) {
-		t.Error("foil card should pass a foil filter on both sides")
-	}
-	if !checkFinish(coRegular, "foil") || !searchFinish([]string{"foil"}, coRegular) {
-		t.Error("regular card should be dropped by a foil filter on both sides")
 	}
 }
 

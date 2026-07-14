@@ -560,8 +560,7 @@ func getIdFromMode(mode string, co *mtgmatcher.CardObject) string {
 
 // resolveEditionFilter turns an edition filter into the uuid list to walk:
 // scanning whole inventories and checking the set code per entry was the
-// dominant cost of edition dumps. The EntryRule edition check stays in place
-// downstream, passing by construction. Returns nil for an unknown set, which
+// dominant cost of edition dumps. Returns nil for an unknown set, which
 // callers treat as no results.
 func resolveEditionFilter(filterByEdition string, filterByHash []string, sealed bool) []string {
 	if filterByHash != nil || filterByEdition == "" {
@@ -573,12 +572,204 @@ func resolveEditionFilter(filterByEdition string, filterByHash []string, sealed 
 	return mtgmatcher.GetUUIDsInSet(filterByEdition)
 }
 
+// apiSearchConfig builds the narrow search config a filtered API request
+// funnels through the website's gathering functions: the resolved uuids
+// (kept to the sealed/singles partition the endpoint serves, which the
+// direct scan used to enforce via the stores' SealedMode flag), the finish
+// predicate, and a positive store filter from the caller's enabled stores.
+// enabledStores is the whole store policy - explicit sig store lists
+// override blocklists by design, and ALL_ACCESS folds them in upstream -
+// so no blocklist is applied here.
+func apiSearchConfig(uuids, enabledStores []string, filterByFinish string, sealed bool) SearchConfig {
+	// The set index buckets are read-only, so partition into a fresh slice
+	kept := make([]string, 0, len(uuids))
+	for _, uuid := range uuids {
+		co, err := mtgmatcher.GetUUID(uuid)
+		if err == nil && co.Sealed == sealed {
+			kept = append(kept, uuid)
+		}
+	}
+
+	stores := make([]string, len(enabledStores))
+	for i := range enabledStores {
+		stores[i] = strings.ToLower(enabledStores[i])
+	}
+
+	config := SearchConfig{
+		SearchMode: "hashing",
+		UUIDs:      kept,
+		StoreFilters: []FilterStoreElem{
+			{Name: "seller", Values: stores, OnlyForSeller: true},
+			{Name: "vendor", Values: stores, OnlyForVendor: true},
+		},
+	}
+	if filterByFinish != "" {
+		config.CardFilters = []FilterElem{{
+			Name:   "finish",
+			Values: fixupFinishNG(filterByFinish),
+		}}
+	}
+	return config
+}
+
+// banPricesFromRows aggregates the search walk's per-condition rows into the
+// BanPrice map the price API serves, mirroring the direct processEntry scan:
+// rows preserve record order (best grade first, then price), so the first
+// row seen per store is the record's best entry and keys the base price; a
+// zero base price drops the store; Conditions are last-write-wins within a
+// grade exactly like the entry loop. INDEX rows are metadata prices whose
+// underlying grade is always NM.
+func banPricesFromRows(cardIds []string, found map[string]map[string][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
+	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
+	// metadata vendors keep their grade bucket, so INDEX membership is not
+	// a reliable proxy) nor the raw scraper name (SearchEntry.ScraperName
+	// has NameOverride applied), so look up the side's info once.
+	var names map[string]string
+	var indexStores map[string]bool
+	if vendorSide {
+		indexStores = map[string]bool{}
+		names = map[string]string{}
+		for _, vendor := range GetVendors() {
+			indexStores[vendor.Info().Shorthand] = vendor.Info().MetadataOnly
+			names[vendor.Info().Shorthand] = vendor.Info().Name
+		}
+	} else {
+		names = map[string]string{}
+		for _, seller := range GetSellers() {
+			names[seller.Info().Shorthand] = seller.Info().Name
+		}
+	}
+
+	out := map[string]map[string]*BanPrice{}
+	for _, cardId := range cardIds {
+		buckets := found[cardId]
+		if len(buckets) == 0 {
+			continue
+		}
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			continue
+		}
+		id := getIdFromMode(idMode, co)
+		if id == "" {
+			continue
+		}
+
+		suffix := ""
+		if co.Etched {
+			suffix = "_etched"
+		} else if co.Foil {
+			suffix = "_foil"
+		}
+
+		// Per-store output for this card; nil marks a store dropped for a
+		// zero base price. Different uuids can share an output id (a name
+		// or tcg id spans finishes), so entries merge into out across cards.
+		prices := map[string]*BanPrice{}
+		for _, cond := range AllConditions {
+			for i := range buckets[cond] {
+				row := &buckets[cond][i]
+
+				price, seen := prices[row.Shorthand]
+				if !seen {
+					// First row per store is the record's best entry
+					if row.Price == 0 {
+						prices[row.Shorthand] = nil
+						continue
+					}
+					tag := row.Shorthand
+					if tagName == "names" {
+						tag = names[row.Shorthand]
+					}
+					if out[id] == nil {
+						out[id] = map[string]*BanPrice{}
+					}
+					price = out[id][tag]
+					if price == nil {
+						price = &BanPrice{}
+						out[id][tag] = price
+					}
+					prices[row.Shorthand] = price
+
+					if co.Sealed {
+						price.Sealed = row.Price
+					} else if co.Etched {
+						price.Etched = row.Price
+					} else if co.Foil {
+						price.Foil = row.Price
+					} else {
+						price.Regular = row.Price
+					}
+					if cond != "INDEX" && !co.Sealed {
+						price.Cond = cond
+					}
+				}
+				if price == nil {
+					continue
+				}
+
+				shouldQty := qty && !row.NoQuantity
+				if vendorSide {
+					shouldQty = qty && (!indexStores[row.Shorthand] || row.Shorthand == "SYP")
+				}
+				if shouldQty {
+					if co.Sealed {
+						price.QtySealed += row.Quantity
+					} else if co.Etched {
+						price.QtyEtched += row.Quantity
+					} else if co.Foil {
+						price.QtyFoil += row.Quantity
+					} else {
+						price.Qty += row.Quantity
+					}
+				}
+
+				if conds && !co.Sealed {
+					condTag := cond
+					if condTag == "INDEX" {
+						condTag = "NM"
+					}
+					condTag += suffix
+					if price.Conditions == nil {
+						price.Conditions = &BanConditions{}
+					}
+					price.Conditions.set(condTag, row.Price)
+					if shouldQty && row.Quantity > 0 {
+						if price.Quantities == nil {
+							price.Quantities = &BanQuantities{}
+						}
+						price.Quantities.set(condTag, row.Quantity)
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
 func getSellerPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
-	filterByHash = resolveEditionFilter(filterByEdition, filterByHash, sealed)
-	if filterByEdition != "" && filterByHash == nil {
-		return out
+
+	// Filtered requests funnel through the shared search gathering: resolve
+	// the filter to a uuid list, walk the same path the website search does,
+	// and aggregate the rows. Full dumps keep the direct scan below - they
+	// have no filter to resolve, and aggregating in place costs orders of
+	// magnitude less than materializing rows for the whole pool.
+	if filterByEdition != "" || filterByHash != nil {
+		uuids := resolveEditionFilter(filterByEdition, filterByHash, sealed)
+		config := apiSearchConfig(uuids, enabledStores, filterByFinish, sealed)
+		cardIds, err := searchAndFilter(config)
+		if err != nil {
+			return out
+		}
+		return banPricesFromRows(cardIds, searchSellersNG(cardIds, config), mode, tagName, qty, conds, false)
 	}
+
+	var finishFilter []string
+	if filterByFinish != "" {
+		finishFilter = fixupFinishNG(filterByFinish)
+	}
+
 	for _, seller := range GetSellers() {
 		// Only keep the right product type
 		if (!sealed && seller.Info().SealedMode) ||
@@ -609,16 +800,10 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		shouldBaseCond := !seller.Info().MetadataOnly && !seller.Info().SealedMode
 
 		rule := EntryRule{
-			Edition: filterByEdition,
-			Finish:  filterByFinish,
+			Finish: finishFilter,
 		}
-		for _, cardId := range filterByHash {
+		for cardId := range inventory {
 			processEntry(out, inventory[cardId], mode, cardId, sellerTag, shouldQty, conds, shouldBaseCond, rule)
-		}
-		if filterByHash == nil {
-			for cardId := range inventory {
-				processEntry(out, inventory[cardId], mode, cardId, sellerTag, shouldQty, conds, shouldBaseCond, rule)
-			}
 		}
 	}
 
@@ -626,8 +811,9 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 }
 
 type EntryRule struct {
-	Edition string
-	Finish  string
+	// Finish holds fixupFinishNG values and is applied through the same
+	// finish predicate the search filters use
+	Finish []string
 
 	MinPrice float64
 	Rate     float64
@@ -648,10 +834,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 
 	rate := 1.0
 	for _, rule := range rules {
-		if rule.Edition != "" && co.SetCode != rule.Edition {
-			return
-		}
-		if rule.Finish != "" && checkFinish(co, rule.Finish) {
+		if len(rule.Finish) > 0 && applyCardFilter("finish", rule.Finish, co) {
 			return
 		}
 		if entries[0].Pricing() < rule.MinPrice {
@@ -757,10 +940,24 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 
 func getVendorPrices(mode string, enabledStores []string, filterByEdition string, filterByHash []string, filterByFinish string, qty, conds, sealed bool, tagName string) map[string]map[string]*BanPrice {
 	out := map[string]map[string]*BanPrice{}
-	filterByHash = resolveEditionFilter(filterByEdition, filterByHash, sealed)
-	if filterByEdition != "" && filterByHash == nil {
-		return out
+
+	// Filtered requests funnel through the shared search gathering, exactly
+	// like getSellerPrices
+	if filterByEdition != "" || filterByHash != nil {
+		uuids := resolveEditionFilter(filterByEdition, filterByHash, sealed)
+		config := apiSearchConfig(uuids, enabledStores, filterByFinish, sealed)
+		cardIds, err := searchAndFilter(config)
+		if err != nil {
+			return out
+		}
+		return banPricesFromRows(cardIds, searchVendorsNG(cardIds, config), mode, tagName, qty, conds, true)
 	}
+
+	var finishFilter []string
+	if filterByFinish != "" {
+		finishFilter = fixupFinishNG(filterByFinish)
+	}
+
 	for _, vendor := range GetVendors() {
 		// Only keep the right product type
 		if (!sealed && vendor.Info().SealedMode) ||
@@ -789,35 +986,14 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		shouldBaseCond := !vendor.Info().MetadataOnly && !vendor.Info().SealedMode
 
 		rule := EntryRule{
-			Edition: filterByEdition,
-			Finish:  filterByFinish,
+			Finish: finishFilter,
 		}
-		for _, cardId := range filterByHash {
+		for cardId := range buylist {
 			processEntry(out, buylist[cardId], mode, cardId, vendorTag, shouldQty, conds, shouldBaseCond, rule)
-		}
-		if filterByHash == nil {
-			for cardId := range buylist {
-				processEntry(out, buylist[cardId], mode, cardId, vendorTag, shouldQty, conds, shouldBaseCond, rule)
-			}
 		}
 	}
 
 	return out
-}
-
-func checkFinish(co *mtgmatcher.CardObject, finish string) bool {
-	if co.Sealed {
-		return false
-	}
-	switch finish {
-	case "nonfoil":
-		return co.Foil || co.Etched
-	case "foil":
-		return !co.Foil || co.Etched
-	case "etched":
-		return co.Foil || !co.Etched
-	}
-	return false
 }
 
 // BanPrice2CSV is a convenience wrapper around SimplePrice2CSV that
