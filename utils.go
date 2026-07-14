@@ -842,6 +842,18 @@ func isSecureRequest(r *http.Request) bool {
 	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
+// storeEligible reports whether a store may appear in a price surface under
+// the given policy: an explicit allowlist is the entire policy (a sig's own
+// store list bypasses blocklists by design), otherwise the store just must
+// not be blocklisted. Both the API's store list construction and the search
+// default blocklists express this precedence rule.
+func storeEligible(shorthand string, allowlist, blocklist []string) bool {
+	if allowlist != nil {
+		return slices.Contains(allowlist, shorthand)
+	}
+	return !slices.Contains(blocklist, shorthand)
+}
+
 // Retrieve default blocklists according to the signature contents
 func getDefaultBlocklists(sig string) ([]string, []string) {
 	var blocklistRetail, blocklistBuylist []string

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -266,6 +268,94 @@ func TestFinishPredicateParity(t *testing.T) {
 		if !applyCardFilter("finish", []string{finish}, coSealed) {
 			t.Errorf("finish(sealed, %s) keeps; want dropped", finish)
 		}
+	}
+}
+
+// TestStoreEligible pins the precedence rule behind divergence #2 of the
+// plan: an explicit allowlist is the entire store policy and bypasses
+// blocklists; without one, blocklists exclude.
+func TestStoreEligible(t *testing.T) {
+	blocklist := []string{"BLOCKED"}
+
+	if !storeEligible("STORE", nil, blocklist) {
+		t.Error("unblocked store should be eligible")
+	}
+	if storeEligible("BLOCKED", nil, blocklist) {
+		t.Error("blocklisted store should not be eligible")
+	}
+	if !storeEligible("BLOCKED", []string{"BLOCKED"}, blocklist) {
+		t.Error("allowlist should override the blocklist")
+	}
+	if storeEligible("STORE", []string{"OTHER"}, nil) {
+		t.Error("with an allowlist, membership is the whole policy")
+	}
+	if !storeEligible("ANY", nil, nil) {
+		t.Error("no policy means everything is eligible")
+	}
+}
+
+// TestApiEnabledStores pins how the API turns the sig store option into the
+// store list: ALL_ACCESS applies the search blocklists at runtime,
+// DEV_ACCESS applies nothing, and an explicit list bypasses them entirely.
+func TestApiEnabledStores(t *testing.T) {
+	regular, foil, _ := parityCards(t)
+	seedParityScrapers(t, regular, foil)
+
+	prevRetail := Config.SearchRetailBlockList
+	prevBuylist := Config.SearchBuylistBlockList
+	Config.SearchRetailBlockList = []string{"PARITYIDX"}
+	Config.SearchBuylistBlockList = []string{"PARITYV"}
+	t.Cleanup(func() {
+		Config.SearchRetailBlockList = prevRetail
+		Config.SearchBuylistBlockList = prevBuylist
+	})
+
+	got := apiEnabledStores("ALL_ACCESS")
+	if !slices.Contains(got, "PARITYA") {
+		t.Errorf("ALL_ACCESS should keep PARITYA, got %v", got)
+	}
+	if slices.Contains(got, "PARITYIDX") || slices.Contains(got, "PARITYV") {
+		t.Errorf("ALL_ACCESS should apply both blocklists, got %v", got)
+	}
+
+	got = apiEnabledStores("DEV_ACCESS")
+	for _, store := range []string{"PARITYA", "PARITYIDX", "PARITYV"} {
+		if !slices.Contains(got, store) {
+			t.Errorf("DEV_ACCESS should keep %s, got %v", store, got)
+		}
+	}
+
+	got = apiEnabledStores("PARITYIDX,PARITYV")
+	if !slices.Equal(got, []string{"PARITYIDX", "PARITYV"}) {
+		t.Errorf("explicit list should bypass blocklists, got %v", got)
+	}
+}
+
+// TestGetDefaultBlocklists pins the search-side counterpart: with no sig the
+// config blocklists apply, a sig can replace them with its own list, and
+// NONE disables them.
+func TestGetDefaultBlocklists(t *testing.T) {
+	prevRetail := Config.SearchRetailBlockList
+	prevBuylist := Config.SearchBuylistBlockList
+	Config.SearchRetailBlockList = []string{"RBLOCK"}
+	Config.SearchBuylistBlockList = []string{"BBLOCK"}
+	t.Cleanup(func() {
+		Config.SearchRetailBlockList = prevRetail
+		Config.SearchBuylistBlockList = prevBuylist
+	})
+
+	retail, buylist := getDefaultBlocklists("")
+	if !slices.Equal(retail, []string{"RBLOCK"}) || !slices.Equal(buylist, []string{"BBLOCK"}) {
+		t.Errorf("no sig should fall back to config: %v / %v", retail, buylist)
+	}
+
+	sig := base64.StdEncoding.EncodeToString([]byte("SearchDisabled=NONE&SearchBuylistDisabled=STOREX,STOREY"))
+	retail, buylist = getDefaultBlocklists(sig)
+	if retail != nil {
+		t.Errorf("NONE should disable the retail blocklist, got %v", retail)
+	}
+	if !slices.Equal(buylist, []string{"STOREX", "STOREY"}) {
+		t.Errorf("sig list should replace the buylist blocklist, got %v", buylist)
 	}
 }
 

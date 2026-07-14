@@ -209,6 +209,38 @@ type PriceAPIOutput struct {
 	Buylist map[string]map[string]*BanPrice `json:"buylist,omitempty"`
 }
 
+// apiEnabledStores expands the sig's API store option into the concrete
+// store list. ALL_ACCESS generates it from the search blocklists at runtime
+// (so scrapers added after the sig was issued are picked up), DEV_ACCESS
+// sees everything, and an explicit list is taken as-is: a sig's own store
+// list bypasses the blocklists by design.
+func apiEnabledStores(storesOpt string) []string {
+	var enabledStores []string
+	switch storesOpt {
+	case "ALL_ACCESS", "DEV_ACCESS":
+		var blocklistRetail, blocklistBuylist []string
+		if storesOpt == "ALL_ACCESS" {
+			blocklistRetail = Config.SearchRetailBlockList
+			blocklistBuylist = Config.SearchBuylistBlockList
+		}
+		for _, seller := range GetSellers() {
+			shorthand := seller.Info().Shorthand
+			if storeEligible(shorthand, nil, blocklistRetail) && !slices.Contains(enabledStores, shorthand) {
+				enabledStores = append(enabledStores, shorthand)
+			}
+		}
+		for _, vendor := range GetVendors() {
+			shorthand := vendor.Info().Shorthand
+			if storeEligible(shorthand, nil, blocklistBuylist) && !slices.Contains(enabledStores, shorthand) {
+				enabledStores = append(enabledStores, shorthand)
+			}
+		}
+	default:
+		enabledStores = strings.Split(storesOpt, ",")
+	}
+	return enabledStores
+}
+
 func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	sig := r.FormValue("sig")
 	out := PriceAPIOutput{}
@@ -282,38 +314,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var enabledStores []string
-	switch storesOpt {
-	case "ALL_ACCESS":
-		for _, seller := range GetSellers() {
-			shorthand := seller.Info().Shorthand
-			if !slices.Contains(Config.SearchRetailBlockList, shorthand) && !slices.Contains(enabledStores, shorthand) {
-				enabledStores = append(enabledStores, shorthand)
-			}
-		}
-		for _, vendor := range GetVendors() {
-			shorthand := vendor.Info().Shorthand
-			if !slices.Contains(Config.SearchBuylistBlockList, shorthand) &&
-				!slices.Contains(enabledStores, shorthand) {
-				enabledStores = append(enabledStores, shorthand)
-			}
-		}
-	case "DEV_ACCESS":
-		for _, seller := range GetSellers() {
-			shorthand := seller.Info().Shorthand
-			if !slices.Contains(enabledStores, shorthand) {
-				enabledStores = append(enabledStores, shorthand)
-			}
-		}
-		for _, vendor := range GetVendors() {
-			shorthand := vendor.Info().Shorthand
-			if !slices.Contains(enabledStores, shorthand) {
-				enabledStores = append(enabledStores, shorthand)
-			}
-		}
-	default:
-		enabledStores = strings.Split(storesOpt, ",")
-	}
+	enabledStores := apiEnabledStores(storesOpt)
 
 	// Endpoint for retrieving the stores shorthands
 	if strings.HasPrefix(urlPath, "stores") {
@@ -387,7 +388,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	if filterByVendors != "" {
 		var newEnabledStores []string
 		for _, filtered := range strings.Split(filterByVendors, ",") {
-			if slices.Contains(enabledStores, filtered) {
+			if storeEligible(filtered, enabledStores, nil) {
 				newEnabledStores = append(newEnabledStores, filtered)
 			}
 		}
