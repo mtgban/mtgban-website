@@ -271,6 +271,47 @@ func TestFinishPredicateParity(t *testing.T) {
 	}
 }
 
+// TestSearchDownloadFilters pins the search download path (SearchAPI): it
+// hands the fully parsed config to the walks and converts the rows, so
+// query-level store and entry filters shape the output. The old path
+// re-derived a store list from blocklists alone and silently dropped every
+// non-card filter the query carried.
+func TestSearchDownloadFilters(t *testing.T) {
+	regular, foil, _ := parityCards(t)
+	seedParityScrapers(t, regular, foil)
+
+	cardIds := []string{regular}
+
+	// A positive seller filter (query "seller:paritya") excludes the index
+	// seller from the download
+	config := SearchConfig{StoreFilters: []FilterStoreElem{{
+		Name: "seller", Values: []string{"paritya"}, OnlyForSeller: true,
+	}}}
+	api := banPricesFromRows(cardIds, searchSellersNG(cardIds, config), "", "", true, true, false)
+	if _, found := api[regular]["PARITYIDX"]; found {
+		t.Error("seller filter should exclude PARITYIDX from the output")
+	}
+	if got := api[regular]["PARITYA"].Regular; got != 10 {
+		t.Errorf("regular = %v, want 10", got)
+	}
+
+	// A hideBLconds-style entry filter keeps only NM buylist rows, prices
+	// and quantities alike
+	config = SearchConfig{EntryFilters: []FilterEntryElem{{
+		Name: "condition", Values: []string{"NM"}, OnlyForVendor: true,
+	}}}
+	bl := banPricesFromRows(cardIds, searchVendorsNG(cardIds, config), "", "", true, true, true)
+	if got := bl[regular]["PARITYV"].Conditions.Get("NM"); got != 5 {
+		t.Errorf("conditions[NM] = %v, want 5", got)
+	}
+	if got := bl[regular]["PARITYV"].Conditions.Get("SP"); got != 0 {
+		t.Errorf("conditions[SP] = %v, want dropped by the entry filter", got)
+	}
+	if got := bl[regular]["PARITYV"].Qty; got != 4 {
+		t.Errorf("qty = %v, want 4 (SP copies filtered out)", got)
+	}
+}
+
 // TestZeroPricedListings pins how both API paths treat zero-priced listings:
 // they are ignored entirely. The base price is the first nonzero entry, and
 // zero entries contribute neither conditions nor quantities. This is the
