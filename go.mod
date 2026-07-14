@@ -16,7 +16,7 @@ require (
 	github.com/mileusna/useragent v1.3.5
 	github.com/mtgban/go-mtgban v0.6.8
 	github.com/mtgban/simplecloud v0.0.11
-	github.com/xuri/excelize/v2 v2.8.0
+	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sys v0.46.0
 	golang.org/x/time v0.15.0
@@ -75,17 +75,17 @@ require (
 	github.com/googleapis/gax-go/v2 v2.22.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
-	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
 	github.com/mtgban/go-tcgplayer v0.0.2 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
-	github.com/richardlehane/mscfb v1.0.4 // indirect
-	github.com/richardlehane/msoleps v1.0.3 // indirect
+	github.com/richardlehane/mscfb v1.0.7 // indirect
+	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
+	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
-	github.com/xuri/efp v0.0.0-20230802181842-ad255f2331ca // indirect
-	github.com/xuri/nfp v0.0.0-20230919160717-d98342af3f05 // indirect
+	github.com/xuri/efp v0.0.1 // indirect
+	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.43.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
