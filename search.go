@@ -1526,8 +1526,8 @@ func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
 
 	// If conversion fails for any reson, try again using the numerical value of the card only
 	if strip {
-		numI = mtgmatcher.ExtractNumericalValue(cI.Card.Number)
-		numJ = mtgmatcher.ExtractNumericalValue(cJ.Card.Number)
+		numI = mtgmatcher.ExtractNumberValue(cI.Card.Number)
+		numJ = mtgmatcher.ExtractNumberValue(cJ.Card.Number)
 		cInum, errI = strconv.Atoi(numI)
 		cJnum, errJ = strconv.Atoi(numJ)
 		if errI == nil && errJ == nil && cInum != cJnum {

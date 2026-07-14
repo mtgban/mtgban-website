@@ -1204,7 +1204,7 @@ func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc
 	for i, num := range []string{filters[0], co.Number} {
 		ref, err := strconv.Atoi(num)
 		if err != nil {
-			ref, err = strconv.Atoi(mtgmatcher.ExtractNumericalValue(num))
+			ref, err = strconv.Atoi(mtgmatcher.ExtractNumberValue(num))
 			if err != nil {
 				// Exclude card in case the number is all letters
 				ref = LargestIntValue
