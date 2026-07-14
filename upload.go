@@ -1391,7 +1391,7 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	}
 
 	for _, item := range items {
-		cardId, err := mtgmatcher.MatchId(item.ScryfallID, item.IsFoil, item.IsEtched)
+		cardId, err := resolveMoxItem(item)
 		entry := UploadEntry{
 			HasQuantity:       true,
 			Quantity:          item.Quantity,
@@ -1404,6 +1404,22 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	}
 
 	return uploadEntries, nil
+}
+
+// resolveMoxItem resolves a Moxfield item to a uuid. Most items carry a
+// scryfall id; deck per-copy printings carry name plus set and collector
+// number instead, resolved through the set catalog with the finish applied
+// on top.
+func resolveMoxItem(item moxfield.Item) (string, error) {
+	if item.ScryfallID != "" {
+		return mtgmatcher.MatchId(item.ScryfallID, item.IsFoil, item.IsEtched)
+	}
+
+	printings := mtgmatcher.MatchWithNumber(item.Name, strings.ToUpper(item.SetCode), item.Number)
+	if len(printings) == 0 {
+		return "", fmt.Errorf("unknown printing %s (%s) %s", item.Name, item.SetCode, item.Number)
+	}
+	return mtgmatcher.MatchId(printings[0].UUID, item.IsFoil, item.IsEtched)
 }
 
 func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
