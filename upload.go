@@ -711,7 +711,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var credits map[string]float64
 
 	if blMode {
-		results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		// Only fetch singles prices when the upload actually has singles. A nil
+		// or empty hash list is the "dump the whole inventory" signal to
+		// getSellerPrices/getVendorPrices, so a sealed-only upload would
+		// otherwise pull every enabled singles store's full catalog — spurious
+		// empty singles columns plus a GetUUID-per-card dump. Guard it the same
+		// way the sealed and index fetches below already do.
+		results = map[string]map[string]*BanPrice{}
+		if len(cardIds) > 0 {
+			results = getVendorPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		}
 
 		// Build the custom buylist if requested
 		customBuylist, _ := strconv.ParseBool(r.FormValue("custombuylist"))
@@ -768,7 +777,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		// Same guard as the buylist branch: skip the singles dump when the
+		// upload has no singles (see the comment above).
+		results = map[string]map[string]*BanPrice{}
+		if len(cardIds) > 0 {
+			results = getSellerPrices("", enabledStores, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		}
 
 		// Fetch sealed seller prices and merge
 		if len(sealedProductIds) > 0 && len(enabledSealedStores) > 0 {
@@ -794,8 +808,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+csvName+".csv\"")
 		csvWriter := csv.NewWriter(w)
 
-		// Search for all csv-specific indexes
-		indexResults := getSellerPrices("", UploadIndexKeysCSV, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		// Search for all csv-specific indexes (skip the dump when there are no singles)
+		indexResults := map[string]map[string]*BanPrice{}
+		if len(cardIds) > 0 {
+			indexResults = getSellerPrices("", UploadIndexKeysCSV, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		}
 
 		// Copy these index prices in the final results
 		for _, cardId := range cardIds {
