@@ -1994,36 +1994,57 @@ func localizeScraper(filters []string, scraper mtgban.Scraper) bool {
 
 // Note that generic store functions should always return the index scrapers
 // Those can be filtered out with the explicit index option
-var FilterStoreFuncs = map[string]func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool{
-	"index": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
-		return scraper.Info().MetadataOnly
-	},
-	"store": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
-		if includeIndex && scraper.Info().MetadataOnly {
-			return false
-		}
-		return !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
-	},
-	"seller": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
-		if includeIndex && scraper.Info().MetadataOnly {
-			return false
-		}
-		_, ok := scraper.(mtgban.Seller)
-		return ok && !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
-	},
-	"vendor": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
-		if includeIndex && scraper.Info().MetadataOnly {
-			return false
-		}
-		_, ok := scraper.(mtgban.Vendor)
-		return ok && !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
-	},
-	"region": func(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
-		if includeIndex && scraper.Info().MetadataOnly {
-			return false
-		}
-		return localizeScraper(filters, scraper)
-	},
+func storeFilterIndex(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+	return scraper.Info().MetadataOnly
+}
+
+func storeFilterStore(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+	if includeIndex && scraper.Info().MetadataOnly {
+		return false
+	}
+	return !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
+}
+
+func storeFilterSeller(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+	if includeIndex && scraper.Info().MetadataOnly {
+		return false
+	}
+	_, ok := scraper.(mtgban.Seller)
+	return ok && !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
+}
+
+func storeFilterVendor(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+	if includeIndex && scraper.Info().MetadataOnly {
+		return false
+	}
+	_, ok := scraper.(mtgban.Vendor)
+	return ok && !slices.Contains(filters, strings.ToLower(scraper.Info().Shorthand))
+}
+
+func storeFilterRegion(filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+	if includeIndex && scraper.Info().MetadataOnly {
+		return false
+	}
+	return localizeScraper(filters, scraper)
+}
+
+// applyStoreFilter dispatches a store filter by name, mirroring
+// applyCardFilter. Unknown names panic, preserving the old registry
+// behavior.
+func applyStoreFilter(name string, filters []string, scraper mtgban.Scraper, includeIndex bool) bool {
+	switch name {
+	case "index":
+		return storeFilterIndex(filters, scraper, includeIndex)
+	case "store":
+		return storeFilterStore(filters, scraper, includeIndex)
+	case "seller":
+		return storeFilterSeller(filters, scraper, includeIndex)
+	case "vendor":
+		return storeFilterVendor(filters, scraper, includeIndex)
+	case "region":
+		return storeFilterRegion(filters, scraper, includeIndex)
+	}
+	panic(name + " option not found")
 }
 
 func shouldSkipStoreNG(scraper mtgban.Scraper, filters []FilterStoreElem) bool {
@@ -2039,11 +2060,7 @@ func shouldSkipStoreNG(scraper mtgban.Scraper, filters []FilterStoreElem) bool {
 			continue
 		}
 
-		f, found := FilterStoreFuncs[filters[i].Name]
-		if !found {
-			panic(filters[i].Name + " option not found")
-		}
-		res := f(filters[i].Values, scraper, filters[i].IncludeIndex)
+		res := applyStoreFilter(filters[i].Name, filters[i].Values, scraper, filters[i].IncludeIndex)
 		if filters[i].Negate {
 			res = !res
 		}
@@ -2074,24 +2091,30 @@ func priceLessThan(filters []float64, refPrice float64) bool {
 	return true
 }
 
-var FilterPriceFuncs = map[string]func(filters []float64, refPrice float64) bool{
-	"price_greater_than":     priceGreaterThan,
-	"price_less_than":        priceLessThan,
-	"buy_price_greater_than": priceGreaterThan,
-	"buy_price_less_than":    priceLessThan,
-	"arb_price_greater_than": priceGreaterThan,
-	"arb_price_less_than":    priceLessThan,
-	"rev_price_greater_than": priceGreaterThan,
-	"rev_price_less_than":    priceLessThan,
+// priceFilterInvalidDirect doubles the check price, filtering out anything
+// (above 1usd) that is at least twice as much the market price
+func priceFilterInvalidDirect(filters []float64, refPrice float64) bool {
+	if len(filters) > 0 && filters[0] < 1 {
+		return false
+	}
+	return priceLessThan(filters, refPrice/2)
+}
 
-	// Special function that doubles the check price, filtering out
-	// anything (above 1usd) that is at least twice as much the market price
-	"invalid_direct": func(filters []float64, refPrice float64) bool {
-		if len(filters) > 0 && filters[0] < 1 {
-			return false
-		}
-		return priceLessThan(filters, refPrice/2)
-	},
+// applyPriceFilter dispatches a price filter by name, mirroring
+// applyCardFilter. Unknown names panic, preserving the old registry
+// behavior.
+func applyPriceFilter(name string, filters []float64, refPrice float64) bool {
+	switch name {
+	case "price_greater_than", "buy_price_greater_than",
+		"arb_price_greater_than", "rev_price_greater_than":
+		return priceGreaterThan(filters, refPrice)
+	case "price_less_than", "buy_price_less_than",
+		"arb_price_less_than", "rev_price_less_than":
+		return priceLessThan(filters, refPrice)
+	case "invalid_direct":
+		return priceFilterInvalidDirect(filters, refPrice)
+	}
+	panic(name + " option not found")
 }
 
 func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []*FilterPriceElem, shorthand string) bool {
@@ -2146,11 +2169,7 @@ func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []*Filt
 			}()
 		}
 
-		f, found := FilterPriceFuncs[filters[i].Name]
-		if !found {
-			panic(filters[i].Name + " option not found")
-		}
-		res := f(prices, entry.Pricing())
+		res := applyPriceFilter(filters[i].Name, prices, entry.Pricing())
 		if filters[i].Negate {
 			res = !res
 		}
@@ -2170,56 +2189,81 @@ var conditionMap = map[string]int{
 	"PO": 0,
 }
 
-var FilterEntryFuncs = map[string]func(filters []string, entry mtgban.GenericEntry) bool{
-	"condition": func(filters []string, entry mtgban.GenericEntry) bool {
-		return !slices.Contains(filters, entry.Condition())
-	},
-	"condition_greater_than": func(filters []string, entry mtgban.GenericEntry) bool {
-		condIndex, found := conditionMap[filters[0]]
-		if !found {
-			return true
-		}
-		return condIndex >= conditionMap[entry.Condition()]
-	},
-	"condition_less_than": func(filters []string, entry mtgban.GenericEntry) bool {
-		condIndex, found := conditionMap[filters[0]]
-		if !found {
-			return true
-		}
-		return condIndex <= conditionMap[entry.Condition()]
-	},
+func entryFilterCondition(filters []string, entry mtgban.GenericEntry) bool {
+	return !slices.Contains(filters, entry.Condition())
+}
 
-	"qty_greater_than": func(filters []string, entry mtgban.GenericEntry) bool {
-		if entry.Qty() == 0 {
-			return true
-		}
-		num, _ := strconv.Atoi(filters[0])
-		return num >= entry.Qty()
-	},
-	"qty_less_than": func(filters []string, entry mtgban.GenericEntry) bool {
-		if entry.Qty() == 0 {
-			return true
-		}
-		num, _ := strconv.Atoi(filters[0])
-		return num <= entry.Qty()
-	},
+func entryFilterConditionGreaterThan(filters []string, entry mtgban.GenericEntry) bool {
+	condIndex, found := conditionMap[filters[0]]
+	if !found {
+		return true
+	}
+	return condIndex >= conditionMap[entry.Condition()]
+}
 
-	"ratio_greater_than": func(filters []string, entry mtgban.GenericEntry) bool {
-		buylist, ok := entry.(mtgban.BuylistEntry)
-		if !ok || buylist.PriceRatio == 0 {
-			return true
-		}
-		value, _ := strconv.ParseFloat(filters[0], 64)
-		return value >= buylist.PriceRatio
-	},
-	"ratio_less_than": func(filters []string, entry mtgban.GenericEntry) bool {
-		buylist, ok := entry.(mtgban.BuylistEntry)
-		if !ok || buylist.PriceRatio == 0 {
-			return true
-		}
-		value, _ := strconv.ParseFloat(filters[0], 64)
-		return value <= buylist.PriceRatio
-	},
+func entryFilterConditionLessThan(filters []string, entry mtgban.GenericEntry) bool {
+	condIndex, found := conditionMap[filters[0]]
+	if !found {
+		return true
+	}
+	return condIndex <= conditionMap[entry.Condition()]
+}
+
+func entryFilterQtyGreaterThan(filters []string, entry mtgban.GenericEntry) bool {
+	if entry.Qty() == 0 {
+		return true
+	}
+	num, _ := strconv.Atoi(filters[0])
+	return num >= entry.Qty()
+}
+
+func entryFilterQtyLessThan(filters []string, entry mtgban.GenericEntry) bool {
+	if entry.Qty() == 0 {
+		return true
+	}
+	num, _ := strconv.Atoi(filters[0])
+	return num <= entry.Qty()
+}
+
+func entryFilterRatioGreaterThan(filters []string, entry mtgban.GenericEntry) bool {
+	buylist, ok := entry.(mtgban.BuylistEntry)
+	if !ok || buylist.PriceRatio == 0 {
+		return true
+	}
+	value, _ := strconv.ParseFloat(filters[0], 64)
+	return value >= buylist.PriceRatio
+}
+
+func entryFilterRatioLessThan(filters []string, entry mtgban.GenericEntry) bool {
+	buylist, ok := entry.(mtgban.BuylistEntry)
+	if !ok || buylist.PriceRatio == 0 {
+		return true
+	}
+	value, _ := strconv.ParseFloat(filters[0], 64)
+	return value <= buylist.PriceRatio
+}
+
+// applyEntryFilter dispatches an entry filter by name, mirroring
+// applyCardFilter. Unknown names panic, preserving the old registry
+// behavior.
+func applyEntryFilter(name string, filters []string, entry mtgban.GenericEntry) bool {
+	switch name {
+	case "condition":
+		return entryFilterCondition(filters, entry)
+	case "condition_greater_than":
+		return entryFilterConditionGreaterThan(filters, entry)
+	case "condition_less_than":
+		return entryFilterConditionLessThan(filters, entry)
+	case "qty_greater_than":
+		return entryFilterQtyGreaterThan(filters, entry)
+	case "qty_less_than":
+		return entryFilterQtyLessThan(filters, entry)
+	case "ratio_greater_than":
+		return entryFilterRatioGreaterThan(filters, entry)
+	case "ratio_less_than":
+		return entryFilterRatioLessThan(filters, entry)
+	}
+	panic(name + " option not found")
 }
 
 func shouldSkipEntryNG(entry mtgban.GenericEntry, filters []FilterEntryElem) bool {
@@ -2233,11 +2277,7 @@ func shouldSkipEntryNG(entry mtgban.GenericEntry, filters []FilterEntryElem) boo
 			continue
 		}
 
-		f, found := FilterEntryFuncs[filters[i].Name]
-		if !found {
-			panic(filters[i].Name + " option not found")
-		}
-		res := f(filters[i].Values, entry)
+		res := applyEntryFilter(filters[i].Name, filters[i].Values, entry)
 		if filters[i].Negate {
 			res = !res
 		}
@@ -2249,40 +2289,47 @@ func shouldSkipEntryNG(entry mtgban.GenericEntry, filters []FilterEntryElem) boo
 	return false
 }
 
-var FilterPostFuncs = map[string]func(filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool{
-	"empty": func(filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool {
-		return len(foundScraper[cardId]) == 0 ||
-			(len(foundScraper[cardId]) == 1 && len(foundScraper[cardId]["INDEX"]) != 0)
-	},
-	"any": func(filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool {
-		for _, cond := range AllConditions {
-			for _, entry := range foundScraper[cardId][cond] {
-				for _, shorthand := range filters {
-					if strings.ToLower(entry.Shorthand) == shorthand {
-						return false
-					}
+func postFilterEmpty(filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool {
+	return len(foundScraper[cardId]) == 0 ||
+		(len(foundScraper[cardId]) == 1 && len(foundScraper[cardId]["INDEX"]) != 0)
+}
+
+func postFilterAny(filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool {
+	for _, cond := range AllConditions {
+		for _, entry := range foundScraper[cardId][cond] {
+			for _, shorthand := range filters {
+				if strings.ToLower(entry.Shorthand) == shorthand {
+					return false
 				}
 			}
 		}
-		return true
-	},
+	}
+	return true
+}
+
+// applyPostFilter dispatches a post-search filter by name, mirroring
+// applyCardFilter. Unknown names panic, preserving the old registry
+// behavior.
+func applyPostFilter(name string, filters []string, cardId string, foundScraper map[string]map[string][]SearchEntry) bool {
+	switch name {
+	case "empty":
+		return postFilterEmpty(filters, cardId, foundScraper)
+	case "any":
+		return postFilterAny(filters, cardId, foundScraper)
+	}
+	panic(name + " option not found")
 }
 
 func shouldSkipPostNG(cardId string, foundSellers, foundVendors map[string]map[string][]SearchEntry, filters []FilterPostElem) bool {
 	for i := range filters {
-		f, found := FilterPostFuncs[filters[i].Name]
-		if !found {
-			panic(filters[i].Name + " option not found")
-		}
-
 		var foundScrapers map[string]map[string][]SearchEntry
 		if filters[i].OnlyForSeller {
 			foundScrapers = foundSellers
 		} else if filters[i].OnlyForVendor {
 			foundScrapers = foundVendors
 		} else {
-			resS := f(filters[i].Values, cardId, foundSellers)
-			resV := f(filters[i].Values, cardId, foundVendors)
+			resS := applyPostFilter(filters[i].Name, filters[i].Values, cardId, foundSellers)
+			resV := applyPostFilter(filters[i].Name, filters[i].Values, cardId, foundVendors)
 			res := resS && resV
 			if res {
 				return true
@@ -2290,7 +2337,7 @@ func shouldSkipPostNG(cardId string, foundSellers, foundVendors map[string]map[s
 			continue
 		}
 
-		res := f(filters[i].Values, cardId, foundScrapers)
+		res := applyPostFilter(filters[i].Name, filters[i].Values, cardId, foundScrapers)
 		if res {
 			return true
 		}
