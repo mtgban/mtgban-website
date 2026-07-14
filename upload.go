@@ -26,6 +26,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/cardconduit"
+	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/moxfield"
 )
@@ -539,6 +540,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				uploadedData, uploadName, err = loadCollection(r.Context(), gdocURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
 				uploadedData, uploadName, err = loadMoxfield(r.Context(), u.Path, maxRows)
+			case "app.getcollectr.com":
+				uploadedData, uploadName, err = loadCollectr(r.Context(), gdocURL, maxRows)
 			case "docs.google.com":
 				uploadedData, uploadName, err = loadSpreadsheet(u.Path, maxRows)
 			default:
@@ -1411,6 +1414,77 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	}
 
 	return uploadEntries, deckName, nil
+}
+
+// loadCollectr fetches a public Collectr showcase (through the configured
+// proxy, which carries a browser TLS fingerprint - direct fetches from
+// datacenter IPs get blocked by Cloudflare) and matches its products.
+func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
+	proxyBase := Config.Uploader["collectr"]
+	if proxyBase == "" {
+		return nil, "", errors.New("Collectr uploader not configured")
+	}
+
+	items, err := collectr.Load(ctx, proxyBase, link, Config.Game, maxRows)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch Collectr showcase: %w", err)
+	}
+
+	var uploadEntries []UploadEntry
+	for _, item := range items {
+		var cardId string
+		var matchErr error
+
+		// Try matching via TCGplayer product ID first
+		uuid := mtgmatcher.ExternalUUID(item.ProductID)
+		if uuid != "" {
+			cardId, matchErr = mtgmatcher.MatchId(uuid, item.IsFoil)
+		}
+
+		// Fall back to name-based matching
+		if cardId == "" {
+			if item.IsSealed {
+				// Search sealed products by name
+				results, err := mtgmatcher.SearchSealedEquals(item.Name)
+				if err != nil {
+					// Try a looser search
+					results, err = mtgmatcher.SearchSealedContains(item.Name)
+				}
+				if err != nil {
+					matchErr = err
+				} else if len(results) > 0 {
+					cardId = results[0]
+				}
+			} else {
+				card := mtgmatcher.InputCard{
+					Name:      item.Name,
+					Edition:   item.SetName,
+					Variation: item.Number,
+					Foil:      item.IsFoil,
+				}
+				cardId, matchErr = mtgmatcher.Match(&card)
+			}
+		}
+
+		entry := UploadEntry{
+			Card: mtgmatcher.InputCard{
+				Name:    item.Name,
+				Edition: item.SetName,
+				Foil:    item.IsFoil,
+			},
+			HasQuantity:       true,
+			Quantity:          item.Quantity,
+			CardId:            cardId,
+			MismatchError:     matchErr,
+			OriginalPrice:     item.Price,
+			OriginalCondition: item.Condition,
+		}
+		uploadEntries = append(uploadEntries, entry)
+	}
+
+	// The showcase handle doubles as the display name
+	handle, _ := collectr.ParseShowcaseURL(link)
+	return uploadEntries, handle, nil
 }
 
 // resolveMoxItem resolves a Moxfield item to a uuid. Most items carry a
