@@ -271,6 +271,51 @@ func TestFinishPredicateParity(t *testing.T) {
 	}
 }
 
+// TestZeroPricedListings pins how both API paths treat zero-priced listings:
+// they are ignored entirely. The base price is the first nonzero entry, and
+// zero entries contribute neither conditions nor quantities. This is the
+// search walk's semantic (shouldSkipPriceNG drops them), adopted by
+// processEntry too - the old behavior dropped the whole store when a zero
+// listing sorted first, while still counting its quantity when it didn't.
+func TestZeroPricedListings(t *testing.T) {
+	regular, _, _ := parityCards(t)
+
+	prevSellers := sellersPtr.Load()
+	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+
+	inv := mtgban.InventoryRecord{}
+	inv.Add(regular, &mtgban.InventoryEntry{Conditions: "NM", Price: 0, Quantity: 1, URL: "u1"})
+	inv.Add(regular, &mtgban.InventoryEntry{Conditions: "NM", Price: 5, Quantity: 2, URL: "u2"})
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Zero Store", Shorthand: "ZEROA"}),
+	}
+	sellersPtr.Store(&sellers)
+
+	check := func(t *testing.T, api map[string]map[string]*BanPrice) {
+		t.Helper()
+		price, found := api[regular]["ZEROA"]
+		if !found {
+			t.Fatal("store with a zero-priced best listing should not be dropped")
+		}
+		if price.Regular != 5 {
+			t.Errorf("regular = %v, want 5 (first nonzero listing)", price.Regular)
+		}
+		if price.Qty != 2 {
+			t.Errorf("qty = %v, want 2 (zero listing contributes none)", price.Qty)
+		}
+		if price.Cond != "NM" {
+			t.Errorf("cond = %q, want NM", price.Cond)
+		}
+	}
+
+	t.Run("funnel path", func(t *testing.T) {
+		check(t, getSellerPrices("", []string{"ZEROA"}, "", []string{regular}, "", true, true, false, ""))
+	})
+	t.Run("full dump path", func(t *testing.T) {
+		check(t, getSellerPrices("", []string{"ZEROA"}, "", nil, "", true, true, false, ""))
+	})
+}
+
 // TestStoreEligible pins the precedence rule behind divergence #2 of the
 // plan: an explicit allowlist is the entire store policy and bypasses
 // blocklists; without one, blocklists exclude.

@@ -511,14 +511,23 @@ func banPricesFromRows(cardIds []string, found map[string]map[string][]SearchEnt
 
 				price, seen := prices[row.Shorthand]
 				if !seen {
-					// First row per store is the record's best entry
+					// First row per store is the record's best entry. The
+					// zero check is defensive only: the walk already drops
+					// zero-priced entries (shouldSkipPriceNG), the same
+					// contract processEntry applies to the full dumps.
 					if row.Price == 0 {
 						prices[row.Shorthand] = nil
 						continue
 					}
 					tag := row.Shorthand
 					if tagName == "names" {
-						tag = names[row.Shorthand]
+						// The scraper list is looked up separately from the
+						// walk's, so a concurrent reload swap can leave a
+						// shorthand unmapped; fall back rather than keying
+						// the output on an empty string
+						if name := names[row.Shorthand]; name != "" {
+							tag = name
+						}
 					}
 					if out[id] == nil {
 						out[id] = map[string]*BanPrice{}
@@ -659,7 +668,19 @@ type EntryRule struct {
 }
 
 func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, idMode, cardId, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
-	if len(entries) == 0 {
+	// Zero-priced listings are ignored throughout, matching the search walk
+	// the filtered endpoints ride (shouldSkipPriceNG drops them before they
+	// become rows): the base price is the first nonzero entry, and zero
+	// entries contribute neither conditions nor quantities. Records sort by
+	// grade then price, so the base stays the best grade's cheapest listing.
+	base := -1
+	for i := range entries {
+		if entries[i].Pricing() != 0 {
+			base = i
+			break
+		}
+	}
+	if base == -1 {
 		return
 	}
 	co, err := mtgmatcher.GetUUID(cardId)
@@ -676,7 +697,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		if len(rule.Finish) > 0 && applyCardFilter("finish", rule.Finish, co) {
 			return
 		}
-		if entries[0].Pricing() < rule.MinPrice {
+		if entries[base].Pricing() < rule.MinPrice {
 			return
 		}
 		if rule.Rate != 0 {
@@ -684,10 +705,7 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		}
 	}
 
-	basePrice := entries[0].Pricing() * rate
-	if basePrice == 0 {
-		return
-	}
+	basePrice := entries[base].Pricing() * rate
 
 	_, found := out[id]
 	if !found {
@@ -698,13 +716,16 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 	}
 
 	if shouldBaseCond {
-		out[id][scraperTag].Cond = entries[0].Condition()
+		out[id][scraperTag].Cond = entries[base].Condition()
 	}
 
 	if co.Sealed {
 		out[id][scraperTag].Sealed = basePrice
 		if qty {
 			for i := range entries {
+				if entries[i].Pricing() == 0 {
+					continue
+				}
 				out[id][scraperTag].QtySealed += entries[i].Qty()
 			}
 		}
@@ -712,11 +733,17 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		out[id][scraperTag].Etched = basePrice
 		if qty {
 			for i := range entries {
+				if entries[i].Pricing() == 0 {
+					continue
+				}
 				out[id][scraperTag].QtyEtched += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
+				if entries[i].Pricing() == 0 {
+					continue
+				}
 				condTag := entries[i].Condition() + "_etched"
 				if out[id][scraperTag].Conditions == nil {
 					out[id][scraperTag].Conditions = &BanConditions{}
@@ -734,11 +761,17 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		out[id][scraperTag].Foil = basePrice
 		if qty {
 			for i := range entries {
+				if entries[i].Pricing() == 0 {
+					continue
+				}
 				out[id][scraperTag].QtyFoil += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
+				if entries[i].Pricing() == 0 {
+					continue
+				}
 				condTag := entries[i].Condition() + "_foil"
 				if out[id][scraperTag].Conditions == nil {
 					out[id][scraperTag].Conditions = &BanConditions{}
@@ -756,11 +789,17 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 		out[id][scraperTag].Regular = basePrice
 		if qty {
 			for i := range entries {
+				if entries[i].Pricing() == 0 {
+					continue
+				}
 				out[id][scraperTag].Qty += entries[i].Qty()
 			}
 		}
 		if conds {
 			for i := range entries {
+				if entries[i].Pricing() == 0 {
+					continue
+				}
 				condTag := entries[i].Condition()
 				if out[id][scraperTag].Conditions == nil {
 					out[id][scraperTag].Conditions = &BanConditions{}
