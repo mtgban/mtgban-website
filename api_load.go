@@ -66,13 +66,13 @@ func loadScrapersAPI(ctx context.Context, apiKey string) error {
 				}
 
 				for _, cond := range conditionTags {
-					price := result.Conditions.get(cond)
+					price := result.Conditions.Get(cond)
 					if price == 0 {
 						continue
 					}
 					retail[id].Add(uuid, &mtgban.InventoryEntry{
 						Conditions: strings.Split(cond, "_")[0],
-						Quantity:   result.Quantities.get(cond),
+						Quantity:   result.Quantities.Get(cond),
 						Price:      price,
 						URL:        resp.Meta.BaseURL + "/go/" + id + "/" + uuid,
 					})
@@ -99,13 +99,13 @@ func loadScrapersAPI(ctx context.Context, apiKey string) error {
 				}
 
 				for _, cond := range conditionTags {
-					price := result.Conditions.get(cond)
+					price := result.Conditions.Get(cond)
 					if price == 0 {
 						continue
 					}
 					buylist[id].Add(uuid, &mtgban.BuylistEntry{
 						Conditions: strings.Split(cond, "_")[0],
-						Quantity:   result.Quantities.get(cond),
+						Quantity:   result.Quantities.Get(cond),
 						BuyPrice:   price,
 						URL:        resp.Meta.BaseURL + "/go/b/" + id + "/" + uuid,
 					})

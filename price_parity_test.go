@@ -124,7 +124,7 @@ func TestPriceParityRetail(t *testing.T) {
 		if got := searchPrice(found, regular, tc.cond, "PARITYA"); got != tc.want {
 			t.Errorf("search %s = %v, want %v", tc.cond, got, tc.want)
 		}
-		if got := api[regular]["PARITYA"].Conditions.get(tc.cond); got != tc.want {
+		if got := api[regular]["PARITYA"].Conditions.Get(tc.cond); got != tc.want {
 			t.Errorf("api conditions[%s] = %v, want %v", tc.cond, got, tc.want)
 		}
 	}
@@ -158,7 +158,7 @@ func TestPriceParityRetail(t *testing.T) {
 	if got := searchPrice(found, regular, "PO", "PARITYA"); got != 2 {
 		t.Errorf("search PO = %v, want 2", got)
 	}
-	if got := api[regular]["PARITYA"].Conditions.get("PO"); got != 2 {
+	if got := api[regular]["PARITYA"].Conditions.Get("PO"); got != 2 {
 		t.Errorf("api conditions[PO] = %v, want 2", got)
 	}
 
@@ -208,7 +208,7 @@ func TestPriceParityBuylist(t *testing.T) {
 	if got := searchPrice(found, regular, "NM", "PARITYV"); got != 5 {
 		t.Errorf("search NM = %v, want 5", got)
 	}
-	if got := api[regular]["PARITYV"].Conditions.get("NM"); got != 5 {
+	if got := api[regular]["PARITYV"].Conditions.Get("NM"); got != 5 {
 		t.Errorf("api conditions[NM] = %v, want 5", got)
 	}
 	if got := api[regular]["PARITYV"].Regular; got != 5 {
@@ -365,10 +365,10 @@ func TestGetDefaultBlocklists(t *testing.T) {
 func TestBanPriceWireFormat(t *testing.T) {
 	price := &BanPrice{Regular: 10}
 	price.Conditions = &BanConditions{}
-	price.Conditions.set("NM", 10)
-	price.Conditions.set("SP_foil", 7.5)
+	price.Conditions.Set("NM", 10)
+	price.Conditions.Set("SP_foil", 7.5)
 	price.Quantities = &BanQuantities{}
-	price.Quantities.set("NM", 3)
+	price.Quantities.Set("NM", 3)
 
 	out, err := json.Marshal(price)
 	if err != nil {

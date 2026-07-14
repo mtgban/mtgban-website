@@ -1291,11 +1291,11 @@ func getPrice(banPrice *BanPrice, conds string) float64 {
 			}
 		}
 	} else {
-		price = banPrice.Conditions.get(conds)
+		price = banPrice.Conditions.Get(conds)
 		if price == 0 {
-			price = banPrice.Conditions.get(conds + "_foil")
+			price = banPrice.Conditions.Get(conds + "_foil")
 			if price == 0 {
-				price = banPrice.Conditions.get(conds + "_etched")
+				price = banPrice.Conditions.Get(conds + "_etched")
 			}
 		}
 		// MetadataOnly sources (TCGLow / TCGMarket / MKM*) never
