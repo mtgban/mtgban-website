@@ -1097,6 +1097,29 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		filters = append(filters, extraConfig.CardFilters...)
 	}
 
+	// Rewrite bare "<set code> <number>" queries, eg "neo 234" or
+	// "plst c16-177", to the equivalent s:CODE cn:NUMBER filters.
+	// ExtractNumberAny doubles as validator and normalizer: it strips
+	// leading # and zeroes, keeps dashed and starred numbers whole, and
+	// rejects ordinals, months, and set-code-shaped tokens.
+	// The shorthand is meaningful only for singles: sealed products have
+	// no collector numbers, and the sealed handler assigns its SearchMode
+	// after this parse, so such queries cannot be told apart here
+	if config.SearchMode == "" {
+		tokens := strings.Fields(query)
+		if len(tokens) == 2 {
+			number := mtgmatcher.ExtractNumberAny(tokens[1])
+			if number != "" {
+				set, err := mtgmatcher.GetSet(tokens[0])
+				if err == nil {
+					extraConfig := parseSearchOptionsNG("s:"+set.Code+" cn:"+number, nil, nil, nil)
+					filters = append(filters, extraConfig.CardFilters...)
+					query = ""
+				}
+			}
+		}
+	}
+
 	// Apply any search not coming from the query itself
 	for _, optName := range miscSearchOpts {
 		switch optName {

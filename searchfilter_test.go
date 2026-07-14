@@ -152,3 +152,128 @@ func TestCollectorNumberPLST(t *testing.T) {
 		t.Error("AKH-127 should be kept by cn<200")
 	}
 }
+
+func TestSetNumberShorthand(t *testing.T) {
+	if _, err := mtgmatcher.GetSet("PLST"); err != nil {
+		t.Skip("datastore not loaded")
+	}
+
+	findFilter := func(config SearchConfig, name string) *FilterElem {
+		for i := range config.CardFilters {
+			if config.CardFilters[i].Name == name {
+				return &config.CardFilters[i]
+			}
+		}
+		return nil
+	}
+
+	checkValues := func(t *testing.T, elem *FilterElem, filterName, want string) {
+		t.Helper()
+		if elem == nil {
+			t.Fatalf("missing %s filter", filterName)
+		}
+		if len(elem.Values) != 1 || elem.Values[0] != want {
+			t.Errorf("%s = %v, want [%s]", filterName, elem.Values, want)
+		}
+	}
+
+	checkNameSearch := func(t *testing.T, query string) {
+		t.Helper()
+		config := parseSearchOptionsNG(query, nil, nil, nil)
+		if findFilter(config, "edition") != nil {
+			t.Error("unexpected edition filter")
+		}
+		if config.CleanQuery != query {
+			t.Errorf("CleanQuery = %q, want %q", config.CleanQuery, query)
+		}
+	}
+
+	t.Run("set code and number rewrite to filters", func(t *testing.T) {
+		config := parseSearchOptionsNG("neo 234", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
+		checkValues(t, findFilter(config, "number"), "number", "234")
+		if config.CleanQuery != "" {
+			t.Errorf("CleanQuery = %q, want empty", config.CleanQuery)
+		}
+		// Synthesized filters must not leak into AppliedFilters: the
+		// suggestion engine removes those tokens from the raw query,
+		// where they never appear
+		if len(config.AppliedFilters) != 0 {
+			t.Errorf("AppliedFilters = %v, want empty", config.AppliedFilters)
+		}
+	})
+
+	t.Run("PLST prefixed numbers stay in one piece", func(t *testing.T) {
+		config := parseSearchOptionsNG("plst c16-177", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "PLST")
+		checkValues(t, findFilter(config, "number"), "number", "c16-177")
+	})
+
+	t.Run("set reading wins over prefix reading", func(t *testing.T) {
+		config := parseSearchOptionsNG("c16 177", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "C16")
+		checkValues(t, findFilter(config, "number"), "number", "177")
+	})
+
+	t.Run("ascending numbers still parse as a range", func(t *testing.T) {
+		config := parseSearchOptionsNG("neo 1-10", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
+		elem := findFilter(config, "number_less_than")
+		checkValues(t, elem, "number_less_than", "10")
+		if len(elem.Subfilters) != 1 || elem.Subfilters[0].Name != "number_greater_than" {
+			t.Fatalf("subfilters = %+v, want a single number_greater_than", elem.Subfilters)
+		}
+	})
+
+	t.Run("shorthand composes with other filters", func(t *testing.T) {
+		config := parseSearchOptionsNG("neo 234 f:foil", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
+		checkValues(t, findFilter(config, "number"), "number", "234")
+		checkValues(t, findFilter(config, "finish"), "finish", "foil")
+		if len(config.AppliedFilters) != 1 || config.AppliedFilters[0] != "f:foil" {
+			t.Errorf("AppliedFilters = %v, want [f:foil]", config.AppliedFilters)
+		}
+	})
+
+	t.Run("shorthand composes with finish suffixes", func(t *testing.T) {
+		// The trailing */&/~ is peeled into a finish filter before the
+		// shorthand sees the query, leaving a clean two-token rewrite
+		config := parseSearchOptionsNG("neo 123*", nil, nil, nil)
+		checkValues(t, findFilter(config, "edition"), "edition", "NEO")
+		checkValues(t, findFilter(config, "number"), "number", "123")
+		checkValues(t, findFilter(config, "finish"), "finish", "foil")
+	})
+
+	t.Run("hash and zero prefixes normalize away", func(t *testing.T) {
+		config := parseSearchOptionsNG("neo #234", nil, nil, nil)
+		checkValues(t, findFilter(config, "number"), "number", "234")
+		config = parseSearchOptionsNG("neo 0234", nil, nil, nil)
+		checkValues(t, findFilter(config, "number"), "number", "234")
+	})
+
+	t.Run("unknown set code keeps the name search", func(t *testing.T) {
+		checkNameSearch(t, "lightning 148")
+	})
+
+	t.Run("non numeric second token keeps the name search", func(t *testing.T) {
+		checkNameSearch(t, "neo dragon")
+	})
+
+	t.Run("ordinal second token keeps the name search", func(t *testing.T) {
+		checkNameSearch(t, "neo 4th")
+	})
+
+	t.Run("set-code-shaped second token keeps the name search", func(t *testing.T) {
+		checkNameSearch(t, "neo 10e")
+	})
+
+	t.Run("explicit search mode disables the shorthand", func(t *testing.T) {
+		config := parseSearchOptionsNG("neo 234 sm:prefix", nil, nil, nil)
+		if findFilter(config, "edition") != nil {
+			t.Error("unexpected edition filter")
+		}
+		if config.CleanQuery != "neo 234" {
+			t.Errorf("CleanQuery = %q, want %q", config.CleanQuery, "neo 234")
+		}
+	})
+}
