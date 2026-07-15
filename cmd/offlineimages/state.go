@@ -3,21 +3,41 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"log"
 
+	"github.com/Backblaze/blazer/b2"
 	"github.com/mtgban/mtgban-website/internal/imgmirror"
 	"github.com/mtgban/simplecloud"
 )
 
-// loadBucketJSON decodes one JSON document; a missing document is a first run.
+// isNotExist reports whether err means the object does not exist yet.
+func isNotExist(err error) bool {
+	return errors.Is(err, fs.ErrNotExist) || b2.IsNotExist(err)
+}
+
+// loadBucketJSON decodes one JSON document; only a missing document is a
+// first run, any other failure is fatal so mirror state cannot silently reset.
 func loadBucketJSON(ctx context.Context, bucket simplecloud.Reader, base, name string, out any) error {
 	reader, err := simplecloud.InitReader(ctx, bucket, imgmirror.JoinPath(base, name))
 	if err != nil {
-		log.Printf("%s unavailable, starting empty: %v", name, err)
-		return nil
+		if isNotExist(err) {
+			log.Printf("%s missing, starting empty", name)
+			return nil
+		}
+		return err
 	}
 	defer reader.Close()
-	return json.NewDecoder(reader).Decode(out)
+	// B2 opens lazily, so a missing object surfaces here on first read.
+	if err := json.NewDecoder(reader).Decode(out); err != nil {
+		if isNotExist(err) {
+			log.Printf("%s missing, starting empty", name)
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func saveBucketJSON(ctx context.Context, bucket simplecloud.Writer, base, name string, value any) error {
