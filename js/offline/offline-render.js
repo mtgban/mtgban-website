@@ -136,8 +136,16 @@
             '</div>';
     }
 
+    // Visible secondary cell text, mirroring renderCell (search.html:1316-1338).
+    // Credit modes have no offline data so they render blank like empty online cells.
+    function buylistExtraText(ctx, ratio, isNM) {
+        var mode = ctx.buylistSecondary || '';
+        if (mode === 'creditPrice' || mode === 'marketCredit') return '';
+        return (ratio > 0 && isNM) ? ratio.toFixed(2) + ' %' : '';
+    }
+
     // buyerRow mirrors the vendor branch (search.html:1216-1262).
-    function buyerRow(name, price, qty, ratio, isNM) {
+    function buyerRow(name, price, qty, ratio, isNM, extra) {
         var title = (ratio > 0 && isNM) ? ' title="Ratio: ' + ratio.toFixed(2) + '%"' : '';
         return '<div class="price-row"' + title + '>' +
             '<span class="store-cell"><a class="store-name dim">' + esc(name) + '</a></span>' +
@@ -145,7 +153,7 @@
             priceSpan(price) +
             '<span class="buylist-extra"' +
             ' data-ratio="' + ((ratio > 0 && isNM) ? ratio.toFixed(2) : '') + '"' +
-            ' data-credit="" data-marketcredit=""></span>' +
+            ' data-credit="" data-marketcredit="">' + esc(extra || '') + '</span>' +
             '<span class="qty">' + ((isNM && qty > 0) ? qty : '') + '</span>' +
             '</span>' +
             '</div>';
@@ -256,7 +264,7 @@
             if (s === 'SYP') {
                 indexHtml += sypBuyerRow(name, entry.qty || 0);
             } else {
-                indexHtml += buyerRow(name, finishPrice(entry, card), 0, 0, false);
+                indexHtml += buyerRow(name, finishPrice(entry, card), 0, 0, false, '');
             }
         });
 
@@ -284,7 +292,7 @@
             var ref = refRetail(res, cond);
             rows.forEach(function (r) {
                 var ratio = ref > 0 ? (r.price / ref) * 100 : 0;
-                rowsMain += buyerRow(r.name, r.price, r.qty, ratio, cond === 'NM');
+                rowsMain += buyerRow(r.name, r.price, r.qty, ratio, cond === 'NM', buylistExtraText(ctx, ratio, cond === 'NM'));
             });
         });
 

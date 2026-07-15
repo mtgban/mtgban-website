@@ -242,3 +242,17 @@ test('country flag appended to store name', () => {
     const html = R.buildHTML([r], ctx);
     expect(html).toContain('ABU Games \u{1F1EF}\u{1F1F5}');
 });
+
+test('index-only card: INDEX m-cond-group gets active class', () => {
+    const r = {
+        uuid: 'uuid-idx',
+        card: {uuid: 'uuid-idx', n: 'Sol Ring', num: '263', r: 'rare', set: 'NEO', f: false, e: false, s: false},
+        retail: {TCGLow: {regular: 1.50}, TCGMarket: {regular: 1.75}},
+        buylist: {},
+    };
+    const html = R.buildHTML([r], CTX);
+    const sellersStart = html.indexOf('id="sellers-uuid-idx"');
+    const sellersHtml = html.slice(sellersStart, html.indexOf('id="buyers-uuid-idx"'));
+    expect(sellersHtml).toContain('m-cond-group active');
+    expect(sellersHtml).toContain('data-cond="INDEX"');
+});
