@@ -35,6 +35,20 @@ Bundle ZIPs are rebuilt only for sets whose per-image digest set has
 changed. The manifest is merged: sets outside the current run scope
 keep their existing manifest entries untouched.
 
+## Backfill marker and website autosync
+
+A full, successful run with no `-sets` and no `-dry-run` writes
+`mirror-backfill-complete.json` next to `mirror-state.json`. Once that
+marker exists, the website process auto-syncs small deltas (up to 2000
+pending images) whenever the datastore reloads, with a daily backstop.
+Larger deltas alert and wait for a manual run of this binary.
+
+Deleting the marker from the bucket pauses autosync until the next full
+successful run rewrites it.
+
+Deployments that completed their backfill before the marker existed need
+one more full run (cheap, incremental) to write it and turn autosync on.
+
 ## Exit code
 
 The binary exits non-zero when any image fetch fails. Bundle and
@@ -56,9 +70,9 @@ falling back from `.webp` to `.jpg`.
 
 ## Suggested cadence
 
-Run after each datastore refresh (typically daily) or at minimum
-weekly. Because only changed URLs trigger re-fetches, subsequent runs
-are cheap.
+Run once for the initial backfill. After the marker is written the website
+handles day-to-day deltas itself; keep an occasional manual or cron run as
+a deep backstop and for cap-exceeded alerts.
 
 ## Windows path note
 
