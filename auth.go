@@ -139,6 +139,32 @@ func getServerURL(r *http.Request) string {
 	return scheme + "://" + host
 }
 
+// initServerURL latches the external ServerURL from the first request on a host
+// we trust — localhost in dev, any *.mtgban.com in production. Requests on any
+// other host are ignored, notably the raw *.ondigitalocean.app app URL that a
+// platform health check hits before any custom-domain traffic: latching that
+// would pin ServerURL to a hostname that isn't a registered Patreon redirect
+// target and then leak into every redirect, embed, and OAuth link.
+func initServerURL(r *http.Request) {
+	if ServerURL != "" {
+		return
+	}
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+	// Match the hostname exactly (dropping any :port) so only localhost in dev
+	// or an mtgban.com host in prod can latch ServerURL — a suffix check, not a
+	// substring one, so a spoofed "…mtgban.com.evil.tld" Host can't slip through.
+	name, _, _ := strings.Cut(host, ":")
+	name = strings.ToLower(name)
+	if name != "localhost" && name != "mtgban.com" && !strings.HasSuffix(name, ".mtgban.com") {
+		return
+	}
+	ServerURL = getServerURL(r)
+	log.Println("Setting server URL as", ServerURL)
+}
+
 func Auth(w http.ResponseWriter, r *http.Request) {
 	code := r.FormValue("code")
 	if code == "" {
@@ -306,10 +332,7 @@ func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		if ServerURL == "" {
-			ServerURL = getServerURL(r)
-			log.Println("Setting server URL as", ServerURL)
-		}
+		initServerURL(r)
 
 		querySig := r.FormValue("sig")
 		if querySig != "" {
@@ -420,10 +443,7 @@ func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		if ServerURL == "" {
-			ServerURL = getServerURL(r)
-			log.Println("Setting server URL as", ServerURL)
-		}
+		initServerURL(r)
 
 		// Check if this endpoint can be bypassed
 		_, checkNoAuth := Config.ACL["Any"]
