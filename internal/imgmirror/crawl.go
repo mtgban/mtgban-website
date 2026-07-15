@@ -1,4 +1,4 @@
-package main
+package imgmirror
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mtgban/mtgban-website/internal/imgmirror"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -31,19 +30,19 @@ type crawler struct {
 	bucket  simplecloud.ReadWriter
 	base    string
 	client  *http.Client
-	limit   *imgmirror.Limiter
+	limit   *Limiter
 	backoff func(int) time.Duration
 	cwebp   string
 
 	mu       sync.Mutex
 	saveMu   sync.Mutex // serializes saveState writes across concurrent domains
-	state    imgmirror.State
+	state    State
 	done     int
 	failures int
 	warnOnce sync.Once
 }
 
-func newCrawler(bucket simplecloud.ReadWriter, base string, state imgmirror.State) *crawler {
+func newCrawler(bucket simplecloud.ReadWriter, base string, state State) *crawler {
 	cwebp, err := exec.LookPath("cwebp")
 	if err != nil {
 		cwebp = ""
@@ -52,8 +51,8 @@ func newCrawler(bucket simplecloud.ReadWriter, base string, state imgmirror.Stat
 		bucket:  bucket,
 		base:    base,
 		client:  &http.Client{Timeout: 60 * time.Second},
-		limit:   &imgmirror.Limiter{Interval: requestInterval},
-		backoff: imgmirror.Backoff,
+		limit:   &Limiter{Interval: requestInterval},
+		backoff: Backoff,
 		cwebp:   cwebp,
 		state:   state,
 	}
@@ -61,7 +60,7 @@ func newCrawler(bucket simplecloud.ReadWriter, base string, state imgmirror.Stat
 
 // fetchAll downloads every queued image, one goroutine per source domain,
 // so each domain sees sequential rate limited traffic.
-func (c *crawler) fetchAll(ctx context.Context, uuids []string, want map[string]imgmirror.Card) error {
+func (c *crawler) fetchAll(ctx context.Context, uuids []string, want map[string]Card) error {
 	queues := map[string][]string{}
 	for _, uuid := range uuids {
 		u, err := url.Parse(want[uuid].URL)
@@ -105,7 +104,7 @@ func (c *crawler) fetchAll(ctx context.Context, uuids []string, want map[string]
 	return nil
 }
 
-func (c *crawler) fetchOne(ctx context.Context, domain, uuid string, card imgmirror.Card) error {
+func (c *crawler) fetchOne(ctx context.Context, domain, uuid string, card Card) error {
 	data, err := c.download(ctx, domain, card.URL)
 	if err != nil {
 		return err
@@ -123,7 +122,7 @@ func (c *crawler) fetchOne(ctx context.Context, domain, uuid string, card imgmir
 		stored, ext = webp, "webp"
 	}
 
-	objPath := imgmirror.JoinPath(c.base, "images", uuid+"."+ext)
+	objPath := JoinPath(c.base, "images", uuid+"."+ext)
 	writer, err := simplecloud.InitWriter(ctx, c.bucket, objPath)
 	if err != nil {
 		return err
@@ -136,7 +135,7 @@ func (c *crawler) fetchOne(ctx context.Context, domain, uuid string, card imgmir
 		return err
 	}
 
-	entry := imgmirror.StateEntry{
+	entry := StateEntry{
 		Digest:    digest,
 		FetchedAt: time.Now().UTC().Format(time.RFC3339),
 		Source:    card.URL,
@@ -237,7 +236,7 @@ func (c *crawler) transcode(jpeg []byte) ([]byte, error) {
 
 func (c *crawler) saveStateSnapshot(ctx context.Context) error {
 	c.mu.Lock()
-	snapshot := make(imgmirror.State, len(c.state))
+	snapshot := make(State, len(c.state))
 	for k, v := range c.state {
 		snapshot[k] = v
 	}

@@ -1,4 +1,4 @@
-package main
+package imgmirror
 
 import (
 	"context"
@@ -12,14 +12,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mtgban/mtgban-website/internal/imgmirror"
 	"github.com/mtgban/simplecloud"
 )
 
 func testCrawler(t *testing.T) *crawler {
 	t.Helper()
-	c := newCrawler(&simplecloud.FileBucket{}, filepath.ToSlash(t.TempDir()), imgmirror.State{})
-	c.limit = &imgmirror.Limiter{Interval: 0}
+	c := newCrawler(&simplecloud.FileBucket{}, filepath.ToSlash(t.TempDir()), State{})
+	c.limit = &Limiter{Interval: 0}
 	c.backoff = func(int) time.Duration { return 0 }
 	return c
 }
@@ -88,7 +87,7 @@ func TestFetchOneJpegFallback(t *testing.T) {
 	// Force the no-cwebp path regardless of the host machine.
 	c.cwebp = ""
 
-	err := c.fetchOne(context.Background(), "test", "uuid-test", imgmirror.Card{URL: srv.URL, SetCode: "TST"})
+	err := c.fetchOne(context.Background(), "test", "uuid-test", Card{URL: srv.URL, SetCode: "TST"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +120,7 @@ func TestFetchAllReturnsErrorOnFailures(t *testing.T) {
 	defer srv.Close()
 
 	c := testCrawler(t)
-	want := map[string]imgmirror.Card{
+	want := map[string]Card{
 		"uuid-fail": {URL: srv.URL + "/img.jpg", SetCode: "TST"},
 		"uuid-bad":  {URL: "://bad url", SetCode: "TST"},
 	}
@@ -136,16 +135,16 @@ func TestRebuildBundlesMergesManifest(t *testing.T) {
 	os.MkdirAll(filepath.Join(base, "images"), 0755)
 	os.WriteFile(filepath.Join(base, "images", "uuid-a.webp"), []byte("img-a"), 0644)
 
-	state := imgmirror.State{"uuid-a": {Digest: "d1", Source: "s"}}
-	want := map[string]imgmirror.Card{"uuid-a": {URL: "s", SetCode: "NEO"}}
-	manifest := imgmirror.Manifest{"MID": {Hash: "keepme", Count: 9, Bytes: 99}}
+	state := State{"uuid-a": {Digest: "d1", Source: "s"}}
+	want := map[string]Card{"uuid-a": {URL: "s", SetCode: "NEO"}}
+	manifest := Manifest{"MID": {Hash: "keepme", Count: 9, Bytes: 99}}
 
-	err := rebuildBundles(context.Background(), &simplecloud.FileBucket{}, base, state, want, manifest)
+	_, err := rebuildBundles(context.Background(), &simplecloud.FileBucket{}, base, state, want, manifest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := loadManifest(context.Background(), &simplecloud.FileBucket{}, base)
+	got, err := LoadManifest(context.Background(), &simplecloud.FileBucket{}, base)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +152,7 @@ func TestRebuildBundlesMergesManifest(t *testing.T) {
 		t.Error("out of scope manifest entry was dropped")
 	}
 	neo := got["NEO"]
-	wantHash := imgmirror.BundleHash(map[string]string{"uuid-a": "d1"})
+	wantHash := BundleHash(map[string]string{"uuid-a": "d1"})
 	if neo.Hash != wantHash || neo.Count != 1 || neo.Bytes == 0 {
 		t.Errorf("NEO entry = %+v, want hash %s", neo, wantHash)
 	}

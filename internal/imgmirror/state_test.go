@@ -1,4 +1,4 @@
-package main
+package imgmirror
 
 import (
 	"context"
@@ -20,7 +20,7 @@ func (b errBucket) NewReader(ctx context.Context, path string) (io.ReadCloser, e
 
 func TestLoadStateMissingFileStartsEmpty(t *testing.T) {
 	base := filepath.ToSlash(t.TempDir())
-	state, err := loadState(context.Background(), &simplecloud.FileBucket{}, base)
+	state, err := LoadState(context.Background(), &simplecloud.FileBucket{}, base)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestLoadStateMissingFileStartsEmpty(t *testing.T) {
 }
 
 func TestLoadStateTransientErrorFails(t *testing.T) {
-	if _, err := loadState(context.Background(), errBucket{errors.New("auth failed")}, "base"); err == nil {
+	if _, err := LoadState(context.Background(), errBucket{errors.New("auth failed")}, "base"); err == nil {
 		t.Fatal("transient error must not silently start empty")
 	}
 }
@@ -38,7 +38,7 @@ func TestLoadStateTransientErrorFails(t *testing.T) {
 func TestLoadStateCorruptFileFails(t *testing.T) {
 	base := filepath.ToSlash(t.TempDir())
 	os.WriteFile(filepath.Join(base, "mirror-state.json"), []byte("{not json"), 0644)
-	if _, err := loadState(context.Background(), &simplecloud.FileBucket{}, base); err == nil {
+	if _, err := LoadState(context.Background(), &simplecloud.FileBucket{}, base); err == nil {
 		t.Fatal("expected error on corrupt state")
 	}
 }

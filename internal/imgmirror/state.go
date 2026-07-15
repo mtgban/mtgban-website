@@ -1,4 +1,4 @@
-package main
+package imgmirror
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"log"
 
 	"github.com/Backblaze/blazer/b2"
-	"github.com/mtgban/mtgban-website/internal/imgmirror"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -20,7 +19,7 @@ func isNotExist(err error) bool {
 // loadBucketJSON decodes one JSON document; only a missing document is a
 // first run, any other failure is fatal so mirror state cannot silently reset.
 func loadBucketJSON(ctx context.Context, bucket simplecloud.Reader, base, name string, out any) error {
-	reader, err := simplecloud.InitReader(ctx, bucket, imgmirror.JoinPath(base, name))
+	reader, err := simplecloud.InitReader(ctx, bucket, JoinPath(base, name))
 	if err != nil {
 		if isNotExist(err) {
 			log.Printf("%s missing, starting empty", name)
@@ -41,7 +40,7 @@ func loadBucketJSON(ctx context.Context, bucket simplecloud.Reader, base, name s
 }
 
 func saveBucketJSON(ctx context.Context, bucket simplecloud.Writer, base, name string, value any) error {
-	writer, err := simplecloud.InitWriter(ctx, bucket, imgmirror.JoinPath(base, name))
+	writer, err := simplecloud.InitWriter(ctx, bucket, JoinPath(base, name))
 	if err != nil {
 		return err
 	}
@@ -52,26 +51,26 @@ func saveBucketJSON(ctx context.Context, bucket simplecloud.Writer, base, name s
 	return writer.Close()
 }
 
-func loadState(ctx context.Context, bucket simplecloud.Reader, base string) (imgmirror.State, error) {
-	state := imgmirror.State{}
+func LoadState(ctx context.Context, bucket simplecloud.Reader, base string) (State, error) {
+	state := State{}
 	if err := loadBucketJSON(ctx, bucket, base, "mirror-state.json", &state); err != nil {
 		return nil, err
 	}
 	return state, nil
 }
 
-func saveState(ctx context.Context, bucket simplecloud.Writer, base string, state imgmirror.State) error {
+func saveState(ctx context.Context, bucket simplecloud.Writer, base string, state State) error {
 	return saveBucketJSON(ctx, bucket, base, "mirror-state.json", state)
 }
 
-func loadManifest(ctx context.Context, bucket simplecloud.Reader, base string) (imgmirror.Manifest, error) {
-	manifest := imgmirror.Manifest{}
+func LoadManifest(ctx context.Context, bucket simplecloud.Reader, base string) (Manifest, error) {
+	manifest := Manifest{}
 	if err := loadBucketJSON(ctx, bucket, base, "images-manifest.json", &manifest); err != nil {
 		return nil, err
 	}
 	return manifest, nil
 }
 
-func saveManifest(ctx context.Context, bucket simplecloud.Writer, base string, manifest imgmirror.Manifest) error {
+func saveManifest(ctx context.Context, bucket simplecloud.Writer, base string, manifest Manifest) error {
 	return saveBucketJSON(ctx, bucket, base, "images-manifest.json", manifest)
 }

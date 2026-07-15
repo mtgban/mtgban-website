@@ -1,4 +1,4 @@
-package main
+package imgmirror
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mtgban/mtgban-website/internal/imgmirror"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -16,21 +15,21 @@ func TestRebuildBundlesIsolatesSetFailures(t *testing.T) {
 	os.WriteFile(filepath.Join(base, "images", "uuid-good.webp"), []byte("img-good"), 0644)
 	// uuid-bad has state but no backing image file, so its set fails.
 
-	state := imgmirror.State{
+	state := State{
 		"uuid-good": {Digest: "d1", Source: "s"},
 		"uuid-bad":  {Digest: "d2", Source: "s"},
 	}
-	want := map[string]imgmirror.Card{
+	want := map[string]Card{
 		"uuid-good": {URL: "s", SetCode: "NEO"},
 		"uuid-bad":  {URL: "s", SetCode: "MID"},
 	}
 
-	err := rebuildBundles(context.Background(), &simplecloud.FileBucket{}, base, state, want, imgmirror.Manifest{})
+	_, err := rebuildBundles(context.Background(), &simplecloud.FileBucket{}, base, state, want, Manifest{})
 	if err == nil {
 		t.Fatal("expected aggregate error for the failed set")
 	}
 
-	got, err := loadManifest(context.Background(), &simplecloud.FileBucket{}, base)
+	got, err := LoadManifest(context.Background(), &simplecloud.FileBucket{}, base)
 	if err != nil {
 		t.Fatal(err)
 	}

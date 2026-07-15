@@ -44,7 +44,7 @@ func run(configPath, setsCSV string, dryRun bool) error {
 		}
 	}
 
-	want := enumerateImages(setsFilter)
+	want := imgmirror.EnumerateImages(setsFilter)
 	log.Printf("enumerated %d printings with images", len(want))
 	for domain, n := range imgmirror.Domains(want) {
 		log.Printf("source domain %s: %d images", domain, n)
@@ -56,19 +56,17 @@ func run(configPath, setsCSV string, dryRun bool) error {
 		return err
 	}
 
-	state, err := loadState(ctx, mirror, base)
-	if err != nil {
-		return err
-	}
-	manifest, err := loadManifest(ctx, mirror, base)
-	if err != nil {
-		return err
-	}
-
-	fetches := imgmirror.NeedFetch(state, want)
-	log.Printf("%d images to fetch", len(fetches))
-
 	if dryRun {
+		state, err := imgmirror.LoadState(ctx, mirror, base)
+		if err != nil {
+			return err
+		}
+		manifest, err := imgmirror.LoadManifest(ctx, mirror, base)
+		if err != nil {
+			return err
+		}
+		fetches := imgmirror.NeedFetch(state, want)
+		log.Printf("%d images to fetch", len(fetches))
 		setCodes := map[string]bool{}
 		for _, card := range want {
 			setCodes[card.SetCode] = true
@@ -78,14 +76,9 @@ func run(configPath, setsCSV string, dryRun bool) error {
 		return nil
 	}
 
-	crawler := newCrawler(mirror, base, state)
-	fetchErr := crawler.fetchAll(ctx, fetches, want)
-	// Complete bundle/manifest work before surfacing fetch failures so cron
-	// gets a consistent tree even on a partial run.
-	if err := rebuildBundles(ctx, mirror, base, crawler.state, want, manifest); err != nil {
-		return err
-	}
-	return fetchErr
+	res, err := imgmirror.RunSync(ctx, imgmirror.SyncOpts{Bucket: mirror, Base: base, Want: want})
+	log.Printf("fetched %d images (%d failed), %d bundles rebuilt", res.Fetched, res.FetchFailed, res.BundlesRebuilt)
+	return err
 }
 
 // loadCardDatastore loads mtgmatcher the way the website does, minus the
@@ -102,29 +95,4 @@ func loadCardDatastore(ctx context.Context, cfg *workerConfig) error {
 	defer reader.Close()
 	log.Println("loading datastore from", cfg.DatastorePath)
 	return mtgmatcher.LoadDatastore(reader)
-}
-
-// enumerateImages maps every uuid, sealed included, to its "full" image URL, skipping printings with no image.
-func enumerateImages(setsFilter map[string]bool) map[string]imgmirror.Card {
-	out := map[string]imgmirror.Card{}
-	skipped := 0
-	for _, uuid := range mtgmatcher.GetUUIDs() {
-		co, err := mtgmatcher.GetUUID(uuid)
-		if err != nil {
-			continue
-		}
-		if setsFilter != nil && !setsFilter[co.SetCode] {
-			continue
-		}
-		imgURL := co.Images["full"]
-		if imgURL == "" {
-			skipped++
-			continue
-		}
-		out[uuid] = imgmirror.Card{URL: imgURL, SetCode: co.SetCode, Sealed: co.Sealed}
-	}
-	if skipped > 0 {
-		log.Printf("skipped %d printings with no image URL", skipped)
-	}
-	return out
 }
