@@ -77,26 +77,20 @@
             .then(function (ok) { clearTimeout(timer); return ok; });
     }
 
-    var pollTimer = null;
-
     // Affordance only, never auto-navigate: auto-jumping would lose mid-browse context.
     // One consistent label whether offline was manual or auto-failover; the button
-    // only shows when the server is reachable, so it always means leave for live search.
+    // only shows when the server is reachable. Polling never stops so a later
+    // outage hides the link again.
     function poll() {
         if (document.hidden) return;
         probe().then(function (ok) {
             var up = ok && navigator.onLine;
             if (up) {
-                clearInterval(pollTimer);
-                pollTimer = null;
                 var q = new URLSearchParams(location.search).get('q');
                 var suffix = q ? '?q=' + encodeURIComponent(q) : '';
                 var sealed = new URLSearchParams(location.search).get('sealed') === '1';
                 backEl.textContent = 'Exit offline mode';
                 backEl.href = (sealed ? '/sealed' : '/search') + suffix;
-            } else if (!pollTimer) {
-                // Cleared after back-online but server down again; re-arm.
-                pollTimer = setInterval(poll, POLL_MS);
             }
             backEl.hidden = !up;
             if (settingsEl) settingsEl.style.display = up ? '' : 'none';
@@ -110,7 +104,7 @@
         renderAge();
         renderAuth();
     }, AGE_TICK_MS);
-    pollTimer = setInterval(poll, POLL_MS);
+    setInterval(poll, POLL_MS);
     window.addEventListener('online', poll);
     window.addEventListener('offline', function () { backEl.hidden = true; if (settingsEl) settingsEl.style.display = 'none'; });
 
