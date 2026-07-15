@@ -91,13 +91,16 @@ func (c *crawler) fetchAll(ctx context.Context, uuids []string, want map[string]
 	}
 	wg.Wait()
 
-	if err := c.saveStateSnapshot(ctx); err != nil {
-		return err
-	}
 	c.mu.Lock()
-	failures := c.failures
+	done, failures := c.done, c.failures
 	c.mu.Unlock()
-	log.Printf("fetched %d images, %d failures", c.done, failures)
+	// Nothing fetched means nothing new to persist.
+	if done > 0 {
+		if err := c.saveStateSnapshot(ctx); err != nil {
+			return err
+		}
+	}
+	log.Printf("fetched %d images, %d failures", done, failures)
 	if failures > 0 {
 		return fmt.Errorf("%d fetches failed", failures)
 	}
