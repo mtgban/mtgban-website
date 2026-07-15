@@ -34,7 +34,11 @@
                         db.close();
                         dbPromise = new Promise(function(res2, rej2) {
                             var del = indexedDB.deleteDatabase(DB_NAME);
-                            del.onsuccess = del.onerror = del.onblocked = function() { open(true).then(res2, rej2); };
+                            del.onsuccess = del.onerror = del.onblocked = function() {
+                                // Free the slot so open(true) opens fresh instead of returning this promise.
+                                dbPromise = null;
+                                open(true).then(res2, rej2);
+                            };
                         });
                         dbPromise.then(resolve, reject);
                         return;
