@@ -11,12 +11,30 @@
     function $(id) { return document.getElementById(id); }
     function fmt(n) { return window.OfflineImages.formatBytes(n); }
 
+    // Pure helpers, exported for tests.
+    function parsePickerCsv(raw) { return (raw || '').split(',').filter(Boolean); }
+    function progressPct(done, total) { return total ? Math.round(done / total * 100) : 100; }
+    function quotaExceeded(totalBytes, quota, usage) {
+        return totalBytes > ((quota || 0) - (usage || 0)) * 0.9;
+    }
+    function buildEstimateText(imagesMap, codes) {
+        var est = window.OfflineImages.estimateSelection(imagesMap, codes);
+        var text = codes.length
+            ? 'Selected: ' + codes.length + ' editions, ' + est.count + ' images, ' + fmt(est.bytes)
+            : 'No editions selected: no images will be downloaded.';
+        if (est.missing.length) text += ' (' + est.missing.length + ' without bundles yet)';
+        return text;
+    }
+    function buildStorageText(usage, quota) {
+        return 'Storage: ' + fmt(usage || 0) + ' used of ' + fmt(quota || 0);
+    }
+
     function selectedCodes() {
-        return window.EditionsPicker.serialize(root).split(',').filter(Boolean);
+        return parsePickerCsv(window.EditionsPicker.serialize(root));
     }
 
     function loadSelection() {
-        var codes = (localStorage.getItem(PREF_KEY) || '').split(',').filter(Boolean);
+        var codes = parsePickerCsv(localStorage.getItem(PREF_KEY));
         root.querySelectorAll('.editions-grid input[type="checkbox"]').forEach(function (cb) {
             cb.checked = codes.indexOf(cb.name) >= 0;
         });
@@ -64,19 +82,14 @@
             groupSizeSpan(group).textContent = est.bytes ? fmt(est.bytes) : '';
         });
         var codes = selectedCodes();
-        var est = window.OfflineImages.estimateSelection(imagesMap, codes);
-        var text = codes.length
-            ? 'Selected: ' + codes.length + ' editions, ' + est.count + ' images, ' + fmt(est.bytes)
-            : 'No editions selected: no images will be downloaded.';
-        if (est.missing.length) text += ' (' + est.missing.length + ' without bundles yet)';
-        estimateEl.textContent = text;
+        estimateEl.textContent = buildEstimateText(imagesMap, codes);
         syncBtn.disabled = syncing || codes.length === 0;
     }
 
     function renderStorage() {
         if (!(navigator.storage && navigator.storage.estimate)) return;
         navigator.storage.estimate().then(function (est) {
-            storageEl.textContent = 'Storage: ' + fmt(est.usage || 0) + ' used of ' + fmt(est.quota || 0);
+            storageEl.textContent = buildStorageText(est.usage, est.quota);
         });
     }
 
@@ -105,7 +118,7 @@
             var plan = window.OfflineImages.computeWorkList(imagesMap || {}, codes, res[1]);
             var est = res[3];
             progressEl.hidden = false;
-            if (est && plan.totalBytes > ((est.quota || 0) - (est.usage || 0)) * 0.9) {
+            if (est && quotaExceeded(plan.totalBytes, est.quota, est.usage)) {
                 fillEl.style.width = '0%';
                 labelEl.textContent = 'Not enough storage: this download needs ' + fmt(plan.totalBytes) +
                     ' but only ' + fmt((est.quota || 0) - (est.usage || 0)) +
@@ -133,7 +146,7 @@
         var msg = e.detail;
         if (!msg) return;
         if (msg.type === 'progress' && msg.stage === 'images') {
-            var pct = msg.total ? Math.round(msg.done / msg.total * 100) : 100;
+            var pct = progressPct(msg.done, msg.total);
             fillEl.style.width = pct + '%';
             labelEl.textContent = msg.done + ' / ' + msg.total + ' bundles (' +
                 fmt(msg.bytes || 0) + ') ' + (msg.code || '');
@@ -156,6 +169,14 @@
             renderStorage();
         }
     }
+
+    window.OfflineImagesUI = {
+        parsePickerCsv: parsePickerCsv,
+        progressPct: progressPct,
+        quotaExceeded: quotaExceeded,
+        buildEstimateText: buildEstimateText,
+        buildStorageText: buildStorageText,
+    };
 
     document.addEventListener('DOMContentLoaded', function () {
         root = $('offline-img-editions-picker');

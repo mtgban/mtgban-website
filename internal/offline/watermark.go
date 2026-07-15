@@ -16,13 +16,17 @@ func Watermark(secret []byte, email string, p *SetPayload) {
 	mac.Write([]byte("offline-watermark:" + strings.ToLower(email)))
 	seed := mac.Sum(nil)
 
+	// One keyed HMAC reused for every mark; Reset restores the keyed state.
+	m := hmac.New(sha256.New, seed)
+	var sum []byte
 	mark := func(section, uuid, store, tag string, price float64) float64 {
 		if price < wmMinPrice {
 			return price
 		}
-		m := hmac.New(sha256.New, seed)
+		m.Reset()
 		m.Write([]byte(section + "|" + uuid + "|" + store + "|" + tag))
-		h := binary.BigEndian.Uint64(m.Sum(nil)[:8])
+		sum = m.Sum(sum[:0])
+		h := binary.BigEndian.Uint64(sum[:8])
 		if h%128 != 0 {
 			return price
 		}

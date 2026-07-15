@@ -111,7 +111,7 @@ func (s *Service) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 // RefreshManifest recomputes fingerprints and bumps versions for changed sets.
-// Called by cron and by scraper-load goroutines.
+// Startup calls it directly; runtime triggers go through RequestRefresh.
 func (s *Service) RefreshManifest() {
 	s.refreshManifest()
 }
