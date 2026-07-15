@@ -151,7 +151,7 @@ test('syncImages downloads, unpacks, and marks done', async () => {
     expect(jpgEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
     expect(states).toEqual([
         { code: 'TST', hash: 'h1', done: false },
-        { code: 'TST', hash: 'h1', done: true },
+        { code: 'TST', hash: 'h1', done: true, uuids: ['uuid-aaa', 'uuid-bbb'] },
     ]);
 });
 
@@ -173,7 +173,7 @@ test('syncImages resumes a bundle left done:false by a previous interrupted run'
     expect(cache.store).toHaveLength(1);
     expect(states).toEqual([
         { code: 'TST', hash: 'h1', done: false },
-        { code: 'TST', hash: 'h1', done: true },
+        { code: 'TST', hash: 'h1', done: true, uuids: ['uuid-aaa'] },
     ]);
 });
 
@@ -293,4 +293,81 @@ test('syncImages pauses between bundles when cancelled', async () => {
     expect(posts).toHaveLength(2);
     expect(posts[0]).toMatchObject({ code: 'AAA', done: 0 });
     expect(posts[1]).toMatchObject({ code: 'AAA', done: 1 });
+});
+
+// --- eviction ---
+
+// Fake cache keyed by pathname, with delete/keys support.
+function makeFakeCacheMap(initial) {
+    const entries = new Map(Object.entries(initial || {}));
+    const cache = {
+        entries,
+        put: async (req, resp) => entries.set(typeof req === 'string' ? req : new URL(req.url).pathname, resp),
+        delete: async (url) => entries.delete(typeof url === 'string' ? url : new URL(url.url).pathname),
+        keys: async () => Array.from(entries.keys()).map((u) => ({ url: 'http://localhost' + u })),
+    };
+    return { cache, caches: { open: async () => cache } };
+}
+
+test('evictImages removes deselected editions by recorded uuids', async () => {
+    const fake = makeFakeCacheMap({
+        '/api/offline/images/uuid-neo.webp': 'x',
+        '/api/offline/images/uuid-mid.webp': 'x',
+    });
+    const mod = loadWithExtras({ caches: fake.caches });
+    const deleted = [];
+    const removed = await mod.evictImages({
+        sel: ['NEO'],
+        getImgStates: async () => [
+            { code: 'NEO', hash: 'a', done: true, uuids: ['uuid-neo'] },
+            { code: 'MID', hash: 'b', done: true, uuids: ['uuid-mid'] },
+        ],
+        deleteImgState: async (code) => deleted.push(code),
+        getCard: async () => null,
+    });
+    expect(removed).toBe(1);
+    expect(deleted).toEqual(['MID']);
+    expect(fake.cache.entries.has('/api/offline/images/uuid-neo.webp')).toBe(true);
+    expect(fake.cache.entries.has('/api/offline/images/uuid-mid.webp')).toBe(false);
+});
+
+test('evictImages matches legacy rows without uuids via card lookup', async () => {
+    const fake = makeFakeCacheMap({
+        '/api/offline/images/uuid-neo.webp': 'x',
+        '/api/offline/images/uuid-mid.webp': 'x',
+    });
+    const mod = loadWithExtras({ caches: fake.caches });
+    const cards = { 'uuid-neo': { set: 'NEO' }, 'uuid-mid': { set: 'MID' } };
+    const removed = await mod.evictImages({
+        sel: ['NEO'],
+        getImgStates: async () => [{ code: 'MID', hash: 'b', done: true }],
+        deleteImgState: async () => {},
+        getCard: async (uuid) => cards[uuid],
+    });
+    expect(removed).toBe(1);
+    expect(fake.cache.entries.has('/api/offline/images/uuid-neo.webp')).toBe(true);
+    expect(fake.cache.entries.has('/api/offline/images/uuid-mid.webp')).toBe(false);
+});
+
+test('syncImages records unpacked uuids on the imgstate row', async () => {
+    const zip = makeZip({ 'uuid-1.webp': [1], 'uuid-2.webp': [2] });
+    const { caches } = makeFakeCache();
+    const mod = loadWithExtras({
+        fflate,
+        caches,
+        fetch: async () => new Response(zip, { status: 200 }),
+        navigator: {},
+    });
+    const puts = [];
+    await mod.syncImages({
+        images: { TST: { h: 'h1', n: 2, b: zip.byteLength } },
+        sel: ['TST'],
+        states: {},
+        cancelled: () => false,
+        putImgState: async (row) => puts.push(row),
+        post: () => {},
+    });
+    const final = puts[puts.length - 1];
+    expect(final.done).toBe(true);
+    expect(final.uuids.slice().sort()).toEqual(['uuid-1', 'uuid-2']);
 });

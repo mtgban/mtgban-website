@@ -1283,6 +1283,10 @@ func main() {
 		log.Printf("checkpoints: initial load failed: %v", err)
 	}
 
+	if sec := os.Getenv("BAN_SECRET"); !DevMode && (sec == "" || sec == DefaultSecret) {
+		log.Println("offline: BAN_SECRET is defaulted, price watermarks are predictable")
+	}
+
 	if err := offlineService.LoadPersisted(context.Background()); err != nil {
 		log.Println("offline: manifest load failed:", err)
 	}
