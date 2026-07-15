@@ -105,7 +105,8 @@
             stores: dicts.stores,
             hiddenSellers: hiddenList('SearchSellersList'),
             hiddenVendors: hiddenList('SearchVendorsList'),
-            byStore: getCookie('SearchListingPriority') === 'stores'
+            byStore: getCookie('SearchListingPriority') === 'stores',
+            buylistSecondary: getCookie('SearchBuylistSecondary') || ''
         };
     }
 

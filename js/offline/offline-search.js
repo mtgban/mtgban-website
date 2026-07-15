@@ -11,8 +11,10 @@
         var needle = deps.normName(rawValue);
         if (needle.length < MIN_CHARS) return Promise.resolve([]);
         return deps.allNames().then(function (names) {
+            // Collect more candidates than MAX_ROWS to account for sealed-mode filtering.
             var hits = [];
-            for (var i = 0; i < names.length && hits.length < MAX_ROWS; i++) {
+            var cap = MAX_ROWS * 4;
+            for (var i = 0; i < names.length && hits.length < cap; i++) {
                 if (names[i].key.indexOf(needle) !== -1) hits.push(names[i]);
             }
             return Promise.all(hits.map(function (h) {
@@ -20,7 +22,7 @@
             }));
         }).then(function (cards) {
             var rows = [];
-            for (var j = 0; j < cards.length; j++) {
+            for (var j = 0; j < cards.length && rows.length < MAX_ROWS; j++) {
                 var c = cards[j];
                 if (!c) continue;
                 // Scope suggestions to the active mode when one is set.
