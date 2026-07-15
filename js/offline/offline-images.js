@@ -91,6 +91,7 @@
             await deps.putImgState({ code: item.code, hash: item.hash, done: false });
             var entries = self.fflate.unzipSync(buf);
             var names = Object.keys(entries);
+            var uuids = [];
             for (var j = 0; j < names.length; j++) {
                 var meta = entryMeta(names[j]);
                 if (!meta) continue;
@@ -104,8 +105,9 @@
                     }
                     throw err;
                 }
+                uuids.push(meta.uuid);
             }
-            await deps.putImgState({ code: item.code, hash: item.hash, done: true });
+            await deps.putImgState({ code: item.code, hash: item.hash, done: true, uuids: uuids });
             // two bundles must not be co-resident across the next await
             buf = null;
             entries = null;
@@ -115,6 +117,37 @@
         return { done: done, total: total, bytes: bytes, paused: false };
     }
 
+    // Removes cached images and state rows for editions no longer selected.
+    async function evictImages(deps) {
+        var sel = {};
+        (deps.sel || []).forEach(function (c) { sel[c] = true; });
+        var rows = await deps.getImgStates();
+        var stale = rows.filter(function (r) { return !sel[r.code]; });
+        if (stale.length === 0) return 0;
+        var cache = await self.caches.open(IMAGE_CACHE);
+        var removed = 0;
+        for (var i = 0; i < stale.length; i++) {
+            var row = stale[i];
+            var uuids = row.uuids;
+            if (!uuids) {
+                // Rows synced before uuids were recorded: match cache keys by card set.
+                uuids = [];
+                var keys = await cache.keys();
+                for (var k = 0; k < keys.length; k++) {
+                    var m = /\/api\/offline\/images\/([^\/.]+)\.webp$/.exec(keys[k].url);
+                    if (!m) continue;
+                    var card = await deps.getCard(m[1]);
+                    if (card && card.set === row.code) uuids.push(m[1]);
+                }
+            }
+            for (var j = 0; j < uuids.length; j++) {
+                if (await cache.delete('/api/offline/images/' + uuids[j] + '.webp')) removed++;
+            }
+            await deps.deleteImgState(row.code);
+        }
+        return removed;
+    }
+
     self.OfflineImages = {
         IMAGE_CACHE: IMAGE_CACHE,
         formatBytes: formatBytes,
@@ -122,5 +155,6 @@
         computeWorkList: computeWorkList,
         estimateSelection: estimateSelection,
         syncImages: syncImages,
+        evictImages: evictImages,
     };
 })();
