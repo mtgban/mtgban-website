@@ -255,3 +255,15 @@ test('notices: unsupported, missing set, empty', () => {
     html = R.noticesHTML({results: [], unsupported: [], missingSets: [], truncated: false}, ctx);
     expect(html).toContain('offline-empty');
 });
+
+test('buylist ratio renders as visible text in the default mode', () => {
+    const html = R.buildHTML([result()], Object.assign({}, CTX, {buylistSecondary: ''}));
+    expect(html).toContain('data-ratio="72.73"');
+    expect(html).toContain('>72.73 %</span>');
+});
+
+test('credit secondary modes render a blank buylist cell offline', () => {
+    const html = R.buildHTML([result()], Object.assign({}, CTX, {buylistSecondary: 'creditPrice'}));
+    expect(html).not.toContain('72.73 %');
+    expect(html).toContain('data-ratio="72.73"');
+});

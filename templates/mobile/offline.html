@@ -146,6 +146,7 @@
             pill.addEventListener('click', function () {
                 var cond = this.getAttribute('data-cond');
                 var card = this.closest('.m-card');
+                if (!card) return;
                 this.closest('.m-cond-pills').querySelectorAll('.m-cond-pill').forEach(function (p) { p.classList.remove('active'); });
                 this.classList.add('active');
                 card.querySelectorAll('.m-cond-group').forEach(function (g) {
