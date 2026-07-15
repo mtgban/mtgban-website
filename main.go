@@ -1315,6 +1315,8 @@ func main() {
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
+		// Startup image sync waits for the datastore it enumerates.
+		mirrorSync.Request()
 	}()
 
 	if SkipPrices {
@@ -1348,9 +1350,8 @@ func main() {
 	// Runtime manifest refreshes funnel through one debounced goroutine.
 	offlineService.StartRefresher()
 
-	// Image mirror follows the datastore; the datastore is loaded by now.
+	// Image mirror sync loop; the startup Request fires after the datastore loads.
 	mirrorSync.Start()
-	mirrorSync.Request()
 
 	if !DevMode {
 		// Set up new refreshes as needed
