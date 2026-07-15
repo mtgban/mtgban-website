@@ -763,6 +763,15 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	BuylistBlockList: func() []string { return Config.SearchBuylistBlockList },
 })
 
+// mirrorSync keeps the image mirror in step with the datastore once the
+// offlineimages backfill marker exists.
+var mirrorSync = newMirrorAutoSync(
+	offlineImagesFactory,
+	func() map[string]imgmirror.Card { return imgmirror.EnumerateImages(nil) },
+	func(kind, message string) { ServerNotify(kind, message) },
+	offlineService.RequestRefresh,
+)
+
 // paletteService wires the command-palette endpoints to the live scraper lists,
 // the newspaper page registry, and the arbit filter options.
 var paletteService = &palette.Service{
@@ -1339,6 +1348,10 @@ func main() {
 	// Runtime manifest refreshes funnel through one debounced goroutine.
 	offlineService.StartRefresher()
 
+	// Image mirror follows the datastore; the datastore is loaded by now.
+	mirrorSync.Start()
+	mirrorSync.Request()
+
 	if !DevMode {
 		// Set up new refreshes as needed
 		c := cron.New()
@@ -1354,6 +1367,9 @@ func main() {
 
 		// Backstop refresh; reloads normally drive this via RequestRefresh.
 		c.AddFunc("20 */12 * * *", offlineService.RequestRefresh)
+
+		// Mirror backstop; datastore reloads normally drive this via Request.
+		c.AddFunc("50 8 * * *", mirrorSync.Request)
 
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
