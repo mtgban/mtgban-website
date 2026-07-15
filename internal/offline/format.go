@@ -98,10 +98,12 @@ func dollars(c uint64) float64 {
 
 type writer struct {
 	buf bytes.Buffer
+	tmp [binary.MaxVarintLen64]byte
 }
 
 func (w *writer) uv(v uint64) {
-	w.buf.Write(binary.AppendUvarint(nil, v))
+	n := binary.PutUvarint(w.tmp[:], v)
+	w.buf.Write(w.tmp[:n])
 }
 
 func (w *writer) str(s string) {
