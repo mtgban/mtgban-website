@@ -78,7 +78,19 @@ func run(configPath, setsCSV string, dryRun bool) error {
 
 	res, err := imgmirror.RunSync(ctx, imgmirror.SyncOpts{Bucket: mirror, Base: base, Want: want})
 	log.Printf("fetched %d images (%d failed), %d bundles rebuilt", res.Fetched, res.FetchFailed, res.BundlesRebuilt)
+	if shouldWriteMarker(setsCSV, err) {
+		if werr := imgmirror.WriteMarker(ctx, mirror, base, len(want)); werr != nil {
+			return werr
+		}
+		log.Println("backfill marker written")
+	}
 	return err
+}
+
+// shouldWriteMarker: only a full, successful, unfiltered run qualifies.
+// The -dry-run path returns before RunSync, so it never reaches this.
+func shouldWriteMarker(setsCSV string, runErr error) bool {
+	return runErr == nil && setsCSV == ""
 }
 
 // loadCardDatastore loads mtgmatcher the way the website does, minus the
