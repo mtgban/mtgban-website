@@ -37,13 +37,24 @@ function fetchChecked(url, stage) {
 
 // Images stage: runs after prices within the same sync message.
 async function runImagesStage(manifest, imgEditions, isCancelled) {
-    if (!Array.isArray(imgEditions) || imgEditions.length === 0) return 0;
+    var sel = Array.isArray(imgEditions) ? imgEditions : [];
+    // Deselected editions release their cached images before new work starts.
+    await OfflineImages.evictImages({
+        sel: sel,
+        getImgStates: function () { return OfflineDB.getAllRows('imgstate'); },
+        deleteImgState: function (code) { return OfflineDB.deleteRow('imgstate', code); },
+        getCard: function (uuid) { return OfflineDB.getCard(uuid); },
+    });
+    if (sel.length === 0) {
+        await OfflineDB.setMeta('imgCount', 0);
+        return 0;
+    }
     var rows = await OfflineDB.getAllRows('imgstate');
     var states = {};
     rows.forEach(function (r) { states[r.code] = r; });
     var res = await OfflineImages.syncImages({
         images: (manifest && manifest.images) || {},
-        sel: imgEditions,
+        sel: sel,
         states: states,
         cancelled: isCancelled,
         putImgState: function (row) { return OfflineDB.putRow('imgstate', row); },

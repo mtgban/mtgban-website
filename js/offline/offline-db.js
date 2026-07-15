@@ -188,6 +188,13 @@
         });
     }
 
+    function deleteRow(store, key) {
+        checkStore(store);
+        return withTx([store], 'readwrite', function(tx) {
+            tx.objectStore(store).delete(key);
+        });
+    }
+
     // Drops card metadata ahead of a catalog version swap; sets stay intact.
     function clearCatalog() {
         return withTx(['cards', 'names'], 'readwrite', function(tx) {
@@ -220,6 +227,7 @@
         allNames: allNames,
         getAllRows: getAllRows,
         putRow: putRow,
+        deleteRow: deleteRow,
         clearCatalog: clearCatalog,
         clearAll: clearAll,
     };
