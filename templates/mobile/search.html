@@ -348,7 +348,10 @@
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
-                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                    <span class="m-locked-cta">
+                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>{{end}}
+                                    </span>
                                 </div>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat">
@@ -369,7 +372,10 @@
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
-                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                    <span class="m-locked-cta">
+                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>{{end}}
+                                    </span>
                                 </div>
                                 {{else}}
                                 {{$hasDetail := $entry.Credit}}
@@ -429,7 +435,10 @@
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
-                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                    <span class="m-locked-cta">
+                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>{{end}}
+                                    </span>
                                 </div>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat">
@@ -450,7 +459,10 @@
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
-                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                    <span class="m-locked-cta">
+                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>{{end}}
+                                    </span>
                                 </div>
                                 {{else}}
                                 {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM"))}}
