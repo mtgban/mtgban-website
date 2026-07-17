@@ -202,7 +202,7 @@
                  data-has-warning="{{$card.HasContentWarning}}"
                  data-crop-url="{{$card.CropURL}}"
                  data-setcode="{{$card.SetCode}}"
-                 onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
+                 onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}', {{$card.HasContentWarning}})">
                 <div class="m-card-icon">
                     {{if $card.Keyrune}}
                         <i class="ss {{$card.Keyrune}} ss-fw"></i>
@@ -813,7 +813,7 @@
     <div class="m-drawer" id="m-drawer">
         <div class="m-drawer-handle" onclick="hideCardDrawer()"><span></span></div>
         <div class="m-drawer-content">
-            <img class="m-drawer-img" id="m-drawer-img" src="" alt="">
+            <img class="m-drawer-img" id="m-drawer-img" src="" alt="" onclick="this.classList.add('cw-revealed')">
             <span class="m-drawer-name" id="m-drawer-name"></span>
         </div>
     </div>
@@ -931,13 +931,17 @@ window.addEventListener('scroll', closeActionsMenus, { passive: true });
 window.addEventListener('resize', closeActionsMenus);
 
 // Card image drawer
-function showCardDrawer(imgUrl, name) {
+function showCardDrawer(imgUrl, name, hasWarning) {
     var overlay = document.getElementById('m-drawer-overlay');
     var drawer = document.getElementById('m-drawer');
     var img = document.getElementById('m-drawer-img');
     var nameEl = document.getElementById('m-drawer-name');
     img.src = imgUrl;
     img.alt = name;
+    // Blur content-warning art until tapped, matching desktop. Reset the
+    // revealed state each open so a fresh card starts blurred again.
+    img.classList.toggle('content-warning', !!hasWarning);
+    img.classList.remove('cw-revealed');
     nameEl.textContent = name;
     overlay.classList.add('open');
     drawer.classList.add('open');
