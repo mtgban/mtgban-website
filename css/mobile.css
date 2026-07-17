@@ -445,3 +445,18 @@ body.mobile:has(.m-home) .m-nav-home {
         animation: none;
     }
 }
+
+/* Portrait phones: fit the whole landing page in the visible viewport so the
+   login/join footer sits at the bottom without scrolling. dvh tracks the real
+   visible height, unlike vh which counts the area behind the mobile address
+   bar and pushed the footer off-screen. Center the brand/search block in the
+   space above the footer (which keeps its own margin-top:auto). Landscape,
+   with no vertical room to spare, is intentionally left as-is. */
+@media (orientation: portrait) {
+    .m-home {
+        min-height: calc(100dvh - 48px);
+    }
+    .m-home-brand {
+        margin-top: auto;
+    }
+}
