@@ -68,9 +68,12 @@ var UploadIndexComparePriceList = []string{
 	"TCGLow", "TCGMarket", "TCGDirect", "CT", "CT0", "MKMLow", "MKMTrend",
 }
 
-// List of sealed index prices to show by default
+// List of sealed index prices to show by default: the EV calculations
+// (the simulations are too noisy to price a collection against) and the
+// plain TCGplayer price, which doubles as a store like TCGDirect does
+// for singles
 var UploadSealedIndexKeysPublic = []string{
-	"TCGLowEV", "TCGDirectNetEV", "TCGLowSim", "TCGDirectNetSim",
+	"TCGLowEV", "TCGDirectNetEV", "CTZeroEV", "TCGSealed",
 }
 
 var ErrUploadDecklist = docparse.ErrDecklist
@@ -388,10 +391,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.EnabledSealedVendors = strings.Split(enabledSealedVendors, "|")
 	}
 
-	// The sealed indexes are the MetadataOnly sealed sellers that were
-	// made public
+	// The sealed indexes are the sealed sellers that were made public;
+	// unlike the EV ones, TCGSealed is not MetadataOnly, since it is a
+	// store too
 	sealedIndexes := filterSellers(func(info mtgban.ScraperInfo) bool {
-		return info.SealedMode && info.MetadataOnly &&
+		return info.SealedMode &&
 			slices.Contains(UploadSealedIndexKeysPublic, info.Shorthand)
 	})
 
@@ -895,9 +899,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		indexResults = getSellerPrices("", indexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	}
 
+	// An index that is also a selected store (TCGSealed) already gets its
+	// own column in retail mode, so drop it here to avoid listing it twice
+	var sealedIndexKeys []string
+	for _, key := range enabledSealedIndexKeys {
+		if !blMode && slices.Contains(enabledSealedStores, key) {
+			continue
+		}
+		sealedIndexKeys = append(sealedIndexKeys, key)
+	}
+
 	// Fetch sealed index prices
-	if len(sealedProductIds) > 0 && len(enabledSealedIndexKeys) > 0 {
-		sealedIndexResults := getSellerPrices("", enabledSealedIndexKeys, "", sealedProductIds, "", false, false, true, tagPref)
+	if len(sealedProductIds) > 0 && len(sealedIndexKeys) > 0 {
+		sealedIndexResults := getSellerPrices("", sealedIndexKeys, "", sealedProductIds, "", false, false, true, tagPref)
 		for cardId, stores := range sealedIndexResults {
 			if indexResults[cardId] == nil {
 				indexResults[cardId] = map[string]*BanPrice{}
@@ -908,9 +922,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set card and sealed keys separately — the template picks per entry.
-	// A store that is also an index (TCGDirect) gets its own column in
-	// retail mode, so skip its index entry to avoid listing it twice
+	// Set card and sealed keys separately — the template picks per entry,
+	// with the same store/index deduplication applied above for sealed
 	for _, key := range enabledIndexKeys {
 		if !blMode && slices.Contains(enabledStores, key) {
 			continue
@@ -920,7 +933,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.ScraperKeys = enabledStores
 	pageVars.AllScraperKeys = enabledStores
 	if len(sealedProductIds) > 0 {
-		pageVars.SealedIndexKeys = enabledSealedIndexKeys
+		pageVars.SealedIndexKeys = sealedIndexKeys
 		pageVars.SealedScraperKeys = enabledSealedStores
 		pageVars.AllScraperKeys = append(append([]string{}, enabledStores...), enabledSealedStores...)
 	}
