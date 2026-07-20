@@ -1037,7 +1037,6 @@ window.__BAN_GUIDE = {
                     { value: 'Excel (.xls, .xlsx)',                    short: 'Sheet name must contain "mtgban"' },
                     { value: 'Google Sheets',                          short: 'Public URL; saved as a preference' },
                     { value: 'TCG Collection URL',                     short: 'TCGplayer store collection link' },
-                    { value: 'Moxfield URL',                           short: 'Public deck URL' },
                     { value: 'Plain decklist',                         short: 'One card name per line (most recent printing)' },
                     { value: 'TCG / Deckbox / BinderPOS / Cardsphere', short: 'Auto-detected exports' }
                 ],
