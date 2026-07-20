@@ -165,6 +165,19 @@ func hasUploadOpt(r *http.Request, field string) bool {
 	return slices.Contains(uploadOpts, field)
 }
 
+// keepInOrder returns the elements of enabled that are present in all,
+// following the order of all, so that a selection coming from a form or
+// a cookie can never reorder the list or smuggle in an unknown key
+func keepInOrder(all, enabled []string) []string {
+	var out []string
+	for _, key := range all {
+		if slices.Contains(enabled, key) {
+			out = append(out, key)
+		}
+	}
+	return out
+}
+
 func Upload(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
@@ -374,6 +387,43 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else {
 		pageVars.EnabledSealedVendors = strings.Split(enabledSealedVendors, "|")
 	}
+
+	// The sealed indexes are the MetadataOnly sealed sellers that were
+	// made public
+	sealedIndexes := filterSellers(func(info mtgban.ScraperInfo) bool {
+		return info.SealedMode && info.MetadataOnly &&
+			slices.Contains(UploadSealedIndexKeysPublic, info.Shorthand)
+	})
+
+	// Index prices are reference prices, so their selection is shared
+	// between Retail and Buylist mode, but singles and sealed keep their
+	// own list, like the stores above. The form always carries the
+	// index_pref marker, so an empty list submitted from the page means
+	// "no index at all" and not "field was never sent" (as it would for
+	// requests that skip the form, like search transfers or remote links)
+	pageVars.IndexAllKeys = UploadIndexKeysPublic
+	pageVars.SealedIndexAllKeys = sealedIndexes
+
+	enabledIndexes := UploadIndexKeysPublic
+	enabledSealedIndexes := sealedIndexes
+	if r.Form.Has("index_pref") {
+		enabledIndexes = r.Form["index_stores"]
+		enabledSealedIndexes = r.Form["sealed_index_stores"]
+		setForeverCookie(w, "enabledIndexes", strings.Join(enabledIndexes, "|"))
+		setForeverCookie(w, "enabledSealedIndexes", strings.Join(enabledSealedIndexes, "|"))
+	} else {
+		if raw := readCookie(r, "enabledIndexes"); raw != "" {
+			enabledIndexes = strings.Split(raw, "|")
+		}
+		if raw := readCookie(r, "enabledSealedIndexes"); raw != "" {
+			enabledSealedIndexes = strings.Split(raw, "|")
+		}
+	}
+
+	enabledIndexKeys := keepInOrder(UploadIndexKeysPublic, enabledIndexes)
+	enabledSealedIndexKeys := keepInOrder(sealedIndexes, enabledSealedIndexes)
+	pageVars.EnabledIndexes = enabledIndexKeys
+	pageVars.EnabledSealedIndexes = enabledSealedIndexKeys
 
 	cachedGdocURL := readCookie(r, "gdocURL")
 	pageVars.RemoteLinkURL = cachedGdocURL
@@ -795,15 +845,22 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+csvName+".csv\"")
 		csvWriter := csv.NewWriter(w)
 
-		// Search for all csv-specific indexes (skip the dump when there are no singles)
+		// Search for the csv-specific indexes that were left enabled
+		// (skip the dump when there are no singles)
+		var csvIndexKeys []string
+		for _, key := range UploadIndexKeysCSV {
+			if slices.Contains(enabledIndexKeys, key) {
+				csvIndexKeys = append(csvIndexKeys, key)
+			}
+		}
 		indexResults := map[string]map[string]*BanPrice{}
-		if len(cardIds) > 0 {
-			indexResults = getSellerPrices("", UploadIndexKeysCSV, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		if len(cardIds) > 0 && len(csvIndexKeys) > 0 {
+			indexResults = getSellerPrices("", csvIndexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 		}
 
 		// Copy these index prices in the final results
 		for _, cardId := range cardIds {
-			for _, index := range UploadIndexKeysCSV {
+			for _, index := range csvIndexKeys {
 				if results[cardId] == nil {
 					results[cardId] = map[string]*BanPrice{}
 				}
@@ -838,22 +895,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		indexResults = getSellerPrices("", indexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	}
 
-	// Build sealed index keys from MetadataOnly sealed sellers
-	var sealedIndexKeys []string
-	for _, seller := range GetSellers() {
-		if seller == nil || !seller.Info().SealedMode || !seller.Info().MetadataOnly {
-			continue
-		}
-		short := seller.Info().Shorthand
-		if !slices.Contains(UploadSealedIndexKeysPublic, short) {
-			continue
-		}
-		sealedIndexKeys = append(sealedIndexKeys, short)
-	}
-
 	// Fetch sealed index prices
-	if len(sealedProductIds) > 0 && len(sealedIndexKeys) > 0 {
-		sealedIndexResults := getSellerPrices("", sealedIndexKeys, "", sealedProductIds, "", false, false, true, tagPref)
+	if len(sealedProductIds) > 0 && len(enabledSealedIndexKeys) > 0 {
+		sealedIndexResults := getSellerPrices("", enabledSealedIndexKeys, "", sealedProductIds, "", false, false, true, tagPref)
 		for cardId, stores := range sealedIndexResults {
 			if indexResults[cardId] == nil {
 				indexResults[cardId] = map[string]*BanPrice{}
@@ -864,12 +908,19 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set card and sealed keys separately — the template picks per entry
-	pageVars.IndexKeys = UploadIndexKeysPublic
+	// Set card and sealed keys separately — the template picks per entry.
+	// A store that is also an index (TCGDirect) gets its own column in
+	// retail mode, so skip its index entry to avoid listing it twice
+	for _, key := range enabledIndexKeys {
+		if !blMode && slices.Contains(enabledStores, key) {
+			continue
+		}
+		pageVars.IndexKeys = append(pageVars.IndexKeys, key)
+	}
 	pageVars.ScraperKeys = enabledStores
 	pageVars.AllScraperKeys = enabledStores
 	if len(sealedProductIds) > 0 {
-		pageVars.SealedIndexKeys = sealedIndexKeys
+		pageVars.SealedIndexKeys = enabledSealedIndexKeys
 		pageVars.SealedScraperKeys = enabledSealedStores
 		pageVars.AllScraperKeys = append(append([]string{}, enabledStores...), enabledSealedStores...)
 	}

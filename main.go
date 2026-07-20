@@ -222,6 +222,13 @@ type PageVars struct {
 	SealedScraperKeys []string
 	SealedIndexKeys   []string
 
+	// All the index prices that can be toggled, and the subset the user
+	// enabled (shared between Retail and Buylist, they are references)
+	IndexAllKeys         []string
+	EnabledIndexes       []string
+	SealedIndexAllKeys   []string
+	EnabledSealedIndexes []string
+
 	// Additional sources for index keys if needed
 	AltKeys              []string
 	SellerKeys           []string

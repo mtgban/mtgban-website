@@ -105,6 +105,38 @@
                         <button type="button" class="upload-tab active" id="tab-singles" onclick="selectTab('singles')">Singles</button>
                         <button type="button" class="upload-tab" id="tab-sealed" onclick="selectTab('sealed')">Sealed</button>
                     </div>
+
+                    <!-- Reference prices: one list per tab, but shared by
+                         Retail and Buylist, so this sits above the mode
+                         toggle. The marker field lets an empty selection
+                         reach the handler as "no index at all". -->
+                    <input type="hidden" name="index_pref" value="1">
+                    <div class="upload-index-row" id="singlesIndexRow">
+                        <span class="upload-index-label">Index prices</span>
+                        <div class="upload-index-grid">
+                            {{range .IndexAllKeys}}{{$name := scraper_name .}}{{if $name}}
+                                <label class="upload-index-item">
+                                    <input type="checkbox" name="index_stores" id="index-{{.}}" value="{{.}}" {{if slice_has $.EnabledIndexes .}}checked{{end}}>
+                                    <span class="upload-store-name">{{$name}}</span>
+                                </label>
+                            {{end}}{{end}}
+                        </div>
+                    </div>
+                    <div class="upload-index-row upload-store-hidden" id="sealedIndexRow">
+                        <span class="upload-index-label">Index prices</span>
+                        <div class="upload-index-grid">
+                            {{range .SealedIndexAllKeys}}
+                                <label class="upload-index-item">
+                                    <input type="checkbox" name="sealed_index_stores" id="index-sealed-{{.}}" value="{{.}}" {{if slice_has $.EnabledSealedIndexes .}}checked{{end}}>
+                                    <span class="upload-store-name">{{scraper_name .}}</span>
+                                </label>
+                            {{end}}
+                            {{if not .SealedIndexAllKeys}}
+                                <span class="upload-mode-hint">No sealed index prices available.</span>
+                            {{end}}
+                        </div>
+                    </div>
+
                     <div class="upload-mode-stores-row">
                         <div class="upload-mode-col">
                             <div class="upload-mode-toggle">
@@ -481,8 +513,12 @@
                 var singlesBox = document.getElementById('singlesBox');
                 var sealedBox = document.getElementById('sealedBox');
                 var sealedNote = document.getElementById('sealedNote');
+                var singlesIndexRow = document.getElementById('singlesIndexRow');
+                var sealedIndexRow = document.getElementById('sealedIndexRow');
                 if (singlesBox) singlesBox.classList.toggle('upload-store-hidden', isSealed);
                 if (sealedBox) sealedBox.classList.toggle('upload-store-hidden', !isSealed);
+                if (singlesIndexRow) singlesIndexRow.classList.toggle('upload-store-hidden', isSealed);
+                if (sealedIndexRow) sealedIndexRow.classList.toggle('upload-store-hidden', !isSealed);
                 if (sealedNote) sealedNote.classList.toggle('upload-store-hidden', !isSealed);
                 try { localStorage.setItem('uploadTab', tab); } catch(e) {}
             };
@@ -720,7 +756,7 @@
             {{range $storeKeys}}
                 <th class="r">{{scraper_name .}}</th>
             {{end}}
-            <th>Index</th>
+            {{if $indexKeys}}<th>Index</th>{{end}}
         </tr>
     </thead>
     <tbody>
@@ -764,6 +800,7 @@
                         {{end}}
                     </td>
                 {{end}}
+                {{if $indexKeys}}
                 <td>
                     <div class="ures-index">
                         {{range $indexKeys}}
@@ -775,6 +812,7 @@
                         {{end}}
                     </div>
                 </td>
+                {{end}}
             </tr>
         {{end}}
         <tr class="ures-totals-row">
@@ -791,6 +829,7 @@
                     {{end}}
                 </td>
             {{end}}
+            {{if $indexKeys}}
             <td>
                 <div class="ures-index" style="font-weight:600">
                     {{range $indexKeys}}
@@ -801,6 +840,7 @@
                     {{end}}
                 </div>
             </td>
+            {{end}}
         </tr>
     </tbody>
 </table>
