@@ -701,7 +701,7 @@
         upload: {
             prefix: '+',
             label: 'UPLOAD',
-            placeholder: 'Paste a Sheets, Moxfield, or TCG URL, or pick a file...',
+            placeholder: 'Paste a Sheets or tracker URL, or pick a file...',
             tile: { title: 'Upload', subtitle: 'Send a URL, file, or page results', icon: 'upload' },
             builder: buildUploadItems,
             skipCap: true,
@@ -1216,14 +1216,14 @@
             } else {
                 rows.push({
                     type: 'upload-error', title: 'Unsupported URL',
-                    subtitle: 'Allowed: TCGplayer collection, Moxfield deck, Google Sheets',
+                    subtitle: 'Allowed: Google Sheets, TCG and other tracker URLs',
                     icon: 'alert-circle', disabled: true
                 });
             }
         } else {
             rows.push({
                 type: 'upload-hint', title: 'Type or paste a URL',
-                subtitle: 'TCGplayer collection, Moxfield deck, or Google Sheets',
+                subtitle: 'Google Sheets, TCG and other tracker URLs',
                 icon: 'link', disabled: true
             });
         }
