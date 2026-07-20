@@ -352,6 +352,20 @@ func findInstanceId(sellerName, cardId, cond string) string {
 	return ""
 }
 
+// uuid2TCGSKU is the reverse of tcgSKU2UUID: it returns the TCGplayer SKU of
+// a card in a given condition, picking the inventory the product lives in.
+// Sources that carry no condition are assumed to be NM, the same way the
+// TCGplayer CSV export does. Returns "" when the card has no SKU on file.
+func uuid2TCGSKU(cardId string, sealed bool, cond string) string {
+	if cond == "" {
+		cond = "NM"
+	}
+	if sealed {
+		return findInstanceId("TCGSealed", cardId, cond)
+	}
+	return findInstanceId("TCGPlayer", cardId, cond)
+}
+
 // tcgSKU2UUID resolves a TCGplayer SKU (instance id) to a card uuid using the
 // precomputed "tcgskuid" index from runSealedAnalysis (O(1)), where the uuid is
 // stored in each entry's OriginalId. Returns "" if the SKU is unknown.

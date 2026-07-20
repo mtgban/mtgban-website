@@ -927,7 +927,13 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 
 	hasUploadData := len(uploadedData) > 0
 
-	header := []string{"UUID", "Card Name", "Set Code", "Edition", "Number", "Finish"}
+	header := []string{"UUID"}
+	// The SKU is per condition, so it is only meaningful for uploads,
+	// where every row carries the condition it was loaded with
+	if hasUploadData {
+		header = append(header, "TCGplayer SKU")
+	}
+	header = append(header, "Card Name", "Set Code", "Edition", "Number", "Finish")
 	header = append(header, allScraperNames...)
 	if hasUploadData {
 		header = append(header, "Loaded Price", "Loaded Condition", "Loaded Quantity", "Notes")
@@ -950,7 +956,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 
 			condition := uploadedData[j].OriginalCondition
 
-			record, err := priceRowToCSV(pm, id, allScrapers, allIndexes, condition, preferFlavor)
+			record, err := priceRowToCSV(pm, id, allScrapers, allIndexes, condition, preferFlavor, true)
 			if err != nil {
 				continue
 			}
@@ -979,7 +985,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			}
 		}
 		for _, id := range sorted {
-			record, err := priceRowToCSV(pm, id, allScrapers, allIndexes, "", preferFlavor)
+			record, err := priceRowToCSV(pm, id, allScrapers, allIndexes, "", preferFlavor, false)
 			if err != nil {
 				continue
 			}
@@ -993,7 +999,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 	return nil
 }
 
-func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition string, preferFlavor bool) ([]string, error) {
+func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition string, preferFlavor, withSKU bool) ([]string, error) {
 	co, err := mtgmatcher.GetUUID(id)
 	if err != nil {
 		uuid := mtgmatcher.ExternalUUID(id)
@@ -1039,7 +1045,11 @@ func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, a
 		finish = "sealed"
 	}
 
-	record := []string{displayID, cardName, co.SetCode, co.Edition, co.Number, finish}
+	record := []string{displayID}
+	if withSKU {
+		record = append(record, uuid2TCGSKU(id, co.Sealed, condition))
+	}
+	record = append(record, cardName, co.SetCode, co.Edition, co.Number, finish)
 	record = append(record, prices...)
 	return record, nil
 }
