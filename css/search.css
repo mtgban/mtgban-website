@@ -337,6 +337,17 @@
     border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     text-align: center;
 }
+/* Product count, appended to the title. Empty when there is nothing to
+   count, so the margin has to come from the span itself. */
+.sidebar-products-count:not(:empty) {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: var(--surface-3, rgba(127,127,127,0.15));
+    color: var(--search-text-dim);
+    font-size: var(--text-xs);
+    letter-spacing: 0;
+}
 .sidebar-products-list {
     padding: 8px 12px;
     font-size: var(--text-sm);

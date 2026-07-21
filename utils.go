@@ -61,6 +61,7 @@ type GenericCard struct {
 	StocksURL    string
 	Printings    string
 	Products     string
+	NumProducts  int
 	TCGId        string
 	Date         string
 	Sealed       bool
@@ -568,6 +569,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	sourceSealed := cardobject2sources(co)
 
 	var products string
+	var numProducts int
 	if len(sourceSealed) > 0 {
 		products += "<h4>"
 		for _, sealed := range sourceSealed {
@@ -578,6 +580,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 				continue
 			}
 			products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + "</a>"
+			numProducts++
 		}
 		products += "</h4>"
 		if len(sourceSealed) > 5 {
@@ -650,6 +653,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		StocksURL:    stocksURL,
 		Printings:    printings,
 		Products:     products,
+		NumProducts:  numProducts,
 		TCGId:        tcgId,
 		Date:         co.OriginalReleaseDate,
 		Sealed:       co.Sealed,

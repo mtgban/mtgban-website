@@ -291,7 +291,7 @@
                     updateSidebar.apply(null, arguments);
                 }
 
-                function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning) {
+                function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount) {
                     document.getElementById('cardImage').src=src;
                     var wrapper = document.getElementById('cardImageWrapper');
                     if (wrapper) {
@@ -313,6 +313,10 @@
                             products = "n/a"
                         }
                         productDiv.innerHTML = products;
+                    }
+                    let productCountSpan = document.getElementById('productsCount');
+                    if (productCountSpan) {
+                        productCountSpan.textContent = productsCount > 0 ? productsCount : '';
                     }
                 }
 
@@ -384,7 +388,7 @@
                         {{end}}
                         {{if .HasAvailable}}
                             <div class="sidebar-products-card">
-                                <div class="sidebar-products-title">Available In</div>
+                                <div class="sidebar-products-title">Available In<span class="sidebar-products-count" id="productsCount"></span></div>
                                 <div class="sidebar-products-list" id="products"></div>
                             </div>
                         {{end}}
@@ -436,6 +440,7 @@
                     {{$firstImg := ""}}
                     {{$firstPrint := ""}}
                     {{$firstProduct := ""}}
+                    {{$firstProductCount := 0}}
                     {{$firstFoil := false}}
                     {{$firstEtched := false}}
                     {{$firstSetCode := ""}}
@@ -941,6 +946,7 @@
                             {{$firstImg = $card.ImageURL}}
                             {{$firstPrint = $card.Printings}}
                             {{$firstProduct = $card.Products}}
+                            {{$firstProductCount = $card.NumProducts}}
                             {{$firstFoil = $card.Foil}}
                             {{$firstEtched = $card.Etched}}
                             {{$firstSetCode = $card.SetCode}}
@@ -961,7 +967,7 @@
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
-                                 onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                                 onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -1057,7 +1063,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
@@ -1303,7 +1309,7 @@
                     {{end}}
                 {{end}}
                 <script type="text/javascript">
-                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}});
+                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}}, {{$firstProductCount}});
                 </script>
             </div>{{/* Close .search-layout */}}
     <br>
