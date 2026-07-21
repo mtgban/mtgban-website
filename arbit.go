@@ -656,6 +656,14 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 	}
 
+	// Keep the menu in a stable alphabetical order. The scraper snapshots are
+	// kept in load order (updates replace entries in place), so without this the
+	// menu follows config order instead of name order.
+	sort.SliceStable(menuScrapers, func(i, j int) bool {
+		return strings.ToLower(scraperName(menuScrapers[i].Info().Shorthand)) <
+			strings.ToLower(scraperName(menuScrapers[j].Info().Shorthand))
+	})
+
 	// Populate the menu bar with the pool selected above
 	for _, scraper := range menuScrapers {
 		var link string
