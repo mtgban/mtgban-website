@@ -17,10 +17,25 @@ import (
 type workerConfig struct {
 	DatastorePath string `json:"datastore_path"`
 	Datastore     struct {
-		BucketAccessKey   string `json:"bucket_access_key"`
-		BucketSecretKey   string `json:"bucket_access_secret"`
-		OfflineImagesPath string `json:"offline_images_path"`
+		BucketAccessKey string `json:"bucket_access_key"`
+		BucketSecretKey string `json:"bucket_access_secret"`
 	} `json:"datastore"`
+	Offline struct {
+		ImagesPath string `json:"images_path"`
+	} `json:"offline"`
+	BucketKeys map[string]struct {
+		AccessKey    string `json:"access_key"`
+		AccessSecret string `json:"access_secret"`
+	} `json:"bucket_keys"`
+}
+
+// bucketCredentials returns the key pair for the named bucket: the matching
+// bucket_keys entry when present, else the datastore pair.
+func (cfg *workerConfig) bucketCredentials(bucketName string) (string, string) {
+	if creds, ok := cfg.BucketKeys[bucketName]; ok {
+		return creds.AccessKey, creds.AccessSecret
+	}
+	return cfg.Datastore.BucketAccessKey, cfg.Datastore.BucketSecretKey
 }
 
 func loadWorkerConfig(path string) (*workerConfig, error) {
@@ -35,11 +50,11 @@ func loadWorkerConfig(path string) (*workerConfig, error) {
 	if cfg.DatastorePath == "" {
 		return nil, errors.New("datastore_path not configured")
 	}
-	if cfg.Datastore.OfflineImagesPath == "" {
-		return nil, errors.New("datastore.offline_images_path not configured")
+	if cfg.Offline.ImagesPath == "" {
+		return nil, errors.New("offline.images_path not configured")
 	}
-	if u, err := url.Parse(cfg.Datastore.OfflineImagesPath); err == nil && len(u.Scheme) == 1 {
-		return nil, errors.New("offline_images_path: Windows absolute paths are broken by simplecloud v0.0.9 (drive letter stripped); use a relative path until the upstream fix lands")
+	if u, err := url.Parse(cfg.Offline.ImagesPath); err == nil && len(u.Scheme) == 1 {
+		return nil, errors.New("offline.images_path: Windows absolute paths are broken by simplecloud v0.0.9 (drive letter stripped); use a relative path until the upstream fix lands")
 	}
 	return &cfg, nil
 }
@@ -55,7 +70,8 @@ func (cfg *workerConfig) newReadBucket(ctx context.Context, bucketPath string) (
 	case u.Scheme == "" || len(u.Scheme) == 1:
 		return &simplecloud.FileBucket{}, nil
 	case u.Scheme == "b2":
-		b2Bucket, err := simplecloud.NewB2Client(ctx, cfg.Datastore.BucketAccessKey, cfg.Datastore.BucketSecretKey, u.Host)
+		key, secret := cfg.bucketCredentials(u.Host)
+		b2Bucket, err := simplecloud.NewB2Client(ctx, key, secret, u.Host)
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +93,8 @@ func (cfg *workerConfig) newReadWriteBucket(ctx context.Context, bucketPath stri
 	case u.Scheme == "" || len(u.Scheme) == 1:
 		return &simplecloud.FileBucket{}, nil
 	case u.Scheme == "b2":
-		return simplecloud.NewB2Client(ctx, cfg.Datastore.BucketAccessKey, cfg.Datastore.BucketSecretKey, u.Host)
+		key, secret := cfg.bucketCredentials(u.Host)
+		return simplecloud.NewB2Client(ctx, key, secret, u.Host)
 	}
 	return nil, fmt.Errorf("unsupported writable path scheme %s", u.Scheme)
 }
