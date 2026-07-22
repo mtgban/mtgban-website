@@ -50,7 +50,7 @@ func run(configPath, setsCSV string, dryRun bool) error {
 		log.Printf("source domain %s: %d images", domain, n)
 	}
 
-	base := cfg.Datastore.OfflineImagesPath
+	base := cfg.Offline.ImagesPath
 	mirror, err := cfg.newReadWriteBucket(ctx, base)
 	if err != nil {
 		return err

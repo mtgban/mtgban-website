@@ -76,7 +76,7 @@ a deep backstop and for cap-exceeded alerts.
 
 ## Windows path note
 
-`offline_images_path` must be a relative path or a `b2://` URL.
+`offline.images_path` must be a relative path or a `b2://` URL.
 Windows absolute paths (e.g. `C:/mirror`) are rejected at startup
 because simplecloud v0.0.9 silently strips the drive letter. This
 restriction will be lifted once the upstream fix lands.
