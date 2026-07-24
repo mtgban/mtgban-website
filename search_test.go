@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -63,6 +64,49 @@ func TestMain(m *testing.M) {
 
 func parseSearchOptionsWrapper(input string) SearchConfig {
 	return parseSearchOptionsNG(input, nil, nil, nil)
+}
+
+// datastoreLoaded reports whether the mtgmatcher card datastore is available,
+// so data-dependent tests can skip when it isn't loaded locally or in CI.
+func datastoreLoaded() bool {
+	_, err := mtgmatcher.Match(&mtgmatcher.InputCard{Name: "Forest"})
+	var alias *mtgmatcher.AliasingError
+	return err == nil || errors.As(err, &alias)
+}
+
+// A variant-qualified name (e.g. "(Borderless)") skips the plain-name search
+// index and falls back to attemptMatch, which must still surface every finish
+// of the matched printing. Regression guard: the foil used to be dropped
+// because the variant already in the name clobbered the "Foil" match hint.
+func TestAttemptMatchVariantIncludesFoil(t *testing.T) {
+	if !datastoreLoaded() {
+		t.Skip("mtgmatcher datastore not loaded")
+	}
+
+	const query = "Meren of Clan Nel Toth (Borderless)"
+	uuids, err := attemptMatch(query)
+	if err != nil {
+		t.Fatalf("attemptMatch(%q): %v", query, err)
+	}
+
+	var haveNonfoil, haveFoil bool
+	for _, id := range uuids {
+		co, err := mtgmatcher.GetUUID(id)
+		if err != nil || co.Etched {
+			continue
+		}
+		if co.Foil {
+			haveFoil = true
+		} else {
+			haveNonfoil = true
+		}
+	}
+	if !haveNonfoil {
+		t.Errorf("attemptMatch(%q) = %v: missing the nonfoil printing", query, uuids)
+	}
+	if !haveFoil {
+		t.Errorf("attemptMatch(%q) = %v: missing the foil printing", query, uuids)
+	}
 }
 
 func BenchmarkRegexp(b *testing.B) {

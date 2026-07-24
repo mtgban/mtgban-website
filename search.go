@@ -1294,6 +1294,19 @@ func editionsForSearch(allKeys []string) []EditionEntry {
 	return out
 }
 
+// addFinishVariants appends id's foil and etched finishes to uuids, skipping
+// any that don't exist, equal id, or are already present.
+func addFinishVariants(uuids []string, id string) []string {
+	foilId, _ := mtgmatcher.MatchId(id, true)
+	etchedId, _ := mtgmatcher.MatchId(id, false, true)
+	for _, otherFinishId := range []string{foilId, etchedId} {
+		if otherFinishId != "" && otherFinishId != id && !slices.Contains(uuids, otherFinishId) {
+			uuids = append(uuids, otherFinishId)
+		}
+	}
+	return uuids
+}
+
 func searchScryfall(query string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*30))
 	defer cancel()
@@ -1323,17 +1336,10 @@ func searchScryfall(query string) ([]string, error) {
 			if id == "" {
 				continue
 			}
-			out = append(out, id)
-
-			foilId, err := mtgmatcher.MatchId(id, true)
-			if err == nil && foilId != id {
-				out = append(out, foilId)
+			if !slices.Contains(out, id) {
+				out = append(out, id)
 			}
-
-			etchedId, err := mtgmatcher.MatchId(id, false, true)
-			if err == nil && etchedId != id {
-				out = append(out, etchedId)
-			}
+			out = addFinishVariants(out, id)
 		}
 
 		// Exit the loop when there are no more results
@@ -1367,23 +1373,8 @@ func attemptMatch(query string) ([]string, error) {
 
 	// Repeat for foil and etched (only add if not previously found)
 	// Add as needed depending on the previous query result
-	for _, tag := range []string{"Foil", "Etched"} {
-		uuid, suberr := mtgmatcher.Match(&mtgmatcher.InputCard{
-			Name:      query,
-			Variation: tag,
-		})
-		if err != nil && suberr != nil {
-			var alias *mtgmatcher.AliasingError
-			if errors.As(suberr, &alias) {
-				for _, extra := range alias.Probe() {
-					if !slices.Contains(uuids, extra) {
-						uuids = append(uuids, extra)
-					}
-				}
-			}
-		} else if !slices.Contains(uuids, uuid) {
-			uuids = append(uuids, uuid)
-		}
+	for _, id := range uuids {
+		uuids = addFinishVariants(uuids, id)
 	}
 
 	return uuids, nil
