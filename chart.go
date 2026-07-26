@@ -181,30 +181,85 @@ type tcgChartGame struct {
 	Foil     []string
 }
 
-// tcgChartGames is the registry of TCGCSV-backed games that render price charts,
-// keyed by Config.Game. Magic is absent on purpose: it charts from product_prices
-// by mtgjson uuid (the default getDatasets path), not from
+// tcgChartGames is the registry of TCGCSV-backed games that can render price
+// charts, keyed by Config.Game. Magic is absent on purpose: it charts from
+// product_prices by mtgjson uuid (the default getDatasets path), not from
 // tcgplayer_nonmagic_product_prices.
 //
-// Adding a game is one entry here. Everything else is already game-agnostic:
-// ingestion (tcgcsv_config.games), storage and schema partitions (schema_tcg.sql,
-// with EnsureTCGCategoryPartition as a runtime backstop), the Market/Low chart
-// lines (tcgChartRefs), curated checkpoints, and the chart UI. The one external
-// prerequisite this file can't encode is card data: mtgmatcher must resolve the
-// game's cards to a tcgplayerProductId (as it does for Lorcana), or charts render
-// empty.
+// Adding a game is one entry here; ingestion (tcgcsv_config.games), schema
+// partitions (schema_tcg.sql, with EnsureTCGCategoryPartition as a runtime
+// backstop), the Market/Low lines (tcgChartRefs), curated checkpoints, and the
+// chart UI are all game-agnostic. The one prerequisite this file can't encode is
+// card data: mtgmatcher must resolve the game's cards to a tcgplayerProductId.
+// Today only Magic and Lorcana have a mtgmatcher loader, so every entry except
+// lorcana is dormant — its sub-types are recorded and ready, but its charts stay
+// empty until mtgmatcher can resolve that game's cards. Keys are the lowercase
+// Config.Game string a future deployment would set; rename if the loader lands
+// under a different identifier.
 //
-// Sub-type names are TCGplayer's own and differ per game, so confirm them against
-// the live tcgcsv feed before adding one — observed names (mapping foil vs
-// non-foil is the adder's call): Pokemon has Normal / Holofoil / Reverse Holofoil,
-// One Piece has Normal / Foil. A game with more than a foil/non-foil split (e.g.
-// Pokemon's Reverse Holofoil as its own printing) needs this finish model
-// revisited once mtgmatcher exposes that distinction.
+// Sub-type names are TCGplayer's own, taken from the live tcgcsv feed. NonFoil
+// and Foil each list every sub_type_name that backs that finish, in preference
+// order; a product carries exactly one sub-type, so listing several just lets one
+// entry cover all of a game's printings. The split is exact for the Normal/Foil
+// games and Lorcana, and approximate where TCGplayer's sub-types aren't a clean
+// foil axis (revisit these when their cards actually load):
+//   - pokemon: Holofoil and Reverse Holofoil are two distinct foil finishes
+//     folded into "foil".
+//   - fleshandblood: only the base finishes; the 1st Edition / Unlimited Edition
+//     variants are not modeled.
+//   - yugioh: sub-types are editions (1st Edition/Unlimited/Limited), not
+//     finishes, so all map to NonFoil and there is no foil line.
+//   - vanguard: the feed exposes no foil sub-type.
 var tcgChartGames = map[string]tcgChartGame{
 	"lorcana": {
 		Category: tcgcsv.CategoryLorcana,
 		NonFoil:  []string{"Normal"},
 		Foil:     []string{"Cold Foil", "Holofoil"},
+	},
+	"onepiece": {
+		Category: tcgcsv.CategoryOnePiece,
+		NonFoil:  []string{"Normal"},
+		Foil:     []string{"Foil"},
+	},
+	"dragonball": {
+		Category: tcgcsv.CategoryDragonBallSuper,
+		NonFoil:  []string{"Normal"},
+		Foil:     []string{"Foil"},
+	},
+	"digimon": {
+		Category: tcgcsv.CategoryDigimon,
+		NonFoil:  []string{"Normal"},
+		Foil:     []string{"Foil"},
+	},
+	"starwars": {
+		Category: tcgcsv.CategoryStarWarsUnlimited,
+		NonFoil:  []string{"Normal"},
+		Foil:     []string{"Foil"},
+	},
+	"riftbound": {
+		Category: tcgcsv.CategoryRiftbound,
+		NonFoil:  []string{"Normal"},
+		Foil:     []string{"Foil"},
+	},
+	"pokemon": {
+		Category: tcgcsv.CategoryPokemon,
+		NonFoil:  []string{"Normal"},
+		Foil:     []string{"Holofoil", "Reverse Holofoil"},
+	},
+	"fleshandblood": {
+		Category: tcgcsv.CategoryFleshAndBlood,
+		NonFoil:  []string{"Normal"},
+		Foil:     []string{"Rainbow Foil", "Cold Foil"},
+	},
+	"vanguard": {
+		Category: tcgcsv.CategoryVanguard,
+		NonFoil:  []string{"Normal"},
+		// The tcgcsv feed exposes no foil sub-type for Vanguard.
+	},
+	"yugioh": {
+		Category: tcgcsv.CategoryYuGiOh,
+		// Sub-types are editions, not finishes, so there is no foil line.
+		NonFoil: []string{"1st Edition", "Unlimited", "Limited", "Normal"},
 	},
 }
 

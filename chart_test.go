@@ -278,6 +278,12 @@ func TestGameTCGCategory(t *testing.T) {
 	if cat, ok := gameTCGCategory(); !ok || cat != 71 {
 		t.Errorf("lorcana -> (%d, %v), want (71, true)", cat, ok)
 	}
+	// A registered non-Lorcana game routes to the TCG path too (dormant until its
+	// cards load, but the dispatch is live).
+	Config.Game = "pokemon"
+	if cat, ok := gameTCGCategory(); !ok || cat != 3 {
+		t.Errorf("pokemon -> (%d, %v), want (3, true)", cat, ok)
+	}
 	// Magic charts off product_prices (mtgjson uuid), so it must NOT route to
 	// the TCG path here — that keeps DisableChart and getDatasets on their
 	// existing Magic behavior.
@@ -285,7 +291,8 @@ func TestGameTCGCategory(t *testing.T) {
 	if _, ok := gameTCGCategory(); ok {
 		t.Error("magic should not have a TCG category")
 	}
-	Config.Game = "pokemon"
+	// A game with no registry entry stays off the TCG path entirely.
+	Config.Game = "notarealgame"
 	if _, ok := gameTCGCategory(); ok {
 		t.Error("an unwired game should not report a TCG category")
 	}
@@ -312,21 +319,28 @@ func TestTCGSubTypesForFinish(t *testing.T) {
 }
 
 // TestTCGChartGamesWellFormed guards the registry that makes adding a game a
-// single entry: every game must name a real TCGplayer category and at least one
-// sub-type per finish, or its charts would silently render empty.
+// single entry: every game must name a real TCGplayer category, carry at least
+// one non-foil sub-type (the base finish that always charts), and use a lowercase
+// single-token key so it can match Config.Game. Foil may be empty for a game with
+// no foil finish (Yu-Gi-Oh, Vanguard).
 func TestTCGChartGamesWellFormed(t *testing.T) {
+	seenCategory := map[int]string{}
 	for game, cfg := range tcgChartGames {
 		if game == "" {
 			t.Error("registry has an empty game key")
 		}
+		if game != strings.ToLower(game) || strings.ContainsAny(game, " \t") {
+			t.Errorf("game key %q must be a lowercase single token (it must equal Config.Game)", game)
+		}
 		if cfg.Category <= 0 {
 			t.Errorf("%s: non-positive category %d", game, cfg.Category)
 		}
-		if len(cfg.NonFoil) == 0 {
-			t.Errorf("%s: no non-foil sub-types", game)
+		if prev, dup := seenCategory[cfg.Category]; dup {
+			t.Errorf("category %d mapped by both %q and %q", cfg.Category, prev, game)
 		}
-		if len(cfg.Foil) == 0 {
-			t.Errorf("%s: no foil sub-types", game)
+		seenCategory[cfg.Category] = game
+		if len(cfg.NonFoil) == 0 {
+			t.Errorf("%s: no non-foil sub-types (the base finish would never chart)", game)
 		}
 	}
 
