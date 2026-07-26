@@ -168,30 +168,72 @@ func buildDataset(results map[string]timeseries.PriceRow, labels []string, confi
 	}
 }
 
-// gameTCGCategory maps the deployment's game to the TCGplayer category whose
-// tcgplayer_nonmagic_product_prices history backs its price charts, and reports
-// whether such charts exist for it. Magic keeps its history in product_prices
-// keyed by mtgjson uuid (the default getDatasets path), so it is not listed
-// here; only games ingested from TCGCSV by product id are. Adding a game is one
-// case here plus a partition in schema_tcg.sql.
-func gameTCGCategory() (int, bool) {
-	switch Config.Game {
-	case "lorcana":
-		return tcgcsv.CategoryLorcana, true
-	}
-	return 0, false
+// tcgChartGame describes how one TCGCSV-backed game plugs into the chart
+// pipeline: which TCGplayer category holds its price history, and which
+// tcgplayer_nonmagic_product_prices sub_type_name values back a card's non-foil
+// and foil printing. mtgmatcher only tracks foil vs non-foil, so those two lists
+// are the whole finish model; each is in preference order — the earliest entry
+// present on a given date wins, so a line stays on one printing even where a
+// product switched sub-types over time.
+type tcgChartGame struct {
+	Category int
+	NonFoil  []string
+	Foil     []string
 }
 
-// tcgSubTypesForFinish lists the tcgcsv sub-types that back a card's finish, in
-// preference order. mtgmatcher only tracks foil vs non-foil, but TCGplayer files
-// a Lorcana card's non-foil printing under "Normal" and its foil printing under
-// "Cold Foil" (older and special products use "Holofoil"), so a foil card
-// accepts either foil sub-type and the earliest/best-populated one wins.
-func tcgSubTypesForFinish(foil bool) []string {
-	if foil {
-		return []string{"Cold Foil", "Holofoil"}
+// tcgChartGames is the registry of TCGCSV-backed games that render price charts,
+// keyed by Config.Game. Magic is absent on purpose: it charts from product_prices
+// by mtgjson uuid (the default getDatasets path), not from
+// tcgplayer_nonmagic_product_prices.
+//
+// Adding a game is one entry here. Everything else is already game-agnostic:
+// ingestion (tcgcsv_config.games), storage and schema partitions (schema_tcg.sql,
+// with EnsureTCGCategoryPartition as a runtime backstop), the Market/Low chart
+// lines (tcgChartRefs), curated checkpoints, and the chart UI. The one external
+// prerequisite this file can't encode is card data: mtgmatcher must resolve the
+// game's cards to a tcgplayerProductId (as it does for Lorcana), or charts render
+// empty.
+//
+// Sub-type names are TCGplayer's own and differ per game, so confirm them against
+// the live tcgcsv feed before adding one — observed names (mapping foil vs
+// non-foil is the adder's call): Pokemon has Normal / Holofoil / Reverse Holofoil,
+// One Piece has Normal / Foil. A game with more than a foil/non-foil split (e.g.
+// Pokemon's Reverse Holofoil as its own printing) needs this finish model
+// revisited once mtgmatcher exposes that distinction.
+var tcgChartGames = map[string]tcgChartGame{
+	"lorcana": {
+		Category: tcgcsv.CategoryLorcana,
+		NonFoil:  []string{"Normal"},
+		Foil:     []string{"Cold Foil", "Holofoil"},
+	},
+}
+
+// gameTCGCategory reports the TCGplayer category whose
+// tcgplayer_nonmagic_product_prices history backs the deployment's chart, and
+// whether the game charts off product ids at all. It is the single dispatch that
+// routes getDatasets, chartEarliestDate, genPageNav's DisableChart, and the
+// checkpoint set/reprint gate onto the TCG path.
+func gameTCGCategory() (int, bool) {
+	g, ok := tcgChartGames[Config.Game]
+	if !ok {
+		return 0, false
 	}
-	return []string{"Normal"}
+	return g.Category, true
+}
+
+// tcgSubTypesForFinish lists the tcgcsv sub-types that back the current game's
+// card finish, in preference order. It returns nil for a game with no chart
+// entry; in practice it is only reached on the TCG path, where Config.Game is a
+// registered game.
+func tcgSubTypesForFinish(foil bool) []string {
+	g, ok := tcgChartGames[Config.Game]
+	if !ok {
+		return nil
+	}
+	if foil {
+		return g.Foil
+	}
+	return g.NonFoil
 }
 
 // tcgChartRefs are the price lines a TCG (product-id) chart draws, one per

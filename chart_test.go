@@ -292,13 +292,50 @@ func TestGameTCGCategory(t *testing.T) {
 }
 
 func TestTCGSubTypesForFinish(t *testing.T) {
+	saved := Config.Game
+	defer func() { Config.Game = saved }()
+
+	Config.Game = "lorcana"
 	if got := tcgSubTypesForFinish(false); !reflect.DeepEqual(got, []string{"Normal"}) {
 		t.Errorf("non-foil = %v, want [Normal]", got)
 	}
 	// Foil accepts either foil sub-type, Cold Foil first so it wins ties.
-	got := tcgSubTypesForFinish(true)
-	if !reflect.DeepEqual(got, []string{"Cold Foil", "Holofoil"}) {
+	if got := tcgSubTypesForFinish(true); !reflect.DeepEqual(got, []string{"Cold Foil", "Holofoil"}) {
 		t.Errorf("foil = %v, want [Cold Foil, Holofoil]", got)
+	}
+	// A game with no chart entry has no sub-types — the TCG path is never taken
+	// for it, so this only guards against a stray lookup returning garbage.
+	Config.Game = "magic"
+	if got := tcgSubTypesForFinish(true); got != nil {
+		t.Errorf("unregistered game foil = %v, want nil", got)
+	}
+}
+
+// TestTCGChartGamesWellFormed guards the registry that makes adding a game a
+// single entry: every game must name a real TCGplayer category and at least one
+// sub-type per finish, or its charts would silently render empty.
+func TestTCGChartGamesWellFormed(t *testing.T) {
+	for game, cfg := range tcgChartGames {
+		if game == "" {
+			t.Error("registry has an empty game key")
+		}
+		if cfg.Category <= 0 {
+			t.Errorf("%s: non-positive category %d", game, cfg.Category)
+		}
+		if len(cfg.NonFoil) == 0 {
+			t.Errorf("%s: no non-foil sub-types", game)
+		}
+		if len(cfg.Foil) == 0 {
+			t.Errorf("%s: no foil sub-types", game)
+		}
+	}
+
+	// The wired game stays reachable through the public dispatch.
+	saved := Config.Game
+	defer func() { Config.Game = saved }()
+	Config.Game = "lorcana"
+	if cat, ok := gameTCGCategory(); !ok || cat != tcgChartGames["lorcana"].Category {
+		t.Errorf("lorcana dispatch = (%d, %v), want (%d, true)", cat, ok, tcgChartGames["lorcana"].Category)
 	}
 }
 
