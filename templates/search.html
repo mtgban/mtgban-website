@@ -475,10 +475,16 @@
                                     {{end}}
                                 </p>
                                 {{if .Checkpoints}}
+                                {{$hasReprint := false}}{{$hasRelease := false}}{{$hasBan := false}}
+                                {{range .Checkpoints}}
+                                    {{if eq .Type "reprint"}}{{$hasReprint = true}}{{end}}
+                                    {{if or (eq .Type "release") (eq .Type "format")}}{{$hasRelease = true}}{{end}}
+                                    {{if or (eq .Type "ban") (eq .Type "unban")}}{{$hasBan = true}}{{end}}
+                                {{end}}
                                 <p class="chart-checkpoint-toggles">
-                                    <label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>
-                                    <label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>
-                                    <label class="cp-pill cp-pill-ban"><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>
+                                    {{if $hasReprint}}<label class="cp-pill cp-pill-reprint"><input type="checkbox" id="cpToggleReprint" checked onchange="toggleCheckpointType('reprint', this.checked)"> Reprints</label>{{end}}
+                                    {{if $hasRelease}}<label class="cp-pill cp-pill-release"><input type="checkbox" id="cpToggleRelease" checked onchange="toggleCheckpointType('release', this.checked)"> Releases</label>{{end}}
+                                    {{if $hasBan}}<label class="cp-pill cp-pill-ban"><input type="checkbox" id="cpToggleBan" checked onchange="toggleCheckpointType('ban', this.checked)"> Bans</label>{{end}}
                                 </p>
                                 {{end}}
                                 {{if and .IsMultiChart .ChartReferences}}
