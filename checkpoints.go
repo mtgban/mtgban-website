@@ -114,23 +114,28 @@ func currentCheckpointsJSON() (string, error) {
 }
 
 // relevantCheckpoints returns the checkpoint markers that apply to a chart for
-// the given card. Bans are curated; releases and reprints both come from
-// SealedEditionsList — the same source that used to feed the keyrune-at-top
-// renderer — so the two systems can't drift apart.
+// the given card. Curated ban/unban/format events are matched by card name and
+// apply to every game — they carry no Magic assumptions, and each deployment
+// loads its own checkpoints.json. Release and reprint markers, by contrast, are
+// derived from SealedEditionsList (MTGJSON set metadata) and rendered with
+// Keyrune set glyphs, neither of which exists for a game charted off TCGplayer
+// product ids, so they are appended only for the mtgmatcher-backed game (Magic).
 func relevantCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 	if cardName == "" {
 		return nil
 	}
 
-	printingSet := map[string]bool{}
-	if codes, err := mtgmatcher.Printings4Card(cardName); err == nil {
-		for _, c := range codes {
-			printingSet[strings.ToUpper(c)] = true
-		}
-	}
-
 	out := curatedCheckpoints(cardName, earliest)
-	out = append(out, setCheckpointsFromEditions(cardName, earliest, printingSet)...)
+
+	if _, isTCG := gameTCGCategory(); !isTCG {
+		printingSet := map[string]bool{}
+		if codes, err := mtgmatcher.Printings4Card(cardName); err == nil {
+			for _, c := range codes {
+				printingSet[strings.ToUpper(c)] = true
+			}
+		}
+		out = append(out, setCheckpointsFromEditions(cardName, earliest, printingSet)...)
+	}
 
 	sort.SliceStable(out, func(i, j int) bool {
 		return out[i].Date < out[j].Date
