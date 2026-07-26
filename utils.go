@@ -319,7 +319,12 @@ func findTCGproductId(cardId string) string {
 	if err != nil {
 		return ""
 	}
+	return tcgProductIdForCO(co, cardId)
+}
 
+// tcgProductIdForCO is findTCGproductId's core for callers that already resolved
+// the card, so they don't pay for a second GetUUID.
+func tcgProductIdForCO(co *mtgmatcher.CardObject, cardId string) string {
 	tcgId := co.Identifiers["tcgplayerProductId"]
 	if co.Etched {
 		id, found := co.Identifiers["tcgplayerEtchedProductId"]

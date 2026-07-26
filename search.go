@@ -727,7 +727,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			lb := chartLookback(sig)
 			pageVars.MaxLookbackDays = lb.Days()
 
-			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
+			earliest := chartEarliestDate(r.Context(), chartId, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
 			pageVars.Datasets = getDatasets(r.Context(), chartId, co.Sealed, pageVars.AxisLabels, lb)
@@ -749,10 +749,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				chartNames = append(chartNames, co.Name)
-				e, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
-				if e.IsZero() {
-					continue
-				}
+				// chartEarliestDate clamps to the lookback floor rather than
+				// returning a zero time, so a card with no history widens the axis
+				// to the full window (as the Magic path already does) instead of
+				// being dropped; earliest.IsZero() below is only the accumulator's
+				// unset state before the first card.
+				e := chartEarliestDate(r.Context(), id, lb)
 				if earliest.IsZero() || e.Before(earliest) {
 					earliest = e
 				}

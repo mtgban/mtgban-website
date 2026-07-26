@@ -685,8 +685,12 @@ func genPageNav(activeTab, sig string) PageVars {
 		// Append which game this site is for
 		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
 
-		// Charts are available only for one game
-		pageVars.DisableChart = true
+		// Magic charts price history by mtgjson uuid; non-Magic games chart off
+		// TCGplayer product ids when we ingest their history (gameTCGCategory).
+		// Any other game has nothing to chart, so keep charts off for it.
+		if _, ok := gameTCGCategory(); !ok {
+			pageVars.DisableChart = true
+		}
 	}
 	if Config.OfflineKey != "" {
 		pageVars.DisableChart = true

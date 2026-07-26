@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -97,6 +98,13 @@ func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string,
 		return nil
 	}
 
+	// Games without an mtgjson uuid (Lorcana, ...) keep their price history in
+	// tcgplayer_nonmagic_product_prices keyed by TCGplayer product id, so route
+	// them to the TCG builder instead of the product_prices/uuid path below.
+	if categoryID, ok := gameTCGCategory(); ok {
+		return getTCGDatasets(ctx, categoryID, cardId, keys, lb)
+	}
+
 	// Pre-filter applicable configs so we don't pay for a DB round-trip
 	// or a UUID lookup when nothing will render.
 	var configs []DatasetConfig
@@ -158,6 +166,181 @@ func buildDataset(results map[string]timeseries.PriceRow, labels []string, confi
 		Color:     config.Color,
 		Reference: config.PublicName,
 	}
+}
+
+// gameTCGCategory maps the deployment's game to the TCGplayer category whose
+// tcgplayer_nonmagic_product_prices history backs its price charts, and reports
+// whether such charts exist for it. Magic keeps its history in product_prices
+// keyed by mtgjson uuid (the default getDatasets path), so it is not listed
+// here; only games ingested from TCGCSV by product id are. Adding a game is one
+// case here plus a partition in schema_tcg.sql.
+func gameTCGCategory() (int, bool) {
+	switch Config.Game {
+	case "lorcana":
+		return tcgcsv.CategoryLorcana, true
+	}
+	return 0, false
+}
+
+// tcgSubTypesForFinish lists the tcgcsv sub-types that back a card's finish, in
+// preference order. mtgmatcher only tracks foil vs non-foil, but TCGplayer files
+// a Lorcana card's non-foil printing under "Normal" and its foil printing under
+// "Cold Foil" (older and special products use "Holofoil"), so a foil card
+// accepts either foil sub-type and the earliest/best-populated one wins.
+func tcgSubTypesForFinish(foil bool) []string {
+	if foil {
+		return []string{"Cold Foil", "Holofoil"}
+	}
+	return []string{"Normal"}
+}
+
+// tcgChartRefs are the price lines a TCG (product-id) chart draws, one per
+// tcgplayer_nonmagic_product_prices column worth plotting. Names and colors
+// mirror the Magic timeseries_config so a TCGplayer line looks the same across
+// games. Market leads Low because it's the headline number; both render as gaps
+// (Number.NaN) on the days TCGCSV reported null.
+var tcgChartRefs = []struct {
+	Name  string
+	Color string
+	Pick  func(timeseries.TCGPriceRow) *float64
+}{
+	{"TCGplayer Market", "rgb(255, 159, 64)", func(r timeseries.TCGPriceRow) *float64 { return r.MarketPrice }},
+	{"TCGplayer Low", "rgb(255, 99, 132)", func(r timeseries.TCGPriceRow) *float64 { return r.LowPrice }},
+}
+
+// tcgProductForCard resolves a card id to its TCGplayer product id (as an int)
+// and foil finish, the two inputs a TCG chart query needs. ok is false when the
+// card doesn't resolve or carries no usable product id.
+func tcgProductForCard(cardId string) (productID int, foil bool, ok bool) {
+	co, err := mtgmatcher.GetUUID(cardId)
+	if err != nil {
+		return 0, false, false
+	}
+	pid, err := strconv.Atoi(tcgProductIdForCO(co, cardId))
+	if err != nil {
+		return 0, false, false
+	}
+	return pid, co.Foil, true
+}
+
+// getTCGEarliest returns the oldest date, within the lookback window, that the
+// card's TCGplayer product has price history for. When the product doesn't
+// resolve or has no rows it falls back to the lookback floor (lb.Since()), never
+// a zero time — getDateAxisValues walks day-by-day from today back to whatever
+// it's handed, so a zero earliest would build a ~740k-entry axis back to year
+// one. This mirrors GetEarliestDate, which clamps the Magic uuid path to the
+// same floor.
+func getTCGEarliest(ctx context.Context, categoryID int, cardId string, lb timeseries.Lookback) time.Time {
+	if PricesArchiveDB == nil {
+		return lb.Since()
+	}
+	pid, foil, ok := tcgProductForCard(cardId)
+	if !ok {
+		return lb.Since()
+	}
+	d, found, err := PricesArchiveDB.GetTCGProductEarliestDate(ctx, categoryID, pid, tcgSubTypesForFinish(foil), lb.Since())
+	if err != nil {
+		log.Println(err)
+		return lb.Since()
+	}
+	if !found {
+		return lb.Since()
+	}
+	return d
+}
+
+// getTCGDatasets is the TCG (product-id) counterpart to the product_prices fan-
+// out in getDatasets: it fetches one card's history from
+// tcgplayer_nonmagic_product_prices and projects each tcgChartRefs column onto
+// the shared date axis. A card's foil printing may live under more than one
+// sub-type; the highest-preference sub-type present on a given date wins, so the
+// line stays continuous even where a product switched from "Holofoil" to
+// "Cold Foil". Reference lines with no data on any axis date are dropped.
+func getTCGDatasets(ctx context.Context, categoryID int, cardId string, labels []string, lb timeseries.Lookback) []Dataset {
+	pid, foil, ok := tcgProductForCard(cardId)
+	if !ok {
+		return nil
+	}
+
+	subTypes := tcgSubTypesForFinish(foil)
+	rows, err := PricesArchiveDB.GetTCGPriceHistorySince(ctx, categoryID, pid, subTypes, lb.Since())
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return buildTCGDatasets(rows, subTypes, labels)
+}
+
+// buildTCGDatasets folds TCG price rows onto one row per date and projects each
+// tcgChartRefs column onto the labels axis — the product-id counterpart to
+// buildDataset. When a date carries more than one sub-type (a product listed
+// under both "Cold Foil" and "Holofoil"), the earlier entry in subTypes wins so
+// the line stays on one printing. Missing dates and null prices render as
+// Number.NaN so the chart draws a gap; a reference with no value on any axis
+// date is dropped so it doesn't clutter the legend/reference picker.
+func buildTCGDatasets(rows []timeseries.TCGPriceRow, subTypes []string, labels []string) []Dataset {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	priority := make(map[string]int, len(subTypes))
+	for i, s := range subTypes {
+		priority[s] = i
+	}
+	byDate := make(map[string]timeseries.TCGPriceRow, len(rows))
+	for _, row := range rows {
+		if cur, seen := byDate[row.Date]; !seen || priority[row.SubTypeName] < priority[cur.SubTypeName] {
+			byDate[row.Date] = row
+		}
+	}
+
+	datasets := make([]Dataset, 0, len(tcgChartRefs))
+	for _, ref := range tcgChartRefs {
+		data := make([]string, len(labels))
+		hasData := false
+		for i, label := range labels {
+			if row, found := byDate[label]; found {
+				if price := ref.Pick(row); price != nil {
+					data[i] = fmt.Sprintf("%g", *price)
+					hasData = true
+					continue
+				}
+			}
+			data[i] = "Number.NaN"
+		}
+		if !hasData {
+			continue
+		}
+		datasets = append(datasets, Dataset{
+			Name:      ref.Name,
+			Data:      data,
+			Color:     ref.Color,
+			Reference: ref.Name,
+		})
+	}
+	return datasets
+}
+
+// chartEarliestDate returns the oldest chartable date for a card within the
+// lookback window, dispatching to the TCG product-id history for games that use
+// it and to the product_prices/mtgjson-uuid history for Magic. It gives the
+// chart handlers a single earliest-date call that works for either game family.
+// It never returns a zero time: the fallbacks clamp to the lookback floor so a
+// single-card caller can hand the result straight to getDateAxisValues without
+// it walking the axis back to year one.
+func chartEarliestDate(ctx context.Context, cardId string, lb timeseries.Lookback) time.Time {
+	if PricesArchiveDB == nil {
+		return lb.Since()
+	}
+	if categoryID, ok := gameTCGCategory(); ok {
+		return getTCGEarliest(ctx, categoryID, cardId, lb)
+	}
+	co, err := mtgmatcher.GetUUID(cardId)
+	if err != nil {
+		return lb.Since()
+	}
+	earliest, _ := PricesArchiveDB.GetEarliestDate(ctx, co.UUID, co.Foil, co.Etched, lb)
+	return earliest
 }
 
 // multiCardInput is one card's contribution to a multi-card chart: the

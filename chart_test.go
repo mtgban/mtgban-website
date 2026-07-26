@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
+
+func fptr(f float64) *float64 { return &f }
 
 // nRealUUIDs returns n distinct UUIDs from the loaded mtgmatcher pool, or skips
 // the test when fewer are available. parseChartIDs is the only branch that
@@ -263,6 +267,129 @@ func TestMergeMultiCardDatasetsReferenceOrderFirstSeen(t *testing.T) {
 	want := []string{"TCG Low", "CK Buy", "TCG Market"}
 	if !reflect.DeepEqual(refs, want) {
 		t.Errorf("refs = %v, want %v", refs, want)
+	}
+}
+
+func TestGameTCGCategory(t *testing.T) {
+	saved := Config.Game
+	defer func() { Config.Game = saved }()
+
+	Config.Game = "lorcana"
+	if cat, ok := gameTCGCategory(); !ok || cat != 71 {
+		t.Errorf("lorcana -> (%d, %v), want (71, true)", cat, ok)
+	}
+	// Magic charts off product_prices (mtgjson uuid), so it must NOT route to
+	// the TCG path here — that keeps DisableChart and getDatasets on their
+	// existing Magic behavior.
+	Config.Game = "magic"
+	if _, ok := gameTCGCategory(); ok {
+		t.Error("magic should not have a TCG category")
+	}
+	Config.Game = "pokemon"
+	if _, ok := gameTCGCategory(); ok {
+		t.Error("an unwired game should not report a TCG category")
+	}
+}
+
+func TestTCGSubTypesForFinish(t *testing.T) {
+	if got := tcgSubTypesForFinish(false); !reflect.DeepEqual(got, []string{"Normal"}) {
+		t.Errorf("non-foil = %v, want [Normal]", got)
+	}
+	// Foil accepts either foil sub-type, Cold Foil first so it wins ties.
+	got := tcgSubTypesForFinish(true)
+	if !reflect.DeepEqual(got, []string{"Cold Foil", "Holofoil"}) {
+		t.Errorf("foil = %v, want [Cold Foil, Holofoil]", got)
+	}
+}
+
+func TestBuildTCGDatasetsEmpty(t *testing.T) {
+	if got := buildTCGDatasets(nil, []string{"Normal"}, []string{"2024-01-01"}); got != nil {
+		t.Errorf("expected nil for no rows, got %v", got)
+	}
+}
+
+// The dataset order and names must track tcgChartRefs (Market then Low) so this
+// test doubles as a guard on that config.
+func TestBuildTCGDatasetsProjectsColumnsOntoAxis(t *testing.T) {
+	labels := []string{"2024-01-03", "2024-01-02", "2024-01-01"}
+	rows := []timeseries.TCGPriceRow{
+		{Date: "2024-01-03", SubTypeName: "Normal", MarketPrice: fptr(3), LowPrice: fptr(2.5)},
+		{Date: "2024-01-01", SubTypeName: "Normal", MarketPrice: fptr(1), LowPrice: fptr(0.5)},
+		// 2024-01-02 intentionally absent -> gap on both lines.
+	}
+	out := buildTCGDatasets(rows, []string{"Normal"}, labels)
+	if len(out) != 2 {
+		t.Fatalf("expected 2 datasets (Market, Low), got %d: %+v", len(out), out)
+	}
+	if out[0].Name != "TCGplayer Market" || out[1].Name != "TCGplayer Low" {
+		t.Fatalf("dataset order/names off: %q, %q", out[0].Name, out[1].Name)
+	}
+	wantMarket := []string{"3", "Number.NaN", "1"}
+	if !reflect.DeepEqual(out[0].Data, wantMarket) {
+		t.Errorf("Market data = %v, want %v", out[0].Data, wantMarket)
+	}
+	wantLow := []string{"2.5", "Number.NaN", "0.5"}
+	if !reflect.DeepEqual(out[1].Data, wantLow) {
+		t.Errorf("Low data = %v, want %v", out[1].Data, wantLow)
+	}
+	if out[0].Reference != "TCGplayer Market" || out[0].Color == "" {
+		t.Errorf("Reference/Color not set: %+v", out[0])
+	}
+}
+
+func TestBuildTCGDatasetsDropsAllNullReference(t *testing.T) {
+	labels := []string{"2024-01-01"}
+	// Market is null everywhere -> its line is dropped; Low survives.
+	rows := []timeseries.TCGPriceRow{
+		{Date: "2024-01-01", SubTypeName: "Normal", MarketPrice: nil, LowPrice: fptr(4)},
+	}
+	out := buildTCGDatasets(rows, []string{"Normal"}, labels)
+	if len(out) != 1 {
+		t.Fatalf("expected only the Low dataset, got %d: %+v", len(out), out)
+	}
+	if out[0].Name != "TCGplayer Low" {
+		t.Errorf("kept the wrong dataset: %q", out[0].Name)
+	}
+}
+
+func TestBuildTCGDatasetsPrefersEarlierSubType(t *testing.T) {
+	labels := []string{"2024-01-01"}
+	// Same date under both foil sub-types; "Cold Foil" precedes "Holofoil" in the
+	// preference list, so its price must win.
+	rows := []timeseries.TCGPriceRow{
+		{Date: "2024-01-01", SubTypeName: "Holofoil", MarketPrice: fptr(99)},
+		{Date: "2024-01-01", SubTypeName: "Cold Foil", MarketPrice: fptr(10)},
+	}
+	out := buildTCGDatasets(rows, []string{"Cold Foil", "Holofoil"}, labels)
+	if len(out) != 1 {
+		t.Fatalf("expected 1 dataset (Market), got %d: %+v", len(out), out)
+	}
+	if !reflect.DeepEqual(out[0].Data, []string{"10"}) {
+		t.Errorf("expected Cold Foil price 10 to win, got %v", out[0].Data)
+	}
+}
+
+// chartEarliestDate feeds getDateAxisValues, which walks day-by-day from today
+// back to the earliest it's handed — a zero time there builds a ~740k-entry axis
+// back to year one. So the earliest must never be zero; the no-data fallbacks
+// clamp to the lookback floor. Regression guard for the TCG path, which used to
+// return a zero time when a card had no history.
+func TestChartEarliestDateStaysBounded(t *testing.T) {
+	saved := Config.Game
+	defer func() { Config.Game = saved }()
+
+	lb := timeseries.Lookback(30)
+	// The Lorcana (TCG product-id) path and the Magic (uuid) path must both stay
+	// bounded when no history is available.
+	for _, game := range []string{"lorcana", "magic"} {
+		Config.Game = game
+		earliest := chartEarliestDate(context.Background(), "no-such-card-id", lb)
+		if earliest.IsZero() {
+			t.Fatalf("%s: chartEarliestDate returned a zero time", game)
+		}
+		if n := len(getDateAxisValues(earliest)); n > lb.Days()+2 {
+			t.Errorf("%s: axis has %d labels, want a window-bounded count (<= %d)", game, n, lb.Days()+2)
+		}
 	}
 }
 
