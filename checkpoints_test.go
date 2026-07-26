@@ -45,9 +45,19 @@ func TestCuratedCheckpointsApplyToAllGames(t *testing.T) {
 			t.Errorf("%s: got %d ban checkpoints, want 1 (curated bans apply to every game)", game, bans)
 		}
 
-		// A card not on any list gets nothing — the curated match is by name.
-		if got := relevantCheckpoints("Some Unlisted Card", earliest); len(got) != 0 {
-			t.Errorf("%s: unlisted card got %d checkpoints, want 0", game, len(got))
+		// A card on no curated list gets no curated markers — the match is by
+		// name. Magic still emits card-independent release markers from set
+		// metadata (they annotate every chart in the window), so count only the
+		// curated types here rather than the full set.
+		curated := 0
+		for _, cp := range relevantCheckpoints("Some Unlisted Card", earliest) {
+			switch cp.Type {
+			case "ban", "unban", "format":
+				curated++
+			}
+		}
+		if curated != 0 {
+			t.Errorf("%s: unlisted card got %d curated checkpoints, want 0", game, curated)
 		}
 	}
 }
