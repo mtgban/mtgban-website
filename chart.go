@@ -297,6 +297,12 @@ func IsStashingInProgress() bool {
 	return stashingInProgress.Load()
 }
 
+// sealedPriceCeiling caps sealed-product prices entering the archive. Rare
+// sealed products (vintage boxes, Secret Lairs) sometimes carry a single
+// mispriced five/six-figure listing upstream; anything above this is treated
+// as noise and dropped. Applies to sealed only — real singles exceed it.
+const sealedPriceCeiling = 50000.0
+
 func stashInTimeseries() {
 	// Only one stash may run at a time. The cron fires every 12h and the
 	// admin button can fire at any moment; CompareAndSwap is the real gate.
@@ -346,6 +352,15 @@ func stashInTimeseries() {
 					continue
 				}
 
+				// Drop mispriced five/six-figure sealed listings so they never
+				// enter the archive. Upstream marketplaces occasionally carry a
+				// lone $100k+ listing for a rare sealed product; anything above
+				// the ceiling is dropped rather than stored. Singles are exempt —
+				// they legitimately exceed this (e.g. an Alpha Black Lotus).
+				if card.Sealed && price > sealedPriceCeiling {
+					continue
+				}
+
 				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
 				row.SetPriceForDataset(config.Index, price)
 			}
@@ -371,6 +386,15 @@ func stashInTimeseries() {
 				card, err := mtgmatcher.GetUUID(id)
 				if err != nil {
 					log.Println("Error getting card for", id, err)
+					continue
+				}
+
+				// Drop mispriced five/six-figure sealed listings so they never
+				// enter the archive. Upstream marketplaces occasionally carry a
+				// lone $100k+ listing for a rare sealed product; anything above
+				// the ceiling is dropped rather than stored. Singles are exempt —
+				// they legitimately exceed this (e.g. an Alpha Black Lotus).
+				if card.Sealed && price > sealedPriceCeiling {
 					continue
 				}
 
