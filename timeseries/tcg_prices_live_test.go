@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 )
 
 // TestTCGPricesLive exercises the tcgplayer_nonmagic_product_prices code paths end to end against a
@@ -124,6 +125,37 @@ func TestTCGPricesLive(t *testing.T) {
 	}
 	if got := newest.Format("2006-01-02"); got != "2024-02-09" {
 		t.Errorf("latest date = %s, want 2024-02-09", got)
+	}
+
+	// Lookback-scoped history for the chart path: both Normal rows on or after
+	// 02-08, newest first; the since bound then trims the older one.
+	day08 := time.Date(2024, 2, 8, 0, 0, 0, 0, time.UTC)
+	day09 := time.Date(2024, 2, 9, 0, 0, 0, 0, time.UTC)
+	since08, err := c.GetTCGPriceHistorySince(ctx, liveSentinelCategory, product, []string{"Normal"}, day08)
+	if err != nil {
+		t.Fatalf("GetTCGPriceHistorySince: %v", err)
+	}
+	if len(since08) != 2 || since08[0].Date != "2024-02-09" || since08[1].Date != "2024-02-08" {
+		t.Errorf("since 02-08 = %+v, want the two Normal rows newest-first", since08)
+	}
+	// Multiple sub-types fold into one query; the since bound drops 02-08 so only
+	// the 02-09 Normal row survives (Foil exists only on 02-08).
+	since09, err := c.GetTCGPriceHistorySince(ctx, liveSentinelCategory, product, []string{"Normal", "Cold Foil", "Foil"}, day09)
+	if err != nil {
+		t.Fatalf("GetTCGPriceHistorySince (since 09): %v", err)
+	}
+	if len(since09) != 1 || since09[0].Date != "2024-02-09" || since09[0].SubTypeName != "Normal" {
+		t.Errorf("since 02-09 = %+v, want only the 02-09 Normal row", since09)
+	}
+
+	// Per-product earliest within the sub-types and window.
+	earliestN, ok, err := c.GetTCGProductEarliestDate(ctx, liveSentinelCategory, product, []string{"Normal"}, day08)
+	if err != nil || !ok || earliestN.Format("2006-01-02") != "2024-02-08" {
+		t.Errorf("GetTCGProductEarliestDate(Normal) = (%v, ok=%v, err=%v), want 2024-02-08", earliestN, ok, err)
+	}
+	// Foil only exists on 02-08, so a 02-09 floor yields no data.
+	if _, ok, err := c.GetTCGProductEarliestDate(ctx, liveSentinelCategory, product, []string{"Foil"}, day09); err != nil || ok {
+		t.Errorf("earliest Foil since 02-09 = (ok=%v, err=%v), want ok=false", ok, err)
 	}
 
 	// Re-upserting is idempotent (no duplicate rows) and overwrites in place.

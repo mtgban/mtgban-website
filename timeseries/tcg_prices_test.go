@@ -69,6 +69,23 @@ func TestDedupeTCGPriceRows(t *testing.T) {
 	}
 }
 
+func TestTCGSubTypeInClause(t *testing.T) {
+	// Leading bound args (category, product, since) keep placeholder numbering
+	// continuing from $4, matching the queries that call this.
+	args := []any{71, 12345, "2024-02-08"}
+	clause := tcgSubTypeInClause([]string{"Cold Foil", "Holofoil"}, &args)
+
+	if clause != "sub_type_name IN ($4,$5)" {
+		t.Errorf("clause = %q, want sub_type_name IN ($4,$5)", clause)
+	}
+	if len(args) != 5 {
+		t.Fatalf("args len = %d, want 5", len(args))
+	}
+	if args[3] != "Cold Foil" || args[4] != "Holofoil" {
+		t.Errorf("appended sub-types = %v, %v; want Cold Foil, Holofoil", args[3], args[4])
+	}
+}
+
 // A read-only client must never touch the database: these calls short-circuit
 // before dereferencing the (nil) connection.
 func TestTCGWritesReadOnly(t *testing.T) {

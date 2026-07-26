@@ -149,6 +149,73 @@ func (c *Client) GetLatestTCGPrice(ctx context.Context, categoryID, productID in
 	return scanTCGRow(c.db.QueryRowContext(ctx, q, categoryID, productID, subTypeName))
 }
 
+// tcgSubTypeInClause builds a "sub_type_name IN ($n,...)" fragment for the given
+// sub-types, appending their values to args, and returns the fragment. Callers
+// pass the already-bound leading args (category, product, ...) so the
+// placeholders continue their numbering. It assumes len(subTypes) > 0.
+func tcgSubTypeInClause(subTypes []string, args *[]any) string {
+	placeholders := make([]string, len(subTypes))
+	for i, s := range subTypes {
+		*args = append(*args, s)
+		placeholders[i] = fmt.Sprintf("$%d", len(*args))
+	}
+	return "sub_type_name IN (" + strings.Join(placeholders, ",") + ")"
+}
+
+// GetTCGPriceHistorySince returns every stored price for a product across the
+// given sub-types on or after `since`, newest first. Accepting more than one
+// sub-type lets a caller fold a card's alternate foil printings (Lorcana lists a
+// foil card under "Cold Foil" or "Holofoil") into one query; the caller picks
+// which sub-type wins per date. Returns nil when no sub-types are requested.
+func (c *Client) GetTCGPriceHistorySince(ctx context.Context, categoryID, productID int, subTypes []string, since time.Time) ([]TCGPriceRow, error) {
+	if len(subTypes) == 0 {
+		return nil, nil
+	}
+	args := []any{categoryID, productID, since}
+	inClause := tcgSubTypeInClause(subTypes, &args)
+	q := `SELECT` + tcgSelectColumns + `
+		FROM tcgplayer_nonmagic_product_prices
+		WHERE category_id = $1 AND product_id = $2 AND date >= $3 AND ` + inClause + `
+		ORDER BY date DESC`
+	rows, err := c.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []TCGPriceRow
+	for rows.Next() {
+		row, err := scanTCGRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
+// GetTCGProductEarliestDate returns the oldest date stored for a product within
+// the given sub-types on or after `since`. The bool is false (with a zero time)
+// when there are no matching rows. It scopes a single card's chart axis the way
+// GetEarliestDate does for a Magic uuid.
+func (c *Client) GetTCGProductEarliestDate(ctx context.Context, categoryID, productID int, subTypes []string, since time.Time) (time.Time, bool, error) {
+	if len(subTypes) == 0 {
+		return time.Time{}, false, nil
+	}
+	args := []any{categoryID, productID, since}
+	inClause := tcgSubTypeInClause(subTypes, &args)
+	q := `SELECT MIN(date) FROM tcgplayer_nonmagic_product_prices
+		WHERE category_id = $1 AND product_id = $2 AND date >= $3 AND ` + inClause
+	var d sql.NullTime
+	if err := c.db.QueryRowContext(ctx, q, args...).Scan(&d); err != nil {
+		return time.Time{}, false, err
+	}
+	if !d.Valid {
+		return time.Time{}, false, nil
+	}
+	return d.Time, true, nil
+}
+
 // GetTCGEarliestDate returns the oldest date stored for a category. The bool is
 // false (with a zero time) when the category has no rows yet.
 func (c *Client) GetTCGEarliestDate(ctx context.Context, categoryID int) (time.Time, bool, error) {
