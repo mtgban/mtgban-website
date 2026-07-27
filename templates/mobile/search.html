@@ -25,6 +25,16 @@
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    {{if .PatreonLogin}}
+    <script>
+        // Build the Patreon OAuth URL at click time so the current page rides
+        // along in the state param; the Auth callback redirects back to it after
+        // authorizing, instead of dropping the user on the homepage.
+        function getPatreonURL(patreonId, client) {
+            return "https://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href + ";" + client);
+        }
+    </script>
+    {{end}}
 {{end}}
 
 {{define "content"}}
@@ -350,7 +360,7 @@
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
                                     <span class="m-locked-cta">
                                         <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
-                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>{{end}}
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>{{end}}
                                     </span>
                                 </div>
                                 {{else}}
@@ -374,7 +384,7 @@
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
                                     <span class="m-locked-cta">
                                         <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
-                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>{{end}}
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>{{end}}
                                     </span>
                                 </div>
                                 {{else}}
@@ -437,7 +447,7 @@
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
                                     <span class="m-locked-cta">
                                         <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
-                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>{{end}}
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>{{end}}
                                     </span>
                                 </div>
                                 {{else}}
@@ -461,7 +471,7 @@
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
                                     <span class="m-locked-cta">
                                         <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
-                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>{{end}}
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>{{end}}
                                     </span>
                                 </div>
                                 {{else}}

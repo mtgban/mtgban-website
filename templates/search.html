@@ -51,6 +51,16 @@
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    {{if .PatreonLogin}}
+    <script>
+        // Build the Patreon OAuth URL at click time so the current page rides
+        // along in the state param; the Auth callback redirects back to it after
+        // authorizing, instead of dropping the user on the homepage.
+        function getPatreonURL(patreonId, client) {
+            return "https://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href + ";" + client);
+        }
+    </script>
+    {{end}}
     {{if .CanFixSearch}}
     <script>
         // Admin Fix mode: the per-result toggle shows a Fix link on each store
@@ -1093,7 +1103,7 @@
                                                         <span class="locked-cta">
                                                             <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                                             {{range $ref, $id := $.PatreonIds}}
-                                                                <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
                                                             {{end}}
                                                         </span>
                                                     {{else if eq .URL ""}}
@@ -1149,7 +1159,7 @@
                                                         <span class="locked-cta">
                                                             <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                                             {{range $ref, $id := $.PatreonIds}}
-                                                                <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
                                                             {{end}}
                                                         </span>
                                                     {{else}}
@@ -1225,7 +1235,7 @@
                                                     <span class="locked-cta">
                                                         <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                                         {{range $ref, $id := $.PatreonIds}}
-                                                            <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                            <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
                                                         {{end}}
                                                     </span>
                                                 {{else}}
