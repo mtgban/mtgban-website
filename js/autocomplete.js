@@ -10,6 +10,12 @@
 var __acCardMetaCache = {};
 var __acCardMetaInflight = {};
 
+/* Mirrors the server's search option vocabulary (FilterOperations in
+ * searchfilter.go): a token shaped like one of these is a search filter, not
+ * part of a card name, so suggestions match on the remaining words only and
+ * the completed value carries the filters along. */
+var __acFilterToken = /^-?(format|legal|sm|skip|sort|edition|set|e|s|se|ee|number|cn|cne|date|year|name|namee|r|t|f|c|color|unpack|contents|container|decklist|ci|identity|cond|condr|condb|id|is|not|on|price|buy_price|arb_price|rev_price|ratio|store|seller|vendor|region|quantity|qty)[:<>]\S/i;
+
 function __acEsc(s) {
     var d = document.createElement('div');
     d.textContent = s == null ? '' : String(s);
@@ -191,6 +197,36 @@ async function autocomplete(form, inp, sealed) {
         /* Clean up input string */
         val = val.trim();
 
+        /* Filter tokens (s:PLST, f:foil, price>10 ...) are not part of the
+         * card name: pull them aside so suggestions match on the remaining
+         * words, and completions reinsert them ("s:PLST naya" completes to
+         * "s:PLST Naya Charm"). */
+        var filterPrefix = '';
+        if (/[:<>]/.test(val)) {
+            var filters = [];
+            /* Quoted option values may contain spaces, extract them first */
+            var rest = val.replace(/-?[a-zA-Z_]+[:<>]"[^"]*"/g, function (m) {
+                if (__acFilterToken.test(m)) {
+                    filters.push(m);
+                    return ' ';
+                }
+                return m;
+            });
+            var words = [];
+            var tokens = rest.split(/\s+/);
+            for (i = 0; i < tokens.length; i++) {
+                if (__acFilterToken.test(tokens[i])) {
+                    filters.push(tokens[i]);
+                } else if (tokens[i]) {
+                    words.push(tokens[i]);
+                }
+            }
+            if (filters.length) {
+                filterPrefix = filters.join(' ') + ' ';
+                val = words.join(' ');
+            }
+        }
+
         /* Prompt suggestions only if input is longer than three characters */
         if (val.length < minlen) {
             return false;
@@ -217,8 +253,9 @@ async function autocomplete(form, inp, sealed) {
                 b.innerHTML = "<strong>" + arr[i].substr(0, val.length) + "</strong>";
                 b.innerHTML += arr[i].substr(val.length);
 
-                /* Insert a input field that will hold the current array item's value */
-                b.innerHTML += "<input type='hidden' value='" + arr[i].replace(/'/g, "&apos;").replace(/\"/g, "&quot;") + "'>";
+                /* Insert a input field that will hold the current array item's
+                 * value, with any search filters the query carried kept in front */
+                b.innerHTML += "<input type='hidden' value='" + (filterPrefix + arr[i]).replace(/'/g, "&apos;").replace(/\"/g, "&quot;") + "'>";
                 /* Execute a function when someone clicks on the item value (DIV element) */
                 b.addEventListener("click", function(e) {
                     /* Insert the value for the autocomplete text field */
