@@ -30,13 +30,18 @@ type chartTarget struct {
 
 // resolveChartTarget turns any supported id string into a chartable target.
 // Supported forms:
-//   - ban:<n>                 our surrogate ban_id (Magic or non-Magic)
-//   - tcg:<n> or a bare <n>   a TCGplayer product id (Magic via mtgmatcher, else non-Magic)
-//   - scryfall:<uuid>         a Scryfall id (via mtgmatcher's external map)
-//   - mtgjson:<uuid> or bare  an mtgjson uuid / mtgmatcher variant string
+//   - ban:<n>            our surrogate ban_id (Magic or non-Magic) — forced
+//   - tcg:<n>            a TCGplayer product id — forced
+//   - scryfall:<uuid>    a Scryfall id (via mtgmatcher's external map)
+//   - mtgjson:<uuid>     an mtgjson uuid
+//   - a bare <n>/<uuid>  resolved by trying each id space in turn (below)
 //
-// A bare integer is a TCGplayer id (mtgmatcher's existing convention); ban_ids
-// must carry the ban: marker because the two integer spaces overlap.
+// The integer id spaces overlap — a ban_id, a TCGplayer product id, and a game's
+// own numeric id (e.g. LorcanaJSON) can all be the same number — so a bare integer
+// is resolved most-specific first: our ban_id, then the game-native id through
+// mtgmatcher (a LorcanaJSON id matches directly, a TCGplayer id via the external
+// map), then a non-Magic product in the variants table. Prefix ban: or tcg: to
+// force one interpretation.
 func resolveChartTarget(ctx context.Context, raw string) (*chartTarget, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -57,11 +62,16 @@ func resolveChartTarget(ctx context.Context, raw string) (*chartTarget, error) {
 		}
 		return targetFromTCGID(ctx, n)
 	case "", "mtgjson", "scryfall":
-		// A bare integer is a TCGplayer id; everything else is a uuid / external id.
-		if n, err := strconv.Atoi(val); err == nil {
-			return targetFromTCGID(ctx, n)
+		// A bare integer tries our ban_id first (the internal primary key); on a
+		// miss it falls through to the game-native / product resolution below.
+		if n, err := strconv.ParseInt(val, 10, 64); err == nil {
+			if t, berr := targetFromBanID(ctx, n); berr == nil {
+				return t, nil
+			} else if !errors.Is(berr, errChartIDNotFound) {
+				return nil, berr
+			}
 		}
-		return magicTargetFromCardID(ctx, val)
+		return matcherTarget(ctx, val)
 	default:
 		return nil, errChartIDNotFound
 	}
@@ -81,11 +91,13 @@ func maybeUUIDString(s string) bool {
 	return len(s) == 36 && strings.Count(s, "-") == 4
 }
 
-// magicTargetFromCardID resolves a Magic card id (mtgjson uuid, mtgmatcher
-// variant string, or a Scryfall id) to a chart target. If mtgmatcher does not
-// know the id but it is an mtgjson uuid still present in our price history (e.g.
-// retired from the datastore), it falls back to charting that variant by ban_id.
-func magicTargetFromCardID(ctx context.Context, id string) (*chartTarget, error) {
+// matcherTarget resolves a game-native card id through mtgmatcher — an mtgjson
+// uuid or mtgmatcher variant string (Magic), a LorcanaJSON id (Lorcana), or an
+// external id (Scryfall / TCGplayer) via the matcher's id map. mtgmatcher holds
+// whichever game the deployment serves, so this is game-agnostic. When mtgmatcher
+// doesn't know the id it falls back to our own price history: a retired Magic
+// uuid, or a non-Magic TCGplayer product id.
+func matcherTarget(ctx context.Context, id string) (*chartTarget, error) {
 	co, err := mtgmatcher.GetUUID(id)
 	if err != nil {
 		// Not a direct mtgmatcher id; try the external id map (Scryfall/TCGplayer).
@@ -94,28 +106,55 @@ func magicTargetFromCardID(ctx context.Context, id string) (*chartTarget, error)
 		}
 	}
 	if err == nil {
-		t := &chartTarget{UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name}
-		// Prefer the cached ban_id so the chart reads the exact variant (skips the
-		// canonical resolution HGetAllLong does in SQL). Falls back to the uuid
-		// path when the cache is cold.
-		if PricesArchiveDB != nil {
-			if id, ok := PricesArchiveDB.CachedMagicBanID(timeseries.MagicVariant{
-				MtgjsonUUID: co.UUID, IsFoil: co.Foil, IsEtched: co.Etched,
-				IsAlt: co.IsAlternative, Language: co.Language,
-			}); ok {
-				t.BanID = id
-			}
-		}
-		return t, nil
+		// Prefer the resolved ban_id so the chart reads the exact variant (skips
+		// the canonical resolution HGetAllLong does in SQL); a cold cache / unknown
+		// product leaves BanID 0 and the canonical uuid path takes over.
+		return &chartTarget{
+			UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
+			BanID: cachedBanIDForCard(ctx, co),
+		}, nil
 	}
 
-	// Datastore fallback: a uuid we have prices for but mtgmatcher no longer knows.
+	// mtgmatcher doesn't know the id — fall back to our own price history.
 	if maybeUUIDString(id) {
+		// A Magic uuid we have prices for but the datastore retired.
 		if banID, ok, lerr := PricesArchiveDB.LookupMagicBanIDByUUID(ctx, id); lerr == nil && ok {
 			return &chartTarget{BanID: banID, UUID: id}, nil
 		}
+		return nil, errChartIDNotFound
+	}
+	// A bare integer mtgmatcher can't map is a non-Magic product id in variants.
+	if n, aerr := strconv.Atoi(id); aerr == nil {
+		if vi, ok, lerr := PricesArchiveDB.LookupTCGBanID(ctx, n); lerr == nil && ok {
+			return nonMagicTarget(ctx, vi), nil
+		}
 	}
 	return nil, errChartIDNotFound
+}
+
+// cachedBanIDForCard maps a resolved mtgmatcher card to our surrogate ban_id
+// using whichever identity the variants table keys on for its game: the mtgjson
+// uuid for Magic (in-memory cache, no round-trip), otherwise the card's TCGplayer
+// product id for non-Magic games (Lorcana, Pokemon, ...), which have no uuid.
+// Returns 0 when nothing matches, so the caller charts by the canonical uuid path.
+func cachedBanIDForCard(ctx context.Context, co *mtgmatcher.CardObject) int64 {
+	if PricesArchiveDB == nil {
+		return 0
+	}
+	if banID, ok := PricesArchiveDB.CachedMagicBanID(timeseries.MagicVariant{
+		MtgjsonUUID: co.UUID, IsFoil: co.Foil, IsEtched: co.Etched,
+		IsAlt: co.IsAlternative, Language: co.Language,
+	}); ok {
+		return banID
+	}
+	if pidStr, ok := co.Identifiers["tcgplayerProductId"]; ok {
+		if pid, err := strconv.Atoi(pidStr); err == nil {
+			if vi, ok, err := PricesArchiveDB.LookupTCGBanID(ctx, pid); err == nil && ok {
+				return vi.BanID
+			}
+		}
+	}
+	return 0
 }
 
 // targetFromTCGID resolves a TCGplayer product id: Magic first (mtgmatcher knows
@@ -126,6 +165,7 @@ func targetFromTCGID(ctx context.Context, tcgID int) (*chartTarget, error) {
 		if co, err := mtgmatcher.GetUUID(matched); err == nil {
 			return &chartTarget{
 				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
+				BanID: cachedBanIDForCard(ctx, co),
 			}, nil
 		}
 	}
