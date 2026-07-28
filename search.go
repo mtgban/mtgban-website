@@ -97,19 +97,38 @@ func isValidChartID(part string) bool {
 	return err == nil
 }
 
-// chartIDToSearchID maps a chart-roster id to a mtgmatcher search id so the
-// results table (which the embedded chart lives inside) resolves it: a ban:<id>
-// becomes its mtgjson uuid; anything else passes through.
+// chartIDToSearchID maps a chart-roster id to an id the results table (which the
+// embedded chart lives inside) can resolve to a card row, mirroring
+// resolveChartTarget's precedence so anything chartable also renders its row.
+// Magic resolves to an mtgjson uuid; non-Magic games (Lorcana, ...) to their
+// mtgmatcher-native id via the TCGplayer external id map.
 func chartIDToSearchID(ctx context.Context, id string) string {
 	if _, err := mtgmatcher.GetUUID(id); err == nil {
-		return id
+		return id // already a matcher id (bare uuid / variant string)
 	}
-	if prefix, val := splitIDPrefix(id); prefix == "ban" && PricesArchiveDB != nil {
+	prefix, val := splitIDPrefix(id)
+
+	// ban: or a bare integer — our ban_id first, matching the chart resolver.
+	if (prefix == "ban" || prefix == "") && PricesArchiveDB != nil {
 		if n, perr := strconv.ParseInt(val, 10, 64); perr == nil {
-			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok && vi.MtgjsonUUID != "" {
-				return vi.MtgjsonUUID
+			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok {
+				if vi.MtgjsonUUID != "" {
+					return vi.MtgjsonUUID // Magic: the mtgjson uuid
+				}
+				// Non-Magic: the product id maps back to the game's own card id.
+				if matched, merr := mtgmatcher.MatchId(strconv.Itoa(vi.TCGProductID)); merr == nil {
+					return matched
+				}
+				return id
 			}
+			// Not a ban_id: fall through to the external-id lookup below.
 		}
+	}
+
+	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
+	// id table (a TCGplayer product id, a Scryfall id, or an mtgjson uuid).
+	if matched, merr := mtgmatcher.MatchId(val); merr == nil {
+		return matched
 	}
 	return id
 }
