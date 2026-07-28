@@ -138,6 +138,95 @@ func (c *Client) ResolveMagicBanID(ctx context.Context, v MagicVariant) (int64, 
 	return banID, nil
 }
 
+// VariantInfo is a variants row resolved by ban_id: either a Magic printing
+// (MtgjsonUUID set) or a non-Magic TCGplayer product (TCGProductID set). It is
+// the bridge from a ban_id back to a chartable/displayable identity.
+type VariantInfo struct {
+	BanID         int64
+	MtgjsonUUID   string // "" for non-Magic
+	IsFoil        bool
+	IsEtched      bool
+	IsAlt         bool
+	Language      string
+	TCGCategoryID int    // 0 for Magic
+	TCGProductID  int    // 0 for Magic
+	TCGSubType    string // "" for Magic
+}
+
+// IsMagic reports whether the variant is a Magic printing (has an mtgjson uuid).
+func (v VariantInfo) IsMagic() bool { return v.MtgjsonUUID != "" }
+
+// LookupVariant returns the identity for a ban_id, ok=false if no such variant.
+// Used to chart/display a ban: id and to route Magic vs non-Magic handling.
+func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, bool, error) {
+	v := VariantInfo{BanID: banID}
+	var uuid, subType sql.NullString
+	var catID, prodID sql.NullInt64
+	err := c.db.QueryRowContext(ctx, `
+		SELECT mtgjson_uuid, is_foil, is_etched, is_alt, language,
+		       tcgp_category_id, tcgp_product_id, tcgp_sub_type
+		FROM variants WHERE ban_id=$1`, banID).Scan(
+		&uuid, &v.IsFoil, &v.IsEtched, &v.IsAlt, &v.Language,
+		&catID, &prodID, &subType)
+	if err == sql.ErrNoRows {
+		return VariantInfo{}, false, nil
+	}
+	if err != nil {
+		return VariantInfo{}, false, err
+	}
+	v.MtgjsonUUID = uuid.String
+	v.TCGCategoryID = int(catID.Int64)
+	v.TCGProductID = int(prodID.Int64)
+	v.TCGSubType = subType.String
+	return v, true, nil
+}
+
+// LookupMagicBanIDByUUID resolves a bare mtgjson uuid to the canonical Magic
+// ban_id (preferring the base printing: language empty, non-foil, non-etched,
+// non-alt; else the smallest match). It lets a uuid that is in our price history
+// but retired from the current mtgmatcher datastore still chart. ok=false if the
+// uuid has no variant.
+func (c *Client) LookupMagicBanIDByUUID(ctx context.Context, uuid string) (int64, bool, error) {
+	uuid = NormalizeUUID(uuid)
+	var banID int64
+	err := c.db.QueryRowContext(ctx, `
+		SELECT ban_id FROM variants
+		 WHERE mtgjson_uuid=$1
+		 ORDER BY (language='' AND is_alt=false AND is_foil=false AND is_etched=false) DESC, ban_id ASC
+		 LIMIT 1`, uuid).Scan(&banID)
+	if err == sql.ErrNoRows {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return banID, true, nil
+}
+
+// LookupTCGBanID resolves a bare TCGplayer product id to a canonical non-Magic
+// variant, preferring sub-type "Normal" (the base printing) and otherwise the
+// smallest ban_id. ok=false when the product has no ingested variant. For a
+// precise sub-type, chart the ban: id directly instead.
+func (c *Client) LookupTCGBanID(ctx context.Context, productID int) (VariantInfo, bool, error) {
+	v := VariantInfo{TCGProductID: productID}
+	var catID sql.NullInt64
+	var subType sql.NullString
+	err := c.db.QueryRowContext(ctx, `
+		SELECT ban_id, tcgp_category_id, tcgp_sub_type FROM variants
+		 WHERE tcgp_product_id=$1
+		 ORDER BY (tcgp_sub_type='Normal') DESC, ban_id ASC LIMIT 1`, productID).Scan(
+		&v.BanID, &catID, &subType)
+	if err == sql.ErrNoRows {
+		return VariantInfo{}, false, nil
+	}
+	if err != nil {
+		return VariantInfo{}, false, err
+	}
+	v.TCGCategoryID = int(catID.Int64)
+	v.TCGSubType = subType.String
+	return v, true, nil
+}
+
 // ResolveTCGBanID returns the ban_id for a non-Magic variant, minting it if new.
 func (c *Client) ResolveTCGBanID(ctx context.Context, v TCGVariant) (int64, error) {
 	if id, ok := c.variants.tcg.Load(v); ok {

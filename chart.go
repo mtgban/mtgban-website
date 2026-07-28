@@ -176,6 +176,98 @@ func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string,
 	return datasets
 }
 
+// nonMagicDatasetSpecs are the TCGplayer metrics rendered for a non-Magic
+// (tcgcsv) product chart. Magic uses the dataset config; non-Magic games have
+// no per-provider config, so their display name/color live here. The Low/Market
+// colors match the Magic config for visual consistency.
+var nonMagicDatasetSpecs = []struct {
+	Provider int16
+	Name     string
+	Color    string
+}{
+	{timeseries.ProviderTCGLow, "TCGplayer Low", "rgb(255, 99, 132)"},
+	{timeseries.ProviderTCGMarket, "TCGplayer Market", "rgb(54, 162, 235)"},
+	{timeseries.ProviderTCGMid, "TCGplayer Mid", "rgb(255, 206, 86)"},
+	{timeseries.ProviderTCGHigh, "TCGplayer High", "rgb(75, 192, 192)"},
+	{timeseries.ProviderTCGDirectLow, "TCGplayer Direct Low", "rgb(153, 102, 255)"},
+}
+
+// chartTargetEarliest returns the oldest on-record date for a resolved target:
+// a precise ban_id, or the Magic canonical (uuid, foil, etched) path.
+func chartTargetEarliest(ctx context.Context, target *chartTarget, lb timeseries.Lookback) (time.Time, error) {
+	if target.BanID != 0 {
+		return PricesArchiveDB.GetEarliestDateByBanID(ctx, target.BanID, lb)
+	}
+	return PricesArchiveDB.GetEarliestDateLong(ctx, target.UUID, target.Foil, target.Etched, lb)
+}
+
+// getDatasetsForTarget builds the chart datasets for a resolved target. It fetches
+// the pivoted series once (by exact ban_id when precise, else the Magic canonical
+// path) and projects the Magic dataset config or the non-Magic TCG providers.
+// Long-form reads only; the legacy path stays in ChartDataAPI.
+func getDatasetsForTarget(ctx context.Context, target *chartTarget, labels []string, lb timeseries.Lookback) []Dataset {
+	if PricesArchiveDB == nil {
+		return nil
+	}
+	var results map[string]timeseries.ProviderPrices
+	var err error
+	if target.BanID != 0 {
+		results, err = PricesArchiveDB.HGetAllByBanID(ctx, target.BanID, lb)
+	} else {
+		results, err = PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, lb)
+	}
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	if !target.IsMagic {
+		return buildNonMagicDatasets(results, labels)
+	}
+
+	var datasets []Dataset
+	for _, config := range Config.TimeseriesConfig.Datasets {
+		if target.Sealed && !config.HasSealed {
+			continue
+		}
+		if !target.Sealed && config.OnlySealed {
+			continue
+		}
+		datasets = append(datasets, buildDatasetLong(results, labels, config))
+	}
+	return datasets
+}
+
+// buildNonMagicDatasets projects the five TCGplayer providers out of a non-Magic
+// product's pivoted series, one dataset per metric.
+func buildNonMagicDatasets(results map[string]timeseries.ProviderPrices, labels []string) []Dataset {
+	datasets := make([]Dataset, 0, len(nonMagicDatasetSpecs))
+	for _, spec := range nonMagicDatasetSpecs {
+		var data []string
+		if len(results) > 0 {
+			data = make([]string, len(labels))
+			for i, label := range labels {
+				if pp, ok := results[label]; ok {
+					if price, ok := pp[spec.Provider]; ok {
+						data[i] = fmt.Sprintf("%g", price)
+					} else {
+						data[i] = "Number.NaN"
+					}
+				} else {
+					data[i] = "Number.NaN"
+				}
+			}
+		}
+		datasets = append(datasets, Dataset{
+			Name:      spec.Name,
+			Data:      data,
+			Color:     spec.Color,
+			Reference: spec.Name,
+		})
+	}
+	return datasets
+}
+
 // buildDatasetLong is buildDataset for the long-form read: it projects one
 // provider out of the pivoted date -> (provider -> price) result. Missing dates
 // and missing providers both render as Number.NaN so the chart leaves a gap.

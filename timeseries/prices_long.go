@@ -30,7 +30,7 @@ const longMaxBatch = pgMaxParams / longColsPerRow
 // HGetAllLong returns a single card's price history over the lookback window,
 // pivoted to date -> (provider -> price). The read identity (uuid, foil, etched)
 // is coarser than a ban_id, so a CTE resolves the canonical printing first:
-// preferring language='' AND is_alt=false, falling back to the smallest matching
+// preferring language=” AND is_alt=false, falling back to the smallest matching
 // ban_id (e.g. a Japanese-only promo). Deterministic, unlike the wide table's
 // last-wins over an unordered scan (plan 17.2).
 //
@@ -73,6 +73,38 @@ func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched 
 	return result, rows.Err()
 }
 
+// HGetAllByBanID returns one exact variant's price history over the lookback
+// window, pivoted to date -> (provider -> price). Unlike HGetAllLong it does no
+// canonical resolution: the caller already holds the precise ban_id (a ban: id,
+// or a resolved TCGplayer product), so it charts that printing exactly, including
+// a specific language/finish/alt or a non-Magic sub-type.
+func (c *Client) HGetAllByBanID(ctx context.Context, banID int64, lb Lookback) (map[string]ProviderPrices, error) {
+	result := make(map[string]ProviderPrices)
+	rows, err := c.db.QueryContext(ctx, `
+		SELECT date, provider, price FROM prices
+		 WHERE ban_id=$1 AND date >= $2`, banID, lb.Since())
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var d time.Time
+		var provider int16
+		var price float64
+		if err := rows.Scan(&d, &provider, &price); err != nil {
+			return nil, err
+		}
+		day := d.Format("2006-01-02")
+		pp := result[day]
+		if pp == nil {
+			pp = ProviderPrices{}
+			result[day] = pp
+		}
+		pp[provider] = price
+	}
+	return result, rows.Err()
+}
+
 // GetEarliestDateLong returns the oldest on-record date for a card, bounded by
 // the lookback window, across every ban_id that shares (uuid, foil, etched) —
 // language/alt-agnostic, matching the wide table's MIN (plan 17.2).
@@ -86,6 +118,19 @@ func (c *Client) GetEarliestDateLong(ctx context.Context, uuid string, isFoil, i
 		  JOIN variants v ON v.ban_id = p.ban_id
 		 WHERE v.mtgjson_uuid=$1 AND v.is_foil=$2 AND v.is_etched=$3 AND p.date >= $4`,
 		uuid, isFoil, isEtched, boundary).Scan(&earliest)
+	if err != nil || !earliest.Valid || earliest.Time.IsZero() {
+		return boundary, err
+	}
+	return earliest.Time, nil
+}
+
+// GetEarliestDateByBanID returns the oldest on-record date for one exact variant,
+// bounded by the lookback window (the ban_id counterpart of GetEarliestDateLong).
+func (c *Client) GetEarliestDateByBanID(ctx context.Context, banID int64, lb Lookback) (time.Time, error) {
+	boundary := lb.Since()
+	var earliest sql.NullTime
+	err := c.db.QueryRowContext(ctx,
+		`SELECT MIN(date) FROM prices WHERE ban_id=$1 AND date >= $2`, banID, boundary).Scan(&earliest)
 	if err != nil || !earliest.Valid || earliest.Time.IsZero() {
 		return boundary, err
 	}

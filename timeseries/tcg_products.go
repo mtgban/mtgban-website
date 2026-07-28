@@ -2,6 +2,7 @@ package timeseries
 
 import (
 	"context"
+	"database/sql"
 	_ "embed"
 	"fmt"
 	"strings"
@@ -33,6 +34,27 @@ const (
 const tcgProductColumns = `
 	product_id, category_id, group_id, name, clean_name,
 	number, rarity, image_url, url, modified_on`
+
+// GetTCGProduct returns the catalog metadata for a TCGplayer product id (name,
+// image, url for non-Magic chart display), ok=false if it is not in the catalog.
+// Nullable text columns coalesce to "".
+func (c *Client) GetTCGProduct(ctx context.Context, productID int) (TCGProduct, bool, error) {
+	var p TCGProduct
+	err := c.db.QueryRowContext(ctx, `
+		SELECT product_id, category_id, group_id, name,
+		       coalesce(clean_name,''), coalesce(number,''), coalesce(rarity,''),
+		       coalesce(image_url,''), coalesce(url,''), coalesce(modified_on,'')
+		FROM tcg_products WHERE product_id=$1`, productID).Scan(
+		&p.ProductID, &p.CategoryID, &p.GroupID, &p.Name,
+		&p.CleanName, &p.Number, &p.Rarity, &p.ImageURL, &p.URL, &p.ModifiedOn)
+	if err == sql.ErrNoRows {
+		return TCGProduct{}, false, nil
+	}
+	if err != nil {
+		return TCGProduct{}, false, err
+	}
+	return p, true, nil
+}
 
 // EnsureTCGProductsSchema creates the tcg_products table and its index if
 // missing. Idempotent; a no-op on a read-only client.
