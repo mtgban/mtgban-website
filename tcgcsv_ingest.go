@@ -12,6 +12,41 @@ import (
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
+// tcgLongForm dual-writes non-Magic price rows into the long prices table,
+// resolving each (category, product, sub-type) to a ban_id and emitting one
+// LongPrice per set price column (> 0, zeros omitted like the backfill). The
+// legacy tcgplayer_nonmagic_product_prices upsert stays the source of truth
+// during the dual-write window; a long-form failure is logged, not fatal.
+func tcgLongForm(ctx context.Context, rows []timeseries.TCGPriceRow) (int, error) {
+	longRows := make([]timeseries.LongPrice, 0, len(rows)*3)
+	for _, r := range rows {
+		banID, err := PricesArchiveDB.ResolveTCGBanID(ctx, timeseries.TCGVariant{
+			CategoryID: r.CategoryID, ProductID: r.ProductID, SubType: r.SubTypeName,
+		})
+		if err != nil {
+			log.Println("tcgcsv long-form: resolve ban_id:", err)
+			continue
+		}
+		for _, pc := range []struct {
+			p        *float64
+			provider int16
+		}{
+			{r.LowPrice, timeseries.ProviderTCGLow},
+			{r.MarketPrice, timeseries.ProviderTCGMarket},
+			{r.MidPrice, timeseries.ProviderTCGMid},
+			{r.HighPrice, timeseries.ProviderTCGHigh},
+			{r.DirectLowPrice, timeseries.ProviderTCGDirectLow},
+		} {
+			if pc.p != nil && *pc.p > 0 {
+				longRows = append(longRows, timeseries.LongPrice{
+					BanID: banID, Date: r.Date, Provider: pc.provider, Price: *pc.p,
+				})
+			}
+		}
+	}
+	return PricesArchiveDB.UpsertLongPrices(ctx, longRows, 0)
+}
+
 // priceToRow maps a tcgcsv price into a tcg_prices row. The pointer price
 // fields carry through unchanged so genuine nulls stay distinct from 0.
 func priceToRow(date string, categoryID int, p tcgcsv.Price) timeseries.TCGPriceRow {
@@ -179,6 +214,11 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 		n, err := PricesArchiveDB.UpsertTCGPrices(ctx, rows, 0)
 		if err != nil {
 			return fmt.Errorf("tcgcsv backfill upsert %s: %w", dateStr, err)
+		}
+		if Config.TimeseriesConfig.LongFormWrites {
+			if _, lerr := tcgLongForm(ctx, rows); lerr != nil {
+				log.Printf("tcgcsv backfill long-form %s: %v", dateStr, lerr)
+			}
 		}
 		totalRows += n
 		daysWithData++
@@ -362,6 +402,11 @@ func ingestTCGCSVGame(ctx context.Context, client *tcgcsv.Client, categoryID int
 	n, err := PricesArchiveDB.UpsertTCGPrices(ctx, rows, 0)
 	if err != nil {
 		return 0, fmt.Errorf("upsert: %w", err)
+	}
+	if Config.TimeseriesConfig.LongFormWrites {
+		if _, lerr := tcgLongForm(ctx, rows); lerr != nil {
+			log.Printf("tcgcsv daily long-form category %d: %v", categoryID, lerr)
+		}
 	}
 	log.Printf("tcgcsv daily %s: category %d, %d rows (%d groups)", dateStr, categoryID, n, len(groups))
 	return n, nil

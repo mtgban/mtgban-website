@@ -47,7 +47,7 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	lb := chartLookback(sig)
 	maxDays := lb.Days()
 
-	earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
+	earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 	if rangeStr := r.FormValue("range"); rangeStr != "" {
 		if days, err := strconv.Atoi(rangeStr); err == nil && days > 0 {

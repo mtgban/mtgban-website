@@ -15,6 +15,14 @@ import (
 
 type TimeseriesConfig struct {
 	Datasets []DatasetConfig `json:"datasets"`
+
+	// LongFormWrites dual-writes each snapshot into the new long tables
+	// (variants + prices) alongside the legacy wide tables. LongFormReads
+	// serves charts/analytics from the long tables instead of the wide ones.
+	// The cutover is: deploy with writes on + reads off, confirm parity, then
+	// flip reads on, then (later) drop the legacy write path. See db_migration/.
+	LongFormWrites bool `json:"long_form_writes,omitempty"`
+	LongFormReads  bool `json:"long_form_reads,omitempty"`
 }
 
 type DatasetConfig struct {
@@ -22,9 +30,33 @@ type DatasetConfig struct {
 	Buylist    []string `json:"buylist,omitempty"`
 	PublicName string   `json:"public_name"`
 	Index      int      `json:"index"`
-	Color      string   `json:"color"`
-	HasSealed  bool     `json:"has_sealed,omitempty"`
-	OnlySealed bool     `json:"only_sealed,omitempty"`
+	// Provider is the id in the providers lookup table this dataset maps to
+	// (long form). Replaces the positional Index once the legacy path is dropped.
+	Provider   int16  `json:"provider"`
+	Color      string `json:"color"`
+	HasSealed  bool   `json:"has_sealed,omitempty"`
+	OnlySealed bool   `json:"only_sealed,omitempty"`
+}
+
+// providerForDatasetIndex resolves a legacy dataset Index to its provider id via
+// the config. Used by the read callers (aggregate stats, movers) that still take
+// an index. Returns false if no dataset carries that index or its provider is unset.
+func providerForDatasetIndex(index int) (int16, bool) {
+	for _, c := range Config.TimeseriesConfig.Datasets {
+		if c.Index == index {
+			return c.Provider, c.Provider != 0
+		}
+	}
+	return 0, false
+}
+
+// earliestChartDate returns the oldest on-record date for a card (bounded by the
+// lookback), reading from the long tables or the legacy wide table per the flag.
+func earliestChartDate(ctx context.Context, uuid string, isFoil, isEtched bool, lb timeseries.Lookback) (time.Time, error) {
+	if Config.TimeseriesConfig.LongFormReads {
+		return PricesArchiveDB.GetEarliestDateLong(ctx, uuid, isFoil, isEtched, lb)
+	}
+	return PricesArchiveDB.GetEarliestDate(ctx, uuid, isFoil, isEtched, lb)
 }
 
 type Dataset struct {
@@ -119,17 +151,56 @@ func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string,
 		return nil
 	}
 
+	datasets := make([]Dataset, 0, len(configs))
+
+	if Config.TimeseriesConfig.LongFormReads {
+		results, err := PricesArchiveDB.HGetAllLong(ctx, co.UUID, co.Foil, co.Etched, lb)
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
+		for _, config := range configs {
+			datasets = append(datasets, buildDatasetLong(results, keys, config))
+		}
+		return datasets
+	}
+
 	results, err := PricesArchiveDB.HGetAll(ctx, co.UUID, co.Foil, co.Etched, nil, lb)
 	if err != nil {
 		log.Println(err)
 		return nil
 	}
-
-	datasets := make([]Dataset, 0, len(configs))
 	for _, config := range configs {
 		datasets = append(datasets, buildDataset(results, keys, config))
 	}
 	return datasets
+}
+
+// buildDatasetLong is buildDataset for the long-form read: it projects one
+// provider out of the pivoted date -> (provider -> price) result. Missing dates
+// and missing providers both render as Number.NaN so the chart leaves a gap.
+func buildDatasetLong(results map[string]timeseries.ProviderPrices, labels []string, config DatasetConfig) Dataset {
+	var data []string
+	if len(results) > 0 {
+		data = make([]string, len(labels))
+		for i, label := range labels {
+			if pp, ok := results[label]; ok {
+				if price, ok := pp[config.Provider]; ok {
+					data[i] = fmt.Sprintf("%g", price)
+				} else {
+					data[i] = "Number.NaN"
+				}
+			} else {
+				data[i] = "Number.NaN"
+			}
+		}
+	}
+	return Dataset{
+		Name:      config.PublicName,
+		Data:      data,
+		Color:     config.Color,
+		Reference: config.PublicName,
+	}
 }
 
 // buildDataset projects a single column out of the shared HGetAll result
@@ -393,7 +464,61 @@ func stashInTimeseries() {
 		ServerNotify("timeseries", fmt.Sprintf("batch upsert error: %s", err))
 	}
 
+	// Dual-write the same snapshot into the long form (variants + prices).
+	// Best-effort: a long-form failure is logged but does not fail the stash,
+	// since the legacy wide upsert above already persisted this snapshot.
+	if Config.TimeseriesConfig.LongFormWrites {
+		if n, lerr := stashLongForm(context.Background(), accumulated); lerr != nil {
+			ServerNotify("timeseries", fmt.Sprintf("long-form dual-write error: %s", lerr))
+		} else {
+			log.Printf("long-form dual-write: %d price rows", n)
+		}
+	}
+
 	SetLastStashUpdate(time.Now())
 	msg := fmt.Sprintf("Snapshot completed in %s: %d upserted, %d errors", time.Since(start), upserted, errCount)
 	ServerNotify("timeseries", msg)
+}
+
+// stashLongForm mirrors the accumulated wide rows into the long prices table. It
+// warms the variant cache once, resolves each row's ban_id (minting new
+// printings on the fly), and emits one LongPrice per set provider column with a
+// positive price (zeros are omitted, matching the backfill). Returns the number
+// of price rows upserted.
+func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.PriceRow) (int, error) {
+	if err := PricesArchiveDB.WarmVariantCache(ctx); err != nil {
+		return 0, fmt.Errorf("warm variant cache: %w", err)
+	}
+	longRows := make([]timeseries.LongPrice, 0, len(accumulated)*4)
+	for _, row := range accumulated {
+		lang := ""
+		if row.Language != nil {
+			lang = *row.Language
+		}
+		banID, err := PricesArchiveDB.ResolveMagicBanID(ctx, timeseries.MagicVariant{
+			MtgjsonUUID: row.MtgjsonUUID,
+			IsFoil:      row.IsFoil,
+			IsEtched:    row.IsEtched,
+			IsAlt:       row.IsAlt,
+			Language:    lang,
+		})
+		if err != nil {
+			log.Println("long-form: resolve ban_id:", err)
+			continue
+		}
+		for _, ds := range Config.TimeseriesConfig.Datasets {
+			if ds.Provider == 0 {
+				continue
+			}
+			if p := row.PriceForDataset(ds.Index); p != nil && *p > 0 {
+				longRows = append(longRows, timeseries.LongPrice{
+					BanID:    banID,
+					Date:     row.Date,
+					Provider: ds.Provider,
+					Price:    *p,
+				})
+			}
+		}
+	}
+	return PricesArchiveDB.UpsertLongPrices(ctx, longRows, 0)
 }
