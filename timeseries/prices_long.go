@@ -27,45 +27,30 @@ const longColsPerRow = 4
 // longMaxBatch keeps a bulk upsert under Postgres's bind-parameter cap.
 const longMaxBatch = pgMaxParams / longColsPerRow
 
-// resolveCanonicalBanID maps a (uuid, foil, etched) — the read identity the chart
-// keys on, coarser than a ban_id — to a single ban_id. It prefers the canonical
-// printing (language=” AND is_alt=false); if none exists (e.g. a Japanese-only
-// promo) it falls back to the smallest matching ban_id. Deterministic, unlike the
-// wide table's last-wins over an unordered scan (plan 17.2). Returns ok=false
-// when the card has no variant at all.
-func (c *Client) resolveCanonicalBanID(ctx context.Context, uuid string, isFoil, isEtched bool) (int64, bool, error) {
-	uuid = NormalizeUUID(uuid)
-	var banID int64
-	err := c.db.QueryRowContext(ctx, `
-		SELECT ban_id FROM variants
-		 WHERE mtgjson_uuid=$1 AND is_foil=$2 AND is_etched=$3
-		 ORDER BY (language='' AND is_alt=false) DESC, ban_id ASC
-		 LIMIT 1`, uuid, isFoil, isEtched).Scan(&banID)
-	if err == sql.ErrNoRows {
-		return 0, false, nil
-	}
-	if err != nil {
-		return 0, false, err
-	}
-	return banID, true, nil
-}
-
 // HGetAllLong returns a single card's price history over the lookback window,
-// pivoted to date -> (provider -> price). It resolves the canonical ban_id for
-// (uuid, foil, etched) and returns that variant's series. The long-form
-// replacement for HGetAll; the caller projects the provider it wants per dataset.
+// pivoted to date -> (provider -> price). The read identity (uuid, foil, etched)
+// is coarser than a ban_id, so a CTE resolves the canonical printing first:
+// preferring language='' AND is_alt=false, falling back to the smallest matching
+// ban_id (e.g. a Japanese-only promo). Deterministic, unlike the wide table's
+// last-wins over an unordered scan (plan 17.2).
+//
+// Resolution and fetch are one statement (a scalar subquery over the CTE), so the
+// common chart read stays a single round-trip; splitting it doubled latency
+// against a remote DB. An unresolved card yields NULL, which matches no prices
+// and returns an empty map.
 func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched bool, lb Lookback) (map[string]ProviderPrices, error) {
-	banID, ok, err := c.resolveCanonicalBanID(ctx, uuid, isFoil, isEtched)
-	if err != nil {
-		return nil, err
-	}
+	uuid = NormalizeUUID(uuid)
 	result := make(map[string]ProviderPrices)
-	if !ok {
-		return result, nil
-	}
 	rows, err := c.db.QueryContext(ctx, `
+		WITH canon AS (
+			SELECT ban_id FROM variants
+			 WHERE mtgjson_uuid=$1 AND is_foil=$2 AND is_etched=$3
+			 ORDER BY (language='' AND is_alt=false) DESC, ban_id ASC
+			 LIMIT 1
+		)
 		SELECT date, provider, price FROM prices
-		 WHERE ban_id=$1 AND date >= $2`, banID, lb.Since())
+		 WHERE ban_id = (SELECT ban_id FROM canon) AND date >= $4`,
+		uuid, isFoil, isEtched, lb.Since())
 	if err != nil {
 		return nil, err
 	}
