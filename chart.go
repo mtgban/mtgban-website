@@ -176,20 +176,44 @@ func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string,
 	return datasets
 }
 
-// nonMagicDatasetSpecs are the TCGplayer metrics rendered for a non-Magic
-// (tcgcsv) product chart. Magic uses the dataset config; non-Magic games have
-// no per-provider config, so their display name/color live here. The Low/Market
-// colors match the Magic config for visual consistency.
-var nonMagicDatasetSpecs = []struct {
+// providerDisplay is one provider's chart display: its name and color.
+type providerDisplay struct {
 	Provider int16
 	Name     string
 	Color    string
-}{
-	{timeseries.ProviderTCGLow, "TCGplayer Low", "rgb(255, 99, 132)"},
-	{timeseries.ProviderTCGMarket, "TCGplayer Market", "rgb(54, 162, 235)"},
-	{timeseries.ProviderTCGMid, "TCGplayer Mid", "rgb(255, 206, 86)"},
-	{timeseries.ProviderTCGHigh, "TCGplayer High", "rgb(75, 192, 192)"},
-	{timeseries.ProviderTCGDirectLow, "TCGplayer Direct Low", "rgb(153, 102, 255)"},
+}
+
+// providerRegistry is the ordered, game-agnostic list of chart providers. A chart
+// renders one dataset per provider that actually has data for the card, in this
+// order, so a new game (which reuses the shared TCGplayer providers) charts with
+// no extra code. Built once at startup from the dataset config (preserving the
+// existing display: names, colors, order) plus the TCGplayer metrics that have no
+// per-provider config.
+var providerRegistry []providerDisplay
+
+// buildProviderRegistry (re)builds providerRegistry from the loaded config. Call
+// it once after the config is parsed.
+func buildProviderRegistry() {
+	seen := map[int16]bool{}
+	registry := make([]providerDisplay, 0, len(Config.TimeseriesConfig.Datasets)+3)
+	for _, d := range Config.TimeseriesConfig.Datasets {
+		if d.Provider == 0 || seen[d.Provider] {
+			continue
+		}
+		seen[d.Provider] = true
+		registry = append(registry, providerDisplay{d.Provider, d.PublicName, d.Color})
+	}
+	// TCGplayer metrics that have no dataset config (used by non-Magic games).
+	for _, extra := range []providerDisplay{
+		{timeseries.ProviderTCGMid, "TCGplayer Mid", "rgb(255, 206, 86)"},
+		{timeseries.ProviderTCGHigh, "TCGplayer High", "rgb(75, 192, 192)"},
+		{timeseries.ProviderTCGDirectLow, "TCGplayer Direct Low", "rgb(153, 102, 255)"},
+	} {
+		if !seen[extra.Provider] {
+			registry = append(registry, extra)
+		}
+	}
+	providerRegistry = registry
 }
 
 // chartTargetEarliest returns the oldest on-record date for a resolved target:
@@ -201,11 +225,12 @@ func chartTargetEarliest(ctx context.Context, target *chartTarget, lb timeseries
 	return PricesArchiveDB.GetEarliestDateLong(ctx, target.UUID, target.Foil, target.Etched, lb)
 }
 
-// getDatasetsForTarget builds the chart datasets for a resolved target. It fetches
-// the pivoted series once (by exact ban_id when precise, else the Magic canonical
-// path) and projects the Magic dataset config or the non-Magic TCG providers.
-// Long-form reads only; the legacy path stays in ChartDataAPI.
-func getDatasetsForTarget(ctx context.Context, target *chartTarget, labels []string, lb timeseries.Lookback) []Dataset {
+// getChartDatasets builds a card's chart datasets, game-agnostic: it fetches the
+// series once (by exact ban_id, else the canonical uuid path) and emits one
+// dataset per registry provider that has data, in registry order. Adding a game
+// needs no code here — its providers just show up. Long-form reads only; the
+// legacy path stays in getDatasets.
+func getChartDatasets(ctx context.Context, target *chartTarget, labels []string, lb timeseries.Lookback) []Dataset {
 	if PricesArchiveDB == nil {
 		return nil
 	}
@@ -221,51 +246,38 @@ func getDatasetsForTarget(ctx context.Context, target *chartTarget, labels []str
 		return nil
 	}
 
-	if !target.IsMagic {
-		return buildNonMagicDatasets(results, labels)
+	// Only providers with data for this card render — that is what makes it
+	// game-agnostic and also drops sealed-vs-single applicability out of config
+	// (e.g. Sealed EV only has data for sealed products, so it only shows there).
+	present := map[int16]bool{}
+	for _, pp := range results {
+		for provider := range pp {
+			present[provider] = true
+		}
 	}
-
-	var datasets []Dataset
-	for _, config := range Config.TimeseriesConfig.Datasets {
-		if target.Sealed && !config.HasSealed {
-			continue
+	datasets := make([]Dataset, 0, len(present))
+	for _, pd := range providerRegistry {
+		if present[pd.Provider] {
+			datasets = append(datasets, buildProviderDataset(results, labels, pd))
 		}
-		if !target.Sealed && config.OnlySealed {
-			continue
-		}
-		datasets = append(datasets, buildDatasetLong(results, labels, config))
 	}
 	return datasets
 }
 
-// buildNonMagicDatasets projects the five TCGplayer providers out of a non-Magic
-// product's pivoted series, one dataset per metric.
-func buildNonMagicDatasets(results map[string]timeseries.ProviderPrices, labels []string) []Dataset {
-	datasets := make([]Dataset, 0, len(nonMagicDatasetSpecs))
-	for _, spec := range nonMagicDatasetSpecs {
-		var data []string
-		if len(results) > 0 {
-			data = make([]string, len(labels))
-			for i, label := range labels {
-				if pp, ok := results[label]; ok {
-					if price, ok := pp[spec.Provider]; ok {
-						data[i] = fmt.Sprintf("%g", price)
-					} else {
-						data[i] = "Number.NaN"
-					}
-				} else {
-					data[i] = "Number.NaN"
-				}
+// buildProviderDataset projects one provider's series across the label dates.
+// Missing dates and missing prices both render as Number.NaN so the chart gaps.
+func buildProviderDataset(results map[string]timeseries.ProviderPrices, labels []string, pd providerDisplay) Dataset {
+	data := make([]string, len(labels))
+	for i, label := range labels {
+		if pp, ok := results[label]; ok {
+			if price, ok := pp[pd.Provider]; ok {
+				data[i] = fmt.Sprintf("%g", price)
+				continue
 			}
 		}
-		datasets = append(datasets, Dataset{
-			Name:      spec.Name,
-			Data:      data,
-			Color:     spec.Color,
-			Reference: spec.Name,
-		})
+		data[i] = "Number.NaN"
 	}
-	return datasets
+	return Dataset{Name: pd.Name, Data: data, Color: pd.Color, Reference: pd.Name}
 }
 
 // buildDatasetLong is buildDataset for the long-form read: it projects one

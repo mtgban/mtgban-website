@@ -125,7 +125,7 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 	}
 
 	axisLabels := getDateAxisValues(earliest)
-	datasets := getDatasetsForTarget(r.Context(), target, axisLabels, lb)
+	datasets := getChartDatasets(r.Context(), target, axisLabels, lb)
 
 	var apiDatasets []ChartAPIDataset
 	for _, ds := range datasets {
@@ -139,17 +139,12 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 		})
 	}
 
-	// Checkpoints (set releases etc.) are Magic-only.
-	var checkpoints []ChartCheckpoint
-	if target.IsMagic {
-		checkpoints = relevantCheckpoints(target.Name, earliest)
-	}
-
+	// Checkpoints match set releases by card name; a non-Magic name matches none.
 	resp := ChartAPIResponse{
 		MaxLookbackDays: maxDays,
 		AxisLabels:      axisLabels,
 		Datasets:        apiDatasets,
-		Checkpoints:     checkpoints,
+		Checkpoints:     relevantCheckpoints(target.Name, earliest),
 	}
 
 	w.Header().Set("Content-Type", "application/json")

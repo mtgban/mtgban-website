@@ -825,6 +825,9 @@ func loadVars(port, datastorePath, offlineKey string) error {
 		return err
 	}
 
+	// Build the game-agnostic chart provider registry from the dataset config.
+	buildProviderRegistry()
+
 	// The -port and -ds flags, when provided, override whatever the config
 	// file set. This must happen after the decode above, which would otherwise
 	// clobber the flag values with the config's fields (breaking blue-green

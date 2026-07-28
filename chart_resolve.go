@@ -13,29 +13,19 @@ import (
 // errChartIDNotFound means a syntactically valid id resolved to no chartable card.
 var errChartIDNotFound = errors.New("chart id not found")
 
-// nonMagicChartProviders are the TCGplayer metrics a non-Magic (tcgcsv) product
-// can chart: Low, Market, Mid, High, Direct Low. Magic uses the dataset config.
-var nonMagicChartProviders = []int16{
-	timeseries.ProviderTCGLow, timeseries.ProviderTCGMarket, timeseries.ProviderTCGMid,
-	timeseries.ProviderTCGHigh, timeseries.ProviderTCGDirectLow,
-}
-
-// chartTarget is a resolved chart identity that unifies Magic (mtgmatcher-backed)
-// and non-Magic (tcg_products-backed) cards. The read mode is:
+// chartTarget is a resolved, game-agnostic chart identity. The read mode is:
 //   - BanID != 0: chart this exact variant via HGetAllByBanID (a ban: id, or a
 //     resolved TCGplayer product). Precise about language/finish/alt/sub-type.
-//   - BanID == 0: Magic canonical path via (UUID, Foil, Etched) through HGetAllLong.
+//   - BanID == 0: canonical uuid path via (UUID, Foil, Etched) through HGetAllLong.
+//
+// Datasets are derived from whichever providers have data (see getChartDatasets),
+// so the target carries no game flag or provider list — a new game just works.
 type chartTarget struct {
-	BanID   int64
-	UUID    string // mtgjson uuid, for the Magic canonical path and display
-	Foil    bool
-	Etched  bool
-	Sealed  bool
-	Name    string
-	IsMagic bool
-	// Providers to render for a non-Magic target; nil means use the Magic
-	// dataset config in getDatasets.
-	Providers []int16
+	BanID  int64
+	UUID   string // mtgjson uuid, for the canonical path and display
+	Foil   bool
+	Etched bool
+	Name   string
 }
 
 // resolveChartTarget turns any supported id string into a chartable target.
@@ -104,20 +94,25 @@ func magicTargetFromCardID(ctx context.Context, id string) (*chartTarget, error)
 		}
 	}
 	if err == nil {
-		return &chartTarget{
-			UUID:    co.UUID,
-			Foil:    co.Foil,
-			Etched:  co.Etched,
-			Sealed:  co.Sealed,
-			Name:    co.Name,
-			IsMagic: true,
-		}, nil
+		t := &chartTarget{UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name}
+		// Prefer the cached ban_id so the chart reads the exact variant (skips the
+		// canonical resolution HGetAllLong does in SQL). Falls back to the uuid
+		// path when the cache is cold.
+		if PricesArchiveDB != nil {
+			if id, ok := PricesArchiveDB.CachedMagicBanID(timeseries.MagicVariant{
+				MtgjsonUUID: co.UUID, IsFoil: co.Foil, IsEtched: co.Etched,
+				IsAlt: co.IsAlternative, Language: co.Language,
+			}); ok {
+				t.BanID = id
+			}
+		}
+		return t, nil
 	}
 
 	// Datastore fallback: a uuid we have prices for but mtgmatcher no longer knows.
 	if maybeUUIDString(id) {
 		if banID, ok, lerr := PricesArchiveDB.LookupMagicBanIDByUUID(ctx, id); lerr == nil && ok {
-			return &chartTarget{BanID: banID, UUID: id, IsMagic: true}, nil
+			return &chartTarget{BanID: banID, UUID: id}, nil
 		}
 	}
 	return nil, errChartIDNotFound
@@ -130,8 +125,7 @@ func targetFromTCGID(ctx context.Context, tcgID int) (*chartTarget, error) {
 	if matched, err := mtgmatcher.MatchId(idStr); err == nil {
 		if co, err := mtgmatcher.GetUUID(matched); err == nil {
 			return &chartTarget{
-				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched,
-				Sealed: co.Sealed, Name: co.Name, IsMagic: true,
+				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
 			}, nil
 		}
 	}
@@ -157,17 +151,15 @@ func targetFromBanID(ctx context.Context, banID int64) (*chartTarget, error) {
 	}
 	if vi.IsMagic() {
 		t := &chartTarget{
-			BanID:   banID,
-			UUID:    vi.MtgjsonUUID,
-			Foil:    vi.IsFoil,
-			Etched:  vi.IsEtched,
-			IsMagic: true,
+			BanID:  banID,
+			UUID:   vi.MtgjsonUUID,
+			Foil:   vi.IsFoil,
+			Etched: vi.IsEtched,
 		}
-		// Name/sealed for display come from mtgmatcher; the base uuid suffices
-		// since the name is finish-independent (the chart uses BanID for data).
+		// Display name comes from mtgmatcher; the base uuid suffices since the
+		// name is finish-independent (the chart uses BanID for data).
 		if co, err := mtgmatcher.GetUUID(vi.MtgjsonUUID); err == nil {
 			t.Name = co.Name
-			t.Sealed = co.Sealed
 		}
 		return t, nil
 	}
@@ -178,11 +170,7 @@ func targetFromBanID(ctx context.Context, banID int64) (*chartTarget, error) {
 // the tcg_products catalog and tagging the printing's sub-type when it is not the
 // base ("Normal").
 func nonMagicTarget(ctx context.Context, vi timeseries.VariantInfo) *chartTarget {
-	t := &chartTarget{
-		BanID:     vi.BanID,
-		IsMagic:   false,
-		Providers: nonMagicChartProviders,
-	}
+	t := &chartTarget{BanID: vi.BanID}
 	if p, ok, _ := PricesArchiveDB.GetTCGProduct(ctx, vi.TCGProductID); ok {
 		t.Name = p.Name
 		if vi.TCGSubType != "" && vi.TCGSubType != "Normal" {
