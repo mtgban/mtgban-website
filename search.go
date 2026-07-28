@@ -82,6 +82,38 @@ func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (strin
 	})
 }
 
+// isValidChartID reports whether a chart= piece is a plausibly chartable id: a
+// mtgmatcher id or a ban:/tcg:/scryfall:/mtgjson: prefixed id (bare numbers are
+// TCGplayer ids). Full resolution happens at render time.
+func isValidChartID(part string) bool {
+	if _, err := mtgmatcher.GetUUID(part); err == nil {
+		return true
+	}
+	switch prefix, _ := splitIDPrefix(part); prefix {
+	case "ban", "tcg", "scryfall", "mtgjson":
+		return true
+	}
+	_, err := strconv.Atoi(part)
+	return err == nil
+}
+
+// chartIDToSearchID maps a chart-roster id to a mtgmatcher search id so the
+// results table (which the embedded chart lives inside) resolves it: a ban:<id>
+// becomes its mtgjson uuid; anything else passes through.
+func chartIDToSearchID(ctx context.Context, id string) string {
+	if _, err := mtgmatcher.GetUUID(id); err == nil {
+		return id
+	}
+	if prefix, val := splitIDPrefix(id); prefix == "ban" && PricesArchiveDB != nil {
+		if n, perr := strconv.ParseInt(val, 10, 64); perr == nil {
+			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok && vi.MtgjsonUUID != "" {
+				return vi.MtgjsonUUID
+			}
+		}
+	}
+	return id
+}
+
 // parseChartIDs splits a chart=... param (comma-separated UUIDs) into a
 // validated, de-duplicated list. Pieces that don't resolve via mtgmatcher are
 // dropped silently, mirroring how single-UUID chart= used to be handled.
@@ -101,7 +133,7 @@ func parseChartIDs(chartParam string) (ids []string, truncated bool) {
 		if part == "" {
 			continue
 		}
-		if _, err := mtgmatcher.GetUUID(part); err != nil {
+		if !isValidChartID(part) {
 			continue
 		}
 		if slices.Contains(ids, part) {
@@ -254,7 +286,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// chart plots (not the raw chartParam), so a URL like
 			// ?chart=uuidA,%20uuidB doesn't leave card B off the results/remove
 			// controls just because fixupIDs won't trim the leading space.
-			query = strings.Join(chartIds, ",")
+			searchIDs := make([]string, len(chartIds))
+			for i, id := range chartIds {
+				searchIDs[i] = chartIDToSearchID(r.Context(), id)
+			}
+			query = strings.Join(searchIDs, ",")
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
 		}
 	} else {
@@ -708,13 +744,27 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.EditionSort = chartEditions.SealedEditionsSorted
 		pageVars.EditionList = chartEditions.SealedEditionsList
 
-		// Rebuild a display query from the (first) chart card
-		cfg := parseSearchOptionsNG(chartId, nil, nil, nil)
+		// Rebuild a display query from the (first) chart card. Use the resolved
+		// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
+		// non-empty and the template renders the results+chart layout rather than
+		// the empty-query editions browse.
+		cfg := parseSearchOptionsNG(chartIDToSearchID(r.Context(), chartId), nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
 		pageVars.ChartID = chartId
 		pageVars.IsMultiChart = isMultiChart
+
+		// The template keys card metadata off ChartID and the roster ids, but the
+		// results Metadata map is keyed by the resolved mtgmatcher id. Alias each
+		// ban:<id> roster entry to its resolved card so those lookups resolve.
+		for _, id := range chartIds {
+			if sid := chartIDToSearchID(r.Context(), id); sid != id {
+				if card, ok := pageVars.Metadata[sid]; ok {
+					pageVars.Metadata[id] = card
+				}
+			}
+		}
 
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"

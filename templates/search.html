@@ -674,7 +674,9 @@
                                     var cardId = item.getAttribute('data-card-id');
                                     if (cardId === lastHoverId) return;
                                     lastHoverId = cardId;
-                                    var row = document.querySelector('.result-header[data-card-id="' + cardId + '"]');
+                                    // Legend entries carry the chart id (ban:<id> when long-form reads
+                                    // are on); match them to the row's data-chart-id, not data-card-id.
+                                    var row = document.querySelector('.result-header[data-chart-id="' + cardId + '"]');
                                     if (row && typeof row.onmouseover === 'function') row.onmouseover();
                                 });
                                 legendEl.addEventListener('mouseleave', function() { lastHoverId = null; });
@@ -967,6 +969,7 @@
                             <div class="result-header{{if eq $i 0}} result-first{{end}}"
                                  style="z-index: {{inc $i 100}}"
                                  data-card-id="{{$cardId}}"
+                                 data-chart-id="{{$card.ChartID}}"
                                  data-card-name="{{$card.Name}}"
                                  data-set-code="{{$card.SetCode}}"
                                  data-edition="{{$card.Edition}}"
@@ -1042,10 +1045,10 @@
                                     {{end}}
                                     {{if not $.DisableChart}}
                                         {{if eq $.ChartIDsCSV ""}}
-                                            <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
-                                        {{else if slice_has $.ChartIDs $cardId}}
+                                            <a href="?chart={{$card.ChartID}}" title="See historical data">&#128200;</a>
+                                        {{else if slice_has $.ChartIDs $card.ChartID}}
                                             {{if or $.ModalMode (gt (len $.ChartIDs) 1)}}
-                                            <a class="chart-remove-link" data-card-id="{{$cardId}}" href="?chart={{csv_without $.ChartIDsCSV $cardId}}" title="Remove from this chart">&#128200;&#10134;</a>
+                                            <a class="chart-remove-link" data-card-id="{{$card.ChartID}}" href="?chart={{csv_without $.ChartIDsCSV $card.ChartID}}" title="Remove from this chart">&#128200;&#10134;</a>
                                             {{else}}
                                             {{/* Sole card on a non-modal chart page: a remove link would
                                                  point at ?chart= and dump the user on a blank landing, so
@@ -1053,7 +1056,7 @@
                                             <span class="emoji" title="The only card on this chart">&#128200;</span>
                                             {{end}}
                                         {{else}}
-                                            <a class="chart-add-link" data-card-id="{{$cardId}}" href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
+                                            <a class="chart-add-link" data-card-id="{{$card.ChartID}}" href="?chart={{$.ChartIDsCSV}},{{$card.ChartID}}" title="Add to this chart">&#128200;&#10133;</a>
                                         {{end}}
                                     {{end}}
                                     {{/* Shown only when the screen is narrow enough that the sidebar
