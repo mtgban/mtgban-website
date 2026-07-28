@@ -1,0 +1,3 @@
+# Transient run logs and Python cache from executing the migration.
+*.log
+__pycache__/
