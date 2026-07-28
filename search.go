@@ -718,6 +718,54 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
+		} else if Config.TimeseriesConfig.LongFormReads {
+			lb := chartLookback(sig)
+			pageVars.MaxLookbackDays = lb.Days()
+
+			// Generic path: resolve every roster id to a target and chart it by
+			// whatever providers have data — one path for every game, keyed on the
+			// cached ban_id. The ?chart= url keeps the mtgmatcher id (the search
+			// UI's identity for favorites/roster/legend); the ban_id is internal.
+			var earliest time.Time
+			var ids, names []string
+			var targets []*chartTarget
+			for _, id := range chartIds {
+				target, terr := resolveChartTarget(r.Context(), id)
+				if terr != nil {
+					continue
+				}
+				ids = append(ids, id)
+				names = append(names, target.Name)
+				targets = append(targets, target)
+				if e, _ := chartTargetEarliest(r.Context(), target, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
+					earliest = e
+				}
+			}
+			if len(targets) == 0 || earliest.IsZero() {
+				pageVars.InfoMessage = "No chart data available"
+			} else {
+				pageVars.AxisLabels = getDateAxisValues(earliest)
+				cards := make([]multiCardInput, len(targets))
+				for i, target := range targets {
+					cards[i] = multiCardInput{
+						CardID:   ids[i],
+						Name:     names[i],
+						Datasets: getChartDatasets(r.Context(), target, pageVars.AxisLabels, lb),
+					}
+				}
+				if isMultiChart {
+					datasets, refs := mergeMultiCardDatasets(cards)
+					pageVars.Datasets = datasets
+					pageVars.ChartReferences = refs
+					pageVars.Checkpoints = multiCardCheckpoints(names, earliest)
+				} else {
+					pageVars.Datasets = cards[0].Datasets
+					pageVars.Checkpoints = relevantCheckpoints(cards[0].Name, earliest)
+				}
+				if len(pageVars.Datasets) == 0 {
+					pageVars.InfoMessage = "No chart data available"
+				}
+			}
 		} else if !isMultiChart {
 			co, err := mtgmatcher.GetUUID(chartId)
 			if err != nil {
