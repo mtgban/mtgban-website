@@ -227,6 +227,19 @@ func (c *Client) LookupTCGBanID(ctx context.Context, productID int) (VariantInfo
 	return v, true, nil
 }
 
+// CachedMagicBanID returns the ban_id for a Magic variant if it is already in the
+// in-memory cache, without touching the DB or minting. It is the read-side lookup
+// for stamping a ban_id onto rendered cards (no per-card round-trip); warm the
+// cache once with WarmVariantCache. A miss (new printing, or an unwarmed cache)
+// returns ok=false and the caller falls back to the uuid path.
+func (c *Client) CachedMagicBanID(v MagicVariant) (int64, bool) {
+	v = v.normalized()
+	if id, ok := c.variants.magic.Load(v); ok {
+		return id.(int64), true
+	}
+	return 0, false
+}
+
 // ResolveTCGBanID returns the ban_id for a non-Magic variant, minting it if new.
 func (c *Client) ResolveTCGBanID(ctx context.Context, v TCGVariant) (int64, error) {
 	if id, ok := c.variants.tcg.Load(v); ok {

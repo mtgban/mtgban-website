@@ -234,7 +234,7 @@
                     {{range $card.Treatments}}<span class="m-badge treatment">{{.}}</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
-                    {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
+                    {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
                     <button class="m-actions-btn" onclick="event.stopPropagation(); toggleActionsMenu(this);" title="More actions"><i data-lucide="more-vertical"></i></button>
                 </div>
             </div>
@@ -245,7 +245,7 @@
                     <i data-lucide="star"></i><span>Favorite</span>
                 </button>
                 {{if not $.DisableChart}}
-                    <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}'); closeActionsMenus();">
+                    <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}'); closeActionsMenus();">
                         <i data-lucide="chart-line"></i><span>Price history</span>
                     </button>
                 {{end}}
