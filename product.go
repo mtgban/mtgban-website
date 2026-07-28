@@ -856,7 +856,17 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 	// One aggregate query for the whole buylist instead of N per-card lookups.
 	// Postgres computes the stats; each reducer just selects the field it
 	// cares about.
-	statsByCard, err := PricesArchiveDB.GetAggregatePriceStats(context.Background(), datasetIndex, threeMonthsAgo)
+	var statsByCard map[timeseries.AggregatePriceKey]timeseries.AggregatePriceStats
+	if Config.TimeseriesConfig.LongFormReads {
+		provider, ok := providerForDatasetIndex(datasetIndex)
+		if !ok {
+			log.Println(store, "has no provider configured for long-form reads")
+			return nil
+		}
+		statsByCard, err = PricesArchiveDB.GetAggregatePriceStatsLong(context.Background(), provider, threeMonthsAgo)
+	} else {
+		statsByCard, err = PricesArchiveDB.GetAggregatePriceStats(context.Background(), datasetIndex, threeMonthsAgo)
+	}
 	if err != nil {
 		log.Println(err)
 		return nil

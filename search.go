@@ -727,7 +727,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			lb := chartLookback(sig)
 			pageVars.MaxLookbackDays = lb.Days()
 
-			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
+			earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
 			pageVars.Datasets = getDatasets(r.Context(), chartId, co.Sealed, pageVars.AxisLabels, lb)
@@ -749,7 +749,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				chartNames = append(chartNames, co.Name)
-				e, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
+				e, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 				if e.IsZero() {
 					continue
 				}

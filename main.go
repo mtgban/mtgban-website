@@ -882,6 +882,22 @@ func openDBs() (err error) {
 				log.Println("warning: could not ensure tcg_products schema:", serr)
 			}
 		}
+		// Long-form dual-write: make sure the current and next month's price
+		// partitions exist ahead of any write, and prime the variant->ban_id
+		// cache so the first stash/ingest doesn't pay a round-trip per printing.
+		// Non-fatal; the write paths re-resolve on a miss regardless.
+		if Config.TimeseriesConfig.LongFormWrites {
+			now := time.Now()
+			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now); serr != nil {
+				log.Println("warning: could not ensure current price partition:", serr)
+			}
+			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now.AddDate(0, 1, 0)); serr != nil {
+				log.Println("warning: could not ensure next price partition:", serr)
+			}
+			if serr := PricesArchiveDB.WarmVariantCache(context.Background()); serr != nil {
+				log.Println("warning: could not warm variant cache:", serr)
+			}
+		}
 	}
 
 	if Config.UserStateConfig == nil {
