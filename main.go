@@ -883,9 +883,7 @@ func openDBs() (err error) {
 			}
 		}
 		// Long-form dual-write: make sure the current and next month's price
-		// partitions exist ahead of any write, and prime the variant->ban_id
-		// cache so the first stash/ingest doesn't pay a round-trip per printing.
-		// Non-fatal; the write paths re-resolve on a miss regardless.
+		// partitions exist ahead of any write. Writes-only (creates partitions).
 		if Config.TimeseriesConfig.LongFormWrites {
 			now := time.Now()
 			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now); serr != nil {
@@ -894,6 +892,11 @@ func openDBs() (err error) {
 			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now.AddDate(0, 1, 0)); serr != nil {
 				log.Println("warning: could not ensure next price partition:", serr)
 			}
+		}
+		// Prime the variant->ban_id cache: the write path resolves/mints on it,
+		// and the read path stamps a cached ban_id onto each rendered card so
+		// charts open by ban:<id> without a per-card round-trip. Non-fatal.
+		if Config.TimeseriesConfig.LongFormWrites || Config.TimeseriesConfig.LongFormReads {
 			if serr := PricesArchiveDB.WarmVariantCache(context.Background()); serr != nil {
 				log.Println("warning: could not warm variant cache:", serr)
 			}
