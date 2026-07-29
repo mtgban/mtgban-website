@@ -195,7 +195,7 @@ var providerRegistry []providerDisplay
 // it once after the config is parsed.
 func buildProviderRegistry() {
 	seen := map[int16]bool{}
-	registry := make([]providerDisplay, 0, len(Config.TimeseriesConfig.Datasets)+3)
+	registry := make([]providerDisplay, 0, len(Config.TimeseriesConfig.Datasets)+5)
 	for _, d := range Config.TimeseriesConfig.Datasets {
 		if d.Provider == 0 || seen[d.Provider] {
 			continue
@@ -203,8 +203,12 @@ func buildProviderRegistry() {
 		seen[d.Provider] = true
 		registry = append(registry, providerDisplay{d.Provider, d.PublicName, d.Color})
 	}
-	// TCGplayer metrics that have no dataset config (used by non-Magic games).
+	// Shared TCGplayer metrics, so a game whose config omits them (or a whole
+	// non-Magic deployment) still charts every column the ingest writes. A real
+	// dataset entry wins its name/color via seen[]; these only fill the gaps.
 	for _, extra := range []providerDisplay{
+		{timeseries.ProviderTCGLow, "TCGplayer Low", "rgb(255, 99, 132)"},
+		{timeseries.ProviderTCGMarket, "TCGplayer Market", "rgb(255, 159, 64)"},
 		{timeseries.ProviderTCGMid, "TCGplayer Mid", "rgb(255, 206, 86)"},
 		{timeseries.ProviderTCGHigh, "TCGplayer High", "rgb(75, 192, 192)"},
 		{timeseries.ProviderTCGDirectLow, "TCGplayer Direct Low", "rgb(153, 102, 255)"},
