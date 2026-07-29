@@ -1235,6 +1235,23 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			uuids = append(uuids, moreUUIDs...)
 		default:
 			uuids, err = mtgmatcher.SearchEquals(query)
+			// An exact name match can be a red herring: "serra" names a
+			// Vanguard card, so "s:leb serra" would stop at it and then
+			// filter it out, finding nothing. When the filters reject every
+			// exact match, widen to the prefix pool - exactly what the
+			// query would have used had the exact name not existed. The
+			// surviving exact matches return directly so the filters run
+			// once either way.
+			if err == nil && len(filters) != 0 {
+				selected := filterUUIDs(uuids, filters)
+				if len(selected) != 0 {
+					return selected, nil
+				}
+				moreUUIDs, moreErr := mtgmatcher.SearchHasPrefix(query)
+				if moreErr == nil {
+					uuids = moreUUIDs
+				}
+			}
 			if err != nil {
 				uuids, err = mtgmatcher.SearchHasPrefix(query)
 				if err != nil {
@@ -1250,14 +1267,19 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		}
 	}
 
-	var selectedUUIDs []string
+	return filterUUIDs(uuids, filters), nil
+}
+
+// filterUUIDs returns the uuids that pass every card filter.
+func filterUUIDs(uuids []string, filters []FilterElem) []string {
+	var selected []string
 	for _, uuid := range uuids {
 		if shouldSkipCardNG(uuid, filters) {
 			continue
 		}
-		selectedUUIDs = append(selectedUUIDs, uuid)
+		selected = append(selected, uuid)
 	}
-	return selectedUUIDs, nil
+	return selected
 }
 
 func editionsForSearch(allKeys []string) []EditionEntry {

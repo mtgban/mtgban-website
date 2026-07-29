@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -201,5 +202,52 @@ func BenchmarkSearchOnlyBuylist(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		allKeys, _ := searchAndFilter(config)
 		searchParallelNG(allKeys, config)
+	}
+}
+
+// The serra bug (#266): "Serra" is an exact (Vanguard) card name, so
+// "s:leb serra" used to stop at the exact match, filter it out, and find
+// nothing. When filters reject every exact match the search widens to the
+// prefix pool; a bare exact query keeps its exact-match priority.
+func TestSearchExactNameWidensWhenFiltered(t *testing.T) {
+	if _, err := mtgmatcher.GetSet("LEB"); err != nil {
+		t.Skip("datastore not loaded")
+	}
+	if uuids, err := mtgmatcher.SearchEquals("serra"); err != nil || len(uuids) == 0 {
+		t.Skip("no exact card named Serra in this datastore")
+	}
+
+	config := parseSearchOptionsNG("s:leb serra", nil, nil, nil)
+	results, err := searchAndFilter(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) == 0 {
+		t.Fatal("s:leb serra should widen to the prefix pool")
+	}
+	for _, uuid := range results {
+		co, err := mtgmatcher.GetUUID(uuid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if co.SetCode != "LEB" || !strings.HasPrefix(co.Name, "Serra") {
+			t.Errorf("unexpected result %s (%s)", co.Name, co.SetCode)
+		}
+	}
+
+	// Bare exact query: only the exact matches, no widening
+	config = parseSearchOptionsNG("serra", nil, nil, nil)
+	results, err = searchAndFilter(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) == 0 {
+		t.Fatal("bare serra should find the exact card")
+	}
+	for _, uuid := range results {
+		co, _ := mtgmatcher.GetUUID(uuid)
+		if co.Name != "Serra" {
+			t.Errorf("bare exact query widened unexpectedly to %s", co.Name)
+		}
 	}
 }
