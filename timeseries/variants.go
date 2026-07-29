@@ -59,6 +59,12 @@ type TCGVariant struct {
 type variantCache struct {
 	magic sync.Map // MagicVariant -> int64
 	tcg   sync.Map // TCGVariant   -> int64
+	// tcgByProduct maps a TCGplayer product id to its canonical ban_id (the
+	// "Normal" sub-type, else the smallest ban_id), so a rendered non-Magic card
+	// resolves its ban_id from memory by product id alone — the read-path analogue
+	// of magic's uuid-keyed lookup, with no per-card DB round-trip. Mirrors
+	// LookupTCGBanID's precedence.
+	tcgByProduct sync.Map // int (product id) -> int64
 }
 
 // WarmVariantCache bulk-loads every existing variant into the in-memory cache in
@@ -73,6 +79,15 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 		return err
 	}
 	defer rows.Close()
+
+	// Best canonical ban_id per product id, resolved after the scan since rows
+	// arrive unordered: prefer the "Normal" sub-type, else the smallest ban_id
+	// (matching LookupTCGBanID's ORDER BY).
+	type tcgBest struct {
+		banID  int64
+		normal bool
+	}
+	byProduct := map[int]tcgBest{}
 
 	var loadedMagic, loadedTCG int
 	for rows.Next() {
@@ -98,9 +113,36 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 				SubType: subType.String,
 			}, banID)
 			loadedTCG++
+
+			pid := int(prodID.Int64)
+			isNormal := subType.String == "Normal"
+			if cur, ok := byProduct[pid]; !ok ||
+				(isNormal && !cur.normal) ||
+				(isNormal == cur.normal && banID < cur.banID) {
+				byProduct[pid] = tcgBest{banID: banID, normal: isNormal}
+			}
 		}
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for pid, best := range byProduct {
+		c.variants.tcgByProduct.Store(pid, best.banID)
+	}
+	return nil
+}
+
+// CachedTCGBanID returns the canonical ban_id for a non-Magic TCGplayer product
+// if it is already in the in-memory cache, without touching the DB. It is the
+// non-Magic counterpart of CachedMagicBanID: the read-side lookup that stamps a
+// ban_id onto a rendered card by product id alone (no per-card round-trip). A miss
+// (new product, or an unwarmed cache) returns ok=false and the caller falls back
+// to the game-native id.
+func (c *Client) CachedTCGBanID(productID int) (int64, bool) {
+	if id, ok := c.variants.tcgByProduct.Load(productID); ok {
+		return id.(int64), true
+	}
+	return 0, false
 }
 
 // ResolveMagicBanID returns the ban_id for a Magic variant, minting it if new.

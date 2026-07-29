@@ -111,7 +111,7 @@ func matcherTarget(ctx context.Context, id string) (*chartTarget, error) {
 		// product leaves BanID 0 and the canonical uuid path takes over.
 		return &chartTarget{
 			UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
-			BanID: cachedBanIDForCard(ctx, co),
+			BanID: resolveBanIDForCard(ctx, co),
 		}, nil
 	}
 
@@ -132,12 +132,14 @@ func matcherTarget(ctx context.Context, id string) (*chartTarget, error) {
 	return nil, errChartIDNotFound
 }
 
-// cachedBanIDForCard maps a resolved mtgmatcher card to our surrogate ban_id
-// using whichever identity the variants table keys on for its game: the mtgjson
-// uuid for Magic (in-memory cache, no round-trip), otherwise the card's TCGplayer
-// product id for non-Magic games (Lorcana, Pokemon, ...), which have no uuid.
-// Returns 0 when nothing matches, so the caller charts by the canonical uuid path.
-func cachedBanIDForCard(ctx context.Context, co *mtgmatcher.CardObject) int64 {
+// cachedBanIDForCard maps a resolved mtgmatcher card to our surrogate ban_id from
+// the in-memory variant caches, game-agnostically and with no DB round-trip, using
+// whichever identity the variants table keys on for its game: the mtgjson uuid for
+// Magic, otherwise the card's TCGplayer product id for non-Magic games (Lorcana,
+// Pokemon, ...), which have no uuid. Returns 0 when nothing is cached (cold cache /
+// new printing), so a caller can fall back to the game-native id. Safe to call per
+// card while rendering a results page.
+func cachedBanIDForCard(co *mtgmatcher.CardObject) int64 {
 	if PricesArchiveDB == nil {
 		return 0
 	}
@@ -147,14 +149,44 @@ func cachedBanIDForCard(ctx context.Context, co *mtgmatcher.CardObject) int64 {
 	}); ok {
 		return banID
 	}
-	if pidStr, ok := co.Identifiers["tcgplayerProductId"]; ok {
-		if pid, err := strconv.Atoi(pidStr); err == nil {
-			if vi, ok, err := PricesArchiveDB.LookupTCGBanID(ctx, pid); err == nil && ok {
-				return vi.BanID
-			}
+	if pid, ok := tcgProductID(co); ok {
+		if banID, ok := PricesArchiveDB.CachedTCGBanID(pid); ok {
+			return banID
 		}
 	}
 	return 0
+}
+
+// resolveBanIDForCard is cachedBanIDForCard for the single chart-open path, where a
+// DB round-trip is affordable: on an in-memory miss it resolves a non-Magic product
+// against the variants table, so a cold cache (or a product ingested since warm-up)
+// still charts precisely. A Magic miss stays 0 — the canonical uuid path covers it.
+func resolveBanIDForCard(ctx context.Context, co *mtgmatcher.CardObject) int64 {
+	if banID := cachedBanIDForCard(co); banID != 0 {
+		return banID
+	}
+	if PricesArchiveDB == nil {
+		return 0
+	}
+	if pid, ok := tcgProductID(co); ok {
+		if vi, ok, err := PricesArchiveDB.LookupTCGBanID(ctx, pid); err == nil && ok {
+			return vi.BanID
+		}
+	}
+	return 0
+}
+
+// tcgProductID extracts a card's TCGplayer product id from its identifiers.
+func tcgProductID(co *mtgmatcher.CardObject) (int, bool) {
+	pidStr, ok := co.Identifiers["tcgplayerProductId"]
+	if !ok {
+		return 0, false
+	}
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		return 0, false
+	}
+	return pid, true
 }
 
 // targetFromTCGID resolves a TCGplayer product id: Magic first (mtgmatcher knows
@@ -165,7 +197,7 @@ func targetFromTCGID(ctx context.Context, tcgID int) (*chartTarget, error) {
 		if co, err := mtgmatcher.GetUUID(matched); err == nil {
 			return &chartTarget{
 				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
-				BanID: cachedBanIDForCard(ctx, co),
+				BanID: resolveBanIDForCard(ctx, co),
 			}, nil
 		}
 	}
