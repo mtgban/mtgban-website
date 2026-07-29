@@ -684,9 +684,6 @@ func genPageNav(activeTab, sig string) PageVars {
 	if Config.Game != DefaultGame {
 		// Append which game this site is for
 		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
-
-		// Charts are available only for one game
-		pageVars.DisableChart = true
 	}
 	if Config.OfflineKey != "" {
 		pageVars.DisableChart = true

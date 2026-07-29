@@ -18,7 +18,6 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/notify"
-	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 var Country2flag = map[string]string{
@@ -435,19 +434,10 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	}
 
 	// Cache the internal ban_id onto the card so charts open by ban:<id> off the
-	// warmed variant cache (no per-card DB round-trip). 0 falls back to the uuid.
-	var banID int64
-	if PricesArchiveDB != nil {
-		if id, ok := PricesArchiveDB.CachedMagicBanID(timeseries.MagicVariant{
-			MtgjsonUUID: co.UUID,
-			IsFoil:      co.Foil,
-			IsEtched:    co.Etched,
-			IsAlt:       co.IsAlternative,
-			Language:    co.Language,
-		}); ok {
-			banID = id
-		}
-	}
+	// warmed variant cache (no per-card DB round-trip), game-agnostically: a Magic
+	// printing resolves by uuid, a non-Magic product by its TCGplayer id. 0 falls
+	// back to the game-native id.
+	banID := cachedBanIDForCard(co)
 	// ChartID is what the UI hands the chart system. It is the internal ban:<id>
 	// once long-form reads serve charts (so lookups go through the new path), and
 	// the mtgmatcher id otherwise, keeping the legacy chart path working pre-cutover.
