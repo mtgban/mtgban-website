@@ -137,7 +137,7 @@ func TestCollectorNumberPLST(t *testing.T) {
 	if skip := applyCardFilter("number", elem.Values, co); skip {
 		t.Error("cn:akh-127 should match a card numbered AKH-127")
 	}
-	if skip := applyCardFilter("number", fixupNumberNG("akh-50"), co); !skip {
+	if skip := applyCardFilter("number", fixupNumberNG("akh-50", false), co); !skip {
 		t.Error("cn:akh-50 should not match a card numbered AKH-127")
 	}
 
@@ -277,4 +277,51 @@ func TestSetNumberShorthand(t *testing.T) {
 			t.Errorf("CleanQuery = %q, want %q", config.CleanQuery, "neo 234")
 		}
 	})
+}
+
+// cn strips the star/dagger/phi decorations from both sides, so plain
+// queries find decorated printings; cns keeps the query verbatim and
+// matches the full decorated number only.
+func TestCollectorNumberStrict(t *testing.T) {
+	co := &mtgmatcher.CardObject{}
+	co.Number = "107★"
+	co.OriginalNumber = "107"
+
+	config := parseSearchOptionsNG("cn:107", nil, nil, nil)
+	elem := findNumberFilter(t, config, "number")
+	if skip := applyCardFilter("number", elem.Values, co); skip {
+		t.Error("cn:107 should match the starred printing")
+	}
+
+	config = parseSearchOptionsNG("cn:107★", nil, nil, nil)
+	elem = findNumberFilter(t, config, "number")
+	if len(elem.Values) != 1 || elem.Values[0] != "107" {
+		t.Errorf("cn should strip decorations from the query, got %v", elem.Values)
+	}
+
+	config = parseSearchOptionsNG("cns:107★", nil, nil, nil)
+	elem = findNumberFilter(t, config, "number_strict")
+	if len(elem.Values) != 1 || elem.Values[0] != "107★" {
+		t.Errorf("cns should keep the query verbatim, got %v", elem.Values)
+	}
+	if skip := applyCardFilter("number_strict", elem.Values, co); skip {
+		t.Error("cns:107★ should match the starred printing")
+	}
+
+	config = parseSearchOptionsNG("cns:107", nil, nil, nil)
+	elem = findNumberFilter(t, config, "number_strict")
+	if skip := applyCardFilter("number_strict", elem.Values, co); !skip {
+		t.Error("cns:107 should not match the starred printing")
+	}
+}
+
+func findNumberFilter(t *testing.T, config SearchConfig, name string) *FilterElem {
+	t.Helper()
+	for i := range config.CardFilters {
+		if config.CardFilters[i].Name == name {
+			return &config.CardFilters[i]
+		}
+	}
+	t.Fatalf("missing %s filter", name)
+	return nil
 }

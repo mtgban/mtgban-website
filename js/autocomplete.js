@@ -14,7 +14,7 @@ var __acCardMetaInflight = {};
  * searchfilter.go): a token shaped like one of these is a search filter, not
  * part of a card name, so suggestions match on the remaining words only and
  * the completed value carries the filters along. */
-var __acFilterToken = /^-?(format|legal|sm|skip|sort|edition|set|e|s|se|ee|number|cn|cne|date|year|name|namee|r|t|f|c|color|unpack|contents|container|decklist|ci|identity|cond|condr|condb|id|is|not|on|price|buy_price|arb_price|rev_price|ratio|store|seller|vendor|region|quantity|qty)[:<>]\S/i;
+var __acFilterToken = /^-?(format|legal|sm|skip|sort|edition|set|e|s|se|ee|number|cn|cns|cne|date|year|name|namee|r|t|f|c|color|unpack|contents|container|decklist|ci|identity|cond|condr|condb|id|is|not|on|price|buy_price|arb_price|rev_price|ratio|store|seller|vendor|region|quantity|qty)[:<>]\S/i;
 
 function __acEsc(s) {
     var d = document.createElement('div');

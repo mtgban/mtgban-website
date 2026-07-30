@@ -321,22 +321,24 @@ window.__BAN_GUIDE = {
             title: 'Collector Numbers',
             icon: 'hash',
             summary: 'Filter by number (cn:123), range (cn:1-50), comparison (cn>300), or per-set (cn:MKM:42).',
-            snippets: ['cn:123', 'cn:1-50', 'cn>300', 'cn:CODE:42', 'cne:REGEXP'],
-            keywords: ['collector', 'number', 'cn', 'cne', 'range', 'comparison', 'regex', 'regexp', '#', 'card number'],
+            snippets: ['cn:123', 'cn:1-50', 'cn>300', 'cn:CODE:42', 'cns:107★', 'cne:REGEXP'],
+            keywords: ['collector', 'number', 'cn', 'cns', 'cne', 'range', 'comparison', 'regex', 'regexp', '#', 'card number', 'strict', 'star'],
             content: {
-                description: '<p>Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.</p><p>Regular expressions are supported via <code>cne:REGEXP</code>.</p><p>To target a specific set while leaving other results untouched, prepend the set code: <code>cn:CODE:NUMBER</code>.</p>',
+                description: '<p>Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.</p><p><code>cn:</code> ignores the ★/†/φ decorations, so <code>cn:107</code> also finds a card numbered 107★; use the strict form <code>cns:NUMBER</code> to match the number exactly as printed.</p><p>Regular expressions are supported via <code>cne:REGEXP</code>.</p><p>To target a specific set while leaving other results untouched, prepend the set code: <code>cn:CODE:NUMBER</code>.</p>',
                 table: [
                     { value: 'cn:NUMBER', short: 'Exact collector number' },
                     { value: 'cn:N-N', short: 'Range of collector numbers' },
                     { value: 'cn>N / cn<N', short: 'Comparison operators' },
                     { value: 'cn:CODE:N', short: 'Number within a specific set' },
+                    { value: 'cns:NUMBER', short: 'Strict match, keeps ★/†/φ' },
                     { value: 'cne:REGEXP', short: 'Collector number by regexp' }
                 ],
                 examples: [
                     { query: 'cn:123', desc: 'Cards numbered 123' },
                     { query: 'cn:1-50', desc: 'Cards numbered 1–50' },
                     { query: 'cn>300', desc: 'Cards above #300' },
-                    { query: 'cn:MKM:42', desc: '#42 from MKM only' }
+                    { query: 'cn:MKM:42', desc: '#42 from MKM only' },
+                    { query: 'cns:107★', desc: 'Only the starred #107' }
                 ]
             }
         },

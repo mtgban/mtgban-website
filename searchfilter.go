@@ -213,11 +213,14 @@ func fixupRarityNG(code string) []string {
 	return filters
 }
 
-func fixupNumberNG(code string) []string {
+func fixupNumberNG(code string, strict bool) []string {
 	code = strings.ToLower(code)
 	filters := strings.Split(code, ",")
 	for i := range filters {
 		filters[i] = strings.TrimLeft(filters[i], "0")
+		if !strict {
+			filters[i] = strings.TrimRight(filters[i], mtgmatcher.SuffixSpecial+mtgmatcher.SuffixVariant+mtgmatcher.SuffixPhiLow+"*")
+		}
 	}
 	return filters
 }
@@ -461,6 +464,7 @@ var FilterOperations = map[string][]string{
 	"ee":        []string{":"},
 	"number":    []string{":", ">", "<"},
 	"cn":        []string{":", ">", "<"},
+	"cns":       []string{":"},
 	"cne":       []string{":"},
 	"date":      []string{":", ">", "<"},
 	"year":      []string{":", ">", "<"},
@@ -720,8 +724,11 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Negate: negate,
 				Values: []string{code},
 			})
-		case "cn", "number":
+		case "cn", "cns", "number":
 			opt := "number"
+			if option == "cns" {
+				opt = "number_strict"
+			}
 			if operation == ">" {
 				opt = "number_greater_than"
 			} else if operation == "<" {
@@ -748,7 +755,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 					opt = "number_greater_than"
 					subfilters = append(subfilters, FilterElem{
 						Name:    opt,
-						Values:  fixupNumberNG(code),
+						Values:  fixupNumberNG(code, false),
 						ApplyTo: applyToSets,
 					})
 					// Reset options to reuse the filter addition below
@@ -760,7 +767,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			filters = append(filters, FilterElem{
 				Name:       opt,
 				Negate:     negate,
-				Values:     fixupNumberNG(code),
+				Values:     fixupNumberNG(code, option == "cns"),
 				Subfilters: subfilters,
 				ApplyTo:    applyToSets,
 			})
@@ -1561,6 +1568,8 @@ func applyCardFilter(name string, filters []string, co *mtgmatcher.CardObject) b
 		return cardFilterContents(filters, co)
 	case "number":
 		return cardFilterNumber(filters, co)
+	case "number_strict":
+		return cardFilterNumberStrict(filters, co)
 	case "number_regexp":
 		return cardFilterNumberRegexp(filters, co)
 	case "number_greater_than":
@@ -1702,12 +1711,12 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 	return false
 }
 
-// The cn checks compare against OriginalNumber, the collector number
-// stripped of its ★/†/φ decorations, so "cn:107" matches the plain and
-// decorated variants alike. The regexp form stays on the full Number so
-// the decorations remain addressable.
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
 	return !slices.Contains(filters, strings.ToLower(co.OriginalNumber))
+}
+
+func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
+	return !slices.Contains(filters, strings.ToLower(co.Number))
 }
 
 func cardFilterNumberRegexp(filters []string, co *mtgmatcher.CardObject) bool {
