@@ -746,6 +746,27 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'quantities',
+            category: 'Search Syntax',
+            title: 'Quantity Filters',
+            icon: 'layers',
+            summary: 'Filter by available quantity (qty>4, qty<2).',
+            snippets: ['qty>4', 'qty<2'],
+            keywords: ['quantity', 'qty', 'stock', 'copies', 'available', 'playset', 'inventory'],
+            content: {
+                description: '<p>Filter results by the quantity a store has in stock (or a buylist wants) with <code>qty&gt;VALUE</code> and <code>qty&lt;VALUE</code>. Comparisons are strict, so <code>qty&gt;3</code> means four or more copies.</p><p>Stores that don\'t report quantities (index price sources and some retailers) are excluded from quantity-filtered results, and cards left with no matching offers are dropped.</p><p><code>quantity</code> works as a long-form alias.</p>',
+                table: [
+                    { value: 'qty>N', short: 'More than N copies in stock' },
+                    { value: 'qty<N', short: 'Fewer than N copies in stock' }
+                ],
+                examples: [
+                    { query: 'qty>3', desc: 'Stores with a playset available' },
+                    { query: 'qty<4', desc: 'Low-stock offers only' }
+                ]
+            }
+        },
+
+        {
             id: 'stores',
             category: 'Search Syntax',
             title: 'Stores & Regions',
