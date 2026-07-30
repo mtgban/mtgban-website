@@ -1224,7 +1224,7 @@ func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc
 	}
 	var values [2]int
 
-	for i, num := range []string{filters[0], co.Number} {
+	for i, num := range []string{filters[0], co.OriginalNumber} {
 		ref, err := strconv.Atoi(num)
 		if err != nil {
 			ref, err = strconv.Atoi(mtgmatcher.ExtractNumberValue(num))
@@ -1702,8 +1702,12 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 	return false
 }
 
+// The cn checks compare against OriginalNumber, the collector number
+// stripped of its ★/†/φ decorations, so "cn:107" matches the plain and
+// decorated variants alike. The regexp form stays on the full Number so
+// the decorations remain addressable.
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, strings.ToLower(co.Number))
+	return !slices.Contains(filters, strings.ToLower(co.OriginalNumber))
 }
 
 func cardFilterNumberRegexp(filters []string, co *mtgmatcher.CardObject) bool {
