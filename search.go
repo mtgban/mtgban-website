@@ -543,7 +543,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		pageVars.Metadata[cardId] = uuid2card(cardId, false, true, preferFlavor)
+		card := uuid2card(cardId, false, true, preferFlavor)
+		// Search results chart cards, so upgrade the chart handle to the cached
+		// ban:<id> here rather than inside uuid2card, which also feeds pages
+		// that never chart.
+		card.ChartID = chartIDForCard(cardId)
+		pageVars.Metadata[cardId] = card
 	}
 
 	// Optionally sort according to price
