@@ -95,7 +95,11 @@ type FilterPriceElem struct {
 	// All stores sources (shorthands) present in the map
 	Stores []string
 
-	// Cache of cardId:prices used in the filter
+	// Cache of cardId:prices used in the filter. The retail and buylist
+	// searches run concurrently and can share one filter (e.g. noSussy spans
+	// TCGDirect retail and TCGDirectNet buylist), so cached slices are read
+	// from multiple goroutines: never mutate one after it is stored — build a
+	// new slice instead.
 	PriceCache map[string][]float64
 
 	// Mutex protecting PriceCache map from concurrent access
@@ -2171,15 +2175,16 @@ func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []*Filt
 				prices = []float64{filters[i].Value}
 			}
 
-			// Update cache
-			go func() {
-				filters[i].Mutex.Lock()
-				if filters[i].PriceCache == nil {
-					filters[i].PriceCache = map[string][]float64{}
-				}
-				filters[i].PriceCache[cardId] = prices
-				filters[i].Mutex.Unlock()
-			}()
+			// Update cache synchronously so the card's next entries hit it: an
+			// async write lands after the burst of same-card lookups has already
+			// missed, recomputing the store prices for nearly every entry (and
+			// spawning a goroutine per miss).
+			filters[i].Mutex.Lock()
+			if filters[i].PriceCache == nil {
+				filters[i].PriceCache = map[string][]float64{}
+			}
+			filters[i].PriceCache[cardId] = prices
+			filters[i].Mutex.Unlock()
 		}
 
 		res := applyPriceFilter(filters[i].Name, prices, entry.Pricing())
