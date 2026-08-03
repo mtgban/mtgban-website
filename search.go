@@ -281,6 +281,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	chartIds, chartTruncated := parseChartIDs(chartParam)
 
 	chartId := ""
+	// Roster id -> resolved search id, computed once per request: a ban:<id>
+	// resolution costs a DB round-trip and each id is consulted three times
+	// (results query, display query, metadata aliasing).
+	chartSearchIDs := map[string]string{}
 	if len(chartIds) > 0 && !pageVars.DisableChart {
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
@@ -308,6 +312,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			searchIDs := make([]string, len(chartIds))
 			for i, id := range chartIds {
 				searchIDs[i] = chartIDToSearchID(r.Context(), id)
+				chartSearchIDs[id] = searchIDs[i]
 			}
 			query = strings.Join(searchIDs, ",")
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
@@ -772,7 +777,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
 		// non-empty and the template renders the results+chart layout rather than
 		// the empty-query editions browse.
-		cfg := parseSearchOptionsNG(chartIDToSearchID(r.Context(), chartId), nil, nil, nil)
+		cfg := parseSearchOptionsNG(chartSearchIDs[chartId], nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
@@ -783,10 +788,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// results Metadata map is keyed by the resolved mtgmatcher id. Alias each
 		// ban:<id> roster entry to its resolved card so those lookups resolve.
 		for _, id := range chartIds {
-			if sid := chartIDToSearchID(r.Context(), id); sid != id {
-				if card, ok := pageVars.Metadata[sid]; ok {
-					pageVars.Metadata[id] = card
-				}
+			sid := chartSearchIDs[id]
+			if sid == "" || sid == id {
+				continue
+			}
+			if card, ok := pageVars.Metadata[sid]; ok {
+				pageVars.Metadata[id] = card
 			}
 		}
 
