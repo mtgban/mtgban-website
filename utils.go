@@ -866,6 +866,14 @@ func isSecureRequest(r *http.Request) bool {
 	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
+// dataReady reports whether the datastore and scrapers are loaded enough to
+// serve real answers (the same predicate /healthz uses). Cacheable endpoints
+// must not let degraded warmup responses into caches: an empty payload with
+// a public max-age poisons every client behind the CDN for its lifetime.
+func dataReady() bool {
+	return len(mtgmatcher.GetUUIDs()) != 0 && len(GetSellers()) != 0 && len(GetVendors()) != 0
+}
+
 // storeEligible reports whether a store may appear in a price surface under
 // the given policy: an explicit allowlist is the entire policy (a sig's own
 // store list bypasses blocklists by design), otherwise the store just must

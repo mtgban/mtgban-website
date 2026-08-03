@@ -77,6 +77,11 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 
 	if r.FormValue("all") == "true" {
 		AllNames := mtgmatcher.AllNames("canonical", sealed)
+		// An empty pool means the datastore isn't (fully) loaded; make sure
+		// no cache holds on to the degraded answer
+		if len(AllNames) == 0 {
+			w.Header().Set("Cache-Control", "no-store")
+		}
 		json.NewEncoder(w).Encode(&AllNames)
 		return
 	}
@@ -89,7 +94,8 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 
 	idx := suggestIndexPtr.Load()
 	if idx == nil {
-		// Datastore not loaded yet
+		// Datastore not loaded yet; don't let a cache hold the empty answer
+		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -117,8 +123,13 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		out = append(out, tags)
 	}
 
-	// Cache response for 5 minutes
-	w.Header().Set("Cache-Control", "public, max-age=300")
+	// Cache response for 5 minutes, unless it was served while the
+	// datastore was still loading
+	if dataReady() {
+		w.Header().Set("Cache-Control", "public, max-age=300")
+	} else {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 
 	json.NewEncoder(w).Encode(&out)
 }

@@ -92,7 +92,12 @@ func ChartDataAPI(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	// An empty chart (DB outage or warmup) must not be cached for an hour
+	if len(apiDatasets) != 0 {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+	} else {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	json.NewEncoder(w).Encode(resp)
 }
 
@@ -148,6 +153,11 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=3600")
+	// An empty chart (DB outage or warmup) must not be cached for an hour
+	if len(apiDatasets) != 0 {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+	} else {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	json.NewEncoder(w).Encode(resp)
 }

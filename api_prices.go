@@ -18,6 +18,14 @@ type PriceResult struct {
 }
 
 func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
+	// During warmup every answer would be empty; a 503 makes clients retry
+	// later instead of caching blank prices and images for their tiles
+	if !dataReady() {
+		w.Header().Set("Cache-Control", "no-store")
+		errorResponse(w, http.StatusServiceUnavailable, "not ready")
+		return
+	}
+
 	sig := getSignatureFromCookies(r)
 	blocklistRetail, blocklistBuylist := getDefaultBlocklists(sig)
 
@@ -122,7 +130,21 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 		results[cardId] = result
 	}
 
+	// A response carrying no data at all (every id unknown or priceless)
+	// is not worth poisoning caches with - serve it uncached
+	hasData := false
+	for _, result := range results {
+		if result.SellPrice != nil || result.BuyPrice != nil || result.ImageURL != "" {
+			hasData = true
+			break
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "public, max-age=300")
+	if hasData {
+		w.Header().Set("Cache-Control", "public, max-age=300")
+	} else {
+		w.Header().Set("Cache-Control", "no-store")
+	}
 	json.NewEncoder(w).Encode(results)
 }
