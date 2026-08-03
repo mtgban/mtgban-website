@@ -39,12 +39,10 @@ var colorRarityMap = map[string]map[string]string{
 
 type GenericCard struct {
 	UUID string
-	// BanID is the internal long-form variant id (see the card_prices redesign),
-	// cached here so charts open by ban:<id> without re-resolving. 0 when unknown
-	// (cache cold / new printing / no DB); callers fall back to UUID.
-	BanID int64
-	// ChartID is the id the UI passes to the chart system: ban:<BanID> when
-	// long-form reads are on, else the mtgmatcher card id (legacy path).
+	// ChartID is the id the UI passes to the chart system. uuid2card leaves it
+	// as the mtgmatcher card id; chart-capable pages override it with ban:<id>
+	// via chartIDForCard, so chartless pages (upload, arbit, news, ...) don't
+	// pay the variant-cache lookup for every card they render.
 	ChartID      string
 	Name         string
 	FlavorName   string
@@ -433,19 +431,6 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		return GenericCard{}
 	}
 
-	// Cache the internal ban_id onto the card so charts open by ban:<id> off the
-	// warmed variant cache (no per-card DB round-trip), game-agnostically: a Magic
-	// printing resolves by uuid, a non-Magic product by its TCGplayer id. 0 falls
-	// back to the game-native id.
-	banID := cachedBanIDForCard(co)
-	// ChartID is what the UI hands the chart system. It is the internal ban:<id>
-	// once long-form reads serve charts (so lookups go through the new path), and
-	// the mtgmatcher id otherwise, keeping the legacy chart path working pre-cutover.
-	chartID := cardId
-	if banID != 0 && Config.TimeseriesConfig.LongFormReads {
-		chartID = "ban:" + strconv.FormatInt(banID, 10)
-	}
-
 	var stocksURL string
 	var sypList bool
 
@@ -651,8 +636,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 
 	return GenericCard{
 		UUID:         co.UUID,
-		BanID:        banID,
-		ChartID:      chartID,
+		ChartID:      cardId,
 		Name:         name,
 		FlavorName:   flavor,
 		Edition:      co.Edition,
