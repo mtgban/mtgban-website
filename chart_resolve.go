@@ -43,6 +43,14 @@ type chartTarget struct {
 // map), then a non-Magic product in the variants table. Prefix ban: or tcg: to
 // force one interpretation.
 func resolveChartTarget(ctx context.Context, raw string) (*chartTarget, error) {
+	// Every resolution branch can reach the variants table (targetFromBanID,
+	// targetFromTCGID, and matcherTarget's retired-uuid fallback dereference
+	// PricesArchiveDB directly). Both current callers are behind their own nil
+	// checks; this guard keeps a future caller from turning a chartless deploy
+	// into a panic.
+	if PricesArchiveDB == nil {
+		return nil, errChartIDNotFound
+	}
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return nil, errChartIDNotFound
