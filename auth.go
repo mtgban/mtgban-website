@@ -300,7 +300,7 @@ func signedUserEmail(r *http.Request) string {
 	}
 
 	q := url.Values{}
-	for _, optional := range append(OrderNav, OptionalFields...) {
+	for _, optional := range SignedFields {
 		if val := v.Get(optional); val != "" {
 			q.Set(optional, val)
 		}
@@ -527,7 +527,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		}
 
 		q := url.Values{}
-		for _, optional := range append(OrderNav, OptionalFields...) {
+		for _, optional := range SignedFields {
 			val := v.Get(optional)
 			if val != "" {
 				q.Set(optional, val)
@@ -660,6 +660,11 @@ func getValuesForTier(tierTitle string) url.Values {
 	}
 	return v
 }
+
+// Every sig-encoded permission field in signing order: OrderNav then
+// OptionalFields. Both lists are fixed at startup, so the concatenation the
+// signing and verification paths walk is computed once instead of per request.
+var SignedFields = slices.Concat(OrderNav, OptionalFields)
 
 func sign(tierTitle string, userData *PatreonUserData) string {
 	v := getValuesForTier(tierTitle)
