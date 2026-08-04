@@ -42,25 +42,31 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 
 	results := map[string]PriceResult{}
 
+	// Clean the ids once up front
+	cardIds := make([]string, 0, len(ids))
 	for _, cardId := range ids {
 		cardId = strings.TrimSpace(cardId)
 		if cardId == "" {
 			continue
 		}
+		cardIds = append(cardIds, cardId)
+	}
 
-		var result PriceResult
-
-		// Find best NM sell price (lowest)
-		var bestSellPrice float64
-		var bestSellName string
-		for _, seller := range GetSellers() {
-			if slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-				continue
-			}
-			if seller.Info().MetadataOnly {
-				continue
-			}
-			inventory := seller.Inventory()
+	// Walk each store once for all ids, rather than every store per id:
+	// the Info() copies and blocklist checks are per store, and each
+	// store's record map is probed once per id.
+	bestSell := map[string]PriceResult{}
+	for _, seller := range GetSellers() {
+		info := seller.Info()
+		if info.MetadataOnly || slices.Contains(blocklistRetail, info.Shorthand) {
+			continue
+		}
+		name := info.Name
+		if override, ok := Config.ScraperConfig.NameOverride[name]; ok {
+			name = override
+		}
+		inventory := seller.Inventory()
+		for _, cardId := range cardIds {
 			entries, found := inventory[cardId]
 			if !found {
 				continue
@@ -69,32 +75,30 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 				if entry.Conditions != "NM" {
 					continue
 				}
-				if entry.Price > 0 && (bestSellPrice == 0 || entry.Price < bestSellPrice) {
-					bestSellPrice = entry.Price
-					name := seller.Info().Name
-					if override, ok := Config.ScraperConfig.NameOverride[name]; ok {
-						name = override
-					}
-					bestSellName = name
+				best := bestSell[cardId]
+				// Lowest NM sell price wins
+				if entry.Price > 0 && (best.SellPrice == nil || entry.Price < *best.SellPrice) {
+					price := entry.Price
+					best.SellPrice = &price
+					best.SellVendor = name
+					bestSell[cardId] = best
 				}
 			}
 		}
-		if bestSellPrice > 0 {
-			result.SellPrice = &bestSellPrice
-			result.SellVendor = bestSellName
-		}
+	}
 
-		// Find best NM buy price (highest buylist)
-		var bestBuyPrice float64
-		var bestBuyName string
-		for _, vendor := range GetVendors() {
-			if slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-				continue
-			}
-			if vendor.Info().MetadataOnly {
-				continue
-			}
-			buylist := vendor.Buylist()
+	bestBuy := map[string]PriceResult{}
+	for _, vendor := range GetVendors() {
+		info := vendor.Info()
+		if info.MetadataOnly || slices.Contains(blocklistBuylist, info.Shorthand) {
+			continue
+		}
+		name := info.Name
+		if override, ok := Config.ScraperConfig.NameOverride[name]; ok {
+			name = override
+		}
+		buylist := vendor.Buylist()
+		for _, cardId := range cardIds {
 			entries, found := buylist[cardId]
 			if !found {
 				continue
@@ -103,19 +107,24 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 				if entry.Conditions != "NM" {
 					continue
 				}
-				if entry.BuyPrice > bestBuyPrice {
-					bestBuyPrice = entry.BuyPrice
-					name := vendor.Info().Name
-					if override, ok := Config.ScraperConfig.NameOverride[name]; ok {
-						name = override
-					}
-					bestBuyName = name
+				best := bestBuy[cardId]
+				// Highest NM buy price wins
+				if entry.BuyPrice > 0 && (best.BuyPrice == nil || entry.BuyPrice > *best.BuyPrice) {
+					price := entry.BuyPrice
+					best.BuyPrice = &price
+					best.BuyVendor = name
+					bestBuy[cardId] = best
 				}
 			}
 		}
-		if bestBuyPrice > 0 {
-			result.BuyPrice = &bestBuyPrice
-			result.BuyVendor = bestBuyName
+	}
+
+	for _, cardId := range cardIds {
+		result := PriceResult{
+			SellPrice:  bestSell[cardId].SellPrice,
+			SellVendor: bestSell[cardId].SellVendor,
+			BuyPrice:   bestBuy[cardId].BuyPrice,
+			BuyVendor:  bestBuy[cardId].BuyVendor,
 		}
 
 		// Prefer thumbnail for inline favorites/recents render; fall back to full.
