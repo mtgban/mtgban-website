@@ -511,8 +511,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			retSellers = append([]string{retSeller}, defaultSellerPriorityOpt...)
 		}
 
+		sortData := resolveSortingData(allKeys)
+		prices := resolveBestPrices(allKeys, retSellers, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsByRetail(allKeys[i], allKeys[j], retSellers)
+			priceI, priceJ := prices[allKeys[i]], prices[allKeys[j]]
+			if priceI == priceJ {
+				return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
+			}
+			return priceI > priceJ
 		})
 	case "buylist":
 		blVendors := defaultVendorPriorityOpt
@@ -521,8 +527,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			blVendors = append([]string{blVendor}, defaultVendorPriorityOpt...)
 		}
 
+		sortData := resolveSortingData(allKeys)
+		buyPrices := resolveBestPrices(allKeys, blVendors, price4vendor)
+		retPrices := resolveBestPrices(allKeys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsByBuylist(allKeys[i], allKeys[j], blVendors)
+			priceI, priceJ := buyPrices[allKeys[i]], buyPrices[allKeys[j]]
+			if priceI != priceJ {
+				return priceI > priceJ
+			}
+			priceI, priceJ = retPrices[allKeys[i]], retPrices[allKeys[j]]
+			if priceI != priceJ {
+				return priceI > priceJ
+			}
+			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	default:
 		sortData := resolveSortingData(allKeys)
@@ -1627,6 +1644,29 @@ func resolveSortingData(cardIds []string) map[string]*SortingData {
 	return data
 }
 
+// resolveBestPrices records the highest price every given id fetches
+// among the listed stores: each price4seller/price4vendor call walks
+// the scraper list, so the price sorts must not repeat it per
+// comparison, let alone N log N times.
+func resolveBestPrices(cardIds []string, stores []string, price4 func(cardId, shorthand string) float64) map[string]float64 {
+	prices := make(map[string]float64, len(cardIds))
+	for _, cardId := range cardIds {
+		_, found := prices[cardId]
+		if found {
+			continue
+		}
+		var best float64
+		for _, store := range stores {
+			price := price4(cardId, store)
+			if price > best {
+				best = price
+			}
+		}
+		prices[cardId] = best
+	}
+	return prices
+}
+
 // Sort cards by their collector number and finish (nonfoil-foil-etched)
 func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
 	sortingI, _ := getSortingData(uuidI)
@@ -1816,52 +1856,4 @@ func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData, preferFlavor bool) 
 	}
 
 	return sortingI.editionLower < sortingJ.editionLower
-}
-
-// Sort cards using the highest price among to the sellers in the input slice
-// If same price is found, sort as normal
-func sortSetsByRetail(uuidI, uuidJ string, retSellers []string) bool {
-	var priceI, priceJ float64
-	for _, retSeller := range retSellers {
-		price := price4seller(uuidI, retSeller)
-		if price > priceI {
-			priceI = price
-		}
-	}
-	for _, retSeller := range retSellers {
-		price := price4seller(uuidJ, retSeller)
-		if price > priceJ {
-			priceJ = price
-		}
-	}
-
-	if priceI == priceJ {
-		return sortSets(uuidI, uuidJ)
-	}
-
-	return priceI > priceJ
-}
-
-// Sort cards using the highest price among to the vendors in the input slice
-// If same price is found, sort by the highest retail price
-func sortSetsByBuylist(uuidI, uuidJ string, blVendors []string) bool {
-	var priceI, priceJ float64
-	for _, blVendor := range blVendors {
-		price := price4vendor(uuidI, blVendor)
-		if price > priceI {
-			priceI = price
-		}
-	}
-	for _, blVendor := range blVendors {
-		price := price4vendor(uuidJ, blVendor)
-		if price > priceJ {
-			priceJ = price
-		}
-	}
-
-	if priceI == priceJ {
-		return sortSetsByRetail(uuidI, uuidJ, defaultSellerPriorityOpt)
-	}
-
-	return priceI > priceJ
 }
