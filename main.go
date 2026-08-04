@@ -656,8 +656,11 @@ func ServeFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func genPageNav(activeTab, sig string) PageVars {
-	exp := GetParamFromSig(sig, "Expires")
-	expires, _ := strconv.ParseInt(exp, 10, 64)
+	// Decode the sig once; this function reads it for expiry, every nav
+	// feature, and the user email, and each GetParamFromSig call would
+	// re-parse the whole thing.
+	sigParams := parseSig(sig)
+	expires, _ := strconv.ParseInt(sigParams.Get("Expires"), 10, 64)
 	msg := ""
 	showPatreonLogin := false
 	if sig != "" {
@@ -718,8 +721,7 @@ func genPageNav(activeTab, sig string) PageVars {
 
 		allowed := devMode || noAuth || alwaysOnDev || offline
 		if !allowed {
-			param := GetParamFromSig(sig, feat)
-			allowed, _ = strconv.ParseBool(param)
+			allowed, _ = strconv.ParseBool(sigParams.Get(feat))
 		}
 
 		if !allowed {
@@ -754,7 +756,7 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars.HasSettings = pageVars.Nav[mainNavIndex].HasSettings
 
 	// Add user information if needed, or public
-	user := GetParamFromSig(sig, "UserEmail")
+	user := sigParams.Get("UserEmail")
 	if user == "" {
 		if !showPatreonLogin {
 			user = "Anonymous"

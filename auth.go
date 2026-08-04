@@ -680,14 +680,23 @@ func sign(tierTitle string, userData *PatreonUserData) string {
 	return str
 }
 
-func GetParamFromSig(sig, param string) string {
+// parseSig decodes the query values packed in a signature. A sig that doesn't
+// decode returns nil, which behaves as an empty url.Values on Get. Decoding
+// the full ~2KB sig costs a few microseconds, so code reading several params
+// (like genPageNav's feature loop) should parse once and Get from the result
+// rather than calling GetParamFromSig per param.
+func parseSig(sig string) url.Values {
 	raw, err := base64.StdEncoding.DecodeString(sig)
 	if err != nil {
-		return ""
+		return nil
 	}
 	v, err := url.ParseQuery(string(raw))
 	if err != nil {
-		return ""
+		return nil
 	}
-	return v.Get(param)
+	return v
+}
+
+func GetParamFromSig(sig, param string) string {
+	return parseSig(sig).Get(param)
 }
