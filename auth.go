@@ -488,9 +488,11 @@ func enforceSigning(next http.Handler) http.Handler {
 			return
 		}
 
-		pageVars := genPageNav("Error", sig)
-
+		// The error nav is built lazily inside each failing branch: on the
+		// happy path — nearly every request — it would be thrown away, and
+		// the handler builds its own right after.
 		if !UserRateLimiter.Allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
+			pageVars := genPageNav("Error", sig)
 			pageVars.Title = "Too Many Requests"
 			pageVars.ErrorMessage = ErrMsgUseAPI
 
@@ -500,6 +502,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		raw, err := base64.StdEncoding.DecodeString(sig)
 		if SigCheck && err != nil {
+			pageVars := genPageNav("Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if DevMode {
@@ -512,6 +515,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		v, err := url.ParseQuery(string(raw))
 		if SigCheck && err != nil {
+			pageVars := genPageNav("Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if DevMode {
@@ -545,6 +549,7 @@ func enforceSigning(next http.Handler) http.Handler {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 				return
 			}
+			pageVars := genPageNav("Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if valid == expectedSig && expires < time.Now().Unix() {
@@ -576,7 +581,7 @@ func enforceSigning(next http.Handler) http.Handler {
 					canDo = true
 				}
 				if SigCheck && !canDo {
-					pageVars = genPageNav(nav.Name, sig)
+					pageVars := genPageNav(nav.Name, sig)
 					pageVars.Title = "This feature is BANned"
 					pageVars.ErrorMessage = ErrMsgPlus
 
@@ -588,6 +593,7 @@ func enforceSigning(next http.Handler) http.Handler {
 				for _, subPage := range nav.SubPages {
 					if strings.HasPrefix(subPage.Link, r.URL.Path) &&
 						subPage.ShouldHide != nil && subPage.ShouldHide() {
+						pageVars := genPageNav("Error", sig)
 						pageVars.Title = "Unauthorized"
 						render(w, "home.html", pageVars)
 						break
