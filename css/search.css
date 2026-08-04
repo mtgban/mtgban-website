@@ -164,7 +164,12 @@
 .sidebar-body {
     flex: 1;
     min-height: 0;
-    overflow: visible;
+    /* Scroll the body (image, set value, printings) rather than let a tall
+       product photo push it over the pinned footer. The printings dropdown
+       lives in the scrollable overflow, so it stays reachable. Hidden x
+       hides the 2px the image borders poke out, instead of a scrollbar. */
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 .sidebar-body::-webkit-scrollbar { width: 4px; }
 .sidebar-body::-webkit-scrollbar-thumb {
