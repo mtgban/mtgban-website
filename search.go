@@ -1597,12 +1597,15 @@ func getSortingData(uuid string) (*SortingData, error) {
 
 // Sort cards by their collector number and finish (nonfoil-foil-etched)
 func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
-	sortingI, err := getSortingData(uuidI)
-	if err != nil {
-		return false
-	}
-	sortingJ, err := getSortingData(uuidJ)
-	if err != nil {
+	sortingI, _ := getSortingData(uuidI)
+	sortingJ, _ := getSortingData(uuidJ)
+	return cmpNumberAndFinish(sortingI, sortingJ, strip)
+}
+
+// cmpNumberAndFinish is sortByNumberAndFinish over already-resolved sorting
+// data; nil data (an unknown id) sorts like the lookup error it stands for.
+func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
+	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI := sortingI.co
@@ -1667,12 +1670,14 @@ func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
 
 // Sort cards grouping them by edition, and then by their collector number
 func sortSets(uuidI, uuidJ string) bool {
-	sortingI, err := getSortingData(uuidI)
-	if err != nil {
-		return false
-	}
-	sortingJ, err := getSortingData(uuidJ)
-	if err != nil {
+	sortingI, _ := getSortingData(uuidI)
+	sortingJ, _ := getSortingData(uuidJ)
+	return cmpSets(sortingI, sortingJ)
+}
+
+// cmpSets is sortSets over already-resolved sorting data.
+func cmpSets(sortingI, sortingJ *SortingData) bool {
+	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI, setDateI := sortingI.co, sortingI.releaseDate
@@ -1708,7 +1713,7 @@ func sortSets(uuidI, uuidJ string) bool {
 				return strings.ToLower(cI.Name) < strings.ToLower(cJ.Name)
 			}
 
-			return sortByNumberAndFinish(uuidI, uuidJ, true)
+			return cmpNumberAndFinish(sortingI, sortingJ, true)
 			// For the special case of set promos, always keeps them after
 		} else if sortingI.parentCode == "" && sortingJ.parentCode != "" {
 			return true
@@ -1725,12 +1730,14 @@ func sortSets(uuidI, uuidJ string) bool {
 // Sort card by their names, trying to keep cards grouped by edition, following
 // the same rules as sortSets
 func sortSetsAlphabetical(uuidI, uuidJ string, preferFlavor bool) bool {
-	sortingI, err := getSortingData(uuidI)
-	if err != nil {
-		return false
-	}
-	sortingJ, err := getSortingData(uuidJ)
-	if err != nil {
+	sortingI, _ := getSortingData(uuidI)
+	sortingJ, _ := getSortingData(uuidJ)
+	return cmpSetsAlphabetical(sortingI, sortingJ, preferFlavor)
+}
+
+// cmpSetsAlphabetical is sortSetsAlphabetical over already-resolved sorting data.
+func cmpSetsAlphabetical(sortingI, sortingJ *SortingData, preferFlavor bool) bool {
+	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI, setDateI := sortingI.co, sortingI.releaseDate
@@ -1748,7 +1755,7 @@ func sortSetsAlphabetical(uuidI, uuidJ string, preferFlavor bool) bool {
 	if cIname == cJname {
 		if setDateI.Equal(setDateJ) {
 			// We need not to strip to keep set ordered wrt Promos etc
-			return sortByNumberAndFinish(uuidI, uuidJ, false)
+			return cmpNumberAndFinish(sortingI, sortingJ, false)
 		}
 
 		return setDateI.After(setDateJ)
@@ -1759,19 +1766,21 @@ func sortSetsAlphabetical(uuidI, uuidJ string, preferFlavor bool) bool {
 
 // Sort card by their names, keeping cards grouped by edition alphabetically
 func sortSetsAlphabeticalSet(uuidI, uuidJ string, preferFlavor bool) bool {
-	sortingI, err := getSortingData(uuidI)
-	if err != nil {
-		return false
-	}
-	sortingJ, err := getSortingData(uuidJ)
-	if err != nil {
+	sortingI, _ := getSortingData(uuidI)
+	sortingJ, _ := getSortingData(uuidJ)
+	return cmpSetsAlphabeticalSet(sortingI, sortingJ, preferFlavor)
+}
+
+// cmpSetsAlphabeticalSet is sortSetsAlphabeticalSet over already-resolved sorting data.
+func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData, preferFlavor bool) bool {
+	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI := sortingI.co
 	cJ := sortingJ.co
 
 	if cI.SetCode == cJ.SetCode {
-		return sortSetsAlphabetical(uuidI, uuidJ, preferFlavor)
+		return cmpSetsAlphabetical(sortingI, sortingJ, preferFlavor)
 	}
 
 	return strings.ToLower(cI.Edition) < strings.ToLower(cJ.Edition)
