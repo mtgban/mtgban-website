@@ -1031,11 +1031,22 @@ func scraperName(shorthand string) string {
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically
 // by their resolved display name (case-insensitive). Stable for equal names.
 func sortKeysByScraperName(keys []string) []string {
-	out := make([]string, len(keys))
-	copy(out, keys)
-	sort.SliceStable(out, func(i, j int) bool {
-		return strings.ToLower(scraperName(out[i])) < strings.ToLower(scraperName(out[j]))
+	// Resolve each key's name once up front instead of twice per comparison.
+	type keyName struct {
+		key  string
+		name string
+	}
+	decorated := make([]keyName, len(keys))
+	for i, key := range keys {
+		decorated[i] = keyName{key, strings.ToLower(scraperName(key))}
+	}
+	sort.SliceStable(decorated, func(i, j int) bool {
+		return decorated[i].name < decorated[j].name
 	})
+	out := make([]string, len(keys))
+	for i, d := range decorated {
+		out[i] = d.key
+	}
 	return out
 }
 
