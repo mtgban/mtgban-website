@@ -121,6 +121,43 @@
     color: var(--text-dim);
 }
 
+/* Quick-add grant form: one compact row above the grants table */
+.admin-grant-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.admin-grant-form input[type="email"],
+.admin-grant-form input[type="text"],
+.admin-grant-form select {
+    flex: 1;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-moderate);
+    background: var(--surface-2);
+    color: var(--normal);
+    font-size: var(--text-md);
+    outline: none;
+    font-family: inherit;
+}
+.admin-grant-form select { cursor: pointer; }
+.admin-grant-form input:focus,
+.admin-grant-form select:focus { border-color: var(--ainfo); }
+.admin-grant-form input::placeholder { color: var(--text-dim); }
+.admin-grant-form input[type="submit"] {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--dodgerblue);
+    color: #fff;
+    font-size: var(--text-md);
+    font-weight: 600;
+    cursor: pointer;
+}
+
 .admin-table-wrap {
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);

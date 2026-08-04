@@ -578,6 +578,58 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	})
 	pageVars.Tables = append(pageVars.Tables, pageTable)
 
+	// -- People: quick-add a Patreon grant --
+	// Reuses the config editor's persistence: the amended config is written
+	// to the config source and swapped in memory, so the grant survives
+	// restarts and shows in the table below immediately.
+	grantEmail := strings.ToLower(strings.TrimSpace(r.FormValue("grantEmail")))
+	if grantEmail != "" {
+		grantTier := r.FormValue("grantTier")
+		newGrant := PatreonGrant{
+			Category: strings.TrimSpace(r.FormValue("grantCategory")),
+			Email:    grantEmail,
+			Name:     strings.TrimSpace(r.FormValue("grantName")),
+			Tier:     grantTier,
+		}
+
+		duplicate := false
+		for _, person := range Config.Patreon.Grants {
+			if strings.EqualFold(person.Email, grantEmail) {
+				duplicate = true
+				break
+			}
+		}
+		_, tierExists := Config.ACL[grantTier]
+
+		switch {
+		case !strings.Contains(grantEmail, "@"):
+			pageVars.WarningMessage = "invalid grant email: " + grantEmail
+		case duplicate:
+			pageVars.WarningMessage = grantEmail + " already has a grant"
+		case !tierExists:
+			pageVars.WarningMessage = "unknown tier: " + grantTier
+		default:
+			newConfig := Config
+			newConfig.Patreon.Grants = append(slices.Clone(Config.Patreon.Grants), newGrant)
+
+			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
+			if err != nil {
+				pageVars.WarningMessage = err.Error()
+			} else {
+				err = writeConfigFile(newConfig, writer)
+				writer.Close()
+				if err != nil {
+					log.Println(err)
+					pageVars.WarningMessage = err.Error()
+				} else {
+					Config = newConfig
+					pageVars.InfoMessage = fmt.Sprintf("Granted %s tier to %s", newGrant.Tier, newGrant.Email)
+					LogPages["Admin"].Printf("Grant added: %+v", newGrant)
+				}
+			}
+		}
+	}
+
 	// -- People: Patreon Grants --
 	var userTable [][]string
 	for i, person := range Config.Patreon.Grants {
