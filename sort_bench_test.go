@@ -32,8 +32,9 @@ func BenchmarkSortSets(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
+		sortData := resolveSortingData(keys)
 		sort.Slice(keys, func(i, j int) bool {
-			return sortSets(keys[i], keys[j])
+			return cmpSets(sortData[keys[i]], sortData[keys[j]])
 		})
 	}
 }
@@ -43,8 +44,9 @@ func BenchmarkSortSetsAlphabetical(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
+		sortData := resolveSortingData(keys)
 		sort.Slice(keys, func(i, j int) bool {
-			return sortSetsAlphabetical(keys[i], keys[j], false)
+			return cmpSetsAlphabetical(sortData[keys[i]], sortData[keys[j]], false)
 		})
 	}
 }
@@ -54,8 +56,9 @@ func BenchmarkSortSetsAlphabeticalSet(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
+		sortData := resolveSortingData(keys)
 		sort.Slice(keys, func(i, j int) bool {
-			return sortSetsAlphabeticalSet(keys[i], keys[j], false)
+			return cmpSetsAlphabeticalSet(sortData[keys[i]], sortData[keys[j]], false)
 		})
 	}
 }
@@ -65,8 +68,9 @@ func BenchmarkSortByNumberAndFinish(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		keys := slices.Clone(uuids)
+		sortData := resolveSortingData(keys)
 		sort.Slice(keys, func(i, j int) bool {
-			return sortByNumberAndFinish(keys[i], keys[j], false)
+			return cmpNumberAndFinish(sortData[keys[i]], sortData[keys[j]], false)
 		})
 	}
 }

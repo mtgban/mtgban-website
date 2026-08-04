@@ -1279,6 +1279,21 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func sortResults(uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string, preferFlavor bool) {
+	// The card-data sorts below order both the uploaded rows and every
+	// per-store optimized list, so resolve the ids of both up front.
+	resolveUploadSortingData := func() map[string]*SortingData {
+		cardIds := make([]string, 0, len(uploadedData))
+		for i := range uploadedData {
+			cardIds = append(cardIds, uploadedData[i].CardId)
+		}
+		for _, entries := range optimizedResults {
+			for i := range entries {
+				cardIds = append(cardIds, entries[i].CardId)
+			}
+		}
+		return resolveSortingData(cardIds)
+	}
+
 	switch sorting {
 	case "highprice":
 		sort.Slice(uploadedData, func(i, j int) bool {
@@ -1291,33 +1306,36 @@ func sortResults(uploadedData []UploadEntry, optimizedResults map[string][]Optim
 			})
 		}
 	case "alphabetical":
+		sortData := resolveUploadSortingData()
 		sort.Slice(uploadedData, func(i, j int) bool {
-			return sortSetsAlphabetical(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
+			return cmpSetsAlphabetical(sortData[uploadedData[i].CardId], sortData[uploadedData[j].CardId], preferFlavor)
 		})
 
 		for store := range optimizedResults {
 			sort.Slice(optimizedResults[store], func(i, j int) bool {
-				return sortSetsAlphabetical(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
+				return cmpSetsAlphabetical(sortData[optimizedResults[store][i].CardId], sortData[optimizedResults[store][j].CardId], preferFlavor)
 			})
 		}
 	case "setalpha":
+		sortData := resolveUploadSortingData()
 		sort.Slice(uploadedData, func(i, j int) bool {
-			return sortSetsAlphabeticalSet(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
+			return cmpSetsAlphabeticalSet(sortData[uploadedData[i].CardId], sortData[uploadedData[j].CardId], preferFlavor)
 		})
 
 		for store := range optimizedResults {
 			sort.Slice(optimizedResults[store], func(i, j int) bool {
-				return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
+				return cmpSetsAlphabeticalSet(sortData[optimizedResults[store][i].CardId], sortData[optimizedResults[store][j].CardId], preferFlavor)
 			})
 		}
 	case "setchrono":
+		sortData := resolveUploadSortingData()
 		sort.Slice(uploadedData, func(i, j int) bool {
-			return sortSets(uploadedData[i].CardId, uploadedData[j].CardId)
+			return cmpSets(sortData[uploadedData[i].CardId], sortData[uploadedData[j].CardId])
 		})
 
 		for store := range optimizedResults {
 			sort.Slice(optimizedResults[store], func(i, j int) bool {
-				return sortSets(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId)
+				return cmpSets(sortData[optimizedResults[store][i].CardId], sortData[optimizedResults[store][j].CardId])
 			})
 		}
 	case "highspread":

@@ -287,10 +287,20 @@ func init() {
 	}
 }
 
-// arbitLess returns the comparator for the given sort mode, or nil for
-// unknown modes (caller leaves the slice unsorted, matching the prior
-// switch's absence of a default case).
-func arbitLess(mode string, globalMode, preferFlavor bool) func(a, b *mtgban.ArbitEntry) bool {
+// arbitCardIds collects the card id of every entry, for resolving their
+// sorting data in one pass.
+func arbitCardIds(entries []mtgban.ArbitEntry) []string {
+	cardIds := make([]string, len(entries))
+	for i := range entries {
+		cardIds[i] = entries[i].CardId
+	}
+	return cardIds
+}
+
+// arbitLess returns the comparator for sorting entries in the given
+// mode, or nil for unknown modes (caller leaves the slice unsorted,
+// matching the prior switch's absence of a default case).
+func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode, preferFlavor bool) func(a, b *mtgban.ArbitEntry) bool {
 	switch mode {
 	case "available":
 		return func(a, b *mtgban.ArbitEntry) bool {
@@ -327,18 +337,20 @@ func arbitLess(mode string, globalMode, preferFlavor bool) func(a, b *mtgban.Arb
 			return a.Spread > b.Spread
 		}
 	case "edition":
+		sortData := resolveSortingData(arbitCardIds(entries))
 		return func(a, b *mtgban.ArbitEntry) bool {
 			if a.CardId == b.CardId {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
 			}
-			return sortSets(a.CardId, b.CardId)
+			return cmpSets(sortData[a.CardId], sortData[b.CardId])
 		}
 	case "alpha":
+		sortData := resolveSortingData(arbitCardIds(entries))
 		return func(a, b *mtgban.ArbitEntry) bool {
 			if a.CardId == b.CardId {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
 			}
-			return sortSetsAlphabetical(a.CardId, b.CardId, preferFlavor)
+			return cmpSetsAlphabetical(sortData[a.CardId], sortData[b.CardId], preferFlavor)
 		}
 	}
 	return nil
@@ -880,7 +892,8 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if sorting == "" {
 			sorting = DefaultSortingOption
 		}
-		if less := arbitLess(sorting, pageVars.GlobalMode, preferFlavor); less != nil {
+		less := arbitLess(arbit, sorting, pageVars.GlobalMode, preferFlavor)
+		if less != nil {
 			sort.Slice(arbit, func(i, j int) bool { return less(&arbit[i], &arbit[j]) })
 		}
 		pageVars.SortOption = sorting

@@ -741,18 +741,19 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Sort results to match the search page order
 	sortOpt := r.FormValue("sort")
+	sortData := resolveSortingData(allKeys)
 	switch sortOpt {
 	case "alpha":
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsAlphabetical(allKeys[i], allKeys[j], false)
+			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
 	case "number":
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortByNumberAndFinish(allKeys[i], allKeys[j], false)
+			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
 	default:
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSets(allKeys[i], allKeys[j])
+			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	}
 	reverseSort, _ := strconv.ParseBool(r.FormValue("reverse"))

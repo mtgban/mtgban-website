@@ -490,16 +490,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Sort sets as requested, default to chronological
 	switch pageVars.SearchSort {
 	case "alpha":
+		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsAlphabetical(allKeys[i], allKeys[j], preferFlavor)
+			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]], preferFlavor)
 		})
 	case "hybrid":
+		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsAlphabeticalSet(allKeys[i], allKeys[j], preferFlavor)
+			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]], preferFlavor)
 		})
 	case "number":
+		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortByNumberAndFinish(allKeys[i], allKeys[j], false)
+			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
 	case "retail":
 		retSellers := defaultSellerPriorityOpt
@@ -522,8 +525,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			return sortSetsByBuylist(allKeys[i], allKeys[j], blVendors)
 		})
 	default:
+		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSets(allKeys[i], allKeys[j])
+			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	}
 
@@ -1573,6 +1577,12 @@ type SortingData struct {
 	co          *mtgmatcher.CardObject
 	releaseDate time.Time
 	parentCode  string
+
+	// Lowercased fields the comparators order by, so the N log N
+	// comparisons don't re-lower them every time.
+	nameLower    string
+	flavorLower  string
+	editionLower string
 }
 
 func getSortingData(uuid string) (*SortingData, error) {
@@ -1589,10 +1599,32 @@ func getSortingData(uuid string) (*SortingData, error) {
 		return nil, err
 	}
 	return &SortingData{
-		co:          co,
-		releaseDate: releaseDate,
-		parentCode:  set.ParentCode,
+		co:           co,
+		releaseDate:  releaseDate,
+		parentCode:   set.ParentCode,
+		nameLower:    strings.ToLower(co.Name),
+		flavorLower:  strings.ToLower(co.FlavorName),
+		editionLower: strings.ToLower(co.Edition),
 	}, nil
+}
+
+// resolveSortingData resolves the sorting data of every given id up
+// front, so the N log N comparisons of a sort look each card up instead
+// of re-resolving it every time they see it; a sort visits all of its
+// elements, so nothing is saved by resolving lazily. Unknown ids get a
+// nil entry, which the cmp* comparators order like the lookup error it
+// stands for.
+func resolveSortingData(cardIds []string) map[string]*SortingData {
+	data := make(map[string]*SortingData, len(cardIds))
+	for _, cardId := range cardIds {
+		_, found := data[cardId]
+		if found {
+			continue
+		}
+		sorting, _ := getSortingData(cardId)
+		data[cardId] = sorting
+	}
+	return data
 }
 
 // Sort cards by their collector number and finish (nonfoil-foil-etched)
@@ -1710,7 +1742,7 @@ func cmpSets(sortingI, sortingJ *SortingData) bool {
 					return true
 				}
 
-				return strings.ToLower(cI.Name) < strings.ToLower(cJ.Name)
+				return sortingI.nameLower < sortingJ.nameLower
 			}
 
 			return cmpNumberAndFinish(sortingI, sortingJ, true)
@@ -1720,7 +1752,7 @@ func cmpSets(sortingI, sortingJ *SortingData) bool {
 		} else if sortingJ.parentCode == "" && sortingI.parentCode != "" {
 			return false
 		} else {
-			return strings.ToLower(cI.Edition) < strings.ToLower(cJ.Edition)
+			return sortingI.editionLower < sortingJ.editionLower
 		}
 	}
 
@@ -1743,13 +1775,13 @@ func cmpSetsAlphabetical(sortingI, sortingJ *SortingData, preferFlavor bool) boo
 	cI, setDateI := sortingI.co, sortingI.releaseDate
 	cJ, setDateJ := sortingJ.co, sortingJ.releaseDate
 
-	cIname := cI.Name
-	cJname := cJ.Name
+	cIname, cInameLower := cI.Name, sortingI.nameLower
+	cJname, cJnameLower := cJ.Name, sortingJ.nameLower
 	if preferFlavor && cI.FlavorName != "" && allLanguageFlags[cI.Language] != "" {
-		cIname = cI.FlavorName
+		cIname, cInameLower = cI.FlavorName, sortingI.flavorLower
 	}
 	if preferFlavor && cJ.FlavorName != "" && allLanguageFlags[cJ.Language] != "" {
-		cJname = cJ.FlavorName
+		cJname, cJnameLower = cJ.FlavorName, sortingJ.flavorLower
 	}
 
 	if cIname == cJname {
@@ -1761,7 +1793,7 @@ func cmpSetsAlphabetical(sortingI, sortingJ *SortingData, preferFlavor bool) boo
 		return setDateI.After(setDateJ)
 	}
 
-	return strings.ToLower(cIname) < strings.ToLower(cJname)
+	return cInameLower < cJnameLower
 }
 
 // Sort card by their names, keeping cards grouped by edition alphabetically
@@ -1783,7 +1815,7 @@ func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData, preferFlavor bool) 
 		return cmpSetsAlphabetical(sortingI, sortingJ, preferFlavor)
 	}
 
-	return strings.ToLower(cI.Edition) < strings.ToLower(cJ.Edition)
+	return sortingI.editionLower < sortingJ.editionLower
 }
 
 // Sort cards using the highest price among to the sellers in the input slice

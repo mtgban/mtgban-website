@@ -1155,18 +1155,20 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		switch sorting {
 		default:
+			sortData := resolveSortingData(arbitCardIds(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardId == arbit[j].CardId {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return sortSets(arbit[i].CardId, arbit[j].CardId)
+				return cmpSets(sortData[arbit[i].CardId], sortData[arbit[j].CardId])
 			})
 		case "alpha":
+			sortData := resolveSortingData(arbitCardIds(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardId == arbit[j].CardId {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId, preferFlavor)
+				return cmpSetsAlphabetical(sortData[arbit[i].CardId], sortData[arbit[j].CardId], preferFlavor)
 			})
 		case "available":
 			sort.Slice(arbit, func(i, j int) bool {

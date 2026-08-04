@@ -60,8 +60,9 @@ func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]Searc
 		sortedKeysSeller = append(sortedKeysSeller, cardId)
 	}
 	if len(sortedKeysSeller) > 1 {
+		sortData := resolveSortingData(sortedKeysSeller)
 		sort.Slice(sortedKeysSeller, func(i, j int) bool {
-			return sortSets(sortedKeysSeller[i], sortedKeysSeller[j])
+			return cmpSets(sortData[sortedKeysSeller[i]], sortData[sortedKeysSeller[j]])
 		})
 	}
 
@@ -131,8 +132,9 @@ func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]Searc
 		sortedKeysVendor = append(sortedKeysVendor, cardId)
 	}
 	if len(sortedKeysVendor) > 1 {
+		sortData := resolveSortingData(sortedKeysVendor)
 		sort.Slice(sortedKeysVendor, func(i, j int) bool {
-			return sortSets(sortedKeysVendor[i], sortedKeysVendor[j])
+			return cmpSets(sortData[sortedKeysVendor[i]], sortData[sortedKeysVendor[j]])
 		})
 	}
 
