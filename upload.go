@@ -1024,13 +1024,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if skipConds {
 			conds = ""
 		}
+		priceKey := cardId + conds
 		for indexKey, indexResult := range indexResults[cardId] {
 			indexPrice := getPrice(indexResult, conds)
 
-			if resultPrices[cardId+conds] == nil {
-				resultPrices[cardId+conds] = map[string]float64{}
+			if resultPrices[priceKey] == nil {
+				resultPrices[priceKey] = map[string]float64{}
 			}
-			resultPrices[cardId+conds][indexKey] = indexPrice
+			resultPrices[priceKey][indexKey] = indexPrice
 
 			qty := 1
 			if uploadedData[i].HasQuantity {
@@ -1055,10 +1056,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Run summaries for each vendor
 		for shorthand, banPrice := range results[cardId] {
-			conds := uploadedData[i].OriginalCondition
-			if skipConds {
-				conds = ""
-			}
 			price := getPrice(banPrice, conds)
 
 			// Adjust for preferred price source
@@ -1071,10 +1068,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Store computed price
-			if resultPrices[cardId+conds] == nil {
-				resultPrices[cardId+conds] = map[string]float64{}
+			if resultPrices[priceKey] == nil {
+				resultPrices[priceKey] = map[string]float64{}
 			}
-			resultPrices[cardId+conds][shorthand] = price
+			resultPrices[priceKey][shorthand] = price
 
 			// Skip empty results
 			if price == 0 {
@@ -1137,7 +1134,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Load the single item priceprice
-			price := resultPrices[cardId+conds][bestStore]
+			price := resultPrices[priceKey][bestStore]
 
 			// Skip if needed
 			if skipLowValueAbs && price < minLowVal {
