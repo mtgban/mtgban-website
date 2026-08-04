@@ -388,11 +388,11 @@
 
                 <div class="search-sidebar">
                     {{template "sidebar-search" .}}
+                    <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
+                        <img class="sidebar-card-img" id="cardImage" src=""/>
+                    </div>
+                    <div class="sidebar-printings" id="printings"></div>
                     <div class="sidebar-body">
-                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
-                            <img class="sidebar-card-img" id="cardImage" src=""/>
-                        </div>
-                        <div class="sidebar-printings" id="printings"></div>
                         {{if .CanShowAll}}
                             <a class="sidebar-action primary" href="search?q={{.CleanSearchQuery}}">Show all versions</a>
                         {{end}}

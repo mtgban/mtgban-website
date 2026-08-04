@@ -170,12 +170,11 @@
        hides the 2px the image borders poke out, instead of a scrollbar. */
     overflow-y: auto;
     overflow-x: hidden;
+    /* Scrollable but chromeless, like the sidebar always was: the page keeps
+       the only visible scrollbar */
+    scrollbar-width: none;
 }
-.sidebar-body::-webkit-scrollbar { width: 4px; }
-.sidebar-body::-webkit-scrollbar-thumb {
-    background: var(--surface-4, #323840);
-    border-radius: 2px;
-}
+.sidebar-body::-webkit-scrollbar { width: 0; height: 0; }
 
 .sidebar-footer {
     flex-shrink: 0;
@@ -222,7 +221,13 @@
 
 .sidebar-img-wrap {
     position: relative;
-    margin-bottom: 14px;
+    /* A fixed flex child of the sidebar column now, above the scrolling body.
+       Shrink-wrapped so the foil ::after overlay hugs the image exactly even
+       when the height cap makes it narrower than the column. */
+    flex-shrink: 0;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto 14px;
 }
 .sidebar-img-wrap.foil-wrap[data-foil="true"]::after,
 .sidebar-img-wrap.foil-wrap[data-etched="true"]::after {
@@ -230,7 +235,13 @@
 }
 
 .sidebar-card-img {
-    width: 100%;
+    /* Cap the height so a tall product photo leaves the scrollable middle
+       (set value, printings, products) some room; the cap clears a normal
+       card's aspect at the sidebar width, and taller shots shrink to fit,
+       centered. width auto keeps the aspect ratio under the cap. */
+    width: auto;
+    max-width: 100%;
+    max-height: 52vh;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     display: block;
@@ -251,6 +262,35 @@
     margin-bottom: 14px;
     line-height: 1.6;
     position: relative;
+    /* A fixed flex child between the pinned image and the scrolling body, so
+       the set-value hover panel can overlay the picture without being
+       clipped by the body's scroll box */
+    flex-shrink: 0;
+}
+
+.sidebar-setvalue {
+    position: relative;
+}
+.sidebar-setvalue-trigger {
+    cursor: default;
+    color: var(--search-text-dim);
+}
+.sidebar-setvalue-panel {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: var(--search-surface-1);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-radius: var(--radius-sm, 6px);
+    padding: 10px 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.sidebar-setvalue:hover .sidebar-setvalue-panel,
+.sidebar-setvalue:focus-within .sidebar-setvalue-panel {
+    display: block;
 }
 .sidebar-printings a { color: var(--search-link); text-decoration: none; }
 .sidebar-printings a:hover { text-decoration: underline; }
