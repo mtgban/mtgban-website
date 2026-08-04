@@ -656,14 +656,18 @@ func stashNonMagicSnapshot(start time.Time) {
 	// Last price wins per (variant, date, provider), matching how the wide path
 	// collapses two sellers feeding the same dataset column.
 	prices := map[longKey]float64{}
-	var unresolved int
+	var unknown, ambiguous int
 	eachSnapshotPrice(start, func(sp snapshotPrice) {
 		if sp.ds.Provider == 0 {
 			return
 		}
-		banID, ok := nonMagicBanID(sp.card)
-		if !ok {
-			unresolved++
+		banID, match := nonMagicBanID(sp.card)
+		switch match {
+		case timeseries.TCGPrintingUnknown:
+			unknown++
+			return
+		case timeseries.TCGPrintingAmbiguous:
+			ambiguous++
 			return
 		}
 		prices[longKey{banID: banID, date: sp.date, provider: sp.ds.Provider}] = sp.price
@@ -685,20 +689,20 @@ func stashNonMagicSnapshot(start time.Time) {
 	}
 
 	SetLastStashUpdate(time.Now())
-	ServerNotify("timeseries", fmt.Sprintf("Snapshot completed in %s: %d upserted, %d unresolved",
-		time.Since(start), upserted, unresolved))
+	ServerNotify("timeseries", fmt.Sprintf("Snapshot completed in %s: %d upserted, %d unknown, %d ambiguous",
+		time.Since(start), upserted, unknown, ambiguous))
 }
 
-// nonMagicBanID resolves a non-Magic card to the variant of its TCGplayer product
-// in the card's finish. Both finishes share one product id and differ only by
-// sub-type, whose name is per-game ("Holofoil" / "Cold Foil" in Lorcana), so the
-// lookup goes through the variants the tcgcsv ingest already minted rather than
-// guessing a name from the foil flag. A product with no variant in that finish
-// drops its price for this run; the next ingest mints it.
-func nonMagicBanID(co *mtgmatcher.CardObject) (int64, bool) {
+// nonMagicBanID resolves a non-Magic card to the printing of its TCGplayer
+// product that its price belongs to. All of a product's printings share one
+// product id and differ only by sub-type, so the lookup goes through the variants
+// the tcgcsv ingest already minted rather than guessing a sub-type name from a
+// foil flag. Prices it can't place — an un-ingested product, or one carrying
+// several alternate sub-types — are dropped for this run and counted.
+func nonMagicBanID(co *mtgmatcher.CardObject) (int64, timeseries.TCGPrintingMatch) {
 	pid, ok := tcgProductID(co)
 	if !ok {
-		return 0, false
+		return 0, timeseries.TCGPrintingUnknown
 	}
 	return PricesArchiveDB.CachedTCGBanIDForFinish(pid, co.Foil)
 }

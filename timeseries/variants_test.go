@@ -2,83 +2,113 @@ package timeseries
 
 import "testing"
 
-// Sub-type names are per-game, so the split is "Normal" vs everything else, and
-// the rows arrive in whatever order the warm-up scan reads them.
-func TestTCGFinishes(t *testing.T) {
+// Sub-type names are per-game and open-ended, so the split is "Normal" against
+// however many alternates a product carries, and the rows arrive in whatever
+// order the warm-up scan reads them.
+func TestTCGPrintings(t *testing.T) {
 	type row struct {
 		banID   int64
 		subType string
 	}
 	cases := []struct {
-		name          string
-		rows          []row
-		normal        int64
-		foil          int64
-		canonicalWant int64
+		name      string
+		rows      []row
+		want      tcgPrintings
+		canonical int64
 	}{
 		{
-			name:          "normal and holofoil",
-			rows:          []row{{10, "Holofoil"}, {20, "Normal"}},
-			normal:        20,
-			foil:          10,
-			canonicalWant: 20,
+			name:      "normal and holofoil",
+			rows:      []row{{10, "Holofoil"}, {20, "Normal"}},
+			want:      tcgPrintings{normal: 20, alt: 10, altCount: 1},
+			canonical: 20,
 		},
 		{
-			name:          "foil only product keeps no normal",
-			rows:          []row{{30, "Cold Foil"}},
-			foil:          30,
-			canonicalWant: 30,
+			name:      "foil only product has no normal",
+			rows:      []row{{30, "Cold Foil"}},
+			want:      tcgPrintings{alt: 30, altCount: 1},
+			canonical: 30,
 		},
 		{
-			name:          "two foil sub-types pick the smallest ban_id",
-			rows:          []row{{50, "Holofoil"}, {40, "Cold Foil"}, {60, "Normal"}},
-			normal:        60,
-			foil:          40,
-			canonicalWant: 60,
+			name:      "two foil sub-types are both counted",
+			rows:      []row{{50, "Holofoil"}, {40, "Cold Foil"}, {60, "Normal"}},
+			want:      tcgPrintings{normal: 60, alt: 40, altCount: 2},
+			canonical: 60,
+		},
+		{
+			name:      "editions are alternates too, and there can be many",
+			rows:      []row{{70, "1st Edition"}, {80, "Unlimited"}, {90, "Limited"}},
+			want:      tcgPrintings{alt: 70, altCount: 3},
+			canonical: 70,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var f tcgFinishes
+			var p tcgPrintings
 			for _, r := range tc.rows {
-				f = f.observe(r.banID, r.subType)
+				p = p.observe(r.banID, r.subType)
 			}
-			if f.normal != tc.normal || f.foil != tc.foil {
-				t.Errorf("finishes = %+v, want normal=%d foil=%d", f, tc.normal, tc.foil)
+			if p != tc.want {
+				t.Errorf("printings = %+v, want %+v", p, tc.want)
 			}
-			if got := f.canonical(); got != tc.canonicalWant {
-				t.Errorf("canonical() = %d, want %d", got, tc.canonicalWant)
+			if got := p.canonical(); got != tc.canonical {
+				t.Errorf("canonical() = %d, want %d", got, tc.canonical)
 			}
 		})
 	}
 }
 
-// The write path must never fall back to the other finish: a non-foil price
-// landing on the foil variant (or the reverse) silently overwrites it.
+// The write path must never fall back to another printing: a base price landing
+// on an alternate (or the reverse) silently overwrites it, and a product with
+// several alternates can't be resolved from a foil bool at all.
 func TestCachedTCGBanIDForFinish(t *testing.T) {
 	var c Client
-	c.variants.tcgNormalByProduct.Store(100, int64(1))
-	c.variants.tcgFoilByProduct.Store(100, int64(2))
-	c.variants.tcgFoilByProduct.Store(200, int64(3))
+	c.variants.tcgPrintingsByProduct.Store(100, tcgPrintings{normal: 1, alt: 2, altCount: 1})
+	c.variants.tcgPrintingsByProduct.Store(200, tcgPrintings{alt: 3, altCount: 1})
+	c.variants.tcgPrintingsByProduct.Store(300, tcgPrintings{normal: 4})
+	c.variants.tcgPrintingsByProduct.Store(400, tcgPrintings{normal: 5, alt: 6, altCount: 2})
 
 	cases := []struct {
+		name      string
 		productID int
 		foil      bool
 		want      int64
-		wantOK    bool
+		wantMatch TCGPrintingMatch
 	}{
-		{productID: 100, foil: false, want: 1, wantOK: true},
-		{productID: 100, foil: true, want: 2, wantOK: true},
-		{productID: 200, foil: true, want: 3, wantOK: true},
-		{productID: 200, foil: false},
-		{productID: 999, foil: true},
+		{"base card takes Normal", 100, false, 1, TCGPrintingResolved},
+		{"foil card takes the only alternate", 100, true, 2, TCGPrintingResolved},
+		{"alternate-only product has no base printing", 200, false, 0, TCGPrintingUnknown},
+		{"alternate-only product resolves its alternate", 200, true, 3, TCGPrintingResolved},
+		{"base-only product has no alternate", 300, true, 0, TCGPrintingUnknown},
+		{"two alternates can't be told apart", 400, true, 0, TCGPrintingAmbiguous},
+		{"two alternates still resolve the base", 400, false, 5, TCGPrintingResolved},
+		{"product not in the cache", 999, true, 0, TCGPrintingUnknown},
 	}
 	for _, tc := range cases {
-		got, ok := c.CachedTCGBanIDForFinish(tc.productID, tc.foil)
-		if got != tc.want || ok != tc.wantOK {
-			t.Errorf("CachedTCGBanIDForFinish(%d, %t) = (%d, %t), want (%d, %t)",
-				tc.productID, tc.foil, got, ok, tc.want, tc.wantOK)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got, match := c.CachedTCGBanIDForFinish(tc.productID, tc.foil)
+			if got != tc.want || match != tc.wantMatch {
+				t.Errorf("CachedTCGBanIDForFinish(%d, %t) = (%d, %v), want (%d, %v)",
+					tc.productID, tc.foil, got, match, tc.want, tc.wantMatch)
+			}
+		})
+	}
+}
+
+// The read path charts a bare product id, so it must keep answering with the
+// canonical printing even where the write path refuses to guess.
+func TestCachedTCGBanID(t *testing.T) {
+	var c Client
+	c.variants.tcgPrintingsByProduct.Store(100, tcgPrintings{normal: 1, alt: 2, altCount: 2})
+	c.variants.tcgPrintingsByProduct.Store(200, tcgPrintings{alt: 3, altCount: 1})
+
+	if got, ok := c.CachedTCGBanID(100); got != 1 || !ok {
+		t.Errorf("CachedTCGBanID(100) = (%d, %t), want (1, true)", got, ok)
+	}
+	if got, ok := c.CachedTCGBanID(200); got != 3 || !ok {
+		t.Errorf("CachedTCGBanID(200) = (%d, %t), want (3, true)", got, ok)
+	}
+	if got, ok := c.CachedTCGBanID(999); got != 0 || ok {
+		t.Errorf("CachedTCGBanID(999) = (%d, %t), want (0, false)", got, ok)
 	}
 }
 

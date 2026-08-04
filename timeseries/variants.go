@@ -59,51 +59,51 @@ type TCGVariant struct {
 type variantCache struct {
 	magic sync.Map // MagicVariant -> int64
 	tcg   sync.Map // TCGVariant   -> int64
-	// tcgByProduct maps a TCGplayer product id to its canonical ban_id (the
-	// "Normal" sub-type, else the smallest ban_id), so a rendered non-Magic card
-	// resolves its ban_id from memory by product id alone — the read-path analogue
-	// of magic's uuid-keyed lookup, with no per-card DB round-trip. Mirrors
-	// LookupTCGBanID's precedence.
-	tcgByProduct sync.Map // int (product id) -> int64
-	// tcgNormalByProduct and tcgFoilByProduct split the same lookup by finish.
-	// A game's foil and non-foil printings share one product id and differ only
-	// by sub-type, so the write path needs them apart: folding both onto the
-	// canonical ban_id would have each finish overwrite the other's price.
-	tcgNormalByProduct sync.Map // int (product id) -> int64
-	tcgFoilByProduct   sync.Map // int (product id) -> int64
+	// tcgPrintingsByProduct maps a TCGplayer product id to its printings, so a
+	// non-Magic card resolves a ban_id from memory by product id alone — the
+	// analogue of magic's uuid-keyed lookup, with no per-card DB round-trip.
+	tcgPrintingsByProduct sync.Map // int (product id) -> tcgPrintings
 }
 
-// tcgFinishes collects one TCGplayer product's printings while the variant cache
-// is warmed: the "Normal" sub-type is the non-foil printing, anything else is the
-// foil one. Sub-type names are per-game ("Holofoil" and "Cold Foil" in Lorcana,
-// "Reverse Holofoil" in Pokemon, ...), so a foil flag can't name one — the only
-// reliable mapping is "not Normal". Either field is 0 when the product has no
-// printing in that finish (foil-only enchanted cards, non-foil-only sealed).
-type tcgFinishes struct {
-	normal int64
-	foil   int64
+// tcgPrintings collects one TCGplayer product's variant rows while the cache is
+// warmed. TCGplayer splits a product into sub-types, and that vocabulary is
+// per-game and open-ended: the catalog holds 16 today, and they are not all
+// finishes — "Foil", "Holofoil", "Reverse Holofoil", "Cold Foil" and "Rainbow
+// Foil" sit next to the Yu-Gi-Oh printings "1st Edition", "Unlimited" and
+// "Limited", and compounds like "1st Edition Rainbow Foil". Only "Normal", the
+// base printing, means the same thing in every game.
+//
+// So a product is modelled as its base printing plus however many alternates it
+// carries, and the alternates are counted rather than collapsed: see
+// CachedTCGBanIDForFinish for why a count of one is the only attributable case.
+type tcgPrintings struct {
+	normal   int64 // the "Normal" sub-type, 0 when the product has none
+	alt      int64 // the smallest-ban_id alternate sub-type, 0 when there are none
+	altCount int   // how many alternate sub-types the product carries
 }
 
-// observe folds one variant row into the product's picks, keeping the smallest
-// ban_id for the foil finish since a few products carry two foil sub-types.
-func (f tcgFinishes) observe(banID int64, subType string) tcgFinishes {
+// observe folds one variant row into the product's printings, keeping the
+// smallest ban_id among the alternates so canonical stays deterministic.
+func (p tcgPrintings) observe(banID int64, subType string) tcgPrintings {
 	if subType == "Normal" {
-		f.normal = banID
-		return f
+		p.normal = banID
+		return p
 	}
-	if f.foil == 0 || banID < f.foil {
-		f.foil = banID
+	p.altCount++
+	if p.alt == 0 || banID < p.alt {
+		p.alt = banID
 	}
-	return f
+	return p
 }
 
 // canonical is the product's default printing — "Normal" when it has one, else
-// its foil printing — mirroring LookupTCGBanID's ORDER BY.
-func (f tcgFinishes) canonical() int64 {
-	if f.normal != 0 {
-		return f.normal
+// the smallest alternate — mirroring LookupTCGBanID's ORDER BY. It is what the
+// read path charts for a bare product id.
+func (p tcgPrintings) canonical() int64 {
+	if p.normal != 0 {
+		return p.normal
 	}
-	return f.foil
+	return p.alt
 }
 
 // WarmVariantCache bulk-loads every existing variant into the in-memory cache in
@@ -120,7 +120,7 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 	defer rows.Close()
 
 	// Per-product printings, resolved after the scan since rows arrive unordered.
-	byProduct := map[int]tcgFinishes{}
+	byProduct := map[int]tcgPrintings{}
 
 	var loadedMagic, loadedTCG int
 	for rows.Next() {
@@ -154,14 +154,8 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	for pid, finishes := range byProduct {
-		c.variants.tcgByProduct.Store(pid, finishes.canonical())
-		if finishes.normal != 0 {
-			c.variants.tcgNormalByProduct.Store(pid, finishes.normal)
-		}
-		if finishes.foil != 0 {
-			c.variants.tcgFoilByProduct.Store(pid, finishes.foil)
-		}
+	for pid, printings := range byProduct {
+		c.variants.tcgPrintingsByProduct.Store(pid, printings)
 	}
 	return nil
 }
@@ -173,32 +167,65 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 // (new product, or an unwarmed cache) returns ok=false and the caller falls back
 // to the game-native id.
 func (c *Client) CachedTCGBanID(productID int) (int64, bool) {
-	if id, ok := c.variants.tcgByProduct.Load(productID); ok {
-		return id.(int64), true
+	p, ok := c.variants.tcgPrintingsByProduct.Load(productID)
+	if !ok {
+		return 0, false
 	}
-	return 0, false
+	return p.(tcgPrintings).canonical(), true
 }
 
-// CachedTCGBanIDForFinish returns the ban_id of a non-Magic product's printing in
-// one finish: the "Normal" sub-type for a non-foil card, the product's foil
-// sub-type otherwise. It is the write-path counterpart of CachedTCGBanID, which
-// answers with the product's canonical printing and so can't tell the two
-// finishes apart.
+// TCGPrintingMatch is the outcome of resolving a non-Magic card to the printing
+// its price belongs to.
+type TCGPrintingMatch int
+
+const (
+	// TCGPrintingResolved: exactly one printing matches; the ban_id is usable.
+	TCGPrintingResolved TCGPrintingMatch = iota
+	// TCGPrintingUnknown: the product has no matching printing in the cache —
+	// not ingested yet, or it exists only in the other finish. Transient: the
+	// next tcgcsv ingest mints it.
+	TCGPrintingUnknown
+	// TCGPrintingAmbiguous: several printings match and nothing in the source
+	// says which one was priced. Permanent for that product until the source
+	// carries a sub-type.
+	TCGPrintingAmbiguous
+)
+
+// CachedTCGBanIDForFinish returns the ban_id of the printing a non-Magic card's
+// price can be attributed to. It is the write-path counterpart of CachedTCGBanID,
+// which answers with the product's canonical printing and so would have every
+// alternate overwrite the base one's prices.
 //
-// A miss (ok=false) means the product has no printing in that finish yet — it
-// hasn't been ingested, or it only exists in the other finish. Skip the price
-// rather than mint: the sub-type's real name varies by game and can't be derived
-// from a foil flag, so minting would create a variant the tcgcsv ingest never
-// matches. The next ingest mints the real one.
-func (c *Client) CachedTCGBanIDForFinish(productID int, foil bool) (int64, bool) {
-	byProduct := &c.variants.tcgNormalByProduct
-	if foil {
-		byProduct = &c.variants.tcgFoilByProduct
+// The caller has a single foil bool — that is all mtgmatcher carries for a
+// non-Magic card — while the product may hold any number of sub-types. So a base
+// card takes "Normal", and a foil card takes the product's alternate only when it
+// has exactly one. Two alternates (a Lorcana card sold as both Cold Foil and
+// Holofoil, a Yu-Gi-Oh product as 1st Edition and Unlimited) make the price
+// unattributable, and guessing would silently file it under the wrong printing —
+// so it returns TCGPrintingAmbiguous and the caller drops it.
+//
+// Nothing is minted on a miss: a sub-type's real name can't be derived from a
+// foil flag, and inventing one would create a variant the tcgcsv ingest never
+// matches.
+func (c *Client) CachedTCGBanIDForFinish(productID int, foil bool) (int64, TCGPrintingMatch) {
+	v, ok := c.variants.tcgPrintingsByProduct.Load(productID)
+	if !ok {
+		return 0, TCGPrintingUnknown
 	}
-	if id, ok := byProduct.Load(productID); ok {
-		return id.(int64), true
+	p := v.(tcgPrintings)
+	if !foil {
+		if p.normal == 0 {
+			return 0, TCGPrintingUnknown
+		}
+		return p.normal, TCGPrintingResolved
 	}
-	return 0, false
+	switch {
+	case p.altCount == 0:
+		return 0, TCGPrintingUnknown
+	case p.altCount > 1:
+		return 0, TCGPrintingAmbiguous
+	}
+	return p.alt, TCGPrintingResolved
 }
 
 // ResolveMagicBanID returns the ban_id for a Magic variant, minting it if new.
