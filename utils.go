@@ -729,6 +729,11 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 
 func genSealedPrintings(co *mtgmatcher.CardObject) string {
 	var b strings.Builder
+	// A hover/focus trigger with the tables in a panel that opens upward,
+	// overlaying the picture, so the products list below stays visible.
+	b.WriteString("<div class='sidebar-setvalue' tabindex='0'>")
+	b.WriteString("<h6 class='sidebar-setvalue-trigger'>Set Value &#9662;</h6>")
+	b.WriteString("<div class='sidebar-setvalue-panel'>")
 	// The first chunk is always present, even for foil-only sets
 	b.WriteString("<h6>Set Value</h6><table class='setValue'>")
 
@@ -754,6 +759,7 @@ func genSealedPrintings(co *mtgmatcher.CardObject) string {
 		}
 		b.WriteString("</table>")
 	}
+	b.WriteString("</div></div>")
 	return b.String()
 }
 
