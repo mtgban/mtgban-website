@@ -65,6 +65,45 @@ type variantCache struct {
 	// of magic's uuid-keyed lookup, with no per-card DB round-trip. Mirrors
 	// LookupTCGBanID's precedence.
 	tcgByProduct sync.Map // int (product id) -> int64
+	// tcgNormalByProduct and tcgFoilByProduct split the same lookup by finish.
+	// A game's foil and non-foil printings share one product id and differ only
+	// by sub-type, so the write path needs them apart: folding both onto the
+	// canonical ban_id would have each finish overwrite the other's price.
+	tcgNormalByProduct sync.Map // int (product id) -> int64
+	tcgFoilByProduct   sync.Map // int (product id) -> int64
+}
+
+// tcgFinishes collects one TCGplayer product's printings while the variant cache
+// is warmed: the "Normal" sub-type is the non-foil printing, anything else is the
+// foil one. Sub-type names are per-game ("Holofoil" and "Cold Foil" in Lorcana,
+// "Reverse Holofoil" in Pokemon, ...), so a foil flag can't name one — the only
+// reliable mapping is "not Normal". Either field is 0 when the product has no
+// printing in that finish (foil-only enchanted cards, non-foil-only sealed).
+type tcgFinishes struct {
+	normal int64
+	foil   int64
+}
+
+// observe folds one variant row into the product's picks, keeping the smallest
+// ban_id for the foil finish since a few products carry two foil sub-types.
+func (f tcgFinishes) observe(banID int64, subType string) tcgFinishes {
+	if subType == "Normal" {
+		f.normal = banID
+		return f
+	}
+	if f.foil == 0 || banID < f.foil {
+		f.foil = banID
+	}
+	return f
+}
+
+// canonical is the product's default printing — "Normal" when it has one, else
+// its foil printing — mirroring LookupTCGBanID's ORDER BY.
+func (f tcgFinishes) canonical() int64 {
+	if f.normal != 0 {
+		return f.normal
+	}
+	return f.foil
 }
 
 // WarmVariantCache bulk-loads every existing variant into the in-memory cache in
@@ -80,14 +119,8 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 	}
 	defer rows.Close()
 
-	// Best canonical ban_id per product id, resolved after the scan since rows
-	// arrive unordered: prefer the "Normal" sub-type, else the smallest ban_id
-	// (matching LookupTCGBanID's ORDER BY).
-	type tcgBest struct {
-		banID  int64
-		normal bool
-	}
-	byProduct := map[int]tcgBest{}
+	// Per-product printings, resolved after the scan since rows arrive unordered.
+	byProduct := map[int]tcgFinishes{}
 
 	var loadedMagic, loadedTCG int
 	for rows.Next() {
@@ -115,19 +148,20 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 			loadedTCG++
 
 			pid := int(prodID.Int64)
-			isNormal := subType.String == "Normal"
-			if cur, ok := byProduct[pid]; !ok ||
-				(isNormal && !cur.normal) ||
-				(isNormal == cur.normal && banID < cur.banID) {
-				byProduct[pid] = tcgBest{banID: banID, normal: isNormal}
-			}
+			byProduct[pid] = byProduct[pid].observe(banID, subType.String)
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	for pid, best := range byProduct {
-		c.variants.tcgByProduct.Store(pid, best.banID)
+	for pid, finishes := range byProduct {
+		c.variants.tcgByProduct.Store(pid, finishes.canonical())
+		if finishes.normal != 0 {
+			c.variants.tcgNormalByProduct.Store(pid, finishes.normal)
+		}
+		if finishes.foil != 0 {
+			c.variants.tcgFoilByProduct.Store(pid, finishes.foil)
+		}
 	}
 	return nil
 }
@@ -140,6 +174,28 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 // to the game-native id.
 func (c *Client) CachedTCGBanID(productID int) (int64, bool) {
 	if id, ok := c.variants.tcgByProduct.Load(productID); ok {
+		return id.(int64), true
+	}
+	return 0, false
+}
+
+// CachedTCGBanIDForFinish returns the ban_id of a non-Magic product's printing in
+// one finish: the "Normal" sub-type for a non-foil card, the product's foil
+// sub-type otherwise. It is the write-path counterpart of CachedTCGBanID, which
+// answers with the product's canonical printing and so can't tell the two
+// finishes apart.
+//
+// A miss (ok=false) means the product has no printing in that finish yet — it
+// hasn't been ingested, or it only exists in the other finish. Skip the price
+// rather than mint: the sub-type's real name varies by game and can't be derived
+// from a foil flag, so minting would create a variant the tcgcsv ingest never
+// matches. The next ingest mints the real one.
+func (c *Client) CachedTCGBanIDForFinish(productID int, foil bool) (int64, bool) {
+	byProduct := &c.variants.tcgNormalByProduct
+	if foil {
+		byProduct = &c.variants.tcgFoilByProduct
+	}
+	if id, ok := byProduct.Load(productID); ok {
 		return id.(int64), true
 	}
 	return 0, false

@@ -476,26 +476,22 @@ func IsStashingInProgress() bool {
 	return stashingInProgress.Load()
 }
 
-func stashInTimeseries() {
-	// Only one stash may run at a time. The cron fires every 12h and the
-	// admin button can fire at any moment; CompareAndSwap is the real gate.
-	if !stashingInProgress.CompareAndSwap(false, true) {
-		log.Println("stashInTimeseries: another stash is already running, skipping")
-		return
-	}
-	defer stashingInProgress.Store(false)
+// snapshotPrice is one priced card in a stash snapshot: the resolved card, the
+// dataset (and therefore the provider) the price belongs to, the observation
+// date, and the condition-graded price.
+type snapshotPrice struct {
+	card  *mtgmatcher.CardObject
+	ds    DatasetConfig
+	date  string
+	price float64
+}
 
-	if PricesArchiveDB == nil {
-		log.Println("PricesArchiveDB not initialized, skipping stash")
-		return
-	}
-
-	start := time.Now()
-	ServerNotify("timeseries", "Taking snapshot...")
-
-	// Accumulate all prices into a single row per (date, uuid, foil, etched).
-	accumulated := map[string]*timeseries.PriceRow{}
-
+// eachSnapshotPrice walks every configured dataset's retail sellers and buylist
+// vendors, resolves each entry to a card and a graded price, and hands the result
+// to fn. It is the game-agnostic half of the stash — what the prices get keyed on
+// (an mtgjson uuid for Magic, a TCGplayer product for every other game) is the
+// caller's business.
+func eachSnapshotPrice(start time.Time, fn func(snapshotPrice)) {
 	// Collect retail prices from sellers
 	for _, seller := range GetSellers() {
 		for _, config := range Config.TimeseriesConfig.Datasets {
@@ -525,8 +521,7 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
-				row.SetPriceForDataset(config.Index, price)
+				fn(snapshotPrice{card: card, ds: config, date: date, price: price})
 			}
 		}
 	}
@@ -553,11 +548,42 @@ func stashInTimeseries() {
 					continue
 				}
 
-				row := getRow(accumulated, card.UUID, card.Foil, card.Etched, card.IsAlternative, card.Language, date)
-				row.SetPriceForDataset(config.Index, price)
+				fn(snapshotPrice{card: card, ds: config, date: date, price: price})
 			}
 		}
 	}
+}
+
+func stashInTimeseries() {
+	// Only one stash may run at a time. The cron fires every 12h and the
+	// admin button can fire at any moment; CompareAndSwap is the real gate.
+	if !stashingInProgress.CompareAndSwap(false, true) {
+		log.Println("stashInTimeseries: another stash is already running, skipping")
+		return
+	}
+	defer stashingInProgress.Store(false)
+
+	if PricesArchiveDB == nil {
+		log.Println("PricesArchiveDB not initialized, skipping stash")
+		return
+	}
+
+	start := time.Now()
+	ServerNotify("timeseries", "Taking snapshot...")
+
+	// Every other game is keyed by TCGplayer product, not by an mtgjson uuid,
+	// and takes the long-form-only path below.
+	if Config.Game != "" && Config.Game != DefaultGame {
+		stashNonMagicSnapshot(start)
+		return
+	}
+
+	// Accumulate all prices into a single row per (date, uuid, foil, etched).
+	accumulated := map[string]*timeseries.PriceRow{}
+	eachSnapshotPrice(start, func(sp snapshotPrice) {
+		row := getRow(accumulated, sp.card.UUID, sp.card.Foil, sp.card.Etched, sp.card.IsAlternative, sp.card.Language, sp.date)
+		row.SetPriceForDataset(sp.ds.Index, sp.price)
+	})
 
 	// Upsert all accumulated rows in batches
 	rows := make([]timeseries.PriceRow, 0, len(accumulated))
@@ -586,6 +612,95 @@ func stashInTimeseries() {
 	SetLastStashUpdate(time.Now())
 	msg := fmt.Sprintf("Snapshot completed in %s: %d upserted, %d errors", time.Since(start), upserted, errCount)
 	ServerNotify("timeseries", msg)
+}
+
+// stashNonMagicSnapshot stores the snapshot of a deployment serving any game but
+// Magic. Those cards have no mtgjson uuid — mtgmatcher keys them by their own
+// numeric id ("1459", "808_f" for Lorcana) — so the legacy wide product_prices
+// table cannot hold them at all: its mtgjson_uuid column is a Postgres uuid and
+// every batch dies on the first game-native id. The long form is their only home,
+// and it is where the non-Magic read path already looks.
+//
+// Each card resolves to the ban_id of its TCGplayer product in the card's finish
+// (minted by the tcgcsv ingest) and contributes one price row per provider.
+func stashNonMagicSnapshot(start time.Time) {
+	// Long-form writes gate the startup work this path depends on: the price
+	// partitions and the warm variant cache. Without them there is nowhere to
+	// put a non-Magic price, so say so instead of silently dropping the run.
+	if !Config.TimeseriesConfig.LongFormWrites {
+		ServerNotify("timeseries", "Snapshot skipped: "+Config.Game+" prices need long_form_writes, the wide table is Magic-only")
+		return
+	}
+
+	// The long form addresses providers by id, so a dataset without one has no
+	// column to write to. A config predating the field would stash nothing at
+	// all — bail loudly rather than warm the cache and upsert an empty batch.
+	if !slices.ContainsFunc(Config.TimeseriesConfig.Datasets, func(ds DatasetConfig) bool {
+		return ds.Provider != 0
+	}) {
+		ServerNotify("timeseries", "Snapshot skipped: no timeseries dataset carries a provider id")
+		return
+	}
+
+	ctx := context.Background()
+	if err := PricesArchiveDB.WarmVariantCache(ctx); err != nil {
+		ServerNotify("timeseries", fmt.Sprintf("warm variant cache error: %s", err))
+		return
+	}
+
+	type longKey struct {
+		banID    int64
+		date     string
+		provider int16
+	}
+	// Last price wins per (variant, date, provider), matching how the wide path
+	// collapses two sellers feeding the same dataset column.
+	prices := map[longKey]float64{}
+	var unresolved int
+	eachSnapshotPrice(start, func(sp snapshotPrice) {
+		if sp.ds.Provider == 0 {
+			return
+		}
+		banID, ok := nonMagicBanID(sp.card)
+		if !ok {
+			unresolved++
+			return
+		}
+		prices[longKey{banID: banID, date: sp.date, provider: sp.ds.Provider}] = sp.price
+	})
+
+	rows := make([]timeseries.LongPrice, 0, len(prices))
+	for key, price := range prices {
+		rows = append(rows, timeseries.LongPrice{
+			BanID:    key.banID,
+			Date:     key.date,
+			Provider: key.provider,
+			Price:    price,
+		})
+	}
+
+	upserted, err := PricesArchiveDB.UpsertLongPrices(ctx, rows, 0)
+	if err != nil {
+		ServerNotify("timeseries", fmt.Sprintf("long-form upsert error: %s", err))
+	}
+
+	SetLastStashUpdate(time.Now())
+	ServerNotify("timeseries", fmt.Sprintf("Snapshot completed in %s: %d upserted, %d unresolved",
+		time.Since(start), upserted, unresolved))
+}
+
+// nonMagicBanID resolves a non-Magic card to the variant of its TCGplayer product
+// in the card's finish. Both finishes share one product id and differ only by
+// sub-type, whose name is per-game ("Holofoil" / "Cold Foil" in Lorcana), so the
+// lookup goes through the variants the tcgcsv ingest already minted rather than
+// guessing a name from the foil flag. A product with no variant in that finish
+// drops its price for this run; the next ingest mints it.
+func nonMagicBanID(co *mtgmatcher.CardObject) (int64, bool) {
+	pid, ok := tcgProductID(co)
+	if !ok {
+		return 0, false
+	}
+	return PricesArchiveDB.CachedTCGBanIDForFinish(pid, co.Foil)
 }
 
 // stashLongForm mirrors the accumulated wide rows into the long prices table. It
