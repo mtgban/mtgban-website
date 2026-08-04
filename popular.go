@@ -69,8 +69,14 @@ func getPopularSearches() []PopularSearch {
 		// searchAndFilter doesn't apply sort:retail (that needs live
 		// prices), so sort here and take the top-retail card as the tile.
 		if config.SortMode == "retail" {
+			sortData := resolveSortingData(uuids)
+			prices := resolveBestPrices(uuids, defaultSellerPriorityOpt, price4seller)
 			sort.Slice(uuids, func(i, j int) bool {
-				return sortSetsByRetail(uuids[i], uuids[j], defaultSellerPriorityOpt)
+				priceI, priceJ := prices[uuids[i]], prices[uuids[j]]
+				if priceI == priceJ {
+					return cmpSets(sortData[uuids[i]], sortData[uuids[j]])
+				}
+				return priceI > priceJ
 			})
 		}
 		imageID := uuids[0]
