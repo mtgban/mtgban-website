@@ -1215,8 +1215,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		cardID := uploadedData[i].CardID
 
-		// Pick the right store list for this entry
-		isSealed := slices.Contains(sealedProductIDs, cardID)
+		// Pick the right store list for this entry. The sealed id list was
+		// built from this same lookup, so ask the datastore directly instead
+		// of scanning the list per row.
+		co, err := mtgmatcher.GetUUID(cardID)
+		isSealed := err == nil && co.Sealed
 		entryStores := enabledStores
 		if isSealed {
 			entryStores = enabledSealedStores
