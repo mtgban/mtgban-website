@@ -158,6 +158,17 @@
                     <h2>Patreon Grants</h2>
                     <span class="count">{{len (index .Tables 3)}} users</span>
                 </div>
+                <form method="POST" action="admin?page=people" class="admin-grant-form">
+                    <input type="email" name="grantEmail" placeholder="email" required>
+                    <input type="text" name="grantName" placeholder="name">
+                    <input type="text" name="grantCategory" placeholder="category">
+                    <select name="grantTier">
+                        {{range .Tiers}}
+                            <option value="{{.}}">{{.}}</option>
+                        {{end}}
+                    </select>
+                    <input type="submit" value="Add Grant">
+                </form>
                 <div class="admin-table-wrap">
                 <table class="table-data admin-table">
                     <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th></tr></thead>

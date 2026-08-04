@@ -38,16 +38,18 @@ var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
 var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
 
+type PatreonGrant struct {
+	Category string `json:"category"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Tier     string `json:"tier"`
+}
+
 type PatreonConfig struct {
 	Source string            `json:"source"`
 	Client map[string]string `json:"client"`
 	Secret map[string]string `json:"secret"`
-	Grants []struct {
-		Category string `json:"category"`
-		Email    string `json:"email"`
-		Name     string `json:"name"`
-		Tier     string `json:"tier"`
-	} `json:"grants"`
+	Grants []PatreonGrant    `json:"grants"`
 }
 
 type PatreonUserData struct {
