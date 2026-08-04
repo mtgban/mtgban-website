@@ -1029,6 +1029,7 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 
 	ServerNotify("init", "Datastore installed")
 	SetLastDatastoreUpdate(time.Now())
+	go rebuildSuggestIndex()
 	go updateStaticData()
 	go cacheNewspaper()
 	go paletteService.BuildSetsCache()
