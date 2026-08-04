@@ -1031,11 +1031,13 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
 }
 
 /* ── Content-warning blur ── */
-/* Applies to wrapper divs (.foil-wrap, .sidebar-img-wrap) and standalone <img> elements */
+/* Applies to wrapper divs (.foil-wrap, .sidebar-img-wrap) and standalone <img> elements.
+   The blurred state deliberately has no transition: fading the blur in
+   briefly flashes the unblurred image when a covered card first renders.
+   Only the reveal (clicking to add .cw-revealed) animates. */
 .content-warning:not(.cw-revealed) img,
 img.content-warning:not(.cw-revealed) {
     filter: blur(14px);
-    transition: filter 0.25s;
 }
 .content-warning:not(.cw-revealed) {
     cursor: pointer;
