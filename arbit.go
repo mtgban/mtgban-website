@@ -248,13 +248,14 @@ var FilterOptConfig = map[string]FilterOpt{
 		Title: "only Legit",
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomPriceFilter
+			tcgMarket, _ := findSellerInventory("TCGMarket")
 			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
 				co, err := mtgmatcher.GetUUID(cardId)
 				if err == nil && co.Sealed {
 					if getTCGSimulationIQR(cardId) > IQRThreshold {
 						return 0, true
 					}
-				} else if invalidDirect(cardId, invEntry.Price) {
+				} else if invalidDirectIn(tcgMarket, cardId, invEntry.Price) {
 					return 0, true
 				}
 				if oldFunc != nil {
@@ -856,10 +857,11 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if !arbitFilters["nosus"] && scraper.Info().Shorthand == "TCGDirect" {
 			sussy = map[string]float64{}
 
+			tcgMarket, _ := findSellerInventory("TCGMarket")
 			for _, res := range arbit {
-				isSussy := invalidDirect(res.CardId, res.ReferenceEntry.Price)
+				isSussy := invalidDirectIn(tcgMarket, res.CardId, res.ReferenceEntry.Price)
 				if isSussy {
-					sussy[res.CardId] = getTCGMarketPrice(res.CardId)
+					sussy[res.CardId] = tcgMarketPriceIn(tcgMarket, res.CardId)
 				}
 			}
 		}

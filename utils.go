@@ -975,6 +975,12 @@ func getTCGMarketPrice(cardId string) float64 {
 	if err != nil {
 		return 0
 	}
+	return tcgMarketPriceIn(inv, cardId)
+}
+
+// tcgMarketPriceIn probes an already-resolved TCGMarket inventory, so
+// per-row loops resolve the seller once instead of per card.
+func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardId string) float64 {
 	entries, found := inv[cardId]
 	if !found {
 		return 0
@@ -1059,10 +1065,17 @@ func sortKeysByScraperName(keys []string) []string {
 // invalid Direct prices. Ignored for anything lower than $1
 // since Direct minimum is $0.40.
 func invalidDirect(id string, price float64) bool {
+	inv, _ := findSellerInventory("TCGMarket")
+	return invalidDirectIn(inv, id, price)
+}
+
+// invalidDirectIn is invalidDirect over an already-resolved TCGMarket
+// inventory; a nil inventory reads as no market price.
+func invalidDirectIn(inv mtgban.InventoryRecord, id string, price float64) bool {
 	if price < 1 {
 		return false
 	}
 
-	marketPrice := getTCGMarketPrice(id)
+	marketPrice := tcgMarketPriceIn(inv, id)
 	return price > marketPrice*2
 }
