@@ -160,26 +160,26 @@ func fixupStoreCodeNG(code string) []string {
 	code = strings.TrimSpace(code)
 	code = strings.ToLower(code)
 
+	snap := getScrapers()
 	filters := strings.Split(code, ",")
 	for i := range filters {
 		filters[i] = strings.Trim(filters[i], "\"")
 
-		// Validate the input against the registered scrapers
-		for _, seller := range GetSellers() {
-			if filters[i] != strings.ToLower(scraperName(seller.Info().Shorthand)) &&
-				filters[i] != strings.ToLower(seller.Info().Shorthand) {
-				continue
+		// Validate the input against the registered scrapers: an overridden
+		// display name first, mapped back through the raw name it replaced,
+		// then the token itself (a raw name or a shorthand).
+		matched := ""
+		for rawName, override := range Config.ScraperConfig.NameOverride {
+			if strings.EqualFold(override, filters[i]) {
+				matched = snap.storeCodeByToken[strings.ToLower(rawName)]
+				break
 			}
-			filters[i] = strings.ToLower(seller.Info().Shorthand)
-			break
 		}
-		for _, vendor := range GetVendors() {
-			if filters[i] != strings.ToLower(scraperName(vendor.Info().Shorthand)) &&
-				filters[i] != strings.ToLower(vendor.Info().Shorthand) {
-				continue
-			}
-			filters[i] = strings.ToLower(vendor.Info().Shorthand)
-			break
+		if matched == "" {
+			matched = snap.storeCodeByToken[filters[i]]
+		}
+		if matched != "" {
+			filters[i] = matched
 		}
 
 		// The manual renames from search.go
