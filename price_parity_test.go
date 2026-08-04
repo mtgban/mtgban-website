@@ -54,12 +54,8 @@ func parityCards(t *testing.T) (regular, foil, sealed string) {
 func seedParityScrapers(t *testing.T, regular, foil string) {
 	t.Helper()
 
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	t.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
+	prev := scrapersPtr.Load()
+	t.Cleanup(func() { scrapersPtr.Store(prev) })
 
 	inv := mtgban.InventoryRecord{}
 	inv.Add(regular, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 2, URL: "u"})
@@ -78,8 +74,6 @@ func seedParityScrapers(t *testing.T, regular, foil string) {
 			Name: "Parity Index", Shorthand: "PARITYIDX", MetadataOnly: true,
 		}),
 	}
-	sellersPtr.Store(&sellers)
-
 	bl := mtgban.BuylistRecord{}
 	bl.Add(regular, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 5, Quantity: 4, URL: "u"})
 	bl.Add(regular, &mtgban.BuylistEntry{Conditions: "SP", BuyPrice: 4, Quantity: 2, URL: "u"})
@@ -89,7 +83,7 @@ func seedParityScrapers(t *testing.T, regular, foil string) {
 			Name: "Parity Buyer", Shorthand: "PARITYV", CreditMultiplier: 1.3,
 		}),
 	}
-	vendorsPtr.Store(&vendors)
+	scrapersPtr.Store(newScraperSnapshot(sellers, vendors))
 }
 
 // searchPrice returns the price of the first row for the given store and
@@ -321,8 +315,8 @@ func TestSearchDownloadFilters(t *testing.T) {
 func TestZeroPricedListings(t *testing.T) {
 	regular, _, _ := parityCards(t)
 
-	prevSellers := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prevSellers) })
+	prev := scrapersPtr.Load()
+	t.Cleanup(func() { scrapersPtr.Store(prev) })
 
 	inv := mtgban.InventoryRecord{}
 	inv.Add(regular, &mtgban.InventoryEntry{Conditions: "NM", Price: 0, Quantity: 1, URL: "u1"})
@@ -330,7 +324,7 @@ func TestZeroPricedListings(t *testing.T) {
 	sellers := []mtgban.Seller{
 		mtgban.NewSellerFromInventory(inv, mtgban.ScraperInfo{Name: "Zero Store", Shorthand: "ZEROA"}),
 	}
-	sellersPtr.Store(&sellers)
+	scrapersPtr.Store(newScraperSnapshot(sellers, GetVendors()))
 
 	check := func(t *testing.T, api map[string]map[string]*BanPrice) {
 		t.Helper()

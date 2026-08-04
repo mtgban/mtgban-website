@@ -30,37 +30,127 @@ const (
 
 var DataBucket simplecloud.Reader
 
-// Snapshots of the loaded retail and buylist data. Held behind atomic.Pointer
-// so readers always observe a fully-constructed, immutable slice and writers
-// publish via a single atomic store. Mutating the slice returned by
-// GetSellers/GetVendors is a bug — treat it as read-only.
+// Snapshot of the loaded retail and buylist data. Held behind one
+// atomic.Pointer so readers always observe a fully-constructed, immutable
+// snapshot and writers publish via a single atomic store. Mutating anything
+// reachable from a snapshot is a bug — treat it all as read-only.
 var (
-	sellersPtr atomic.Pointer[[]mtgban.Seller]
-	vendorsPtr atomic.Pointer[[]mtgban.Vendor]
+	scrapersPtr atomic.Pointer[scraperSnapshot]
 
 	// Serializes writers so concurrent updateSellers/updateVendors calls
 	// don't lose each other's changes during the read-modify-publish cycle.
 	scrapersWriteMu sync.Mutex
 )
 
+// scraperNameKey identifies a scraper by lowercased display name and sealed
+// mode, the pair the ByName lookups discriminate on.
+type scraperNameKey struct {
+	name   string
+	sealed bool
+}
+
+// scraperSnapshot bundles the seller and vendor slices with lookup tables
+// derived from them, replacing the per-call linear scans of scraperName and
+// the find* helpers — which run per card, per entry, and per sort comparison
+// in the render loops. Snapshots are immutable and only built by
+// newScraperSnapshot, so the tables can never disagree with the slices.
+// Display-name overrides stay out of the tables and are applied by callers,
+// so a config reload cannot go stale here.
+type scraperSnapshot struct {
+	sellers []mtgban.Seller
+	vendors []mtgban.Vendor
+
+	// ToLower(shorthand) -> scraper; first occurrence wins, matching the
+	// order of the EqualFold scans these replace (shorthands are ASCII,
+	// where EqualFold and ToLower equality agree).
+	sellerByShorthand map[string]mtgban.Seller
+	vendorByShorthand map[string]mtgban.Vendor
+
+	// {ToLower(name), sealed} -> scraper
+	sellerByName map[scraperNameKey]mtgban.Seller
+	vendorByName map[scraperNameKey]mtgban.Vendor
+
+	// Exact shorthand -> raw Info().Name, sellers first.
+	rawNameByShorthand map[string]string
+
+	// ToLower(raw name or shorthand) -> ToLower(shorthand), sellers first,
+	// for store-code resolution in search filters.
+	storeCodeByToken map[string]string
+}
+
+// emptyScrapers keeps the read path nil-safe before anything is loaded.
+var emptyScrapers = newScraperSnapshot(nil, nil)
+
+func getScrapers() *scraperSnapshot {
+	snap := scrapersPtr.Load()
+	if snap == nil {
+		return emptyScrapers
+	}
+	return snap
+}
+
 // GetSellers returns the current sellers snapshot. The returned slice is
 // shared and MUST NOT be modified by callers.
 func GetSellers() []mtgban.Seller {
-	p := sellersPtr.Load()
-	if p == nil {
-		return nil
-	}
-	return *p
+	return getScrapers().sellers
 }
 
 // GetVendors returns the current vendors snapshot. The returned slice is
 // shared and MUST NOT be modified by callers.
 func GetVendors() []mtgban.Vendor {
-	p := vendorsPtr.Load()
-	if p == nil {
-		return nil
+	return getScrapers().vendors
+}
+
+func newScraperSnapshot(sellers []mtgban.Seller, vendors []mtgban.Vendor) *scraperSnapshot {
+	snap := &scraperSnapshot{
+		sellers:            sellers,
+		vendors:            vendors,
+		sellerByShorthand:  map[string]mtgban.Seller{},
+		vendorByShorthand:  map[string]mtgban.Vendor{},
+		sellerByName:       map[scraperNameKey]mtgban.Seller{},
+		vendorByName:       map[scraperNameKey]mtgban.Vendor{},
+		rawNameByShorthand: map[string]string{},
+		storeCodeByToken:   map[string]string{},
 	}
-	return *p
+	for _, seller := range sellers {
+		info := seller.Info()
+		short := strings.ToLower(info.Shorthand)
+		name := strings.ToLower(info.Name)
+		if _, found := snap.sellerByShorthand[short]; !found {
+			snap.sellerByShorthand[short] = seller
+		}
+		nameKey := scraperNameKey{name, info.SealedMode}
+		if _, found := snap.sellerByName[nameKey]; !found {
+			snap.sellerByName[nameKey] = seller
+		}
+		snap.indexNames(info.Shorthand, info.Name, short, name)
+	}
+	for _, vendor := range vendors {
+		info := vendor.Info()
+		short := strings.ToLower(info.Shorthand)
+		name := strings.ToLower(info.Name)
+		if _, found := snap.vendorByShorthand[short]; !found {
+			snap.vendorByShorthand[short] = vendor
+		}
+		nameKey := scraperNameKey{name, info.SealedMode}
+		if _, found := snap.vendorByName[nameKey]; !found {
+			snap.vendorByName[nameKey] = vendor
+		}
+		snap.indexNames(info.Shorthand, info.Name, short, name)
+	}
+	return snap
+}
+
+func (snap *scraperSnapshot) indexNames(shorthand, name, shortLower, nameLower string) {
+	if _, found := snap.rawNameByShorthand[shorthand]; !found {
+		snap.rawNameByShorthand[shorthand] = name
+	}
+	if _, found := snap.storeCodeByToken[nameLower]; !found {
+		snap.storeCodeByToken[nameLower] = shortLower
+	}
+	if _, found := snap.storeCodeByToken[shortLower]; !found {
+		snap.storeCodeByToken[shortLower] = shortLower
+	}
 }
 
 type ScraperConfig struct {
@@ -206,7 +296,7 @@ func updateSellers(scraper mtgban.Scraper) {
 		ServerNotify("refresh", msg, true)
 		return
 	}
-	sellersPtr.Store(&next)
+	scrapersPtr.Store(newScraperSnapshot(next, GetVendors()))
 
 	msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
 	ServerNotify("refresh", msg)
@@ -266,7 +356,7 @@ func updateVendors(scraper mtgban.Scraper) {
 		ServerNotify("refresh", msg, true)
 		return
 	}
-	vendorsPtr.Store(&next)
+	scrapersPtr.Store(newScraperSnapshot(GetSellers(), next))
 
 	msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
 	ServerNotify("refresh", msg)

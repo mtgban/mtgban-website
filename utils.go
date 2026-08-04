@@ -280,42 +280,38 @@ func findCredit(shorthand string) float64 {
 
 // Look up a seller and return its inventory
 func findSellerInventory(shorthand string) (mtgban.InventoryRecord, error) {
-	for _, seller := range GetSellers() {
-		if strings.EqualFold(seller.Info().Shorthand, shorthand) {
-			return seller.Inventory(), nil
-		}
+	seller, found := getScrapers().sellerByShorthand[strings.ToLower(shorthand)]
+	if !found {
+		return nil, errors.New("seller not found")
 	}
-	return nil, errors.New("seller not found")
+	return seller.Inventory(), nil
 }
 
 // Look up a vendor and return its buylist
 func findVendorBuylist(shorthand string) (mtgban.BuylistRecord, error) {
-	for _, vendor := range GetVendors() {
-		if strings.EqualFold(vendor.Info().Shorthand, shorthand) {
-			return vendor.Buylist(), nil
-		}
+	vendor, found := getScrapers().vendorByShorthand[strings.ToLower(shorthand)]
+	if !found {
+		return nil, errors.New("vendor not found")
 	}
-	return nil, errors.New("vendor not found")
+	return vendor.Buylist(), nil
 }
 
 // Look up a seller with its name and return its inventory
 func findSellerInventoryByName(name string, sealed bool) (mtgban.InventoryRecord, error) {
-	for _, seller := range GetSellers() {
-		if seller.Info().SealedMode == sealed && strings.EqualFold(seller.Info().Name, name) {
-			return seller.Inventory(), nil
-		}
+	seller, found := getScrapers().sellerByName[scraperNameKey{strings.ToLower(name), sealed}]
+	if !found {
+		return nil, errors.New("seller not found")
 	}
-	return nil, errors.New("seller not found")
+	return seller.Inventory(), nil
 }
 
 // Look up a vendor with its name and return its inventory
 func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, error) {
-	for _, vendor := range GetVendors() {
-		if vendor.Info().SealedMode == sealed && strings.EqualFold(vendor.Info().Name, name) {
-			return vendor.Buylist(), nil
-		}
+	vendor, found := getScrapers().vendorByName[scraperNameKey{strings.ToLower(name), sealed}]
+	if !found {
+		return nil, errors.New("vendor not found")
 	}
-	return nil, errors.New("vendor not found")
+	return vendor.Buylist(), nil
 }
 
 // Look for a TCGproductId in all available places
@@ -1018,29 +1014,18 @@ func getTCGSimulationIQR(productId string) float64 {
 
 // Return the full display name displayed from the input shorthand
 func scraperName(shorthand string) string {
-	for _, seller := range GetSellers() {
-		if shorthand == seller.Info().Shorthand {
-			name := seller.Info().Name
-			override, found := Config.ScraperConfig.NameOverride[seller.Info().Name]
-			if found {
-				name = override
-			}
-			return name
-		}
+	name, found := getScrapers().rawNameByShorthand[shorthand]
+	if !found {
+		// If nothing is found, check if there is a custom override for the shorthand itself
+		return Config.ScraperConfig.NameOverride[shorthand]
 	}
-	for _, vendor := range GetVendors() {
-		if shorthand == vendor.Info().Shorthand {
-			name := vendor.Info().Name
-			override, found := Config.ScraperConfig.NameOverride[vendor.Info().Name]
-			if found {
-				name = override
-			}
-			return name
-		}
+	// The display override is applied here rather than baked into the
+	// snapshot tables, so a config reload takes effect immediately.
+	override, found := Config.ScraperConfig.NameOverride[name]
+	if found {
+		return override
 	}
-
-	// If nothing is found, check if there is a custom override for the shorthand itself
-	return Config.ScraperConfig.NameOverride[shorthand]
+	return name
 }
 
 // sortKeysByScraperName returns a new slice of shorthand keys sorted alphabetically

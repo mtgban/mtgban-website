@@ -13,12 +13,8 @@ import (
 // named "Bench Store %03d" with shorthand "BS%03d"; sellers and vendors share
 // names and shorthands, mirroring production stores that run both sides.
 func installTestScrapers(tb testing.TB, n int) {
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	tb.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
+	prev := scrapersPtr.Load()
+	tb.Cleanup(func() { scrapersPtr.Store(prev) })
 
 	var sellers []mtgban.Seller
 	var vendors []mtgban.Vendor
@@ -42,8 +38,7 @@ func installTestScrapers(tb testing.TB, n int) {
 		Name: "Bench Store 001", Shorthand: "VENDONLY",
 	}))
 
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	scrapersPtr.Store(newScraperSnapshot(sellers, vendors))
 }
 
 func TestScraperNameLookup(t *testing.T) {

@@ -35,11 +35,11 @@ func TestSimplePrice2CSVTCGSKU(t *testing.T) {
 	for cond, sku := range map[string]string{"NM": "111", "SP": "222"} {
 		inventory.Add(id, &mtgban.InventoryEntry{Conditions: cond, InstanceId: sku})
 	}
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
+	prev := scrapersPtr.Load()
+	t.Cleanup(func() { scrapersPtr.Store(prev) })
 	sellers := []mtgban.Seller{mtgban.NewSellerFromInventory(
 		inventory, mtgban.ScraperInfo{Shorthand: "TCGPlayer"})}
-	sellersPtr.Store(&sellers)
+	scrapersPtr.Store(newScraperSnapshot(sellers, GetVendors()))
 
 	pm := map[string]map[string]*BanPrice{
 		id: {"TCGPlayer": &BanPrice{Regular: 1.0}},
@@ -93,14 +93,14 @@ func TestUUID2TCGCSVCondQtyIndexing(t *testing.T) {
 
 	// Inject empty TCG sellers so the inventory lookups in UUID2TCGCSV succeed
 	// (prices come out 0, which is fine — we only assert condition/quantity).
-	prev := sellersPtr.Load()
-	t.Cleanup(func() { sellersPtr.Store(prev) })
+	prev := scrapersPtr.Load()
+	t.Cleanup(func() { scrapersPtr.Store(prev) })
 	var sellers []mtgban.Seller
 	for _, sh := range []string{"TCGPlayer", "TCGDirectLow", "TCGLow", "TCGSealed"} {
 		sellers = append(sellers, mtgban.NewSellerFromInventory(
 			mtgban.InventoryRecord{}, mtgban.ScraperInfo{Shorthand: sh}))
 	}
-	sellersPtr.Store(&sellers)
+	scrapersPtr.Store(newScraperSnapshot(sellers, GetVendors()))
 
 	// Two distinct non-foil, non-sealed cards so condition codes map cleanly to
 	// labels (no " Foil" suffix) and Rarity is present.

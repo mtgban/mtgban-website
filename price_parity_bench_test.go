@@ -105,16 +105,11 @@ func seedBenchScrapers(b *testing.B) (stores []string) {
 		b.Skip("no suitable set found for benchmarking")
 	}
 
-	prevSellers := sellersPtr.Load()
-	prevVendors := vendorsPtr.Load()
-	b.Cleanup(func() {
-		sellersPtr.Store(prevSellers)
-		vendorsPtr.Store(prevVendors)
-	})
+	prev := scrapersPtr.Load()
+	b.Cleanup(func() { scrapersPtr.Store(prev) })
 	sellers := benchSellers
 	vendors := benchVendors
-	sellersPtr.Store(&sellers)
-	vendorsPtr.Store(&vendors)
+	scrapersPtr.Store(newScraperSnapshot(sellers, vendors))
 
 	for _, seller := range sellers {
 		stores = append(stores, seller.Info().Shorthand)
