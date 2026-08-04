@@ -51,8 +51,12 @@ func buildSuggestEntries(names []string) []suggestEntry {
 	return entries
 }
 
-// prefixMatches returns the entries whose lowercase form starts with prefix,
-// located by binary search over the sorted index.
+// maxSuggestions caps a response: the search box renders at most 30
+// candidates, and every match costs a printings-line render.
+const maxSuggestions = 30
+
+// prefixMatches returns the first entries whose lowercase form starts with
+// prefix, located by binary search over the sorted index.
 func (idx *suggestIndex) prefixMatches(prefix string, sealed bool) []suggestEntry {
 	entries := idx.singles
 	if sealed {
@@ -62,7 +66,7 @@ func (idx *suggestIndex) prefixMatches(prefix string, sealed bool) []suggestEntr
 		return entries[i].lower >= prefix
 	})
 	end := start
-	for end < len(entries) && strings.HasPrefix(entries[end].lower, prefix) {
+	for end < len(entries) && end-start < maxSuggestions && strings.HasPrefix(entries[end].lower, prefix) {
 		end++
 	}
 	return entries[start:end]
