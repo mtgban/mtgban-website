@@ -159,8 +159,8 @@ github.com/mileusna/useragent v1.3.5 h1:SJM5NzBmh/hO+4LGeATKpaEX9+b4vcGg2qXGLiNG
 github.com/mileusna/useragent v1.3.5/go.mod h1:3d8TOmwL/5I8pJjyVDteHtgDGcefrFUX4ccGOMKNYYc=
 github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd5E/OeU=
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
-github.com/mtgban/go-mtgban v0.6.10 h1:qBb74S8uumSUm/NYrVwY23f51Sl/NQTJA97hTpqP96I=
-github.com/mtgban/go-mtgban v0.6.10/go.mod h1:ifRnJzoMYIwIE40EAJCgTU+24wErFadcvYnjLzNlJMg=
+github.com/mtgban/go-mtgban v0.6.11 h1:q1aPB55Yi/wpDkf4JYHr9n9FI2UpXzoxgNKB9wOz6uc=
+github.com/mtgban/go-mtgban v0.6.11/go.mod h1:ifRnJzoMYIwIE40EAJCgTU+24wErFadcvYnjLzNlJMg=
 github.com/mtgban/go-tcgplayer v0.0.2 h1:qKCk0O74GoLs/FSyjdqoNqpah0WS8h/GZ77+x35u0rg=
 github.com/mtgban/go-tcgplayer v0.0.2/go.mod h1:KaXcyjC/Y1M9itmWcjGcZi0ao40RkHAGua1nLML+4xA=
 github.com/mtgban/simplecloud v0.0.11 h1:KkMyHnLtWVuypnasJeE/eTm3LIx0lCvwHQUwghS+gHI=
