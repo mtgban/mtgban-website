@@ -630,6 +630,39 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// -- People: remove a Patreon grant --
+	// Persists like the quick-add above, so the row disappears from the
+	// table rendered below and stays gone after a restart.
+	revokeEmail := strings.ToLower(strings.TrimSpace(r.FormValue("revokeEmail")))
+	if revokeEmail != "" {
+		idx := slices.IndexFunc(Config.Patreon.Grants, func(person PatreonGrant) bool {
+			return strings.EqualFold(person.Email, revokeEmail)
+		})
+		if idx < 0 {
+			pageVars.WarningMessage = "no grant found for " + revokeEmail
+		} else {
+			removed := Config.Patreon.Grants[idx]
+			newConfig := Config
+			newConfig.Patreon.Grants = slices.Delete(slices.Clone(Config.Patreon.Grants), idx, idx+1)
+
+			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
+			if err != nil {
+				pageVars.WarningMessage = err.Error()
+			} else {
+				err = writeConfigFile(newConfig, writer)
+				writer.Close()
+				if err != nil {
+					log.Println(err)
+					pageVars.WarningMessage = err.Error()
+				} else {
+					Config = newConfig
+					pageVars.InfoMessage = fmt.Sprintf("Removed %s grant from %s", removed.Tier, removed.Email)
+					LogPages["Admin"].Printf("Grant removed: %+v", removed)
+				}
+			}
+		}
+	}
+
 	// -- People: Patreon Grants --
 	var userTable [][]string
 	for i, person := range Config.Patreon.Grants {
