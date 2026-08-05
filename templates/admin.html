@@ -171,7 +171,7 @@
                 </form>
                 <div class="admin-table-wrap">
                 <table class="table-data admin-table">
-                    <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th></tr></thead>
+                    <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th><th></th></tr></thead>
                     <tbody>
                     {{range $row := index .Tables 3}}
                         <tr>
@@ -180,6 +180,12 @@
                             <td class="admin-mono">{{index $row 2}}</td>
                             <td>{{index $row 3}}</td>
                             <td>{{index $row 4}}</td>
+                            <td class="admin-grant-remove-cell">
+                                <form method="POST" action="admin?page=people">
+                                    <input type="hidden" name="revokeEmail" value="{{index $row 2}}">
+                                    <button type="submit" class="admin-grant-remove" title="Remove grant for {{index $row 2}}">✕</button>
+                                </form>
+                            </td>
                         </tr>
                     {{end}}
                     </tbody>

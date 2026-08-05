@@ -158,6 +158,24 @@
     cursor: pointer;
 }
 
+/* Per-row grant removal: a small ✕ at the right edge of the grants table */
+.admin-grant-remove-cell {
+    width: 1%;
+    text-align: center;
+}
+.admin-grant-remove {
+    border: none;
+    background: none;
+    padding: 0 4px;
+    color: var(--text-dim);
+    font-size: var(--text-md);
+    line-height: 1;
+    cursor: pointer;
+}
+.admin-grant-remove:hover {
+    color: var(--adanger);
+}
+
 .admin-table-wrap {
     background: var(--surface-1);
     border: 1px solid var(--border-subtle);
