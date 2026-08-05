@@ -186,7 +186,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		if !found {
 			continue
 		}
-		productId := blEntries[0].CustomFields["scgSKU"]
+		productId := blEntries[0].InstanceId
 		name := blEntries[0].CustomFields["SCGName"]
 		edition := blEntries[0].CustomFields["SCGEdition"]
 		language := blEntries[0].CustomFields["SCGLanguage"]
