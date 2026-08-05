@@ -44,8 +44,6 @@ const (
 	MaxUploadFileSize     = 5 << 20
 
 	ProfitabilityConstant = 2
-
-	TooManyEntriesMessage = "Note: you reached the maximum number of entries supported by this tool"
 )
 
 // List of ALL index prices to track
@@ -609,6 +607,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Warn when the input was cut at the row cap. Checked before the merge
+	// below (which can shrink the count back under the cap), unlike the old
+	// matched-singles check that missed most real truncations.
+	if len(uploadedData) >= maxRows {
+		pageVars.WarningMessage = fmt.Sprintf("Input truncated to the first %d entries", maxRows)
+	}
+
 	uploadedData = docparse.MergeIdenticalEntries(uploadedData)
 
 	// Allow estimating on a separate page
@@ -736,11 +741,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	log.Printf("Card IDs: %d, Sealed product IDs: %d", len(cardIds), len(sealedProductIds))
-
-	// Check not too many entries got uploaded
-	if len(cardIds) >= maxRows {
-		pageVars.InfoMessage = TooManyEntriesMessage
-	}
 
 	tagPref := "tags"
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
