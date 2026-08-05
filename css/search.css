@@ -271,11 +271,19 @@
 .sidebar-setvalue {
     position: relative;
 }
+/* Roomy default: the tables sit inline in the printings slot (the panel's
+   own Set Value headings label them) and the one-line trigger is hidden.
+   JS stashes them behind the trigger only when inline tables would squeeze
+   the products list, by putting .setvalue-stashed on #printings. */
 .sidebar-setvalue-trigger {
+    display: none;
     cursor: default;
     color: var(--search-text-dim);
 }
-.sidebar-setvalue-panel {
+.setvalue-stashed .sidebar-setvalue-trigger {
+    display: block;
+}
+.setvalue-stashed .sidebar-setvalue-panel {
     display: none;
     position: absolute;
     bottom: calc(100% + 6px);
@@ -288,8 +296,8 @@
     padding: 10px 12px;
     box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
-.sidebar-setvalue:hover .sidebar-setvalue-panel,
-.sidebar-setvalue:focus-within .sidebar-setvalue-panel {
+.setvalue-stashed .sidebar-setvalue:hover .sidebar-setvalue-panel,
+.setvalue-stashed .sidebar-setvalue:focus-within .sidebar-setvalue-panel {
     display: block;
 }
 .sidebar-printings a { color: var(--search-link); text-decoration: none; }

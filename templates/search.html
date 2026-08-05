@@ -301,8 +301,40 @@
                     updateSidebar.apply(null, arguments);
                 }
 
+                // The set value tables render inline in the pinned printings
+                // slot while the column is tall enough; only when inline
+                // tables would squeeze the scrolling products list below a
+                // useful height are they stashed behind the hover trigger.
+                // Measured by un-stashing and reading the body's flex
+                // leftover, so it tracks the actual image and table heights.
+                const SETVALUE_MIN_BODY = 160;
+                function updateSetValueMode() {
+                    var printings = document.getElementById('printings');
+                    if (!printings) return;
+                    printings.classList.remove('setvalue-stashed');
+                    if (!printings.querySelector('.sidebar-setvalue')) return;
+                    var sidebar = printings.closest('.search-sidebar');
+                    var body = sidebar ? sidebar.querySelector('.sidebar-body') : null;
+                    // The sidebar is content-sized under a viewport cap, so a
+                    // small body can also mean a short products list that fits
+                    // entirely; only a body that is both below a useful height
+                    // and actually hiding content is squeezed.
+                    if (body && body.clientHeight < SETVALUE_MIN_BODY
+                            && body.scrollHeight > body.clientHeight + 1) {
+                        printings.classList.add('setvalue-stashed');
+                    }
+                }
+
                 function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount) {
-                    document.getElementById('cardImage').src=src;
+                    var img = document.getElementById('cardImage');
+                    img.src = src;
+                    // The image height feeds the space measurement but only
+                    // settles on load; resizes move the 52vh cap too.
+                    if (!img.__setValueHooked) {
+                        img.__setValueHooked = true;
+                        img.addEventListener('load', updateSetValueMode);
+                        window.addEventListener('resize', updateSetValueMode);
+                    }
                     var wrapper = document.getElementById('cardImageWrapper');
                     if (wrapper) {
                         wrapper.setAttribute('data-foil', isFoil ? 'true' : 'false');
@@ -316,6 +348,7 @@
                     }
                     document.getElementById('printings').innerHTML = printings;
                     collapsePrintings();
+                    updateSetValueMode();
 
                     let productDiv = document.getElementById('products');
                     if (productDiv) {
