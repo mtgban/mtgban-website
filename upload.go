@@ -40,7 +40,7 @@ const (
 
 	MaxUploadEntries      = 350
 	MaxUploadProEntries   = 1000
-	MaxUploadTotalEntries = 10000
+	MaxUploadTotalEntries = 15000
 	MaxUploadFileSize     = 5 << 20
 
 	ProfitabilityConstant = 2
@@ -561,8 +561,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		maxRows = MaxUploadProEntries
 	}
 	// Allow a larger upload limit if set, if dev, or if it's an external call
-	limitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
-	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
+	noLimitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
+	uploadNoLimit := noLimitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
 	}
