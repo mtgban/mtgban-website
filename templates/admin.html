@@ -181,7 +181,7 @@
                             <td>{{index $row 3}}</td>
                             <td>{{index $row 4}}</td>
                             <td class="admin-grant-remove-cell">
-                                <form method="POST" action="admin?page=people">
+                                <form method="POST" action="admin?page=people" onsubmit="return confirm('Remove the {{index $row 4}} grant for {{index $row 2}}?')">
                                     <input type="hidden" name="revokeEmail" value="{{index $row 2}}">
                                     <button type="submit" class="admin-grant-remove" title="Remove grant for {{index $row 2}}">✕</button>
                                 </form>
