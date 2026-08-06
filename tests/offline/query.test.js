@@ -152,6 +152,22 @@ test('results carry payload slices', async () => {
     expect(out.results[0].buylist.CK.regular).toBe(0.8);
 });
 
+test('result rows carry the image key when present, undefined otherwise', async () => {
+    Q.resetCaches();
+    const env = fakeEnv();
+    env.getCard = async function (uuid) {
+        const c = { 'u-neo-1':  {uuid: 'u-neo-1',  n: 'Boseiju Reaches', num: '177', r: 'rare',   set: 'NEO', f: false, e: false, s: false, i: 'abc123'},
+                    'u-neo-1f': {uuid: 'u-neo-1f', n: 'Boseiju Reaches', num: '177', r: 'rare',   set: 'NEO', f: true,  e: false, s: false},
+                    'u-mh2-1':  {uuid: 'u-mh2-1',  n: 'Boseiju Whisper', num: '12',  r: 'mythic', set: 'MH2', f: false, e: false, s: false} };
+        return c[uuid] || null;
+    };
+    const out = await Q.execute(Q.parse('boseiju'), env);
+    const withImg = out.results.find(r => r.uuid === 'u-neo-1');
+    const withoutImg = out.results.find(r => r.uuid === 'u-mh2-1');
+    expect(withImg.i).toBe('abc123');
+    expect(withoutImg.i).toBeUndefined();
+});
+
 test('finish, rarity, set, and number filters', async () => {
     Q.resetCaches();
     const env = fakeEnv();

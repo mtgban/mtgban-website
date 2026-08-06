@@ -223,6 +223,7 @@
             bySet[code].forEach(function (card) {
                 out.results.push({
                     uuid: card.uuid,
+                    i: card.i,
                     card: card,
                     retail: (pl.retail && pl.retail[card.uuid]) || {},
                     buylist: (pl.buylist && pl.buylist[card.uuid]) || {},
