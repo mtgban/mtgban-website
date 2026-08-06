@@ -515,39 +515,42 @@ type ConfigType struct {
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
 	Datastore     struct {
-		BackupPath          string `json:"backup_path"`
-		BucketAccessKey     string `json:"bucket_access_key"`
-		BucketSecretKey     string `json:"bucket_access_secret"`
-		CheckpointsPath     string `json:"checkpoints_path"`
-		OfflineManifestPath string `json:"offline_manifest_path"`
-		OfflineImagesPath   string `json:"offline_images_path"`
+		BackupPath      string `json:"backup_path"`
+		BucketAccessKey string `json:"bucket_access_key"`
+		BucketSecretKey string `json:"bucket_access_secret"`
+		CheckpointsPath string `json:"checkpoints_path"`
 	} `json:"datastore"`
-	Game                   string             `json:"game"`
-	ScraperConfig          ScraperConfig      `json:"scraper_config"`
-	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
-	DiscordHook            string             `json:"discord_hook"`
-	DiscordNotifHook       string             `json:"discord_notif_hook"`
-	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
-	DiscordInviteLink      string             `json:"discord_invite_link"`
-	Affiliate              map[string]string  `json:"affiliate"`
-	AffiliatesList         []string           `json:"affiliates_list"`
-	AffiliatesBuylistList  []string           `json:"affiliates_buylist_list"`
-	Api                    map[string]string  `json:"api"`
-	ApiDemoStores          []string           `json:"api_demo_stores"`
-	DiscordToken           string             `json:"discord_token"`
-	ArbitDefaultSellers    []string           `json:"arbit_default_sellers"`
-	ArbitBlockVendors      []string           `json:"arbit_block_vendors"`
-	SearchRetailBlockList  []string           `json:"search_block_list"`
-	SearchBuylistBlockList []string           `json:"search_buylist_block_list"`
-	SleepersBlockList      []string           `json:"sleepers_block_list"`
-	UploadSealedBlockList  []string           `json:"upload_sealed_block_list"`
-	GlobalAllowList        []string           `json:"global_allow_list"`
-	GlobalProbeList        []string           `json:"global_probe_list"`
-	Patreon                PatreonConfig      `json:"patreon"`
-	ApiUserSecrets         map[string]string  `json:"api_user_secrets"`
-	GoogleCredentials      string             `json:"google_credentials"`
-	BuylistMarketCredit    map[string]float64 `json:"buylist_market_credit"`
+	Offline struct {
+		ManifestPath string `json:"manifest_path"`
+		ImagesPath   string `json:"images_path"`
+	} `json:"offline"`
+	BucketKeys             map[string]BucketKey `json:"bucket_keys"`
+	Game                   string               `json:"game"`
+	ScraperConfig          ScraperConfig        `json:"scraper_config"`
+	TimeseriesConfig       TimeseriesConfig     `json:"timeseries_config"`
+	NewNewspaperConfigLine string               `json:"new_newspaper_config_line"`
+	DiscordHook            string               `json:"discord_hook"`
+	DiscordNotifHook       string               `json:"discord_notif_hook"`
+	DiscordAPINotifHook    string               `json:"discord_api_notif_hook"`
+	DiscordInviteLink      string               `json:"discord_invite_link"`
+	Affiliate              map[string]string    `json:"affiliate"`
+	AffiliatesList         []string             `json:"affiliates_list"`
+	AffiliatesBuylistList  []string             `json:"affiliates_buylist_list"`
+	Api                    map[string]string    `json:"api"`
+	ApiDemoStores          []string             `json:"api_demo_stores"`
+	DiscordToken           string               `json:"discord_token"`
+	ArbitDefaultSellers    []string             `json:"arbit_default_sellers"`
+	ArbitBlockVendors      []string             `json:"arbit_block_vendors"`
+	SearchRetailBlockList  []string             `json:"search_block_list"`
+	SearchBuylistBlockList []string             `json:"search_buylist_block_list"`
+	SleepersBlockList      []string             `json:"sleepers_block_list"`
+	UploadSealedBlockList  []string             `json:"upload_sealed_block_list"`
+	GlobalAllowList        []string             `json:"global_allow_list"`
+	GlobalProbeList        []string             `json:"global_probe_list"`
+	Patreon                PatreonConfig        `json:"patreon"`
+	ApiUserSecrets         map[string]string    `json:"api_user_secrets"`
+	GoogleCredentials      string               `json:"google_credentials"`
+	BuylistMarketCredit    map[string]float64   `json:"buylist_market_credit"`
 
 	PopularSearches []PopularSearchEntry `json:"popular_searches"`
 
@@ -619,37 +622,44 @@ var ConfigBucket simplecloud.ReadWriter
 
 // Cache for offlineImagesFactory: the bucket client is reused because image requests are hot.
 var (
-	offlineImagesBucketMu   sync.Mutex
-	offlineImagesBucketCur  simplecloud.ReadWriter
-	offlineImagesBucketBase string
+	offlineImagesBucketMu     sync.Mutex
+	offlineImagesBucketCur    simplecloud.ReadWriter
+	offlineImagesBucketBase   string
+	offlineImagesBucketKey    string
+	offlineImagesBucketSecret string
 )
 
 func offlineImagesFactory(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-	base := Config.Datastore.OfflineImagesPath
+	base := Config.Offline.ImagesPath
 	if base == "" {
-		return nil, "", errors.New("offline_images_path not configured")
+		return nil, "", errors.New("offline.images_path not configured")
 	}
-
-	offlineImagesBucketMu.Lock()
-	defer offlineImagesBucketMu.Unlock()
-	if offlineImagesBucketCur != nil && offlineImagesBucketBase == base {
-		return offlineImagesBucketCur, base, nil
-	}
-
 	u, err := url.Parse(base)
 	if err != nil {
 		return nil, "", err
 	}
+	var key, secret string
+	if u.Scheme == "b2" {
+		key, secret = bucketCredentials(u.Host)
+	}
+
+	offlineImagesBucketMu.Lock()
+	defer offlineImagesBucketMu.Unlock()
+	if offlineImagesBucketCur != nil && offlineImagesBucketBase == base &&
+		offlineImagesBucketKey == key && offlineImagesBucketSecret == secret {
+		return offlineImagesBucketCur, base, nil
+	}
+
 	var bucket simplecloud.ReadWriter
 	switch {
 	// A one-letter scheme is a Windows drive path; fail loud so misconfigured
 	// Windows absolute paths (broken by simplecloud v0.0.9) are caught early.
 	case len(u.Scheme) == 1:
-		return nil, "", errors.New("offline_images_path: Windows absolute paths are broken by simplecloud v0.0.9 (drive letter stripped); use a relative path until the upstream fix lands")
+		return nil, "", errors.New("offline.images_path: Windows absolute paths are broken by simplecloud v0.0.9 (drive letter stripped); use a relative path until the upstream fix lands")
 	case u.Scheme == "":
 		bucket = &simplecloud.FileBucket{}
 	case u.Scheme == "b2":
-		bucket, err = simplecloud.NewB2Client(ctx, Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
+		bucket, err = simplecloud.NewB2Client(ctx, key, secret, u.Host)
 		if err != nil {
 			return nil, "", err
 		}
@@ -657,6 +667,7 @@ func offlineImagesFactory(ctx context.Context) (simplecloud.ReadWriter, string, 
 		return nil, "", fmt.Errorf("unsupported offline images path scheme: %s", u.Scheme)
 	}
 	offlineImagesBucketCur, offlineImagesBucketBase = bucket, base
+	offlineImagesBucketKey, offlineImagesBucketSecret = key, secret
 	return bucket, base, nil
 }
 
@@ -724,9 +735,9 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	CardObjectSources: cardobject2sources,
 
 	ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-		omPath := Config.Datastore.OfflineManifestPath
+		omPath := Config.Offline.ManifestPath
 		if omPath == "" {
-			return nil, "", errors.New("offline_manifest_path not configured")
+			return nil, "", errors.New("offline.manifest_path not configured")
 		}
 		u, err := url.Parse(omPath)
 		if err != nil {
@@ -736,7 +747,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 		case u.Scheme == "" || len(u.Scheme) == 1:
 			return &simplecloud.FileBucket{}, omPath, nil
 		case u.Scheme == "b2":
-			bucket, err := simplecloud.NewB2Client(ctx, Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
+			bucket, err := newB2ClientFor(ctx, u.Host)
 			return bucket, omPath, err
 		default:
 			return nil, "", fmt.Errorf("unsupported offline manifest path scheme: %s", u.Scheme)
@@ -753,8 +764,8 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 
 	ImagesBucket: offlineImagesFactory,
 
-	ManifestPathConfigured: func() bool { return Config.Datastore.OfflineManifestPath != "" },
-	ImagesPathConfigured:   func() bool { return Config.Datastore.OfflineImagesPath != "" },
+	ManifestPathConfigured: func() bool { return Config.Offline.ManifestPath != "" },
+	ImagesPathConfigured:   func() bool { return Config.Offline.ImagesPath != "" },
 
 	WatermarkSecret: func() []byte { return []byte(os.Getenv("BAN_SECRET")) },
 
@@ -1149,7 +1160,7 @@ func newReadBucket(path string) (simplecloud.Reader, error) {
 	case "":
 		return &simplecloud.FileBucket{}, nil
 	case "b2":
-		b2Bucket, err := simplecloud.NewB2Client(context.Background(), Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
+		b2Bucket, err := newB2ClientFor(context.Background(), u.Host)
 		if err != nil {
 			return nil, err
 		}

@@ -1,6 +1,10 @@
 package offlineapi
 
-import "time"
+import (
+	"time"
+
+	"github.com/mtgban/mtgban-website/internal/debounce"
+)
 
 // refreshDebounce is the quiet window a burst of RequestRefresh calls must
 // settle for before the manifest is recomputed. A pipeline that reloads many
@@ -20,27 +24,5 @@ func (s *Service) RequestRefresh() {
 // funnel through this single goroutine, so refreshManifest never overlaps
 // itself. Call once after startup loads are kicked off.
 func (s *Service) StartRefresher() {
-	go debounceLoop(s.refreshSignal, refreshDebounce, s.refreshManifest)
-}
-
-// debounceLoop runs `run` once per burst of signals: after the first signal it
-// waits for `wait` of quiet, resetting the window each time another signal
-// arrives, then runs.
-func debounceLoop(signal <-chan struct{}, wait time.Duration, run func()) {
-	for range signal {
-		timer := time.NewTimer(wait)
-		settling := true
-		for settling {
-			select {
-			case <-signal:
-				if !timer.Stop() {
-					<-timer.C
-				}
-				timer.Reset(wait)
-			case <-timer.C:
-				settling = false
-			}
-		}
-		run()
-	}
+	go debounce.Loop(s.refreshSignal, refreshDebounce, s.refreshManifest)
 }
