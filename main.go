@@ -16,6 +16,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -1302,8 +1303,20 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
+	// pprof registered itself on the default mux at import time, so its
+	// routes cannot be wrapped individually like the other pages; steer
+	// them through the standard signing middleware (plus the Admin grant)
+	// here instead, and everything else straight to the mux
+	debugHandler := enforceSigning(adminOnly(http.DefaultServeMux))
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/debug") {
+				debugHandler.ServeHTTP(w, r)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		}),
 	}
 
 	done := make(chan os.Signal, 1)

@@ -328,6 +328,22 @@ func putSignatureInCookies(w http.ResponseWriter, sig string) {
 	setCookie(w, "MTGBAN", sig, oneMonth, true)
 }
 
+// adminOnly hides the wrapped handler from signatures that do not carry
+// the Admin grant. It performs no validation of its own: it must sit
+// behind enforceSigning, which authenticates the signature before any of
+// its parameters can be trusted. Non-admins get a plain 404 so the
+// endpoint's existence is not advertised.
+func adminOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		canDo, _ := strconv.ParseBool(GetParamFromSig(getSignatureFromCookies(r), "Admin"))
+		if !canDo && !(DevMode && !SigCheck) {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // This function is mostly here only for initializing the host
 // and the signature from invite links
 func noSigning(next http.Handler) http.Handler {
