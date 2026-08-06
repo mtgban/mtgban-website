@@ -1090,6 +1090,11 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 		// Get inventory
 		inventory := seller.Inventory()
 
+		// Fetch the seller info (a struct copy) and its display name once
+		// per store instead of once per entry
+		info := seller.Info()
+		name := scraperName(info.Shorthand)
+
 		for _, cardId := range cardIds {
 			entries, found := inventory[cardId]
 			if !found {
@@ -1099,12 +1104,12 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 			// Loop thorugh available conditions
 			for _, entry := range entries {
 				// Skip cards that have not the desired condition
-				if !seller.Info().MetadataOnly && shouldSkipEntryNG(entry, entryFilters) {
+				if !info.MetadataOnly && shouldSkipEntryNG(entry, entryFilters) {
 					continue
 				}
 
 				// Skip cards that don't match desired pricing
-				if shouldSkipPriceNG(cardId, entry, priceFilters, seller.Info().Shorthand) {
+				if shouldSkipPriceNG(cardId, entry, priceFilters, info.Shorthand) {
 					continue
 				}
 
@@ -1117,26 +1122,26 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 				// Set conditions - handle the special TCG one that appears
 				// at the top of the results
 				conditions := entry.Conditions
-				if seller.Info().MetadataOnly {
+				if info.MetadataOnly {
 					conditions = "INDEX"
 				}
 
-				icon := Config.ScraperConfig.Icons[seller.Info().Shorthand]
+				icon := Config.ScraperConfig.Icons[info.Shorthand]
 
 				// Prepare all the deets
 				res := SearchEntry{
-					ScraperName: scraperName(seller.Info().Shorthand),
-					Shorthand:   seller.Info().Shorthand,
+					ScraperName: name,
+					Shorthand:   info.Shorthand,
 					Price:       entry.Price,
 					Quantity:    entry.Quantity,
 					URL:         entry.URL,
-					NoQuantity:  seller.Info().NoQuantityInventory || seller.Info().MetadataOnly,
+					NoQuantity:  info.NoQuantityInventory || info.MetadataOnly,
 					BundleIcon:  icon,
-					Country:     Country2flag[seller.Info().CountryFlag],
+					Country:     Country2flag[info.CountryFlag],
 					ExtraValues: entry.ExtraValues,
 				}
-				if seller.Info().CreditMultiplier > 0 {
-					res.Credit = entry.Price / seller.Info().CreditMultiplier
+				if info.CreditMultiplier > 0 {
+					res.Credit = entry.Price / info.CreditMultiplier
 				}
 
 				// Touchdown
@@ -1164,6 +1169,11 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 
 		buylist := vendor.Buylist()
 
+		// Fetch the vendor info and its display name once per store, like
+		// in searchSellersNG
+		info := vendor.Info()
+		name := scraperName(info.Shorthand)
+
 		for _, cardId := range cardIds {
 			entries, found := buylist[cardId]
 			if !found {
@@ -1175,7 +1185,7 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 					continue
 				}
 
-				if shouldSkipPriceNG(cardId, entry, priceFilters, vendor.Info().Shorthand) {
+				if shouldSkipPriceNG(cardId, entry, priceFilters, info.Shorthand) {
 					continue
 				}
 
@@ -1185,23 +1195,23 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 				}
 
 				conditions := entry.Conditions
-				if vendor.Info().MetadataOnly && !vendor.Info().SealedMode {
+				if info.MetadataOnly && !info.SealedMode {
 					conditions = "INDEX"
 				}
 
-				icon := Config.ScraperConfig.Icons[vendor.Info().Shorthand]
+				icon := Config.ScraperConfig.Icons[info.Shorthand]
 
 				res := SearchEntry{
-					ScraperName:  scraperName(vendor.Info().Shorthand),
-					Shorthand:    vendor.Info().Shorthand,
+					ScraperName:  name,
+					Shorthand:    info.Shorthand,
 					Price:        entry.BuyPrice,
-					Credit:       entry.BuyPrice * vendor.Info().CreditMultiplier,
-					MarketCredit: entry.BuyPrice * vendor.Info().CreditMultiplier * Config.BuylistMarketCredit[vendor.Info().Shorthand],
+					Credit:       entry.BuyPrice * info.CreditMultiplier,
+					MarketCredit: entry.BuyPrice * info.CreditMultiplier * Config.BuylistMarketCredit[info.Shorthand],
 					Ratio:        entry.PriceRatio,
 					Quantity:     entry.Quantity,
 					URL:          entry.URL,
 					BundleIcon:   icon,
-					Country:      Country2flag[vendor.Info().CountryFlag],
+					Country:      Country2flag[info.CountryFlag],
 				}
 
 				foundVendors[cardId][conditions] = append(foundVendors[cardId][conditions], res)
