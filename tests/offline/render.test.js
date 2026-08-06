@@ -27,6 +27,7 @@ const CTX = {
 function result(overrides) {
     return Object.assign({
         uuid: 'uuid-1',
+        i: 'img-key-1',
         card: {uuid: 'uuid-1', n: 'Boseiju, Who Endures', num: '177', r: 'rare', set: 'NEO', f: false, e: false, s: false},
         retail: {
             CK: {regular: 30, cond: 'NM', qty: 4,
@@ -45,7 +46,7 @@ test('header mirrors search.html classes and data attrs', () => {
     expect(html).toContain('class="result-header-cover"');
     expect(html).toContain('class="result-header result-first"');
     expect(html).toContain('data-card-id="uuid-1"');
-    expect(html).toContain('data-image-url="/api/offline/images/uuid-1.webp"');
+    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
     expect(html).toContain('class="ss ss-neo ss-2x ss-fw result-set-icon"');
     expect(html).toContain('class="result-card-info"');
     expect(html).toContain('class="result-card-name-row"');
@@ -57,6 +58,7 @@ test('header mirrors search.html classes and data attrs', () => {
 
 test('body columns and condition grouping', () => {
     const html = R.buildHTML([result()], CTX);
+    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
     expect(html).toContain('class="result-body result-last-body"');
     expect(html).toContain('<div class="result-col-header">Sellers</div>');
     expect(html).toContain('<div class="result-col-header">Buyers</div>');
@@ -266,4 +268,11 @@ test('credit secondary modes render a blank buylist cell offline', () => {
     const html = R.buildHTML([result()], Object.assign({}, CTX, {buylistSecondary: 'creditPrice'}));
     expect(html).not.toContain('72.73 %');
     expect(html).toContain('data-ratio="72.73"');
+});
+
+test('card without image key renders empty data-image-url', () => {
+    const r = result({i: undefined});
+    const html = R.buildHTML([r], CTX);
+    expect(html).toContain('data-image-url=""');
+    expect(html).not.toContain('/api/offline/images/');
 });
