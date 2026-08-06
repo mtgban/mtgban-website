@@ -115,7 +115,7 @@
 
     function headerHTML(res) {
         var card = res.card;
-        var imgURL = '/api/offline/images/' + encodeURIComponent(res.uuid) + '.webp';
+        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '';
         var icon = res._setKey
             ? '<i class="ss ss-' + esc(res._setKey) + ' ss-fw"></i>'
             : '<span>' + esc(card.set) + '</span>';
@@ -333,7 +333,7 @@
         var card = res.card;
         var set = ctx.sets[card.set] || {};
         res._setKey = set.k || '';
-        var imgURL = '/api/offline/images/' + encodeURIComponent(res.uuid) + '.webp';
+        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '';
         var sData = condGroupsForSellers(res, ctx);
         var bData = condGroupsForBuyers(res, ctx);
         var ac = activeConds(sData, bData);
@@ -341,7 +341,9 @@
         html += headerHTML(res);
         html += condPillsHTML(res.uuid, ac.conds, ac.hasIndex, !!card.s);
         html += tabsHTML(res.uuid, sData.hasAny, bData.hasAny);
-        html += '<img class="m-card-img-landscape" src="' + esc(imgURL) + '" loading="lazy" alt="' + esc(card.n) + '">';
+        if (imgURL) {
+            html += '<img class="m-card-img-landscape" src="' + esc(imgURL) + '" loading="lazy" alt="' + esc(card.n) + '">';
+        }
         html += sellersPanel(res.uuid, sData, ac, !!card.s);
         html += buyersPanel(res.uuid, bData, ac, res, !!card.s);
         html += '</div>';

@@ -25,6 +25,7 @@ const CTX = {
 function result(overrides) {
     return Object.assign({
         uuid: 'uuid-1',
+        i: 'img-key-1',
         card: {uuid: 'uuid-1', n: 'Boseiju, Who Endures', num: '177', r: 'rare', set: 'NEO', f: false, e: false, s: false},
         retail: {
             CK: {regular: 30, cond: 'NM', qty: 4,
@@ -46,7 +47,7 @@ test('card wrapper has m-card class', () => {
 test('header data attributes', () => {
     const html = R.buildHTML([result()], CTX);
     expect(html).toContain('data-card-id="uuid-1"');
-    expect(html).toContain('data-image-url="/api/offline/images/uuid-1.webp"');
+    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
     expect(html).toContain('data-set-code="NEO"');
     expect(html).toContain('data-card-name="Boseiju, Who Endures"');
 });
@@ -180,7 +181,19 @@ test('no-offers row when both sides empty', () => {
 test('landscape image stub present', () => {
     const html = R.buildHTML([result()], CTX);
     expect(html).toContain('class="m-card-img-landscape"');
-    expect(html).toContain('src="/api/offline/images/uuid-1.webp"');
+    expect(html).toContain('src="/api/offline/images/img-key-1.jpg"');
+});
+
+test('landscape image omitted when card has no image key', () => {
+    const r = result({i: undefined});
+    const html = R.buildHTML([r], CTX);
+    expect(html).not.toContain('m-card-img-landscape');
+});
+
+test('header data-image-url empty when card has no image key', () => {
+    const r = result({i: undefined});
+    const html = R.buildHTML([r], CTX);
+    expect(html).toContain('data-image-url=""');
 });
 
 test('html is escaped in card name', () => {
