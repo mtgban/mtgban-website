@@ -43,7 +43,6 @@ async function runImagesStage(manifest, imgEditions, isCancelled) {
         sel: sel,
         getImgStates: function () { return OfflineDB.getAllRows('imgstate'); },
         deleteImgState: function (code) { return OfflineDB.deleteRow('imgstate', code); },
-        getCard: function (uuid) { return OfflineDB.getCard(uuid); },
     });
     if (sel.length === 0) {
         await OfflineDB.setMeta('imgCount', 0);

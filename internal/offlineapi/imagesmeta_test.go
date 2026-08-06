@@ -7,12 +7,12 @@ import (
 
 func TestJoinBucketPath(t *testing.T) {
 	tests := []struct{ base, want string }{
-		{"offline-mirror", "offline-mirror/images/x.webp"},
-		{"b2://bucket/offline", "b2://bucket/offline/images/x.webp"},
-		{"C:/Users/elmo/scratch", "C:/Users/elmo/scratch/images/x.webp"},
+		{"offline-mirror", "offline-mirror/images/x.jpg"},
+		{"b2://bucket/offline", "b2://bucket/offline/images/x.jpg"},
+		{"C:/Users/elmo/scratch", "C:/Users/elmo/scratch/images/x.jpg"},
 	}
 	for _, tt := range tests {
-		if got := JoinBucketPath(tt.base, "images", "x.webp"); got != tt.want {
+		if got := JoinBucketPath(tt.base, "images", "x.jpg"); got != tt.want {
 			t.Errorf("JoinBucketPath(%q) = %q, want %q", tt.base, got, tt.want)
 		}
 	}
