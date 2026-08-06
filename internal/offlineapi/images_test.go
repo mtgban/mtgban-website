@@ -34,22 +34,23 @@ func newTestService(t *testing.T) (*Service, string) {
 
 func TestServeOfflineImage(t *testing.T) {
 	s, dir := newTestService(t)
-	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "images"), 0755)
-	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "images", "uuid-aaa.webp"), []byte("webpdata"), 0644)
-	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "images", "uuid-jpg.jpg"), []byte("jpegdata"), 0644)
+	scryfallID := "ab154b52-1234-5678-9abc-def012345678"
+	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b"), 0755)
+	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b", scryfallID+".jpg"), []byte("jpegdata"), 0644)
+	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "MH3", "sealed"), 0755)
+	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "MH3", "sealed", "541185.jpg"), []byte("sealeddata"), 0644)
 
 	tests := []struct {
 		rest string
 		code int
 		body string
-		mime string
 	}{
-		{"uuid-aaa.webp", 200, "webpdata", "image/webp"},
-		{"uuid-jpg.webp", 200, "jpegdata", "image/jpeg"},
-		{"uuid-none.webp", 404, "", ""},
-		{"uuid-aaa", 404, "", ""},
-		{"../images/uuid-aaa.webp", 404, "", ""},
-		{"..\\uuid-aaa.webp", 404, "", ""},
+		{scryfallID + ".jpg", 200, "jpegdata"},
+		{"p-MH3-541185.jpg", 200, "sealeddata"},
+		{"../x", 404, ""},
+		{"a%2f.jpg", 404, ""},
+		{scryfallID + ".extra.jpg", 404, ""},
+		{scryfallID + ".webp", 404, ""},
 	}
 	for _, tt := range tests {
 		w := httptest.NewRecorder()
@@ -65,8 +66,8 @@ func TestServeOfflineImage(t *testing.T) {
 		if w.Body.String() != tt.body {
 			t.Errorf("%s: body = %q, want %q", tt.rest, w.Body.String(), tt.body)
 		}
-		if got := w.Header().Get("Content-Type"); got != tt.mime {
-			t.Errorf("%s: content type = %q, want %q", tt.rest, got, tt.mime)
+		if got := w.Header().Get("Content-Type"); got != "image/jpeg" {
+			t.Errorf("%s: content type = %q, want image/jpeg", tt.rest, got)
 		}
 		if got := w.Header().Get("Cache-Control"); got != "private, max-age=604800" {
 			t.Errorf("%s: cache control = %q", tt.rest, got)

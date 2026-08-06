@@ -150,7 +150,7 @@
 
     function showImage(url) {
         var img = document.getElementById('cardImage');
-        if (img && url) img.src = url;
+        if (img) img.src = url || PLACEHOLDER;
     }
 
     function showErrorNotice(err) {

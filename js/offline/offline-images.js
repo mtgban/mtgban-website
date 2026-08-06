@@ -3,7 +3,7 @@
 (function () {
     'use strict';
 
-    var IMAGE_CACHE = 'mtgban-images-v1';
+    var IMAGE_CACHE = 'mtgban-images-v2';
 
     function formatBytes(n) {
         if (!isFinite(n) || n <= 0) return '0 B';
@@ -15,14 +15,14 @@
         return s + ' ' + units[u];
     }
 
-    // Cache key is always the .webp URL shape; jpg fallback entries only change Content-Type.
+    // Bundle entries are flat <key>.jpg; key is the image key (scryfallId or p-<CODE>-<tcgId>).
     function entryMeta(name) {
-        var m = /^([^\/]+)\.(webp|jpe?g)$/i.exec(name);
+        var m = /^([^\/]+)\.jpe?g$/i.exec(name);
         if (!m) return null;
         return {
-            uuid: m[1],
-            url: '/api/offline/images/' + m[1] + '.webp',
-            contentType: m[2].toLowerCase() === 'webp' ? 'image/webp' : 'image/jpeg',
+            key: m[1],
+            url: '/api/offline/images/' + m[1] + '.jpg',
+            type: 'image/jpeg',
         };
     }
 
@@ -91,13 +91,13 @@
             await deps.putImgState({ code: item.code, hash: item.hash, done: false });
             var entries = self.fflate.unzipSync(buf);
             var names = Object.keys(entries);
-            var uuids = [];
+            var keys = [];
             for (var j = 0; j < names.length; j++) {
                 var meta = entryMeta(names[j]);
                 if (!meta) continue;
                 try {
                     await cache.put(new Request(meta.url), new Response(entries[names[j]], {
-                        headers: { 'Content-Type': meta.contentType },
+                        headers: { 'Content-Type': meta.type },
                     }));
                 } catch (err) {
                     if (err && err.name === 'QuotaExceededError') {
@@ -105,9 +105,9 @@
                     }
                     throw err;
                 }
-                uuids.push(meta.uuid);
+                keys.push(meta.key);
             }
-            await deps.putImgState({ code: item.code, hash: item.hash, done: true, uuids: uuids });
+            await deps.putImgState({ code: item.code, hash: item.hash, done: true, keys: keys });
             // two bundles must not be co-resident across the next await
             buf = null;
             entries = null;
@@ -128,20 +128,13 @@
         var removed = 0;
         for (var i = 0; i < stale.length; i++) {
             var row = stale[i];
-            var uuids = row.uuids;
-            if (!uuids) {
-                // Rows synced before uuids were recorded: match cache keys by card set.
-                uuids = [];
-                var keys = await cache.keys();
-                for (var k = 0; k < keys.length; k++) {
-                    var m = /\/api\/offline\/images\/([^\/.]+)\.webp$/.exec(keys[k].url);
-                    if (!m) continue;
-                    var card = await deps.getCard(m[1]);
-                    if (card && card.set === row.code) uuids.push(m[1]);
-                }
+            if (!row.keys) {
+                // v1-era row (uuids field): the v1 cache is reaped wholesale by the SW, so just drop the row.
+                await deps.deleteImgState(row.code);
+                continue;
             }
-            for (var j = 0; j < uuids.length; j++) {
-                if (await cache.delete('/api/offline/images/' + uuids[j] + '.webp')) removed++;
+            for (var j = 0; j < row.keys.length; j++) {
+                if (await cache.delete('/api/offline/images/' + row.keys[j] + '.jpg')) removed++;
             }
             await deps.deleteImgState(row.code);
         }

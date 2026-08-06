@@ -7,6 +7,7 @@ import (
 	"hash/fnv"
 	"log"
 	"net/http"
+	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,38 @@ type catalogCard struct {
 	Etched   bool     `json:"e,omitempty"`
 	Sealed   bool     `json:"s,omitempty"`
 	Products []string `json:"p,omitempty"`
+	Image    string   `json:"i,omitempty"`
+}
+
+// imageKey derives the offline image bucket key from a card's full-image URL.
+func imageKey(imagesFull, setCode string, sealed bool) string {
+	if imagesFull == "" {
+		return ""
+	}
+	base := path.Base(imagesFull)
+	base = strings.TrimSuffix(base, ".jpg")
+	if base == "" || base == "." || base == "/" {
+		return ""
+	}
+	if sealed {
+		return "p-" + setCode + "-" + base
+	}
+	return base
+}
+
+// newCatalogCard builds a catalog entry from a card object and its store list.
+func newCatalogCard(co *mtgmatcher.CardObject, products []string) catalogCard {
+	return catalogCard{
+		Name:     co.Name,
+		Number:   co.Number,
+		Rarity:   co.Rarity,
+		SetCode:  co.SetCode,
+		Foil:     co.Foil,
+		Etched:   co.Etched,
+		Sealed:   co.Sealed,
+		Products: products,
+		Image:    imageKey(co.Images["full"], co.SetCode, co.Sealed),
+	}
 }
 
 type catalogSet struct {
@@ -53,16 +86,7 @@ func (s *Service) refreshCatalog() {
 		if err != nil {
 			continue
 		}
-		cards[uuid] = catalogCard{
-			Name:     co.Name,
-			Number:   co.Number,
-			Rarity:   co.Rarity,
-			SetCode:  co.SetCode,
-			Foil:     co.Foil,
-			Etched:   co.Etched,
-			Sealed:   co.Sealed,
-			Products: s.deps.CardObjectSources(co),
-		}
+		cards[uuid] = newCatalogCard(co, s.deps.CardObjectSources(co))
 	}
 
 	sets := map[string]catalogSet{}

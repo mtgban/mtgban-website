@@ -42,15 +42,14 @@ test('formatBytes renders human sizes', () => {
 });
 
 test('entryMeta maps bundle entries to cache keys', () => {
-    expect(OfflineImages.entryMeta('abc-123.webp')).toEqual({
-        uuid: 'abc-123',
-        url: '/api/offline/images/abc-123.webp',
-        contentType: 'image/webp',
+    expect(OfflineImages.entryMeta('abc-123.jpg')).toEqual({
+        key: 'abc-123',
+        url: '/api/offline/images/abc-123.jpg',
+        type: 'image/jpeg',
     });
-    // cwebp-missing fallback entries: jpg bytes behind the canonical .webp key
-    expect(OfflineImages.entryMeta('abc-123.jpg').contentType).toBe('image/jpeg');
-    expect(OfflineImages.entryMeta('abc-123.jpg').url).toBe('/api/offline/images/abc-123.webp');
-    expect(OfflineImages.entryMeta('nested/abc.webp')).toBeNull();
+    expect(OfflineImages.entryMeta('abc-123.jpeg').type).toBe('image/jpeg');
+    expect(OfflineImages.entryMeta('abc-123.webp')).toBeNull();
+    expect(OfflineImages.entryMeta('nested/abc.jpg')).toBeNull();
     expect(OfflineImages.entryMeta('README.txt')).toBeNull();
 });
 
@@ -126,7 +125,7 @@ test('syncImages returns immediately when no work is needed', async () => {
 });
 
 test('syncImages downloads, unpacks, and marks done', async () => {
-    const zip = makeZip({ 'uuid-aaa.webp': [82, 73, 70, 70], 'uuid-bbb.jpg': [255, 216], 'notes.txt': [104, 105] });
+    const zip = makeZip({ 'key-aaa.jpg': [255, 216], 'key-bbb.jpg': [255, 216], 'notes.txt': [104, 105] });
     const { cache, caches } = makeFakeCache();
     const posts = [];
     const states = [];
@@ -143,20 +142,20 @@ test('syncImages downloads, unpacks, and marks done', async () => {
     expect(posts).toHaveLength(2);
     expect(posts[0]).toMatchObject({ type: 'progress', stage: 'images', done: 0, total: 1, code: 'TST', bytes: 0 });
     expect(posts[1]).toMatchObject({ type: 'progress', stage: 'images', done: 1, total: 1, bytes: zip.byteLength });
-    // webp and jpg entries stored (.txt skipped); jpg keyed as .webp URL
+    // both jpg entries stored (.txt skipped)
     expect(cache.store).toHaveLength(2);
-    const webpEntry = cache.store.find(e => e.req.url.endsWith('uuid-aaa.webp'));
-    const jpgEntry = cache.store.find(e => e.req.url.endsWith('uuid-bbb.webp'));
-    expect(webpEntry.resp.headers.get('Content-Type')).toBe('image/webp');
-    expect(jpgEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
+    const aaaEntry = cache.store.find(e => e.req.url.endsWith('key-aaa.jpg'));
+    const bbbEntry = cache.store.find(e => e.req.url.endsWith('key-bbb.jpg'));
+    expect(aaaEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
+    expect(bbbEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
     expect(states).toEqual([
         { code: 'TST', hash: 'h1', done: false },
-        { code: 'TST', hash: 'h1', done: true, uuids: ['uuid-aaa', 'uuid-bbb'] },
+        { code: 'TST', hash: 'h1', done: true, keys: ['key-aaa', 'key-bbb'] },
     ]);
 });
 
 test('syncImages resumes a bundle left done:false by a previous interrupted run', async () => {
-    const zip = makeZip({ 'uuid-aaa.webp': [1, 2, 3] });
+    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
     const { cache, caches } = makeFakeCache();
     const states = [];
     const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
@@ -173,7 +172,7 @@ test('syncImages resumes a bundle left done:false by a previous interrupted run'
     expect(cache.store).toHaveLength(1);
     expect(states).toEqual([
         { code: 'TST', hash: 'h1', done: false },
-        { code: 'TST', hash: 'h1', done: true, uuids: ['uuid-aaa'] },
+        { code: 'TST', hash: 'h1', done: true, keys: ['key-aaa'] },
     ]);
 });
 
@@ -195,7 +194,7 @@ test('syncImages refuses when projected bytes exceed 90pct of free storage', asy
 });
 
 test('syncImages stops cleanly on QuotaExceededError; imgstate stays done:false', async () => {
-    const zip = makeZip({ 'uuid-aaa.webp': [1, 2, 3] });
+    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
     const quotaErr = Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
     const fakeCache = { put: async () => { throw quotaErr; } };
     const fakeCaches = { open: async () => fakeCache };
@@ -268,7 +267,7 @@ test('imgCount returns 0 when no done rows', () => {
 });
 
 test('syncImages pauses between bundles when cancelled', async () => {
-    const zip = makeZip({ 'uuid-aaa.webp': [1, 2, 3] });
+    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
     const { cache, caches } = makeFakeCache();
     const posts = [];
     let callCount = 0;
@@ -309,48 +308,45 @@ function makeFakeCacheMap(initial) {
     return { cache, caches: { open: async () => cache } };
 }
 
-test('evictImages removes deselected editions by recorded uuids', async () => {
+test('evictImages removes deselected editions by recorded keys', async () => {
     const fake = makeFakeCacheMap({
-        '/api/offline/images/uuid-neo.webp': 'x',
-        '/api/offline/images/uuid-mid.webp': 'x',
+        '/api/offline/images/key-neo.jpg': 'x',
+        '/api/offline/images/key-mid.jpg': 'x',
     });
     const mod = loadWithExtras({ caches: fake.caches });
     const deleted = [];
     const removed = await mod.evictImages({
         sel: ['NEO'],
         getImgStates: async () => [
-            { code: 'NEO', hash: 'a', done: true, uuids: ['uuid-neo'] },
-            { code: 'MID', hash: 'b', done: true, uuids: ['uuid-mid'] },
+            { code: 'NEO', hash: 'a', done: true, keys: ['key-neo'] },
+            { code: 'MID', hash: 'b', done: true, keys: ['key-mid'] },
         ],
         deleteImgState: async (code) => deleted.push(code),
-        getCard: async () => null,
     });
     expect(removed).toBe(1);
     expect(deleted).toEqual(['MID']);
-    expect(fake.cache.entries.has('/api/offline/images/uuid-neo.webp')).toBe(true);
-    expect(fake.cache.entries.has('/api/offline/images/uuid-mid.webp')).toBe(false);
+    expect(fake.cache.entries.has('/api/offline/images/key-neo.jpg')).toBe(true);
+    expect(fake.cache.entries.has('/api/offline/images/key-mid.jpg')).toBe(false);
 });
 
-test('evictImages matches legacy rows without uuids via card lookup', async () => {
+test('evictImages drops legacy uuids rows without touching the cache', async () => {
     const fake = makeFakeCacheMap({
-        '/api/offline/images/uuid-neo.webp': 'x',
-        '/api/offline/images/uuid-mid.webp': 'x',
+        '/api/offline/images/key-neo.jpg': 'x',
     });
     const mod = loadWithExtras({ caches: fake.caches });
-    const cards = { 'uuid-neo': { set: 'NEO' }, 'uuid-mid': { set: 'MID' } };
+    const deleted = [];
     const removed = await mod.evictImages({
         sel: ['NEO'],
-        getImgStates: async () => [{ code: 'MID', hash: 'b', done: true }],
-        deleteImgState: async () => {},
-        getCard: async (uuid) => cards[uuid],
+        getImgStates: async () => [{ code: 'MID', hash: 'b', done: true, uuids: ['uuid-mid'] }],
+        deleteImgState: async (code) => deleted.push(code),
     });
-    expect(removed).toBe(1);
-    expect(fake.cache.entries.has('/api/offline/images/uuid-neo.webp')).toBe(true);
-    expect(fake.cache.entries.has('/api/offline/images/uuid-mid.webp')).toBe(false);
+    expect(removed).toBe(0);
+    expect(deleted).toEqual(['MID']);
+    expect(fake.cache.entries.has('/api/offline/images/key-neo.jpg')).toBe(true);
 });
 
-test('syncImages records unpacked uuids on the imgstate row', async () => {
-    const zip = makeZip({ 'uuid-1.webp': [1], 'uuid-2.webp': [2] });
+test('syncImages records unpacked keys on the imgstate row', async () => {
+    const zip = makeZip({ 'key-1.jpg': [1], 'key-2.jpg': [2] });
     const { caches } = makeFakeCache();
     const mod = loadWithExtras({
         fflate,
@@ -369,5 +365,5 @@ test('syncImages records unpacked uuids on the imgstate row', async () => {
     });
     const final = puts[puts.length - 1];
     expect(final.done).toBe(true);
-    expect(final.uuids.slice().sort()).toEqual(['uuid-1', 'uuid-2']);
+    expect(final.keys.slice().sort()).toEqual(['key-1', 'key-2']);
 });

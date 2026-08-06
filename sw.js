@@ -5,7 +5,7 @@
 // URLs must match the page's ?hash= exactly, even when the build id is empty.
 var BUILD = self.__BUILD || '';
 var SHELL_CACHE = 'mtgban-shell-' + (BUILD || 'dev');
-var IMAGE_CACHE = 'mtgban-images-v1';
+var IMAGE_CACHE = 'mtgban-images-v2';
 
 // Same-origin chrome needed to render the /offline shell with no network.
 var SHELL_URLS = [
@@ -58,7 +58,7 @@ self.addEventListener('install', function (e) {
 self.addEventListener('activate', function (e) {
     e.waitUntil(caches.keys().then(function (names) {
         return Promise.all(names.filter(function (n) {
-            return n.indexOf('mtgban-shell-') === 0 && n !== SHELL_CACHE;
+            return (n.indexOf('mtgban-shell-') === 0 && n !== SHELL_CACHE) || n === 'mtgban-images-v1';
         }).map(function (n) { return caches.delete(n); }));
     }).then(function () { return self.clients.claim(); }));
 });
