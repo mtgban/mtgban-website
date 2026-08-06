@@ -101,7 +101,7 @@
             return caches.keys();
         }).then(function (names) {
             return Promise.all(names.filter(function (n) {
-                return n.indexOf('mtgban-shell-') === 0 || n === 'mtgban-images-v1';
+                return n.indexOf('mtgban-shell-') === 0 || n === 'mtgban-images-v2';
             }).map(function (n) { return caches.delete(n); }));
         }).then(function () {
             return OfflineDB.close();
