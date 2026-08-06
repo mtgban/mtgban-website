@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/mtgban/mtgban-website/internal/imgmirror"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -26,7 +25,7 @@ func (s *Service) openImageObject(ctx context.Context, dir, name string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	return simplecloud.InitReader(ctx, bucket, imgmirror.JoinPath(base, dir, name))
+	return simplecloud.InitReader(ctx, bucket, joinBucketPath(base, dir, name))
 }
 
 // etagMatches reports whether an If-None-Match header matches etag.

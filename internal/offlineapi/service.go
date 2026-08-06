@@ -13,7 +13,6 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/bucketstore"
-	"github.com/mtgban/mtgban-website/internal/imgmirror"
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/simplecloud"
 )
@@ -61,7 +60,7 @@ type Deps struct {
 type Service struct {
 	deps          Deps
 	manifestStore *bucketstore.Store[manifestFile]
-	imagesStore   *bucketstore.Store[imgmirror.Manifest]
+	imagesStore   *bucketstore.Store[ImagesManifest]
 	catalog       atomic.Pointer[catalogCache]
 	// refreshSignal wakes the background refresher; buffered so RequestRefresh
 	// never blocks and bursts coalesce.
@@ -76,7 +75,7 @@ func NewService(deps Deps) *Service {
 		MissingOK: true,
 		Bucket:    deps.ManifestBucket,
 	}
-	s.imagesStore = &bucketstore.Store[imgmirror.Manifest]{
+	s.imagesStore = &bucketstore.Store[ImagesManifest]{
 		MissingOK: true,
 		Bucket:    deps.ImagesManifestBucket,
 	}

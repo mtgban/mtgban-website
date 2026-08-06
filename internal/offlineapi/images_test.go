@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mtgban/mtgban-website/internal/imgmirror"
 	"github.com/mtgban/simplecloud"
 )
 
@@ -22,10 +21,10 @@ func newTestService(t *testing.T) (*Service, string) {
 			return &simplecloud.FileBucket{}, dir, nil
 		},
 		ImagesManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-			return &simplecloud.FileBucket{}, imgmirror.JoinPath(dir, "images-manifest.json"), nil
+			return &simplecloud.FileBucket{}, joinBucketPath(dir, "images-manifest.json"), nil
 		},
 		ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
-			return &simplecloud.FileBucket{}, imgmirror.JoinPath(dir, "offline-manifest.json"), nil
+			return &simplecloud.FileBucket{}, joinBucketPath(dir, "offline-manifest.json"), nil
 		},
 		ManifestPathConfigured: func() bool { return false },
 		ImagesPathConfigured:   func() bool { return true },
@@ -79,7 +78,7 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	s, dir := newTestService(t)
 	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "bundles"), 0755)
 	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "bundles", "NEO-abc123.zip"), []byte("zipdata"), 0644)
-	s.imagesStore.Set(imgmirror.Manifest{"NEO": {Hash: "abc123", Count: 1, Bytes: 7}})
+	s.imagesStore.Set(ImagesManifest{"NEO": {Hash: "abc123", Count: 1, Bytes: 7}})
 	t.Cleanup(func() { s.imagesStore.Set(nil) })
 
 	w := httptest.NewRecorder()
@@ -128,7 +127,7 @@ func TestServeOfflineImageBundle(t *testing.T) {
 
 func TestOfflineManifestIncludesImages(t *testing.T) {
 	s, _ := newTestService(t)
-	s.imagesStore.Set(imgmirror.Manifest{
+	s.imagesStore.Set(ImagesManifest{
 		"NEO": {Hash: "abc123", Count: 302, Bytes: 24800000},
 	})
 	t.Cleanup(func() { s.imagesStore.Set(nil) })
