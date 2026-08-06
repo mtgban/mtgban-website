@@ -317,7 +317,7 @@
     function headerHTML(res, ctx, i) {
         var card = res.card;
         var set = ctx.sets[card.set] || {};
-        var imgURL = '/api/offline/images/' + encodeURIComponent(res.uuid) + '.webp';
+        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '';
 
         var icon;
         if (set.k) {
@@ -365,7 +365,7 @@
 
     function bodyHTML(res, ctx, isLast) {
         return '<div class="result-body' + (isLast ? ' result-last-body' : '') + '"' +
-            ' data-image-url="' + esc('/api/offline/images/' + encodeURIComponent(res.uuid) + '.webp') + '">' +
+            ' data-image-url="' + esc(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '') + '">' +
             sellersColumn(res, ctx) +
             buyersColumn(res, ctx) +
             '</div>';

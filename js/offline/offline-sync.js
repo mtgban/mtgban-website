@@ -43,7 +43,6 @@ async function runImagesStage(manifest, imgEditions, isCancelled) {
         sel: sel,
         getImgStates: function () { return OfflineDB.getAllRows('imgstate'); },
         deleteImgState: function (code) { return OfflineDB.deleteRow('imgstate', code); },
-        getCard: function (uuid) { return OfflineDB.getCard(uuid); },
     });
     if (sel.length === 0) {
         await OfflineDB.setMeta('imgCount', 0);
@@ -177,7 +176,7 @@ async function rebuildCatalog(catalog) {
     var names = {};
     Object.keys(catalog.cards || {}).forEach(function(uuid) {
         var c = catalog.cards[uuid];
-        cards.push({ uuid: uuid, n: c.n, num: c.num, r: c.r, set: c.set, f: c.f, e: c.e, s: c.s, p: c.p });
+        cards.push({ uuid: uuid, n: c.n, num: c.num, r: c.r, set: c.set, f: c.f, e: c.e, s: c.s, p: c.p, i: c.i });
         var k = self.OfflineUtil.normName(c.n || '');
         if (!k) return;
         if (!names[k]) names[k] = [];

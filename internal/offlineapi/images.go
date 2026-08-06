@@ -5,9 +5,16 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"path"
+	"regexp"
 	"strings"
 
 	"github.com/mtgban/simplecloud"
+)
+
+var (
+	scryfallIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	sealedKeyPattern  = regexp.MustCompile(`^p-([0-9A-Z]{2,6})-([0-9]+)$`)
 )
 
 // refreshImagesManifest reloads the worker-written images manifest.
@@ -43,29 +50,37 @@ func etagMatches(header, etag string) bool {
 	return false
 }
 
-// serveImage streams one mirrored image, webp first, jpg fallback.
+// serveImage streams one mirrored image by scryfall id or sealed key.
 func (s *Service) serveImage(w http.ResponseWriter, r *http.Request, rest string) {
-	uuid := strings.TrimSuffix(rest, ".webp")
-	if uuid == "" || uuid == rest || strings.ContainsAny(uuid, "/\\.%") {
+	key := strings.TrimSuffix(rest, ".jpg")
+	if key == "" || key == rest {
 		http.NotFound(w, r)
 		return
 	}
 
-	for _, try := range []struct{ ext, mime string }{
-		{"webp", "image/webp"},
-		{"jpg", "image/jpeg"},
-	} {
-		reader, err := s.openImageObject(r.Context(), "images", uuid+"."+try.ext)
-		if err != nil {
-			continue
-		}
-		defer reader.Close()
-		w.Header().Set("Content-Type", try.mime)
-		w.Header().Set("Cache-Control", "private, max-age=604800")
-		io.Copy(w, reader)
+	var dir, name string
+	switch {
+	case scryfallIDPattern.MatchString(key):
+		dir = path.Join("normal", "front", key[0:1], key[1:2])
+		name = key + ".jpg"
+	case sealedKeyPattern.MatchString(key):
+		m := sealedKeyPattern.FindStringSubmatch(key)
+		dir = path.Join(m[1], "sealed")
+		name = m[2] + ".jpg"
+	default:
+		http.NotFound(w, r)
 		return
 	}
-	http.NotFound(w, r)
+
+	reader, err := s.openImageObject(r.Context(), dir, name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	defer reader.Close()
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Cache-Control", "private, max-age=604800")
+	io.Copy(w, reader)
 }
 
 // serveImageBundle streams the current per-set zip with ETag support.
