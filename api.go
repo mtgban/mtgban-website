@@ -880,7 +880,6 @@ func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 
 	ServerNotify("reload", "Datastore reloaded from "+Config.DatastorePath)
 	offlineService.RequestRefresh()
-	mirrorSync.Request()
 	w.Write([]byte(`{"status": "ok"}`))
 }
 
