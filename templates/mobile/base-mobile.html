@@ -39,5 +39,10 @@
 </div>
 
 {{block "extra-scripts" .}}{{end}}
+<script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-prefer.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-mode.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-watch.js?hash={{.Hash}}"></script>
 </body>
 </html>

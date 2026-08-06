@@ -1,0 +1,219 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" type="text/css" href="/css/search.css?hash={{.Hash}}">
+    <link rel="stylesheet" type="text/css" href="/css/offline.css?hash={{.Hash}}">
+{{end}}
+
+{{define "title"}}Offline Search{{end}}
+
+{{define "extra-head"}}
+    <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-format.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-util.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-query.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-render.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-search.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/offline/offline-age.js?hash={{.Hash}}"></script>
+{{end}}
+
+{{define "content"}}
+<div class="offline-shell">
+    <div id="offline-banner" class="offline-banner" role="status">
+        <span class="offline-banner-dot" aria-hidden="true"></span>
+        <span id="offline-banner-age">Offline data: checking</span>
+        <span id="offline-banner-auth" class="offline-banner-auth" hidden>
+            Subscription lapsed: saved prices stay browsable, syncing is paused.
+        </span>
+        <a id="offline-banner-back" class="offline-banner-back" href="/search" hidden>
+            Exit offline mode
+        </a>
+    </div>
+    <div class="search-layout">
+        <div class="search-sidebar">
+            <div class="sidebar-search">
+                <div class="search-sort-row">
+                    <span class="search-sort-label">Sort</span>
+                    <button class="search-sort-pill" data-sort="chrono" title="Chronological" aria-label="Sort chronological" type="button"><svg class="lucide lucide-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                    <button class="search-sort-pill" data-sort="alpha" title="Alphabetical" aria-label="Sort alphabetical" type="button"><svg class="lucide lucide-a-large-small" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 14h-5"/><path d="M16 16v-3.5a2.5 2.5 0 0 1 5 0V16"/><path d="M4.5 13h6"/><path d="m3 16 4.5-9 4.5 9"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                    <button class="search-sort-pill" data-sort="number" title="Collector Number" aria-label="Sort by collector number" type="button"><svg class="lucide lucide-hash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                    <button class="search-sort-pill" data-sort="retail" title="Retail Price" aria-label="Sort by retail price" type="button"><svg class="lucide lucide-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                    <button class="search-sort-pill" data-sort="buylist" title="Buylist Price" aria-label="Sort by buylist price" type="button"><svg class="lucide lucide-shopping-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg><span class="search-sort-dir"><svg class="lucide lucide-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></span></button>
+                </div>
+                <div class="search-result-divider">
+                    <span class="search-result-count" id="offline-count"></span>
+                </div>
+            </div>
+            <div class="sidebar-body">
+                <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper">
+                    <img class="sidebar-card-img" id="cardImage" src="" alt="">
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <a class="sidebar-action default" id="offline-settings-link" href="/search?settings=1">Offline sync settings</a>
+            </div>
+        </div>
+        <div class="search-results" id="offline-results"></div>
+    </div>
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script type="text/javascript" src="/js/offline/offline-banner.js?hash={{.Hash}}"></script>
+<script type="text/javascript">
+(function () {
+    'use strict';
+
+    var PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    // Mirrors MaxSearchResults (search.go:29); no pagination in v1.
+    var PAGE_SIZE = 100;
+
+    var dicts = null;
+    var env = null;
+    var exec = null;
+    var ctx = null;
+    var sortMode = getCookie('SearchDefaultSort') || 'chrono';
+    var reverse = false;
+    if (sortMode === 'hybrid') sortMode = 'alpha';
+    var sealedMode = new URLSearchParams(location.search).get('sealed') === '1';
+    // Suggestions read the current mode off this shared deps object.
+    var searchDeps = null;
+    function hiddenList(name) {
+        return (getCookie(name) || '').split(',').filter(Boolean);
+    }
+
+    // Compose a shell URL carrying the query and active mode.
+    function buildUrl(q) {
+        var parts = [];
+        if (q) parts.push('q=' + encodeURIComponent(q));
+        if (sealedMode) parts.push('sealed=1');
+        return parts.length ? '?' + parts.join('&') : location.pathname;
+    }
+
+    async function setup() {
+        // Warm the shared connection; rejects when IndexedDB is unavailable.
+        await OfflineDB.open();
+        dicts = await OfflineUtil.loadCatalogDicts();
+        env = {
+            normName: OfflineUtil.normName,
+            lookupName: OfflineDB.lookupName,
+            allNames: OfflineDB.allNames,
+            getCard: OfflineDB.getCard,
+            hasSet: OfflineDB.hasSet,
+            loadSetPayload: OfflineUtil.loadSetPayload
+        };
+        ctx = {
+            sets: dicts.sets,
+            stores: dicts.stores,
+            hiddenSellers: hiddenList('SearchSellersList'),
+            hiddenVendors: hiddenList('SearchVendorsList'),
+            byStore: getCookie('SearchListingPriority') === 'stores',
+            buylistSecondary: getCookie('SearchBuylistSecondary') || ''
+        };
+    }
+
+    function paintCount() {
+        var el = document.getElementById('offline-count');
+        if (!exec) { el.textContent = ''; return; }
+        var n = exec.results.length;
+        var shown = Math.min(n, PAGE_SIZE);
+        el.textContent = n ? n + ' result' + (n > 1 ? 's' : '') + ' found' + (n > shown ? ' (' + shown + ' shown)' : '') : '';
+    }
+
+    function paintPills() {
+        document.querySelectorAll('.search-sort-pill').forEach(function (b) {
+            b.classList.toggle('active', b.getAttribute('data-sort') === sortMode);
+            b.classList.toggle('reversed', b.getAttribute('data-sort') === sortMode && reverse);
+        });
+    }
+
+    function paint() {
+        OfflineQuery.sortResults(exec.results, sortMode, reverse, ctx.sets);
+        var page = Object.assign({}, exec, {results: exec.results.slice(0, PAGE_SIZE)});
+        OfflineRender.render(document.getElementById('offline-results'), page, ctx);
+        paintCount();
+        paintPills();
+        var first = document.querySelector('#offline-results .result-header');
+        if (first) showImage(first.getAttribute('data-image-url'));
+    }
+
+    async function runQuery(q) {
+        if (!q) {
+            exec = null;
+            document.getElementById('offline-results').innerHTML = '';
+            paintCount();
+            return;
+        }
+        var parsed = OfflineQuery.parse(q);
+        parsed.sealed = sealedMode;
+        exec = await OfflineQuery.execute(parsed, env);
+        paint();
+    }
+
+    function showImage(url) {
+        var img = document.getElementById('cardImage');
+        if (img) img.src = url || PLACEHOLDER;
+    }
+
+    function showErrorNotice(err) {
+        document.getElementById('offline-results').innerHTML =
+            '<div class="offline-notice offline-notice-warn">Offline data is not ready. Enable offline mode in Settings and let a sync finish.</div>';
+        console.error('offline shell setup failed', err);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Sidebar image follows the hovered result, like search.html.
+        document.getElementById('offline-results').addEventListener('mouseover', function (e) {
+            var row = e.target.closest('[data-image-url]');
+            if (row) showImage(row.getAttribute('data-image-url'));
+        });
+
+        // Failed offline images fall back to the neutral placeholder.
+        document.getElementById('cardImage').addEventListener('error', function () {
+            if (this.src !== PLACEHOLDER) this.src = PLACEHOLDER;
+        });
+
+        document.querySelectorAll('.search-sort-pill').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var mode = b.getAttribute('data-sort');
+                reverse = (mode === sortMode) ? !reverse : false;
+                sortMode = mode;
+                if (exec) paint();
+            });
+        });
+
+        var box = document.getElementById('nav-searchbox');
+        var form = document.getElementById('nav-searchform');
+
+        window.addEventListener('popstate', function () {
+            var params = new URLSearchParams(location.search);
+            var q = params.get('q') || '';
+            sealedMode = params.get('sealed') === '1';
+            if (searchDeps) searchDeps.sealed = sealedMode;
+            box.value = q;
+            runQuery(q).catch(showErrorNotice);
+        });
+
+        setup().then(function () {
+            searchDeps = {
+                normName: OfflineUtil.normName,
+                allNames: OfflineDB.allNames,
+                getCard: OfflineDB.getCard,
+                sets: dicts.sets,
+                sealed: sealedMode
+            };
+            OfflineSearch.mount({
+                input: box,
+                form: form,
+                deps: searchDeps,
+                onSubmit: function (q) {
+                    history.pushState(null, '', buildUrl(q));
+                    runQuery(q).catch(showErrorNotice);
+                }
+            });
+            var q = new URLSearchParams(location.search).get('q') || '';
+            box.value = q;
+            return runQuery(q);
+        }).catch(showErrorNotice);
+    });
+})();
+</script>
+{{end}}

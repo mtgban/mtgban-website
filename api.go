@@ -865,6 +865,7 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ServerNotify("reload", "Server reloaded "+name)
+	offlineService.RequestRefresh()
 	w.Write([]byte(`{"status": "ok"}`))
 }
 
@@ -884,6 +885,7 @@ func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ServerNotify("reload", "Datastore reloaded from "+Config.DatastorePath)
+	offlineService.RequestRefresh()
 	w.Write([]byte(`{"status": "ok"}`))
 }
 
