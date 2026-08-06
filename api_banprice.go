@@ -976,7 +976,6 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			if err := w.Write(record); err != nil {
 				return err
 			}
-			w.Flush()
 		}
 	} else {
 		if sorted == nil {
@@ -992,11 +991,12 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 			if err := w.Write(record); err != nil {
 				return err
 			}
-			w.Flush()
 		}
 	}
 
-	return nil
+	// The csv writer buffers; one flush at the end instead of per row.
+	w.Flush()
+	return w.Error()
 }
 
 func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition string, preferFlavor, withSKU bool) ([]string, error) {
