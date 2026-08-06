@@ -760,7 +760,7 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 		if err != nil {
 			return nil, "", err
 		}
-		return bucket, imgmirror.JoinPath(base, "images-manifest.json"), nil
+		return bucket, offlineapi.JoinBucketPath(base, "images-manifest.json"), nil
 	},
 
 	ImagesBucket: offlineImagesFactory,
