@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/BlueMonday/go-scryfall v0.9.0
-	github.com/NYTimes/gziphandler v1.1.1
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/bwmarrin/discordgo v0.27.1
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
