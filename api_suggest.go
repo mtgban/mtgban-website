@@ -81,7 +81,14 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		// no cache holds on to the degraded answer
 		if len(AllNames) == 0 {
 			w.Header().Set("Cache-Control", "no-store")
+		} else {
+			// The full name list is the heaviest thing the front end
+			// asks for, and it only changes when the datastore reloads,
+			// so let the browser keep it instead of pulling it down on
+			// every page view
+			w.Header().Set("Cache-Control", "public, max-age=3600")
 		}
+		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(&AllNames)
 		return
 	}
