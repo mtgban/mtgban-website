@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NYTimes/gziphandler"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
@@ -390,7 +389,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		// If signature is empty let it pass through
 		if sig == "" && !strings.HasPrefix(r.URL.Path, "/api/load") {
-			gziphandler.GzipHandler(next).ServeHTTP(w, r)
+			next.ServeHTTP(w, r)
 			return
 		}
 
@@ -453,7 +452,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			return
 		}
 
-		gziphandler.GzipHandler(next).ServeHTTP(w, r)
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -643,7 +642,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		}
 
 		recordPageHit(r)
-		gziphandler.GzipHandler(next).ServeHTTP(w, r)
+		next.ServeHTTP(w, r)
 	})
 }
 
