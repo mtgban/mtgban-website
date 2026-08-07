@@ -457,6 +457,26 @@ func enforceAPISigning(next http.Handler) http.Handler {
 	})
 }
 
+// targetsSubPage reports whether r asks for the given subpage. Some
+// subpages have a path of their own, others are a query parameter on the
+// parent's path (the newspaper's pages all live under /newspaper and pick
+// themselves with page=), so the path has to match and so does every
+// parameter the link pins down. Matching the path alone would let the
+// parent stand in for its own subpage.
+func targetsSubPage(r *http.Request, link string) bool {
+	target, err := url.Parse(link)
+	if err != nil || target.Path != r.URL.Path {
+		return false
+	}
+	query := r.URL.Query()
+	for key, values := range target.Query() {
+		if len(values) > 0 && query.Get(key) != values[0] {
+			return false
+		}
+	}
+	return true
+}
+
 func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
@@ -609,12 +629,12 @@ func enforceSigning(next http.Handler) http.Handler {
 
 				// Check if link is a subpage, and validate if viewing conditions are met
 				for _, subPage := range nav.SubPages {
-					if strings.HasPrefix(subPage.Link, r.URL.Path) &&
+					if targetsSubPage(r, subPage.Link) &&
 						subPage.ShouldHide != nil && subPage.ShouldHide() {
 						pageVars := genPageNav("Error", sig)
 						pageVars.Title = "Unauthorized"
 						render(w, "home.html", pageVars)
-						break
+						return
 					}
 				}
 
