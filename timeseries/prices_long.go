@@ -173,15 +173,73 @@ func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16,
 	return result, rows.Err()
 }
 
-// GetMoversLong returns the largest per-card price moves for one provider over a
-// window. Anchored to the provider's own latest date (a lagging metric has no
-// data on the global latest). Restricted to canonical English variants
-// (language=”), so each (uuid, foil, etched, is_alt) is a single ban_id and cur
-// vs prior compare the same printing (plan 17.2).
-func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays int, minPrice, minPriorPrice float64) ([]MoverRow, error) {
+// CategoryMagic is TCGplayer's own category id for Magic. Magic rows are keyed
+// by mtgjson uuid rather than by TCGplayer product, so this doubles as the
+// discriminator between the two identities a mover row can carry.
+const CategoryMagic = 1
+
+// moverGameScope restricts mover rows to a single game, as a predicate over an
+// aliased `v` of variants. Its parameters are fixed at $1 (magic-keyed) and $2
+// (TCGplayer category) so every query below can embed this same text: the
+// anchor dates and the result set have to agree on what "this game" means, and
+// sharing the string is what keeps them from drifting apart.
+//
+// CategoryMagic selects the Magic rows, keyed by mtgjson uuid and restricted to
+// canonical English variants (empty language), so each (uuid, foil, etched,
+// is_alt) is a single ban_id and cur vs prior compare the same printing (plan
+// 17.2). Any other category selects that TCGplayer category's rows, which have
+// no mtgjson uuid and are keyed by their product + sub-type - already one
+// ban_id per identity.
+const moverGameScope = `(($1 AND v.mtgjson_uuid IS NOT NULL AND v.language='')
+		    OR (NOT $1 AND v.mtgjson_uuid IS NULL AND v.tcgp_category_id = $2))`
+
+// The anchor dates are scoped to the game, not just to the provider. Every
+// game's rows live under the same provider ids, written by two independent
+// producers - the per-site snapshot stash for Magic, the TCGplayer archive
+// ingest for the others - so a provider's newest date routinely belongs to a
+// game other than the one being asked about. Anchoring provider-wide and
+// filtering afterwards returns nothing at all whenever the games sit a day
+// apart: the normal state for part of every day, since the two producers run on
+// unrelated schedules, and the lasting state whenever one game's ingest fails,
+// since the daily ingest is deliberately per-category and non-fatal and its
+// long-form write is best-effort while the freshness cursor tracks the short
+// table.
+const moverLatestQuery = `
+		SELECT max(p.date)
+		  FROM prices p
+		  JOIN variants v ON v.ban_id = p.ban_id
+		 WHERE p.provider = $3 AND ` + moverGameScope
+
+const moverPriorQuery = moverLatestQuery + `
+		   AND p.date <= $4`
+
+const moverRowsQuery = `
+		WITH cur AS (
+			SELECT ban_id, price FROM prices
+			 WHERE provider=$3 AND date=$4 AND price >= $6
+		),
+		old AS (
+			SELECT ban_id, price FROM prices
+			 WHERE provider=$3 AND date=$5 AND price >= $7
+		)
+		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched,
+		       v.tcgp_product_id, v.tcgp_sub_type,
+		       cur.price, old.price
+		  FROM cur JOIN old USING (ban_id)
+		  JOIN variants v ON v.ban_id = cur.ban_id
+		 WHERE ` + moverGameScope
+
+// GetMoversLong returns the largest per-card price moves for one provider over
+// a window, for the game picked by tcgCategory. It is anchored to that game's
+// own latest date for that provider: a lagging metric has no data on the global
+// latest date, and a game has no data on another game's latest date. See
+// moverGameScope for the scoping the three queries share.
+func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays int, minPrice, minPriorPrice float64, tcgCategory int) ([]MoverRow, error) {
+	magicKeyed := tcgCategory == CategoryMagic
+
 	var latest sql.NullTime
-	if err := c.db.QueryRowContext(ctx,
-		`SELECT max(date) FROM prices WHERE provider=$1`, provider).Scan(&latest); err != nil {
+	err := c.db.QueryRowContext(ctx, moverLatestQuery, magicKeyed, tcgCategory, provider).Scan(&latest)
+	if err != nil {
 		return nil, err
 	}
 	if !latest.Valid {
@@ -190,28 +248,16 @@ func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays i
 	target := latest.Time.AddDate(0, 0, -windowDays)
 
 	var prior sql.NullTime
-	if err := c.db.QueryRowContext(ctx,
-		`SELECT max(date) FROM prices WHERE provider=$1 AND date <= $2`, provider, target).Scan(&prior); err != nil {
+	err = c.db.QueryRowContext(ctx, moverPriorQuery, magicKeyed, tcgCategory, provider, target).Scan(&prior)
+	if err != nil {
 		return nil, err
 	}
 	if !prior.Valid {
 		return nil, nil
 	}
 
-	q := `
-		WITH cur AS (
-			SELECT ban_id, price FROM prices
-			 WHERE provider=$1 AND date=$2 AND price >= $4
-		),
-		old AS (
-			SELECT ban_id, price FROM prices
-			 WHERE provider=$1 AND date=$3 AND price >= $5
-		)
-		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched, cur.price, old.price
-		  FROM cur JOIN old USING (ban_id)
-		  JOIN variants v ON v.ban_id = cur.ban_id
-		 WHERE v.mtgjson_uuid IS NOT NULL AND v.language=''`
-	rows, err := c.db.QueryContext(ctx, q, provider, latest.Time, prior.Time, minPrice, minPriorPrice)
+	rows, err := c.db.QueryContext(ctx, moverRowsQuery,
+		magicKeyed, tcgCategory, provider, latest.Time, prior.Time, minPrice, minPriorPrice)
 	if err != nil {
 		return nil, err
 	}
@@ -220,9 +266,18 @@ func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays i
 	var result []MoverRow
 	for rows.Next() {
 		var m MoverRow
-		if err := rows.Scan(&m.MtgjsonUUID, &m.IsFoil, &m.IsEtched, &m.Current, &m.Prior); err != nil {
+		var uuid, subType sql.NullString
+		var isFoil, isEtched sql.NullBool
+		var productID sql.NullInt64
+		err = rows.Scan(&uuid, &isFoil, &isEtched, &productID, &subType, &m.Current, &m.Prior)
+		if err != nil {
 			return nil, err
 		}
+		m.MtgjsonUUID = uuid.String
+		m.IsFoil = isFoil.Bool
+		m.IsEtched = isEtched.Bool
+		m.TCGProductID = int(productID.Int64)
+		m.TCGSubType = subType.String
 		result = append(result, m)
 	}
 	return result, rows.Err()

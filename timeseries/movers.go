@@ -10,8 +10,14 @@ type MoverRow struct {
 	MtgjsonUUID string
 	IsFoil      bool
 	IsEtched    bool
-	Current     float64
-	Prior       float64
+
+	// Non-Magic rows have no mtgjson uuid; they are keyed by their
+	// TCGplayer product instead (see GetMoversLong)
+	TCGProductID int
+	TCGSubType   string
+
+	Current float64
+	Prior   float64
 }
 
 func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int, minPrice, minPriorPrice float64) ([]MoverRow, error) {

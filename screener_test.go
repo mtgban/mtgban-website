@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -318,5 +320,90 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCacheMu.Unlock()
 	if n > screenerCacheMax {
 		t.Errorf("cache size %d exceeds cap %d", n, screenerCacheMax)
+	}
+}
+
+// Non-Magic mover rows arrive keyed by TCGplayer product; they resolve to the
+// serving game's uuid through the external id map, sub-type picking the finish.
+func TestMoverCardIdResolvesTCGRows(t *testing.T) {
+	// Magic rows pass through untouched
+	uuid, isFoil, ok := moverCardId(timeseries.MoverRow{MtgjsonUUID: "abc", IsFoil: true})
+	if !ok || uuid != "abc" || !isFoil {
+		t.Errorf("magic row = %q/%v/%v, want abc/true/true", uuid, isFoil, ok)
+	}
+
+	// A row with no identity at all resolves to nothing
+	if _, _, ok := moverCardId(timeseries.MoverRow{}); ok {
+		t.Error("identity-less row should not resolve")
+	}
+
+	// TCG-keyed rows resolve through the id map (needs the datastore)
+	uuids := mtgmatcher.GetUUIDs()
+	if len(uuids) == 0 {
+		t.Skip("datastore not loaded")
+	}
+	var pid int
+	var want string
+	for _, u := range uuids {
+		co, err := mtgmatcher.GetUUID(u)
+		if err != nil || co.Foil || co.Etched || co.Sealed {
+			continue
+		}
+		pidStr, found := co.Identifiers["tcgplayerProductId"]
+		if !found {
+			continue
+		}
+		if n, err := strconv.Atoi(pidStr); err == nil {
+			pid = n
+			want = co.UUID
+			break
+		}
+	}
+	if pid == 0 {
+		t.Skip("no card with a tcgplayer product id")
+	}
+
+	uuid, isFoil, ok = moverCardId(timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Normal"})
+	if !ok || isFoil {
+		t.Fatalf("tcg row did not resolve: %q/%v/%v", uuid, isFoil, ok)
+	}
+	if uuid != want {
+		t.Errorf("resolved %q, want %q", uuid, want)
+	}
+
+	// Only "Normal" reads as unfoiled; the foiled sub-type is named per game.
+	if _, isFoil, ok := moverCardId(timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Holofoil"}); !ok || !isFoil {
+		t.Errorf("non-Normal sub-type = %v/%v, want foil", isFoil, ok)
+	}
+}
+
+// The archive is scoped per game via TCGplayer category, read from the
+// catalog dump the game loads at startup. Only the default game may fall back
+// to a category without one; every other game refuses to guess.
+func TestGameTCGCategory(t *testing.T) {
+	prevGame := Config.Game
+	prevCatalog := tcgCatalogPtr.Load()
+	t.Cleanup(func() {
+		Config.Game = prevGame
+		tcgCatalogPtr.Store(prevCatalog)
+	})
+
+	// A loaded catalog names the category, whatever the game is called.
+	tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryID: 71, CategoryName: "Lorcana TCG"})
+	Config.Game = "lorcana"
+	if got := gameTCGCategory(); got != 71 {
+		t.Errorf("lorcana category = %d, want 71 (from the catalog)", got)
+	}
+
+	// Without one, only the default game has an answer.
+	tcgCatalogPtr.Store(nil)
+	Config.Game = DefaultGame
+	if got := gameTCGCategory(); got != timeseries.CategoryMagic {
+		t.Errorf("default game category = %d, want %d", got, timeseries.CategoryMagic)
+	}
+
+	Config.Game = "unknowngame"
+	if got := gameTCGCategory(); got != -1 {
+		t.Errorf("catalog-less non-default game = %d, want -1", got)
 	}
 }
