@@ -1151,28 +1151,24 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 					Quantity:       entry.Quantity,
 				})
 			}
-
-			_, found := pageVars.Metadata[cardId]
-			if found {
-				continue
-			}
-			pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
 		}
 
 		switch sorting {
 		default:
+			sortData := resolveSortingData(arbitCardIds(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardId == arbit[j].CardId {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return sortSets(arbit[i].CardId, arbit[j].CardId)
+				return cmpSets(sortData[arbit[i].CardId], sortData[arbit[j].CardId])
 			})
 		case "alpha":
+			sortData := resolveSortingData(arbitCardIds(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardId == arbit[j].CardId {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return sortSetsAlphabetical(arbit[i].CardId, arbit[j].CardId, preferFlavor)
+				return cmpSetsAlphabetical(sortData[arbit[i].CardId], sortData[arbit[j].CardId], preferFlavor)
 			})
 		case "available":
 			sort.Slice(arbit, func(i, j int) bool {
@@ -1189,6 +1185,17 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		if len(arbit) > MaxSYPResults {
 			pageIndex, _ := strconv.Atoi(r.FormValue("p"))
 			arbit, pageVars.Pagination = Paginate(arbit, pageIndex, MaxSYPResults, MaxSYPTotalResults)
+		}
+
+		// Resolve card metadata only for the visible page: the full SYP list
+		// runs to tens of thousands of cards and all the template reads are
+		// keyed by the paginated entries.
+		for _, entry := range arbit {
+			_, found := pageVars.Metadata[entry.CardId]
+			if found {
+				continue
+			}
+			pageVars.Metadata[entry.CardId] = uuid2card(entry.CardId, true, false, preferFlavor)
 		}
 
 		entry := Arbitrage{

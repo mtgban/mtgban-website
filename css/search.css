@@ -164,13 +164,17 @@
 .sidebar-body {
     flex: 1;
     min-height: 0;
-    overflow: visible;
+    /* Scroll the body (image, set value, printings) rather than let a tall
+       product photo push it over the pinned footer. The printings dropdown
+       lives in the scrollable overflow, so it stays reachable. Hidden x
+       hides the 2px the image borders poke out, instead of a scrollbar. */
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* Scrollable but chromeless, like the sidebar always was: the page keeps
+       the only visible scrollbar */
+    scrollbar-width: none;
 }
-.sidebar-body::-webkit-scrollbar { width: 4px; }
-.sidebar-body::-webkit-scrollbar-thumb {
-    background: var(--surface-4, #323840);
-    border-radius: 2px;
-}
+.sidebar-body::-webkit-scrollbar { width: 0; height: 0; }
 
 .sidebar-footer {
     flex-shrink: 0;
@@ -217,7 +221,13 @@
 
 .sidebar-img-wrap {
     position: relative;
-    margin-bottom: 14px;
+    /* A fixed flex child of the sidebar column now, above the scrolling body.
+       Shrink-wrapped so the foil ::after overlay hugs the image exactly even
+       when the height cap makes it narrower than the column. */
+    flex-shrink: 0;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0 auto 14px;
 }
 .sidebar-img-wrap.foil-wrap[data-foil="true"]::after,
 .sidebar-img-wrap.foil-wrap[data-etched="true"]::after {
@@ -225,7 +235,13 @@
 }
 
 .sidebar-card-img {
-    width: 100%;
+    /* Cap the height so a tall product photo leaves the scrollable middle
+       (set value, printings, products) some room; the cap clears a normal
+       card's aspect at the sidebar width, and taller shots shrink to fit,
+       centered. width auto keeps the aspect ratio under the cap. */
+    width: auto;
+    max-width: 100%;
+    max-height: 52vh;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     display: block;
@@ -246,6 +262,43 @@
     margin-bottom: 14px;
     line-height: 1.6;
     position: relative;
+    /* A fixed flex child between the pinned image and the scrolling body, so
+       the set-value hover panel can overlay the picture without being
+       clipped by the body's scroll box */
+    flex-shrink: 0;
+}
+
+.sidebar-setvalue {
+    position: relative;
+}
+/* Roomy default: the tables sit inline in the printings slot (the panel's
+   own Set Value headings label them) and the one-line trigger is hidden.
+   JS stashes them behind the trigger only when inline tables would squeeze
+   the products list, by putting .setvalue-stashed on #printings. */
+.sidebar-setvalue-trigger {
+    display: none;
+    cursor: default;
+    color: var(--search-text-dim);
+}
+.setvalue-stashed .sidebar-setvalue-trigger {
+    display: block;
+}
+.setvalue-stashed .sidebar-setvalue-panel {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background: var(--search-surface-1);
+    border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+    border-radius: var(--radius-sm, 6px);
+    padding: 10px 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.setvalue-stashed .sidebar-setvalue:hover .sidebar-setvalue-panel,
+.setvalue-stashed .sidebar-setvalue:focus-within .sidebar-setvalue-panel {
+    display: block;
 }
 .sidebar-printings a { color: var(--search-link); text-decoration: none; }
 .sidebar-printings a:hover { text-decoration: underline; }
@@ -336,6 +389,17 @@
     padding: 6px 12px;
     border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     text-align: center;
+}
+/* Product count, appended to the title. Empty when there is nothing to
+   count, so the margin has to come from the span itself. */
+.sidebar-products-count:not(:empty) {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 20px;
+    background: var(--surface-3, rgba(127,127,127,0.15));
+    color: var(--search-text-dim);
+    font-size: var(--text-xs);
+    letter-spacing: 0;
 }
 .sidebar-products-list {
     padding: 8px 12px;

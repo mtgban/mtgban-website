@@ -54,6 +54,12 @@ type SearchEntry struct {
 	NoQuantity   bool
 	BundleIcon   string
 
+	// QuantityPriority marks a store whose rows are read as a count of
+	// copies wanted rather than as an offer, so the quantity is shown
+	// where the price would be and the price is not ranked against the
+	// others. The scraper declares it; nothing here names the store.
+	QuantityPriority bool
+
 	// Badge renders this entry as the official "Available at Amazon"
 	// search-link badge rather than a normal store row. BundleIcon is a
 	// generic per-store icon, so it cannot be used to single this out.
@@ -82,6 +88,57 @@ func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (strin
 	})
 }
 
+// isValidChartID reports whether a chart= piece is a plausibly chartable id: a
+// mtgmatcher id or a ban:/tcg:/scryfall:/mtgjson: prefixed id (bare numbers are
+// TCGplayer ids). Full resolution happens at render time.
+func isValidChartID(part string) bool {
+	if _, err := mtgmatcher.GetUUID(part); err == nil {
+		return true
+	}
+	switch prefix, _ := splitIDPrefix(part); prefix {
+	case "ban", "tcg", "scryfall", "mtgjson":
+		return true
+	}
+	_, err := strconv.Atoi(part)
+	return err == nil
+}
+
+// chartIDToSearchID maps a chart-roster id to an id the results table (which the
+// embedded chart lives inside) can resolve to a card row, mirroring
+// resolveChartTarget's precedence so anything chartable also renders its row.
+// Magic resolves to an mtgjson uuid; non-Magic games (Lorcana, ...) to their
+// mtgmatcher-native id via the TCGplayer external id map.
+func chartIDToSearchID(ctx context.Context, id string) string {
+	if _, err := mtgmatcher.GetUUID(id); err == nil {
+		return id // already a matcher id (bare uuid / variant string)
+	}
+	prefix, val := splitIDPrefix(id)
+
+	// ban: or a bare integer — our ban_id first, matching the chart resolver.
+	if (prefix == "ban" || prefix == "") && PricesArchiveDB != nil {
+		if n, perr := strconv.ParseInt(val, 10, 64); perr == nil {
+			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok {
+				if vi.MtgjsonUUID != "" {
+					return vi.MtgjsonUUID // Magic: the mtgjson uuid
+				}
+				// Non-Magic: the product id maps back to the game's own card id.
+				if matched, merr := mtgmatcher.MatchId(strconv.Itoa(vi.TCGProductID)); merr == nil {
+					return matched
+				}
+				return id
+			}
+			// Not a ban_id: fall through to the external-id lookup below.
+		}
+	}
+
+	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
+	// id table (a TCGplayer product id, a Scryfall id, or an mtgjson uuid).
+	if matched, merr := mtgmatcher.MatchId(val); merr == nil {
+		return matched
+	}
+	return id
+}
+
 // parseChartIDs splits a chart=... param (comma-separated UUIDs) into a
 // validated, de-duplicated list. Pieces that don't resolve via mtgmatcher are
 // dropped silently, mirroring how single-UUID chart= used to be handled.
@@ -101,7 +158,7 @@ func parseChartIDs(chartParam string) (ids []string, truncated bool) {
 		if part == "" {
 			continue
 		}
-		if _, err := mtgmatcher.GetUUID(part); err != nil {
+		if !isValidChartID(part) {
 			continue
 		}
 		if slices.Contains(ids, part) {
@@ -239,6 +296,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	chartIds, chartTruncated := parseChartIDs(chartParam)
 
 	chartId := ""
+	// Roster id -> resolved search id, computed once per request: a ban:<id>
+	// resolution costs a DB round-trip and each id is consulted three times
+	// (results query, display query, metadata aliasing).
+	chartSearchIDs := map[string]string{}
 	if len(chartIds) > 0 && !pageVars.DisableChart {
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
@@ -263,7 +324,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// chart plots (not the raw chartParam), so a URL like
 			// ?chart=uuidA,%20uuidB doesn't leave card B off the results/remove
 			// controls just because fixupIDs won't trim the leading space.
-			query = strings.Join(chartIds, ",")
+			searchIDs := make([]string, len(chartIds))
+			for i, id := range chartIds {
+				searchIDs[i] = chartIDToSearchID(r.Context(), id)
+				chartSearchIDs[id] = searchIDs[i]
+			}
+			query = strings.Join(searchIDs, ",")
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
 		}
 	} else {
@@ -439,16 +505,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Sort sets as requested, default to chronological
 	switch pageVars.SearchSort {
 	case "alpha":
+		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsAlphabetical(allKeys[i], allKeys[j], preferFlavor)
+			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]], preferFlavor)
 		})
 	case "hybrid":
+		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsAlphabeticalSet(allKeys[i], allKeys[j], preferFlavor)
+			return cmpSetsAlphabeticalSet(sortData[allKeys[i]], sortData[allKeys[j]], preferFlavor)
 		})
 	case "number":
+		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortByNumberAndFinish(allKeys[i], allKeys[j], false)
+			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
 	case "retail":
 		retSellers := defaultSellerPriorityOpt
@@ -457,8 +526,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			retSellers = append([]string{retSeller}, defaultSellerPriorityOpt...)
 		}
 
+		sortData := resolveSortingData(allKeys)
+		prices := resolveBestPrices(allKeys, retSellers, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsByRetail(allKeys[i], allKeys[j], retSellers)
+			priceI, priceJ := prices[allKeys[i]], prices[allKeys[j]]
+			if priceI == priceJ {
+				return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
+			}
+			return priceI > priceJ
 		})
 	case "buylist":
 		blVendors := defaultVendorPriorityOpt
@@ -467,12 +542,24 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			blVendors = append([]string{blVendor}, defaultVendorPriorityOpt...)
 		}
 
+		sortData := resolveSortingData(allKeys)
+		buyPrices := resolveBestPrices(allKeys, blVendors, price4vendor)
+		retPrices := resolveBestPrices(allKeys, defaultSellerPriorityOpt, price4seller)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsByBuylist(allKeys[i], allKeys[j], blVendors)
+			priceI, priceJ := buyPrices[allKeys[i]], buyPrices[allKeys[j]]
+			if priceI != priceJ {
+				return priceI > priceJ
+			}
+			priceI, priceJ = retPrices[allKeys[i]], retPrices[allKeys[j]]
+			if priceI != priceJ {
+				return priceI > priceJ
+			}
+			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	default:
+		sortData := resolveSortingData(allKeys)
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSets(allKeys[i], allKeys[j])
+			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	}
 
@@ -497,7 +584,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if found {
 			continue
 		}
-		pageVars.Metadata[cardId] = uuid2card(cardId, false, true, preferFlavor)
+		card := uuid2card(cardId, false, true, preferFlavor)
+		// Search results chart cards, so upgrade the chart handle to the cached
+		// ban:<id> here rather than inside uuid2card, which also feeds pages
+		// that never chart.
+		card.ChartID = chartIDForCard(cardId)
+		pageVars.Metadata[cardId] = card
 	}
 
 	// Optionally sort according to price
@@ -717,16 +809,80 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.EditionSort = chartEditions.SealedEditionsSorted
 		pageVars.EditionList = chartEditions.SealedEditionsList
 
-		// Rebuild a display query from the (first) chart card
-		cfg := parseSearchOptionsNG(chartId, nil, nil, nil)
+		// Rebuild a display query from the (first) chart card. Use the resolved
+		// mtgmatcher id (a ban:<id> doesn't parse as a query), so SearchQuery is
+		// non-empty and the template renders the results+chart layout rather than
+		// the empty-query editions browse.
+		cfg := parseSearchOptionsNG(chartSearchIDs[chartId], nil, nil, nil)
 		pageVars.SearchQuery = cfg.FullQuery
 
 		// Retrieve data
 		pageVars.ChartID = chartId
 		pageVars.IsMultiChart = isMultiChart
 
+		// The template keys card metadata off ChartID and the roster ids, but the
+		// results Metadata map is keyed by the resolved mtgmatcher id. Alias each
+		// ban:<id> roster entry to its resolved card so those lookups resolve.
+		for _, id := range chartIds {
+			sid := chartSearchIDs[id]
+			if sid == "" || sid == id {
+				continue
+			}
+			if card, ok := pageVars.Metadata[sid]; ok {
+				pageVars.Metadata[id] = card
+			}
+		}
+
 		if PricesArchiveDB == nil {
 			pageVars.InfoMessage = "No chart data available"
+		} else if Config.TimeseriesConfig.LongFormReads {
+			lb := chartLookback(sig)
+			pageVars.MaxLookbackDays = lb.Days()
+
+			// Generic path: resolve every roster id to a target and chart it by
+			// whatever providers have data — one path for every game, keyed on the
+			// cached ban_id. The ?chart= url keeps the mtgmatcher id (the search
+			// UI's identity for favorites/roster/legend); the ban_id is internal.
+			var earliest time.Time
+			var ids, names []string
+			var targets []*chartTarget
+			for _, id := range chartIds {
+				target, terr := resolveChartTarget(r.Context(), id)
+				if terr != nil {
+					continue
+				}
+				ids = append(ids, id)
+				names = append(names, target.Name)
+				targets = append(targets, target)
+				if e, _ := chartTargetEarliest(r.Context(), target, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
+					earliest = e
+				}
+			}
+			if len(targets) == 0 || earliest.IsZero() {
+				pageVars.InfoMessage = "No chart data available"
+			} else {
+				pageVars.AxisLabels = getDateAxisValues(earliest)
+				cards := make([]multiCardInput, len(targets))
+				for i, target := range targets {
+					cards[i] = multiCardInput{
+						CardID:   ids[i],
+						Name:     names[i],
+						Datasets: getChartDatasets(r.Context(), target, pageVars.AxisLabels, lb),
+					}
+				}
+				if isMultiChart {
+					datasets, refs := mergeMultiCardDatasets(cards)
+					pageVars.Datasets = datasets
+					pageVars.ChartReferences = refs
+					pageVars.Checkpoints = multiCardCheckpoints(names, earliest)
+				} else {
+					pageVars.Datasets = cards[0].Datasets
+					pageVars.Checkpoints = relevantCheckpoints(cards[0].Name, earliest)
+				}
+				if len(pageVars.Datasets) == 0 {
+					pageVars.InfoMessage = "No chart data available"
+				}
+			}
 		} else if !isMultiChart {
 			co, err := mtgmatcher.GetUUID(chartId)
 			if err != nil {
@@ -736,7 +892,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			lb := chartLookback(sig)
 			pageVars.MaxLookbackDays = lb.Days()
 
-			earliest, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
+			earliest, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 
 			pageVars.AxisLabels = getDateAxisValues(earliest)
 			pageVars.Datasets = getDatasets(r.Context(), chartId, co.Sealed, pageVars.AxisLabels, lb)
@@ -758,7 +914,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 				chartNames = append(chartNames, co.Name)
-				e, _ := PricesArchiveDB.GetEarliestDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
+				e, _ := earliestChartDate(r.Context(), co.UUID, co.Foil, co.Etched, lb)
 				if e.IsZero() {
 					continue
 				}
@@ -970,6 +1126,11 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 		// Get inventory
 		inventory := seller.Inventory()
 
+		// Fetch the seller info (a struct copy) and its display name once
+		// per store instead of once per entry
+		info := seller.Info()
+		name := scraperName(info.Shorthand)
+
 		for _, cardId := range cardIds {
 			entries, found := inventory[cardId]
 			if !found {
@@ -979,12 +1140,12 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 			// Loop thorugh available conditions
 			for _, entry := range entries {
 				// Skip cards that have not the desired condition
-				if !seller.Info().MetadataOnly && shouldSkipEntryNG(entry, entryFilters) {
+				if !info.MetadataOnly && shouldSkipEntryNG(entry, entryFilters) {
 					continue
 				}
 
 				// Skip cards that don't match desired pricing
-				if shouldSkipPriceNG(cardId, entry, priceFilters, seller.Info().Shorthand) {
+				if shouldSkipPriceNG(cardId, entry, priceFilters, info.Shorthand) {
 					continue
 				}
 
@@ -997,26 +1158,27 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 				// Set conditions - handle the special TCG one that appears
 				// at the top of the results
 				conditions := entry.Conditions
-				if seller.Info().MetadataOnly {
+				if info.MetadataOnly {
 					conditions = "INDEX"
 				}
 
-				icon := Config.ScraperConfig.Icons[seller.Info().Shorthand]
+				icon := Config.ScraperConfig.Icons[info.Shorthand]
 
 				// Prepare all the deets
 				res := SearchEntry{
-					ScraperName: scraperName(seller.Info().Shorthand),
-					Shorthand:   seller.Info().Shorthand,
-					Price:       entry.Price,
-					Quantity:    entry.Quantity,
-					URL:         entry.URL,
-					NoQuantity:  seller.Info().NoQuantityInventory || seller.Info().MetadataOnly,
-					BundleIcon:  icon,
-					Country:     Country2flag[seller.Info().CountryFlag],
-					ExtraValues: entry.ExtraValues,
+					ScraperName:      name,
+					Shorthand:        info.Shorthand,
+					Price:            entry.Price,
+					Quantity:         entry.Quantity,
+					URL:              entry.URL,
+					NoQuantity:       info.NoQuantityInventory || info.MetadataOnly,
+					BundleIcon:       icon,
+					QuantityPriority: info.QuantityPriority,
+					Country:          Country2flag[info.CountryFlag],
+					ExtraValues:      entry.ExtraValues,
 				}
-				if seller.Info().CreditMultiplier > 0 {
-					res.Credit = entry.Price / seller.Info().CreditMultiplier
+				if info.CreditMultiplier > 0 {
+					res.Credit = entry.Price / info.CreditMultiplier
 				}
 
 				// Touchdown
@@ -1044,6 +1206,11 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 
 		buylist := vendor.Buylist()
 
+		// Fetch the vendor info and its display name once per store, like
+		// in searchSellersNG
+		info := vendor.Info()
+		name := scraperName(info.Shorthand)
+
 		for _, cardId := range cardIds {
 			entries, found := buylist[cardId]
 			if !found {
@@ -1055,7 +1222,7 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 					continue
 				}
 
-				if shouldSkipPriceNG(cardId, entry, priceFilters, vendor.Info().Shorthand) {
+				if shouldSkipPriceNG(cardId, entry, priceFilters, info.Shorthand) {
 					continue
 				}
 
@@ -1065,23 +1232,23 @@ func searchVendorsNG(cardIds []string, config SearchConfig) (foundVendors map[st
 				}
 
 				conditions := entry.Conditions
-				if vendor.Info().MetadataOnly && !vendor.Info().SealedMode {
+				if info.MetadataOnly && !info.SealedMode {
 					conditions = "INDEX"
 				}
 
-				icon := Config.ScraperConfig.Icons[vendor.Info().Shorthand]
+				icon := Config.ScraperConfig.Icons[info.Shorthand]
 
 				res := SearchEntry{
-					ScraperName:  scraperName(vendor.Info().Shorthand),
-					Shorthand:    vendor.Info().Shorthand,
+					ScraperName:  name,
+					Shorthand:    info.Shorthand,
 					Price:        entry.BuyPrice,
-					Credit:       entry.BuyPrice * vendor.Info().CreditMultiplier,
-					MarketCredit: entry.BuyPrice * vendor.Info().CreditMultiplier * Config.BuylistMarketCredit[vendor.Info().Shorthand],
+					Credit:       entry.BuyPrice * info.CreditMultiplier,
+					MarketCredit: entry.BuyPrice * info.CreditMultiplier * Config.BuylistMarketCredit[info.Shorthand],
 					Ratio:        entry.PriceRatio,
 					Quantity:     entry.Quantity,
 					URL:          entry.URL,
 					BundleIcon:   icon,
-					Country:      Country2flag[vendor.Info().CountryFlag],
+					Country:      Country2flag[info.CountryFlag],
 				}
 
 				foundVendors[cardId][conditions] = append(foundVendors[cardId][conditions], res)
@@ -1244,6 +1411,23 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			uuids = append(uuids, moreUUIDs...)
 		default:
 			uuids, err = mtgmatcher.SearchEquals(query)
+			// An exact name match can be a red herring: "serra" names a
+			// Vanguard card, so "s:leb serra" would stop at it and then
+			// filter it out, finding nothing. When the filters reject every
+			// exact match, widen to the prefix pool - exactly what the
+			// query would have used had the exact name not existed. The
+			// surviving exact matches return directly so the filters run
+			// once either way.
+			if err == nil && len(filters) != 0 {
+				selected := filterUUIDs(uuids, filters)
+				if len(selected) != 0 {
+					return selected, nil
+				}
+				moreUUIDs, moreErr := mtgmatcher.SearchHasPrefix(query)
+				if moreErr == nil {
+					uuids = moreUUIDs
+				}
+			}
 			if err != nil {
 				uuids, err = mtgmatcher.SearchHasPrefix(query)
 				if err != nil {
@@ -1259,14 +1443,19 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		}
 	}
 
-	var selectedUUIDs []string
+	return filterUUIDs(uuids, filters), nil
+}
+
+// filterUUIDs returns the uuids that pass every card filter.
+func filterUUIDs(uuids []string, filters []FilterElem) []string {
+	var selected []string
 	for _, uuid := range uuids {
 		if shouldSkipCardNG(uuid, filters) {
 			continue
 		}
-		selectedUUIDs = append(selectedUUIDs, uuid)
+		selected = append(selected, uuid)
 	}
-	return selectedUUIDs, nil
+	return selected
 }
 
 func editionsForSearch(allKeys []string) []EditionEntry {
@@ -1303,6 +1492,19 @@ func editionsForSearch(allKeys []string) []EditionEntry {
 	return out
 }
 
+// addFinishVariants appends id's foil and etched finishes to uuids, skipping
+// any that don't exist, equal id, or are already present.
+func addFinishVariants(uuids []string, id string) []string {
+	foilId, _ := mtgmatcher.MatchId(id, true)
+	etchedId, _ := mtgmatcher.MatchId(id, false, true)
+	for _, otherFinishId := range []string{foilId, etchedId} {
+		if otherFinishId != "" && otherFinishId != id && !slices.Contains(uuids, otherFinishId) {
+			uuids = append(uuids, otherFinishId)
+		}
+	}
+	return uuids
+}
+
 func searchScryfall(query string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(time.Second*30))
 	defer cancel()
@@ -1332,17 +1534,10 @@ func searchScryfall(query string) ([]string, error) {
 			if id == "" {
 				continue
 			}
-			out = append(out, id)
-
-			foilId, err := mtgmatcher.MatchId(id, true)
-			if err == nil && foilId != id {
-				out = append(out, foilId)
+			if !slices.Contains(out, id) {
+				out = append(out, id)
 			}
-
-			etchedId, err := mtgmatcher.MatchId(id, false, true)
-			if err == nil && etchedId != id {
-				out = append(out, etchedId)
-			}
+			out = addFinishVariants(out, id)
 		}
 
 		// Exit the loop when there are no more results
@@ -1376,23 +1571,8 @@ func attemptMatch(query string) ([]string, error) {
 
 	// Repeat for foil and etched (only add if not previously found)
 	// Add as needed depending on the previous query result
-	for _, tag := range []string{"Foil", "Etched"} {
-		uuid, suberr := mtgmatcher.Match(&mtgmatcher.InputCard{
-			Name:      query,
-			Variation: tag,
-		})
-		if err != nil && suberr != nil {
-			var alias *mtgmatcher.AliasingError
-			if errors.As(suberr, &alias) {
-				for _, extra := range alias.Probe() {
-					if !slices.Contains(uuids, extra) {
-						uuids = append(uuids, extra)
-					}
-				}
-			}
-		} else if !slices.Contains(uuids, uuid) {
-			uuids = append(uuids, uuid)
-		}
+	for _, id := range uuids {
+		uuids = addFinishVariants(uuids, id)
 	}
 
 	return uuids, nil
@@ -1430,6 +1610,12 @@ type SortingData struct {
 	co          *mtgmatcher.CardObject
 	releaseDate time.Time
 	parentCode  string
+
+	// Lowercased fields the comparators order by, so the N log N
+	// comparisons don't re-lower them every time.
+	nameLower    string
+	flavorLower  string
+	editionLower string
 }
 
 func getSortingData(uuid string) (*SortingData, error) {
@@ -1446,20 +1632,68 @@ func getSortingData(uuid string) (*SortingData, error) {
 		return nil, err
 	}
 	return &SortingData{
-		co:          co,
-		releaseDate: releaseDate,
-		parentCode:  set.ParentCode,
+		co:           co,
+		releaseDate:  releaseDate,
+		parentCode:   set.ParentCode,
+		nameLower:    strings.ToLower(co.Name),
+		flavorLower:  strings.ToLower(co.FlavorName),
+		editionLower: strings.ToLower(co.Edition),
 	}, nil
+}
+
+// resolveSortingData resolves the sorting data of every given id up
+// front, so the N log N comparisons of a sort look each card up instead
+// of re-resolving it every time they see it; a sort visits all of its
+// elements, so nothing is saved by resolving lazily. Unknown ids get a
+// nil entry, which the cmp* comparators order like the lookup error it
+// stands for.
+func resolveSortingData(cardIds []string) map[string]*SortingData {
+	data := make(map[string]*SortingData, len(cardIds))
+	for _, cardId := range cardIds {
+		_, found := data[cardId]
+		if found {
+			continue
+		}
+		sorting, _ := getSortingData(cardId)
+		data[cardId] = sorting
+	}
+	return data
+}
+
+// resolveBestPrices records the highest price every given id fetches
+// among the listed stores: each price4seller/price4vendor call walks
+// the scraper list, so the price sorts must not repeat it per
+// comparison, let alone N log N times.
+func resolveBestPrices(cardIds []string, stores []string, price4 func(cardId, shorthand string) float64) map[string]float64 {
+	prices := make(map[string]float64, len(cardIds))
+	for _, cardId := range cardIds {
+		_, found := prices[cardId]
+		if found {
+			continue
+		}
+		var best float64
+		for _, store := range stores {
+			price := price4(cardId, store)
+			if price > best {
+				best = price
+			}
+		}
+		prices[cardId] = best
+	}
+	return prices
 }
 
 // Sort cards by their collector number and finish (nonfoil-foil-etched)
 func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
-	sortingI, err := getSortingData(uuidI)
-	if err != nil {
-		return false
-	}
-	sortingJ, err := getSortingData(uuidJ)
-	if err != nil {
+	sortingI, _ := getSortingData(uuidI)
+	sortingJ, _ := getSortingData(uuidJ)
+	return cmpNumberAndFinish(sortingI, sortingJ, strip)
+}
+
+// cmpNumberAndFinish is sortByNumberAndFinish over already-resolved sorting
+// data; nil data (an unknown id) sorts like the lookup error it stands for.
+func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
+	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI := sortingI.co
@@ -1524,12 +1758,14 @@ func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
 
 // Sort cards grouping them by edition, and then by their collector number
 func sortSets(uuidI, uuidJ string) bool {
-	sortingI, err := getSortingData(uuidI)
-	if err != nil {
-		return false
-	}
-	sortingJ, err := getSortingData(uuidJ)
-	if err != nil {
+	sortingI, _ := getSortingData(uuidI)
+	sortingJ, _ := getSortingData(uuidJ)
+	return cmpSets(sortingI, sortingJ)
+}
+
+// cmpSets is sortSets over already-resolved sorting data.
+func cmpSets(sortingI, sortingJ *SortingData) bool {
+	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI, setDateI := sortingI.co, sortingI.releaseDate
@@ -1562,17 +1798,17 @@ func sortSets(uuidI, uuidJ string) bool {
 					return true
 				}
 
-				return strings.ToLower(cI.Name) < strings.ToLower(cJ.Name)
+				return sortingI.nameLower < sortingJ.nameLower
 			}
 
-			return sortByNumberAndFinish(uuidI, uuidJ, true)
+			return cmpNumberAndFinish(sortingI, sortingJ, true)
 			// For the special case of set promos, always keeps them after
 		} else if sortingI.parentCode == "" && sortingJ.parentCode != "" {
 			return true
 		} else if sortingJ.parentCode == "" && sortingI.parentCode != "" {
 			return false
 		} else {
-			return strings.ToLower(cI.Edition) < strings.ToLower(cJ.Edition)
+			return sortingI.editionLower < sortingJ.editionLower
 		}
 	}
 
@@ -1582,102 +1818,58 @@ func sortSets(uuidI, uuidJ string) bool {
 // Sort card by their names, trying to keep cards grouped by edition, following
 // the same rules as sortSets
 func sortSetsAlphabetical(uuidI, uuidJ string, preferFlavor bool) bool {
-	sortingI, err := getSortingData(uuidI)
-	if err != nil {
-		return false
-	}
-	sortingJ, err := getSortingData(uuidJ)
-	if err != nil {
+	sortingI, _ := getSortingData(uuidI)
+	sortingJ, _ := getSortingData(uuidJ)
+	return cmpSetsAlphabetical(sortingI, sortingJ, preferFlavor)
+}
+
+// cmpSetsAlphabetical is sortSetsAlphabetical over already-resolved sorting data.
+func cmpSetsAlphabetical(sortingI, sortingJ *SortingData, preferFlavor bool) bool {
+	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI, setDateI := sortingI.co, sortingI.releaseDate
 	cJ, setDateJ := sortingJ.co, sortingJ.releaseDate
 
-	cIname := cI.Name
-	cJname := cJ.Name
+	cIname, cInameLower := cI.Name, sortingI.nameLower
+	cJname, cJnameLower := cJ.Name, sortingJ.nameLower
 	if preferFlavor && cI.FlavorName != "" && allLanguageFlags[cI.Language] != "" {
-		cIname = cI.FlavorName
+		cIname, cInameLower = cI.FlavorName, sortingI.flavorLower
 	}
 	if preferFlavor && cJ.FlavorName != "" && allLanguageFlags[cJ.Language] != "" {
-		cJname = cJ.FlavorName
+		cJname, cJnameLower = cJ.FlavorName, sortingJ.flavorLower
 	}
 
 	if cIname == cJname {
 		if setDateI.Equal(setDateJ) {
 			// We need not to strip to keep set ordered wrt Promos etc
-			return sortByNumberAndFinish(uuidI, uuidJ, false)
+			return cmpNumberAndFinish(sortingI, sortingJ, false)
 		}
 
 		return setDateI.After(setDateJ)
 	}
 
-	return strings.ToLower(cIname) < strings.ToLower(cJname)
+	return cInameLower < cJnameLower
 }
 
 // Sort card by their names, keeping cards grouped by edition alphabetically
 func sortSetsAlphabeticalSet(uuidI, uuidJ string, preferFlavor bool) bool {
-	sortingI, err := getSortingData(uuidI)
-	if err != nil {
-		return false
-	}
-	sortingJ, err := getSortingData(uuidJ)
-	if err != nil {
+	sortingI, _ := getSortingData(uuidI)
+	sortingJ, _ := getSortingData(uuidJ)
+	return cmpSetsAlphabeticalSet(sortingI, sortingJ, preferFlavor)
+}
+
+// cmpSetsAlphabeticalSet is sortSetsAlphabeticalSet over already-resolved sorting data.
+func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData, preferFlavor bool) bool {
+	if sortingI == nil || sortingJ == nil {
 		return false
 	}
 	cI := sortingI.co
 	cJ := sortingJ.co
 
 	if cI.SetCode == cJ.SetCode {
-		return sortSetsAlphabetical(uuidI, uuidJ, preferFlavor)
+		return cmpSetsAlphabetical(sortingI, sortingJ, preferFlavor)
 	}
 
-	return strings.ToLower(cI.Edition) < strings.ToLower(cJ.Edition)
-}
-
-// Sort cards using the highest price among to the sellers in the input slice
-// If same price is found, sort as normal
-func sortSetsByRetail(uuidI, uuidJ string, retSellers []string) bool {
-	var priceI, priceJ float64
-	for _, retSeller := range retSellers {
-		price := price4seller(uuidI, retSeller)
-		if price > priceI {
-			priceI = price
-		}
-	}
-	for _, retSeller := range retSellers {
-		price := price4seller(uuidJ, retSeller)
-		if price > priceJ {
-			priceJ = price
-		}
-	}
-
-	if priceI == priceJ {
-		return sortSets(uuidI, uuidJ)
-	}
-
-	return priceI > priceJ
-}
-
-// Sort cards using the highest price among to the vendors in the input slice
-// If same price is found, sort by the highest retail price
-func sortSetsByBuylist(uuidI, uuidJ string, blVendors []string) bool {
-	var priceI, priceJ float64
-	for _, blVendor := range blVendors {
-		price := price4vendor(uuidI, blVendor)
-		if price > priceI {
-			priceI = price
-		}
-	}
-	for _, blVendor := range blVendors {
-		price := price4vendor(uuidJ, blVendor)
-		if price > priceJ {
-			priceJ = price
-		}
-	}
-
-	if priceI == priceJ {
-		return sortSetsByRetail(uuidI, uuidJ, defaultSellerPriorityOpt)
-	}
-
-	return priceI > priceJ
+	return sortingI.editionLower < sortingJ.editionLower
 }

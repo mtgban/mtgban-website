@@ -578,6 +578,91 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	})
 	pageVars.Tables = append(pageVars.Tables, pageTable)
 
+	// -- People: quick-add a Patreon grant --
+	// Reuses the config editor's persistence: the amended config is written
+	// to the config source and swapped in memory, so the grant survives
+	// restarts and shows in the table below immediately.
+	grantEmail := strings.ToLower(strings.TrimSpace(r.FormValue("grantEmail")))
+	if grantEmail != "" {
+		grantTier := r.FormValue("grantTier")
+		newGrant := PatreonGrant{
+			Category: strings.TrimSpace(r.FormValue("grantCategory")),
+			Email:    grantEmail,
+			Name:     strings.TrimSpace(r.FormValue("grantName")),
+			Tier:     grantTier,
+		}
+
+		duplicate := false
+		for _, person := range Config.Patreon.Grants {
+			if strings.EqualFold(person.Email, grantEmail) {
+				duplicate = true
+				break
+			}
+		}
+		_, tierExists := Config.ACL[grantTier]
+
+		switch {
+		case !strings.Contains(grantEmail, "@"):
+			pageVars.WarningMessage = "invalid grant email: " + grantEmail
+		case duplicate:
+			pageVars.WarningMessage = grantEmail + " already has a grant"
+		case !tierExists:
+			pageVars.WarningMessage = "unknown tier: " + grantTier
+		default:
+			newConfig := Config
+			newConfig.Patreon.Grants = append(slices.Clone(Config.Patreon.Grants), newGrant)
+
+			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
+			if err != nil {
+				pageVars.WarningMessage = err.Error()
+			} else {
+				err = writeConfigFile(newConfig, writer)
+				writer.Close()
+				if err != nil {
+					log.Println(err)
+					pageVars.WarningMessage = err.Error()
+				} else {
+					Config = newConfig
+					pageVars.InfoMessage = fmt.Sprintf("Granted %s tier to %s", newGrant.Tier, newGrant.Email)
+					LogPages["Admin"].Printf("Grant added: %+v", newGrant)
+				}
+			}
+		}
+	}
+
+	// -- People: remove a Patreon grant --
+	// Persists like the quick-add above, so the row disappears from the
+	// table rendered below and stays gone after a restart.
+	revokeEmail := strings.ToLower(strings.TrimSpace(r.FormValue("revokeEmail")))
+	if revokeEmail != "" {
+		idx := slices.IndexFunc(Config.Patreon.Grants, func(person PatreonGrant) bool {
+			return strings.EqualFold(person.Email, revokeEmail)
+		})
+		if idx < 0 {
+			pageVars.WarningMessage = "no grant found for " + revokeEmail
+		} else {
+			removed := Config.Patreon.Grants[idx]
+			newConfig := Config
+			newConfig.Patreon.Grants = slices.Delete(slices.Clone(Config.Patreon.Grants), idx, idx+1)
+
+			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
+			if err != nil {
+				pageVars.WarningMessage = err.Error()
+			} else {
+				err = writeConfigFile(newConfig, writer)
+				writer.Close()
+				if err != nil {
+					log.Println(err)
+					pageVars.WarningMessage = err.Error()
+				} else {
+					Config = newConfig
+					pageVars.InfoMessage = fmt.Sprintf("Removed %s grant from %s", removed.Tier, removed.Email)
+					LogPages["Admin"].Printf("Grant removed: %+v", removed)
+				}
+			}
+		}
+	}
+
 	// -- People: Patreon Grants --
 	var userTable [][]string
 	for i, person := range Config.Patreon.Grants {

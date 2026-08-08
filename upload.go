@@ -26,6 +26,7 @@ import (
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/cardconduit"
+	"github.com/mtgban/mtgban-website/collectr"
 	"github.com/mtgban/mtgban-website/internal/docparse"
 	"github.com/mtgban/mtgban-website/moxfield"
 )
@@ -39,12 +40,10 @@ const (
 
 	MaxUploadEntries      = 350
 	MaxUploadProEntries   = 1000
-	MaxUploadTotalEntries = 10000
+	MaxUploadTotalEntries = 15000
 	MaxUploadFileSize     = 5 << 20
 
 	ProfitabilityConstant = 2
-
-	TooManyEntriesMessage = "Note: you reached the maximum number of entries supported by this tool"
 )
 
 // List of ALL index prices to track
@@ -67,9 +66,12 @@ var UploadIndexComparePriceList = []string{
 	"TCGLow", "TCGMarket", "TCGDirect", "CT", "CT0", "MKMLow", "MKMTrend",
 }
 
-// List of sealed index prices to show by default
+// List of sealed index prices to show by default: the EV calculations
+// (the simulations are too noisy to price a collection against) and the
+// plain TCGplayer price, which doubles as a store like TCGDirect does
+// for singles
 var UploadSealedIndexKeysPublic = []string{
-	"TCGLowEV", "TCGDirectNetEV", "TCGLowSim", "TCGDirectNetSim",
+	"TCGLowEV", "TCGDirectNetEV", "CTZeroEV", "TCGSealed",
 }
 
 var ErrUploadDecklist = docparse.ErrDecklist
@@ -162,6 +164,19 @@ func hasUploadOpt(r *http.Request, field string) bool {
 		uploadOpts = strings.Split(optsRaw, ",")
 	}
 	return slices.Contains(uploadOpts, field)
+}
+
+// keepInOrder returns the elements of enabled that are present in all,
+// following the order of all, so that a selection coming from a form or
+// a cookie can never reorder the list or smuggle in an unknown key
+func keepInOrder(all, enabled []string) []string {
+	var out []string
+	for _, key := range all {
+		if slices.Contains(enabled, key) {
+			out = append(out, key)
+		}
+	}
+	return out
 }
 
 func Upload(w http.ResponseWriter, r *http.Request) {
@@ -374,6 +389,44 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.EnabledSealedVendors = strings.Split(enabledSealedVendors, "|")
 	}
 
+	// The sealed indexes are the sealed sellers that were made public;
+	// unlike the EV ones, TCGSealed is not MetadataOnly, since it is a
+	// store too
+	sealedIndexes := filterSellers(func(info mtgban.ScraperInfo) bool {
+		return info.SealedMode &&
+			slices.Contains(UploadSealedIndexKeysPublic, info.Shorthand)
+	})
+
+	// Index prices are reference prices, so their selection is shared
+	// between Retail and Buylist mode, but singles and sealed keep their
+	// own list, like the stores above. The form always carries the
+	// index_pref marker, so an empty list submitted from the page means
+	// "no index at all" and not "field was never sent" (as it would for
+	// requests that skip the form, like search transfers or remote links)
+	pageVars.IndexAllKeys = UploadIndexKeysPublic
+	pageVars.SealedIndexAllKeys = sealedIndexes
+
+	enabledIndexes := UploadIndexKeysPublic
+	enabledSealedIndexes := sealedIndexes
+	if r.Form.Has("index_pref") {
+		enabledIndexes = r.Form["index_stores"]
+		enabledSealedIndexes = r.Form["sealed_index_stores"]
+		setForeverCookie(w, "enabledIndexes", strings.Join(enabledIndexes, "|"))
+		setForeverCookie(w, "enabledSealedIndexes", strings.Join(enabledSealedIndexes, "|"))
+	} else {
+		if raw := readCookie(r, "enabledIndexes"); raw != "" {
+			enabledIndexes = strings.Split(raw, "|")
+		}
+		if raw := readCookie(r, "enabledSealedIndexes"); raw != "" {
+			enabledSealedIndexes = strings.Split(raw, "|")
+		}
+	}
+
+	enabledIndexKeys := keepInOrder(UploadIndexKeysPublic, enabledIndexes)
+	enabledSealedIndexKeys := keepInOrder(sealedIndexes, enabledSealedIndexes)
+	pageVars.EnabledIndexes = enabledIndexKeys
+	pageVars.EnabledSealedIndexes = enabledSealedIndexKeys
+
 	cachedGdocURL := readCookie(r, "gdocURL")
 	pageVars.RemoteLinkURL = cachedGdocURL
 
@@ -508,8 +561,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		maxRows = MaxUploadProEntries
 	}
 	// Allow a larger upload limit if set, if dev, or if it's an external call
-	limitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
-	uploadNoLimit := limitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
+	noLimitOpt, _ := strconv.ParseBool(GetParamFromSig(sig, "UploadNoLimit"))
+	uploadNoLimit := noLimitOpt || (DevMode && !SigCheck) || estimate || deckbox || tcgpCSV || (download && canBuylist)
 	if uploadNoLimit {
 		maxRows = MaxUploadTotalEntries
 	}
@@ -517,6 +570,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Load data
 	var uploadedData []UploadEntry
+	var uploadName string
 	if len(hashes) != 0 {
 		uploadedData, err = loadHashes(hashes, r.Form["hashesQtys"], r.Form["hashesCond"], r.Form["hashesPrice"])
 	} else if textArea != "" {
@@ -535,11 +589,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			switch u.Host {
 			case "store.tcgplayer.com":
-				uploadedData, err = loadCollection(r.Context(), gdocURL, maxRows)
+				uploadedData, uploadName, err = loadCollection(r.Context(), gdocURL, maxRows)
 			case "www.moxfield.com", "moxfield.com":
-				uploadedData, err = loadMoxfield(r.Context(), u.Path, maxRows)
+				uploadedData, uploadName, err = loadMoxfield(r.Context(), u.Path, maxRows)
+			case "app.getcollectr.com":
+				uploadedData, uploadName, err = loadCollectr(r.Context(), gdocURL, maxRows)
 			case "docs.google.com":
-				uploadedData, err = loadSpreadsheet(u.Path, maxRows)
+				uploadedData, uploadName, err = loadSpreadsheet(u.Path, maxRows)
 			default:
 				err = errors.New("unsupported URL")
 			}
@@ -549,6 +605,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		pageVars.WarningMessage = err.Error()
 		render(w, "upload.html", pageVars)
 		return
+	}
+
+	// Warn when the input was cut at the row cap. Checked before the merge
+	// below (which can shrink the count back under the cap), unlike the old
+	// matched-singles check that missed most real truncations.
+	if len(uploadedData) >= maxRows {
+		pageVars.WarningMessage = fmt.Sprintf("Input truncated to the first %d entries", maxRows)
 	}
 
 	uploadedData = docparse.MergeIdenticalEntries(uploadedData)
@@ -679,11 +742,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Card IDs: %d, Sealed product IDs: %d", len(cardIds), len(sealedProductIds))
 
-	// Check not too many entries got uploaded
-	if len(cardIds) >= maxRows {
-		pageVars.InfoMessage = TooManyEntriesMessage
-	}
-
 	tagPref := "tags"
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
@@ -791,15 +849,22 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+csvName+".csv\"")
 		csvWriter := csv.NewWriter(w)
 
-		// Search for all csv-specific indexes (skip the dump when there are no singles)
+		// Search for the csv-specific indexes that were left enabled
+		// (skip the dump when there are no singles)
+		var csvIndexKeys []string
+		for _, key := range UploadIndexKeysCSV {
+			if slices.Contains(enabledIndexKeys, key) {
+				csvIndexKeys = append(csvIndexKeys, key)
+			}
+		}
 		indexResults := map[string]map[string]*BanPrice{}
-		if len(cardIds) > 0 {
-			indexResults = getSellerPrices("", UploadIndexKeysCSV, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
+		if len(cardIds) > 0 && len(csvIndexKeys) > 0 {
+			indexResults = getSellerPrices("", csvIndexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 		}
 
 		// Copy these index prices in the final results
 		for _, cardId := range cardIds {
-			for _, index := range UploadIndexKeysCSV {
+			for _, index := range csvIndexKeys {
 				if results[cardId] == nil {
 					results[cardId] = map[string]*BanPrice{}
 				}
@@ -834,17 +899,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		indexResults = getSellerPrices("", indexKeys, "", cardIds, "", false, shouldCheckForConditions, false, tagPref)
 	}
 
-	// Build sealed index keys from MetadataOnly sealed sellers
+	// An index that is also a selected store (TCGSealed) already gets its
+	// own column in retail mode, so drop it here to avoid listing it twice
 	var sealedIndexKeys []string
-	for _, seller := range GetSellers() {
-		if seller == nil || !seller.Info().SealedMode || !seller.Info().MetadataOnly {
+	for _, key := range enabledSealedIndexKeys {
+		if !blMode && slices.Contains(enabledSealedStores, key) {
 			continue
 		}
-		short := seller.Info().Shorthand
-		if !slices.Contains(UploadSealedIndexKeysPublic, short) {
-			continue
-		}
-		sealedIndexKeys = append(sealedIndexKeys, short)
+		sealedIndexKeys = append(sealedIndexKeys, key)
 	}
 
 	// Fetch sealed index prices
@@ -860,8 +922,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set card and sealed keys separately — the template picks per entry
-	pageVars.IndexKeys = UploadIndexKeysPublic
+	// Set card and sealed keys separately — the template picks per entry,
+	// with the same store/index deduplication applied above for sealed
+	for _, key := range enabledIndexKeys {
+		if !blMode && slices.Contains(enabledStores, key) {
+			continue
+		}
+		pageVars.IndexKeys = append(pageVars.IndexKeys, key)
+	}
 	pageVars.ScraperKeys = enabledStores
 	pageVars.AllScraperKeys = enabledStores
 	if len(sealedProductIds) > 0 {
@@ -877,7 +945,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else if textArea != "" {
 		pageVars.UploadQuery = "pasted text"
 	} else if gdocURL != "" {
+		// Show the source's own name when the loader could retrieve one,
+		// and let the results header link back to it
 		pageVars.UploadQuery = "remote URL"
+		if uploadName != "" {
+			pageVars.UploadQuery = uploadName
+		}
+		pageVars.UploadSourceURL = gdocURL
 	} else {
 		pageVars.UploadQuery = handler.Filename
 	}
@@ -950,13 +1024,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		if skipConds {
 			conds = ""
 		}
+		priceKey := cardId + conds
 		for indexKey, indexResult := range indexResults[cardId] {
 			indexPrice := getPrice(indexResult, conds)
 
-			if resultPrices[cardId+conds] == nil {
-				resultPrices[cardId+conds] = map[string]float64{}
+			if resultPrices[priceKey] == nil {
+				resultPrices[priceKey] = map[string]float64{}
 			}
-			resultPrices[cardId+conds][indexKey] = indexPrice
+			resultPrices[priceKey][indexKey] = indexPrice
 
 			qty := 1
 			if uploadedData[i].HasQuantity {
@@ -981,10 +1056,6 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		// Run summaries for each vendor
 		for shorthand, banPrice := range results[cardId] {
-			conds := uploadedData[i].OriginalCondition
-			if skipConds {
-				conds = ""
-			}
 			price := getPrice(banPrice, conds)
 
 			// Adjust for preferred price source
@@ -997,10 +1068,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Store computed price
-			if resultPrices[cardId+conds] == nil {
-				resultPrices[cardId+conds] = map[string]float64{}
+			if resultPrices[priceKey] == nil {
+				resultPrices[priceKey] = map[string]float64{}
 			}
-			resultPrices[cardId+conds][shorthand] = price
+			resultPrices[priceKey][shorthand] = price
 
 			// Skip empty results
 			if price == 0 {
@@ -1063,7 +1134,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Load the single item priceprice
-			price := resultPrices[cardId+conds][bestStore]
+			price := resultPrices[priceKey][bestStore]
 
 			// Skip if needed
 			if skipLowValueAbs && price < minLowVal {
@@ -1208,6 +1279,21 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func sortResults(uploadedData []UploadEntry, optimizedResults map[string][]OptimizedUploadEntry, sorting string, preferFlavor bool) {
+	// The card-data sorts below order both the uploaded rows and every
+	// per-store optimized list, so resolve the ids of both up front.
+	resolveUploadSortingData := func() map[string]*SortingData {
+		cardIds := make([]string, 0, len(uploadedData))
+		for i := range uploadedData {
+			cardIds = append(cardIds, uploadedData[i].CardId)
+		}
+		for _, entries := range optimizedResults {
+			for i := range entries {
+				cardIds = append(cardIds, entries[i].CardId)
+			}
+		}
+		return resolveSortingData(cardIds)
+	}
+
 	switch sorting {
 	case "highprice":
 		sort.Slice(uploadedData, func(i, j int) bool {
@@ -1220,33 +1306,36 @@ func sortResults(uploadedData []UploadEntry, optimizedResults map[string][]Optim
 			})
 		}
 	case "alphabetical":
+		sortData := resolveUploadSortingData()
 		sort.Slice(uploadedData, func(i, j int) bool {
-			return sortSetsAlphabetical(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
+			return cmpSetsAlphabetical(sortData[uploadedData[i].CardId], sortData[uploadedData[j].CardId], preferFlavor)
 		})
 
 		for store := range optimizedResults {
 			sort.Slice(optimizedResults[store], func(i, j int) bool {
-				return sortSetsAlphabetical(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
+				return cmpSetsAlphabetical(sortData[optimizedResults[store][i].CardId], sortData[optimizedResults[store][j].CardId], preferFlavor)
 			})
 		}
 	case "setalpha":
+		sortData := resolveUploadSortingData()
 		sort.Slice(uploadedData, func(i, j int) bool {
-			return sortSetsAlphabeticalSet(uploadedData[i].CardId, uploadedData[j].CardId, preferFlavor)
+			return cmpSetsAlphabeticalSet(sortData[uploadedData[i].CardId], sortData[uploadedData[j].CardId], preferFlavor)
 		})
 
 		for store := range optimizedResults {
 			sort.Slice(optimizedResults[store], func(i, j int) bool {
-				return sortSetsAlphabeticalSet(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId, preferFlavor)
+				return cmpSetsAlphabeticalSet(sortData[optimizedResults[store][i].CardId], sortData[optimizedResults[store][j].CardId], preferFlavor)
 			})
 		}
 	case "setchrono":
+		sortData := resolveUploadSortingData()
 		sort.Slice(uploadedData, func(i, j int) bool {
-			return sortSets(uploadedData[i].CardId, uploadedData[j].CardId)
+			return cmpSets(sortData[uploadedData[i].CardId], sortData[uploadedData[j].CardId])
 		})
 
 		for store := range optimizedResults {
 			sort.Slice(optimizedResults[store], func(i, j int) bool {
-				return sortSets(optimizedResults[store][i].CardId, optimizedResults[store][j].CardId)
+				return cmpSets(sortData[optimizedResults[store][i].CardId], sortData[optimizedResults[store][j].CardId])
 			})
 		}
 	case "highspread":
@@ -1362,12 +1451,12 @@ func loadHashes(hashes, qtys, cond, prices []string) ([]UploadEntry, error) {
 	return uploadEntries, nil
 }
 
-func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
+func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
 	var uploadEntries []UploadEntry
 
 	deckID := path.Base(link)
 	if deckID == "" {
-		return nil, errors.New("invalid Moxfield deck URL")
+		return nil, "", errors.New("invalid Moxfield deck URL")
 	}
 
 	// Build the request URL from the configured proxy base so the host
@@ -1376,22 +1465,22 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 	// require a clean absolute path so it can't inject a scheme or host
 	// (e.g. via a leading "//" or an embedded "://").
 	if !strings.HasPrefix(link, "/") || strings.HasPrefix(link, "//") || strings.Contains(link, "://") {
-		return nil, errors.New("invalid Moxfield deck URL")
+		return nil, "", errors.New("invalid Moxfield deck URL")
 	}
 	base, err := url.Parse(Config.Uploader["moxfield"])
 	if err != nil {
-		return nil, errors.New("invalid Moxfield uploader configuration")
+		return nil, "", errors.New("invalid Moxfield uploader configuration")
 	}
 	base.Path = path.Join(base.Path, link)
 	moxURL := base.String()
 
-	items, err := moxfield.Load(ctx, moxURL, maxRows)
+	items, deckName, err := moxfield.Load(ctx, moxURL, maxRows)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch Moxfield deck: %w", err)
+		return nil, "", fmt.Errorf("failed to fetch Moxfield deck: %w", err)
 	}
 
 	for _, item := range items {
-		cardId, err := mtgmatcher.MatchId(item.ScryfallID, item.IsFoil, item.IsEtched)
+		cardId, err := resolveMoxItem(item)
 		entry := UploadEntry{
 			HasQuantity:       true,
 			Quantity:          item.Quantity,
@@ -1403,38 +1492,131 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 		uploadEntries = append(uploadEntries, entry)
 	}
 
-	return uploadEntries, nil
+	return uploadEntries, deckName, nil
 }
 
-func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, error) {
+// loadCollectr fetches a public Collectr showcase (through the configured
+// proxy, which carries a browser TLS fingerprint - direct fetches from
+// datacenter IPs get blocked by Cloudflare) and matches its products.
+func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
+	proxyBase := Config.Uploader["collectr"]
+	if proxyBase == "" {
+		return nil, "", errors.New("Collectr uploader not configured")
+	}
+
+	items, err := collectr.Load(ctx, proxyBase, link, Config.Game, maxRows)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch Collectr showcase: %w", err)
+	}
+
+	var uploadEntries []UploadEntry
+	for _, item := range items {
+		var cardId string
+		var matchErr error
+
+		// Try matching via TCGplayer product ID first
+		uuid := mtgmatcher.ExternalUUID(item.ProductID)
+		if uuid != "" {
+			cardId, matchErr = mtgmatcher.MatchId(uuid, item.IsFoil)
+		}
+
+		// Fall back to name-based matching
+		if cardId == "" {
+			if item.IsSealed {
+				// Search sealed products by name
+				results, err := mtgmatcher.SearchSealedEquals(item.Name)
+				if err != nil {
+					// Try a looser search
+					results, err = mtgmatcher.SearchSealedContains(item.Name)
+				}
+				if err != nil {
+					matchErr = err
+				} else if len(results) > 0 {
+					cardId = results[0]
+				}
+			} else {
+				card := mtgmatcher.InputCard{
+					Name:      item.Name,
+					Edition:   item.SetName,
+					Variation: item.Number,
+					Foil:      item.IsFoil,
+				}
+				cardId, matchErr = mtgmatcher.Match(&card)
+			}
+		}
+
+		entry := UploadEntry{
+			Card: mtgmatcher.InputCard{
+				Name:    item.Name,
+				Edition: item.SetName,
+				Foil:    item.IsFoil,
+			},
+			HasQuantity:       true,
+			Quantity:          item.Quantity,
+			CardId:            cardId,
+			MismatchError:     matchErr,
+			OriginalPrice:     item.Price,
+			OriginalCondition: item.Condition,
+		}
+		uploadEntries = append(uploadEntries, entry)
+	}
+
+	// The showcase handle doubles as the display name
+	handle, _ := collectr.ParseShowcaseURL(link)
+	return uploadEntries, handle, nil
+}
+
+// resolveMoxItem resolves a Moxfield item to a uuid. Most items carry a
+// scryfall id; deck per-copy printings carry name plus set and collector
+// number instead, resolved through the set catalog with the finish applied
+// on top.
+func resolveMoxItem(item moxfield.Item) (string, error) {
+	if item.ScryfallID != "" {
+		return mtgmatcher.MatchId(item.ScryfallID, item.IsFoil, item.IsEtched)
+	}
+
+	printings := mtgmatcher.MatchWithNumber(item.Name, strings.ToUpper(item.SetCode), item.Number)
+	if len(printings) == 0 {
+		return "", fmt.Errorf("unknown printing %s (%s) %s", item.Name, item.SetCode, item.Number)
+	}
+	return mtgmatcher.MatchId(printings[0].UUID, item.IsFoil, item.IsEtched)
+}
+
+func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
 	// Re-validate the URL locally rather than trusting the caller's host
 	// switch: parse it here and require the exact TCGplayer store host so
 	// the request target can't be pointed at an arbitrary (e.g. internal)
 	// address. This also gives the static analyzer a sanitizer it can see.
 	u, err := url.Parse(link)
 	if err != nil {
-		return nil, errors.New("unsupported URL")
+		return nil, "", errors.New("unsupported URL")
 	}
 	if u.Scheme != "https" || u.Host != "store.tcgplayer.com" {
-		return nil, errors.New("unsupported URL")
+		return nil, "", errors.New("unsupported URL")
 	}
 	if !strings.Contains(u.Path, "/collection/view/") {
-		return nil, errors.New("unsupported URL")
+		return nil, "", errors.New("unsupported URL")
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+
+	// The page title names the collection ("<owner>'s Collection")
+	collectionName := strings.TrimSpace(doc.Find("title").First().Text())
+	if idx := strings.Index(collectionName, "|"); idx > 0 {
+		collectionName = strings.TrimSpace(collectionName[:idx])
 	}
 
 	var header []string
@@ -1444,7 +1626,7 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 
 	indexMap, err := uploadParser.ParseHeader(header)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var uploadEntries []UploadEntry
@@ -1489,17 +1671,19 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 		return true
 	})
 
-	return uploadEntries, nil
+	return uploadEntries, collectionName, nil
 }
 
-func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
+func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, string, error) {
 	service := spreadsheet.NewServiceWithClient(GoogleDocsClient)
 
 	hash := path.Base(strings.TrimSuffix(urlPath, "/edit"))
 	spreadsheet, err := service.FetchSpreadsheet(hash)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
+
+	docName := spreadsheet.Properties.Title
 
 	sheetIndex := 0
 	for i := 0; i < len(spreadsheet.Sheets); i++ {
@@ -1511,11 +1695,11 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
 
 	sheet, err := spreadsheet.SheetByIndex(uint(sheetIndex))
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	if len(sheet.Rows) == 0 {
-		return nil, errors.New("empty xls file")
+		return nil, "", errors.New("empty xls file")
 	}
 
 	record := make([]string, len(sheet.Rows[0]))
@@ -1528,7 +1712,7 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
 	if errors.Is(err, ErrUploadDecklist) || errors.Is(err, ErrReloadFirstRow) {
 		i-- // Parse the first line again
 	} else if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	var uploadEntries []UploadEntry
@@ -1555,7 +1739,7 @@ func loadSpreadsheet(urlPath string, maxRows int) ([]UploadEntry, error) {
 		uploadEntries = append(uploadEntries, res)
 	}
 
-	return uploadEntries, nil
+	return uploadEntries, docName, nil
 }
 
 func loadOldXls(reader io.ReadSeeker, maxRows int) ([]UploadEntry, error) {

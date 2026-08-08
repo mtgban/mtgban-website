@@ -95,7 +95,11 @@ type FilterPriceElem struct {
 	// All stores sources (shorthands) present in the map
 	Stores []string
 
-	// Cache of cardId:prices used in the filter
+	// Cache of cardId:prices used in the filter. The retail and buylist
+	// searches run concurrently and can share one filter (e.g. noSussy spans
+	// TCGDirect retail and TCGDirectNet buylist), so cached slices are read
+	// from multiple goroutines: never mutate one after it is stored — build a
+	// new slice instead.
 	PriceCache map[string][]float64
 
 	// Mutex protecting PriceCache map from concurrent access
@@ -213,11 +217,14 @@ func fixupRarityNG(code string) []string {
 	return filters
 }
 
-func fixupNumberNG(code string) []string {
+func fixupNumberNG(code string, strict bool) []string {
 	code = strings.ToLower(code)
 	filters := strings.Split(code, ",")
 	for i := range filters {
 		filters[i] = strings.TrimLeft(filters[i], "0")
+		if !strict {
+			filters[i] = strings.TrimRight(filters[i], mtgmatcher.SuffixSpecial+mtgmatcher.SuffixVariant+mtgmatcher.SuffixPhiLow+"*")
+		}
 	}
 	return filters
 }
@@ -461,6 +468,7 @@ var FilterOperations = map[string][]string{
 	"ee":        []string{":"},
 	"number":    []string{":", ">", "<"},
 	"cn":        []string{":", ">", "<"},
+	"cns":       []string{":"},
 	"cne":       []string{":"},
 	"date":      []string{":", ">", "<"},
 	"year":      []string{":", ">", "<"},
@@ -720,8 +728,11 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Negate: negate,
 				Values: []string{code},
 			})
-		case "cn", "number":
+		case "cn", "cns", "number":
 			opt := "number"
+			if option == "cns" {
+				opt = "number_strict"
+			}
 			if operation == ">" {
 				opt = "number_greater_than"
 			} else if operation == "<" {
@@ -748,7 +759,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 					opt = "number_greater_than"
 					subfilters = append(subfilters, FilterElem{
 						Name:    opt,
-						Values:  fixupNumberNG(code),
+						Values:  fixupNumberNG(code, false),
 						ApplyTo: applyToSets,
 					})
 					// Reset options to reuse the filter addition below
@@ -760,7 +771,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			filters = append(filters, FilterElem{
 				Name:       opt,
 				Negate:     negate,
-				Values:     fixupNumberNG(code),
+				Values:     fixupNumberNG(code, option == "cns"),
 				Subfilters: subfilters,
 				ApplyTo:    applyToSets,
 			})
@@ -1224,7 +1235,7 @@ func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc
 	}
 	var values [2]int
 
-	for i, num := range []string{filters[0], co.Number} {
+	for i, num := range []string{filters[0], co.OriginalNumber} {
 		ref, err := strconv.Atoi(num)
 		if err != nil {
 			ref, err = strconv.Atoi(mtgmatcher.ExtractNumberValue(num))
@@ -1561,6 +1572,8 @@ func applyCardFilter(name string, filters []string, co *mtgmatcher.CardObject) b
 		return cardFilterContents(filters, co)
 	case "number":
 		return cardFilterNumber(filters, co)
+	case "number_strict":
+		return cardFilterNumberStrict(filters, co)
 	case "number_regexp":
 		return cardFilterNumberRegexp(filters, co)
 	case "number_greater_than":
@@ -1703,6 +1716,10 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 }
 
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
+	return !slices.Contains(filters, strings.ToLower(co.OriginalNumber))
+}
+
+func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
 	return !slices.Contains(filters, strings.ToLower(co.Number))
 }
 
@@ -2158,15 +2175,16 @@ func shouldSkipPriceNG(cardId string, entry mtgban.GenericEntry, filters []*Filt
 				prices = []float64{filters[i].Value}
 			}
 
-			// Update cache
-			go func() {
-				filters[i].Mutex.Lock()
-				if filters[i].PriceCache == nil {
-					filters[i].PriceCache = map[string][]float64{}
-				}
-				filters[i].PriceCache[cardId] = prices
-				filters[i].Mutex.Unlock()
-			}()
+			// Update cache synchronously so the card's next entries hit it: an
+			// async write lands after the burst of same-card lookups has already
+			// missed, recomputing the store prices for nearly every entry (and
+			// spawning a goroutine per miss).
+			filters[i].Mutex.Lock()
+			if filters[i].PriceCache == nil {
+				filters[i].PriceCache = map[string][]float64{}
+			}
+			filters[i].PriceCache[cardId] = prices
+			filters[i].Mutex.Unlock()
 		}
 
 		res := applyPriceFilter(filters[i].Name, prices, entry.Pricing())

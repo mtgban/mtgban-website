@@ -207,8 +207,9 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 	}
 
 	// Keep the first (most recent) result
+	sortData := resolveSortingData(uuids)
 	sort.Slice(uuids, func(i, j int) bool {
-		return sortSets(uuids[i], uuids[j])
+		return cmpSets(sortData[uuids[i]], sortData[uuids[j]])
 	})
 	cardId := uuids[0]
 

@@ -34,7 +34,7 @@ window.__BAN_GUIDE = {
                     { value: '*',  short: 'Saved - browse and run your saved searches; Shift+Enter restores chips for editing' },
                     { value: '<',  short: 'Recent - recall your recent searches' },
                     { value: '$',  short: 'Sealed - search sealed products; Enter for prices, Shift+Enter for contents, Ctrl+Enter to simulate a pack pull' },
-                    { value: '+',  short: 'Upload - submit a Sheets/Moxfield/TCG URL, pick a CSV/XLS file, or push current page results to the Uploader' }
+                    { value: '+',  short: 'Upload - submit a Sheets or tracker URL, pick a CSV/XLS file, or push current page results to the Uploader' }
                 ],
                 examples: [
                     { query: 'Lightning Bolt', desc: 'Just type a card name - Enter to search' },
@@ -180,20 +180,19 @@ window.__BAN_GUIDE = {
             icon: 'upload',
             summary: 'Send URLs, files, or current results to the Uploader without leaving the palette.',
             snippets: ['+', '+https://docs.google.com/...', '+ Browse for file...', '+ Send results'],
-            keywords: ['upload', 'uploader', 'url', 'file', 'csv', 'xls', 'xlsx', 'sheets', 'moxfield', 'tcgplayer', 'send', 'hashes', 'collection'],
+            keywords: ['upload', 'uploader', 'url', 'file', 'csv', 'xls', 'xlsx', 'sheets', 'tcgplayer', 'send', 'hashes', 'collection'],
             requiresNav: 'Upload',
             content: {
-                description: '<p>Type <code>+</code> as the first character to enter <strong>Upload mode</strong> (available when your tier includes the Uploader). The dropdown adapts to what is available:</p><ul><li><strong>Pasted URL</strong> - any input matching <code>store.tcgplayer.com</code>, <code>moxfield.com</code>, or <code>docs.google.com</code> shows an "Upload from..." row identifying the source.</li><li><strong>Browse for file...</strong> - always present; opens the native file picker for CSV / XLS / XLSX.</li><li><strong>Send N results to Uploader</strong> - shown on any page with row hashes (search and contents results); posts the visible hashes to the Uploader.</li></ul><p>All paths submit to <code>/upload</code> as a POST. Your saved upload preferences (mode, store list, optimizer settings) ride along automatically as cookies, so the result page reflects whatever you last configured at <code>/upload</code>.</p><p>Unsupported URL hosts render an error row that ignores Enter; pick one of the supported sources or use the file picker.</p>',
+                description: '<p>Type <code>+</code> as the first character to enter <strong>Upload mode</strong> (available when your tier includes the Uploader). The dropdown adapts to what is available:</p><ul><li><strong>Pasted URL</strong> - any input matching a supported collection, deck tracker, or spreadsheet host shows an "Upload from..." row identifying the source.</li><li><strong>Browse for file...</strong> - always present; opens the native file picker for CSV / XLS / XLSX.</li><li><strong>Send N results to Uploader</strong> - shown on any page with row hashes (search and contents results); posts the visible hashes to the Uploader.</li></ul><p>All paths submit to <code>/upload</code> as a POST. Your saved upload preferences (mode, store list, optimizer settings) ride along automatically as cookies, so the result page reflects whatever you last configured at <code>/upload</code>.</p><p>Unsupported URL hosts render an error row that ignores Enter; pick one of the supported sources or use the file picker.</p>',
                 table: [
                     { value: '+',                                    short: 'Enter upload mode (when tier permits)' },
-                    { value: '+<URL>',                               short: 'Submit a Sheets / Moxfield / TCGplayer URL' },
+                    { value: '+<URL>',                               short: 'Submit a Sheets or tracker URL' },
                     { value: 'Browse for file...',                   short: 'Open native file picker (CSV/XLS/XLSX)' },
                     { value: 'Send N results to Uploader',           short: 'Shown on results pages; posts row hashes to /upload' },
                     { value: 'Cookies (mode, stores, optimizer)',    short: 'Honored from your last /upload session' }
                 ],
                 examples: [
                     { query: '+https://docs.google.com/spreadsheets/d/...',         desc: 'Submit a Google Sheets collection', palette: true },
-                    { query: '+https://www.moxfield.com/decks/abc',                  desc: 'Submit a Moxfield deck', palette: true },
                     { query: 'On /search?q=lightning bolt -> + -> Send results',     desc: 'Push current results to Uploader', palette: true },
                     { query: '+ -> Browse for file... -> pick collection.csv',       desc: 'Local file path', palette: true }
                 ]
@@ -322,22 +321,24 @@ window.__BAN_GUIDE = {
             title: 'Collector Numbers',
             icon: 'hash',
             summary: 'Filter by number (cn:123), range (cn:1-50), comparison (cn>300), or per-set (cn:MKM:42).',
-            snippets: ['cn:123', 'cn:1-50', 'cn>300', 'cn:CODE:42', 'cne:REGEXP'],
-            keywords: ['collector', 'number', 'cn', 'cne', 'range', 'comparison', 'regex', 'regexp', '#', 'card number'],
+            snippets: ['cn:123', 'cn:1-50', 'cn>300', 'cn:CODE:42', 'cns:107★', 'cne:REGEXP'],
+            keywords: ['collector', 'number', 'cn', 'cns', 'cne', 'range', 'comparison', 'regex', 'regexp', '#', 'card number', 'strict', 'star'],
             content: {
-                description: '<p>Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.</p><p>Regular expressions are supported via <code>cne:REGEXP</code>.</p><p>To target a specific set while leaving other results untouched, prepend the set code: <code>cn:CODE:NUMBER</code>.</p>',
+                description: '<p>Filter by collector number using <code>cn:NUMBER</code>. For plain numbers you can use comparison operators <code>cn&gt;NUMBER</code> and <code>cn&lt;NUMBER</code>, or a range <code>cn:NUMBER-NUMBER</code>.</p><p><code>cn:</code> ignores the ★/†/φ decorations, so <code>cn:107</code> also finds a card numbered 107★; use the strict form <code>cns:NUMBER</code> to match the number exactly as printed.</p><p>Regular expressions are supported via <code>cne:REGEXP</code>.</p><p>To target a specific set while leaving other results untouched, prepend the set code: <code>cn:CODE:NUMBER</code>.</p>',
                 table: [
                     { value: 'cn:NUMBER', short: 'Exact collector number' },
                     { value: 'cn:N-N', short: 'Range of collector numbers' },
                     { value: 'cn>N / cn<N', short: 'Comparison operators' },
                     { value: 'cn:CODE:N', short: 'Number within a specific set' },
+                    { value: 'cns:NUMBER', short: 'Strict match, keeps ★/†/φ' },
                     { value: 'cne:REGEXP', short: 'Collector number by regexp' }
                 ],
                 examples: [
                     { query: 'cn:123', desc: 'Cards numbered 123' },
                     { query: 'cn:1-50', desc: 'Cards numbered 1–50' },
                     { query: 'cn>300', desc: 'Cards above #300' },
-                    { query: 'cn:MKM:42', desc: '#42 from MKM only' }
+                    { query: 'cn:MKM:42', desc: '#42 from MKM only' },
+                    { query: 'cns:107★', desc: 'Only the starred #107' }
                 ]
             }
         },
@@ -745,6 +746,27 @@ window.__BAN_GUIDE = {
         },
 
         {
+            id: 'quantities',
+            category: 'Search Syntax',
+            title: 'Quantity Filters',
+            icon: 'layers',
+            summary: 'Filter by available quantity (qty>4, qty<2).',
+            snippets: ['qty>4', 'qty<2'],
+            keywords: ['quantity', 'qty', 'stock', 'copies', 'available', 'playset', 'inventory'],
+            content: {
+                description: '<p>Filter results by the quantity a store has in stock (or a buylist wants) with <code>qty&gt;VALUE</code> and <code>qty&lt;VALUE</code>. Comparisons are strict, so <code>qty&gt;3</code> means four or more copies.</p><p>Stores that don\'t report quantities (index price sources and some retailers) are excluded from quantity-filtered results, and cards left with no matching offers are dropped.</p><p><code>quantity</code> works as a long-form alias.</p>',
+                table: [
+                    { value: 'qty>N', short: 'More than N copies in stock' },
+                    { value: 'qty<N', short: 'Fewer than N copies in stock' }
+                ],
+                examples: [
+                    { query: 'qty>3', desc: 'Stores with a playset available' },
+                    { query: 'qty<4', desc: 'Low-stock offers only' }
+                ]
+            }
+        },
+
+        {
             id: 'stores',
             category: 'Search Syntax',
             title: 'Stores & Regions',
@@ -1029,21 +1051,19 @@ window.__BAN_GUIDE = {
             icon: 'upload',
             summary: 'Upload a collection in any common format and compare prices across vendors.',
             snippets: [],
-            keywords: ['upload', 'collection', 'CSV', 'excel', 'xls', 'xlsx', 'google sheets', 'moxfield', 'tcgplayer', 'tcg collection', 'deckbox', 'binderpos', 'cardsphere', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket', 'cardconduit', 'retail', 'mtgban', 'sheet'],
+            keywords: ['upload', 'collection', 'CSV', 'excel', 'xls', 'xlsx', 'google sheets', 'tcgplayer', 'tcg collection', 'deckbox', 'binderpos', 'cardsphere', 'buylist', 'optimize', 'export', 'CK', 'SCG', 'TCG', 'MKM', 'card kingdom', 'cardmarket', 'cardconduit', 'retail', 'mtgban', 'sheet'],
             content: {
-                description: '<p>Upload &amp; Compare matches your collection against every active vendor and reports prices side-by-side. The page is a three-step flow.</p><p><strong>Step 1 - Mode &amp; Stores.</strong> Toggle between <strong>Retail</strong> (cheapest places to buy) and <strong>Buylist</strong> (best places to sell), then pick which vendors to include - Card Kingdom, Star City Games, Strike Zone, TCG Direct (net), TCGplayer SYP, and others depending on your tier. Your selection persists as a cookie, so the palette\'s upload mode (<code>+</code>) uses the same set.</p><p><strong>Step 2 - Load data.</strong> Three input paths:</p><ul><li><strong>Local CSV/XLS</strong> - drop or browse for a file (max 5MB)</li><li><strong>Remote URL</strong> - Google Sheets (must be publicly accessible), TCG Collection URLs, or Moxfield deck URLs</li><li><strong>Paste Text</strong> - any tab/comma-separated text, or a plain card-name decklist</li></ul><p><strong>Step 3 - Process.</strong> <em>Upload</em> runs the match and produces an in-browser results page. From there, <em>Get CSV</em> downloads the full results, and three export buttons format the data for specific destinations: <em>CardConduit</em> (estimate), <em>Deckbox CSV</em>, and <em>TCGplayer CSV</em>.</p><p><strong>Format detection.</strong> Exports from TCGplayer, Deckbox, BinderPOS, and Cardsphere are auto-detected. Plain card-name lists also work - the most recent printing is used for ambiguous names. To pin a specific printing of a multi-printing card, include the collector number or variant.</p><p><strong>Sheet quirks:</strong> Excel sheets must contain <code>mtgban</code> somewhere in the sheet name (BAN uses this to find the right tab in multi-sheet workbooks). A Google Sheets URL is remembered as a preference and reused on the next visit.</p><p><strong>Limits:</strong> 350 entries per upload (1000 with Optimizer tier). Rows with quantity 0 are skipped; identical entries with matching condition are merged.</p>',
+                description: '<p>Upload &amp; Compare matches your collection against every active vendor and reports prices side-by-side. The page is a three-step flow.</p><p><strong>Step 1 - Mode &amp; Stores.</strong> Toggle between <strong>Retail</strong> (cheapest places to buy) and <strong>Buylist</strong> (best places to sell), then pick which vendors to include - Card Kingdom, Star City Games, Strike Zone, TCG Direct (net), TCGplayer SYP, and others depending on your tier. Your selection persists as a cookie, so the palette\'s upload mode (<code>+</code>) uses the same set.</p><p><strong>Step 2 - Load data.</strong> Three input paths:</p><ul><li><strong>Local CSV/XLS</strong> - drop or browse for a file (max 5MB)</li><li><strong>Remote URL</strong> - Google Sheets (must be publicly accessible), or collection and deck tracker URLs</li><li><strong>Paste Text</strong> - any tab/comma-separated text, or a plain card-name decklist</li></ul><p><strong>Step 3 - Process.</strong> <em>Upload</em> runs the match and produces an in-browser results page. From there, <em>Get CSV</em> downloads the full results, and three export buttons format the data for specific destinations: <em>CardConduit</em> (estimate), <em>Deckbox CSV</em>, and <em>TCGplayer CSV</em>.</p><p><strong>Format detection.</strong> Exports from TCGplayer, Deckbox, BinderPOS, and Cardsphere are auto-detected. Plain card-name lists also work - the most recent printing is used for ambiguous names. To pin a specific printing of a multi-printing card, include the collector number or variant.</p><p><strong>Sheet quirks:</strong> Excel sheets must contain <code>mtgban</code> somewhere in the sheet name (BAN uses this to find the right tab in multi-sheet workbooks). A Google Sheets URL is remembered as a preference and reused on the next visit.</p><p><strong>Limits:</strong> 350 entries per upload (1000 with Optimizer tier). Rows with quantity 0 are skipped; identical entries with matching condition are merged.</p>',
                 table: [
                     { value: 'CSV / TSV',                              short: 'Comma or tab separated with sensible headers' },
                     { value: 'Excel (.xls, .xlsx)',                    short: 'Sheet name must contain "mtgban"' },
                     { value: 'Google Sheets',                          short: 'Public URL; saved as a preference' },
                     { value: 'TCG Collection URL',                     short: 'TCGplayer store collection link' },
-                    { value: 'Moxfield URL',                           short: 'Public deck URL' },
                     { value: 'Plain decklist',                         short: 'One card name per line (most recent printing)' },
                     { value: 'TCG / Deckbox / BinderPOS / Cardsphere', short: 'Auto-detected exports' }
                 ],
                 examples: [
                     { query: '+https://docs.google.com/spreadsheets/d/...', desc: 'Submit a Google Sheets collection from the palette', palette: true },
-                    { query: '+https://www.moxfield.com/decks/abc', desc: 'Submit a Moxfield deck', palette: true },
                     { query: 'On a search results page: + then Send results', desc: 'Push current results to the Uploader', palette: true }
                 ]
             }

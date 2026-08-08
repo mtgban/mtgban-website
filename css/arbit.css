@@ -128,6 +128,9 @@
     font-size: var(--text-lg);
     font-weight: 600;
     color: var(--ainfo);
+    /* The whole pill opens the picker (see js/store-picker.js), not just the
+       select's own text, so advertise that across the entire box. */
+    cursor: pointer;
 }
 
 .arb-current-store .store-type {
@@ -137,6 +140,9 @@
     letter-spacing: 0.06em;
     color: var(--text-dim);
     margin-right: 4px;
+    /* Clicking the label opens the picker; without this a click-drag on it
+       selects the text instead. */
+    user-select: none;
 }
 
 .arb-change-btn {

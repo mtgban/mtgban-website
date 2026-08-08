@@ -30,13 +30,14 @@ func TestLoad(t *testing.T) {
 		]
 	}`
 
-	products, categoryName, err := Load(strings.NewReader(dump))
+	products, category, err := Load(strings.NewReader(dump))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if categoryName != "Magic" {
-		t.Errorf("categoryName = %q, want Magic", categoryName)
+	// The id travels with the dump so a game can name its own category.
+	if category == nil || *category != (Category{ID: 1, Name: "Magic"}) {
+		t.Errorf("category = %+v, want {1 Magic}", category)
 	}
 	if len(products) != 2 {
 		t.Errorf("got %d products, want 2: %v", len(products), products)

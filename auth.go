@@ -17,7 +17,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NYTimes/gziphandler"
 	"github.com/mtgban/mtgban-website/patreon"
 	"github.com/mtgban/mtgban-website/ratelimit"
 )
@@ -38,16 +37,18 @@ var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
 var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
 
+type PatreonGrant struct {
+	Category string `json:"category"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Tier     string `json:"tier"`
+}
+
 type PatreonConfig struct {
 	Source string            `json:"source"`
 	Client map[string]string `json:"client"`
 	Secret map[string]string `json:"secret"`
-	Grants []struct {
-		Category string `json:"category"`
-		Email    string `json:"email"`
-		Name     string `json:"name"`
-		Tier     string `json:"tier"`
-	} `json:"grants"`
+	Grants []PatreonGrant    `json:"grants"`
 }
 
 type PatreonUserData struct {
@@ -137,6 +138,32 @@ func getServerURL(r *http.Request) string {
 	}
 
 	return scheme + "://" + host
+}
+
+// initServerURL latches the external ServerURL from the first request on a host
+// we trust — localhost in dev, any *.mtgban.com in production. Requests on any
+// other host are ignored, notably the raw *.ondigitalocean.app app URL that a
+// platform health check hits before any custom-domain traffic: latching that
+// would pin ServerURL to a hostname that isn't a registered Patreon redirect
+// target and then leak into every redirect, embed, and OAuth link.
+func initServerURL(r *http.Request) {
+	if ServerURL != "" {
+		return
+	}
+	host := r.Header.Get("X-Forwarded-Host")
+	if host == "" {
+		host = r.Host
+	}
+	// Match the hostname exactly (dropping any :port) so only localhost in dev
+	// or an mtgban.com host in prod can latch ServerURL — a suffix check, not a
+	// substring one, so a spoofed "…mtgban.com.evil.tld" Host can't slip through.
+	name, _, _ := strings.Cut(host, ":")
+	name = strings.ToLower(name)
+	if name != "localhost" && name != "mtgban.com" && !strings.HasSuffix(name, ".mtgban.com") {
+		return
+	}
+	ServerURL = getServerURL(r)
+	log.Println("Setting server URL as", ServerURL)
 }
 
 func Auth(w http.ResponseWriter, r *http.Request) {
@@ -274,7 +301,7 @@ func signedUserEmail(r *http.Request) string {
 	}
 
 	q := url.Values{}
-	for _, optional := range append(OrderNav, OptionalFields...) {
+	for _, optional := range SignedFields {
 		if val := v.Get(optional); val != "" {
 			q.Set(optional, val)
 		}
@@ -300,16 +327,29 @@ func putSignatureInCookies(w http.ResponseWriter, sig string) {
 	setCookie(w, "MTGBAN", sig, oneMonth, true)
 }
 
+// adminOnly hides the wrapped handler from signatures that do not carry
+// the Admin grant. It performs no validation of its own: it must sit
+// behind enforceSigning, which authenticates the signature before any of
+// its parameters can be trusted. Non-admins get a plain 404 so the
+// endpoint's existence is not advertised.
+func adminOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		canDo, _ := strconv.ParseBool(GetParamFromSig(getSignatureFromCookies(r), "Admin"))
+		if !canDo && !(DevMode && !SigCheck) {
+			http.NotFound(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // This function is mostly here only for initializing the host
 // and the signature from invite links
 func noSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		if ServerURL == "" {
-			ServerURL = getServerURL(r)
-			log.Println("Setting server URL as", ServerURL)
-		}
+		initServerURL(r)
 
 		querySig := r.FormValue("sig")
 		if querySig != "" {
@@ -349,7 +389,7 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		// If signature is empty let it pass through
 		if sig == "" && !strings.HasPrefix(r.URL.Path, "/api/load") {
-			gziphandler.GzipHandler(next).ServeHTTP(w, r)
+			next.ServeHTTP(w, r)
 			return
 		}
 
@@ -412,18 +452,35 @@ func enforceAPISigning(next http.Handler) http.Handler {
 			return
 		}
 
-		gziphandler.GzipHandler(next).ServeHTTP(w, r)
+		next.ServeHTTP(w, r)
 	})
+}
+
+// targetsSubPage reports whether r asks for the given subpage. Some
+// subpages have a path of their own, others are a query parameter on the
+// parent's path (the newspaper's pages all live under /newspaper and pick
+// themselves with page=), so the path has to match and so does every
+// parameter the link pins down. Matching the path alone would let the
+// parent stand in for its own subpage.
+func targetsSubPage(r *http.Request, link string) bool {
+	target, err := url.Parse(link)
+	if err != nil || target.Path != r.URL.Path {
+		return false
+	}
+	query := r.URL.Query()
+	for key, values := range target.Query() {
+		if len(values) > 0 && query.Get(key) != values[0] {
+			return false
+		}
+	}
+	return true
 }
 
 func enforceSigning(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer recoverPanic(r, w)
 
-		if ServerURL == "" {
-			ServerURL = getServerURL(r)
-			log.Println("Setting server URL as", ServerURL)
-		}
+		initServerURL(r)
 
 		// Check if this endpoint can be bypassed
 		_, checkNoAuth := Config.ACL["Any"]
@@ -468,9 +525,11 @@ func enforceSigning(next http.Handler) http.Handler {
 			return
 		}
 
-		pageVars := genPageNav("Error", sig)
-
+		// The error nav is built lazily inside each failing branch: on the
+		// happy path — nearly every request — it would be thrown away, and
+		// the handler builds its own right after.
 		if !UserRateLimiter.Allow(GetParamFromSig(sig, "UserEmail")) && r.URL.Path != "/admin" {
+			pageVars := genPageNav("Error", sig)
 			pageVars.Title = "Too Many Requests"
 			pageVars.ErrorMessage = ErrMsgUseAPI
 
@@ -480,6 +539,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		raw, err := base64.StdEncoding.DecodeString(sig)
 		if SigCheck && err != nil {
+			pageVars := genPageNav("Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if DevMode {
@@ -492,6 +552,7 @@ func enforceSigning(next http.Handler) http.Handler {
 
 		v, err := url.ParseQuery(string(raw))
 		if SigCheck && err != nil {
+			pageVars := genPageNav("Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if DevMode {
@@ -503,7 +564,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		}
 
 		q := url.Values{}
-		for _, optional := range append(OrderNav, OptionalFields...) {
+		for _, optional := range SignedFields {
 			val := v.Get(optional)
 			if val != "" {
 				q.Set(optional, val)
@@ -525,6 +586,7 @@ func enforceSigning(next http.Handler) http.Handler {
 				http.Error(w, "405 Method Not Allowed", http.StatusMethodNotAllowed)
 				return
 			}
+			pageVars := genPageNav("Error", sig)
 			pageVars.Title = "Unauthorized"
 			pageVars.ErrorMessage = ErrMsg
 			if valid == expectedSig && expires < time.Now().Unix() {
@@ -556,7 +618,7 @@ func enforceSigning(next http.Handler) http.Handler {
 					canDo = true
 				}
 				if SigCheck && !canDo {
-					pageVars = genPageNav(nav.Name, sig)
+					pageVars := genPageNav(nav.Name, sig)
 					pageVars.Title = "This feature is BANned"
 					pageVars.ErrorMessage = ErrMsgPlus
 
@@ -566,11 +628,12 @@ func enforceSigning(next http.Handler) http.Handler {
 
 				// Check if link is a subpage, and validate if viewing conditions are met
 				for _, subPage := range nav.SubPages {
-					if strings.HasPrefix(subPage.Link, r.URL.Path) &&
+					if targetsSubPage(r, subPage.Link) &&
 						subPage.ShouldHide != nil && subPage.ShouldHide() {
+						pageVars := genPageNav("Error", sig)
 						pageVars.Title = "Unauthorized"
 						render(w, "home.html", pageVars)
-						break
+						return
 					}
 				}
 
@@ -579,7 +642,7 @@ func enforceSigning(next http.Handler) http.Handler {
 		}
 
 		recordPageHit(r)
-		gziphandler.GzipHandler(next).ServeHTTP(w, r)
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -635,6 +698,11 @@ func getValuesForTier(tierTitle string) url.Values {
 	return v
 }
 
+// Every sig-encoded permission field in signing order: OrderNav then
+// OptionalFields. Both lists are fixed at startup, so the concatenation the
+// signing and verification paths walk is computed once instead of per request.
+var SignedFields = slices.Concat(OrderNav, OptionalFields)
+
 func sign(tierTitle string, userData *PatreonUserData) string {
 	v := getValuesForTier(tierTitle)
 	if userData != nil {
@@ -660,14 +728,23 @@ func sign(tierTitle string, userData *PatreonUserData) string {
 	return str
 }
 
-func GetParamFromSig(sig, param string) string {
+// parseSig decodes the query values packed in a signature. A sig that doesn't
+// decode returns nil, which behaves as an empty url.Values on Get. Decoding
+// the full ~2KB sig costs a few microseconds, so code reading several params
+// (like genPageNav's feature loop) should parse once and Get from the result
+// rather than calling GetParamFromSig per param.
+func parseSig(sig string) url.Values {
 	raw, err := base64.StdEncoding.DecodeString(sig)
 	if err != nil {
-		return ""
+		return nil
 	}
 	v, err := url.ParseQuery(string(raw))
 	if err != nil {
-		return ""
+		return nil
 	}
-	return v.Get(param)
+	return v
+}
+
+func GetParamFromSig(sig, param string) string {
+	return parseSig(sig).Get(param)
 }

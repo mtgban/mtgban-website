@@ -38,7 +38,12 @@ var colorRarityMap = map[string]map[string]string{
 }
 
 type GenericCard struct {
-	UUID         string
+	UUID string
+	// ChartID is the id the UI passes to the chart system. uuid2card leaves it
+	// as the mtgmatcher card id; chart-capable pages override it with ban:<id>
+	// via chartIDForCard, so chartless pages (upload, arbit, news, ...) don't
+	// pay the variant-cache lookup for every card they render.
+	ChartID      string
 	Name         string
 	FlavorName   string
 	Edition      string
@@ -61,6 +66,7 @@ type GenericCard struct {
 	StocksURL    string
 	Printings    string
 	Products     string
+	NumProducts  int
 	TCGId        string
 	Date         string
 	Sealed       bool
@@ -352,6 +358,20 @@ func findInstanceId(sellerName, cardId, cond string) string {
 	return ""
 }
 
+// uuid2TCGSKU is the reverse of tcgSKU2UUID: it returns the TCGplayer SKU of
+// a card in a given condition, picking the inventory the product lives in.
+// Sources that carry no condition are assumed to be NM, the same way the
+// TCGplayer CSV export does. Returns "" when the card has no SKU on file.
+func uuid2TCGSKU(cardId string, sealed bool, cond string) string {
+	if cond == "" {
+		cond = "NM"
+	}
+	if sealed {
+		return findInstanceId("TCGSealed", cardId, cond)
+	}
+	return findInstanceId("TCGPlayer", cardId, cond)
+}
+
 // tcgSKU2UUID resolves a TCGplayer SKU (instance id) to a card uuid using the
 // precomputed "tcgskuid" index from runSealedAnalysis (O(1)), where the uuid is
 // stored in each entry's OriginalId. Returns "" if the SKU is unknown.
@@ -554,6 +574,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	sourceSealed := cardobject2sources(co)
 
 	var products string
+	var numProducts int
 	if len(sourceSealed) > 0 {
 		products += "<h4>"
 		for _, sealed := range sourceSealed {
@@ -564,6 +585,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 				continue
 			}
 			products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + "</a>"
+			numProducts++
 		}
 		products += "</h4>"
 		if len(sourceSealed) > 5 {
@@ -614,6 +636,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 
 	return GenericCard{
 		UUID:         co.UUID,
+		ChartID:      cardId,
 		Name:         name,
 		FlavorName:   flavor,
 		Edition:      co.Edition,
@@ -636,6 +659,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		StocksURL:    stocksURL,
 		Printings:    printings,
 		Products:     products,
+		NumProducts:  numProducts,
 		TCGId:        tcgId,
 		Date:         co.OriginalReleaseDate,
 		Sealed:       co.Sealed,
@@ -705,6 +729,11 @@ func genCardPrintings(co *mtgmatcher.CardObject) string {
 
 func genSealedPrintings(co *mtgmatcher.CardObject) string {
 	var b strings.Builder
+	// A hover/focus trigger with the tables in a panel that opens upward,
+	// overlaying the picture, so the products list below stays visible.
+	b.WriteString("<div class='sidebar-setvalue' tabindex='0'>")
+	b.WriteString("<h6 class='sidebar-setvalue-trigger'>Set Value &#9662;</h6>")
+	b.WriteString("<div class='sidebar-setvalue-panel'>")
 	// The first chunk is always present, even for foil-only sets
 	b.WriteString("<h6>Set Value</h6><table class='setValue'>")
 
@@ -730,6 +759,7 @@ func genSealedPrintings(co *mtgmatcher.CardObject) string {
 		}
 		b.WriteString("</table>")
 	}
+	b.WriteString("</div></div>")
 	return b.String()
 }
 
@@ -842,6 +872,14 @@ func isSecureRequest(r *http.Request) bool {
 	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
+// dataReady reports whether the datastore and scrapers are loaded enough to
+// serve real answers (the same predicate /healthz uses). Cacheable endpoints
+// must not let degraded warmup responses into caches: an empty payload with
+// a public max-age poisons every client behind the CDN for its lifetime.
+func dataReady() bool {
+	return len(mtgmatcher.GetUUIDs()) != 0 && len(GetSellers()) != 0 && len(GetVendors()) != 0
+}
+
 // storeEligible reports whether a store may appear in a price surface under
 // the given policy: an explicit allowlist is the entire policy (a sig's own
 // store list bypasses blocklists by design), otherwise the store just must
@@ -951,6 +989,12 @@ func getTCGMarketPrice(cardId string) float64 {
 	if err != nil {
 		return 0
 	}
+	return tcgMarketPriceIn(inv, cardId)
+}
+
+// tcgMarketPriceIn probes an already-resolved TCGMarket inventory, so
+// per-row loops resolve the seller once instead of per card.
+func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardId string) float64 {
 	entries, found := inv[cardId]
 	if !found {
 		return 0
@@ -1035,10 +1079,17 @@ func sortKeysByScraperName(keys []string) []string {
 // invalid Direct prices. Ignored for anything lower than $1
 // since Direct minimum is $0.40.
 func invalidDirect(id string, price float64) bool {
+	inv, _ := findSellerInventory("TCGMarket")
+	return invalidDirectIn(inv, id, price)
+}
+
+// invalidDirectIn is invalidDirect over an already-resolved TCGMarket
+// inventory; a nil inventory reads as no market price.
+func invalidDirectIn(inv mtgban.InventoryRecord, id string, price float64) bool {
 	if price < 1 {
 		return false
 	}
 
-	marketPrice := getTCGMarketPrice(id)
+	marketPrice := tcgMarketPriceIn(inv, id)
 	return price > marketPrice*2
 }

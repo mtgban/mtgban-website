@@ -124,6 +124,61 @@
     color: var(--text-dim);
 }
 
+/* ── Index Price Selector ──
+   Reference prices, valid for both Retail and Buylist, so this row sits
+   above the mode toggle and outside the Singles/Sealed tabs. */
+.upload-index-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 1em;
+}
+
+.upload-index-label {
+    font-size: var(--text-base);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    margin-right: 4px;
+}
+
+.upload-index-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.upload-index-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: border-color 0.15s;
+    font-size: var(--text-base);
+    margin: 0;
+}
+
+.upload-index-item:hover {
+    border-color: var(--accent-border);
+}
+
+.upload-index-item:has(input:checked) {
+    background: var(--accent-muted);
+    border-color: var(--accent-border);
+}
+
+.upload-index-item input[type="checkbox"] {
+    accent-color: var(--ainfo);
+    width: 14px;
+    height: 14px;
+}
+
 /* ── Singles / Sealed Tabs ── */
 .upload-tabs {
     display: flex;
@@ -1472,3 +1527,16 @@ tr.opt-removed td:last-child { opacity: 1; }
 tr.opt-removed .opt-name a { text-decoration: line-through; }
 tr.opt-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 .opt-row-check { cursor: pointer; }
+
+/* ── Results header source link ── */
+/* Remote-URL uploads name their source (deck/sheet title) and link back
+   to it; keep the heading's color so it reads as a title, not a nav link */
+.page-header h1 .upload-source-link {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--border-subtle, rgba(128,128,128,0.5));
+    text-underline-offset: 4px;
+}
+.page-header h1 .upload-source-link:hover {
+    text-decoration-color: currentColor;
+}

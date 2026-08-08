@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+
+	"github.com/mtgban/mtgban-website/moxfield"
 )
 
 // The mtgban inventory/cart CSV export must round-trip through the uploader:
@@ -70,5 +72,46 @@ func TestUploadSealedCSV(t *testing.T) {
 			t.Errorf("name path %q: resolved to non-sealed %q", row[1], res.CardId)
 		}
 		t.Logf("name path %q -> %s (%s)", row[1], res.CardId, co.Name)
+	}
+}
+
+// Deck per-copy printings arrive as set+number instead of a scryfall id;
+// they must resolve to the exact printing with the finish applied, so
+// mixed-printing decks don't collapse into one variation.
+func TestResolveMoxItemPrinting(t *testing.T) {
+	if _, err := mtgmatcher.GetSet("UNF"); err != nil {
+		t.Skip("datastore not loaded")
+	}
+
+	check := func(item moxfield.Item, wantNumber string, wantFoil bool) string {
+		t.Helper()
+		cardId, err := resolveMoxItem(item)
+		if err != nil {
+			t.Fatalf("resolve %+v: %s", item, err)
+		}
+		co, err := mtgmatcher.GetUUID(cardId)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if co.SetCode != "UNF" || co.Number != wantNumber || co.Foil != wantFoil {
+			t.Errorf("resolved to %s %s foil=%v, want UNF %s foil=%v",
+				co.SetCode, co.Number, co.Foil, wantNumber, wantFoil)
+		}
+		return cardId
+	}
+
+	// The galaxy-foil printing is its own collector number
+	check(moxfield.Item{Name: "Island", SetCode: "unf", Number: "487", IsFoil: true}, "487", true)
+
+	// Same number, different finishes stay distinct
+	regular := check(moxfield.Item{Name: "Island", SetCode: "unf", Number: "236"}, "236", false)
+	foil := check(moxfield.Item{Name: "Island", SetCode: "unf", Number: "236", IsFoil: true}, "236", true)
+	if regular == foil {
+		t.Error("foil and nonfoil of the same printing should resolve to different uuids")
+	}
+
+	// Unknown printings surface a mismatch error instead of a silent match
+	if _, err := resolveMoxItem(moxfield.Item{Name: "Island", SetCode: "unf", Number: "9999"}); err == nil {
+		t.Error("unknown collector number should error")
 	}
 }

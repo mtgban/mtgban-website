@@ -15,6 +15,14 @@ import (
 
 type TimeseriesConfig struct {
 	Datasets []DatasetConfig `json:"datasets"`
+
+	// LongFormWrites dual-writes each snapshot into the new long tables
+	// (variants + prices) alongside the legacy wide tables. LongFormReads
+	// serves charts/analytics from the long tables instead of the wide ones.
+	// The cutover is: deploy with writes on + reads off, confirm parity, then
+	// flip reads on, then (later) drop the legacy write path. See db_migration/.
+	LongFormWrites bool `json:"long_form_writes,omitempty"`
+	LongFormReads  bool `json:"long_form_reads,omitempty"`
 }
 
 type DatasetConfig struct {
@@ -22,9 +30,33 @@ type DatasetConfig struct {
 	Buylist    []string `json:"buylist,omitempty"`
 	PublicName string   `json:"public_name"`
 	Index      int      `json:"index"`
-	Color      string   `json:"color"`
-	HasSealed  bool     `json:"has_sealed,omitempty"`
-	OnlySealed bool     `json:"only_sealed,omitempty"`
+	// Provider is the id in the providers lookup table this dataset maps to
+	// (long form). Replaces the positional Index once the legacy path is dropped.
+	Provider   int16  `json:"provider"`
+	Color      string `json:"color"`
+	HasSealed  bool   `json:"has_sealed,omitempty"`
+	OnlySealed bool   `json:"only_sealed,omitempty"`
+}
+
+// providerForDatasetIndex resolves a legacy dataset Index to its provider id via
+// the config. Used by the read callers (aggregate stats, movers) that still take
+// an index. Returns false if no dataset carries that index or its provider is unset.
+func providerForDatasetIndex(index int) (int16, bool) {
+	for _, c := range Config.TimeseriesConfig.Datasets {
+		if c.Index == index {
+			return c.Provider, c.Provider != 0
+		}
+	}
+	return 0, false
+}
+
+// earliestChartDate returns the oldest on-record date for a card (bounded by the
+// lookback), reading from the long tables or the legacy wide table per the flag.
+func earliestChartDate(ctx context.Context, uuid string, isFoil, isEtched bool, lb timeseries.Lookback) (time.Time, error) {
+	if Config.TimeseriesConfig.LongFormReads {
+		return PricesArchiveDB.GetEarliestDateLong(ctx, uuid, isFoil, isEtched, lb)
+	}
+	return PricesArchiveDB.GetEarliestDate(ctx, uuid, isFoil, isEtched, lb)
 }
 
 type Dataset struct {
@@ -119,17 +151,164 @@ func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string,
 		return nil
 	}
 
+	datasets := make([]Dataset, 0, len(configs))
+
+	if Config.TimeseriesConfig.LongFormReads {
+		results, err := PricesArchiveDB.HGetAllLong(ctx, co.UUID, co.Foil, co.Etched, lb)
+		if err != nil {
+			log.Println(err)
+			return nil
+		}
+		for _, config := range configs {
+			datasets = append(datasets, buildDatasetLong(results, keys, config))
+		}
+		return datasets
+	}
+
 	results, err := PricesArchiveDB.HGetAll(ctx, co.UUID, co.Foil, co.Etched, nil, lb)
 	if err != nil {
 		log.Println(err)
 		return nil
 	}
-
-	datasets := make([]Dataset, 0, len(configs))
 	for _, config := range configs {
 		datasets = append(datasets, buildDataset(results, keys, config))
 	}
 	return datasets
+}
+
+// providerDisplay is one provider's chart display: its name and color.
+type providerDisplay struct {
+	Provider int16
+	Name     string
+	Color    string
+}
+
+// providerRegistry is the ordered, game-agnostic list of chart providers. A chart
+// renders one dataset per provider that actually has data for the card, in this
+// order, so a new game (which reuses the shared TCGplayer providers) charts with
+// no extra code. Built once at startup from the dataset config (preserving the
+// existing display: names, colors, order) plus the TCGplayer metrics that have no
+// per-provider config.
+var providerRegistry []providerDisplay
+
+// buildProviderRegistry (re)builds providerRegistry from the loaded config. Call
+// it once after the config is parsed.
+func buildProviderRegistry() {
+	seen := map[int16]bool{}
+	registry := make([]providerDisplay, 0, len(Config.TimeseriesConfig.Datasets)+5)
+	for _, d := range Config.TimeseriesConfig.Datasets {
+		if d.Provider == 0 || seen[d.Provider] {
+			continue
+		}
+		seen[d.Provider] = true
+		registry = append(registry, providerDisplay{d.Provider, d.PublicName, d.Color})
+	}
+	// Shared TCGplayer metrics, so a game whose config omits them (or a whole
+	// non-Magic deployment) still charts every column the ingest writes. A real
+	// dataset entry wins its name/color via seen[]; these only fill the gaps.
+	for _, extra := range []providerDisplay{
+		{timeseries.ProviderTCGLow, "TCGplayer Low", "rgb(255, 99, 132)"},
+		{timeseries.ProviderTCGMarket, "TCGplayer Market", "rgb(255, 159, 64)"},
+		{timeseries.ProviderTCGMid, "TCGplayer Mid", "rgb(255, 206, 86)"},
+		{timeseries.ProviderTCGHigh, "TCGplayer High", "rgb(75, 192, 192)"},
+		{timeseries.ProviderTCGDirectLow, "TCGplayer Direct Low", "rgb(153, 102, 255)"},
+	} {
+		if !seen[extra.Provider] {
+			registry = append(registry, extra)
+		}
+	}
+	providerRegistry = registry
+}
+
+// chartTargetEarliest returns the oldest on-record date for a resolved target:
+// a precise ban_id, or the Magic canonical (uuid, foil, etched) path.
+func chartTargetEarliest(ctx context.Context, target *chartTarget, lb timeseries.Lookback) (time.Time, error) {
+	if target.BanID != 0 {
+		return PricesArchiveDB.GetEarliestDateByBanID(ctx, target.BanID, lb)
+	}
+	return PricesArchiveDB.GetEarliestDateLong(ctx, target.UUID, target.Foil, target.Etched, lb)
+}
+
+// getChartDatasets builds a card's chart datasets, game-agnostic: it fetches the
+// series once (by exact ban_id, else the canonical uuid path) and emits one
+// dataset per registry provider that has data, in registry order. Adding a game
+// needs no code here — its providers just show up. Long-form reads only; the
+// legacy path stays in getDatasets.
+func getChartDatasets(ctx context.Context, target *chartTarget, labels []string, lb timeseries.Lookback) []Dataset {
+	if PricesArchiveDB == nil {
+		return nil
+	}
+	var results map[string]timeseries.ProviderPrices
+	var err error
+	if target.BanID != 0 {
+		results, err = PricesArchiveDB.HGetAllByBanID(ctx, target.BanID, lb)
+	} else {
+		results, err = PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, lb)
+	}
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	// Only providers with data for this card render — that is what makes it
+	// game-agnostic and also drops sealed-vs-single applicability out of config
+	// (e.g. Sealed EV only has data for sealed products, so it only shows there).
+	present := map[int16]bool{}
+	for _, pp := range results {
+		for provider := range pp {
+			present[provider] = true
+		}
+	}
+	datasets := make([]Dataset, 0, len(present))
+	for _, pd := range providerRegistry {
+		if present[pd.Provider] {
+			datasets = append(datasets, buildProviderDataset(results, labels, pd))
+		}
+	}
+	return datasets
+}
+
+// buildProviderDataset projects one provider's series across the label dates.
+// Missing dates and missing prices both render as Number.NaN so the chart gaps.
+func buildProviderDataset(results map[string]timeseries.ProviderPrices, labels []string, pd providerDisplay) Dataset {
+	data := make([]string, len(labels))
+	for i, label := range labels {
+		if pp, ok := results[label]; ok {
+			if price, ok := pp[pd.Provider]; ok {
+				data[i] = fmt.Sprintf("%g", price)
+				continue
+			}
+		}
+		data[i] = "Number.NaN"
+	}
+	return Dataset{Name: pd.Name, Data: data, Color: pd.Color, Reference: pd.Name}
+}
+
+// buildDatasetLong is buildDataset for the long-form read: it projects one
+// provider out of the pivoted date -> (provider -> price) result. Missing dates
+// and missing providers both render as Number.NaN so the chart leaves a gap.
+func buildDatasetLong(results map[string]timeseries.ProviderPrices, labels []string, config DatasetConfig) Dataset {
+	var data []string
+	if len(results) > 0 {
+		data = make([]string, len(labels))
+		for i, label := range labels {
+			if pp, ok := results[label]; ok {
+				if price, ok := pp[config.Provider]; ok {
+					data[i] = fmt.Sprintf("%g", price)
+				} else {
+					data[i] = "Number.NaN"
+				}
+			} else {
+				data[i] = "Number.NaN"
+			}
+		}
+	}
+	return Dataset{
+		Name:      config.PublicName,
+		Data:      data,
+		Color:     config.Color,
+		Reference: config.PublicName,
+	}
 }
 
 // buildDataset projects a single column out of the shared HGetAll result
@@ -393,7 +572,61 @@ func stashInTimeseries() {
 		ServerNotify("timeseries", fmt.Sprintf("batch upsert error: %s", err))
 	}
 
+	// Dual-write the same snapshot into the long form (variants + prices).
+	// Best-effort: a long-form failure is logged but does not fail the stash,
+	// since the legacy wide upsert above already persisted this snapshot.
+	if Config.TimeseriesConfig.LongFormWrites {
+		if n, lerr := stashLongForm(context.Background(), accumulated); lerr != nil {
+			ServerNotify("timeseries", fmt.Sprintf("long-form dual-write error: %s", lerr))
+		} else {
+			log.Printf("long-form dual-write: %d price rows", n)
+		}
+	}
+
 	SetLastStashUpdate(time.Now())
 	msg := fmt.Sprintf("Snapshot completed in %s: %d upserted, %d errors", time.Since(start), upserted, errCount)
 	ServerNotify("timeseries", msg)
+}
+
+// stashLongForm mirrors the accumulated wide rows into the long prices table. It
+// warms the variant cache once, resolves each row's ban_id (minting new
+// printings on the fly), and emits one LongPrice per set provider column with a
+// positive price (zeros are omitted, matching the backfill). Returns the number
+// of price rows upserted.
+func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.PriceRow) (int, error) {
+	if err := PricesArchiveDB.WarmVariantCache(ctx); err != nil {
+		return 0, fmt.Errorf("warm variant cache: %w", err)
+	}
+	longRows := make([]timeseries.LongPrice, 0, len(accumulated)*4)
+	for _, row := range accumulated {
+		lang := ""
+		if row.Language != nil {
+			lang = *row.Language
+		}
+		banID, err := PricesArchiveDB.ResolveMagicBanID(ctx, timeseries.MagicVariant{
+			MtgjsonUUID: row.MtgjsonUUID,
+			IsFoil:      row.IsFoil,
+			IsEtched:    row.IsEtched,
+			IsAlt:       row.IsAlt,
+			Language:    lang,
+		})
+		if err != nil {
+			log.Println("long-form: resolve ban_id:", err)
+			continue
+		}
+		for _, ds := range Config.TimeseriesConfig.Datasets {
+			if ds.Provider == 0 {
+				continue
+			}
+			if p := row.PriceForDataset(ds.Index); p != nil && *p > 0 {
+				longRows = append(longRows, timeseries.LongPrice{
+					BanID:    banID,
+					Date:     row.Date,
+					Provider: ds.Provider,
+					Price:    *p,
+				})
+			}
+		}
+	}
+	return PricesArchiveDB.UpsertLongPrices(ctx, longRows, 0)
 }

@@ -6,6 +6,7 @@
 {{define "extra-head"}}
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/filtering.js?hash={{.Hash}}"></script>
+    <script type="text/javascript" src="/js/store-picker.js?hash={{.Hash}}"></script>
 {{end}}
 
 {{define "content"}}
@@ -116,13 +117,12 @@
                 <span class="store-type">{{if .GlobalMode}}Index{{else if .ReverseMode}}Selling to{{else}}Buying from{{end}}</span>
                 <select class="arb-store-select" onchange="if(/^\/(?!\/)/.test(this.value)) window.location.href=this.value">
                     {{range .ExtraNav}}
-                        {{if and .Active (not (contains .Name "Sealed"))}}
-                            <option value="" selected>{{.Name}}</option>
-                        {{end}}
-                    {{end}}
-                    {{range .ExtraNav}}
-                        {{if and (not .Active) (not (contains .Name "Sealed"))}}
-                            <option value="{{.Link}}">{{.Name}}</option>
+                        {{if not (contains .Name "Sealed")}}
+                            {{if .Active}}
+                                <option value="" selected>{{.Name}}</option>
+                            {{else}}
+                                <option value="{{.Link}}">{{.Name}}</option>
+                            {{end}}
                         {{end}}
                     {{end}}
                     {{$hasSealed := false}}
@@ -132,13 +132,12 @@
                     {{if $hasSealed}}
                         <option disabled>──────────</option>
                         {{range .ExtraNav}}
-                            {{if and .Active (contains .Name "Sealed")}}
-                                <option value="" selected>{{.Name}}</option>
-                            {{end}}
-                        {{end}}
-                        {{range .ExtraNav}}
-                            {{if and (not .Active) (contains .Name "Sealed")}}
-                                <option value="{{.Link}}">{{.Name}}</option>
+                            {{if contains .Name "Sealed"}}
+                                {{if .Active}}
+                                    <option value="" selected>{{.Name}}</option>
+                                {{else}}
+                                    <option value="{{.Link}}">{{.Name}}</option>
+                                {{end}}
                             {{end}}
                         {{end}}
                     {{end}}

@@ -12,16 +12,29 @@ import (
 )
 
 type Item struct {
+	// ScryfallID identifies the printing when the source carries one;
+	// deck per-copy printings carry Name+SetCode+Number instead
 	ScryfallID string
-	Quantity   int
-	IsFoil     bool
-	IsEtched   bool
-	Condition  string
-	Price      float64
-	Notes      string
+	Name       string
+	SetCode    string
+	Number     string
+
+	Quantity  int
+	IsFoil    bool
+	IsEtched  bool
+	Condition string
+	Price     float64
+	Notes     string
+}
+
+// sortKey gives map-sourced items a stable ordering regardless of which
+// identifier shape they carry.
+func (i Item) sortKey() string {
+	return i.ScryfallID + i.Name + i.SetCode + i.Number + fmt.Sprint(i.IsFoil, i.IsEtched)
 }
 
 type Deck struct {
+	Name   string `json:"name"`
 	Boards map[string]struct {
 		Count int `json:"count"`
 		Cards map[string]struct {
@@ -29,7 +42,18 @@ type Deck struct {
 			Finish   string `json:"finish"`
 			Card     struct {
 				ScryfallID string `json:"scryfall_id"`
+				Name       string `json:"name"`
 			} `json:"card"`
+			// A deck entry aggregates every copy of one card under a
+			// single representative printing and finish; the per-copy
+			// breakdown (set, collector number, finish, quantity) lives
+			// here, and is absent when all copies share the default
+			PrintingData []struct {
+				Quantity int    `json:"quantity"`
+				Finish   string `json:"finish"`
+				Set      string `json:"set"`
+				Number   string `json:"cn"`
+			} `json:"printingData"`
 		} `json:"cards"`
 	} `json:"boards"`
 }
@@ -68,12 +92,29 @@ func prepareDecklist(deck *Deck, maxRows int) []Item {
 				break
 			}
 
-			items = append(items, Item{
-				ScryfallID: card.Card.ScryfallID,
-				IsFoil:     card.Finish == "foil",
-				IsEtched:   card.Finish == "etched",
-				Quantity:   card.Quantity,
-			})
+			// Expand the per-copy printing breakdown when present, so a
+			// deck mixing printings and finishes of one card uploads one
+			// item per printing instead of collapsing into the entry's
+			// representative one
+			if len(card.PrintingData) > 0 {
+				for _, printing := range card.PrintingData {
+					items = append(items, Item{
+						Name:     card.Card.Name,
+						SetCode:  printing.Set,
+						Number:   printing.Number,
+						IsFoil:   printing.Finish == "foil",
+						IsEtched: printing.Finish == "etched",
+						Quantity: printing.Quantity,
+					})
+				}
+			} else {
+				items = append(items, Item{
+					ScryfallID: card.Card.ScryfallID,
+					IsFoil:     card.Finish == "foil",
+					IsEtched:   card.Finish == "etched",
+					Quantity:   card.Quantity,
+				})
+			}
 
 			count++
 		}
@@ -81,7 +122,7 @@ func prepareDecklist(deck *Deck, maxRows int) []Item {
 
 	// Preserve some sort of ordering since boards are maps
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].ScryfallID < items[j].ScryfallID
+		return items[i].sortKey() < items[j].sortKey()
 	})
 
 	return items
@@ -191,15 +232,19 @@ func getMoxCollection(ctx context.Context, collectionURL string, maxRows int) ([
 	return items, nil
 }
 
-func Load(ctx context.Context, link string, maxRows int) ([]Item, error) {
+// Load fetches a Moxfield deck or collection and returns its items plus the
+// source's display name when one is available (deck name; collections carry
+// none).
+func Load(ctx context.Context, link string, maxRows int) ([]Item, string, error) {
 	if !strings.Contains(link, "/decks/") {
-		return getMoxCollection(ctx, link, maxRows)
+		items, err := getMoxCollection(ctx, link, maxRows)
+		return items, "", err
 	}
 
 	deck, err := getMoxDeck(ctx, link)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return prepareDecklist(deck, maxRows), nil
+	return prepareDecklist(deck, maxRows), deck.Name, nil
 }

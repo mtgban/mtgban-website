@@ -659,6 +659,11 @@
     min-height: 48px;
 }
 
+.m-locked-cta {
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+}
 .m-locked-btn {
     font-size: 0.75rem;
     font-weight: 600;
@@ -667,6 +672,14 @@
     background: var(--dodgerblue);
     color: white;
     text-decoration: none;
+    white-space: nowrap;
+}
+/* Log in reads as the secondary action next to the solid Join button. */
+.m-locked-btn-login {
+    background: transparent;
+    color: var(--dodgerblue);
+    border: 1px solid var(--dodgerblue);
+    padding: calc(0.3em - 1px) calc(0.75em - 1px);
 }
 
 /* Pagination */

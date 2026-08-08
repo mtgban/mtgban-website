@@ -2,9 +2,10 @@ package main
 
 import (
 	"net/url"
-	"reflect"
+	"slices"
 	"sort"
 	"sync"
+	"time"
 )
 
 // PopularSearch is a resolved featured tile shown on the landing page: a
@@ -30,6 +31,11 @@ var (
 	popularSearchesMu      sync.Mutex
 	popularSearchesCache   []PopularSearch
 	popularSearchesCfgSnap []PopularSearchEntry
+
+	// When a build comes up empty (datastore or prices still warming up),
+	// the next attempt is delayed so the landing page doesn't re-run every
+	// configured search on each view in the meantime.
+	popularSearchesRetryAt time.Time
 )
 
 // getPopularSearches resolves each configured query to a representative card
@@ -42,10 +48,15 @@ func getPopularSearches() []PopularSearch {
 	popularSearchesMu.Lock()
 	defer popularSearchesMu.Unlock()
 
-	// Reuse the cache only while it's populated and built from the current
-	// config; a config reload (or a still-empty datastore) forces a rebuild.
-	if len(popularSearchesCache) > 0 && reflect.DeepEqual(popularSearchesCfgSnap, cfg) {
-		return popularSearchesCache
+	// Reuse the cache while it was built from the current config; a config
+	// reload forces a rebuild, and an empty result retries on a delay.
+	if slices.Equal(popularSearchesCfgSnap, cfg) {
+		if len(popularSearchesCache) > 0 {
+			return popularSearchesCache
+		}
+		if time.Now().Before(popularSearchesRetryAt) {
+			return nil
+		}
 	}
 
 	var out []PopularSearch
@@ -58,8 +69,14 @@ func getPopularSearches() []PopularSearch {
 		// searchAndFilter doesn't apply sort:retail (that needs live
 		// prices), so sort here and take the top-retail card as the tile.
 		if config.SortMode == "retail" {
+			sortData := resolveSortingData(uuids)
+			prices := resolveBestPrices(uuids, defaultSellerPriorityOpt, price4seller)
 			sort.Slice(uuids, func(i, j int) bool {
-				return sortSetsByRetail(uuids[i], uuids[j], defaultSellerPriorityOpt)
+				priceI, priceJ := prices[uuids[i]], prices[uuids[j]]
+				if priceI == priceJ {
+					return cmpSets(sortData[uuids[i]], sortData[uuids[j]])
+				}
+				return priceI > priceJ
 			})
 		}
 		imageID := uuids[0]
@@ -82,9 +99,10 @@ func getPopularSearches() []PopularSearch {
 		})
 	}
 
-	if len(out) > 0 {
-		popularSearchesCache = out
-		popularSearchesCfgSnap = cfg
+	popularSearchesCfgSnap = cfg
+	popularSearchesCache = out
+	if len(out) == 0 {
+		popularSearchesRetryAt = time.Now().Add(time.Minute)
 	}
 	return out
 }

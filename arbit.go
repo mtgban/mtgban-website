@@ -248,13 +248,14 @@ var FilterOptConfig = map[string]FilterOpt{
 		Title: "only Legit",
 		Func: func(opts *mtgban.ArbitOpts) {
 			oldFunc := opts.CustomPriceFilter
+			tcgMarket, _ := findSellerInventory("TCGMarket")
 			opts.CustomPriceFilter = func(cardId string, invEntry mtgban.InventoryEntry) (float64, bool) {
 				co, err := mtgmatcher.GetUUID(cardId)
 				if err == nil && co.Sealed {
 					if getTCGSimulationIQR(cardId) > IQRThreshold {
 						return 0, true
 					}
-				} else if invalidDirect(cardId, invEntry.Price) {
+				} else if invalidDirectIn(tcgMarket, cardId, invEntry.Price) {
 					return 0, true
 				}
 				if oldFunc != nil {
@@ -286,10 +287,20 @@ func init() {
 	}
 }
 
-// arbitLess returns the comparator for the given sort mode, or nil for
-// unknown modes (caller leaves the slice unsorted, matching the prior
-// switch's absence of a default case).
-func arbitLess(mode string, globalMode, preferFlavor bool) func(a, b *mtgban.ArbitEntry) bool {
+// arbitCardIds collects the card id of every entry, for resolving their
+// sorting data in one pass.
+func arbitCardIds(entries []mtgban.ArbitEntry) []string {
+	cardIds := make([]string, len(entries))
+	for i := range entries {
+		cardIds[i] = entries[i].CardId
+	}
+	return cardIds
+}
+
+// arbitLess returns the comparator for sorting entries in the given
+// mode, or nil for unknown modes (caller leaves the slice unsorted,
+// matching the prior switch's absence of a default case).
+func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode, preferFlavor bool) func(a, b *mtgban.ArbitEntry) bool {
 	switch mode {
 	case "available":
 		return func(a, b *mtgban.ArbitEntry) bool {
@@ -326,18 +337,20 @@ func arbitLess(mode string, globalMode, preferFlavor bool) func(a, b *mtgban.Arb
 			return a.Spread > b.Spread
 		}
 	case "edition":
+		sortData := resolveSortingData(arbitCardIds(entries))
 		return func(a, b *mtgban.ArbitEntry) bool {
 			if a.CardId == b.CardId {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
 			}
-			return sortSets(a.CardId, b.CardId)
+			return cmpSets(sortData[a.CardId], sortData[b.CardId])
 		}
 	case "alpha":
+		sortData := resolveSortingData(arbitCardIds(entries))
 		return func(a, b *mtgban.ArbitEntry) bool {
 			if a.CardId == b.CardId {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
 			}
-			return sortSetsAlphabetical(a.CardId, b.CardId, preferFlavor)
+			return cmpSetsAlphabetical(sortData[a.CardId], sortData[b.CardId], preferFlavor)
 		}
 	}
 	return nil
@@ -656,6 +669,14 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		}
 	}
 
+	// Keep the menu in a stable alphabetical order. The scraper snapshots are
+	// kept in load order (updates replace entries in place), so without this the
+	// menu follows config order instead of name order.
+	sort.SliceStable(menuScrapers, func(i, j int) bool {
+		return strings.ToLower(scraperName(menuScrapers[i].Info().Shorthand)) <
+			strings.ToLower(scraperName(menuScrapers[j].Info().Shorthand))
+	})
+
 	// Populate the menu bar with the pool selected above
 	for _, scraper := range menuScrapers {
 		var link string
@@ -848,10 +869,11 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if !arbitFilters["nosus"] && scraper.Info().Shorthand == "TCGDirect" {
 			sussy = map[string]float64{}
 
+			tcgMarket, _ := findSellerInventory("TCGMarket")
 			for _, res := range arbit {
-				isSussy := invalidDirect(res.CardId, res.ReferenceEntry.Price)
+				isSussy := invalidDirectIn(tcgMarket, res.CardId, res.ReferenceEntry.Price)
 				if isSussy {
-					sussy[res.CardId] = getTCGMarketPrice(res.CardId)
+					sussy[res.CardId] = tcgMarketPriceIn(tcgMarket, res.CardId)
 				}
 			}
 		}
@@ -870,7 +892,8 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if sorting == "" {
 			sorting = DefaultSortingOption
 		}
-		if less := arbitLess(sorting, pageVars.GlobalMode, preferFlavor); less != nil {
+		less := arbitLess(arbit, sorting, pageVars.GlobalMode, preferFlavor)
+		if less != nil {
 			sort.Slice(arbit, func(i, j int) bool { return less(&arbit[i], &arbit[j]) })
 		}
 		pageVars.SortOption = sorting

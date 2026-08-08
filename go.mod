@@ -4,7 +4,6 @@ go 1.25.0
 
 require (
 	github.com/BlueMonday/go-scryfall v0.9.0
-	github.com/NYTimes/gziphandler v1.1.1
 	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/bwmarrin/discordgo v0.27.1
 	github.com/danielgtaylor/unistyle v0.0.0-20190218054314-fff153823f5f
@@ -14,7 +13,7 @@ require (
 	github.com/lib/pq v1.11.1
 	github.com/mackerelio/go-osstat v0.2.4
 	github.com/mileusna/useragent v1.3.5
-	github.com/mtgban/go-mtgban v0.6.8
+	github.com/mtgban/go-mtgban v0.6.13
 	github.com/mtgban/simplecloud v0.0.11
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/oauth2 v0.36.0
@@ -76,7 +75,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/mroth/weightedrand/v2 v2.1.0 // indirect
-	github.com/mtgban/go-tcgplayer v0.0.2 // indirect
+	github.com/mtgban/go-tcgplayer v0.0.3 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/richardlehane/mscfb v1.0.7 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
@@ -99,11 +98,11 @@ require (
 	golang.org/x/crypto v0.53.0 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/text v0.39.0 // indirect
 	google.golang.org/api v0.276.0 // indirect
 	google.golang.org/genproto v0.0.0-20260414002931-afd174a4e478 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
-	google.golang.org/grpc v1.80.0 // indirect
+	google.golang.org/grpc v1.82.1 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

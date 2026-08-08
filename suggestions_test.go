@@ -11,6 +11,9 @@ import (
 // live here rather than in internal/suggest.
 
 func TestClosestCardName(t *testing.T) {
+	if !datastoreLoaded() {
+		t.Skip("mtgmatcher datastore not loaded")
+	}
 	if got := suggest.Closest("lightnig bolt", false); got != "Lightning Bolt" {
 		t.Errorf("typo: Closest = %q, want Lightning Bolt", got)
 	}

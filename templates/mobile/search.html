@@ -28,6 +28,16 @@
     {{end}}
     <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    {{if .PatreonLogin}}
+    <script>
+        // Build the Patreon OAuth URL at click time so the current page rides
+        // along in the state param; the Auth callback redirects back to it after
+        // authorizing, instead of dropping the user on the homepage.
+        function getPatreonURL(patreonId, client) {
+            return "https://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href + ";" + client);
+        }
+    </script>
+    {{end}}
 {{end}}
 
 {{define "content"}}
@@ -171,7 +181,7 @@
     {{/* Result count + sort pills */}}
     {{if .TotalUnique}}
     <div class="m-result-meta">
-        <span>{{.TotalUnique}} result{{if gt (len .AllKeys) 1}}s{{end}} found</span>
+        <span>{{.TotalUnique}} result{{if ne .TotalUnique 1}}s{{end}} found</span>
         {{if gt .TotalUnique (len .AllKeys)}}<span class="m-meta-sub">({{len .AllKeys}} shown)</span>{{end}}
         {{if not .NoSort}}
         <div class="m-sort-pills">
@@ -205,7 +215,7 @@
                  data-has-warning="{{$card.HasContentWarning}}"
                  data-crop-url="{{$card.CropURL}}"
                  data-setcode="{{$card.SetCode}}"
-                 onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}')">
+                 onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}', {{$card.HasContentWarning}})">
                 <div class="m-card-icon">
                     {{if $card.Keyrune}}
                         <i class="ss {{$card.Keyrune}} ss-fw"></i>
@@ -227,7 +237,7 @@
                     {{range $card.Treatments}}<span class="m-badge treatment">{{.}}</span>{{end}}
                     {{if $card.Reserved}}<span class="m-badge rl">RL</span>{{end}}
                     <button class="m-fav-btn fav-btn" data-card-id="{{$cardId}}" onclick="event.stopPropagation(); toggleFavorite(this);" title="Add to favorites"><i data-lucide="star"></i></button>
-                    {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
+                    {{if not $.DisableChart}}<button class="m-chart-btn" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}');" title="Price history"><i data-lucide="chart-line"></i></button>{{end}}
                     <button class="m-actions-btn" onclick="event.stopPropagation(); toggleActionsMenu(this);" title="More actions"><i data-lucide="more-vertical"></i></button>
                 </div>
             </div>
@@ -238,7 +248,7 @@
                     <i data-lucide="star"></i><span>Favorite</span>
                 </button>
                 {{if not $.DisableChart}}
-                    <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); showChartDrawer('{{$cardId}}', {{$card.Sealed}}, '{{$card.Name}}'); closeActionsMenus();">
+                    <button type="button" class="m-actions-item m-actions-chart" onclick="event.stopPropagation(); showChartDrawer('{{$card.ChartID}}', {{$card.Sealed}}, '{{$card.Name}}'); closeActionsMenus();">
                         <i data-lucide="chart-line"></i><span>Price history</span>
                     </button>
                 {{end}}
@@ -351,7 +361,10 @@
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
-                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                    <span class="m-locked-cta">
+                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>{{end}}
+                                    </span>
                                 </div>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat">
@@ -372,7 +385,10 @@
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
-                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                    <span class="m-locked-cta">
+                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>{{end}}
+                                    </span>
                                 </div>
                                 {{else}}
                                 {{$hasDetail := $entry.Credit}}
@@ -432,7 +448,10 @@
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}}</span>
-                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                    <span class="m-locked-cta">
+                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>{{end}}
+                                    </span>
                                 </div>
                                 {{else}}
                                 <div class="m-vendor-row m-vendor-flat">
@@ -440,7 +459,7 @@
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-price">{{if $entry.QuantityPriority}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
                                         <span class="m-vendor-qty"></span>
                                     </span>
                                 </div>
@@ -453,7 +472,10 @@
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
                                     <span class="m-vendor-name dim">{{$entry.ScraperName}} {{$entry.Country}}</span>
-                                    <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                    <span class="m-locked-cta">
+                                        <a class="m-locked-btn" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
+                                        {{range $ref, $id := $.PatreonIds}}<a class="m-locked-btn m-locked-btn-login" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>{{end}}
+                                    </span>
                                 </div>
                                 {{else}}
                                 {{$hasDetail := or $entry.Credit $entry.MarketCredit (and $entry.Ratio (eq $conditions "NM"))}}
@@ -466,7 +488,7 @@
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price{{if and (ne $entry.Shorthand "SYP") (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
+                                            <span class="m-vendor-price{{if and (not $entry.QuantityPriority) (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
                                             <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                             <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
@@ -500,7 +522,7 @@
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price{{if and (ne $entry.Shorthand "SYP") (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
+                                        <span class="m-vendor-price{{if and (not $entry.QuantityPriority) (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
                                         <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                     </span>
                                 </div>
@@ -823,7 +845,7 @@
     <div class="m-drawer" id="m-drawer">
         <div class="m-drawer-handle" onclick="hideCardDrawer()"><span></span></div>
         <div class="m-drawer-content">
-            <img class="m-drawer-img" id="m-drawer-img" src="" alt="">
+            <img class="m-drawer-img" id="m-drawer-img" src="" alt="" onclick="this.classList.add('cw-revealed')">
             <span class="m-drawer-name" id="m-drawer-name"></span>
         </div>
     </div>
@@ -941,13 +963,17 @@ window.addEventListener('scroll', closeActionsMenus, { passive: true });
 window.addEventListener('resize', closeActionsMenus);
 
 // Card image drawer
-function showCardDrawer(imgUrl, name) {
+function showCardDrawer(imgUrl, name, hasWarning) {
     var overlay = document.getElementById('m-drawer-overlay');
     var drawer = document.getElementById('m-drawer');
     var img = document.getElementById('m-drawer-img');
     var nameEl = document.getElementById('m-drawer-name');
     img.src = imgUrl;
     img.alt = name;
+    // Blur content-warning art until tapped, matching desktop. Reset the
+    // revealed state each open so a fresh card starts blurred again.
+    img.classList.toggle('content-warning', !!hasWarning);
+    img.classList.remove('cw-revealed');
     nameEl.textContent = name;
     overlay.classList.add('open');
     drawer.classList.add('open');

@@ -96,8 +96,32 @@
 
     function payloadForSection(section) {
         if (section === 'favorites') return JSON.parse(readLocal(FAVORITES_KEY, '[]')).map(trimFavorite);
-        if (section === 'recents') return JSON.parse(readLocal(RECENTS_KEY, '[]'));
+        if (section === 'recents') return JSON.parse(readLocal(RECENTS_KEY, '[]')).map(trimRecent);
         return buildPreferences();
+    }
+
+    // Card art on a recent search is owned by the device: captureFirstResultImage
+    // in recent-searches.js reads it off the results page on every visit. It never
+    // travels over the wire, so drop whatever a server copy carries (older clients
+    // did push it) and re-apply what this device already has - otherwise a hydrate
+    // blanks the thumbnails of any entry whose art had not been pushed yet.
+    var RECENT_ART_KEYS = ['img', 'crop', 'foil', 'cw'];
+    function recentId(s) { return ('' + ((s && s.q) || '')).toLowerCase(); }
+    function keepRecentArt(recents) {
+        var localBy = {};
+        localRecents().forEach(function(s) { if (s && s.q != null) localBy[recentId(s)] = s; });
+        return (recents || []).map(function(s) {
+            if (!s) return s;
+            var prev = s.q != null ? localBy[recentId(s)] : null;
+            // Read prev before clearing s: a caller may hand us the local list.
+            var art = {};
+            if (prev && !s.del) {
+                RECENT_ART_KEYS.forEach(function(k) { if (prev[k] != null) art[k] = prev[k]; });
+            }
+            RECENT_ART_KEYS.forEach(function(k) { delete s[k]; });
+            Object.keys(art).forEach(function(k) { s[k] = art[k]; });
+            return s;
+        });
     }
 
     // Apply server state into localStorage.
@@ -121,8 +145,9 @@
                 writeFP('favorites', JSON.stringify(favs.map(trimFavorite)));
             }
             if (state.recents) {
-                rawSetItem(RECENTS_KEY, JSON.stringify(state.recents));
-                writeFP('recents', JSON.stringify(state.recents));
+                var recents = keepRecentArt(state.recents);
+                rawSetItem(RECENTS_KEY, JSON.stringify(recents));
+                writeFP('recents', JSON.stringify(recents.map(trimRecent)));
             }
             if (state.preferences) {
                 Object.keys(state.preferences).forEach(function(k) {
@@ -209,8 +234,10 @@
         attempt = attempt || 0;
         if (!serverState) return Promise.resolve(false);
         var mergedFavs = mergeList(localFavorites(), serverState.favorites || [], function(f) { return f.id; }, 50);
-        var mergedRecents = mergeList(localRecents(), serverState.recents || [], function(s) { return (s.q || '').toLowerCase(); }, 15);
+        var mergedRecents = mergeList(localRecents(), serverState.recents || [], recentId, 15);
         var mergedPrefs = mergePrefs(buildPreferences(), serverState.preferences || {});
+        // Must run before the write below: it reads the pre-merge local copies.
+        mergedRecents = keepRecentArt(mergedRecents);
 
         try {
             rawSetItem(FAVORITES_KEY, JSON.stringify(mergedFavs));
@@ -225,16 +252,30 @@
 
         // Nothing new to push: adopt version, skip the write.
         if (!localHasNew(mergedFavs, mergedRecents, mergedPrefs, serverState)) {
-            writeFP('favorites', JSON.stringify(mergedFavs.map(trimFavorite)));
-            writeFP('recents', JSON.stringify(mergedRecents));
-            writeFP('preferences', JSON.stringify(mergedPrefs));
-            markClean();
+            // Record a fingerprint only for a section the server verifiably
+            // holds. Claiming one for a payload that was never sent makes the
+            // next flush skip its PATCH, stranding the local copy for good.
+            // Merging can still reorder or cap a list the server agrees on, so
+            // re-queue whatever came out different instead of going clean.
+            var trimmedFavs = mergedFavs.map(trimFavorite);
+            var trimmedRecents = mergedRecents.map(trimRecent);
+            var synced = true;
+            if (sameList(trimmedFavs, (serverState.favorites || []).map(trimFavorite), function(f) { return f.id; })) {
+                writeFP('favorites', JSON.stringify(trimmedFavs));
+            } else { schedule('favorites'); synced = false; }
+            if (sameList(trimmedRecents, (serverState.recents || []).map(trimRecent), recentId)) {
+                writeFP('recents', JSON.stringify(trimmedRecents));
+            } else { schedule('recents'); synced = false; }
+            if (canonJSON(mergedPrefs) === canonJSON(serverState.preferences || {})) {
+                writeFP('preferences', JSON.stringify(mergedPrefs));
+            } else { schedule('preferences'); synced = false; }
+            if (synced) markClean();
             writeMarker(version);
             return Promise.resolve(true);
         }
 
         var body = JSON.stringify({
-            favorites: mergedFavs.map(trimFavorite), recents: mergedRecents,
+            favorites: mergedFavs.map(trimFavorite), recents: mergedRecents.map(trimRecent),
             preferences: mergedPrefs, version: version
         });
         return fetch(BASE, {
@@ -255,7 +296,7 @@
                 if (res && typeof res.version === 'number') version = res.version;
                 writeMarker(version);
                 writeFP('favorites', JSON.stringify(mergedFavs.map(trimFavorite)));
-                writeFP('recents', JSON.stringify(mergedRecents));
+                writeFP('recents', JSON.stringify(mergedRecents.map(trimRecent)));
                 writeFP('preferences', JSON.stringify(mergedPrefs));
                 markClean();
                 return true;
@@ -323,6 +364,31 @@
         return live.concat(tombs);
     }
 
+    // A payload and the server's copy of it agree on content but not on shape:
+    // JSONB does not preserve key order, and mergeList re-sorts and caps lists.
+    // Compare on a canonical form - keys sorted, entries ordered by id.
+    function canonJSON(x) {
+        return JSON.stringify(canonValue(x));
+    }
+    function canonValue(x) {
+        if (x === null || typeof x !== 'object') return x === undefined ? null : x;
+        if (Array.isArray(x)) return x.map(canonValue);
+        var out = {};
+        Object.keys(x).sort().forEach(function(k) {
+            if (x[k] !== undefined) out[k] = canonValue(x[k]);
+        });
+        return out;
+    }
+    function sameList(a, b, idOf) {
+        function canon(list) {
+            return canonJSON((list || []).slice().sort(function(x, y) {
+                var xi = String(idOf(x)), yi = String(idOf(y));
+                return xi < yi ? -1 : xi > yi ? 1 : 0;
+            }));
+        }
+        return canon(a) === canon(b);
+    }
+
     // Preferences: last-write-wins per key (local wins on first merge).
     function mergePrefs(localPrefs, serverPrefs) {
         var out = {};
@@ -343,6 +409,15 @@
             foil: f.foil, etched: f.etched,
             finishTag: f.finishTag, finishClass: f.finishClass,
             treatments: f.treatments, img: f.img, cw: f.cw
+        };
+    }
+
+    // Recents sync identity and intent only; the card art (img, crop, foil, cw)
+    // is re-derived on each device from the search results page.
+    function trimRecent(s) {
+        return {
+            q: s.q, t: s.t, m: s.m, del: s.del, pinned: s.pinned,
+            set: s.set, keyrune: s.keyrune
         };
     }
 

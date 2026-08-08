@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -24,13 +25,13 @@ import (
 
 	"database/sql"
 
-	"github.com/NYTimes/gziphandler"
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/mtgban-website/internal/offlineapi"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
+	"github.com/mtgban/mtgban-website/internal/tmplparse"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -105,7 +106,6 @@ type PageVars struct {
 	NoSettings     bool
 	HasSettings    bool
 	HasAvailable   bool
-	CardBackURL    string
 	ShowUpsell     bool
 
 	PopularSearches []PopularSearch
@@ -227,6 +227,13 @@ type PageVars struct {
 	SealedScraperKeys []string
 	SealedIndexKeys   []string
 
+	// All the index prices that can be toggled, and the subset the user
+	// enabled (shared between Retail and Buylist, they are references)
+	IndexAllKeys         []string
+	EnabledIndexes       []string
+	SealedIndexAllKeys   []string
+	EnabledSealedIndexes []string
+
 	// Additional sources for index keys if needed
 	AltKeys              []string
 	SellerKeys           []string
@@ -256,6 +263,9 @@ type PageVars struct {
 	MissingPrices        map[string]float64
 	ResultPrices         map[string]map[string]float64
 	UploadQuery          string
+	// Original link of a remote-URL upload, so the results header can
+	// point back at the source
+	UploadSourceURL string
 	// Upload singles/sealed/not-found split
 	SinglesEntries    []UploadEntry
 	SealedEntries     []UploadEntry
@@ -515,7 +525,6 @@ type ConfigType struct {
 	} `json:"offline"`
 	BucketKeys             map[string]BucketKey `json:"bucket_keys"`
 	Game                   string             `json:"game"`
-	CardBackImage          string             `json:"card_back_image"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
 	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
@@ -810,8 +819,11 @@ func ServeFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func genPageNav(activeTab, sig string) PageVars {
-	exp := GetParamFromSig(sig, "Expires")
-	expires, _ := strconv.ParseInt(exp, 10, 64)
+	// Decode the sig once; this function reads it for expiry, every nav
+	// feature, and the user email, and each GetParamFromSig call would
+	// re-parse the whole thing.
+	sigParams := parseSig(sig)
+	expires, _ := strconv.ParseInt(sigParams.Get("Expires"), 10, 64)
 	msg := ""
 	showPatreonLogin := false
 	if sig != "" {
@@ -839,15 +851,17 @@ func genPageNav(activeTab, sig string) PageVars {
 		// Append which game this site is for
 		pageVars.Title += " - " + mtgmatcher.Title(Config.Game)
 
-		// Charts are available only for one game
-		pageVars.DisableChart = true
+		// Charts for a non-Magic game are served only by the long-form read
+		// path; the legacy wide table is mtgjson-uuid keyed and has no rows for
+		// them. Until reads flip on, keep the chart UI hidden rather than show
+		// buttons that resolve to an always-empty chart.
+		if !Config.TimeseriesConfig.LongFormReads {
+			pageVars.DisableChart = true
+		}
 	}
 	if Config.OfflineKey != "" {
 		pageVars.DisableChart = true
 	}
-
-	// Set card back
-	pageVars.CardBackURL = Config.CardBackImage
 
 	// Allocate a new navigation bar
 	pageVars.Nav = make([]NavElem, len(DefaultNav))
@@ -867,8 +881,7 @@ func genPageNav(activeTab, sig string) PageVars {
 
 		allowed := devMode || noAuth || alwaysOnDev || offline
 		if !allowed {
-			param := GetParamFromSig(sig, feat)
-			allowed, _ = strconv.ParseBool(param)
+			allowed, _ = strconv.ParseBool(sigParams.Get(feat))
 		}
 
 		if !allowed {
@@ -903,7 +916,7 @@ func genPageNav(activeTab, sig string) PageVars {
 	pageVars.HasSettings = pageVars.Nav[mainNavIndex].HasSettings
 
 	// Add user information if needed, or public
-	user := GetParamFromSig(sig, "UserEmail")
+	user := sigParams.Get("UserEmail")
 	if user == "" {
 		if !showPatreonLogin {
 			user = "Anonymous"
@@ -979,6 +992,9 @@ func loadVars(port, datastorePath, offlineKey string) error {
 		return err
 	}
 
+	// Build the game-agnostic chart provider registry from the dataset config.
+	buildProviderRegistry()
+
 	// The -port and -ds flags, when provided, override whatever the config
 	// file set. This must happen after the decode above, which would otherwise
 	// clobber the flag values with the config's fields (breaking blue-green
@@ -1034,6 +1050,25 @@ func openDBs() (err error) {
 			}
 			if serr := PricesArchiveDB.EnsureTCGProductsSchema(context.Background()); serr != nil {
 				log.Println("warning: could not ensure tcg_products schema:", serr)
+			}
+		}
+		// Long-form dual-write: make sure the current and next month's price
+		// partitions exist ahead of any write. Writes-only (creates partitions).
+		if Config.TimeseriesConfig.LongFormWrites {
+			now := time.Now()
+			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now); serr != nil {
+				log.Println("warning: could not ensure current price partition:", serr)
+			}
+			if serr := PricesArchiveDB.EnsurePricePartition(context.Background(), now.AddDate(0, 1, 0)); serr != nil {
+				log.Println("warning: could not ensure next price partition:", serr)
+			}
+		}
+		// Prime the variant->ban_id cache: the write path resolves/mints on it,
+		// and the read path stamps a cached ban_id onto each rendered card so
+		// charts open by ban:<id> without a per-card round-trip. Non-fatal.
+		if Config.TimeseriesConfig.LongFormWrites || Config.TimeseriesConfig.LongFormReads {
+			if serr := PricesArchiveDB.WarmVariantCache(context.Background()); serr != nil {
+				log.Println("warning: could not warm variant cache:", serr)
 			}
 		}
 	}
@@ -1154,6 +1189,7 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 
 	ServerNotify("init", "Datastore installed")
 	SetLastDatastoreUpdate(time.Now())
+	go rebuildSuggestIndex()
 	go updateStaticData()
 	go cacheNewspaper()
 	go paletteService.BuildSetsCache()
@@ -1420,7 +1456,7 @@ func main() {
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(http.HandlerFunc(BatchPricesAPI)))
-	http.Handle("/api/userstate/", noSigning(gziphandler.GzipHandler(http.HandlerFunc(UserStateAPI))))
+	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))
 	http.Handle("/api/opensearch.xml", noSigning(http.HandlerFunc(OpenSearchDesc)))
 	http.Handle("/api/load/datastore", noSigning(http.HandlerFunc(LoadDatastoreFromCloud)))
 	http.Handle("/api/load/", enforceAPISigning(http.HandlerFunc(LoadFromCloud)))
@@ -1448,8 +1484,20 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
+	// pprof registered itself on the default mux at import time, so its
+	// routes cannot be wrapped individually like the other pages; steer
+	// them through the standard signing middleware (plus the Admin grant)
+	// here instead, and everything else straight to the mux
+	debugHandler := enforceSigning(adminOnly(http.DefaultServeMux))
 	srv := &http.Server{
 		Addr: ":" + Config.Port,
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, "/debug") {
+				debugHandler.ServeHTTP(w, r)
+				return
+			}
+			http.DefaultServeMux.ServeHTTP(w, r)
+		}),
 	}
 
 	done := make(chan os.Signal, 1)
@@ -1576,7 +1624,7 @@ func buildTemplateCache() (map[string]*template.Template, error) {
 				key = "mobile/" + name
 			}
 			baseName, files := renderTemplateFiles(name, mobile)
-			t, err := template.New(baseName).Funcs(funcMap).ParseFiles(files...)
+			t, err := tmplparse.ParseFiles(baseName, files, funcMap)
 			if err != nil {
 				return nil, fmt.Errorf("parsing %s (mobile=%v): %w", name, mobile, err)
 			}
@@ -1592,7 +1640,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	if DevMode {
 		// Hot-reload: re-parse from disk every request
 		baseName, files := renderTemplateFiles(tmpl, pageVars.IsMobile)
-		t, err := template.New(baseName).Funcs(funcMap).ParseFiles(files...)
+		t, err := tmplparse.ParseFiles(baseName, files, funcMap)
 		if err != nil {
 			log.Print("template parsing error: ", err)
 			return

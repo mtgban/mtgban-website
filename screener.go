@@ -270,6 +270,13 @@ func screenerCacheKey(metric, window int, minPrice, minPriorPrice float64) strin
 
 // overridable in tests
 var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
+	if Config.TimeseriesConfig.LongFormReads {
+		provider, ok := providerForDatasetIndex(metric)
+		if !ok {
+			return nil, fmt.Errorf("screener: no provider configured for metric %d", metric)
+		}
+		return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice)
+	}
 	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice, minPriorPrice)
 }
 

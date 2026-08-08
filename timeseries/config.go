@@ -37,6 +37,10 @@ func (c SqlConfig) DSN() string {
 type Client struct {
 	db       *sql.DB
 	readOnly bool
+
+	// variants caches variant identity -> ban_id for the long-form (variants +
+	// prices) write path. Warm it once with WarmVariantCache; misses mint.
+	variants variantCache
 }
 
 // OpenDB opens a raw Postgres pool for the database described by the config,

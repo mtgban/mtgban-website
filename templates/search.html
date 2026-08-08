@@ -51,6 +51,16 @@
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    {{if .PatreonLogin}}
+    <script>
+        // Build the Patreon OAuth URL at click time so the current page rides
+        // along in the state param; the Auth callback redirects back to it after
+        // authorizing, instead of dropping the user on the homepage.
+        function getPatreonURL(patreonId, client) {
+            return "https://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href + ";" + client);
+        }
+    </script>
+    {{end}}
     {{if .CanFixSearch}}
     <script>
         // Admin Fix mode: the per-result toggle shows a Fix link on each store
@@ -108,7 +118,7 @@
             <span class="search-result-count">
                 {{.TotalUnique}}
                 {{if .TotalCards}}/ {{.TotalCards}}{{end}}
-                result{{if gt (len .AllKeys) 1}}s{{end}} found
+                result{{if ne .TotalUnique 1}}s{{end}} found
                 {{if gt .TotalUnique (len .AllKeys)}}({{len .AllKeys}} shown){{end}}
             </span>
         </div>
@@ -274,6 +284,10 @@
                 // recent *real* (position-changing) move or scroll, and ignore
                 // any hover glued to a keystroke (the phantom's actual cause).
                 var __lastMove = 0, __mx = null, __my = null, __lastKey = 0;
+                // Set while the scroll handler calls a row's handler after
+                // hit-testing the pointer itself: that update is trusted by
+                // construction and must not be filtered as a phantom.
+                var __hoverTrusted = false;
                 document.addEventListener('mousemove', function(e) {
                     if (e.clientX !== __mx || e.clientY !== __my) {
                         __mx = e.clientX; __my = e.clientY; __lastMove = performance.now();
@@ -287,12 +301,44 @@
                 });
                 function hoverSidebar() {
                     var now = performance.now();
-                    if (now - __lastMove > 100 || now - __lastKey < 120) return;
+                    if (!__hoverTrusted && (now - __lastMove > 100 || now - __lastKey < 120)) return;
                     updateSidebar.apply(null, arguments);
                 }
 
-                function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning) {
-                    document.getElementById('cardImage').src=src;
+                // The set value tables render inline in the pinned printings
+                // slot while the column is tall enough; only when inline
+                // tables would squeeze the scrolling products list below a
+                // useful height are they stashed behind the hover trigger.
+                // Measured by un-stashing and reading the body's flex
+                // leftover, so it tracks the actual image and table heights.
+                const SETVALUE_MIN_BODY = 160;
+                function updateSetValueMode() {
+                    var printings = document.getElementById('printings');
+                    if (!printings) return;
+                    printings.classList.remove('setvalue-stashed');
+                    if (!printings.querySelector('.sidebar-setvalue')) return;
+                    var sidebar = printings.closest('.search-sidebar');
+                    var body = sidebar ? sidebar.querySelector('.sidebar-body') : null;
+                    // The sidebar is content-sized under a viewport cap, so a
+                    // small body can also mean a short products list that fits
+                    // entirely; only a body that is both below a useful height
+                    // and actually hiding content is squeezed.
+                    if (body && body.clientHeight < SETVALUE_MIN_BODY
+                            && body.scrollHeight > body.clientHeight + 1) {
+                        printings.classList.add('setvalue-stashed');
+                    }
+                }
+
+                function updateSidebar(src, printings, products, isFoil, isEtched, setCode, hasWarning, productsCount) {
+                    var img = document.getElementById('cardImage');
+                    img.src = src;
+                    // The image height feeds the space measurement but only
+                    // settles on load; resizes move the 52vh cap too.
+                    if (!img.__setValueHooked) {
+                        img.__setValueHooked = true;
+                        img.addEventListener('load', updateSetValueMode);
+                        window.addEventListener('resize', updateSetValueMode);
+                    }
                     var wrapper = document.getElementById('cardImageWrapper');
                     if (wrapper) {
                         wrapper.setAttribute('data-foil', isFoil ? 'true' : 'false');
@@ -306,6 +352,7 @@
                     }
                     document.getElementById('printings').innerHTML = printings;
                     collapsePrintings();
+                    updateSetValueMode();
 
                     let productDiv = document.getElementById('products');
                     if (productDiv) {
@@ -313,6 +360,10 @@
                             products = "n/a"
                         }
                         productDiv.innerHTML = products;
+                    }
+                    let productCountSpan = document.getElementById('productsCount');
+                    if (productCountSpan) {
+                        productCountSpan.textContent = productsCount > 0 ? productsCount : '';
                     }
                 }
 
@@ -374,17 +425,17 @@
 
                 <div class="search-sidebar">
                     {{template "sidebar-search" .}}
+                    <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
+                        <img class="sidebar-card-img" id="cardImage" src=""/>
+                    </div>
+                    <div class="sidebar-printings" id="printings"></div>
                     <div class="sidebar-body">
-                        <div class="sidebar-img-wrap foil-wrap" id="cardImageWrapper" onclick="if(this.classList.contains('content-warning')){this.classList.add('cw-revealed');return}var input=document.getElementById('searchbox')||document.getElementById('nav-searchbox');if(input){input.focus();input.setSelectionRange(0,input.value.length);}">
-                            <img class="sidebar-card-img" id="cardImage" src=""/>
-                        </div>
-                        <div class="sidebar-printings" id="printings"></div>
                         {{if .CanShowAll}}
                             <a class="sidebar-action primary" href="search?q={{.CleanSearchQuery}}">Show all versions</a>
                         {{end}}
                         {{if .HasAvailable}}
                             <div class="sidebar-products-card">
-                                <div class="sidebar-products-title">Available In</div>
+                                <div class="sidebar-products-title">Available In<span class="sidebar-products-count" id="productsCount"></span></div>
                                 <div class="sidebar-products-list" id="products"></div>
                             </div>
                         {{end}}
@@ -436,6 +487,7 @@
                     {{$firstImg := ""}}
                     {{$firstPrint := ""}}
                     {{$firstProduct := ""}}
+                    {{$firstProductCount := 0}}
                     {{$firstFoil := false}}
                     {{$firstEtched := false}}
                     {{$firstSetCode := ""}}
@@ -659,7 +711,9 @@
                                     var cardId = item.getAttribute('data-card-id');
                                     if (cardId === lastHoverId) return;
                                     lastHoverId = cardId;
-                                    var row = document.querySelector('.result-header[data-card-id="' + cardId + '"]');
+                                    // Legend entries carry the chart id (ban:<id> when long-form reads
+                                    // are on); match them to the row's data-chart-id, not data-card-id.
+                                    var row = document.querySelector('.result-header[data-chart-id="' + cardId + '"]');
                                     if (row && typeof row.onmouseover === 'function') row.onmouseover();
                                 });
                                 legendEl.addEventListener('mouseleave', function() { lastHoverId = null; });
@@ -941,6 +995,7 @@
                             {{$firstImg = $card.ImageURL}}
                             {{$firstPrint = $card.Printings}}
                             {{$firstProduct = $card.Products}}
+                            {{$firstProductCount = $card.NumProducts}}
                             {{$firstFoil = $card.Foil}}
                             {{$firstEtched = $card.Etched}}
                             {{$firstSetCode = $card.SetCode}}
@@ -951,6 +1006,7 @@
                             <div class="result-header{{if eq $i 0}} result-first{{end}}"
                                  style="z-index: {{inc $i 100}}"
                                  data-card-id="{{$cardId}}"
+                                 data-chart-id="{{$card.ChartID}}"
                                  data-card-name="{{$card.Name}}"
                                  data-set-code="{{$card.SetCode}}"
                                  data-edition="{{$card.Edition}}"
@@ -961,7 +1017,7 @@
                                  data-treatments="{{range $i, $t := $card.Treatments}}{{if $i}},{{end}}{{$t}}{{end}}"
                                  data-has-warning="{{$card.HasContentWarning}}"
                                  data-crop-url="{{$card.CropURL}}"
-                                 onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                                 onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
@@ -1026,10 +1082,10 @@
                                     {{end}}
                                     {{if not $.DisableChart}}
                                         {{if eq $.ChartIDsCSV ""}}
-                                            <a href="?chart={{$cardId}}" title="See historical data">&#128200;</a>
-                                        {{else if slice_has $.ChartIDs $cardId}}
+                                            <a href="?chart={{$card.ChartID}}" title="See historical data">&#128200;</a>
+                                        {{else if slice_has $.ChartIDs $card.ChartID}}
                                             {{if or $.ModalMode (gt (len $.ChartIDs) 1)}}
-                                            <a class="chart-remove-link" data-card-id="{{$cardId}}" href="?chart={{csv_without $.ChartIDsCSV $cardId}}" title="Remove from this chart">&#128200;&#10134;</a>
+                                            <a class="chart-remove-link" data-card-id="{{$card.ChartID}}" href="?chart={{csv_without $.ChartIDsCSV $card.ChartID}}" title="Remove from this chart">&#128200;&#10134;</a>
                                             {{else}}
                                             {{/* Sole card on a non-modal chart page: a remove link would
                                                  point at ?chart= and dump the user on a blank landing, so
@@ -1037,7 +1093,7 @@
                                             <span class="emoji" title="The only card on this chart">&#128200;</span>
                                             {{end}}
                                         {{else}}
-                                            <a class="chart-add-link" data-card-id="{{$cardId}}" href="?chart={{$.ChartIDsCSV}},{{$cardId}}" title="Add to this chart">&#128200;&#10133;</a>
+                                            <a class="chart-add-link" data-card-id="{{$card.ChartID}}" href="?chart={{$.ChartIDsCSV}},{{$card.ChartID}}" title="Add to this chart">&#128200;&#10133;</a>
                                         {{end}}
                                     {{end}}
                                     {{/* Shown only when the screen is narrow enough that the sidebar
@@ -1057,7 +1113,7 @@
                                 {{end}}
                             </div>
                             {{end}}
-                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}});">
+                            <div class="result-body{{if eq $i (dec (len $.AllKeys) 1)}} result-last-body{{end}}" onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}});">
                                 <!-- Sellers column -->
                                 <div class="result-col">
                                     <div class="result-col-header">Sellers</div>
@@ -1087,7 +1143,7 @@
                                                         <span class="locked-cta">
                                                             <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                                             {{range $ref, $id := $.PatreonIds}}
-                                                                <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
                                                             {{end}}
                                                         </span>
                                                     {{else if eq .URL ""}}
@@ -1143,7 +1199,7 @@
                                                         <span class="locked-cta">
                                                             <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                                             {{range $ref, $id := $.PatreonIds}}
-                                                                <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                                <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
                                                             {{end}}
                                                         </span>
                                                     {{else}}
@@ -1219,7 +1275,7 @@
                                                     <span class="locked-cta">
                                                         <a class="locked-btn locked-btn-join" href="https://www.patreon.com/MTGBAN" target="_blank">Join</a>
                                                         {{range $ref, $id := $.PatreonIds}}
-                                                            <a class="locked-btn" href="https://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state={{$ref}}">Log in</a>
+                                                            <a class="locked-btn" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
                                                         {{end}}
                                                     </span>
                                                 {{else}}
@@ -1240,10 +1296,10 @@
                                                     {{$blPriceWarn = invalid_direct $cardId .Price}}
                                                 {{end}}
                                                 {{$aboveP90 := false}}
-                                                {{if and (ne .Shorthand "SYP") (gt $card.GoodBuylist 0.0) (ge .Price $card.GoodBuylist)}}{{$aboveP90 = true}}{{end}}
+                                                {{if and (not .QuantityPriority) (gt $card.GoodBuylist 0.0) (ge .Price $card.GoodBuylist)}}{{$aboveP90 = true}}{{end}}
                                                 <span class="price-right has-buylist-extra">
                                                 <span class="price{{if $blPriceWarn}} price-warn{{end}}{{if $aboveP90}} price-best{{end}}" {{if $blPriceWarn}}data-tooltip="Price looks off — TCG Market is {{$marketPrice := tcg_market_price $cardId}}{{if $marketPrice}}$ {{printf "%.2f" $marketPrice}}{{else}}missing{{end}}"{{else if gt $card.GoodBuylist 0.0}}title="Card Kingdom P90 $ {{printf "%.2f" $card.GoodBuylist}}{{if gt $card.HighestBuylist 0.0}}; 90-day high $ {{printf "%.2f" $card.HighestBuylist}}{{end}}"{{end}}>
-                                                    {{if ne .Shorthand "SYP"}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
+                                                    {{if not .QuantityPriority}}<span class="cur">$</span><span class="amt">{{printf "%.2f" .Price}}</span>
                                                     {{else}}<span class="cur">#</span><span class="amt">{{.Quantity}}</span>
                                                     {{end}}
                                                 </span>
@@ -1293,17 +1349,10 @@
                 </div>{{/* Close .search-results */}}
 
                 {{if eq $firstImg ""}}
-                    {{/* Sealed products often have no image; a card back would
-                         just flash until the first hover blanks it, so use the
-                         transparent placeholder instead. */}}
-                    {{if $.IsSealed}}
-                        {{$firstImg = $emptyImg}}
-                    {{else}}
-                        {{$firstImg = $.CardBackURL}}
-                    {{end}}
+                    {{$firstImg = $emptyImg}}
                 {{end}}
                 <script type="text/javascript">
-                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}});
+                    updateSidebar({{$firstImg}}, {{$firstPrint}}, {{$firstProduct}}, {{$firstFoil}}, {{$firstEtched}}, {{$firstSetCode}}, {{$firstWarning}}, {{$firstProductCount}});
                 </script>
             </div>{{/* Close .search-layout */}}
     <br>
@@ -1410,6 +1459,32 @@
             headers[currentIdx].dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
         });
 
+        // Rows sliding under a still cursor never produce a mouseover: browsers
+        // recompute :hover on scroll but only synthesize pointer events on the
+        // next real move, so the sidebar used to stay on whatever was hovered
+        // last until the mouse was wiggled. Hit-test the pointer ourselves each
+        // scroll frame and drive the row it actually lands on.
+        var lastPointerTarget = null;
+        function hoverRowUnderPointer() {
+            if (typeof __mx !== 'number' || typeof __my !== 'number') return false;
+            var el = document.elementFromPoint(__mx, __my);
+            var row = el && el.closest ? el.closest('[onmouseover]') : null;
+            if (!row || typeof row.onmouseover !== 'function') {
+                lastPointerTarget = null;
+                return false;
+            }
+            if (row !== lastPointerTarget) {
+                lastPointerTarget = row;
+                __hoverTrusted = true;
+                try {
+                    row.onmouseover();
+                } finally {
+                    __hoverTrusted = false;
+                }
+            }
+            return true;
+        }
+
         // Update sidebar image when scrolling naturally
         var lastStuckIdx = -1;
         var scrollTick = false;
@@ -1418,6 +1493,7 @@
             scrollTick = true;
             requestAnimationFrame(function() {
                 scrollTick = false;
+                var pointerHandled = hoverRowUnderPointer();
                 // Find the last header that is stuck (rect.top ≈ sticky position)
                 var stuckIdx = -1;
                 for (var i = headers.length - 1; i >= 0; i--) {
@@ -1429,7 +1505,11 @@
                 if (stuckIdx >= 0 && stuckIdx !== lastStuckIdx) {
                     lastStuckIdx = stuckIdx;
                     currentIdx = stuckIdx;
-                    headers[stuckIdx].dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
+                    // Keyboard paging still needs currentIdx tracked, but the
+                    // row under the pointer wins the sidebar when there is one.
+                    if (!pointerHandled) {
+                        headers[stuckIdx].dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
+                    }
                 }
             });
         });

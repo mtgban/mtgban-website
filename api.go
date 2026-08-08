@@ -186,7 +186,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		if !found {
 			continue
 		}
-		productId := blEntries[0].CustomFields["scgSKU"]
+		productId := blEntries[0].InstanceId
 		name := blEntries[0].CustomFields["SCGName"]
 		edition := blEntries[0].CustomFields["SCGEdition"]
 		language := blEntries[0].CustomFields["SCGLanguage"]
@@ -741,18 +741,19 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 
 	// Sort results to match the search page order
 	sortOpt := r.FormValue("sort")
+	sortData := resolveSortingData(allKeys)
 	switch sortOpt {
 	case "alpha":
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSetsAlphabetical(allKeys[i], allKeys[j], false)
+			return cmpSetsAlphabetical(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
 	case "number":
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortByNumberAndFinish(allKeys[i], allKeys[j], false)
+			return cmpNumberAndFinish(sortData[allKeys[i]], sortData[allKeys[j]], false)
 		})
 	default:
 		sort.Slice(allKeys, func(i, j int) bool {
-			return sortSets(allKeys[i], allKeys[j])
+			return cmpSets(sortData[allKeys[i]], sortData[allKeys[j]])
 		})
 	}
 	reverseSort, _ := strconv.ParseBool(r.FormValue("reverse"))
@@ -770,34 +771,38 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	canRetail := canAccessMode(enabledModes, "retail")
 	canBuylist := canAccessMode(enabledModes, "buylist")
 
-	// Build store lists
-	var enabledRetailStores []string
-	for _, seller := range GetSellers() {
-		if seller != nil && !slices.Contains(blocklistRetail, seller.Info().Shorthand) {
-			enabledRetailStores = append(enabledRetailStores, seller.Info().Shorthand)
-		}
-	}
-	var enabledBuylistStores []string
-	for _, vendor := range GetVendors() {
-		if vendor != nil && !slices.Contains(blocklistBuylist, vendor.Info().Shorthand) {
-			enabledBuylistStores = append(enabledBuylistStores, vendor.Info().Shorthand)
-		}
+	// The demo (sig-less) JSON endpoint sees only the demo stores; per the
+	// storeEligible precedence an explicit store list is the entire policy,
+	// so it replaces the parsed store filters (blocklists included)
+	demoStores := sig == "" && isJSON
+	demoFilter := func(name string, forSeller bool) []FilterStoreElem {
+		return []FilterStoreElem{{
+			Name:          name,
+			Values:        fixupStoreCodeNG(strings.Join(Config.ApiDemoStores, ",")),
+			OnlyForSeller: forSeller,
+			OnlyForVendor: !forSeller,
+		}}
 	}
 
-	// Retrieve prices
+	// Retrieve prices through the same gathering the search page uses, so
+	// every filter the query carries (stores, conditions, prices) shapes
+	// the output instead of only the card-level ones
+	var foundSellers, foundVendors map[string]map[string][]SearchEntry
 	if isRetail && canRetail {
-		stores := enabledRetailStores
-		if sig == "" && isJSON {
-			stores = Config.ApiDemoStores
+		cfg := config
+		if demoStores {
+			cfg.StoreFilters = demoFilter("seller", true)
 		}
-		out.Retail = getSellerPrices(idOpt, stores, "", allKeys, "", true, true, isSealed, tagName)
+		foundSellers = searchSellersNG(allKeys, cfg)
+		out.Retail = banPricesFromRows(allKeys, foundSellers, idOpt, tagName, true, true, false)
 	}
 	if isBuylist && canBuylist {
-		stores := enabledBuylistStores
-		if sig == "" && isJSON {
-			stores = Config.ApiDemoStores
+		cfg := config
+		if demoStores {
+			cfg.StoreFilters = demoFilter("vendor", false)
 		}
-		out.Buylist = getVendorPrices(idOpt, stores, "", allKeys, "", true, true, isSealed, tagName)
+		foundVendors = searchVendorsNG(allKeys, cfg)
+		out.Buylist = banPricesFromRows(allKeys, foundVendors, idOpt, tagName, true, true, true)
 	}
 
 	if isJSON {
@@ -809,12 +814,14 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	if isCSV {
 		w.Header().Set("Content-Type", "text/csv")
 
-		// Re-fetch prices keyed by BAN UUID so foil/nonfoil stay separate
+		// Reuse the walked rows, keyed by BAN UUID so foil/nonfoil stay
+		// separate (CSV is never the demo mode, so the rows above carry
+		// the full store policy)
 		var results map[string]map[string]*BanPrice
 		if isRetail && canRetail {
-			results = getSellerPrices("", enabledRetailStores, "", allKeys, "", true, true, isSealed, tagName)
+			results = banPricesFromRows(allKeys, foundSellers, "", tagName, true, true, false)
 		} else if isBuylist && canBuylist {
-			results = getVendorPrices("", enabledBuylistStores, "", allKeys, "", true, true, isSealed, tagName)
+			results = banPricesFromRows(allKeys, foundVendors, "", tagName, true, true, true)
 		}
 
 		err := BanPrice2CSV(w, results, allKeys)

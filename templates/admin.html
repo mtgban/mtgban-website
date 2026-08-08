@@ -158,9 +158,20 @@
                     <h2>Patreon Grants</h2>
                     <span class="count">{{len (index .Tables 3)}} users</span>
                 </div>
+                <form method="POST" action="admin?page=people" class="admin-grant-form">
+                    <input type="email" name="grantEmail" placeholder="email" required>
+                    <input type="text" name="grantName" placeholder="name">
+                    <input type="text" name="grantCategory" placeholder="category">
+                    <select name="grantTier">
+                        {{range .Tiers}}
+                            <option value="{{.}}">{{.}}</option>
+                        {{end}}
+                    </select>
+                    <input type="submit" value="Add Grant">
+                </form>
                 <div class="admin-table-wrap">
                 <table class="table-data admin-table">
-                    <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th></tr></thead>
+                    <thead><tr><th>#</th><th>Category</th><th>Email</th><th>Name</th><th>Tier</th><th></th></tr></thead>
                     <tbody>
                     {{range $row := index .Tables 3}}
                         <tr>
@@ -169,6 +180,12 @@
                             <td class="admin-mono">{{index $row 2}}</td>
                             <td>{{index $row 3}}</td>
                             <td>{{index $row 4}}</td>
+                            <td class="admin-grant-remove-cell">
+                                <form method="POST" action="admin?page=people" onsubmit="return confirm('Remove the {{index $row 4}} grant for {{index $row 2}}?')">
+                                    <input type="hidden" name="revokeEmail" value="{{index $row 2}}">
+                                    <button type="submit" class="admin-grant-remove" title="Remove grant for {{index $row 2}}">✕</button>
+                                </form>
+                            </td>
                         </tr>
                     {{end}}
                     </tbody>
