@@ -102,7 +102,6 @@ type PageVars struct {
 	NoSettings     bool
 	HasSettings    bool
 	HasAvailable   bool
-	CardBackURL    string
 	ShowUpsell     bool
 
 	PopularSearches []PopularSearch
@@ -515,7 +514,6 @@ type ConfigType struct {
 		CheckpointsPath string `json:"checkpoints_path"`
 	} `json:"datastore"`
 	Game                   string             `json:"game"`
-	CardBackImage          string             `json:"card_back_image"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
 	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
@@ -700,9 +698,6 @@ func genPageNav(activeTab, sig string) PageVars {
 	if Config.OfflineKey != "" {
 		pageVars.DisableChart = true
 	}
-
-	// Set card back
-	pageVars.CardBackURL = Config.CardBackImage
 
 	// Allocate a new navigation bar
 	pageVars.Nav = make([]NavElem, len(DefaultNav))
