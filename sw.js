@@ -49,10 +49,15 @@ var SHELL_URLS = [
 // keyrune CDN is cross-origin and uncacheable; mobile renderer degrades to set-code span offline
 
 self.addEventListener('install', function (e) {
-    // No skipWaiting: new shells activate after the old session's pages go away.
+    // cache: 'reload' bypasses HTTP caches so precache never picks up a stale edge/browser hit.
     e.waitUntil(caches.open(SHELL_CACHE).then(function (c) {
-        return c.addAll(SHELL_URLS);
-    }));
+        return Promise.all(SHELL_URLS.map(function (url) {
+            return fetch(new Request(url, { cache: 'reload' })).then(function (res) {
+                if (!res.ok) throw new Error('precache fetch failed: ' + url);
+                return c.put(url, res);
+            });
+        }));
+    }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function (e) {

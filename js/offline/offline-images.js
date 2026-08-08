@@ -30,17 +30,18 @@
         var work = [];
         var totalBytes = 0;
         var totalCount = 0;
+        var missing = [];
         var codes = (sel || []).slice().sort();
         codes.forEach(function (code) {
             var img = images ? images[code] : null;
-            if (!img) return;
+            if (!img) { missing.push(code); return; }
             var st = states ? states[code] : null;
             if (st && st.done && st.hash === img.h) return;
             work.push({ code: code, hash: img.h, count: img.n || 0, bytes: img.b || 0 });
             totalBytes += img.b || 0;
             totalCount += img.n || 0;
         });
-        return { work: work, totalBytes: totalBytes, totalCount: totalCount };
+        return { work: work, totalBytes: totalBytes, totalCount: totalCount, missing: missing };
     }
 
     function estimateSelection(images, codes) {
@@ -62,8 +63,8 @@
         var total = plan.work.length;
         var done = 0;
         var bytes = 0;
-        if (total === 0) return { done: 0, total: 0, bytes: 0, paused: false };
-        if (deps.cancelled()) return { done: 0, total: total, bytes: 0, paused: true };
+        if (total === 0) return { done: 0, total: 0, bytes: 0, paused: false, missing: plan.missing };
+        if (deps.cancelled()) return { done: 0, total: total, bytes: 0, paused: true, missing: plan.missing };
 
         if (self.navigator && self.navigator.storage && self.navigator.storage.estimate) {
             var est = await self.navigator.storage.estimate();
@@ -76,7 +77,7 @@
 
         var cache = await self.caches.open(IMAGE_CACHE);
         for (var i = 0; i < plan.work.length; i++) {
-            if (deps.cancelled()) return { done: done, total: total, bytes: bytes, paused: true };
+            if (deps.cancelled()) return { done: done, total: total, bytes: bytes, paused: true, missing: plan.missing };
             var item = plan.work[i];
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
 
@@ -114,7 +115,7 @@
             done++;
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
         }
-        return { done: done, total: total, bytes: bytes, paused: false };
+        return { done: done, total: total, bytes: bytes, paused: false, missing: plan.missing };
     }
 
     // Removes cached images and state rows for editions no longer selected.
