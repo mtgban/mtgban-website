@@ -456,7 +456,7 @@
                                         {{if $entry.URL}}<a class="m-vendor-link" href="{{$entry.URL}}" target="_blank" rel="nofollow">{{$entry.ScraperName}}</a>{{else}}{{$entry.ScraperName}}{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price">{{if eq $entry.Shorthand "SYP"}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
+                                        <span class="m-vendor-price">{{if $entry.QuantityPriority}}# {{$entry.Quantity}}{{else if $entry.Price}}$ {{printf "%.2f" $entry.Price}}{{else}}n/a{{end}}</span>
                                         <span class="m-vendor-qty"></span>
                                     </span>
                                 </div>
@@ -485,7 +485,7 @@
                                             {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                         </span>
                                         <span class="m-vendor-right">
-                                            <span class="m-vendor-price{{if and (ne $entry.Shorthand "SYP") (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
+                                            <span class="m-vendor-price{{if and (not $entry.QuantityPriority) (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
                                             <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                             <i class="m-vendor-chevron" data-lucide="chevron-down"></i>
                                         </span>
@@ -519,7 +519,7 @@
                                         {{if eq $ei 0}}<span class="m-best-badge">Best</span>{{end}}
                                     </span>
                                     <span class="m-vendor-right">
-                                        <span class="m-vendor-price{{if and (ne $entry.Shorthand "SYP") (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
+                                        <span class="m-vendor-price{{if and (not $entry.QuantityPriority) (gt $card.GoodBuylist 0.0) (ge $entry.Price $card.GoodBuylist)}} m-price-best{{end}}">$ {{printf "%.2f" $entry.Price}}</span>
                                         <span class="m-vendor-qty">{{if and $entry.Quantity (eq $conditions "NM")}}{{$entry.Quantity}}{{end}}</span>
                                     </span>
                                 </div>
