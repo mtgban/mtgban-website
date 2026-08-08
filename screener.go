@@ -175,14 +175,25 @@ func sortScreenerRows(rows []ScreenerResult, field, dir string) {
 	if field == "" {
 		field = "pct"
 	}
-	sort.SliceStable(rows, func(i, j int) bool {
-		a, _ := strconv.ParseFloat(rows[i].FieldValue(field), 64)
-		b, _ := strconv.ParseFloat(rows[j].FieldValue(field), 64)
+	// FieldValue formats the field per call; resolve each row's key once.
+	type decorated struct {
+		row ScreenerResult
+		num float64
+	}
+	dec := make([]decorated, len(rows))
+	for i := range rows {
+		num, _ := strconv.ParseFloat(rows[i].FieldValue(field), 64)
+		dec[i] = decorated{row: rows[i], num: num}
+	}
+	sort.SliceStable(dec, func(i, j int) bool {
 		if dir == "asc" {
-			return a < b
+			return dec[i].num < dec[j].num
 		}
-		return a > b
+		return dec[i].num > dec[j].num
 	})
+	for i := range dec {
+		rows[i] = dec[i].row
+	}
 }
 
 type EditionFacet struct {
