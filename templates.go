@@ -134,6 +134,9 @@ var funcMap = template.FuncMap{
 	"game_title": func() string {
 		return gameMap[Config.Game]
 	},
+	"card_back": func() string {
+		return "/img/backs/" + Config.Game + ".webp"
+	},
 	"uuid2ckid": func(s string) string {
 		bl, err := findVendorBuylist("CK")
 		if err != nil {
