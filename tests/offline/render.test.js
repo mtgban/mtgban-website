@@ -47,7 +47,7 @@ test('header mirrors search.html classes and data attrs', () => {
     expect(html).toContain('class="result-header result-first"');
     expect(html).toContain('data-card-id="uuid-1"');
     expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
-    expect(html).toContain('class="ss ss-neo ss-2x ss-fw result-set-icon"');
+    expect(html).toContain('class="ss ss-neo ss-rare ss-2x ss-fw result-set-icon"');
     expect(html).toContain('class="result-card-info"');
     expect(html).toContain('class="result-card-name-row"');
     expect(html).toContain('class="result-card-name"');
@@ -275,4 +275,19 @@ test('card without image key renders empty data-image-url', () => {
     const html = R.buildHTML([r], CTX);
     expect(html).toContain('data-image-url=""');
     expect(html).not.toContain('/api/offline/images/');
+});
+
+test('keyruneClasses mirrors keyruneForCardSet rarity/foil mapping', () => {
+    expect(R.keyruneClasses({r: 'mythic', f: false, e: false})).toBe(' ss-mythic');
+    expect(R.keyruneClasses({r: 'common', f: false, e: false})).toBe('');
+    expect(R.keyruneClasses({r: 'rare', f: true, e: false})).toBe(' ss-foil ss-grad');
+    expect(R.keyruneClasses({r: 'rare', f: true, e: false})).not.toContain('ss-rare');
+    expect(R.keyruneClasses({r: 'rare', f: false, e: true})).toBe(' ss-timeshifted');
+    expect(R.keyruneClasses({r: 'token', f: false, e: false})).toBe('');
+});
+
+test('mythic card renders ss-mythic on the result icon', () => {
+    const r = result({card: Object.assign({}, result().card, {r: 'mythic'})});
+    const html = R.buildHTML([r], CTX);
+    expect(html).toContain('class="ss ss-neo ss-mythic ss-2x ss-fw result-set-icon"');
 });

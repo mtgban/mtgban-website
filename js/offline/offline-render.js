@@ -23,6 +23,24 @@
         return Number(v).toFixed(2);
     }
 
+    // keyruneClasses mirrors keyruneForCardSet's rarity/foil mapping (utils.go:110-152).
+    function keyruneClasses(card) {
+        var rarity = card.r || '';
+        if (rarity === 'special' || card.e) {
+            rarity = 'timeshifted';
+        } else if (rarity === 'token' || rarity === 'oversize') {
+            rarity = 'common';
+        }
+        var out = '';
+        if (rarity && rarity !== 'common' && !card.f) {
+            out += ' ss-' + rarity;
+        }
+        if (card.f) {
+            out += ' ss-foil ss-grad';
+        }
+        return out;
+    }
+
     // finishPrice picks the finish-level price matching the card flags.
     function finishPrice(entry, card) {
         if (card.s && entry.sealed > 0) return entry.sealed;
@@ -321,7 +339,7 @@
 
         var icon;
         if (set.k) {
-            icon = '<i class="ss ss-' + esc(set.k) + ' ss-2x ss-fw result-set-icon"></i>';
+            icon = '<i class="ss ss-' + esc(set.k) + keyruneClasses(card) + ' ss-2x ss-fw result-set-icon"></i>';
         } else {
             icon = '<span>' + esc(card.set) + '</span>';
         }
@@ -411,6 +429,7 @@
         buildHTML: buildHTML,
         noticesHTML: noticesHTML,
         condPrices: condPrices,
-        refRetail: refRetail
+        refRetail: refRetail,
+        keyruneClasses: keyruneClasses
     };
 })(typeof self !== 'undefined' ? self : globalThis);
