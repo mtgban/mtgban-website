@@ -23,6 +23,24 @@
         return Number(v).toFixed(2);
     }
 
+    // keyruneClasses mirrors keyruneForCardSet's rarity/foil mapping (utils.go:110-152).
+    function keyruneClasses(card) {
+        var rarity = card.r || '';
+        if (rarity === 'special' || card.e) {
+            rarity = 'timeshifted';
+        } else if (rarity === 'token' || rarity === 'oversize') {
+            rarity = 'common';
+        }
+        var out = '';
+        if (rarity && rarity !== 'common' && !card.f) {
+            out += ' ss-' + rarity;
+        }
+        if (card.f) {
+            out += ' ss-foil ss-grad';
+        }
+        return out;
+    }
+
     // finishPrice picks the finish-level price matching the card flags.
     function finishPrice(entry, card) {
         if (card.s && entry.sealed > 0) return entry.sealed;
@@ -321,7 +339,7 @@
 
         var icon;
         if (set.k) {
-            icon = '<i class="ss ss-' + esc(set.k) + ' ss-2x ss-fw result-set-icon"></i>';
+            icon = '<i class="ss ss-' + esc(set.k) + keyruneClasses(card) + ' ss-2x ss-fw result-set-icon"></i>';
         } else {
             icon = '<span>' + esc(card.set) + '</span>';
         }
@@ -351,7 +369,9 @@
             ' data-card-name="' + esc(card.n) + '"' +
             ' data-set-code="' + esc(card.set) + '"' +
             ' data-number="' + esc(card.num || '') + '"' +
-            ' data-image-url="' + esc(imgURL) + '">' +
+            ' data-image-url="' + esc(imgURL) + '"' +
+            ' data-foil="' + (card.f ? 'true' : 'false') + '"' +
+            ' data-etched="' + (card.e ? 'true' : 'false') + '">' +
             '<a class="result-set-link" href="' + setQuery + '">' + icon + '</a>' +
             '<div class="result-card-info">' +
             '<div class="result-card-name-row">' +
@@ -364,8 +384,12 @@
     }
 
     function bodyHTML(res, ctx, isLast) {
+        var card = res.card;
         return '<div class="result-body' + (isLast ? ' result-last-body' : '') + '"' +
-            ' data-image-url="' + esc(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '') + '">' +
+            ' data-image-url="' + esc(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '') + '"' +
+            ' data-set-code="' + esc(card.set) + '"' +
+            ' data-foil="' + (card.f ? 'true' : 'false') + '"' +
+            ' data-etched="' + (card.e ? 'true' : 'false') + '">' +
             sellersColumn(res, ctx) +
             buyersColumn(res, ctx) +
             '</div>';
@@ -411,6 +435,7 @@
         buildHTML: buildHTML,
         noticesHTML: noticesHTML,
         condPrices: condPrices,
-        refRetail: refRetail
+        refRetail: refRetail,
+        keyruneClasses: keyruneClasses
     };
 })(typeof self !== 'undefined' ? self : globalThis);

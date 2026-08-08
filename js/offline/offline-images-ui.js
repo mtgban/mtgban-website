@@ -7,6 +7,7 @@
     var imagesMap = null;
     var syncing = false;
     var pauseRequested = false;
+    var syncSelectedCount = 0;
 
     function $(id) { return document.getElementById(id); }
     function fmt(n) { return window.OfflineImages.formatBytes(n); }
@@ -27,6 +28,16 @@
     }
     function buildStorageText(usage, quota) {
         return 'Storage: ' + fmt(usage || 0) + ' used of ' + fmt(quota || 0);
+    }
+    function buildDoneMessage(paused, missingCount, selectedCount) {
+        if (paused) return 'Paused. Sync Images Now resumes where it left off.';
+        if (selectedCount > 0 && missingCount === selectedCount) {
+            return '0 of ' + selectedCount + ' selected editions have bundles yet.';
+        }
+        if (missingCount > 0) {
+            return 'Image sync finished. (' + missingCount + ' editions have no bundles yet)';
+        }
+        return 'Image sync finished.';
     }
 
     function selectedCodes() {
@@ -126,6 +137,7 @@
                 return;
             }
             syncing = true;
+            syncSelectedCount = codes.length;
             pauseRequested = false;
             syncBtn.disabled = true;
             pauseBtn.hidden = false;
@@ -153,9 +165,7 @@
         } else if (msg.type === 'done' && syncing) {
             syncing = false;
             pauseBtn.hidden = true;
-            labelEl.textContent = pauseRequested
-                ? 'Paused. Sync Images Now resumes where it left off.'
-                : 'Image sync finished.';
+            labelEl.textContent = buildDoneMessage(pauseRequested, (msg.imgMissing || []).length, syncSelectedCount);
             pauseRequested = false;
             renderEstimates();
             renderStorage();
@@ -176,6 +186,7 @@
         quotaExceeded: quotaExceeded,
         buildEstimateText: buildEstimateText,
         buildStorageText: buildStorageText,
+        buildDoneMessage: buildDoneMessage,
     };
 
     document.addEventListener('DOMContentLoaded', function () {
