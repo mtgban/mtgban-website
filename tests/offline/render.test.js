@@ -47,6 +47,8 @@ test('header mirrors search.html classes and data attrs', () => {
     expect(html).toContain('class="result-header result-first"');
     expect(html).toContain('data-card-id="uuid-1"');
     expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
+    expect(html).toContain('data-foil="false"');
+    expect(html).toContain('data-etched="false"');
     expect(html).toContain('class="ss ss-neo ss-rare ss-2x ss-fw result-set-icon"');
     expect(html).toContain('class="result-card-info"');
     expect(html).toContain('class="result-card-name-row"');
@@ -56,10 +58,33 @@ test('header mirrors search.html classes and data attrs', () => {
     expect(html).toContain('Kamigawa: Neon Dynasty - Rare #177');
 });
 
+test('header and body carry data-foil/data-etched for foil and etched cards', () => {
+    const foil = result({
+        uuid: 'uuid-foil',
+        card: Object.assign({}, result().card, {uuid: 'uuid-foil', f: true, e: false}),
+    });
+    const foilHtml = R.buildHTML([foil], CTX);
+    expect(foilHtml).toContain('data-foil="true"');
+    expect(foilHtml).toContain('data-etched="false"');
+
+    const etched = result({
+        uuid: 'uuid-etched',
+        card: Object.assign({}, result().card, {uuid: 'uuid-etched', f: false, e: true}),
+    });
+    const etchedHtml = R.buildHTML([etched], CTX);
+    expect(etchedHtml).toContain('data-foil="false"');
+    expect(etchedHtml).toContain('data-etched="true"');
+
+    const plainHtml = R.buildHTML([result()], CTX);
+    expect(plainHtml).toContain('data-foil="false"');
+    expect(plainHtml).toContain('data-etched="false"');
+});
+
 test('body columns and condition grouping', () => {
     const html = R.buildHTML([result()], CTX);
     expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
     expect(html).toContain('class="result-body result-last-body"');
+    expect(html).toContain('data-set-code="NEO"');
     expect(html).toContain('<div class="result-col-header">Sellers</div>');
     expect(html).toContain('<div class="result-col-header">Buyers</div>');
     expect(html).toContain('<div class="price-cond-header">Condition: NM</div>');

@@ -369,7 +369,9 @@
             ' data-card-name="' + esc(card.n) + '"' +
             ' data-set-code="' + esc(card.set) + '"' +
             ' data-number="' + esc(card.num || '') + '"' +
-            ' data-image-url="' + esc(imgURL) + '">' +
+            ' data-image-url="' + esc(imgURL) + '"' +
+            ' data-foil="' + (card.f ? 'true' : 'false') + '"' +
+            ' data-etched="' + (card.e ? 'true' : 'false') + '">' +
             '<a class="result-set-link" href="' + setQuery + '">' + icon + '</a>' +
             '<div class="result-card-info">' +
             '<div class="result-card-name-row">' +
@@ -382,8 +384,12 @@
     }
 
     function bodyHTML(res, ctx, isLast) {
+        var card = res.card;
         return '<div class="result-body' + (isLast ? ' result-last-body' : '') + '"' +
-            ' data-image-url="' + esc(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '') + '">' +
+            ' data-image-url="' + esc(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '') + '"' +
+            ' data-set-code="' + esc(card.set) + '"' +
+            ' data-foil="' + (card.f ? 'true' : 'false') + '"' +
+            ' data-etched="' + (card.e ? 'true' : 'false') + '">' +
             sellersColumn(res, ctx) +
             buyersColumn(res, ctx) +
             '</div>';
