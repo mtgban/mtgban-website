@@ -54,7 +54,7 @@ test('header data attributes', () => {
 
 test('keyrune icon when set.k present', () => {
     const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('class="ss ss-neo ss-fw"');
+    expect(html).toContain('class="ss ss-neo ss-rare ss-fw"');
 });
 
 test('set-code span fallback when no keyrune', () => {
@@ -254,6 +254,15 @@ test('country flag appended to store name', () => {
     r.buylist.ABU = {regular: 15, conditions: {NM: 15}};
     const html = R.buildHTML([r], ctx);
     expect(html).toContain('ABU Games \u{1F1EF}\u{1F1F5}');
+});
+
+test('keyruneClasses mirrors keyruneForCardSet rarity/foil mapping', () => {
+    expect(R.keyruneClasses({r: 'mythic', f: false, e: false})).toBe(' ss-mythic');
+    expect(R.keyruneClasses({r: 'common', f: false, e: false})).toBe('');
+    expect(R.keyruneClasses({r: 'rare', f: true, e: false})).toBe(' ss-foil ss-grad');
+    expect(R.keyruneClasses({r: 'rare', f: true, e: false})).not.toContain('ss-rare');
+    expect(R.keyruneClasses({r: 'rare', f: false, e: true})).toBe(' ss-timeshifted');
+    expect(R.keyruneClasses({r: 'token', f: false, e: false})).toBe('');
 });
 
 test('index-only card: INDEX m-cond-group gets active class', () => {

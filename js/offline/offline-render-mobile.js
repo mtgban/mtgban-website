@@ -18,6 +18,24 @@
 
     function money(v) { return Number(v).toFixed(2); }
 
+    // keyruneClasses mirrors keyruneForCardSet's rarity/foil mapping (utils.go:110-152).
+    function keyruneClasses(card) {
+        var rarity = card.r || '';
+        if (rarity === 'special' || card.e) {
+            rarity = 'timeshifted';
+        } else if (rarity === 'token' || rarity === 'oversize') {
+            rarity = 'common';
+        }
+        var out = '';
+        if (rarity && rarity !== 'common' && !card.f) {
+            out += ' ss-' + rarity;
+        }
+        if (card.f) {
+            out += ' ss-foil ss-grad';
+        }
+        return out;
+    }
+
     function finishPrice(entry, card) {
         if (card.s && entry.sealed > 0) return entry.sealed;
         if (card.e && entry.etched > 0) return entry.etched;
@@ -117,7 +135,7 @@
         var card = res.card;
         var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '';
         var icon = res._setKey
-            ? '<i class="ss ss-' + esc(res._setKey) + ' ss-fw"></i>'
+            ? '<i class="ss ss-' + esc(res._setKey) + keyruneClasses(card) + ' ss-fw"></i>'
             : '<span>' + esc(card.set) + '</span>';
         var finish = '';
         if (card.e) finish = '<span class="m-badge etched">Etched</span>';
@@ -384,5 +402,5 @@
         container.innerHTML = noticesHTML(exec, ctx) + buildHTML(exec.results, ctx);
     }
 
-    root.OfflineRenderMobile = {render: render, buildHTML: buildHTML, noticesHTML: noticesHTML, condPrices: condPrices, refRetail: refRetail};
+    root.OfflineRenderMobile = {render: render, buildHTML: buildHTML, noticesHTML: noticesHTML, condPrices: condPrices, refRetail: refRetail, keyruneClasses: keyruneClasses};
 })(typeof self !== 'undefined' ? self : globalThis);
