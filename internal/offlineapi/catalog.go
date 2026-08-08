@@ -81,12 +81,18 @@ type catalogCache struct {
 // mtgmatcher datastore and scraper list.
 func (s *Service) refreshCatalog() {
 	cards := map[string]catalogCard{}
-	for _, uuid := range mtgmatcher.GetUUIDs() {
+	addCard := func(uuid string) {
 		co, err := mtgmatcher.GetUUID(uuid)
 		if err != nil {
-			continue
+			return
 		}
 		cards[uuid] = newCatalogCard(co, s.deps.CardObjectSources(co))
+	}
+	for _, uuid := range mtgmatcher.GetUUIDs() {
+		addCard(uuid)
+	}
+	for _, uuid := range mtgmatcher.GetSealedUUIDs() {
+		addCard(uuid)
 	}
 
 	sets := map[string]catalogSet{}
