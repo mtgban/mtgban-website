@@ -49,10 +49,9 @@ var SHELL_URLS = [
 // keyrune CDN is cross-origin and uncacheable; mobile renderer degrades to set-code span offline
 
 self.addEventListener('install', function (e) {
-    // No skipWaiting: new shells activate after the old session's pages go away.
     e.waitUntil(caches.open(SHELL_CACHE).then(function (c) {
         return c.addAll(SHELL_URLS);
-    }));
+    }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function (e) {
