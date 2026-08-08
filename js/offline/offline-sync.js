@@ -23,8 +23,9 @@ function forbidden(stage) {
 }
 
 // Same-origin credentials carry the MTGBAN cookie; 403 means lapsed access.
-function fetchChecked(url, stage) {
-    return fetch(url, { credentials: 'same-origin' }).then(function(resp) {
+function fetchChecked(url, stage, opts) {
+    var options = Object.assign({ credentials: 'same-origin' }, opts);
+    return fetch(url, options).then(function(resp) {
         if (resp.status === 403) throw forbidden(stage);
         if (!resp.ok) {
             var err = new Error('http ' + resp.status);
@@ -73,7 +74,7 @@ async function runSync(msg) {
     var stage = 'manifest';
     try {
         post({ type: 'progress', stage: 'manifest', done: 0, total: 1 });
-        var manifest = await fetchChecked('/api/offline/manifest.json', 'manifest')
+        var manifest = await fetchChecked('/api/offline/manifest.json', 'manifest', { cache: 'no-cache' })
             .then(function(r) { return r.json(); });
         post({ type: 'progress', stage: 'manifest', done: 1, total: 1 });
 
@@ -90,7 +91,7 @@ async function runSync(msg) {
         var catalogVersion = await self.OfflineDB.getMeta('catalogVersion');
         if (manifest.catalog && manifest.catalog !== catalogVersion) {
             post({ type: 'progress', stage: 'catalog', done: 0, total: 1 });
-            var catalog = await fetchChecked('/api/offline/catalog.json', 'catalog')
+            var catalog = await fetchChecked('/api/offline/catalog.json', 'catalog', { cache: 'no-cache' })
                 .then(function(r) { return r.json(); });
             await rebuildCatalog(catalog);
             await self.OfflineDB.setMeta('catalogVersion', catalog.version);
