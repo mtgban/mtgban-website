@@ -148,7 +148,7 @@
         if (syncWorker) {
             syncWorker.terminate();
             syncWorker = null;
-            syncing = false;
+            setSyncing(false);
         }
         // Remove selections first, offline_mode last: one userstate PATCH carries all.
         removePref('offline_stores');
@@ -166,6 +166,18 @@
     var syncWorker = null;
     var syncing = false;
 
+    // Warn on navigation while a sync is running so in-flight work isn't silently dropped.
+    function onBeforeUnload(e) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+
+    function setSyncing(v) {
+        syncing = v;
+        if (v) window.addEventListener('beforeunload', onBeforeUnload);
+        else window.removeEventListener('beforeunload', onBeforeUnload);
+    }
+
     function setSyncStatus(text) {
         var el = document.getElementById('offlineSyncStatus');
         if (el) el.textContent = text;
@@ -181,7 +193,7 @@
         syncWorker = new Worker('/js/offline/offline-sync.js');
         syncWorker.onmessage = onSyncMessage;
         syncWorker.onerror = function(e) {
-            syncing = false;
+            setSyncing(false);
             syncWorker = null;
             setSyncStatus('sync failed: ' + (e.message || 'worker error'));
         };
@@ -197,7 +209,7 @@
             if (m.code) label += ' (' + m.code + ')';
             setSyncStatus('syncing: ' + label);
         } else if (m.type === 'done') {
-            syncing = false;
+            setSyncing(false);
             state.bytes = m.bytes || 0;
             OfflineDB.setMeta('lastSync', new Date().toISOString()).then(refreshStatus).then(function() {
                 updateAuthNotice();
@@ -205,7 +217,7 @@
                 paintUsage();
             });
         } else if (m.type === 'error') {
-            syncing = false;
+            setSyncing(false);
             if (m.message === 'forbidden') {
                 setAuthLapsed(true);
                 setSyncStatus('sync stopped: offline access expired');
@@ -217,7 +229,7 @@
 
     function sync() {
         if (syncing || !enabled()) return;
-        syncing = true;
+        setSyncing(true);
         setSyncStatus('syncing: starting');
         Promise.all([
             OfflineDB.getMeta('storesSel'),
@@ -231,7 +243,7 @@
                 imgEditions: sel[2] || [],
             });
         }).catch(function(err) {
-            syncing = false;
+            setSyncing(false);
             setSyncStatus('sync error: ' + err);
         });
     }
