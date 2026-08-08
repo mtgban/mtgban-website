@@ -558,7 +558,7 @@ func banPricesFromRows(cardIds []string, found map[string]map[string][]SearchEnt
 
 				shouldQty := qty && !row.NoQuantity
 				if vendorSide {
-					shouldQty = qty && (!indexStores[row.Shorthand] || row.Shorthand == "SYP")
+					shouldQty = qty && (!indexStores[row.Shorthand] || row.QuantityPriority)
 				}
 				if shouldQty {
 					if co.Sealed {
@@ -860,7 +860,7 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		}
 
 		// Loop through cards
-		shouldQty := qty && (!vendor.Info().MetadataOnly || vendor.Info().Shorthand == "SYP")
+		shouldQty := qty && (!vendor.Info().MetadataOnly || vendor.Info().QuantityPriority)
 		shouldBaseCond := !vendor.Info().MetadataOnly && !vendor.Info().SealedMode
 
 		rule := EntryRule{

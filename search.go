@@ -54,6 +54,12 @@ type SearchEntry struct {
 	NoQuantity   bool
 	BundleIcon   string
 
+	// QuantityPriority marks a store whose rows are read as a count of
+	// copies wanted rather than as an offer, so the quantity is shown
+	// where the price would be and the price is not ranked against the
+	// others. The scraper declares it; nothing here names the store.
+	QuantityPriority bool
+
 	// Badge renders this entry as the official "Available at Amazon"
 	// search-link badge rather than a normal store row. BundleIcon is a
 	// generic per-store icon, so it cannot be used to single this out.
@@ -1151,15 +1157,16 @@ func searchSellersNG(cardIds []string, config SearchConfig) (foundSellers map[st
 
 				// Prepare all the deets
 				res := SearchEntry{
-					ScraperName: name,
-					Shorthand:   info.Shorthand,
-					Price:       entry.Price,
-					Quantity:    entry.Quantity,
-					URL:         entry.URL,
-					NoQuantity:  info.NoQuantityInventory || info.MetadataOnly,
-					BundleIcon:  icon,
-					Country:     Country2flag[info.CountryFlag],
-					ExtraValues: entry.ExtraValues,
+					ScraperName:      name,
+					Shorthand:        info.Shorthand,
+					Price:            entry.Price,
+					Quantity:         entry.Quantity,
+					URL:              entry.URL,
+					NoQuantity:       info.NoQuantityInventory || info.MetadataOnly,
+					BundleIcon:       icon,
+					QuantityPriority: info.QuantityPriority,
+					Country:          Country2flag[info.CountryFlag],
+					ExtraValues:      entry.ExtraValues,
 				}
 				if info.CreditMultiplier > 0 {
 					res.Credit = entry.Price / info.CreditMultiplier
