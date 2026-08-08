@@ -132,7 +132,10 @@
         paintCount();
         paintPills();
         var first = document.querySelector('#offline-results .result-header');
-        if (first) showImage(first.getAttribute('data-image-url'));
+        if (first) {
+            showImage(first.getAttribute('data-image-url'), first.getAttribute('data-foil') === 'true',
+                first.getAttribute('data-etched') === 'true', first.getAttribute('data-set-code'));
+        }
     }
 
     async function runQuery(q) {
@@ -148,9 +151,15 @@
         paint();
     }
 
-    function showImage(url) {
+    function showImage(url, isFoil, isEtched, setCode) {
         var img = document.getElementById('cardImage');
         if (img) img.src = url || PLACEHOLDER;
+        var wrapper = document.getElementById('cardImageWrapper');
+        if (wrapper) {
+            wrapper.setAttribute('data-foil', (url && isFoil) ? 'true' : 'false');
+            wrapper.setAttribute('data-etched', (url && isEtched) ? 'true' : 'false');
+            wrapper.setAttribute('data-set', setCode || '');
+        }
     }
 
     function showErrorNotice(err) {
@@ -163,7 +172,10 @@
         // Sidebar image follows the hovered result, like search.html.
         document.getElementById('offline-results').addEventListener('mouseover', function (e) {
             var row = e.target.closest('[data-image-url]');
-            if (row) showImage(row.getAttribute('data-image-url'));
+            if (row) {
+                showImage(row.getAttribute('data-image-url'), row.getAttribute('data-foil') === 'true',
+                    row.getAttribute('data-etched') === 'true', row.getAttribute('data-set-code'));
+            }
         });
 
         // Failed offline images fall back to the neutral placeholder.
