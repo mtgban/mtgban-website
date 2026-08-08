@@ -64,6 +64,25 @@ func TestNewCatalogCardIncludesImageKey(t *testing.T) {
 	}
 }
 
+func TestNewCatalogCardSealed(t *testing.T) {
+	co := &mtgmatcher.CardObject{
+		Card: mtgmatcher.Card{
+			Name:    "Modern Horizons 3 Collector Booster",
+			SetCode: "MH3",
+			Images:  map[string]string{"full": "https://product-images.tcgplayer.com/541185.jpg"},
+		},
+		Sealed: true,
+	}
+
+	card := newCatalogCard(co, nil)
+	if !card.Sealed {
+		t.Error("Sealed = false, want true")
+	}
+	if card.Image != "p-MH3-541185" {
+		t.Errorf("Image = %q, want %q", card.Image, "p-MH3-541185")
+	}
+}
+
 func TestNewCatalogCardOmitsImageKeyWhenMissing(t *testing.T) {
 	co := &mtgmatcher.CardObject{
 		Card: mtgmatcher.Card{
