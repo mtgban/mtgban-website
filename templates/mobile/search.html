@@ -178,7 +178,7 @@
     {{/* Result count + sort pills */}}
     {{if .TotalUnique}}
     <div class="m-result-meta">
-        <span>{{.TotalUnique}} result{{if gt (len .AllKeys) 1}}s{{end}} found</span>
+        <span>{{.TotalUnique}} result{{if ne .TotalUnique 1}}s{{end}} found</span>
         {{if gt .TotalUnique (len .AllKeys)}}<span class="m-meta-sub">({{len .AllKeys}} shown)</span>{{end}}
         {{if not .NoSort}}
         <div class="m-sort-pills">

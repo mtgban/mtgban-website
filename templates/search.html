@@ -118,7 +118,7 @@
             <span class="search-result-count">
                 {{.TotalUnique}}
                 {{if .TotalCards}}/ {{.TotalCards}}{{end}}
-                result{{if gt (len .AllKeys) 1}}s{{end}} found
+                result{{if ne .TotalUnique 1}}s{{end}} found
                 {{if gt .TotalUnique (len .AllKeys)}}({{len .AllKeys}} shown){{end}}
             </span>
         </div>
