@@ -27,6 +27,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
+	"github.com/mtgban/mtgban-website/internal/tmplparse"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -1436,7 +1437,7 @@ func buildTemplateCache() (map[string]*template.Template, error) {
 				key = "mobile/" + name
 			}
 			baseName, files := renderTemplateFiles(name, mobile)
-			t, err := template.New(baseName).Funcs(funcMap).ParseFiles(files...)
+			t, err := tmplparse.ParseFiles(baseName, files, funcMap)
 			if err != nil {
 				return nil, fmt.Errorf("parsing %s (mobile=%v): %w", name, mobile, err)
 			}
@@ -1452,7 +1453,7 @@ func render(w http.ResponseWriter, tmpl string, pageVars PageVars) {
 	if DevMode {
 		// Hot-reload: re-parse from disk every request
 		baseName, files := renderTemplateFiles(tmpl, pageVars.IsMobile)
-		t, err := template.New(baseName).Funcs(funcMap).ParseFiles(files...)
+		t, err := tmplparse.ParseFiles(baseName, files, funcMap)
 		if err != nil {
 			log.Print("template parsing error: ", err)
 			return
