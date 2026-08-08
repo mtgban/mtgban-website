@@ -45,3 +45,28 @@ func TestBuildLongUpsertQuery(t *testing.T) {
 		t.Errorf("args order wrong: %+v", args[:5])
 	}
 }
+
+// TestMoverQueriesShareGameScope guards the drift that let the anchors and the
+// result set disagree: the anchor dates were provider-wide while the rows were
+// game-scoped, so a game a day behind its provider's newest date resolved to an
+// anchor holding none of its rows. Behavior lives in
+// TestMoversLongGameScopingLive; this keeps the three queries textually tied
+// together without needing a database.
+func TestMoverQueriesShareGameScope(t *testing.T) {
+	for _, q := range []struct {
+		name  string
+		query string
+	}{
+		{"latest", moverLatestQuery},
+		{"prior", moverPriorQuery},
+		{"rows", moverRowsQuery},
+	} {
+		if !strings.Contains(q.query, moverGameScope) {
+			t.Errorf("%s query does not carry moverGameScope:\n%s", q.name, q.query)
+		}
+	}
+	// The scope owns $1 and $2 in every query, so the rest start at $3.
+	if strings.Contains(moverRowsQuery, "provider=$1") || strings.Contains(moverLatestQuery, "provider = $1") {
+		t.Error("provider must not reuse the game-scope parameters")
+	}
+}
