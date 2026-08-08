@@ -18,6 +18,10 @@ mtgban-website
 # Dependency directories (remove the comment below to include it)
 vendor/
 
+# Vendored frontend assets (exempt from the vendor/ ignore above)
+!css/vendor/
+!css/vendor/**
+
 # Scraper daily cache
 cache_*
 

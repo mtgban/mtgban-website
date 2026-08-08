@@ -28,6 +28,9 @@ var SHELL_URLS = [
     '/js/settings.js?hash=' + BUILD,
     '/css/search.css?hash=' + BUILD,
     '/css/offline.css?hash=' + BUILD,
+    '/css/vendor/keyrune/keyrune.css?hash=' + BUILD,
+    '/css/vendor/keyrune/keyrune.woff2',
+    '/css/vendor/keyrune/keyrune.woff',
     '/js/offline/offline-db.js?hash=' + BUILD,
     '/js/offline/offline-mode.js?hash=' + BUILD,
     '/js/offline/offline-format.js?hash=' + BUILD,
@@ -46,7 +49,7 @@ var SHELL_URLS = [
     '/img/favicon/favicon-32x32.png',
     '/img/favicon/site.webmanifest'
 ];
-// keyrune CDN is cross-origin and uncacheable; mobile renderer degrades to set-code span offline
+// keyrune is now vendored same-origin (css/vendor/keyrune) and precached above
 
 self.addEventListener('install', function (e) {
     // cache: 'reload' bypasses HTTP caches so precache never picks up a stale edge/browser hit.
