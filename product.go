@@ -70,6 +70,7 @@ func GetInfos() map[string]mtgban.InventoryRecord {
 // TCGplayer's own identifiers from the tcgdumper catalog dump, published
 // together as a single immutable snapshot.
 type tcgCatalogSnapshot struct {
+	CategoryID   int
 	CategoryName string
 	Products     map[string]tcgcatalog.Entry
 }
@@ -85,6 +86,18 @@ func GetTCGCatalog() (string, map[string]tcgcatalog.Entry) {
 		return "", nil
 	}
 	return p.CategoryName, p.Products
+}
+
+// GetTCGCategoryID returns TCGplayer's category id for the loaded catalog, or 0
+// when no catalog is loaded. It is how the site learns which slice of the
+// shared price archive is its own, so enabling a game is a matter of shipping
+// its dump rather than editing a table of ids here.
+func GetTCGCategoryID() int {
+	p := tcgCatalogPtr.Load()
+	if p == nil {
+		return 0
+	}
+	return p.CategoryID
 }
 
 // EditionsSnapshot bundles every piece of edition-derived state produced by
@@ -716,10 +729,10 @@ func tcgCatalogPath() string {
 
 // loadTCGCatalog streams the catalog dump living alongside the datastore,
 // served by the same bucket.
-func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, string, error) {
+func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Category, error) {
 	reader, err := simplecloud.InitReader(context.Background(), DatastoreBucket, path)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 	defer reader.Close()
 
@@ -774,12 +787,14 @@ func runSealedAnalysis() {
 	// Index TCGplayer's own identifiers for every product, used to report
 	// values TCGplayer always recognizes in exported CSVs. A missing dump
 	// is not fatal, the CSV columns simply stay blank.
-	products, categoryName, err := loadTCGCatalog(tcgCatalogPath())
-	if err != nil {
+	products, category, err := loadTCGCatalog(tcgCatalogPath())
+	if err != nil || category == nil {
 		log.Println("tcg catalog:", err)
 	} else {
-		log.Println("Loaded tcg catalog for", categoryName+",", len(products), "products")
-		tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryName: categoryName, Products: products})
+		log.Println("Loaded tcg catalog for", category.Name+",", len(products), "products")
+		tcgCatalogPtr.Store(&tcgCatalogSnapshot{
+			CategoryID: category.ID, CategoryName: category.Name, Products: products,
+		})
 	}
 }
 

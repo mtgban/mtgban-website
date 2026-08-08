@@ -8,6 +8,14 @@ import (
 	"strconv"
 )
 
+// Category identifies the dumped category: TCGplayer's own id and name (e.g.
+// 1, "Magic"). The id scopes reads of the shared price archive to one game, so
+// a game carries its own category in its dump rather than in a table here.
+type Category struct {
+	ID   int
+	Name string
+}
+
 // Entry carries TCGplayer's own identifiers of a product.
 type Entry struct {
 	// The product name
@@ -34,38 +42,40 @@ type product struct {
 	} `json:"extendedData"`
 }
 
-// Load parses a catalog dump into a map of entries keyed by product id,
-// also returning TCGplayer's own name of the dumped category (e.g. "Magic").
+// Load parses a catalog dump into a map of entries keyed by product id, also
+// returning the dumped category. The category is nil on error, and never nil
+// otherwise (a dump without a category object yields a zero-valued one).
 //
 // Dumps easily exceed 1GB uncompressed, so the top-level object is walked
 // one token at a time and products are decoded one by one; the whole
 // document is never held in memory.
-func Load(r io.Reader) (map[string]Entry, string, error) {
+func Load(r io.Reader) (map[string]Entry, *Category, error) {
 	dec := json.NewDecoder(r)
 	groupNames := map[int]string{}
 	products := map[string]Entry{}
-	var categoryName string
+	var category Category
 
 	// Opening brace of the top-level object
 	if _, err := dec.Token(); err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 	for dec.More() {
 		keyToken, err := dec.Token()
 		if err != nil {
-			return nil, "", err
+			return nil, nil, err
 		}
 		key, _ := keyToken.(string)
 		switch key {
 		case "category":
-			var category struct {
-				Name string `json:"name"`
+			var cat struct {
+				CategoryId int    `json:"categoryId"`
+				Name       string `json:"name"`
 			}
-			err := dec.Decode(&category)
+			err := dec.Decode(&cat)
 			if err != nil {
-				return nil, "", err
+				return nil, nil, err
 			}
-			categoryName = category.Name
+			category = Category{ID: cat.CategoryId, Name: cat.Name}
 		case "groups":
 			var groups []struct {
 				GroupId int    `json:"groupId"`
@@ -73,7 +83,7 @@ func Load(r io.Reader) (map[string]Entry, string, error) {
 			}
 			err := dec.Decode(&groups)
 			if err != nil {
-				return nil, "", err
+				return nil, nil, err
 			}
 			for _, group := range groups {
 				groupNames[group.GroupId] = group.Name
@@ -81,13 +91,13 @@ func Load(r io.Reader) (map[string]Entry, string, error) {
 		case "products":
 			// Opening bracket of the array
 			if _, err := dec.Token(); err != nil {
-				return nil, "", err
+				return nil, nil, err
 			}
 			for dec.More() {
 				var prod product
 				err := dec.Decode(&prod)
 				if err != nil {
-					return nil, "", err
+					return nil, nil, err
 				}
 				entry := Entry{
 					Name:    prod.Name,
@@ -105,16 +115,16 @@ func Load(r io.Reader) (map[string]Entry, string, error) {
 			}
 			// Closing bracket of the array
 			if _, err := dec.Token(); err != nil {
-				return nil, "", err
+				return nil, nil, err
 			}
 		default:
 			// Any future field: decode and discard
 			var skip json.RawMessage
 			err := dec.Decode(&skip)
 			if err != nil {
-				return nil, "", err
+				return nil, nil, err
 			}
 		}
 	}
-	return products, categoryName, nil
+	return products, &category, nil
 }
