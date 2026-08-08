@@ -68,7 +68,17 @@ test('computeWorkList selects missing, changed, and unfinished bundles', () => {
 test('computeWorkList ignores bundle-less codes and handles empty input', () => {
     const plan = OfflineImages.computeWorkList(images, ['NEO', 'NOPE'], {});
     expect(plan.work).toEqual([{ code: 'NEO', hash: 'aaaa', count: 302, bytes: 24800000 }]);
-    expect(OfflineImages.computeWorkList(null, null, null).work).toEqual([]);
+    expect(plan.missing).toEqual(['NOPE']);
+    const empty = OfflineImages.computeWorkList(null, null, null);
+    expect(empty.work).toEqual([]);
+    expect(empty.missing).toEqual([]);
+});
+
+test('computeWorkList reports missing codes separately from up-to-date skips', () => {
+    const states = { NEO: { code: 'NEO', hash: 'aaaa', done: true } };
+    const plan = OfflineImages.computeWorkList(images, ['NEO', 'NOPE'], states);
+    expect(plan.work).toEqual([]);
+    expect(plan.missing).toEqual(['NOPE']);
 });
 
 test('computeWorkList sorts work by set code', () => {
@@ -121,7 +131,35 @@ test('syncImages returns immediately when no work is needed', async () => {
         cancelled: () => false,
         putImgState: async () => {},
     });
-    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false });
+    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: [] });
+});
+
+test('syncImages returns missing codes with zero total when selection has no bundles yet', async () => {
+    const mod = loadWithExtras({ fflate });
+    const result = await mod.syncImages({
+        images: { TST: { h: 'h1', n: 1, b: 100 } },
+        sel: ['NOPE'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async () => {},
+    });
+    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: ['NOPE'] });
+});
+
+test('syncImages includes missing codes alongside completed work when some editions have no bundles', async () => {
+    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
+    const { caches } = makeFakeCache();
+    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
+    const result = await mod.syncImages({
+        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
+        sel: ['TST', 'NOPE'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async () => {},
+    });
+    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: ['NOPE'] });
 });
 
 test('syncImages downloads, unpacks, and marks done', async () => {
@@ -138,7 +176,7 @@ test('syncImages downloads, unpacks, and marks done', async () => {
         cancelled: () => false,
         putImgState: async r => states.push({ ...r }),
     });
-    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false });
+    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: [] });
     expect(posts).toHaveLength(2);
     expect(posts[0]).toMatchObject({ type: 'progress', stage: 'images', done: 0, total: 1, code: 'TST', bytes: 0 });
     expect(posts[1]).toMatchObject({ type: 'progress', stage: 'images', done: 1, total: 1, bytes: zip.byteLength });
@@ -285,7 +323,7 @@ test('syncImages pauses between bundles when cancelled', async () => {
         cancelled,
         putImgState: async () => {},
     });
-    expect(result).toEqual({ done: 1, total: 2, bytes: zip.byteLength, paused: true });
+    expect(result).toEqual({ done: 1, total: 2, bytes: zip.byteLength, paused: true, missing: [] });
     // AAA processed (1 cache entry); BBB skipped
     expect(cache.store).toHaveLength(1);
     // AAA's two posts; BBB cancel before any post for BBB
