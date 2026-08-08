@@ -260,14 +260,20 @@
         return (i === 0 ? n : n.toFixed(1)) + ' ' + units[i];
     }
 
+    // Sync-status suffix for the storage line: last-sync date, first-sync-in-progress, or not yet synced.
+    function syncStatusText(s) {
+        if (s.lastSync) return 'last sync ' + new Date(s.lastSync).toLocaleString();
+        if (s.syncing) return 'enabling offline mode';
+        return 'not synced yet';
+    }
+
     // Repaint the settings storage line from current status; safe to call anytime.
     function paintUsage() {
         var usage = document.getElementById('settings-offline-usage');
         if (!usage) return;
         if (!enabled()) { usage.textContent = ''; return; }
         var s = status();
-        usage.textContent = 'Using ' + fmtBytes(s.bytes) +
-            (s.lastSync ? ', last sync ' + new Date(s.lastSync).toLocaleString() : ', not synced yet');
+        usage.textContent = 'Using ' + fmtBytes(s.bytes) + ', ' + syncStatusText(s);
     }
 
     // Inline lucide cloud-off; conveys offline data at a glance.
@@ -360,7 +366,8 @@
         disable: disable,
         sync: sync,
         cancelSync: cancelSync,
-        status: status
+        status: status,
+        syncStatusText: syncStatusText
     };
 
     if (available() && enabled() && supported()) {
