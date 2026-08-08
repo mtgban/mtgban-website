@@ -284,6 +284,10 @@
                 // recent *real* (position-changing) move or scroll, and ignore
                 // any hover glued to a keystroke (the phantom's actual cause).
                 var __lastMove = 0, __mx = null, __my = null, __lastKey = 0;
+                // Set while the scroll handler calls a row's handler after
+                // hit-testing the pointer itself: that update is trusted by
+                // construction and must not be filtered as a phantom.
+                var __hoverTrusted = false;
                 document.addEventListener('mousemove', function(e) {
                     if (e.clientX !== __mx || e.clientY !== __my) {
                         __mx = e.clientX; __my = e.clientY; __lastMove = performance.now();
@@ -297,7 +301,7 @@
                 });
                 function hoverSidebar() {
                     var now = performance.now();
-                    if (now - __lastMove > 100 || now - __lastKey < 120) return;
+                    if (!__hoverTrusted && (now - __lastMove > 100 || now - __lastKey < 120)) return;
                     updateSidebar.apply(null, arguments);
                 }
 
@@ -1455,6 +1459,32 @@
             headers[currentIdx].dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
         });
 
+        // Rows sliding under a still cursor never produce a mouseover: browsers
+        // recompute :hover on scroll but only synthesize pointer events on the
+        // next real move, so the sidebar used to stay on whatever was hovered
+        // last until the mouse was wiggled. Hit-test the pointer ourselves each
+        // scroll frame and drive the row it actually lands on.
+        var lastPointerTarget = null;
+        function hoverRowUnderPointer() {
+            if (typeof __mx !== 'number' || typeof __my !== 'number') return false;
+            var el = document.elementFromPoint(__mx, __my);
+            var row = el && el.closest ? el.closest('[onmouseover]') : null;
+            if (!row || typeof row.onmouseover !== 'function') {
+                lastPointerTarget = null;
+                return false;
+            }
+            if (row !== lastPointerTarget) {
+                lastPointerTarget = row;
+                __hoverTrusted = true;
+                try {
+                    row.onmouseover();
+                } finally {
+                    __hoverTrusted = false;
+                }
+            }
+            return true;
+        }
+
         // Update sidebar image when scrolling naturally
         var lastStuckIdx = -1;
         var scrollTick = false;
@@ -1463,6 +1493,7 @@
             scrollTick = true;
             requestAnimationFrame(function() {
                 scrollTick = false;
+                var pointerHandled = hoverRowUnderPointer();
                 // Find the last header that is stuck (rect.top ≈ sticky position)
                 var stuckIdx = -1;
                 for (var i = headers.length - 1; i >= 0; i--) {
@@ -1474,7 +1505,11 @@
                 if (stuckIdx >= 0 && stuckIdx !== lastStuckIdx) {
                     lastStuckIdx = stuckIdx;
                     currentIdx = stuckIdx;
-                    headers[stuckIdx].dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
+                    // Keyboard paging still needs currentIdx tracked, but the
+                    // row under the pointer wins the sidebar when there is one.
+                    if (!pointerHandled) {
+                        headers[stuckIdx].dispatchEvent(new MouseEvent('mouseover', {bubbles: true}));
+                    }
                 }
             });
         });
