@@ -148,7 +148,7 @@ func TestCompareReadPaths(t *testing.T) {
 		t.Fatalf("GetMovers: %v", err)
 	}
 	t1 = time.Now()
-	longMovers, err := c.GetMoversLong(ctx, cmpProvider, 30, 1.0, 1.0)
+	longMovers, err := c.GetMoversLong(ctx, cmpProvider, 30, 1.0, 1.0, CategoryMagic)
 	newMov := time.Since(t1)
 	if err != nil {
 		t.Fatalf("GetMoversLong: %v", err)

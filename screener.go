@@ -268,6 +268,25 @@ func screenerCacheKey(metric, window int, minPrice, minPriorPrice float64) strin
 	return fmt.Sprintf("%d:%d:%.2f:%.2f", metric, window, minPrice, minPriorPrice)
 }
 
+// gameTCGCategory returns the TCGplayer category of the serving game, used to
+// scope shared-archive reads to this site's rows. It comes from the catalog
+// dump the game already loads at startup, which names its own category, so a
+// new game site needs no case here - only its dump.
+//
+// The default game falls back to Magic when no catalog is loaded, since it
+// predates the dumps and screens fine without one. Any other game without a
+// catalog returns -1: its rows are indistinguishable from every other game's
+// in the shared archive, and callers refuse to guess.
+func gameTCGCategory() int {
+	if id := GetTCGCategoryID(); id > 0 {
+		return id
+	}
+	if Config.Game == DefaultGame {
+		return timeseries.CategoryMagic
+	}
+	return -1
+}
+
 // overridable in tests
 var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
 	if Config.TimeseriesConfig.LongFormReads {
@@ -275,9 +294,35 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 		if !ok {
 			return nil, fmt.Errorf("screener: no provider configured for metric %d", metric)
 		}
-		return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice)
+		category := gameTCGCategory()
+		if category < 0 {
+			return nil, fmt.Errorf("screener: no TCGplayer category known for game %q", Config.Game)
+		}
+		return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice, category)
 	}
 	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice, minPriorPrice)
+}
+
+// moverCardId resolves a mover row to this game's uuid: Magic rows carry the
+// mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
+// through the external id map with the sub-type picking the finish.
+// Overridable in tests.
+var moverCardId = func(row timeseries.MoverRow) (string, bool, bool) {
+	if row.MtgjsonUUID != "" {
+		return row.MtgjsonUUID, row.IsFoil, true
+	}
+	if row.TCGProductID == 0 {
+		return "", false, false
+	}
+	// TCGplayer names the unfoiled printing "Normal" in every category, while
+	// the foiled one varies by game ("Foil" here, "Holofoil" and friends
+	// elsewhere), so test against the stable half of the pair.
+	isFoil := row.TCGSubType != "Normal"
+	uuid, err := mtgmatcher.MatchId(strconv.Itoa(row.TCGProductID), isFoil)
+	if err != nil {
+		return "", false, false
+	}
+	return uuid, isFoil, true
 }
 
 type screenerMeta struct {
@@ -311,6 +356,14 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPri
 	}
 	rows := make([]screenerRow, 0, len(raw))
 	for _, row := range raw {
+		// Resolve non-Magic rows to this game's uuid so the rest of the
+		// pipeline (classification, dedup keys, links) is id-uniform
+		uuid, isFoil, ok := moverCardId(row)
+		if !ok {
+			continue
+		}
+		row.MtgjsonUUID = uuid
+		row.IsFoil = isFoil
 		if meta, ok := screenerClassify(row.MtgjsonUUID); ok {
 			rows = append(rows, screenerRow{MoverRow: row, Sealed: meta.Sealed, SetCode: meta.SetCode, Edition: meta.Edition})
 		}
