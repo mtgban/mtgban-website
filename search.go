@@ -726,15 +726,17 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				var link string
 
+				game := cardmarket.GameIdMagic
+				if Config.Game == "lorcana" {
+					game = cardmarket.GameIdLorcana
+				}
 				id, err := strconv.Atoi(co.Identifiers["mcmId"])
 				if err != nil || id == 0 {
-					link = "https://www.cardmarket.com/en/Products/Search?searchString=" + url.QueryEscape(pageVars.Metadata[cardId].Name)
+					// Cardmarket names the game in every product path, so the
+					// name-only fallback has to carry it too.
+					link = cardmarket.SearchURL(pageVars.Metadata[cardId].Name, game, Config.Affiliate["MKM"])
 				} else {
-					game := cardmarket.GameIdMagic
-					if Config.Game == "lorcana" {
-						game = cardmarket.GameIdLorcana
-					}
-					link = cardmarket.BuildURL(id, game, "", co.Foil || co.Etched)
+					link = cardmarket.BuildURL(id, game, Config.Affiliate["MKM"], co.Foil || co.Etched)
 				}
 				tmp = append(tmp, SearchEntry{
 					ScraperName: "CardMarket",
