@@ -109,3 +109,22 @@ test('quotaExceeded handles zero quota gracefully', () => {
     expect(UI.quotaExceeded(1, 0, 0)).toBe(true);
     expect(UI.quotaExceeded(0, 0, 0)).toBe(false);
 });
+
+// --- Done-message assembly ---
+
+test('buildDoneMessage reports paused regardless of missing count', () => {
+    expect(UI.buildDoneMessage(true, 0, 3)).toBe('Paused. Sync Images Now resumes where it left off.');
+    expect(UI.buildDoneMessage(true, 2, 3)).toBe('Paused. Sync Images Now resumes where it left off.');
+});
+
+test('buildDoneMessage reports plain finish when nothing is missing', () => {
+    expect(UI.buildDoneMessage(false, 0, 3)).toBe('Image sync finished.');
+});
+
+test('buildDoneMessage reports all-missing outcome when every selected edition lacks a bundle', () => {
+    expect(UI.buildDoneMessage(false, 3, 3)).toBe('0 of 3 selected editions have bundles yet.');
+});
+
+test('buildDoneMessage appends missing count when some but not all editions lack bundles', () => {
+    expect(UI.buildDoneMessage(false, 2, 5)).toBe('Image sync finished. (2 editions have no bundles yet)');
+});

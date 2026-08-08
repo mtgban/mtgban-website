@@ -46,7 +46,7 @@ async function runImagesStage(manifest, imgEditions, isCancelled) {
     });
     if (sel.length === 0) {
         await OfflineDB.setMeta('imgCount', 0);
-        return 0;
+        return { bytes: 0, missing: [] };
     }
     var rows = await OfflineDB.getAllRows('imgstate');
     var states = {};
@@ -66,7 +66,7 @@ async function runImagesStage(manifest, imgEditions, isCancelled) {
         return sum + (imgMap[r.code] ? imgMap[r.code].n : 1);
     }, 0);
     await OfflineDB.setMeta('imgCount', imgCount);
-    return res.bytes;
+    return { bytes: res.bytes, missing: res.missing || [] };
 }
 
 async function runSync(msg) {
@@ -140,8 +140,11 @@ async function runSync(msg) {
             await self.OfflineDB.setMeta('manifest', manifest);
             await self.OfflineDB.setMeta('authLapsed', false);
         }
+        var imgMissing = [];
         try {
-            state.bytes += await runImagesStage(manifest, msg.imgEditions, function() { return cancelled; });
+            var imgResult = await runImagesStage(manifest, msg.imgEditions, function() { return cancelled; });
+            state.bytes += imgResult.bytes;
+            imgMissing = imgResult.missing;
         } catch (err) {
             if (err && err.message === 'forbidden') {
                 try { await self.OfflineDB.setMeta('authLapsed', true); } catch (e) {}
@@ -149,7 +152,7 @@ async function runSync(msg) {
             post({ type: 'error', stage: 'images', message: err.message });
             return;
         }
-        post({ type: 'done', changedSets: state.done, bytes: state.bytes });
+        post({ type: 'done', changedSets: state.done, bytes: state.bytes, imgMissing: imgMissing });
     } catch (err) {
         if (err && err.message === 'forbidden') await self.OfflineDB.setMeta('authLapsed', true);
         post({ type: 'error', stage: (err && err.stage) || stage, message: (err && err.message) || String(err) });
