@@ -69,14 +69,14 @@
                 </tr></thead>
                 <tbody>
                 {{range $row := index .Tables 0}}
-                    <tr>
+                    <tr data-tag="{{index $row 2}}">
                         <td><a href="?refresh={{index $row 2}}" onclick="return confirm('Are you sure you want to refresh {{index $row 0}}?')">{{index $row 0}}</a></td>
                         <td class="admin-mono">{{index $row 1}}</td>
                         <td class="admin-mono"><a href="?logs={{index $row 2}}">{{index $row 2}}</a></td>
                         <td class="admin-mono"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
                         <td class="c">{{index $row 5}}</td>
-                        <td class="c">{{index $row 6}}</td>
+                        <td class="c admin-status">{{index $row 6}}</td>
                     </tr>
                 {{end}}
                 </tbody>
@@ -100,14 +100,14 @@
                 </tr></thead>
                 <tbody>
                 {{range $row := index .Tables 1}}
-                    <tr>
+                    <tr data-tag="{{index $row 2}}">
                         <td><a href="?refresh={{index $row 2}}" onclick="return confirm('Are you sure you want to refresh {{index $row 0}}?')">{{index $row 0}}</a></td>
                         <td class="admin-mono">{{index $row 1}}</td>
                         <td class="admin-mono"><a href="?logs={{index $row 2}}">{{index $row 2}}</a></td>
                         <td class="admin-mono"><time class="admin-localtime" datetime="{{index $row 3}}">{{index $row 3}}</time></td>
                         <td class="admin-mono">{{index $row 4}}</td>
                         <td class="c">{{index $row 5}}</td>
-                        <td class="c">{{index $row 6}}</td>
+                        <td class="c admin-status">{{index $row 6}}</td>
                     </tr>
                 {{end}}
                 </tbody>
@@ -438,6 +438,43 @@
 {{end}}
 
 {{define "extra-scripts"}}
+<script>
+// The scraper rows render with the status the server can answer for free
+// (has data / has none). Whether a refresh is running lives at GitHub, so it
+// is fetched after paint and folded in here rather than holding the page.
+(function () {
+    var rows = document.querySelectorAll('tr[data-tag]');
+    if (!rows.length) {
+        return;
+    }
+    fetch('?workflows=1', {credentials: 'same-origin'})
+        .then(function (resp) {
+            return resp.ok ? resp.json() : null;
+        })
+        .then(function (data) {
+            if (!data || !data.running) {
+                return;
+            }
+            var running = {};
+            data.running.forEach(function (name) {
+                running[name] = true;
+            });
+            rows.forEach(function (row) {
+                if (!running[row.getAttribute('data-tag')]) {
+                    return;
+                }
+                var cell = row.querySelector('.admin-status');
+                if (cell) {
+                    cell.textContent = '🔶';
+                    cell.title = 'refresh running';
+                }
+            });
+        })
+        .catch(function () {
+            // Status stays as rendered; the dashboard is still usable.
+        });
+})();
+</script>
 <script>
 window.__jsonEditors = window.__jsonEditors || {};
 

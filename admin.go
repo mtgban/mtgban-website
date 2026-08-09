@@ -54,6 +54,14 @@ var BuildCommit = func() string {
 }()
 
 func Admin(w http.ResponseWriter, r *http.Request) {
+	// The dashboard asks for the workflow status once it has rendered, so a
+	// round trip to GitHub never delays the page. Answered from here rather
+	// than a route of its own, to stay behind the same signing middleware.
+	if r.FormValue("workflows") != "" {
+		serveRunningWorkflows(w)
+		return
+	}
+
 	sig := getSignatureFromCookies(r)
 
 	page := r.FormValue("page")
@@ -66,15 +74,6 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.LastUpdate = GetLastDatastoreUpdate()
 	pageVars.LastNews = GetLastNewspaperUpdate()
 	pageVars.LastStash = GetLastStashUpdate()
-
-	var gaScrapers []string
-	for _, state := range []string{"in_progress", "queued"} {
-		scrapers, err := snapshotGithubAction(state)
-		if err != nil {
-			log.Println(err)
-		}
-		gaScrapers = append(gaScrapers, scrapers...)
-	}
 
 	msg := r.FormValue("msg")
 	if msg != "" {
@@ -466,10 +465,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		inv := seller.Inventory()
 
+		// A running workflow overrides this to 🔶 once the poll answers.
 		status := "✅"
-		if slices.Contains(gaScrapers, key) {
-			status = "🔶"
-		} else if len(inv) == 0 {
+		if len(inv) == 0 {
 			status = "🔴"
 		}
 
@@ -520,10 +518,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 		bl := vendor.Buylist()
 
+		// A running workflow overrides this to 🔶 once the poll answers.
 		status := "✅"
-		if slices.Contains(gaScrapers, key) {
-			status = "🔶"
-		} else if len(bl) == 0 {
+		if len(bl) == 0 {
 			status = "🔴"
 		}
 
@@ -804,6 +801,55 @@ func sendGithubAction(key string) error {
 
 	return nil
 }
+
+// serveRunningWorkflows answers the dashboard's status poll.
+func serveRunningWorkflows(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	err := json.NewEncoder(w).Encode(struct {
+		Running []string `json:"running"`
+	}{runningWorkflows()})
+	if err != nil {
+		log.Println("workflow status:", err)
+	}
+}
+
+// runningWorkflows lists the workflows queued or in progress. The two states
+// are queried at once: they are independent, and serialized they doubled the
+// wait. Empty without a token to ask with, and on failure - the dashboard
+// simply leaves its rows as rendered.
+func runningWorkflows() []string {
+	if Config.Api["github_action_token"] == "" {
+		return nil
+	}
+
+	states := []string{"in_progress", "queued"}
+	results := make([][]string, len(states))
+
+	var wg sync.WaitGroup
+	for i, state := range states {
+		wg.Add(1)
+		go func(i int, state string) {
+			defer wg.Done()
+			names, err := gaFetch(state)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			results[i] = names
+		}(i, state)
+	}
+	wg.Wait()
+
+	var names []string
+	for _, result := range results {
+		names = append(names, result...)
+	}
+	return names
+}
+
+// overridable in tests
+var gaFetch = snapshotGithubAction
 
 func snapshotGithubAction(state string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
