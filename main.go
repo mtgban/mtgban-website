@@ -39,6 +39,7 @@ import (
 	"gopkg.in/robfig/cron.v2"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	_ "github.com/mtgban/go-mtgban/mtgmatcher/games"
 	"github.com/mtgban/simplecloud"
 
 	_ "net/http/pprof"
