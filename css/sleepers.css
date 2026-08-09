@@ -485,10 +485,39 @@
 }
 
 /* Card image rounding */
-.sleep-card-wrap img {
-    border-radius: 12px;
-    display: block;
+.sleep-card-wrap {
+    --card-radius: 12px;
 }
-.sleep-card-wrap[data-set="LEA"] img {
-    border-radius: 22px;
+.sleep-card-wrap[data-set="LEA"] {
+    --card-radius: 22px;
+}
+/* Oversized printings are scanned with a much rounder corner than the modern
+   crop. Every card in these sets is oversized, so the set alone selects them;
+   adding a set is one more entry here. */
+.sleep-card-wrap:is(
+    [data-set="OARC"], [data-set="PSSC"], [data-set="OC20"],
+    [data-set="OC19"], [data-set="OC18"], [data-set="OC17"],
+    [data-set="OE01"], [data-set="OPCA"], [data-set="OC16"],
+    [data-set="OC15"], [data-set="OC14"], [data-set="PPC1"],
+    [data-set="OC13"], [data-set="OCM1"], [data-set="OPC2"],
+    [data-set="PHOP"], [data-set="PCMD"], [data-set="OCMD"],
+    [data-set="OHOP"]
+) {
+    --card-radius: 22px;
+}
+/* PHEL is the exception: five oversized angels plus one normal-size
+   double-faced token, and nothing else tells them apart - they share the set,
+   and the whole set has no release date of its own. */
+.sleep-card-wrap[data-set="PHEL"]:not([data-name="Angel // Demon"]) {
+    --card-radius: 22px;
+}
+/* DCI mixes ten oversized promos into eighty normal ones, and only those two
+   print runs (Planechase planes, Archenemy schemes) are cut this way. No other
+   DCI promo shares either date. */
+.sleep-card-wrap[data-set="DCI"]:is([data-date="2009-09-30"], [data-date="2010-09-30"]) {
+    --card-radius: 22px;
+}
+.sleep-card-wrap img {
+    border-radius: var(--card-radius);
+    display: block;
 }
