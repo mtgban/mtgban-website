@@ -221,6 +221,9 @@
 
 .sidebar-img-wrap {
     position: relative;
+    /* The image and its foil overlay both read this, so a set whose scans are
+       cut rounder only has to set it once. */
+    --card-radius: var(--radius-lg);
     /* A fixed flex child of the sidebar column now, above the scrolling body.
        Shrink-wrapped so the foil ::after overlay hugs the image exactly even
        when the height cap makes it narrower than the column. */
@@ -229,9 +232,39 @@
     max-width: 100%;
     margin: 0 auto 14px;
 }
+/* Alpha's scans are cut rounder than the modern crop. */
+.sidebar-img-wrap[data-set="LEA"] {
+    --card-radius: 22px;
+}
+/* Oversized printings are scanned with a much rounder corner than the modern
+   crop. Every card in these sets is oversized, so the set alone selects them;
+   adding a set is one more entry here. */
+.sidebar-img-wrap:is(
+    [data-set="OARC"], [data-set="PSSC"], [data-set="OC20"],
+    [data-set="OC19"], [data-set="OC18"], [data-set="OC17"],
+    [data-set="OE01"], [data-set="OPCA"], [data-set="OC16"],
+    [data-set="OC15"], [data-set="OC14"], [data-set="PPC1"],
+    [data-set="OC13"], [data-set="OCM1"], [data-set="OPC2"],
+    [data-set="PHOP"], [data-set="PCMD"], [data-set="OCMD"],
+    [data-set="OHOP"]
+) {
+    --card-radius: 22px;
+}
+/* PHEL is the exception: five oversized angels plus one normal-size
+   double-faced token, and nothing else tells them apart - they share the set,
+   and the whole set has no release date of its own. */
+.sidebar-img-wrap[data-set="PHEL"]:not([data-name="Angel // Demon"]) {
+    --card-radius: 22px;
+}
+/* DCI mixes ten oversized promos into eighty normal ones, and only those two
+   print runs (Planechase planes, Archenemy schemes) are cut this way. No other
+   DCI promo shares either date. */
+.sidebar-img-wrap[data-set="DCI"]:is([data-date="2009-09-30"], [data-date="2010-09-30"]) {
+    --card-radius: 22px;
+}
 .sidebar-img-wrap.foil-wrap[data-foil="true"]::after,
 .sidebar-img-wrap.foil-wrap[data-etched="true"]::after {
-    border-radius: var(--radius-lg);
+    border-radius: var(--card-radius);
 }
 
 .sidebar-card-img {
@@ -242,19 +275,11 @@
     width: auto;
     max-width: 100%;
     max-height: 52vh;
-    border-radius: var(--radius-lg);
+    border-radius: var(--card-radius);
     border: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
     display: block;
     background: var(--search-surface-2);
 }
-.sidebar-img-wrap[data-set="LEA"] .sidebar-card-img {
-    border-radius: 22px;
-}
-.sidebar-img-wrap[data-set="LEA"].foil-wrap[data-foil="true"]::after,
-.sidebar-img-wrap[data-set="LEA"].foil-wrap[data-etched="true"]::after {
-    border-radius: 22px;
-}
-
 .sidebar-printings {
     font-size: var(--text-base);
     color: var(--activetext);
