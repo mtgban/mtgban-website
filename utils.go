@@ -17,6 +17,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 	"github.com/mtgban/mtgban-website/internal/notify"
 )
 
@@ -453,11 +454,11 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	variant := ""
 	if showVariant(cardId) {
 		switch {
-		case co.HasFrameEffect(mtgmatcher.FrameEffectShowcase):
+		case co.HasFrameEffect(magic.FrameEffectShowcase):
 			variant = "Showcase "
-		case co.HasFrameEffect(mtgmatcher.FrameEffectExtendedArt):
+		case co.HasFrameEffect(magic.FrameEffectExtendedArt):
 			variant = "Extended Art "
-		case co.BorderColor == mtgmatcher.BorderColorBorderless:
+		case co.BorderColor == magic.BorderColorBorderless:
 			variant = "Borderless "
 		case co.FrameVersion == "1997":
 			variant = "Retro Frame "
@@ -479,7 +480,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	// Loop through the supported promo types, skipping Boosterfun already processed above
 	altFoilWord := ""
 	for _, promoType := range co.PromoTypes {
-		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != mtgmatcher.PromoTypeBoosterfun {
+		if slices.Contains(mtgmatcher.AllPromoTypes(), promoType) && promoType != magic.PromoTypeBoosterfun {
 			if slices.Contains(altFoilTags, promoType) {
 				if co.Foil || co.Etched {
 					// Foiling variant replaces the generic Foil/Etched chip

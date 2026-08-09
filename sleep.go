@@ -14,6 +14,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 )
 
 type Sleeper struct {
@@ -224,8 +225,8 @@ func getBulks(skipEditions []string) map[string]int {
 				continue
 			}
 			if co.Foil || co.Etched || co.IsPromo ||
-				co.HasPromoType(mtgmatcher.PromoTypeBoosterfun) ||
-				co.HasPromoType(mtgmatcher.PromoTypePromoPack) {
+				co.HasPromoType(magic.PromoTypeBoosterfun) ||
+				co.HasPromoType(magic.PromoTypePromoPack) {
 				continue
 			}
 
@@ -471,7 +472,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 		if err != nil {
 			continue
 		}
-		if co.HasPromoType(mtgmatcher.PromoTypeSerialized) {
+		if co.HasPromoType(magic.PromoTypeSerialized) {
 			continue
 		}
 

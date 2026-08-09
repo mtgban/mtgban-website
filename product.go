@@ -11,6 +11,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 	"github.com/mtgban/mtgban-website/internal/tcgcatalog"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/simplecloud"
@@ -555,8 +556,8 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 		if co.IsReserved || mtgmatcher.IsToken(co.Name) ||
 			co.BorderColor == "gold" || co.BorderColor == "silver" ||
 			co.Rarity == "oversize" ||
-			co.HasPromoType(mtgmatcher.PromoTypePromoPack) ||
-			co.HasPromoType(mtgmatcher.PromoTypePrerelease) {
+			co.HasPromoType(magic.PromoTypePromoPack) ||
+			co.HasPromoType(magic.PromoTypePrerelease) {
 			continue
 		}
 

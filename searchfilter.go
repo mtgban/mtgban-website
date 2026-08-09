@@ -12,6 +12,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 )
 
 type SearchConfig struct {
@@ -223,7 +224,7 @@ func fixupNumberNG(code string, strict bool) []string {
 	for i := range filters {
 		filters[i] = strings.TrimLeft(filters[i], "0")
 		if !strict {
-			filters[i] = strings.TrimRight(filters[i], mtgmatcher.SuffixSpecial+mtgmatcher.SuffixVariant+mtgmatcher.SuffixPhiLow+"*")
+			filters[i] = strings.TrimRight(filters[i], magic.SuffixSpecial+magic.SuffixVariant+magic.SuffixPhiLow+"*")
 		}
 	}
 	return filters
@@ -1336,31 +1337,31 @@ func compareReleaseDate(filters []string, co *mtgmatcher.CardObject, cmpFunc fun
 }
 
 var isKnownPromo = map[string]string{
-	"bf":        mtgmatcher.PromoTypeBoosterfun,
-	"v":         mtgmatcher.PromoTypeBoosterfun,
-	"rewards":   mtgmatcher.PromoTypePlayerRewards,
-	"mpr":       mtgmatcher.PromoTypePlayerRewards,
-	"bab":       mtgmatcher.PromoTypeBuyABox,
-	"buyabox":   mtgmatcher.PromoTypeBuyABox,
-	"buy-a-box": mtgmatcher.PromoTypeBuyABox,
-	"arena":     mtgmatcher.PromoTypeArenaLeague,
-	"judge":     mtgmatcher.PromoTypeJudgeGift,
-	"confetti":  mtgmatcher.PromoTypeConfettiFoil,
-	"fracture":  mtgmatcher.PromoTypeFractureFoil,
-	"galaxy":    mtgmatcher.PromoTypeGalaxyFoil,
-	"halo":      mtgmatcher.PromoTypeHaloFoil,
-	"mana":      mtgmatcher.PromoTypeManaFoil,
-	"rainbow":   mtgmatcher.PromoTypeRainbowFoil,
-	"raised":    mtgmatcher.PromoTypeRaisedFoil,
-	"ripple":    mtgmatcher.PromoTypeRippleFoil,
-	"silver":    mtgmatcher.PromoTypeSilverFoil,
-	"surge":     mtgmatcher.PromoTypeSurgeFoil,
-	"wpn":       mtgmatcher.PromoTypeWPN,
-	"pre":       mtgmatcher.PromoTypePrerelease,
-	"pp":        mtgmatcher.PromoTypePromoPack,
-	"neon":      mtgmatcher.PromoTypeNeonInk,
-	"thicc":     mtgmatcher.PromoTypeThickDisplay,
-	"display":   mtgmatcher.PromoTypeThickDisplay,
+	"bf":        magic.PromoTypeBoosterfun,
+	"v":         magic.PromoTypeBoosterfun,
+	"rewards":   magic.PromoTypePlayerRewards,
+	"mpr":       magic.PromoTypePlayerRewards,
+	"bab":       magic.PromoTypeBuyABox,
+	"buyabox":   magic.PromoTypeBuyABox,
+	"buy-a-box": magic.PromoTypeBuyABox,
+	"arena":     magic.PromoTypeArenaLeague,
+	"judge":     magic.PromoTypeJudgeGift,
+	"confetti":  magic.PromoTypeConfettiFoil,
+	"fracture":  magic.PromoTypeFractureFoil,
+	"galaxy":    magic.PromoTypeGalaxyFoil,
+	"halo":      magic.PromoTypeHaloFoil,
+	"mana":      magic.PromoTypeManaFoil,
+	"rainbow":   magic.PromoTypeRainbowFoil,
+	"raised":    magic.PromoTypeRaisedFoil,
+	"ripple":    magic.PromoTypeRippleFoil,
+	"silver":    magic.PromoTypeSilverFoil,
+	"surge":     magic.PromoTypeSurgeFoil,
+	"wpn":       magic.PromoTypeWPN,
+	"pre":       magic.PromoTypePrerelease,
+	"pp":        magic.PromoTypePromoPack,
+	"neon":      magic.PromoTypeNeonInk,
+	"thicc":     magic.PromoTypeThickDisplay,
+	"display":   magic.PromoTypeThickDisplay,
 }
 
 var altFoilTags = []string{
@@ -1867,15 +1868,15 @@ func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
 				return false
 			}
 		case "extendedart", "ea":
-			if co.HasFrameEffect(mtgmatcher.FrameEffectExtendedArt) {
+			if co.HasFrameEffect(magic.FrameEffectExtendedArt) {
 				return false
 			}
 		case "showcase", "sc", "sh":
-			if co.HasFrameEffect(mtgmatcher.FrameEffectShowcase) {
+			if co.HasFrameEffect(magic.FrameEffectShowcase) {
 				return false
 			}
 		case "borderless", "bd", "bl":
-			if co.BorderColor == mtgmatcher.BorderColorBorderless {
+			if co.BorderColor == magic.BorderColorBorderless {
 				return false
 			}
 		case "future":
@@ -1891,11 +1892,11 @@ func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
 				return false
 			}
 		case "japanese", "jpn", "jp", "ja":
-			if co.Language == mtgmatcher.LanguageJapanese {
+			if co.Language == magic.LanguageJapanese {
 				return false
 			}
 		case "phyrexian", "ph":
-			if co.Language == mtgmatcher.LanguagePhyrexian {
+			if co.Language == magic.LanguagePhyrexian {
 				return false
 			}
 		case "commander":
@@ -1914,7 +1915,7 @@ func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
 			if co.SetCode != "PAFR" {
 				continue
 			}
-			if co.HasPromoType(mtgmatcher.PromoTypeEmbossed) {
+			if co.HasPromoType(magic.PromoTypeEmbossed) {
 				return false
 			}
 		case "p9":
