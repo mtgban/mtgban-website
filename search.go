@@ -726,10 +726,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				var link string
 
-				game := cardmarket.GameIdMagic
-				if Config.Game == "lorcana" {
-					game = cardmarket.GameIdLorcana
-				}
+				game := cardmarket.GameIdFromName(Config.Game)
 				id, err := strconv.Atoi(co.Identifiers["mcmId"])
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the
