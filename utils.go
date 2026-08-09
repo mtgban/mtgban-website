@@ -36,6 +36,18 @@ var colorRarityMap = map[string]map[string]string{
 		"special":   "#652978",
 		"enchanted": "#03A9FC",
 	},
+	// The four printed tiers climb the same metals Lorcana uses, and the two
+	// treatments that cut across them take the two remaining colors. Riftbound
+	// also has a "none" rarity, held by four cards, which is left out so it
+	// renders uncolored like any rarity a game does not describe.
+	"riftbound": {
+		"common":   "var(--normal)",
+		"uncommon": "#707883",
+		"rare":     "#CD7F32",
+		"epic":     "#FFD700",
+		"showcase": "#03A9FC",
+		"promo":    "#652978",
+	},
 }
 
 type GenericCard struct {
