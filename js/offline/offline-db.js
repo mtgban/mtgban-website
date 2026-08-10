@@ -4,10 +4,10 @@
     'use strict';
 
     var DB_NAME = 'mtgban-offline';
-    var DB_VERSION = 1;
+    var DB_VERSION = 2;
 
     // keyPath per object store; the sync worker and page code rely on these key names.
-    var STORES = { meta: 'k', sets: 'code', cards: 'uuid', names: 'key', imgstate: 'code' };
+    var STORES = { meta: 'k', sets: 'code', cards: 'uuid', names: 'key', imgstate: 'code', imgkeys: 'code' };
 
     var dbPromise = null;
 
@@ -181,6 +181,13 @@
         });
     }
 
+    function getRow(store, key) {
+        checkStore(store);
+        return withTx([store], 'readonly', function(tx, out) {
+            var req = tx.objectStore(store).get(key);
+            req.onsuccess = function() { out.result = req.result; };
+        });
+    }
     function putRow(store, row) {
         checkStore(store);
         return withTx([store], 'readwrite', function(tx) {
@@ -226,6 +233,7 @@
         lookupName: lookupName,
         allNames: allNames,
         getAllRows: getAllRows,
+        getRow: getRow,
         putRow: putRow,
         deleteRow: deleteRow,
         clearCatalog: clearCatalog,

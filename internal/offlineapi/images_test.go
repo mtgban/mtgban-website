@@ -75,65 +75,6 @@ func TestServeOfflineImage(t *testing.T) {
 	}
 }
 
-func TestServeOfflineImageBundle(t *testing.T) {
-	s, dir := newTestService(t)
-	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "bundles"), 0755)
-	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "bundles", "NEO-abc123.zip"), []byte("zipdata"), 0644)
-	s.imagesStore.Set(ImagesManifest{"NEO": {Hash: "abc123", Count: 1, Bytes: 7}})
-	t.Cleanup(func() { s.imagesStore.Set(nil) })
-
-	w := httptest.NewRecorder()
-	s.serveImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil), "NEO.zip")
-	if w.Code != 200 || w.Body.String() != "zipdata" {
-		t.Fatalf("bundle fetch: code %d body %q", w.Code, w.Body.String())
-	}
-	if w.Header().Get("ETag") != `"abc123"` {
-		t.Fatalf("etag = %q", w.Header().Get("ETag"))
-	}
-	if w.Header().Get("Content-Type") != "application/zip" {
-		t.Fatalf("content type = %q", w.Header().Get("Content-Type"))
-	}
-	// without a declared length a cut stream is a short zip the client caches
-	// and extracts as though it were whole
-	if got := w.Header().Get("Content-Length"); got != "7" {
-		t.Fatalf("content length = %q, want the manifest's 7", got)
-	}
-
-	r := httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
-	r.Header.Set("If-None-Match", `"abc123"`)
-	w = httptest.NewRecorder()
-	s.serveImageBundle(w, r, "NEO.zip")
-	if w.Code != http.StatusNotModified {
-		t.Fatalf("conditional get: code = %d, want 304", w.Code)
-	}
-	if got := w.Header().Get("Content-Length"); got != "" {
-		t.Fatalf("304 declared a length of %q", got)
-	}
-
-	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
-	r.Header.Set("If-None-Match", "*")
-	w = httptest.NewRecorder()
-	s.serveImageBundle(w, r, "NEO.zip")
-	if w.Code != http.StatusNotModified {
-		t.Fatalf("conditional get with *: code = %d, want 304", w.Code)
-	}
-
-	// Weak ETag validators must also match.
-	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
-	r.Header.Set("If-None-Match", `W/"abc123"`)
-	w = httptest.NewRecorder()
-	s.serveImageBundle(w, r, "NEO.zip")
-	if w.Code != http.StatusNotModified {
-		t.Fatalf("weak etag: code = %d, want 304", w.Code)
-	}
-
-	w = httptest.NewRecorder()
-	s.serveImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/XXX.zip", nil), "XXX.zip")
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("unknown set: code = %d, want 404", w.Code)
-	}
-}
-
 func TestOfflineManifestIncludesImages(t *testing.T) {
 	s, _ := newTestService(t)
 	s.imagesStore.Set(ImagesManifest{

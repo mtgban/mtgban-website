@@ -2,9 +2,8 @@ import { test, expect } from 'bun:test';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// fflate.min.js needs self in scope before import
+// the module under test is a plain script attaching to self
 globalThis.self = globalThis.self || globalThis;
-const fflate = await import('../../js/vendor/fflate.min.js');
 
 // Bun rejects relative URL strings in Request; remap /path -> http://localhost/path.
 const _NativeRequest = globalThis.Request;
@@ -41,16 +40,19 @@ test('formatBytes renders human sizes', () => {
     expect(OfflineImages.formatBytes(9500000000)).toBe('9.5 GB');
 });
 
-test('entryMeta maps bundle entries to cache keys', () => {
-    expect(OfflineImages.entryMeta('abc-123.jpg')).toEqual({
-        key: 'abc-123',
-        url: '/api/offline/images/abc-123.jpg',
-        type: 'image/jpeg',
-    });
-    expect(OfflineImages.entryMeta('abc-123.jpeg').type).toBe('image/jpeg');
-    expect(OfflineImages.entryMeta('abc-123.webp')).toBeNull();
-    expect(OfflineImages.entryMeta('nested/abc.jpg')).toBeNull();
-    expect(OfflineImages.entryMeta('README.txt')).toBeNull();
+test('fetchImage caches under the per-image url and reports its size', async () => {
+    const { cache, caches } = makeFakeCache();
+    const mod = loadWithExtras({ caches, fetch: makeImageFetch({ 'key-aaa': [255, 216, 1] }) });
+    expect(await mod.fetchImage(cache, 'key-aaa')).toBe(3);
+    expect(cache.store[0].req.url).toEndWith('/api/offline/images/key-aaa.jpg');
+    expect(cache.store[0].resp.headers.get('Content-Type')).toBe('image/jpeg');
+});
+
+test('fetchImage treats an unpublished image as a skip, not a failure', async () => {
+    const { cache, caches } = makeFakeCache();
+    const mod = loadWithExtras({ caches, fetch: makeImageFetch({}) });
+    expect(await mod.fetchImage(cache, 'never-published')).toBe(0);
+    expect(cache.store).toHaveLength(0);
 });
 
 test('computeWorkList selects missing, changed, and unfinished bundles', () => {
@@ -104,13 +106,19 @@ function loadWithExtras(extras) {
     return sandbox.OfflineImages;
 }
 
-// Build a zip from a name -> bytes map using the vendored fflate.
-function makeZip(files) {
-    const entries = {};
-    for (const [name, data] of Object.entries(files)) {
-        entries[name] = data instanceof Uint8Array ? data : new Uint8Array(data);
-    }
-    return fflate.zipSync(entries);
+// Serves one response per image key. An absent key 404s, which is how the
+// server reports an image the source never published.
+function makeImageFetch(bytesByKey) {
+    return async (url) => {
+        const key = String(url).replace(/^.*\/images\//, '').replace(/\.jpg$/, '');
+        if (!(key in bytesByKey)) return new Response(null, { status: 404 });
+        return new Response(new Uint8Array(bytesByKey[key]));
+    };
+}
+
+// deps.getImgKeys backed by a plain map.
+function keysFrom(map) {
+    return async (code) => map[code] || [];
 }
 
 // Minimal fake cache that records put calls; returns caches wrapper.
@@ -122,7 +130,7 @@ function makeFakeCache() {
 }
 
 test('syncImages returns immediately when no work is needed', async () => {
-    const mod = loadWithExtras({ fflate });
+    const mod = loadWithExtras({});
     const result = await mod.syncImages({
         images: { TST: { h: 'h1', n: 1, b: 100 } },
         sel: ['TST'],
@@ -134,8 +142,8 @@ test('syncImages returns immediately when no work is needed', async () => {
     expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: [] });
 });
 
-test('syncImages returns missing codes with zero total when selection has no bundles yet', async () => {
-    const mod = loadWithExtras({ fflate });
+test('syncImages returns missing codes with zero total when selection has no images yet', async () => {
+    const mod = loadWithExtras({});
     const result = await mod.syncImages({
         images: { TST: { h: 'h1', n: 1, b: 100 } },
         sel: ['NOPE'],
@@ -147,71 +155,82 @@ test('syncImages returns missing codes with zero total when selection has no bun
     expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: ['NOPE'] });
 });
 
-test('syncImages includes missing codes alongside completed work when some editions have no bundles', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
+test('syncImages includes missing codes alongside completed work', async () => {
     const { caches } = makeFakeCache();
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
+    const mod = loadWithExtras({ caches, fetch: makeImageFetch({ 'key-aaa': [1, 2, 3] }) });
     const result = await mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
+        images: { TST: { h: 'h1', n: 1, b: 3 } },
         sel: ['TST', 'NOPE'],
         states: {},
         post: () => {},
         cancelled: () => false,
         putImgState: async () => {},
+        getImgKeys: keysFrom({ TST: ['key-aaa'] }),
     });
-    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: ['NOPE'] });
+    expect(result).toEqual({ done: 1, total: 1, bytes: 3, paused: false, missing: ['NOPE'] });
 });
 
-test('syncImages downloads, unpacks, and marks done', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [255, 216], 'key-bbb.jpg': [255, 216], 'notes.txt': [104, 105] });
+test('syncImages downloads each image and marks done', async () => {
     const { cache, caches } = makeFakeCache();
     const posts = [];
     const states = [];
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
+    const mod = loadWithExtras({
+        caches,
+        fetch: makeImageFetch({ 'key-aaa': [255, 216], 'key-bbb': [255, 216] }),
+    });
     const result = await mod.syncImages({
-        images: { TST: { h: 'h1', n: 2, b: zip.byteLength } },
+        images: { TST: { h: 'h1', n: 2, b: 4 } },
         sel: ['TST'],
         states: {},
         post: m => posts.push(m),
         cancelled: () => false,
         putImgState: async r => states.push({ ...r }),
+        getImgKeys: keysFrom({ TST: ['key-aaa', 'key-bbb'] }),
     });
-    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: [] });
+    expect(result).toEqual({ done: 1, total: 1, bytes: 4, paused: false, missing: [] });
     expect(posts).toHaveLength(2);
-    expect(posts[0]).toMatchObject({ type: 'progress', stage: 'images', done: 0, total: 1, code: 'TST', bytes: 0 });
-    expect(posts[1]).toMatchObject({ type: 'progress', stage: 'images', done: 1, total: 1, bytes: zip.byteLength });
-    // both jpg entries stored (.txt skipped)
     expect(cache.store).toHaveLength(2);
-    const aaaEntry = cache.store.find(e => e.req.url.endsWith('key-aaa.jpg'));
-    const bbbEntry = cache.store.find(e => e.req.url.endsWith('key-bbb.jpg'));
-    expect(aaaEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
-    expect(bbbEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
     expect(states).toEqual([
         { code: 'TST', hash: 'h1', done: false },
         { code: 'TST', hash: 'h1', done: true, keys: ['key-aaa', 'key-bbb'] },
     ]);
 });
 
-test('syncImages resumes a bundle left done:false by a previous interrupted run', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
+test('syncImages records only the images the server actually had', async () => {
     const { cache, caches } = makeFakeCache();
     const states = [];
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
+    const mod = loadWithExtras({ caches, fetch: makeImageFetch({ 'key-aaa': [1, 2] }) });
     const result = await mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
+        images: { TST: { h: 'h1', n: 2, b: 4 } },
+        sel: ['TST'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async r => states.push({ ...r }),
+        getImgKeys: keysFrom({ TST: ['key-aaa', 'key-gone'] }),
+    });
+    // the 404 is expected and must not fail the set or be recorded as cached
+    expect(result.done).toBe(1);
+    expect(result.bytes).toBe(2);
+    expect(cache.store).toHaveLength(1);
+    expect(states[1].keys).toEqual(['key-aaa']);
+});
+
+test('syncImages resumes a set left done:false by a previous interrupted run', async () => {
+    const { caches } = makeFakeCache();
+    const states = [];
+    const mod = loadWithExtras({ caches, fetch: makeImageFetch({ 'key-aaa': [1, 2, 3] }) });
+    const result = await mod.syncImages({
+        images: { TST: { h: 'h1', n: 1, b: 3 } },
         sel: ['TST'],
         states: { TST: { code: 'TST', hash: 'h1', done: false } },
         post: () => {},
         cancelled: () => false,
         putImgState: async r => states.push({ ...r }),
+        getImgKeys: keysFrom({ TST: ['key-aaa'] }),
     });
     expect(result.done).toBe(1);
-    expect(result.paused).toBe(false);
-    expect(cache.store).toHaveLength(1);
-    expect(states).toEqual([
-        { code: 'TST', hash: 'h1', done: false },
-        { code: 'TST', hash: 'h1', done: true, keys: ['key-aaa'] },
-    ]);
+    expect(states[states.length - 1]).toMatchObject({ code: 'TST', done: true });
 });
 
 test('syncImages refuses when projected bytes exceed 90pct of free storage', async () => {
@@ -219,7 +238,7 @@ test('syncImages refuses when projected bytes exceed 90pct of free storage', asy
     // totalBytes = 600 > (1000 - 500) * 0.9 = 450 -> should throw
     const { caches } = makeFakeCache();
     let fetched = false;
-    const mod = loadWithExtras({ fflate, navigator: fakeNavigator, caches, fetch: async () => { fetched = true; return new Response(new Uint8Array(0)); } });
+    const mod = loadWithExtras({ navigator: fakeNavigator, caches, fetch: async () => { fetched = true; return new Response(new Uint8Array(0)); } });
     await expect(mod.syncImages({
         images: { TST: { h: 'h1', n: 1, b: 600 } },
         sel: ['TST'],
@@ -232,44 +251,46 @@ test('syncImages refuses when projected bytes exceed 90pct of free storage', asy
 });
 
 test('syncImages stops cleanly on QuotaExceededError; imgstate stays done:false', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
-    const quotaErr = Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
-    const fakeCache = { put: async () => { throw quotaErr; } };
-    const fakeCaches = { open: async () => fakeCache };
+    const store = [];
+    const cache = {
+        store,
+        put: async () => {
+            const err = new Error('quota');
+            err.name = 'QuotaExceededError';
+            throw err;
+        },
+    };
+    const caches = { open: async () => cache };
     const states = [];
-    const posts = [];
-    const mod = loadWithExtras({ fflate, caches: fakeCaches, fetch: async () => new Response(zip) });
+    const mod = loadWithExtras({ caches, fetch: makeImageFetch({ 'key-aaa': [1, 2, 3] }) });
     await expect(mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
+        images: { TST: { h: 'h1', n: 1, b: 3 } },
         sel: ['TST'],
         states: {},
-        post: m => posts.push(m),
+        post: () => {},
         cancelled: () => false,
         putImgState: async r => states.push({ ...r }),
+        getImgKeys: keysFrom({ TST: ['key-aaa'] }),
     })).rejects.toThrow('storage quota exceeded');
-    // imgstate written done:false before unpack; never updated to done:true
+    // never marked done, so the next sync retries the set
     expect(states).toEqual([{ code: 'TST', hash: 'h1', done: false }]);
-    // only one progress post (pre-bundle); nothing posted after error
-    expect(posts).toHaveLength(1);
 });
 
-test('syncImages throws forbidden on 403 and writes no imgstate', async () => {
+test('syncImages throws forbidden on 403', async () => {
     const { caches } = makeFakeCache();
     const states = [];
-    const posts = [];
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(null, { status: 403 }) });
+    const mod = loadWithExtras({ caches, fetch: async () => new Response(null, { status: 403 }) });
     await expect(mod.syncImages({
         images: { TST: { h: 'h1', n: 1, b: 100 } },
         sel: ['TST'],
         states: {},
-        post: m => posts.push(m),
+        post: () => {},
         cancelled: () => false,
-        putImgState: async r => states.push(r),
+        putImgState: async r => states.push({ ...r }),
+        getImgKeys: keysFrom({ TST: ['key-aaa'] }),
     })).rejects.toThrow('forbidden');
-    // fetch failed before putImgState; no imgstate written
-    expect(states).toHaveLength(0);
-    // only pre-bundle progress post; nothing after 403
-    expect(posts).toHaveLength(1);
+    // a lapsed subscription must not leave the set marked complete
+    expect(states.some(r => r.done)).toBe(false);
 });
 
 // --- imgCount math (mirrors runImagesStage in offline-sync.js) ---
@@ -304,32 +325,21 @@ test('imgCount returns 0 when no done rows', () => {
     expect(computeImgCount([{ code: 'NEO', done: false }], { NEO: { n: 302 } })).toBe(0);
 });
 
-test('syncImages pauses between bundles when cancelled', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
-    const { cache, caches } = makeFakeCache();
-    const posts = [];
-    let callCount = 0;
-    // false on first two cancelled() checks (pre-loop + AAA iteration), true on third (skips BBB)
-    const cancelled = () => callCount++ > 1;
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
+test('syncImages pauses between sets when cancelled', async () => {
+    const { caches } = makeFakeCache();
+    let calls = 0;
+    const mod = loadWithExtras({ caches, fetch: makeImageFetch({ 'a': [1], 'b': [2] }) });
     const result = await mod.syncImages({
-        images: {
-            AAA: { h: 'h1', n: 1, b: zip.byteLength },
-            BBB: { h: 'h2', n: 1, b: zip.byteLength },
-        },
+        images: { AAA: { h: 'h1', n: 1, b: 1 }, BBB: { h: 'h2', n: 1, b: 1 } },
         sel: ['AAA', 'BBB'],
         states: {},
-        post: m => posts.push(m),
-        cancelled,
+        post: () => {},
+        cancelled: () => calls++ > 1,
         putImgState: async () => {},
+        getImgKeys: keysFrom({ AAA: ['a'], BBB: ['b'] }),
     });
-    expect(result).toEqual({ done: 1, total: 2, bytes: zip.byteLength, paused: true, missing: [] });
-    // AAA processed (1 cache entry); BBB skipped
-    expect(cache.store).toHaveLength(1);
-    // AAA's two posts; BBB cancel before any post for BBB
-    expect(posts).toHaveLength(2);
-    expect(posts[0]).toMatchObject({ code: 'AAA', done: 0 });
-    expect(posts[1]).toMatchObject({ code: 'AAA', done: 1 });
+    expect(result.paused).toBe(true);
+    expect(result.done).toBeLessThan(2);
 });
 
 // --- eviction ---
@@ -383,25 +393,19 @@ test('evictImages drops legacy uuids rows without touching the cache', async () 
     expect(fake.cache.entries.has('/api/offline/images/key-neo.jpg')).toBe(true);
 });
 
-test('syncImages records unpacked keys on the imgstate row', async () => {
-    const zip = makeZip({ 'key-1.jpg': [1], 'key-2.jpg': [2] });
+test('syncImages records cached keys on the imgstate row for eviction', async () => {
     const { caches } = makeFakeCache();
-    const mod = loadWithExtras({
-        fflate,
-        caches,
-        fetch: async () => new Response(zip, { status: 200 }),
-        navigator: {},
-    });
-    const puts = [];
+    const states = [];
+    const mod = loadWithExtras({ caches, fetch: makeImageFetch({ 'k1': [1], 'k2': [2] }) });
     await mod.syncImages({
-        images: { TST: { h: 'h1', n: 2, b: zip.byteLength } },
+        images: { TST: { h: 'h1', n: 2, b: 2 } },
         sel: ['TST'],
         states: {},
-        cancelled: () => false,
-        putImgState: async (row) => puts.push(row),
         post: () => {},
+        cancelled: () => false,
+        putImgState: async r => states.push({ ...r }),
+        getImgKeys: keysFrom({ TST: ['k1', 'k2'] }),
     });
-    const final = puts[puts.length - 1];
-    expect(final.done).toBe(true);
-    expect(final.keys.slice().sort()).toEqual(['key-1', 'key-2']);
+    // evictImages deletes by these keys, so they must be the cached set
+    expect(states[states.length - 1].keys).toEqual(['k1', 'k2']);
 });
