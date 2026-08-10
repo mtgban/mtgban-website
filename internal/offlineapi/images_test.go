@@ -35,8 +35,8 @@ func newTestService(t *testing.T) (*Service, string) {
 func TestServeOfflineImage(t *testing.T) {
 	s, dir := newTestService(t)
 	scryfallID := "ab154b52-1234-5678-9abc-def012345678"
-	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b"), 0755)
-	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b", scryfallID+".jpg"), []byte("jpegdata"), 0644)
+	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "singles", "front", "a", "b"), 0755)
+	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "singles", "front", "a", "b", scryfallID+".jpg"), []byte("jpegdata"), 0644)
 	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "sealed", "MH3"), 0755)
 	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "sealed", "MH3", "541185.jpg"), []byte("sealeddata"), 0644)
 
@@ -115,8 +115,8 @@ func TestOfflineManifestOmitsEmptyImages(t *testing.T) {
 func TestServeOfflineImageETag(t *testing.T) {
 	s, dir := newTestService(t)
 	id := "ab154b52-1234-5678-9abc-def012345678"
-	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b"), 0755)
-	path := filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b", id+".jpg")
+	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "singles", "front", "a", "b"), 0755)
+	path := filepath.Join(filepath.FromSlash(dir), "singles", "front", "a", "b", id+".jpg")
 	os.WriteFile(path, []byte("jpegdata"), 0644)
 
 	get := func(inm string) *httptest.ResponseRecorder {

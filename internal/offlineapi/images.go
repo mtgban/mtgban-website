@@ -63,7 +63,8 @@ func (s *Service) serveImage(w http.ResponseWriter, r *http.Request, rest string
 	var dir, name string
 	switch {
 	case scryfallIDPattern.MatchString(key):
-		dir = path.Join("normal", "front", key[0:1], key[1:2])
+		// singles/front/<c1>/<c2>/<scryfallId>.jpg in the mirror
+		dir = path.Join("singles", "front", key[0:1], key[1:2])
 		name = key + ".jpg"
 	case sealedKeyPattern.MatchString(key):
 		// sealed/<SETCODE>/<tcgProductId>.jpg in the mirror
