@@ -503,19 +503,19 @@
     [data-set="PHOP"], [data-set="PCMD"], [data-set="OCMD"],
     [data-set="OHOP"]
 ) {
-    --card-radius: 22px;
+    --card-radius: 18px;
 }
 /* PHEL is the exception: five oversized angels plus one normal-size
    double-faced token, and nothing else tells them apart - they share the set,
    and the whole set has no release date of its own. */
 .sleep-card-wrap[data-set="PHEL"]:not([data-name="Angel // Demon"]) {
-    --card-radius: 22px;
+    --card-radius: 18px;
 }
 /* DCI mixes ten oversized promos into eighty normal ones, and only those two
    print runs (Planechase planes, Archenemy schemes) are cut this way. No other
    DCI promo shares either date. */
 .sleep-card-wrap[data-set="DCI"]:is([data-date="2009-09-30"], [data-date="2010-09-30"]) {
-    --card-radius: 22px;
+    --card-radius: 18px;
 }
 .sleep-card-wrap img {
     border-radius: var(--card-radius);
