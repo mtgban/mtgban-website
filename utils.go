@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"log"
@@ -69,6 +70,86 @@ var colorRarityMap = map[string]map[string]string{
 	},
 }
 
+// rarityBadge is the badge one rarity draws. Path is the outline, and Font
+// and TextY place the set code inside it: a triangle only has room low down
+// and a fan only high up, and both need a smaller code than a circle does.
+type rarityBadge struct {
+	Path  string
+	Font  float64
+	TextY float64
+}
+
+// badgeFile is an img/setsymbol drawing: one path, plus the fitting the shape
+// needs recorded on the root element.
+type badgeFile struct {
+	Font  float64 `xml:"data-code-size,attr"`
+	TextY float64 `xml:"data-code-y,attr"`
+	Path  struct {
+		D string `xml:"d,attr"`
+	} `xml:"path"`
+}
+
+func readBadge(path string) (rarityBadge, error) {
+	blob, err := os.ReadFile(path)
+	if err != nil {
+		return rarityBadge{}, err
+	}
+
+	var file badgeFile
+	err = xml.Unmarshal(blob, &file)
+	if err != nil {
+		return rarityBadge{}, err
+	}
+	if file.Path.D == "" || file.Font == 0 || file.TextY == 0 {
+		return rarityBadge{}, fmt.Errorf("%s: incomplete badge", path)
+	}
+
+	return rarityBadge{file.Path.D, file.Font, file.TextY}, nil
+}
+
+// rarityBadges holds the drawings, keyed by rarity, with the default circle
+// under the empty key. loadRarityBadges fills it at startup, before anything
+// renders, so nothing reads a file per card.
+var rarityBadges = map[string]rarityBadge{}
+
+// loadRarityBadges reads the game's own shapes from its directory, and the
+// circle beside them. A game with no directory draws that circle throughout.
+// Magic draws keyrune glyphs instead and never asks for a badge, so it reads
+// nothing.
+func loadRarityBadges() {
+	if Config.Game == DefaultGame {
+		return
+	}
+
+	fallback, err := readBadge("img/setsymbol/default.svg")
+	if err != nil {
+		log.Println("no default set symbol:", err)
+	}
+	rarityBadges[""] = fallback
+
+	entries, _ := os.ReadDir("img/setsymbol/" + Config.Game)
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".svg") {
+			continue
+		}
+		badge, err := readBadge("img/setsymbol/" + Config.Game + "/" + entry.Name())
+		if err != nil {
+			log.Println("skipping set symbol:", err)
+			continue
+		}
+		rarityBadges[strings.TrimSuffix(entry.Name(), ".svg")] = badge
+	}
+}
+
+func rarityShape(rarity string) rarityBadge {
+	badge, found := rarityBadges[rarity]
+	if !found {
+		return rarityBadges[""]
+	}
+
+	return badge
+}
+
 type GenericCard struct {
 	UUID string
 	// ChartID is the id the UI passes to the chart system. uuid2card leaves it
@@ -108,6 +189,7 @@ type GenericCard struct {
 	LangTag      string
 
 	RarityColor       string
+	RarityShape       rarityBadge
 	ScryfallURL       string
 	DeckboxURL        string
 	CKRestockURL      string
@@ -701,6 +783,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		LangTag:      mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
 		RarityColor:       rarityColor,
+		RarityShape:       rarityShape(co.Rarity),
 		ScryfallURL:       scryfallURL,
 		DeckboxURL:        deckboxURL,
 		CKRestockURL:      restockURL,

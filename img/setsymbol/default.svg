@@ -1,0 +1,4 @@
+<!-- The badge every game draws when it has no shape of its own. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" data-code-size="10.0" data-code-y="10.0">
+    <path d="M 10 1 A 9 9 0 1 0 10 19 A 9 9 0 1 0 10 1 Z" fill="currentColor"/>
+</svg>

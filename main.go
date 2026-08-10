@@ -1075,6 +1075,8 @@ func main() {
 		}
 	}
 
+	loadRarityBadges()
+
 	// Maintenance mode: ingest tcgcsv prices, then exit without standing up the
 	// web server. Needs only the config and the price DB.
 	if *tcgcsvBackfill || *tcgcsvDaily || *tcgcsvProducts {

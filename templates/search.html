@@ -1012,9 +1012,9 @@
                                     {{if $card.Keyrune}}
                                         <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
                                     {{else if $card.RarityColor}}
-                                        <svg width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-                                            <circle r="15" cx="16" cy="16" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}"/>
-                                            <text font-size="16" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                        <svg width="32" height="32" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="{{$card.RarityShape.Path}}" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}" stroke-width="0.75"/>
+                                            <text font-size="{{$card.RarityShape.Font}}" font-family="monospace" font-weight="bold" x="10" y="{{$card.RarityShape.TextY}}" text-anchor="middle" dominant-baseline="central" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
                                         </svg>
                                     {{else}}
                                         <span>{{$card.SetCode}}</span>
