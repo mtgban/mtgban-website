@@ -26,25 +26,34 @@ var Country2flag = map[string]string{
 	"JP": "🇯🇵",
 }
 
-// A rarity missing from these tables leaves RarityColor empty, and the
-// templates then skip the whole badge — the set code rides inside the colored
-// circle, so an unmapped rarity costs the card its edition marker too. Every
-// rarity a game actually prints belongs here.
+// colorRarityMap paints the rarity badge. The Lorcana entries are sampled
+// from the rarity symbols the cards actually carry: a grey ink drop, a copper
+// triangle, a silver diamond, a gold pentagon.
+//
+// The three tiers above those share one prismatic symbol, differing in shape
+// rather than color, so each takes a different arc of that one wheel: its
+// crimson, its cyan, its violet. Enchanted keeps the cyan it has always had.
+//
+// Uncommon is the one tier not taken from its symbol. That symbol is white,
+// and the set code inside the badge is drawn in the page color, so a white
+// badge on a light page is a blank shape holding an invisible number. It
+// keeps the slate it always had, which reads against either page and is the
+// value Riftbound gives the tier too.
+//
+// Illumineer's Quest and promo cards are "special", which carries the gold
+// Lorcana emblem rather than a rarity gem; the invented purple stays, since
+// the emblem's gold is legendary's.
 var colorRarityMap = map[string]map[string]string{
-	// Epic and Iconic joined the ladder in Fabled: the above-base numbering
-	// runs epic, enchanted, iconic, so epic takes the last warm color before
-	// enchanted's cyan and iconic, the two-per-set apex, takes magenta.
-	// Illumineer's Quest cards are "special" here, not a rarity of their own.
 	"lorcana": {
 		"common":    "var(--normal)",
 		"uncommon":  "#707883",
-		"rare":      "#CD7F32",
-		"superrare": "#C0C0C0",
-		"legendary": "#FFD700",
+		"rare":      "#B06435",
+		"superrare": "#919495",
+		"legendary": "#CDB55E",
+		"epic":      "#C63A4D",
+		"enchanted": "#1FA7C9",
+		"iconic":    "#B45A96",
 		"special":   "#652978",
-		"epic":      "#D0342C",
-		"enchanted": "#03A9FC",
-		"iconic":    "#E8388B",
 	},
 	// The four printed tiers climb the same metals Lorcana uses, and the two
 	// treatments that cut across them take the two remaining colors. Riftbound
