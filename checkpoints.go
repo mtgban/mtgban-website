@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -16,45 +18,107 @@ import (
 	"github.com/mtgban/mtgban-website/internal/bucketstore"
 )
 
-// CheckpointEvent is one record as authored in checkpoints.json. A single event
-// can fan out into multiple ChartCheckpoint annotations (e.g. a ban announcement
-// affecting several cards or carrying both banned and unbanned lists).
-//
-// AllCards skips the per-card filter so the event lands on every chart — used
-// for game-wide news like a format launch ("Pioneer announced") where the
-// banned/unbanned card lists don't apply. Type "format" is implicitly AllCards.
-type CheckpointEvent struct {
-	ID            string   `json:"id"`
-	Type          string   `json:"type"` // "ban" | "format"
-	Date          string   `json:"date"` // YYYY-MM-DD
-	Format        string   `json:"format,omitempty"`
-	Title         string   `json:"title"`
-	URL           string   `json:"url,omitempty"`
-	SetCode       string   `json:"set_code,omitempty"`
-	AllCards      bool     `json:"all_cards,omitempty"`
-	CardsBanned   []string `json:"cards_banned,omitempty"`
-	CardsUnbanned []string `json:"cards_unbanned,omitempty"`
-	// Vintage restricts rather than bans; the announcement is the same event,
-	// so restrictions ride the same "ban" type and share its toggle.
-	CardsRestricted   []string `json:"cards_restricted,omitempty"`
-	CardsUnrestricted []string `json:"cards_unrestricted,omitempty"`
+// banlistFile is the upstream ban list: one chronological list of changes per
+// format, keyed by the format's own lowercase name. It carries no titles or
+// ids - the frontend composes a title from the format - and no notion of a
+// format launch, which lives in the config instead.
+type banlistFile map[string][]banlistEntry
+
+// banlistEntry is one announcement for one format. A null date decodes to the
+// empty string; those entries are the format's standing ban list rather than
+// an event, and are only usable when the announcement url names a date.
+type banlistEntry struct {
+	Date string `json:"date"`
+	URL  string `json:"url"`
+	// Changes maps a card name to what the announcement did to it:
+	// "banned", "restricted" or "legal" (no longer either).
+	Changes map[string]string `json:"changes"`
 }
 
-type checkpointsFile struct {
-	Events []CheckpointEvent `json:"events"`
+// checkpointFormats are the formats whose announcements move prices enough to
+// be worth a marker, mapped to the spelling shown on the chart. The upstream
+// list also covers Alchemy and a long tail of retired or niche formats (block
+// formats, unsets, two-headed giant); charting a card's Tempest-block ban is
+// noise, so anything absent here is dropped at load.
+var checkpointFormats = map[string]string{
+	"standard":  "Standard",
+	"pioneer":   "Pioneer",
+	"modern":    "Modern",
+	"legacy":    "Legacy",
+	"vintage":   "Vintage",
+	"pauper":    "Pauper",
+	"commander": "Commander",
+	"brawl":     "Brawl",
 }
 
-// ChartCheckpoint is the per-chart annotation shape sent to the frontend.
-// One record == one vertical line on the chart.
-//
-// Bans/unbans/restrictions carry an IconURL pointing to a local white-stroked SVG.
-// Releases/reprints carry a KeyruneCode so the frontend can render the set
-// glyph from the Keyrune font (already loaded for the search page) — that
-// avoids fetching and recoloring external SVGs at render time.
-// Format events carry an IconText (the format name, e.g. "Pioneer") which
-// the frontend draws directly as the label content.
+// banlistAction describes one card's fate in one announcement, already
+// resolved to the marker the chart draws.
+type banlistAction struct {
+	Type    string // "ban" | "restrict" | "legal"
+	Detail  string // "Banned in Legacy"
+	IconURL string
+}
+
+var banlistActions = map[string]banlistAction{
+	"banned":     {Type: "ban", Detail: "Banned", IconURL: "/img/checkpoints/hammer.svg"},
+	"restricted": {Type: "restrict", Detail: "Restricted", IconURL: "/img/checkpoints/restricted.svg"},
+	// The upstream list says only that a card is legal again, without
+	// distinguishing an unban from an unrestriction - and both are true of
+	// "legal" in the formats that restrict. Say what it says.
+	"legal": {Type: "legal", Detail: "Legal", IconURL: "/img/checkpoints/unlock.svg"},
+}
+
+// banlistDateFromURL recovers the date of an entry that carries none from its
+// announcement url, which ends in one ("...announcing-pioneer-format-2019-10-21").
+// The dateless entries are format launches and standing lists; the launches
+// have such a url, the standing lists have none and are skipped.
+var banlistURLDate = regexp.MustCompile(`(\d{4}-\d{2}-\d{2})$`)
+
+// banlistVariantSuffix matches the per-variant letter the list appends to the
+// Unfinity attractions ("Scavenger Hunt (a)" through "(f)"). Those are six
+// printings of one card, named once in our datastore, so the suffix is dropped
+// and the six identical markers collapse to one.
+var banlistVariantSuffix = regexp.MustCompile(`\s+\([a-z]\)$`)
+
+// banlistYears bounds how far back the timeline is worth building. The list
+// reaches 1994; a chart cannot show a marker older than its own data, and the
+// index would otherwise carry three decades nobody looks at.
+const banlistYears = 10
+
+func banlistDateFromURL(link string) string {
+	return banlistURLDate.FindString(strings.TrimRight(link, "/"))
+}
+
+// banlistNames are the few cards the list spells differently from our
+// datastore. Normalization closes most gaps on its own, but not this one: it
+// drops every "s", so "Name Sticker" Goblin folds to nametickergoblin and can
+// never meet the card it means.
+var banlistNames = map[string]string{
+	`"Name Sticker" Goblin`: "_____ Goblin",
+}
+
+func banlistCardName(name string) string {
+	name = banlistVariantSuffix.ReplaceAllString(name, "")
+	if known, found := banlistNames[name]; found {
+		return known
+	}
+	return name
+}
+
+// FormatEvent is a curated, game-wide marker configured by hand: a format
+// launch or similar, which no ban list reports. Every chart shows it.
+type FormatEvent struct {
+	Date   string `json:"date"`
+	Format string `json:"format"`
+	Title  string `json:"title,omitempty"`
+	URL    string `json:"url,omitempty"`
+}
+
 type ChartCheckpoint struct {
-	Type        string `json:"type"`   // "ban" | "unban" | "restrict" | "unrestrict" | "release" | "reprint" | "format"
+	Type string `json:"type"` // "ban" | "restrict" | "legal" | "release" | "reprint" | "format"
+	// Format names the format an announcement applies to, so the frontend can
+	// compose the title the upstream ban list does not carry.
+	Format      string `json:"format,omitempty"`
 	Date        string `json:"date"`   // YYYY-MM-DD
 	Title       string `json:"title"`  // headline, e.g. set name or ban announcement title
 	Detail      string `json:"detail"` // sub-line, e.g. "Banned in Modern"
@@ -69,7 +133,7 @@ type ChartCheckpoint struct {
 // credentials, since the document lives on the same bucket as the datastore —
 // reload/save are infrequent enough that the extra B2 auth round-trip is not
 // worth a long-lived client.
-var checkpointsStore = &bucketstore.Store[checkpointsFile]{
+var checkpointsStore = &bucketstore.Store[banlistFile]{
 	Bucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 		cpPath := Config.Datastore.CheckpointsPath
 		if cpPath == "" {
@@ -95,24 +159,90 @@ func reloadCheckpoints() error {
 	if err := checkpointsStore.Load(context.Background()); err != nil {
 		return err
 	}
+	events := indexBanlist(checkpointsStore.Get())
+	banlistIndex.Store(&events)
+
 	cpPath := Config.Datastore.CheckpointsPath
 	source := "disk"
 	if strings.HasPrefix(cpPath, "b2://") {
 		source = "B2"
 	}
-	log.Printf("checkpoints: loaded %d events from %s (%s)", len(checkpointsStore.Get().Events), cpPath, source)
+	var markers int
+	for _, list := range events {
+		markers += len(list)
+	}
+	log.Printf("checkpoints: loaded %d cards, %d markers from %s (%s)", len(events), markers, cpPath, source)
 	return nil
 }
 
-// saveCheckpoints pushes events to the bucket and, on success, atomically
-// swaps the in-memory cache.
-func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
-	return checkpointsStore.Save(ctx, checkpointsFile{Events: events})
+// banlistIndex is the loaded ban list turned inside out: one entry per card,
+// since every chart asks about a single card and walking 350-odd
+// announcements (some listing eighty cards) per render is wasted work. Keyed
+// by normalized name so lookups need no case folding.
+var banlistIndex atomic.Pointer[map[string][]ChartCheckpoint]
+
+// indexBanlist flattens the document into per-card markers, dropping formats
+// that are not charted and entries that cannot be placed on a timeline.
+func indexBanlist(doc banlistFile) map[string][]ChartCheckpoint {
+	cutoff := time.Now().AddDate(-banlistYears, 0, 0).Format("2006-01-02")
+
+	out := map[string][]ChartCheckpoint{}
+	// One announcement can name the same card several times once the variant
+	// suffixes are stripped, and that is one marker, not six.
+	type marker struct{ card, date, format, kind string }
+	seen := map[marker]bool{}
+
+	for rawFormat, entries := range doc {
+		format, charted := checkpointFormats[strings.ToLower(rawFormat)]
+		if !charted {
+			continue
+		}
+		for _, entry := range entries {
+			date := entry.Date
+			if date == "" {
+				date = banlistDateFromURL(entry.URL)
+			}
+			if date == "" || date < cutoff {
+				continue
+			}
+			for card, rawAction := range entry.Changes {
+				action, known := banlistActions[strings.ToLower(rawAction)]
+				if !known {
+					continue
+				}
+				key := mtgmatcher.Normalize(banlistCardName(card))
+				m := marker{key, date, format, action.Type}
+				if seen[m] {
+					continue
+				}
+				seen[m] = true
+				out[key] = append(out[key], ChartCheckpoint{
+					Type:    action.Type,
+					Date:    date,
+					Format:  format,
+					Detail:  action.Detail + " in " + format,
+					URL:     entry.URL,
+					IconURL: action.IconURL,
+				})
+			}
+		}
+	}
+	return out
+}
+
+// saveCheckpoints pushes the document to the bucket and, on success, atomically
+// swaps the in-memory cache and its index.
+func saveCheckpoints(ctx context.Context, doc banlistFile) error {
+	if err := checkpointsStore.Save(ctx, doc); err != nil {
+		return err
+	}
+	events := indexBanlist(doc)
+	banlistIndex.Store(&events)
+	return nil
 }
 
 // currentCheckpointsJSON returns the in-memory document serialized as JSON,
-// for display in the admin editor. An empty store still produces a valid
-// `{"events": []}` document.
+// for display in the admin editor.
 func currentCheckpointsJSON() (string, error) {
 	return checkpointsStore.JSON()
 }
@@ -188,73 +318,45 @@ func multiCardCheckpoints(cardNames []string, earliest time.Time) []ChartCheckpo
 }
 
 func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
-	events := checkpointsStore.Get().Events
-
 	earliestStr := earliest.Format("2006-01-02")
 	var out []ChartCheckpoint
 
-	for _, ev := range events {
+	if idx := banlistIndex.Load(); idx != nil {
+		// A ban list names the face it means - "Reflection of Kiki-Jiki" -
+		// while the chart asks with the whole card, so look up each face too.
+		// An announcement naming more than one face of the same card is still
+		// one marker, hence the dedupe.
+		names := []string{cardName}
+		if strings.Contains(cardName, " // ") {
+			names = append(names, strings.Split(cardName, " // ")...)
+		}
+		seen := map[ChartCheckpoint]bool{}
+		for _, name := range names {
+			for _, cp := range (*idx)[mtgmatcher.Normalize(name)] {
+				if cp.Date < earliestStr || seen[cp] {
+					continue
+				}
+				seen[cp] = true
+				out = append(out, cp)
+			}
+		}
+	}
+
+	// Format launches are game-wide: every chart should see "Pioneer
+	// announced" regardless of which card the user is viewing.
+	for _, ev := range Config.FormatEvents {
 		if ev.Date < earliestStr {
 			continue
 		}
-		switch ev.Type {
-		case "ban":
-			if ev.AllCards || containsFold(ev.CardsBanned, cardName) {
-				out = append(out, ChartCheckpoint{
-					Type:    "ban",
-					Date:    ev.Date,
-					Title:   ev.Title,
-					Detail:  banDetail("Banned", ev.Format),
-					URL:     ev.URL,
-					IconURL: "/img/checkpoints/hammer.svg",
-				})
-			}
-			if ev.AllCards || containsFold(ev.CardsUnbanned, cardName) {
-				out = append(out, ChartCheckpoint{
-					Type:    "unban",
-					Date:    ev.Date,
-					Title:   ev.Title,
-					Detail:  banDetail("Unbanned", ev.Format),
-					URL:     ev.URL,
-					IconURL: "/img/checkpoints/unlock.svg",
-				})
-			}
-			// AllCards is deliberately not honoured here: an announcement that
-			// applies to every card is a ban-style event, and claiming every
-			// card was restricted would be wrong.
-			if containsFold(ev.CardsRestricted, cardName) {
-				out = append(out, ChartCheckpoint{
-					Type:    "restrict",
-					Date:    ev.Date,
-					Title:   ev.Title,
-					Detail:  banDetail("Restricted", ev.Format),
-					URL:     ev.URL,
-					IconURL: "/img/checkpoints/restricted.svg",
-				})
-			}
-			if containsFold(ev.CardsUnrestricted, cardName) {
-				out = append(out, ChartCheckpoint{
-					Type:    "unrestrict",
-					Date:    ev.Date,
-					Title:   ev.Title,
-					Detail:  banDetail("Unrestricted", ev.Format),
-					URL:     ev.URL,
-					IconURL: "/img/checkpoints/unlock.svg",
-				})
-			}
-		case "format":
-			// Format-launch events are inherently all-cards: every chart
-			// should see "Pioneer announced" regardless of which card the
-			// user is viewing.
-			out = append(out, ChartCheckpoint{
-				Type:     "format",
-				Date:     ev.Date,
-				Title:    ev.Title,
-				Detail:   formatDetail(ev.Format),
-				URL:      ev.URL,
-				IconText: ev.Format,
-			})
-		}
+		out = append(out, ChartCheckpoint{
+			Type:     "format",
+			Date:     ev.Date,
+			Format:   ev.Format,
+			Title:    ev.Title,
+			Detail:   formatDetail(ev.Format),
+			URL:      ev.URL,
+			IconText: ev.Format,
+		})
 	}
 	return out
 }
@@ -399,25 +501,9 @@ func perCardSetCheckpoints(cardName string, e EditionEntry, earliest, now time.T
 	return out
 }
 
-func banDetail(action, format string) string {
-	if format == "" {
-		return action
-	}
-	return action + " in " + format
-}
-
 func formatDetail(format string) string {
 	if format == "" {
 		return "Format announced"
 	}
 	return format + " format announced"
-}
-
-func containsFold(list []string, target string) bool {
-	for _, item := range list {
-		if strings.EqualFold(item, target) {
-			return true
-		}
-	}
-	return false
 }

@@ -110,7 +110,7 @@ function externalTooltipHandler(context) {
                 // a CSS custom property so per-row styling stays in CSS.
                 html += '<div class="chart-tooltip-row chart-tooltip-cp" style="--cp-color:' + dotColor + '">' +
                     '<span class="chart-tooltip-swatch" style="background:' + dotColor + '"></span>' +
-                    '<span><strong>' + escapeHtml(cp.title) + '</strong>' +
+                    '<span><strong>' + escapeHtml(checkpointTitle(cp)) + '</strong>' +
                     (cp.detail ? '<br><span style="opacity:.75">' + escapeHtml(cp.detail) + '</span>' : '') +
                     '</span>' +
                     '</div>';
@@ -363,31 +363,32 @@ function saveLegendState(chart, storageKey) {
 // otherwise render black-on-grey, which disappears).
 const checkpointColors = {
     ban:        { line: 'rgba(217, 83, 79, 0.9)',  label: 'rgba(217, 83, 79, 0.9)'  },
-    unban:      { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
     // Vintage restrictions are their own action, not a softer ban, so they get
     // their own hue rather than a shade of the ban red.
     restrict:   { line: 'rgba(13, 110, 253, 0.9)', label: 'rgba(13, 110, 253, 0.9)' },
-    unrestrict: { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
+    // The ban list reports only that a card is legal again, without saying
+    // whether it was unbanned or unrestricted, so one marker covers both.
+    legal:      { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
     release: { line: 'rgba(108, 117, 125, 0.9)', label: 'rgba(0, 0, 0, 0.9)'    },
     reprint: { line: 'rgba(240, 173, 78, 0.9)', label: 'rgba(240, 173, 78, 0.9)' },
     format:  { line: 'rgba(102, 16, 242, 0.9)', label: 'rgba(102, 16, 242, 0.9)' },
 };
 
 // Line z-order priority for same-date overlaps. Higher z draws later, so
-// the more important line wins the pixel: red ban > green unban > orange
+// the more important line wins the pixel: red ban > blue restrict > green
 // reprint > black release. Format isn't called out in the priority but
 // sits below release as a soft default.
 const checkpointZ = {
     ban: 6,
     restrict: 5,
-    unban: 4,
-    unrestrict: 3,
+    legal: 3,
     reprint: 2,
     release: 1,
     format: 0,
 };
 
-// Bans + unbans share the "Bans" checkbox; releases + formats share the
+// Bans, restrictions and returns to legal share the "Bans" checkbox;
+// releases + formats share the
 // "Releases" checkbox (both are set/format-launch context).
 // Checkpoint dates are calendar days ("2026-08-10"). new Date() reads that
 // form as UTC midnight, while the time scale parses the same string as local
@@ -395,6 +396,15 @@ const checkpointZ = {
 // East of UTC that pushes a checkpoint on the last axis day past scale.max and
 // the annotation is dropped as out of range - a ban announced today would not
 // draw at all. Parse into the scale's own frame instead.
+// The ban list carries no titles, so a checkpoint from it arrives with a
+// format and no title; announcements are named after their format everywhere
+// else, so compose the same thing here rather than storing it 350 times.
+function checkpointTitle(cp) {
+    if (cp.title) return cp.title;
+    if (cp.format) return cp.format + ' B&R Announcement';
+    return cp.detail || '';
+}
+
 function checkpointTime(dateStr) {
     if (typeof dateStr !== 'string') return NaN;
     var parts = dateStr.split('-');
@@ -408,7 +418,7 @@ function checkpointTime(dateStr) {
 function checkpointToggleKey(type) {
     // Restrictions come from the same B&R announcement as bans, so they ride
     // the same toggle rather than adding a checkbox for a Vintage-only action.
-    if (type === 'unban' || type === 'restrict' || type === 'unrestrict') return 'ban';
+    if (type === 'restrict' || type === 'legal') return 'ban';
     if (type === 'format') return 'release';
     return type;
 }
@@ -892,7 +902,7 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
         // load triggers redraw above) pick up the real glyph character.
         //
         // The glyph itself carries the type's color (release = monochrome
-        // theme-text, reprint = orange, ban = red, unban = green). Release
+        // theme-text, reprint = orange, ban = red, legal = green). Release
         // is the only monochrome type, so it flips between black and white
         // to stay legible against the chart background.
         var glyphColorFn = function () {
@@ -912,7 +922,7 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
             // renders strings inline using the label font, so the badge sizes
             // to fit the text rather than to the uniform icon canvas.
             if (cp.iconText) return cp.iconText;
-            return cp.title;
+            return checkpointTitle(cp);
         };
         // Font only affects the text-fallback path now — canvas content is
         // pre-rendered and the plugin ignores the font option for it.
@@ -932,7 +942,7 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
             borderColor: palette.line,
             // Release lines get noisy at multi-year zooms — drop the dashed
             // line once the visible range exceeds 2 years (i.e. 5y/10y),
-            // keeping only the keyrune icon at the top. Bans/unbans/
+            // keeping only the keyrune icon at the top. Bans/restrictions/
             // reprints/formats stay dashed regardless.
             borderWidth: function (ctx) {
                 if (cp.type !== 'release') return 1.5;

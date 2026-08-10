@@ -359,10 +359,10 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	// -- Checkpoints: handle POST if submitted --
 	newCheckpoints := r.FormValue("checkpointsTextArea")
 	if newCheckpoints != "" {
-		var parsed checkpointsFile
+		var parsed banlistFile
 		if err := json.Unmarshal([]byte(newCheckpoints), &parsed); err != nil {
 			pageVars.WarningMessage = "Checkpoints JSON invalid: " + err.Error()
-		} else if err := saveCheckpoints(r.Context(), parsed.Events); err != nil {
+		} else if err := saveCheckpoints(r.Context(), parsed); err != nil {
 			pageVars.WarningMessage = "Checkpoints save failed: " + err.Error()
 		} else {
 			pageVars.InfoMessage = "Checkpoints updated"

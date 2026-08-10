@@ -514,7 +514,11 @@ type ConfigType struct {
 		BucketSecretKey string `json:"bucket_access_secret"`
 		CheckpointsPath string `json:"checkpoints_path"`
 	} `json:"datastore"`
-	Game                   string             `json:"game"`
+	Game string `json:"game"`
+	// FormatEvents are the game-wide chart markers no ban list reports - a
+	// format launching, say. Everything else on the checkpoint timeline comes
+	// from the ban list document or the set registry.
+	FormatEvents           []FormatEvent      `json:"format_events,omitempty"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
 	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
