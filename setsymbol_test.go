@@ -2,27 +2,38 @@ package main
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
+// TestBadgeFilesParse reads every drawing under img/setsymbol the way the
+// server does at startup. A malformed one degrades quietly there — the badge
+// falls back to a circle — so it fails here instead.
 func TestBadgeFilesParse(t *testing.T) {
-	entries, err := os.ReadDir("img/setsymbol/lorcana")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(entries) != 8 {
-		t.Fatalf("got %d files, want 8", len(entries))
-	}
-	for _, entry := range entries {
-		badge, err := readBadge("img/setsymbol/lorcana/" + entry.Name())
+	var files []string
+	err := filepath.WalkDir("img/setsymbol", func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
-			t.Fatalf("%s: %s", entry.Name(), err)
+			return err
 		}
-		t.Logf("%-14s font %4.1f  y %4.1f  %.40s...", entry.Name(), badge.Font, badge.TextY, badge.Path)
-	}
-	fallback, err := readBadge("img/setsymbol/default.svg")
+		if !entry.IsDir() && strings.HasSuffix(path, ".svg") {
+			files = append(files, path)
+		}
+		return nil
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("%-14s font %4.1f  y %4.1f  %s", "default.svg", fallback.Font, fallback.TextY, fallback.Path)
+	if len(files) == 0 {
+		t.Fatal("no set symbols found")
+	}
+
+	for _, path := range files {
+		badge, err := readBadge(path)
+		if err != nil {
+			t.Errorf("%s: %s", path, err)
+			continue
+		}
+		t.Logf("%-40s font %4.1f  y %4.1f", path, badge.Font, badge.TextY)
+	}
 }

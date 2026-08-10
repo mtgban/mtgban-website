@@ -56,16 +56,21 @@ var colorRarityMap = map[string]map[string]string{
 		"iconic":    "#B45A96",
 		"special":   "#652978",
 	},
-	// The four printed tiers climb the same metals Lorcana uses, and the two
-	// treatments that cut across them take the two remaining colors. Riftbound
-	// also has a "none" rarity, held by four cards, which is left out so those
-	// cards render without a badge at all.
+	// Riftbound prints its rarity as a gem under the text box, and these are
+	// sampled from those gems: a teal pyramid, a magenta octahedron, an amber
+	// gem, a gold cube. Common's sphere is white, and a white badge on a light
+	// page holds an invisible set code, so it takes the theme's neutral the
+	// same way Lorcana's does.
+	//
+	// A promo carries a banner over whatever gem the card already had rather
+	// than one of its own, so its purple stays invented. The "none" rarity,
+	// held by twelve tokens, is left out so those cards render no badge.
 	"riftbound": {
 		"common":   "var(--normal)",
-		"uncommon": "#707883",
-		"rare":     "#CD7F32",
-		"epic":     "#FFD700",
-		"showcase": "#03A9FC",
+		"uncommon": "#187870",
+		"rare":     "#BF287F",
+		"epic":     "#B66204",
+		"showcase": "#BA9900",
 		"promo":    "#652978",
 	},
 }
