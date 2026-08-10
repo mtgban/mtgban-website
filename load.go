@@ -97,23 +97,41 @@ func loadScrapersNG(config ScraperConfig) error {
 		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
 	}
 
+	var loaded int
+	var failed []string
+
 	for name, scrapersConfig := range config.Config {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
 				err := loadScraperWithRetry(DataBucket, config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
 				if err != nil {
-					msg := fmt.Sprintf("failed to load %s/%s/%s after %d attempts: %s",
-						name, kind, shorthand, scraperLoadRetries, err)
-					ServerNotify("reload", msg, true)
+					failed = append(failed, fmt.Sprintf("%s/%s/%s: %s", name, kind, shorthand, err))
 					continue
 				}
+				loaded++
 			}
 		}
 	}
 
-	ServerNotify("reload", "Server loaded")
+	// No @here: at startup nothing has loaded yet, so an absent scraper is
+	// the ordinary state rather than news. Breakage worth waking someone for
+	// is a scraper that was serving and stopped, which is the reload path.
+	ServerNotify("reload", loadSummary(loaded, failed))
 
 	return nil
+}
+
+func loadSummary(loaded int, failed []string) string {
+	var b strings.Builder
+
+	slices.Sort(failed)
+
+	fmt.Fprintf(&b, "Server loaded %d/%d scrapers", loaded, loaded+len(failed))
+	if len(failed) > 0 {
+		fmt.Fprintf(&b, "\nnot loaded (%d): %s", len(failed), strings.Join(failed, "; "))
+	}
+
+	return b.String()
 }
 
 // isTimeout reports whether err is the hung-connection case scraperLoadTimeout
