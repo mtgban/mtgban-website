@@ -855,14 +855,26 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var failed []string
 	for kind, list := range scrapersConfig {
 		for _, shorthand := range list {
 			err := loadScraper(DataBucket, config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
 			if err != nil {
 				log.Println(err)
+				failed = append(failed, fmt.Sprintf("%s/%s: %s", kind, shorthand, err))
 				continue
 			}
 		}
+	}
+
+	// A scraper that just finished producing and still will not load is the
+	// case worth waking someone for, unlike the same absence at startup.
+	if len(failed) > 0 {
+		slices.Sort(failed)
+		msg := fmt.Sprintf("Server reloaded %s, %d did not load: %s", name, len(failed), strings.Join(failed, "; "))
+		ServerNotify("reload", msg, true)
+		w.Write([]byte(`{"status": "ok"}`))
+		return
 	}
 
 	ServerNotify("reload", "Server reloaded "+name)
