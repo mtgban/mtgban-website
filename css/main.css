@@ -1027,8 +1027,50 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
     width: auto;
     max-width: 640px;
     max-height: 360px;
-    border-radius: 8px;
+    /* Default in the fallback, not a declaration: a rule here would carry two
+       classes and outrank the identity-keyed overrides below. */
+    border-radius: var(--card-radius, 8px);
 }
+
+/* ── Card scan corners ── */
+/* Some printings are photographed with a much rounder corner than the modern
+   crop, so a wrapper that rounds to the usual radius shows a sliver of square
+   behind the art. Every surface that renders a card image reads --card-radius
+   through a var() fallback for its own default, so these rules - keyed on the
+   card identity the wrapper carries - are the only thing that ever sets the
+   property and cannot be outranked by a surface's own selector. The list
+   lives here once instead of in each stylesheet.
+
+   Alpha is its own case; the rest are oversized printings. */
+[data-set="LEA"] {
+    --card-radius: 22px;
+}
+/* Every card in these sets is oversized, so the set alone selects them;
+   adding a set is one more entry here. */
+:is(
+    [data-set="OARC"], [data-set="PSSC"], [data-set="OC20"],
+    [data-set="OC19"], [data-set="OC18"], [data-set="OC17"],
+    [data-set="OE01"], [data-set="OPCA"], [data-set="OC16"],
+    [data-set="OC15"], [data-set="OC14"], [data-set="PPC1"],
+    [data-set="OC13"], [data-set="OCM1"], [data-set="OPC2"],
+    [data-set="PHOP"], [data-set="PCMD"], [data-set="OCMD"],
+    [data-set="OHOP"]
+) {
+    --card-radius: 18px;
+}
+/* PHEL is the exception: five oversized angels plus one normal-size
+   double-faced token, and nothing else tells them apart - they share the set,
+   and the whole set has no release date of its own. */
+[data-set="PHEL"]:not([data-name="Angel // Demon"]) {
+    --card-radius: 18px;
+}
+/* DCI mixes ten oversized promos into eighty normal ones, and only those two
+   print runs (Planechase planes, Archenemy schemes) are cut this way. No other
+   DCI promo shares either date. */
+[data-set="DCI"]:is([data-date="2009-09-30"], [data-date="2010-09-30"]) {
+    --card-radius: 18px;
+}
+
 
 /* ── Content-warning blur ── */
 /* Applies to wrapper divs (.foil-wrap, .sidebar-img-wrap) and standalone <img> elements.

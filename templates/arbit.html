@@ -420,7 +420,7 @@
                 {{$arbitContainer := .}}
                 {{range .Arbit}}
                     {{$card := (index $.Metadata .CardId)}}
-                    <tr data-arb-id="{{.CardId}}" data-arb-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-arb-name="{{$card.Name}}" data-arb-cond="{{.InventoryEntry.Conditions}}" data-arb-ckid="{{uuid2ckid .CardId}}" data-arb-tcgid="{{uuid2tcgid .CardId}}" onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                    <tr data-arb-id="{{.CardId}}" data-arb-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-arb-name="{{$card.Name}}" data-arb-cond="{{.InventoryEntry.Conditions}}" data-arb-ckid="{{uuid2ckid .CardId}}" data-arb-tcgid="{{uuid2tcgid .CardId}}" onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                         <td>
                             <div class="arb-card-cell">
                                 {{$keyrune := $card.Keyrune}}
