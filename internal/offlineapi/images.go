@@ -63,11 +63,13 @@ func (s *Service) serveImage(w http.ResponseWriter, r *http.Request, rest string
 	var dir, name string
 	switch {
 	case scryfallIDPattern.MatchString(key):
-		dir = path.Join("normal", "front", key[0:1], key[1:2])
+		// singles/front/<c1>/<c2>/<scryfallId>.jpg in the mirror
+		dir = path.Join("singles", "front", key[0:1], key[1:2])
 		name = key + ".jpg"
 	case sealedKeyPattern.MatchString(key):
+		// sealed/<SETCODE>/<tcgProductId>.jpg in the mirror
 		m := sealedKeyPattern.FindStringSubmatch(key)
-		dir = path.Join(m[1], "sealed")
+		dir = path.Join("sealed", m[1])
 		name = m[2] + ".jpg"
 	default:
 		http.NotFound(w, r)
@@ -105,39 +107,4 @@ func (s *Service) serveImage(w http.ResponseWriter, r *http.Request, rest string
 	}
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.Write(data)
-}
-
-// serveImageBundle streams the current per-set zip with ETag support.
-func (s *Service) serveImageBundle(w http.ResponseWriter, r *http.Request, rest string) {
-	code := strings.TrimSuffix(rest, ".zip")
-	if code == "" || code == rest || strings.ContainsAny(code, "/\\.%") {
-		http.NotFound(w, r)
-		return
-	}
-
-	info, found := s.imagesStore.Get()[code]
-	if !found {
-		http.NotFound(w, r)
-		return
-	}
-
-	etag := `"` + info.Hash + `"`
-	inm := r.Header.Get("If-None-Match")
-	if inm != "" && etagMatches(inm, etag) {
-		w.Header().Set("ETag", etag)
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-
-	reader, err := s.openImageObject(r.Context(), "bundles", code+"-"+info.Hash+".zip")
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer reader.Close()
-
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("ETag", etag)
-	w.Header().Set("Cache-Control", "private, max-age=300")
-	io.Copy(w, reader)
 }

@@ -1,6 +1,6 @@
 // Offline price sync worker: manifest diff, catalog rebuild, encrypted set blobs, image bundles.
 importScripts('/js/offline/offline-util.js', '/js/offline/offline-db.js', '/js/offline/offline-format.js');
-importScripts('/js/vendor/fflate.min.js', '/js/offline/offline-images.js');
+importScripts('/js/offline/offline-images.js');
 
 var cancelled = false;
 
@@ -58,6 +58,10 @@ async function runImagesStage(manifest, imgEditions, isCancelled) {
         states: states,
         cancelled: isCancelled,
         putImgState: function (row) { return OfflineDB.putRow('imgstate', row); },
+        getImgKeys: async function (code) {
+            var row = await OfflineDB.getRow('imgkeys', code);
+            return (row && row.keys) || [];
+        },
         post: function (msg) { self.postMessage(msg); },
     });
     // Refresh the status snapshot: imgCount is per-image, summed from manifest.
@@ -178,9 +182,16 @@ async function syncSet(code, version, stores, key) {
 async function rebuildCatalog(catalog) {
     var cards = [];
     var names = {};
+    var imgKeys = {};
     Object.keys(catalog.cards || {}).forEach(function(uuid) {
         var c = catalog.cards[uuid];
         cards.push({ uuid: uuid, n: c.n, num: c.num, r: c.r, set: c.set, f: c.f, e: c.e, s: c.s, p: c.p, i: c.i });
+        // image keys per set, so a sync can fetch a set's images without a
+        // manifest of its own; foil and etched printings share one key
+        if (c.i && c.set) {
+            var bucket = imgKeys[c.set] || (imgKeys[c.set] = {});
+            bucket[c.i] = true;
+        }
         var k = self.OfflineUtil.normName(c.n || '');
         if (!k) return;
         if (!names[k]) names[k] = [];
@@ -195,6 +206,10 @@ async function rebuildCatalog(catalog) {
     }
     for (var j = 0; j < nameRows.length; j += CHUNK) {
         await self.OfflineDB.putCards({ cards: [], names: nameRows.slice(j, j + CHUNK) });
+    }
+
+    for (var code in imgKeys) {
+        await self.OfflineDB.putRow('imgkeys', { code: code, keys: Object.keys(imgKeys[code]).sort() });
     }
 
     // Display dictionaries for the offline shell (OfflineUtil.loadCatalogDicts reads these).
