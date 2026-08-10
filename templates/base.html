@@ -42,6 +42,21 @@
 <script>(function(){try{var v=localStorage.getItem('theme');var pref=(v==='light'||v==='dark'||v==='system')?v:'system';var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(dark){document.body.classList.remove('light-theme');document.body.classList.add('dark-theme');}}catch(e){}})();</script>
 {{if not .ModalMode}}{{template "navbar" .}}{{end}}
 
+{{/* The paint every foil rarity badge fills itself with. It lives here
+     because more than one page draws that badge, and a page that referenced
+     the gradient without carrying this block rendered the badges hollow. */}}
+<svg height="0" width="0" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="gradient-foil" x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(45)">
+            <stop offset="4%"   stop-color="#ea8d66" />
+            <stop offset="18%"  stop-color="#fdef8a" />
+            <stop offset="42%"  stop-color="#8bcc93" />
+            <stop offset="63%"  stop-color="#a6dced" />
+            <stop offset="100%" stop-color="#e599c2" />
+        </linearGradient>
+    </defs>
+</svg>
+
 <div class="page-content">
     {{if ne .ErrorMessage ""}}
         <div class="page-error">{{.ErrorMessage}}</div>

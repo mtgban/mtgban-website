@@ -979,18 +979,6 @@
                         </div>
                     {{end}}
 
-                    <svg height="0" width="0" xmlns="http://www.w3.org/2000/svg">
-                        <defs>
-                            <linearGradient id="gradient-foil" x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(45)">
-                                <stop offset="4%"   stop-color="#ea8d66" />
-                                <stop offset="18%"  stop-color="#fdef8a" />
-                                <stop offset="42%"  stop-color="#8bcc93" />
-                                <stop offset="63%"  stop-color="#a6dced" />
-                                <stop offset="100%" stop-color="#e599c2" />
-                            </linearGradient>
-                        </defs>
-                    </svg>
-
                     {{range $i, $cardId := .AllKeys}}
                         {{$card := (index $.Metadata $cardId)}}
                         {{if eq $firstImg ""}}
