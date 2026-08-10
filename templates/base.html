@@ -44,14 +44,22 @@
 
 {{/* The paint every foil rarity badge fills itself with. It lives here
      because more than one page draws that badge, and a page that referenced
-     the gradient without carrying this block rendered the badges hollow. */}}
+     the gradient without carrying this block rendered the badges hollow.
+
+     The stops are keyrune's own .ss-foil.ss-grad, so a foil badge and the
+     foil keyrune a Magic page draws beside it are the same rainbow. Keyrune
+     writes it as linear-gradient(135deg, ...), which on a square runs corner
+     to corner — hence x1,y1 to x2,y2 rather than a rotation. */}}
 <svg height="0" width="0" xmlns="http://www.w3.org/2000/svg">
     <defs>
-        <linearGradient id="gradient-foil" x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(45)">
-            <stop offset="4%"   stop-color="#ea8d66" />
-            <stop offset="18%"  stop-color="#fdef8a" />
+        <linearGradient id="gradient-foil" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%"   stop-color="#ea8d66" />
+            <stop offset="15%"  stop-color="#ea8d66" />
+            <stop offset="28%"  stop-color="#fdef8a" />
             <stop offset="42%"  stop-color="#8bcc93" />
-            <stop offset="63%"  stop-color="#a6dced" />
+            <stop offset="55%"  stop-color="#a6dced" />
+            <stop offset="68%"  stop-color="#6f75aa" />
+            <stop offset="84%"  stop-color="#e599c2" />
             <stop offset="100%" stop-color="#e599c2" />
         </linearGradient>
     </defs>
