@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"path"
 	"slices"
@@ -115,6 +116,19 @@ func loadScrapersNG(config ScraperConfig) error {
 	return nil
 }
 
+// isTimeout reports whether err is the hung-connection case scraperLoadTimeout
+// exists to catch, which is the only thing worth a second attempt here: the B2
+// client already retries what it considers transient before returning, and
+// everything else, an unpublished dump most of all, is permanent.
+func isTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
 func loadScraperWithRetry(bucket simplecloud.Reader, base, game, name, kind, shorthand, format string) error {
 	var lastErr error
 	for attempt := range scraperLoadRetries {
@@ -129,8 +143,11 @@ func loadScraperWithRetry(bucket simplecloud.Reader, base, game, name, kind, sho
 		if lastErr == nil {
 			return nil
 		}
+		if !isTimeout(lastErr) {
+			return lastErr
+		}
 
-		log.Printf("load %s/%s/%s failed: %v", name, kind, shorthand, lastErr)
+		log.Printf("load %s/%s/%s timed out: %v", name, kind, shorthand, lastErr)
 	}
 	return lastErr
 }
