@@ -362,8 +362,12 @@ function saveLegendState(chart, storageKey) {
 // black with a white icon (the Scryfall set glyphs are monochrome and would
 // otherwise render black-on-grey, which disappears).
 const checkpointColors = {
-    ban:     { line: 'rgba(217, 83, 79, 0.9)',  label: 'rgba(217, 83, 79, 0.9)'  },
-    unban:   { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
+    ban:        { line: 'rgba(217, 83, 79, 0.9)',  label: 'rgba(217, 83, 79, 0.9)'  },
+    unban:      { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
+    // Vintage restrictions are their own action, not a softer ban, so they get
+    // their own hue rather than a shade of the ban red.
+    restrict:   { line: 'rgba(13, 110, 253, 0.9)', label: 'rgba(13, 110, 253, 0.9)' },
+    unrestrict: { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
     release: { line: 'rgba(108, 117, 125, 0.9)', label: 'rgba(0, 0, 0, 0.9)'    },
     reprint: { line: 'rgba(240, 173, 78, 0.9)', label: 'rgba(240, 173, 78, 0.9)' },
     format:  { line: 'rgba(102, 16, 242, 0.9)', label: 'rgba(102, 16, 242, 0.9)' },
@@ -374,8 +378,10 @@ const checkpointColors = {
 // reprint > black release. Format isn't called out in the priority but
 // sits below release as a soft default.
 const checkpointZ = {
-    ban: 4,
-    unban: 3,
+    ban: 6,
+    restrict: 5,
+    unban: 4,
+    unrestrict: 3,
     reprint: 2,
     release: 1,
     format: 0,
@@ -400,7 +406,9 @@ function checkpointTime(dateStr) {
 }
 
 function checkpointToggleKey(type) {
-    if (type === 'unban') return 'ban';
+    // Restrictions come from the same B&R announcement as bans, so they ride
+    // the same toggle rather than adding a checkbox for a Vintage-only action.
+    if (type === 'unban' || type === 'restrict' || type === 'unrestrict') return 'ban';
     if (type === 'format') return 'release';
     return type;
 }

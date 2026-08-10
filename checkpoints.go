@@ -34,6 +34,10 @@ type CheckpointEvent struct {
 	AllCards      bool     `json:"all_cards,omitempty"`
 	CardsBanned   []string `json:"cards_banned,omitempty"`
 	CardsUnbanned []string `json:"cards_unbanned,omitempty"`
+	// Vintage restricts rather than bans; the announcement is the same event,
+	// so restrictions ride the same "ban" type and share its toggle.
+	CardsRestricted   []string `json:"cards_restricted,omitempty"`
+	CardsUnrestricted []string `json:"cards_unrestricted,omitempty"`
 }
 
 type checkpointsFile struct {
@@ -43,14 +47,14 @@ type checkpointsFile struct {
 // ChartCheckpoint is the per-chart annotation shape sent to the frontend.
 // One record == one vertical line on the chart.
 //
-// Bans/unbans carry an IconURL pointing to a local white-stroked SVG.
+// Bans/unbans/restrictions carry an IconURL pointing to a local white-stroked SVG.
 // Releases/reprints carry a KeyruneCode so the frontend can render the set
 // glyph from the Keyrune font (already loaded for the search page) — that
 // avoids fetching and recoloring external SVGs at render time.
 // Format events carry an IconText (the format name, e.g. "Pioneer") which
 // the frontend draws directly as the label content.
 type ChartCheckpoint struct {
-	Type        string `json:"type"`   // "ban" | "unban" | "release" | "reprint" | "format"
+	Type        string `json:"type"`   // "ban" | "unban" | "restrict" | "unrestrict" | "release" | "reprint" | "format"
 	Date        string `json:"date"`   // YYYY-MM-DD
 	Title       string `json:"title"`  // headline, e.g. set name or ban announcement title
 	Detail      string `json:"detail"` // sub-line, e.g. "Banned in Modern"
@@ -211,6 +215,29 @@ func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 					Date:    ev.Date,
 					Title:   ev.Title,
 					Detail:  banDetail("Unbanned", ev.Format),
+					URL:     ev.URL,
+					IconURL: "/img/checkpoints/unlock.svg",
+				})
+			}
+			// AllCards is deliberately not honoured here: an announcement that
+			// applies to every card is a ban-style event, and claiming every
+			// card was restricted would be wrong.
+			if containsFold(ev.CardsRestricted, cardName) {
+				out = append(out, ChartCheckpoint{
+					Type:    "restrict",
+					Date:    ev.Date,
+					Title:   ev.Title,
+					Detail:  banDetail("Restricted", ev.Format),
+					URL:     ev.URL,
+					IconURL: "/img/checkpoints/restricted.svg",
+				})
+			}
+			if containsFold(ev.CardsUnrestricted, cardName) {
+				out = append(out, ChartCheckpoint{
+					Type:    "unrestrict",
+					Date:    ev.Date,
+					Title:   ev.Title,
+					Detail:  banDetail("Unrestricted", ev.Format),
 					URL:     ev.URL,
 					IconURL: "/img/checkpoints/unlock.svg",
 				})
