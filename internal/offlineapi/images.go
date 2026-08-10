@@ -139,5 +139,12 @@ func (s *Service) serveImageBundle(w http.ResponseWriter, r *http.Request, rest 
 	w.Header().Set("Content-Type", "application/zip")
 	w.Header().Set("ETag", etag)
 	w.Header().Set("Cache-Control", "private, max-age=300")
-	io.Copy(w, reader)
+	// A bundle is far too large to buffer, so the status is already sent by
+	// the time a read can fail. Declaring the length the manifest recorded at
+	// build time turns a cut stream into an error the client raises, rather
+	// than a short zip it caches and extracts as though it were whole.
+	w.Header().Set("Content-Length", strconv.FormatInt(info.Bytes, 10))
+	if n, err := io.Copy(w, reader); err != nil {
+		log.Printf("offline: bundle %s cut short after %d of %d bytes: %v", code, n, info.Bytes, err)
+	}
 }

@@ -93,6 +93,11 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	if w.Header().Get("Content-Type") != "application/zip" {
 		t.Fatalf("content type = %q", w.Header().Get("Content-Type"))
 	}
+	// without a declared length a cut stream is a short zip the client caches
+	// and extracts as though it were whole
+	if got := w.Header().Get("Content-Length"); got != "7" {
+		t.Fatalf("content length = %q, want the manifest's 7", got)
+	}
 
 	r := httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
 	r.Header.Set("If-None-Match", `"abc123"`)
@@ -100,6 +105,9 @@ func TestServeOfflineImageBundle(t *testing.T) {
 	s.serveImageBundle(w, r, "NEO.zip")
 	if w.Code != http.StatusNotModified {
 		t.Fatalf("conditional get: code = %d, want 304", w.Code)
+	}
+	if got := w.Header().Get("Content-Length"); got != "" {
+		t.Fatalf("304 declared a length of %q", got)
 	}
 
 	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
