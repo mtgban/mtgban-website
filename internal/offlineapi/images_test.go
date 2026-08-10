@@ -162,3 +162,52 @@ func TestOfflineManifestOmitsEmptyImages(t *testing.T) {
 		t.Errorf("empty images map should be omitted: %s", w.Body.String())
 	}
 }
+
+func TestServeOfflineImageETag(t *testing.T) {
+	s, dir := newTestService(t)
+	id := "ab154b52-1234-5678-9abc-def012345678"
+	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b"), 0755)
+	path := filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b", id+".jpg")
+	os.WriteFile(path, []byte("jpegdata"), 0644)
+
+	get := func(inm string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("GET", "/api/offline/images/"+id+".jpg", nil)
+		if inm != "" {
+			r.Header.Set("If-None-Match", inm)
+		}
+		s.serveImage(w, r, id+".jpg")
+		return w
+	}
+
+	first := get("")
+	etag := first.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("no ETag on the first response")
+	}
+	if got := first.Header().Get("Content-Length"); got != "8" {
+		t.Errorf("Content-Length = %q, want 8 so a short body is detectable", got)
+	}
+
+	// a matching validator must save the body, including the weak form
+	for _, inm := range []string{etag, "W/" + etag, `"other", ` + etag} {
+		w := get(inm)
+		if w.Code != http.StatusNotModified {
+			t.Errorf("If-None-Match %s: code = %d, want 304", inm, w.Code)
+		}
+		if w.Body.Len() != 0 {
+			t.Errorf("If-None-Match %s: 304 carried a body", inm)
+		}
+	}
+
+	// rewriting the image in place, as a Scryfall reprocess does, must
+	// invalidate the cached copy rather than serve it for another week
+	os.WriteFile(path, []byte("reprocessed"), 0644)
+	changed := get(etag)
+	if changed.Code != http.StatusOK {
+		t.Errorf("code = %d, want 200 after the bytes changed", changed.Code)
+	}
+	if changed.Header().Get("ETag") == etag {
+		t.Error("ETag unchanged after the image was rewritten")
+	}
+}

@@ -2,11 +2,13 @@ package offlineapi
 
 import (
 	"context"
+	"hash/fnv"
 	"io"
 	"log"
 	"net/http"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/mtgban/simplecloud"
@@ -78,9 +80,31 @@ func (s *Service) serveImage(w http.ResponseWriter, r *http.Request, rest string
 		return
 	}
 	defer reader.Close()
+
+	// The bytes are the only version marker available for a single image: the
+	// mirror rewrites an image in place when Scryfall reprocesses it, and the
+	// images manifest only tracks whole sets. Buffering to hash them also lets
+	// a failed read answer with an error instead of a truncated 200, and gives
+	// the client a Content-Length to detect a short response against.
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusBadGateway), http.StatusBadGateway)
+		return
+	}
+
+	sum := fnv.New64a()
+	sum.Write(data)
+	etag := `"` + strconv.FormatUint(sum.Sum64(), 16) + `"`
+
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Header().Set("Cache-Control", "private, max-age=604800")
-	io.Copy(w, reader)
+	w.Header().Set("ETag", etag)
+	if inm := r.Header.Get("If-None-Match"); inm != "" && etagMatches(inm, etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data)
 }
 
 // serveImageBundle streams the current per-set zip with ETag support.
