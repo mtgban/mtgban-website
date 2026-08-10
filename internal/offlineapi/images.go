@@ -66,8 +66,9 @@ func (s *Service) serveImage(w http.ResponseWriter, r *http.Request, rest string
 		dir = path.Join("normal", "front", key[0:1], key[1:2])
 		name = key + ".jpg"
 	case sealedKeyPattern.MatchString(key):
+		// sealed/<SETCODE>/<tcgProductId>.jpg in the mirror
 		m := sealedKeyPattern.FindStringSubmatch(key)
-		dir = path.Join(m[1], "sealed")
+		dir = path.Join("sealed", m[1])
 		name = m[2] + ".jpg"
 	default:
 		http.NotFound(w, r)

@@ -37,8 +37,8 @@ func TestServeOfflineImage(t *testing.T) {
 	scryfallID := "ab154b52-1234-5678-9abc-def012345678"
 	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b"), 0755)
 	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "normal", "front", "a", "b", scryfallID+".jpg"), []byte("jpegdata"), 0644)
-	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "MH3", "sealed"), 0755)
-	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "MH3", "sealed", "541185.jpg"), []byte("sealeddata"), 0644)
+	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "sealed", "MH3"), 0755)
+	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "sealed", "MH3", "541185.jpg"), []byte("sealeddata"), 0644)
 
 	tests := []struct {
 		rest string
