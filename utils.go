@@ -26,7 +26,15 @@ var Country2flag = map[string]string{
 	"JP": "🇯🇵",
 }
 
+// A rarity missing from these tables leaves RarityColor empty, and the
+// templates then skip the whole badge — the set code rides inside the colored
+// circle, so an unmapped rarity costs the card its edition marker too. Every
+// rarity a game actually prints belongs here.
 var colorRarityMap = map[string]map[string]string{
+	// Epic and Iconic joined the ladder in Fabled: the above-base numbering
+	// runs epic, enchanted, iconic, so epic takes the last warm color before
+	// enchanted's cyan and iconic, the two-per-set apex, takes magenta.
+	// Illumineer's Quest cards are "special" here, not a rarity of their own.
 	"lorcana": {
 		"common":    "var(--normal)",
 		"uncommon":  "#707883",
@@ -34,12 +42,14 @@ var colorRarityMap = map[string]map[string]string{
 		"superrare": "#C0C0C0",
 		"legendary": "#FFD700",
 		"special":   "#652978",
+		"epic":      "#D0342C",
 		"enchanted": "#03A9FC",
+		"iconic":    "#E8388B",
 	},
 	// The four printed tiers climb the same metals Lorcana uses, and the two
 	// treatments that cut across them take the two remaining colors. Riftbound
-	// also has a "none" rarity, held by four cards, which is left out so it
-	// renders uncolored like any rarity a game does not describe.
+	// also has a "none" rarity, held by four cards, which is left out so those
+	// cards render without a badge at all.
 	"riftbound": {
 		"common":   "var(--normal)",
 		"uncommon": "#707883",
