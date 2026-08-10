@@ -383,6 +383,22 @@ const checkpointZ = {
 
 // Bans + unbans share the "Bans" checkbox; releases + formats share the
 // "Releases" checkbox (both are set/format-launch context).
+// Checkpoint dates are calendar days ("2026-08-10"). new Date() reads that
+// form as UTC midnight, while the time scale parses the same string as local
+// midnight, so comparing one against the other is off by the zone's offset.
+// East of UTC that pushes a checkpoint on the last axis day past scale.max and
+// the annotation is dropped as out of range - a ban announced today would not
+// draw at all. Parse into the scale's own frame instead.
+function checkpointTime(dateStr) {
+    if (typeof dateStr !== 'string') return NaN;
+    var parts = dateStr.split('-');
+    if (parts.length === 3) {
+        var t = new Date(+parts[0], +parts[1] - 1, +parts[2]).getTime();
+        if (isFinite(t)) return t;
+    }
+    return new Date(dateStr).getTime();
+}
+
 function checkpointToggleKey(type) {
     if (type === 'unban') return 'ban';
     if (type === 'format') return 'release';
@@ -535,7 +551,7 @@ function computeCheckpointYLayout(xScale) {
         var key = checkpointToggleKey(cp.type);
         if (key === 'release' && releasesSuppressedByRange) continue;
         if (!visibleCheckpointTypes.has(key)) continue;
-        var px = xScale.getPixelForValue(new Date(cp.date).getTime());
+        var px = xScale.getPixelForValue(checkpointTime(cp.date));
         if (!isFinite(px)) continue;
         items.push({ idx: i, px: px, type: cp.type });
     }
@@ -595,13 +611,13 @@ function activateCheckpointDate(chart, dateStr) {
     var labels = chart.data.labels;
     if (labels.length === 0) return;
 
-    var target = new Date(dateStr).getTime();
+    var target = checkpointTime(dateStr);
     if (!isFinite(target)) return;
 
     var closestIdx = 0;
-    var minDist = Math.abs(new Date(labels[0]).getTime() - target);
+    var minDist = Math.abs(checkpointTime(labels[0]) - target);
     for (var k = 1; k < labels.length; k++) {
-        var d = Math.abs(new Date(labels[k]).getTime() - target);
+        var d = Math.abs(checkpointTime(labels[k]) - target);
         if (d < minDist) { minDist = d; closestIdx = k; }
     }
 
@@ -924,7 +940,7 @@ function buildCheckpointAnnotations(checkpoints, chartRef, opts) {
                 // into the axis margin. Filter them out by date here.
                 var xScale = ctx.chart && ctx.chart.scales && ctx.chart.scales.x;
                 if (xScale && typeof xScale.min === 'number' && typeof xScale.max === 'number') {
-                    var t = new Date(cp.date).getTime();
+                    var t = checkpointTime(cp.date);
                     if (t < xScale.min || t > xScale.max) return false;
                 }
                 return true;
