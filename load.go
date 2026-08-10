@@ -27,6 +27,15 @@ const (
 
 	// Number of retry attempts for a failed/timed-out scraper load.
 	scraperLoadRetries = 3
+
+	// How many scrapers are fetched at once during a full load. Each one in
+	// flight holds a decoded inventory, so the ceiling here is memory rather
+	// than anything the bucket imposes.
+	scraperLoadConcurrency = 6
+
+	// blazer's range parallelism within a single object. It multiplies with
+	// the fan-out above, hence lower than what a serial loader could afford.
+	bucketConcurrentDownloads = 4
 )
 
 var DataBucket simplecloud.Reader
@@ -90,28 +99,58 @@ func loadScrapersNG(config ScraperConfig) error {
 		if err != nil {
 			return err
 		}
-		b2Bucket.ConcurrentDownloads = 20
+		b2Bucket.ConcurrentDownloads = bucketConcurrentDownloads
 
 		DataBucket = b2Bucket
 	default:
 		return fmt.Errorf("unsupported path scheme %s", u.Scheme)
 	}
 
-	var loaded int
-	var failed []string
+	type scraperLoad struct {
+		name      string
+		kind      string
+		shorthand string
+	}
 
+	var loads []scraperLoad
 	for name, scrapersConfig := range config.Config {
 		for kind, list := range scrapersConfig {
 			for _, shorthand := range list {
-				err := loadScraperWithRetry(DataBucket, config.BucketPath, Config.Game, name, kind, shorthand, config.BucketFileFormat)
-				if err != nil {
-					failed = append(failed, fmt.Sprintf("%s/%s/%s: %s", name, kind, shorthand, err))
-					continue
-				}
-				loaded++
+				loads = append(loads, scraperLoad{name, kind, shorthand})
 			}
 		}
 	}
+
+	type loadResult struct {
+		entry string
+		err   error
+	}
+
+	var loaded int
+	var failed []string
+
+	// The tally needs no lock: WorkerPool runs consume on this goroutine, and
+	// publishing is already serialized by updateSellers/updateVendors. A load
+	// that fails travels as a result rather than as the worker's error, since
+	// the summary reports it and loadScraperWithRetry has already logged it.
+	mtgban.WorkerPool(context.Background(), scraperLoadConcurrency, loads,
+		func(ctx context.Context, load scraperLoad, results chan<- loadResult) error {
+			err := loadScraperWithRetry(DataBucket, config.BucketPath, Config.Game, load.name, load.kind, load.shorthand, config.BucketFileFormat)
+			results <- loadResult{
+				entry: fmt.Sprintf("%s/%s/%s", load.name, load.kind, load.shorthand),
+				err:   err,
+			}
+			return nil
+		},
+		func(result loadResult) {
+			if result.err != nil {
+				failed = append(failed, fmt.Sprintf("%s: %s", result.entry, result.err))
+				return
+			}
+			loaded++
+		},
+		nil,
+	)
 
 	// No @here: at startup nothing has loaded yet, so an absent scraper is
 	// the ordinary state rather than news. Breakage worth waking someone for
