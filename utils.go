@@ -73,6 +73,26 @@ var colorRarityMap = map[string]map[string]string{
 		"showcase": "#BA9900",
 		"promo":    "#652978",
 	},
+	// One Piece prints no gem: every rarity is the same lettered box beside
+	// the card number, so there is nothing to sample and nothing to shape.
+	// The badge climbs the same ladder the other games do, and only SEC is
+	// taken from the card, whose box is a brass plate rather than the white
+	// every other tier carries.
+	//
+	// SP, TR and PR are treatments rather than tiers — a TR card's own box
+	// still reads C — so they sit off the end in the colors the other games
+	// give their treatments.
+	"onepiece": {
+		"C":   "var(--normal)",
+		"UC":  "#707883",
+		"R":   "#B06435",
+		"SR":  "#919495",
+		"L":   "#C63A4D",
+		"SEC": "#A88A3C",
+		"SP":  "#B45A96",
+		"TR":  "#1FA7C9",
+		"PR":  "#652978",
+	},
 }
 
 // rarityBadge is the badge one rarity draws. Path is the outline, and Font

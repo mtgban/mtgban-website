@@ -198,7 +198,12 @@
                                             {{else if $card.RarityColor}}
                                                 <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
                                                     <path d="{{$card.RarityShape.Path}}" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}" stroke-width="0.75"/>
-                                                    <text font-size="{{$card.RarityShape.Font}}" font-family="monospace" font-weight="bold" x="10" y="{{$card.RarityShape.TextY}}" text-anchor="middle" dominant-baseline="central" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                                    {{/* The code only rides inside the badge where it fits: the shapes
+                                                         are cut for three characters, and One Piece names its sets in up
+                                                         to nine. */}}
+                                                    {{if lt (len $card.SetCode) 4}}
+                                                        <text font-size="{{$card.RarityShape.Font}}" font-family="monospace" font-weight="bold" x="10" y="{{$card.RarityShape.TextY}}" text-anchor="middle" dominant-baseline="central" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
+                                                    {{end}}
                                                 </svg>
                                             {{end}}
                                             <div class="card-detail">
