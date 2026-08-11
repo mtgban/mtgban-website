@@ -95,13 +95,36 @@ var colorRarityMap = map[string]map[string]string{
 	},
 }
 
+// badgeFont is the size the shapes are cut at, and the ceiling a set code is
+// ever drawn at however short it is.
+const badgeFont = 10
+
 // rarityBadge is the badge one rarity draws. Path is the outline, and Font
 // and TextY place the set code inside it: a triangle only has room low down
 // and a fan only high up, and both need a smaller code than a circle does.
+// Chars is how long a code that size was cut for, so fitCode can shrink it
+// for a longer one.
 type rarityBadge struct {
 	Path  string
 	Font  float64
 	TextY float64
+	Chars int
+}
+
+// fitCode sizes the set code to the badge it has to sit inside. Past three
+// characters a shape's room runs out almost exactly in proportion to the
+// length — the largest size times the count holds steady within a few percent
+// across a circle's four-to-nine character fits — so scaling by the ratio
+// lands where measuring would.
+func fitCode(badge rarityBadge, code string) rarityBadge {
+	if badge.Chars > 0 && len(code) > 0 {
+		badge.Font = badge.Font * float64(badge.Chars) / float64(len(code))
+	}
+	if badge.Font > badgeFont {
+		badge.Font = badgeFont
+	}
+
+	return badge
 }
 
 // badgeFile is an img/setsymbol drawing: one path, plus the fitting the shape
@@ -109,6 +132,7 @@ type rarityBadge struct {
 type badgeFile struct {
 	Font  float64 `xml:"data-code-size,attr"`
 	TextY float64 `xml:"data-code-y,attr"`
+	Chars int     `xml:"data-code-chars,attr"`
 	Path  struct {
 		D string `xml:"d,attr"`
 	} `xml:"path"`
@@ -125,11 +149,11 @@ func readBadge(path string) (rarityBadge, error) {
 	if err != nil {
 		return rarityBadge{}, err
 	}
-	if file.Path.D == "" || file.Font == 0 || file.TextY == 0 {
+	if file.Path.D == "" || file.Font == 0 || file.TextY == 0 || file.Chars == 0 {
 		return rarityBadge{}, fmt.Errorf("%s: incomplete badge", path)
 	}
 
-	return rarityBadge{file.Path.D, file.Font, file.TextY}, nil
+	return rarityBadge{file.Path.D, file.Font, file.TextY, file.Chars}, nil
 }
 
 // rarityBadges holds the drawings, keyed by rarity, with the default circle
@@ -166,13 +190,13 @@ func loadRarityBadges() {
 	}
 }
 
-func rarityShape(rarity string) rarityBadge {
+func rarityShape(rarity, code string) rarityBadge {
 	badge, found := rarityBadges[rarity]
 	if !found {
-		return rarityBadges[""]
+		badge = rarityBadges[""]
 	}
 
-	return badge
+	return fitCode(badge, code)
 }
 
 type GenericCard struct {
@@ -808,7 +832,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		LangTag:      mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
 		RarityColor:       rarityColor,
-		RarityShape:       rarityShape(co.Rarity),
+		RarityShape:       rarityShape(co.Rarity, co.Card.SetCode),
 		ScryfallURL:       scryfallURL,
 		DeckboxURL:        deckboxURL,
 		CKRestockURL:      restockURL,
