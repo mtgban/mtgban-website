@@ -47,7 +47,7 @@ test('card wrapper has m-card class', () => {
 test('header data attributes', () => {
     const html = R.buildHTML([result()], CTX);
     expect(html).toContain('data-card-id="uuid-1"');
-    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
+    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.webp"');
     expect(html).toContain('data-set-code="NEO"');
     expect(html).toContain('data-card-name="Boseiju, Who Endures"');
 });
@@ -181,7 +181,7 @@ test('no-offers row when both sides empty', () => {
 test('landscape image stub present', () => {
     const html = R.buildHTML([result()], CTX);
     expect(html).toContain('class="m-card-img-landscape"');
-    expect(html).toContain('src="/api/offline/images/img-key-1.jpg"');
+    expect(html).toContain('src="/api/offline/images/img-key-1.webp"');
 });
 
 test('landscape image omitted when card has no image key', () => {

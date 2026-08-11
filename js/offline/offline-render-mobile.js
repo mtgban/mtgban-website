@@ -133,7 +133,7 @@
 
     function headerHTML(res) {
         var card = res.card;
-        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '';
+        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + (res.i.indexOf('p-') === 0 ? '.jpg' : '.webp') : '';
         var icon = res._setKey
             ? '<i class="ss ss-' + esc(res._setKey) + keyruneClasses(card) + ' ss-fw"></i>'
             : '<span>' + esc(card.set) + '</span>';
@@ -351,7 +351,7 @@
         var card = res.card;
         var set = ctx.sets[card.set] || {};
         res._setKey = set.k || '';
-        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '';
+        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + (res.i.indexOf('p-') === 0 ? '.jpg' : '.webp') : '';
         var sData = condGroupsForSellers(res, ctx);
         var bData = condGroupsForBuyers(res, ctx);
         var ac = activeConds(sData, bData);

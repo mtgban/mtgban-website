@@ -46,7 +46,7 @@ test('header mirrors search.html classes and data attrs', () => {
     expect(html).toContain('class="result-header-cover"');
     expect(html).toContain('class="result-header result-first"');
     expect(html).toContain('data-card-id="uuid-1"');
-    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
+    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.webp"');
     expect(html).toContain('data-foil="false"');
     expect(html).toContain('data-etched="false"');
     expect(html).toContain('class="ss ss-neo ss-rare ss-2x ss-fw result-set-icon"');
@@ -82,7 +82,7 @@ test('header and body carry data-foil/data-etched for foil and etched cards', ()
 
 test('body columns and condition grouping', () => {
     const html = R.buildHTML([result()], CTX);
-    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.jpg"');
+    expect(html).toContain('data-image-url="/api/offline/images/img-key-1.webp"');
     expect(html).toContain('class="result-body result-last-body"');
     expect(html).toContain('data-set-code="NEO"');
     expect(html).toContain('<div class="result-col-header">Sellers</div>');
