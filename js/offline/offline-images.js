@@ -46,6 +46,14 @@
         return { bytes: bytes, count: count, missing: missing };
     }
 
+    // Sealed images are TCGplayer's jpg; singles are Scryfall's webp. The
+    // extension is part of the url the cache is keyed on, so it is derived
+    // from the key rather than written out at each call site.
+    function imageURL(key) {
+        var ext = key.indexOf('p-') === 0 ? '.jpg' : '.webp';
+        return '/api/offline/images/' + encodeURIComponent(key) + ext;
+    }
+
     // How many image requests are in flight at once. Enough to keep a
     // connection busy without burying a phone's network stack.
     var FETCH_CONCURRENCY = 6;
@@ -53,7 +61,7 @@
     // Fetches one image into the cache. Reports its size, or 0 when the source
     // never published it, which is expected and not an error.
     async function fetchImage(cache, key) {
-        var url = '/api/offline/images/' + key + '.jpg';
+        var url = imageURL(key);
         var resp = await self.fetch(url, { credentials: 'same-origin' });
         if (resp.status === 403) throw new Error('forbidden');
         if (resp.status === 404) return 0;
@@ -145,7 +153,7 @@
                 continue;
             }
             for (var j = 0; j < row.keys.length; j++) {
-                if (await cache.delete('/api/offline/images/' + row.keys[j] + '.jpg')) removed++;
+                if (await cache.delete(imageURL(row.keys[j]))) removed++;
             }
             await deps.deleteImgState(row.code);
         }
@@ -155,6 +163,7 @@
     self.OfflineImages = {
         IMAGE_CACHE: IMAGE_CACHE,
         formatBytes: formatBytes,
+        imageURL: imageURL,
         fetchImage: fetchImage,
         computeWorkList: computeWorkList,
         estimateSelection: estimateSelection,

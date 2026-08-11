@@ -335,7 +335,7 @@
     function headerHTML(res, ctx, i) {
         var card = res.card;
         var set = ctx.sets[card.set] || {};
-        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '';
+        var imgURL = res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + (res.i.indexOf('p-') === 0 ? '.jpg' : '.webp') : '';
 
         var icon;
         if (set.k) {
@@ -386,7 +386,7 @@
     function bodyHTML(res, ctx, isLast) {
         var card = res.card;
         return '<div class="result-body' + (isLast ? ' result-last-body' : '') + '"' +
-            ' data-image-url="' + esc(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + '.jpg' : '') + '"' +
+            ' data-image-url="' + esc(res.i ? '/api/offline/images/' + encodeURIComponent(res.i) + (res.i.indexOf('p-') === 0 ? '.jpg' : '.webp') : '') + '"' +
             ' data-set-code="' + esc(card.set) + '"' +
             ' data-foil="' + (card.f ? 'true' : 'false') + '"' +
             ' data-etched="' + (card.e ? 'true' : 'false') + '">' +
