@@ -151,11 +151,12 @@
         paint();
     }
 
-    // The renderers emit exactly one shape, /api/offline/images/<key>.jpg, or
-    // an empty string. Anything else is rejected rather than assigned: the
+    // The renderers emit exactly one shape, /api/offline/images/<key>.webp for
+    // singles or .jpg for sealed, or an empty string. Anything else is
+    // rejected rather than assigned: the
     // value is read back out of the DOM, so checking it here does not depend on
     // the renderers' escaping staying correct as they change.
-    var IMAGE_URL = /^\/api\/offline\/images\/[A-Za-z0-9._%-]+\.jpg$/;
+    var IMAGE_URL = /^\/api\/offline\/images\/[A-Za-z0-9._%-]+\.(webp|jpg)$/;
 
     function safeImageURL(url) {
         return (url && IMAGE_URL.test(url)) ? url : PLACEHOLDER;

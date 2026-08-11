@@ -44,7 +44,7 @@ test('fetchImage caches under the per-image url and reports its size', async () 
     const { cache, caches } = makeFakeCache();
     const mod = loadWithExtras({ caches, fetch: makeImageFetch({ 'key-aaa': [255, 216, 1] }) });
     expect(await mod.fetchImage(cache, 'key-aaa')).toBe(3);
-    expect(cache.store[0].req.url).toEndWith('/api/offline/images/key-aaa.jpg');
+    expect(cache.store[0].req.url).toEndWith('/api/offline/images/key-aaa.webp');
     expect(cache.store[0].resp.headers.get('Content-Type')).toBe('image/jpeg');
 });
 
@@ -110,7 +110,7 @@ function loadWithExtras(extras) {
 // server reports an image the source never published.
 function makeImageFetch(bytesByKey) {
     return async (url) => {
-        const key = String(url).replace(/^.*\/images\//, '').replace(/\.jpg$/, '');
+        const key = String(url).replace(/^.*\/images\//, '').replace(/\.(webp|jpg)$/, '');
         if (!(key in bytesByKey)) return new Response(null, { status: 404 });
         return new Response(new Uint8Array(bytesByKey[key]));
     };
@@ -358,8 +358,8 @@ function makeFakeCacheMap(initial) {
 
 test('evictImages removes deselected editions by recorded keys', async () => {
     const fake = makeFakeCacheMap({
-        '/api/offline/images/key-neo.jpg': 'x',
-        '/api/offline/images/key-mid.jpg': 'x',
+        '/api/offline/images/key-neo.webp': 'x',
+        '/api/offline/images/key-mid.webp': 'x',
     });
     const mod = loadWithExtras({ caches: fake.caches });
     const deleted = [];
@@ -373,13 +373,13 @@ test('evictImages removes deselected editions by recorded keys', async () => {
     });
     expect(removed).toBe(1);
     expect(deleted).toEqual(['MID']);
-    expect(fake.cache.entries.has('/api/offline/images/key-neo.jpg')).toBe(true);
-    expect(fake.cache.entries.has('/api/offline/images/key-mid.jpg')).toBe(false);
+    expect(fake.cache.entries.has('/api/offline/images/key-neo.webp')).toBe(true);
+    expect(fake.cache.entries.has('/api/offline/images/key-mid.webp')).toBe(false);
 });
 
 test('evictImages drops legacy uuids rows without touching the cache', async () => {
     const fake = makeFakeCacheMap({
-        '/api/offline/images/key-neo.jpg': 'x',
+        '/api/offline/images/key-neo.webp': 'x',
     });
     const mod = loadWithExtras({ caches: fake.caches });
     const deleted = [];
@@ -390,7 +390,7 @@ test('evictImages drops legacy uuids rows without touching the cache', async () 
     });
     expect(removed).toBe(0);
     expect(deleted).toEqual(['MID']);
-    expect(fake.cache.entries.has('/api/offline/images/key-neo.jpg')).toBe(true);
+    expect(fake.cache.entries.has('/api/offline/images/key-neo.webp')).toBe(true);
 });
 
 test('syncImages records cached keys on the imgstate row for eviction', async () => {
