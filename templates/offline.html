@@ -151,13 +151,24 @@
         paint();
     }
 
+    // The renderers emit exactly one shape, /api/offline/images/<key>.jpg, or
+    // an empty string. Anything else is rejected rather than assigned: the
+    // value is read back out of the DOM, so checking it here does not depend on
+    // the renderers' escaping staying correct as they change.
+    var IMAGE_URL = /^\/api\/offline\/images\/[A-Za-z0-9._%-]+\.jpg$/;
+
+    function safeImageURL(url) {
+        return (url && IMAGE_URL.test(url)) ? url : PLACEHOLDER;
+    }
+
     function showImage(url, isFoil, isEtched, setCode) {
         var img = document.getElementById('cardImage');
-        if (img) img.src = url || PLACEHOLDER;
+        if (img) img.src = safeImageURL(url);
         var wrapper = document.getElementById('cardImageWrapper');
         if (wrapper) {
-            wrapper.setAttribute('data-foil', (url && isFoil) ? 'true' : 'false');
-            wrapper.setAttribute('data-etched', (url && isEtched) ? 'true' : 'false');
+            var ok = IMAGE_URL.test(url || '');
+            wrapper.setAttribute('data-foil', (ok && isFoil) ? 'true' : 'false');
+            wrapper.setAttribute('data-etched', (ok && isEtched) ? 'true' : 'false');
             wrapper.setAttribute('data-set', setCode || '');
         }
     }
