@@ -48,7 +48,11 @@ test('entryMeta maps bundle entries to cache keys', () => {
         type: 'image/jpeg',
     });
     expect(OfflineImages.entryMeta('abc-123.jpeg').type).toBe('image/jpeg');
-    expect(OfflineImages.entryMeta('abc-123.webp')).toBeNull();
+    expect(OfflineImages.entryMeta('abc-123.webp')).toEqual({
+        key: 'abc-123',
+        url: '/api/offline/images/abc-123.webp',
+        type: 'image/webp',
+    });
     expect(OfflineImages.entryMeta('nested/abc.jpg')).toBeNull();
     expect(OfflineImages.entryMeta('README.txt')).toBeNull();
 });
@@ -348,8 +352,8 @@ function makeFakeCacheMap(initial) {
 
 test('evictImages removes deselected editions by recorded keys', async () => {
     const fake = makeFakeCacheMap({
-        '/api/offline/images/key-neo.jpg': 'x',
-        '/api/offline/images/key-mid.jpg': 'x',
+        '/api/offline/images/key-neo.webp': 'x',
+        '/api/offline/images/key-mid.webp': 'x',
     });
     const mod = loadWithExtras({ caches: fake.caches });
     const deleted = [];
@@ -363,13 +367,13 @@ test('evictImages removes deselected editions by recorded keys', async () => {
     });
     expect(removed).toBe(1);
     expect(deleted).toEqual(['MID']);
-    expect(fake.cache.entries.has('/api/offline/images/key-neo.jpg')).toBe(true);
-    expect(fake.cache.entries.has('/api/offline/images/key-mid.jpg')).toBe(false);
+    expect(fake.cache.entries.has('/api/offline/images/key-neo.webp')).toBe(true);
+    expect(fake.cache.entries.has('/api/offline/images/key-mid.webp')).toBe(false);
 });
 
 test('evictImages drops legacy uuids rows without touching the cache', async () => {
     const fake = makeFakeCacheMap({
-        '/api/offline/images/key-neo.jpg': 'x',
+        '/api/offline/images/key-neo.webp': 'x',
     });
     const mod = loadWithExtras({ caches: fake.caches });
     const deleted = [];
@@ -380,7 +384,7 @@ test('evictImages drops legacy uuids rows without touching the cache', async () 
     });
     expect(removed).toBe(0);
     expect(deleted).toEqual(['MID']);
-    expect(fake.cache.entries.has('/api/offline/images/key-neo.jpg')).toBe(true);
+    expect(fake.cache.entries.has('/api/offline/images/key-neo.webp')).toBe(true);
 });
 
 test('syncImages records unpacked keys on the imgstate row', async () => {

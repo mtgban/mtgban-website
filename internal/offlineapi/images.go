@@ -50,23 +50,30 @@ func etagMatches(header, etag string) bool {
 	return false
 }
 
-// serveImage streams one mirrored image by scryfall id or sealed key.
+// serveImage streams one mirrored image by scryfall id or sealed key. The
+// extension is part of the key's identity, not decoration: singles are
+// Scryfall's webp and sealed are TCGplayer's jpg, so a request for the wrong
+// one is a miss rather than a silent substitution.
 func (s *Service) serveImage(w http.ResponseWriter, r *http.Request, rest string) {
-	key := strings.TrimSuffix(rest, ".jpg")
-	if key == "" || key == rest {
-		http.NotFound(w, r)
-		return
-	}
-
-	var dir, name string
+	var key, dir, name, ctype string
 	switch {
-	case scryfallIDPattern.MatchString(key):
-		dir = path.Join("normal", "front", key[0:1], key[1:2])
-		name = key + ".jpg"
-	case sealedKeyPattern.MatchString(key):
+	case strings.HasSuffix(rest, ".webp"):
+		key = strings.TrimSuffix(rest, ".webp")
+		if !scryfallIDPattern.MatchString(key) {
+			http.NotFound(w, r)
+			return
+		}
+		// singles/grid/front/<c1>/<c2>/<scryfallId>.webp in the mirror
+		dir, name, ctype = path.Join("singles", "grid", "front", key[0:1], key[1:2]), key+".webp", "image/webp"
+	case strings.HasSuffix(rest, ".jpg"):
+		key = strings.TrimSuffix(rest, ".jpg")
 		m := sealedKeyPattern.FindStringSubmatch(key)
-		dir = path.Join(m[1], "sealed")
-		name = m[2] + ".jpg"
+		if m == nil {
+			http.NotFound(w, r)
+			return
+		}
+		// sealed/<SETCODE>/<tcgProductId>.jpg in the mirror
+		dir, name, ctype = path.Join("sealed", m[1]), m[2]+".jpg", "image/jpeg"
 	default:
 		http.NotFound(w, r)
 		return
@@ -78,7 +85,7 @@ func (s *Service) serveImage(w http.ResponseWriter, r *http.Request, rest string
 		return
 	}
 	defer reader.Close()
-	w.Header().Set("Content-Type", "image/jpeg")
+	w.Header().Set("Content-Type", ctype)
 	w.Header().Set("Cache-Control", "private, max-age=604800")
 	io.Copy(w, reader)
 }

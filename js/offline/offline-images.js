@@ -17,12 +17,13 @@
 
     // Bundle entries are flat <key>.jpg; key is the image key (scryfallId or p-<CODE>-<tcgId>).
     function entryMeta(name) {
-        var m = /^([^\/]+)\.jpe?g$/i.exec(name);
+        var m = /^([^\/]+)\.(webp|jpe?g)$/i.exec(name);
         if (!m) return null;
+        var webp = m[2].toLowerCase() === 'webp';
         return {
             key: m[1],
-            url: '/api/offline/images/' + m[1] + '.jpg',
-            type: 'image/jpeg',
+            url: '/api/offline/images/' + m[1] + (webp ? '.webp' : '.jpg'),
+            type: webp ? 'image/webp' : 'image/jpeg',
         };
     }
 
@@ -55,6 +56,14 @@
             count += img.n || 0;
         });
         return { bytes: bytes, count: count, missing: missing };
+    }
+
+    // Sealed images are TCGplayer's jpg; singles are Scryfall's webp, so the
+    // extension a key is cached under is derived from the key rather than
+    // written out at each call site.
+    function imageURL(key) {
+        var ext = key.indexOf('p-') === 0 ? '.jpg' : '.webp';
+        return '/api/offline/images/' + encodeURIComponent(key) + ext;
     }
 
     // Downloads and unpacks each stale bundle; imgstate rows are the resume point.
@@ -135,7 +144,7 @@
                 continue;
             }
             for (var j = 0; j < row.keys.length; j++) {
-                if (await cache.delete('/api/offline/images/' + row.keys[j] + '.jpg')) removed++;
+                if (await cache.delete(imageURL(row.keys[j]))) removed++;
             }
             await deps.deleteImgState(row.code);
         }
@@ -146,6 +155,7 @@
         IMAGE_CACHE: IMAGE_CACHE,
         formatBytes: formatBytes,
         entryMeta: entryMeta,
+        imageURL: imageURL,
         computeWorkList: computeWorkList,
         estimateSelection: estimateSelection,
         syncImages: syncImages,
