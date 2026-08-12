@@ -23,21 +23,22 @@
         var text = codes.length
             ? 'Selected: ' + codes.length + ' editions, ' + est.count + ' images, ' + fmt(est.bytes)
             : 'No editions selected: no images will be downloaded.';
-        if (est.missing.length) text += ' (' + est.missing.length + ' without bundles yet)';
+        if (est.missing.length) text += ' (' + est.missing.length + ' without images yet)';
         return text;
     }
     function buildStorageText(usage, quota) {
         return 'Storage: ' + fmt(usage || 0) + ' used of ' + fmt(quota || 0);
     }
-    function buildDoneMessage(paused, missingCount, selectedCount) {
+    function buildDoneMessage(paused, missingCount, selectedCount, failedCount) {
         if (paused) return 'Paused. Sync Images Now resumes where it left off.';
         if (selectedCount > 0 && missingCount === selectedCount) {
-            return '0 of ' + selectedCount + ' selected editions have bundles yet.';
+            return '0 of ' + selectedCount + ' selected editions have images yet.';
         }
-        if (missingCount > 0) {
-            return 'Image sync finished. (' + missingCount + ' editions have no bundles yet)';
-        }
-        return 'Image sync finished.';
+        var notes = [];
+        if (missingCount > 0) notes.push(missingCount + ' editions have no images yet');
+        if (failedCount > 0) notes.push(failedCount + ' images failed and retry on the next sync');
+        if (!notes.length) return 'Image sync finished.';
+        return 'Image sync finished. (' + notes.join('; ') + ')';
     }
 
     function selectedCodes() {
@@ -144,7 +145,7 @@
             pauseBtn.disabled = false;
             fillEl.style.width = '0%';
             labelEl.textContent = plan.work.length
-                ? 'Syncing ' + plan.work.length + ' bundles (' + fmt(plan.totalBytes) + ')...'
+                ? 'Syncing ' + plan.work.length + ' editions (' + fmt(plan.totalBytes) + ')...'
                 : 'Images already up to date.';
             window.OfflineMode.sync();
         }).catch(function (err) {
@@ -160,12 +161,12 @@
         if (msg.type === 'progress' && msg.stage === 'images') {
             var pct = progressPct(msg.done, msg.total);
             fillEl.style.width = pct + '%';
-            labelEl.textContent = msg.done + ' / ' + msg.total + ' bundles (' +
+            labelEl.textContent = msg.done + ' / ' + msg.total + ' editions (' +
                 fmt(msg.bytes || 0) + ') ' + (msg.code || '');
         } else if (msg.type === 'done' && syncing) {
             syncing = false;
             pauseBtn.hidden = true;
-            labelEl.textContent = buildDoneMessage(pauseRequested, (msg.imgMissing || []).length, syncSelectedCount);
+            labelEl.textContent = buildDoneMessage(pauseRequested, (msg.imgMissing || []).length, syncSelectedCount, msg.imgFailed || 0);
             pauseRequested = false;
             renderEstimates();
             renderStorage();
@@ -208,7 +209,7 @@
         pauseBtn.addEventListener('click', function () {
             pauseRequested = true;
             pauseBtn.disabled = true;
-            labelEl.textContent = 'Pausing after the current bundle...';
+            labelEl.textContent = 'Pausing after the current edition...';
             window.OfflineMode.cancelSync();
         });
         document.addEventListener('offline:sync-message', onSyncMessage);
