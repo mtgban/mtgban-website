@@ -58,14 +58,45 @@
     // connection busy without burying a phone's network stack.
     var FETCH_CONCURRENCY = 6;
 
+    // A corpus this size meets transient 5xx and dropped connections as a
+    // matter of course, so each image gets its own retries before it counts
+    // as failed.
+    var MAX_ATTEMPTS = 3;
+    var RETRY_BASE_MS = 500;
+
+    function delay(ms) {
+        return new Promise(function (resolve) { self.setTimeout(resolve, ms); });
+    }
+
+    // Marks the errors that must end the whole run rather than cost one image.
+    function fatalError(message) {
+        var err = new Error(message);
+        err.fatal = true;
+        return err;
+    }
+
     // Fetches one image into the cache. Reports its size, or 0 when the source
     // never published it, which is expected and not an error.
     async function fetchImage(cache, key) {
         var url = imageURL(key);
-        var resp = await self.fetch(url, { credentials: 'same-origin' });
-        if (resp.status === 403) throw new Error('forbidden');
-        if (resp.status === 404) return 0;
-        if (!resp.ok) throw new Error('image ' + key + ': HTTP ' + resp.status);
+        var resp = null;
+        for (var attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                resp = await self.fetch(url, { credentials: 'same-origin' });
+            } catch (err) {
+                if (attempt === MAX_ATTEMPTS) throw err;
+                await delay(RETRY_BASE_MS * attempt);
+                continue;
+            }
+            if (resp.status === 403) throw fatalError('forbidden');
+            if (resp.status === 404) return 0;
+            if (resp.ok) break;
+            // Only a server-side failure is worth a second attempt.
+            if (resp.status < 500 || attempt === MAX_ATTEMPTS) {
+                throw new Error('image ' + key + ': HTTP ' + resp.status);
+            }
+            await delay(RETRY_BASE_MS * attempt);
+        }
         var blob = await resp.blob();
         try {
             await cache.put(new Request(url), new Response(blob, {
@@ -73,7 +104,7 @@
             }));
         } catch (err) {
             if (err && err.name === 'QuotaExceededError') {
-                throw new Error('storage quota exceeded while caching ' + key);
+                throw fatalError('storage quota exceeded while caching ' + key);
             }
             throw err;
         }
@@ -86,8 +117,9 @@
         var total = plan.work.length;
         var done = 0;
         var bytes = 0;
-        if (total === 0) return { done: 0, total: 0, bytes: 0, paused: false, missing: plan.missing };
-        if (deps.cancelled()) return { done: 0, total: total, bytes: 0, paused: true, missing: plan.missing };
+        var failed = 0;
+        if (total === 0) return { done: 0, total: 0, bytes: 0, paused: false, missing: plan.missing, failed: 0 };
+        if (deps.cancelled()) return { done: 0, total: total, bytes: 0, paused: true, missing: plan.missing, failed: 0 };
 
         if (self.navigator && self.navigator.storage && self.navigator.storage.estimate) {
             var est = await self.navigator.storage.estimate();
@@ -100,7 +132,7 @@
 
         var cache = await self.caches.open(IMAGE_CACHE);
         for (var i = 0; i < plan.work.length; i++) {
-            if (deps.cancelled()) return { done: done, total: total, bytes: bytes, paused: true, missing: plan.missing };
+            if (deps.cancelled()) return { done: done, total: total, bytes: bytes, paused: true, missing: plan.missing, failed: failed };
             var item = plan.work[i];
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
 
@@ -111,29 +143,40 @@
             var stored = [];
             var next = 0;
             var cancelled = false;
+            var fatal = null;
+            var setFailures = 0;
             var workers = [];
             for (var w = 0; w < FETCH_CONCURRENCY; w++) {
                 workers.push((async function () {
                     while (true) {
+                        if (fatal) return;
                         if (deps.cancelled()) { cancelled = true; return; }
                         var idx = next++;
                         if (idx >= keys.length) return;
-                        var size = await fetchImage(cache, keys[idx]);
-                        if (size > 0) {
-                            bytes += size;
-                            stored.push(keys[idx]);
+                        try {
+                            var size = await fetchImage(cache, keys[idx]);
+                            if (size > 0) {
+                                bytes += size;
+                                stored.push(keys[idx]);
+                            }
+                        } catch (err) {
+                            if (err && err.fatal) { fatal = err; return; }
+                            setFailures++;
                         }
                     }
                 })());
             }
             await Promise.all(workers);
-            if (cancelled) return { done: done, total: total, bytes: bytes, paused: true, missing: plan.missing };
+            if (fatal) throw fatal;
+            failed += setFailures;
+            if (cancelled) return { done: done, total: total, bytes: bytes, paused: true, missing: plan.missing, failed: failed };
 
-            await deps.putImgState({ code: item.code, hash: item.hash, done: true, keys: stored.sort() });
+            // A set that lost images stays not-done, so the next sync retries it.
+            await deps.putImgState({ code: item.code, hash: item.hash, done: setFailures === 0, keys: stored.sort() });
             done++;
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
         }
-        return { done: done, total: total, bytes: bytes, paused: false, missing: plan.missing };
+        return { done: done, total: total, bytes: bytes, paused: false, missing: plan.missing, failed: failed };
     }
 
     // Removes cached images and state rows for editions no longer selected.

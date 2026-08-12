@@ -55,6 +55,49 @@ test('fetchImage treats an unpublished image as a skip, not a failure', async ()
     expect(cache.store).toHaveLength(0);
 });
 
+test('fetchImage retries a transient 5xx and succeeds', async () => {
+    const { cache, caches } = makeFakeCache();
+    let calls = 0;
+    const mod = loadWithExtras({
+        caches,
+        setTimeout: fn => fn(),
+        fetch: async () => {
+            calls++;
+            if (calls < 3) return new Response(null, { status: 504 });
+            return new Response(new Uint8Array([1, 2, 3]));
+        },
+    });
+    expect(await mod.fetchImage(cache, 'key-aaa')).toBe(3);
+    expect(calls).toBe(3);
+});
+
+test('fetchImage retries a network error before giving up', async () => {
+    const { cache, caches } = makeFakeCache();
+    let calls = 0;
+    const mod = loadWithExtras({
+        caches,
+        setTimeout: fn => fn(),
+        fetch: async () => {
+            calls++;
+            throw new TypeError('Failed to fetch');
+        },
+    });
+    await expect(mod.fetchImage(cache, 'key-aaa')).rejects.toThrow('Failed to fetch');
+    expect(calls).toBe(3);
+});
+
+test('fetchImage does not retry a 403, which means auth lapsed', async () => {
+    const { cache, caches } = makeFakeCache();
+    let calls = 0;
+    const mod = loadWithExtras({
+        caches,
+        setTimeout: fn => fn(),
+        fetch: async () => { calls++; return new Response(null, { status: 403 }); },
+    });
+    await expect(mod.fetchImage(cache, 'key-aaa')).rejects.toThrow('forbidden');
+    expect(calls).toBe(1);
+});
+
 test('computeWorkList selects missing, changed, and unfinished bundles', () => {
     const states = {
         NEO: { code: 'NEO', hash: 'aaaa', done: true },  // up to date: skip
@@ -139,7 +182,7 @@ test('syncImages returns immediately when no work is needed', async () => {
         cancelled: () => false,
         putImgState: async () => {},
     });
-    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: [] });
+    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: [], failed: 0 });
 });
 
 test('syncImages returns missing codes with zero total when selection has no images yet', async () => {
@@ -152,7 +195,7 @@ test('syncImages returns missing codes with zero total when selection has no ima
         cancelled: () => false,
         putImgState: async () => {},
     });
-    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: ['NOPE'] });
+    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: ['NOPE'], failed: 0 });
 });
 
 test('syncImages includes missing codes alongside completed work', async () => {
@@ -167,7 +210,7 @@ test('syncImages includes missing codes alongside completed work', async () => {
         putImgState: async () => {},
         getImgKeys: keysFrom({ TST: ['key-aaa'] }),
     });
-    expect(result).toEqual({ done: 1, total: 1, bytes: 3, paused: false, missing: ['NOPE'] });
+    expect(result).toEqual({ done: 1, total: 1, bytes: 3, paused: false, missing: ['NOPE'], failed: 0 });
 });
 
 test('syncImages downloads each image and marks done', async () => {
@@ -187,13 +230,60 @@ test('syncImages downloads each image and marks done', async () => {
         putImgState: async r => states.push({ ...r }),
         getImgKeys: keysFrom({ TST: ['key-aaa', 'key-bbb'] }),
     });
-    expect(result).toEqual({ done: 1, total: 1, bytes: 4, paused: false, missing: [] });
+    expect(result).toEqual({ done: 1, total: 1, bytes: 4, paused: false, missing: [], failed: 0 });
     expect(posts).toHaveLength(2);
     expect(cache.store).toHaveLength(2);
     expect(states).toEqual([
         { code: 'TST', hash: 'h1', done: false },
         { code: 'TST', hash: 'h1', done: true, keys: ['key-aaa', 'key-bbb'] },
     ]);
+});
+
+test('syncImages survives an image the server keeps failing on', async () => {
+    const { caches } = makeFakeCache();
+    const states = [];
+    const mod = loadWithExtras({
+        caches,
+        setTimeout: fn => fn(),
+        fetch: async url => String(url).includes('key-bad')
+            ? new Response(null, { status: 504 })
+            : new Response(new Uint8Array([1, 2])),
+    });
+    const result = await mod.syncImages({
+        images: { TST: { h: 'h1', n: 2, b: 4 } },
+        sel: ['TST'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async r => states.push({ ...r }),
+        getImgKeys: keysFrom({ TST: ['key-good', 'key-bad'] }),
+    });
+    expect(result).toEqual({ done: 1, total: 1, bytes: 2, paused: false, missing: [], failed: 1 });
+    // Left not-done on purpose: the next sync retries the image that failed.
+    expect(states[states.length - 1]).toEqual({
+        code: 'TST', hash: 'h1', done: false, keys: ['key-good'],
+    });
+});
+
+test('syncImages moves on to the next set after one set fails', async () => {
+    const { caches } = makeFakeCache();
+    const mod = loadWithExtras({
+        caches,
+        setTimeout: fn => fn(),
+        fetch: async url => String(url).includes('key-bad')
+            ? new Response(null, { status: 504 })
+            : new Response(new Uint8Array([1, 2])),
+    });
+    const result = await mod.syncImages({
+        images: { AAA: { h: 'h1', n: 1, b: 2 }, BBB: { h: 'h2', n: 1, b: 2 } },
+        sel: ['AAA', 'BBB'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async () => {},
+        getImgKeys: keysFrom({ AAA: ['key-bad'], BBB: ['key-good'] }),
+    });
+    expect(result).toEqual({ done: 2, total: 2, bytes: 2, paused: false, missing: [], failed: 1 });
 });
 
 test('syncImages records only the images the server actually had', async () => {
