@@ -135,7 +135,7 @@ test('syncImages returns immediately when no work is needed', async () => {
         cancelled: () => false,
         putImgState: async () => {},
     });
-    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: [] });
+    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: [], failed: 0 });
 });
 
 test('syncImages returns missing codes with zero total when selection has no bundles yet', async () => {
@@ -148,7 +148,7 @@ test('syncImages returns missing codes with zero total when selection has no bun
         cancelled: () => false,
         putImgState: async () => {},
     });
-    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: ['NOPE'] });
+    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: ['NOPE'], failed: 0 });
 });
 
 test('syncImages includes missing codes alongside completed work when some editions have no bundles', async () => {
@@ -163,7 +163,7 @@ test('syncImages includes missing codes alongside completed work when some editi
         cancelled: () => false,
         putImgState: async () => {},
     });
-    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: ['NOPE'] });
+    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: ['NOPE'], failed: 0 });
 });
 
 test('syncImages downloads, unpacks, and marks done', async () => {
@@ -180,7 +180,7 @@ test('syncImages downloads, unpacks, and marks done', async () => {
         cancelled: () => false,
         putImgState: async r => states.push({ ...r }),
     });
-    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: [] });
+    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: [], failed: 0 });
     expect(posts).toHaveLength(2);
     expect(posts[0]).toMatchObject({ type: 'progress', stage: 'images', done: 0, total: 1, code: 'TST', bytes: 0 });
     expect(posts[1]).toMatchObject({ type: 'progress', stage: 'images', done: 1, total: 1, bytes: zip.byteLength });
@@ -327,7 +327,7 @@ test('syncImages pauses between bundles when cancelled', async () => {
         cancelled,
         putImgState: async () => {},
     });
-    expect(result).toEqual({ done: 1, total: 2, bytes: zip.byteLength, paused: true, missing: [] });
+    expect(result).toEqual({ done: 1, total: 2, bytes: zip.byteLength, paused: true, missing: [], failed: 0 });
     // AAA processed (1 cache entry); BBB skipped
     expect(cache.store).toHaveLength(1);
     // AAA's two posts; BBB cancel before any post for BBB
@@ -408,4 +408,49 @@ test('syncImages records unpacked keys on the imgstate row', async () => {
     const final = puts[puts.length - 1];
     expect(final.done).toBe(true);
     expect(final.keys.slice().sort()).toEqual(['key-1', 'key-2']);
+});
+
+// One unreachable bundle must not cost the rest of the selection, and the
+// edition it belongs to has to stay not-done so the next sync retries it.
+test('syncImages keeps one failed bundle from ending the whole sync', async () => {
+    const { caches } = makeFakeCache();
+    const zip = makeZip({ 'key-a.webp': [1] });
+    const states = [];
+    const mod = loadWithExtras({
+        fflate,
+        caches,
+        fetch: async (url) => String(url).includes('MID')
+            ? new Response(null, { status: 500 })
+            : new Response(zip),
+    });
+    const result = await mod.syncImages({
+        images: { NEO: { h: 'h1', n: 1, b: 1 }, MID: { h: 'h2', n: 1, b: 1 }, VOW: { h: 'h3', n: 1, b: 1 } },
+        sel: ['NEO', 'MID', 'VOW'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async r => states.push({ ...r }),
+    });
+    expect(result.failed).toBe(1);
+    expect(result.done).toBe(3);
+    expect(states.filter(r => r.code === 'MID').every(r => r.done === false)).toBe(true);
+    expect(states.filter(r => r.code === 'VOW' && r.done === true)).toHaveLength(1);
+});
+
+// A rejected authorization fails every remaining bundle the same way.
+test('syncImages stops the run when access is refused', async () => {
+    const { caches } = makeFakeCache();
+    const mod = loadWithExtras({
+        fflate,
+        caches,
+        fetch: async () => new Response(null, { status: 403 }),
+    });
+    await expect(mod.syncImages({
+        images: { NEO: { h: 'h1', n: 1, b: 1 }, MID: { h: 'h2', n: 1, b: 1 } },
+        sel: ['NEO', 'MID'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async () => {},
+    })).rejects.toThrow('forbidden');
 });
