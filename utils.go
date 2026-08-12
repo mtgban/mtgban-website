@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -123,6 +124,8 @@ func fitCode(badge rarityBadge, code string) rarityBadge {
 	if badge.Font > badgeFont {
 		badge.Font = badgeFont
 	}
+	// one decimal is all the drawings carry, and all that reaches the markup
+	badge.Font = math.Round(badge.Font*10) / 10
 
 	return badge
 }
