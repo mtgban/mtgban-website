@@ -3,9 +3,32 @@ package main
 import (
 	"io"
 	"net/http/httptest"
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 )
+
+// The offline shell renders base.html with the shared navbar, so every script
+// and stylesheet they pull has to be precached or the shell breaks offline.
+func TestServiceWorkerPrecachesShellAssets(t *testing.T) {
+	sw, err := os.ReadFile("sw.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assetRE := regexp.MustCompile(`(?:src|href)="(/(?:js|css)/[^"?]+)`)
+	for _, tmpl := range []string{"templates/base.html", "templates/partials/navbar.html"} {
+		body, err := os.ReadFile(tmpl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range assetRE.FindAllStringSubmatch(string(body), -1) {
+			if !strings.Contains(string(sw), "'"+m[1]+"?hash=") {
+				t.Errorf("%s: %s is missing from the service worker precache list", tmpl, m[1])
+			}
+		}
+	}
+}
 
 func TestServeServiceWorker(t *testing.T) {
 	r := httptest.NewRequest("GET", "/sw.js", nil)
