@@ -19,6 +19,7 @@ var SHELL_URLS = [
     '/js/fetchnames.js?hash=' + BUILD,
     '/js/autocomplete.js?hash=' + BUILD,
     '/js/navbar.js?hash=' + BUILD,
+    '/js/nightmode.js?hash=' + BUILD,
     '/js/palette-chips.js?hash=' + BUILD,
     '/js/palette-providers.js?hash=' + BUILD,
     '/js/guide-data.js?hash=' + BUILD,
@@ -30,6 +31,7 @@ var SHELL_URLS = [
     '/css/offline.css?hash=' + BUILD,
     '/js/offline/offline-db.js?hash=' + BUILD,
     '/js/offline/offline-mode.js?hash=' + BUILD,
+    '/js/offline/offline-prefer.js?hash=' + BUILD,
     '/js/offline/offline-format.js?hash=' + BUILD,
     '/js/offline/offline-util.js?hash=' + BUILD,
     '/js/offline/offline-query.js?hash=' + BUILD,
@@ -43,10 +45,60 @@ var SHELL_URLS = [
     '/js/offline/offline-banner.js?hash=' + BUILD,
     '/js/offline/offline-watch.js?hash=' + BUILD,
     '/img/logo/ban-stroop.png',
+    '/img/misc/patreon.png',
+    '/img/misc/discord.png',
     '/img/favicon/favicon-32x32.png',
     '/img/favicon/site.webmanifest'
 ];
-// keyrune CDN is cross-origin and uncacheable; mobile renderer degrades to set-code span offline
+// Keyrune ships from a CDN so its ~460 KB of font and stylesheet stay out of
+// the repo, and stays on @latest so new set symbols arrive without a deploy.
+var KEYRUNE_PREFIX = 'https://cdn.jsdelivr.net/npm/keyrune@';
+var KEYRUNE_CSS = KEYRUNE_PREFIX + 'latest/css/keyrune.css';
+
+// Lucide draws the navbar and picker icons, and stays on @latest for the same
+// reason keyrune does.
+var LUCIDE_PREFIX = 'https://unpkg.com/lucide@';
+var LUCIDE_JS = LUCIDE_PREFIX + 'latest/dist/umd/lucide.js';
+
+function isKeyrune(url) {
+    return url.href.indexOf(KEYRUNE_PREFIX) === 0;
+}
+
+function isCdnAsset(url) {
+    return isKeyrune(url) || url.href.indexOf(LUCIDE_PREFIX) === 0;
+}
+
+// Best effort, like the stylesheet: a CDN outage costs icons, not the install.
+function cacheCdnScript(c, url) {
+    return fetch(new Request(url, { cache: 'reload', mode: 'cors' })).then(function (res) {
+        if (res.ok) return c.put(url, res);
+    }).catch(function () {});
+}
+
+// Caches the stylesheet plus the font files it actually names. The font URLs
+// carry a ?v= matching the published version, so they are read back out of the
+// stylesheet rather than hardcoded: a fixed version would stop matching the
+// moment @latest moves, and the glyphs would break offline only.
+function cacheKeyrune(c) {
+    return fetch(new Request(KEYRUNE_CSS, { cache: 'reload', mode: 'cors' })).then(function (res) {
+        if (!res.ok) return;
+        return res.clone().text().then(function (css) {
+            return c.put(KEYRUNE_CSS, res).then(function () {
+                var urls = [];
+                var re = /url\(['"]?([^'")]+\.woff2?(?:\?[^'")]*)?)['"]?\)/g;
+                var m;
+                while ((m = re.exec(css)) !== null) {
+                    urls.push(new URL(m[1], KEYRUNE_CSS).href);
+                }
+                return Promise.all(urls.map(function (u) {
+                    return fetch(new Request(u, { cache: 'reload', mode: 'cors' })).then(function (r) {
+                        if (r.ok) return c.put(u, r);
+                    }).catch(function () {});
+                }));
+            });
+        });
+    }).catch(function () {});
+}
 
 self.addEventListener('install', function (e) {
     // cache: 'reload' bypasses HTTP caches so precache never picks up a stale edge/browser hit.
@@ -56,7 +108,13 @@ self.addEventListener('install', function (e) {
                 if (!res.ok) throw new Error('precache fetch failed: ' + url);
                 return c.put(url, res);
             });
-        }));
+        })).then(function () {
+            // Best effort, unlike the shell above: a CDN outage should cost set
+            // symbols, not fail the install and take offline mode down with it.
+            // Fetched cors so the entry is a real response rather than an opaque
+            // one, which would be unreadable and padded against the quota.
+            return cacheKeyrune(c).then(function () { return cacheCdnScript(c, LUCIDE_JS); });
+        });
     }).then(function () { return self.skipWaiting(); }));
 });
 
@@ -72,7 +130,20 @@ self.addEventListener('fetch', function (e) {
     var req = e.request;
     if (req.method !== 'GET') return;
     var url = new URL(req.url);
-    if (url.origin !== self.location.origin) return;
+    if (url.origin !== self.location.origin) {
+        // Network first, so @latest keeps delivering new set symbols; the cache
+        // is only the offline fallback. ignoreVary because the CDN varies on
+        // Accept-Encoding, which would otherwise stop the stylesheet's own font
+        // request from matching what was cached.
+        if (isCdnAsset(url)) {
+            e.respondWith(fetch(req).catch(function () {
+                return caches.match(req, { cacheName: SHELL_CACHE, ignoreVary: true }).then(function (hit) {
+                    return hit || Response.error();
+                });
+            }));
+        }
+        return;
+    }
 
     // Health probes must always hit the network.
     if (url.pathname === '/healthz') return;
@@ -80,7 +151,9 @@ self.addEventListener('fetch', function (e) {
     // Card images: cache-first with network fallback (the image sync fills the cache).
     if (url.pathname.indexOf('/api/offline/images/') === 0) {
         e.respondWith(caches.open(IMAGE_CACHE).then(function (c) {
-            return c.match(req).then(function (hit) { return hit || fetch(req); });
+            return c.match(req).then(function (hit) {
+                return hit || fetch(req).catch(function () { return Response.error(); });
+            });
         }));
         return;
     }
@@ -99,7 +172,9 @@ self.addEventListener('fetch', function (e) {
     }
 
     // Shell assets: cache-first; hash-keyed URLs make cache and server agree.
+    // An uncached asset offline answers with an error rather than an unhandled
+    // rejection, which the page sees as a failed request either way.
     e.respondWith(caches.match(req, { cacheName: SHELL_CACHE }).then(function (hit) {
-        return hit || fetch(req);
+        return hit || fetch(req).catch(function () { return Response.error(); });
     }));
 });
