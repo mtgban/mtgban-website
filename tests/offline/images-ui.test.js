@@ -63,15 +63,15 @@ test('buildEstimateText with known editions', () => {
     expect(UI.buildEstimateText(images, ['NEO', 'MID'])).toBe('Selected: 2 editions, 702 images, 54.8 MB');
 });
 
-test('buildEstimateText appends missing count when some codes have no bundle', () => {
+test('buildEstimateText appends missing count when some codes have no images', () => {
     expect(UI.buildEstimateText(images, ['NEO', 'NOPE'])).toBe(
-        'Selected: 2 editions, 302 images, 24.8 MB (1 without bundles yet)'
+        'Selected: 2 editions, 302 images, 24.8 MB (1 without images yet)'
     );
 });
 
 test('buildEstimateText with all codes missing from manifest', () => {
     expect(UI.buildEstimateText(images, ['X', 'Y'])).toBe(
-        'Selected: 2 editions, 0 images, 0 B (2 without bundles yet)'
+        'Selected: 2 editions, 0 images, 0 B (2 without images yet)'
     );
 });
 
@@ -121,10 +121,22 @@ test('buildDoneMessage reports plain finish when nothing is missing', () => {
     expect(UI.buildDoneMessage(false, 0, 3)).toBe('Image sync finished.');
 });
 
-test('buildDoneMessage reports all-missing outcome when every selected edition lacks a bundle', () => {
-    expect(UI.buildDoneMessage(false, 3, 3)).toBe('0 of 3 selected editions have bundles yet.');
+test('buildDoneMessage reports all-missing outcome when every selected edition lacks images', () => {
+    expect(UI.buildDoneMessage(false, 3, 3)).toBe('0 of 3 selected editions have images yet.');
 });
 
-test('buildDoneMessage appends missing count when some but not all editions lack bundles', () => {
-    expect(UI.buildDoneMessage(false, 2, 5)).toBe('Image sync finished. (2 editions have no bundles yet)');
+test('buildDoneMessage appends missing count when some but not all editions lack images', () => {
+    expect(UI.buildDoneMessage(false, 2, 5)).toBe('Image sync finished. (2 editions have no images yet)');
+});
+
+test('buildDoneMessage reports images that failed and will be retried', () => {
+    expect(UI.buildDoneMessage(false, 0, 5, 7)).toBe(
+        'Image sync finished. (7 images failed and retry on the next sync)'
+    );
+});
+
+test('buildDoneMessage reports missing editions and failed images together', () => {
+    expect(UI.buildDoneMessage(false, 2, 5, 7)).toBe(
+        'Image sync finished. (2 editions have no images yet; 7 images failed and retry on the next sync)'
+    );
 });
