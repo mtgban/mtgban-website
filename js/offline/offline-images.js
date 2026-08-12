@@ -66,14 +66,22 @@
         return '/api/offline/images/' + encodeURIComponent(key) + ext;
     }
 
+    // Marks the errors that must end the whole run rather than cost one edition.
+    function fatalError(message) {
+        var err = new Error(message);
+        err.fatal = true;
+        return err;
+    }
+
     // Downloads and unpacks each stale bundle; imgstate rows are the resume point.
     async function syncImages(deps) {
         var plan = computeWorkList(deps.images, deps.sel, deps.states);
         var total = plan.work.length;
         var done = 0;
         var bytes = 0;
-        if (total === 0) return { done: 0, total: 0, bytes: 0, paused: false, missing: plan.missing };
-        if (deps.cancelled()) return { done: 0, total: total, bytes: 0, paused: true, missing: plan.missing };
+        var failed = 0;
+        if (total === 0) return { done: 0, total: 0, bytes: 0, paused: false, missing: plan.missing, failed: 0 };
+        if (deps.cancelled()) return { done: 0, total: total, bytes: 0, paused: true, missing: plan.missing, failed: 0 };
 
         if (self.navigator && self.navigator.storage && self.navigator.storage.estimate) {
             var est = await self.navigator.storage.estimate();
@@ -86,45 +94,56 @@
 
         var cache = await self.caches.open(IMAGE_CACHE);
         for (var i = 0; i < plan.work.length; i++) {
-            if (deps.cancelled()) return { done: done, total: total, bytes: bytes, paused: true, missing: plan.missing };
+            if (deps.cancelled()) return { done: done, total: total, bytes: bytes, paused: true, missing: plan.missing, failed: failed };
             var item = plan.work[i];
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
 
-            var resp = await self.fetch('/api/offline/imagebundles/' + item.code + '.zip',
-                { credentials: 'same-origin' });
-            if (resp.status === 403) throw new Error('forbidden');
-            if (!resp.ok) throw new Error('bundle ' + item.code + ': HTTP ' + resp.status);
-            var buf = new Uint8Array(await resp.arrayBuffer());
-            bytes += buf.byteLength;
+            var buf = null;
+            var entries = null;
+            try {
+                var resp = await self.fetch('/api/offline/imagebundles/' + item.code + '.zip',
+                    { credentials: 'same-origin' });
+                // Auth is gone, not this one set: every remaining bundle would
+                // fail the same way, so stop rather than grinding through them.
+                if (resp.status === 403) throw fatalError('forbidden');
+                if (!resp.ok) throw new Error('bundle ' + item.code + ': HTTP ' + resp.status);
+                buf = new Uint8Array(await resp.arrayBuffer());
+                bytes += buf.byteLength;
 
-            // Mark in progress first so an interrupted unpack retries next sync.
-            await deps.putImgState({ code: item.code, hash: item.hash, done: false });
-            var entries = self.fflate.unzipSync(buf);
-            var names = Object.keys(entries);
-            var keys = [];
-            for (var j = 0; j < names.length; j++) {
-                var meta = entryMeta(names[j]);
-                if (!meta) continue;
-                try {
-                    await cache.put(new Request(meta.url), new Response(entries[names[j]], {
-                        headers: { 'Content-Type': meta.type },
-                    }));
-                } catch (err) {
-                    if (err && err.name === 'QuotaExceededError') {
-                        throw new Error('storage quota exceeded while unpacking ' + item.code);
+                // Mark in progress first so an interrupted unpack retries next sync.
+                await deps.putImgState({ code: item.code, hash: item.hash, done: false });
+                entries = self.fflate.unzipSync(buf);
+                var names = Object.keys(entries);
+                var keys = [];
+                for (var j = 0; j < names.length; j++) {
+                    var meta = entryMeta(names[j]);
+                    if (!meta) continue;
+                    try {
+                        await cache.put(new Request(meta.url), new Response(entries[names[j]], {
+                            headers: { 'Content-Type': meta.type },
+                        }));
+                    } catch (err) {
+                        if (err && err.name === 'QuotaExceededError') {
+                            throw fatalError('storage quota exceeded while unpacking ' + item.code);
+                        }
+                        throw err;
                     }
-                    throw err;
+                    keys.push(meta.key);
                 }
-                keys.push(meta.key);
+                await deps.putImgState({ code: item.code, hash: item.hash, done: true, keys: keys });
+            } catch (err) {
+                if (err && err.fatal) throw err;
+                // One bad bundle costs that edition, not the rest of the
+                // selection; its row stays not-done so the next sync retries it.
+                failed++;
             }
-            await deps.putImgState({ code: item.code, hash: item.hash, done: true, keys: keys });
             // two bundles must not be co-resident across the next await
             buf = null;
             entries = null;
             done++;
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
         }
-        return { done: done, total: total, bytes: bytes, paused: false, missing: plan.missing };
+        return { done: done, total: total, bytes: bytes, paused: false, missing: plan.missing, failed: failed };
     }
 
     // Removes cached images and state rows for editions no longer selected.
