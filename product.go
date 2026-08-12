@@ -262,7 +262,7 @@ func makeEditionEntry(set *mtgmatcher.Set, names ...string) EditionEntry {
 		Name:     name,
 		Code:     set.Code,
 		Date:     date,
-		Keyrune:  strings.ToLower(set.KeyruneCode),
+		Keyrune:  keyruneClass(set.KeyruneCode),
 		Size:     len(set.Cards),
 		FmtDate:  set.ReleaseDate,
 		Special:  special,

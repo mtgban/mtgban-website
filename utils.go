@@ -240,8 +240,8 @@ type GenericCard struct {
 	Flag         string
 	LangTag      string
 
+	Rarity            string
 	RarityColor       string
-	RarityShape       rarityBadge
 	ScryfallURL       string
 	DeckboxURL        string
 	CKRestockURL      string
@@ -834,8 +834,8 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		Flag:         allLanguageFlags[co.Language],
 		LangTag:      mtgmatcher.LanguageTag2LanguageCode[co.Language],
 
+		Rarity:            co.Rarity,
 		RarityColor:       rarityColor,
-		RarityShape:       rarityShape(co.Rarity, co.Card.SetCode),
 		ScryfallURL:       scryfallURL,
 		DeckboxURL:        deckboxURL,
 		CKRestockURL:      restockURL,
@@ -1259,4 +1259,13 @@ func invalidDirectIn(inv mtgban.InventoryRecord, id string, price float64) bool 
 
 	marketPrice := tcgMarketPriceIn(inv, id)
 	return price > marketPrice*2
+}
+
+// keyruneClass turns a set's keyrune code into the class the font wants, and
+// gives nothing at all to a game whose sets carry no keyrune.
+func keyruneClass(code string) string {
+	if code == "" {
+		return ""
+	}
+	return "ss-" + strings.ToLower(code)
 }

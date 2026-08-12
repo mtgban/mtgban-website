@@ -423,15 +423,7 @@
                     <tr data-arb-id="{{.CardId}}" data-arb-qty="{{if .Quantity}}{{.Quantity}}{{else}}1{{end}}" data-arb-name="{{$card.Name}}" data-arb-cond="{{.InventoryEntry.Conditions}}" data-arb-ckid="{{uuid2ckid .CardId}}" data-arb-tcgid="{{uuid2tcgid .CardId}}" onmouseover="document.getElementById('hoverImage').src='{{$card.ImageURL}}';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                         <td>
                             <div class="arb-card-cell">
-                                {{$keyrune := $card.Keyrune}}
-                                {{if $keyrune}}
-                                    <i class="ss {{$keyrune}} ss-1x ss-fw set-icon"></i>
-                                {{else}}
-                                    <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-                                        <circle r="11" cx="12" cy="12" fill="var(--normal)"/>
-                                        <text font-size="12" font-family="monospace" font-weight="bold" x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{$card.SetCode}}</text>
-                                    </svg>
-                                {{end}}
+                                {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 24 "Class" "set-icon"}}
                                 <span class="card-name-line">
                                     <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
                                     {{buylist_badge $.ScraperShort $card.HotlistStore}}

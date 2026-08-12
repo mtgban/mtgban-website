@@ -193,14 +193,7 @@
                                 {{else if eq $head.Title "Card Name"}}
                                     <td class="news-td-card">
                                         <div class="news-cc">
-                                            {{if $card.Keyrune}}
-                                                <i class="ss {{$card.Keyrune}} ss-1x ss-fw set-icon"></i>
-                                            {{else if $card.RarityColor}}
-                                                <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="{{$card.RarityShape.Path}}" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}" stroke-width="0.75"/>
-                                                    <text font-size="{{$card.RarityShape.Font}}" font-family="monospace" font-weight="bold" x="10" y="{{$card.RarityShape.TextY}}" text-anchor="middle" dominant-baseline="central" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
-                                                </svg>
-                                            {{end}}
+                                            {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 20 "Class" "set-icon"}}
                                             <div class="card-detail">
                                                 <span class="card-name"><a href="search?q={{$row.CardName}} s:{{$card.SetCode}} cn:{{$row.Number}}" lang="{{$card.LangTag}}">{{$row.CardName}}</a></span>
                                                 <span class="set-sub">{{$row.Edition}} &bull; #{{$row.Number}}</span>

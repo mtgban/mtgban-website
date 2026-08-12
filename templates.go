@@ -137,6 +137,15 @@ var funcMap = template.FuncMap{
 	"card_back": func() string {
 		return "/img/backs/" + Config.Game + ".webp"
 	},
+	// rarity_badge hands the set-symbol block the drawing for one rarity,
+	// already sized for the code it has to hold.
+	"rarity_badge": func(rarity, code string) rarityBadge {
+		badge, found := rarityBadges[rarity]
+		if !found {
+			badge = rarityBadges[""]
+		}
+		return fitCode(badge, code)
+	},
 	"uuid2ckid": func(s string) string {
 		bl, err := findVendorBuylist("CK")
 		if err != nil {

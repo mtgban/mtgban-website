@@ -116,7 +116,7 @@
             <div class="m-sealed-grid">
                 {{range $editionList}}
                     <a class="m-sealed-edition" href="/sealed?q=s:{{.Code}}">
-                        <i class="ss ss-{{.Keyrune}} ss-fw"></i> {{.Name}}
+                        {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Size" 20 "Class" ""}} {{.Name}}
                     </a>
                 {{end}}
             </div>
@@ -214,14 +214,7 @@
                  data-setcode="{{$card.SetCode}}"
                  onclick="showCardDrawer({{$card.ImageURL}}, '{{$card.Name}}', {{$card.HasContentWarning}})">
                 <div class="m-card-icon">
-                    {{if $card.Keyrune}}
-                        <i class="ss {{$card.Keyrune}} ss-fw"></i>
-                    {{else if $card.RarityColor}}
-                        <svg width="20" height="20" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path d="{{$card.RarityShape.Path}}" fill="{{$card.RarityColor}}" stroke="{{$card.RarityColor}}" stroke-width="0.75"/>
-                            <text font-size="{{$card.RarityShape.Font}}" font-family="monospace" font-weight="bold" x="10" y="{{$card.RarityShape.TextY}}" text-anchor="middle" dominant-baseline="central" fill="var(--background)">{{$card.SetCode}}</text>
-                        </svg>
-                    {{end}}
+                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 20 "Class" ""}}
                 </div>
                 <div class="m-card-info">
                     <span class="m-card-name" lang="{{$card.LangTag}}">{{strip_edition $card.Name $card.Edition $card.Sealed}}</span>
@@ -610,7 +603,7 @@
             <li data-value="" data-name="All Sets" onclick="selectSet(event)">All Sets</li>
             {{range .EditionFilterList}}
             <li data-value="{{.Code}}" data-name="{{.Name}}" onclick="selectSet(event)">
-                {{if .Keyrune}}<i class="ss ss-{{.Keyrune}} ss-fw"></i>{{end}}
+                {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Size" 20 "Class" ""}}
                 <span>{{.Name}}</span>
             </li>
             {{end}}

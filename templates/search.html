@@ -149,7 +149,7 @@
                         <div class="sealed-grid">
                             {{range $editionList}}
                                 <a class="sealed-edition" href="/sealed?q=s:{{.Code}}">
-                                    <i class="ss ss-{{.Keyrune}} ss-fw"></i> {{.Name}}
+                                    {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Size" 20 "Class" ""}} {{.Name}}
                                 </a>
                             {{end}}
                         </div>
@@ -1009,16 +1009,7 @@
                                  data-crop-url="{{$card.CropURL}}"
                                  onmouseover="hoverSidebar({{$card.ImageURL}}, {{$card.Printings}}, {{$card.Products}}, {{$card.Foil}}, {{$card.Etched}}, {{$card.SetCode}}, {{$card.HasContentWarning}}, {{$card.NumProducts}}, {{$card.Date}}, {{$card.Name}});">
                                 <a class="result-set-link" href="?q=s:{{$card.SetCode}}">
-                                    {{if $card.Keyrune}}
-                                        <i class="ss {{$card.Keyrune}} ss-2x ss-fw result-set-icon"></i>
-                                    {{else if $card.RarityColor}}
-                                        <svg width="32" height="32" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="{{$card.RarityShape.Path}}" fill="{{if $card.Foil}}url(#gradient-foil){{else}}{{$card.RarityColor}}{{end}}" stroke="{{if $card.Foil}}black{{else}}{{$card.RarityColor}}{{end}}" stroke-width="0.75"/>
-                                            <text font-size="{{$card.RarityShape.Font}}" font-family="monospace" font-weight="bold" x="10" y="{{$card.RarityShape.TextY}}" text-anchor="middle" dominant-baseline="central" fill="{{if $card.Foil}}black{{else}}var(--background){{end}}">{{$card.SetCode}}</text>
-                                        </svg>
-                                    {{else}}
-                                        <span>{{$card.SetCode}}</span>
-                                    {{end}}
+                                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 32 "Class" "result-set-icon"}}
                                 </a>
                                 <div class="result-card-info">
                                     <div class="result-card-name-row">

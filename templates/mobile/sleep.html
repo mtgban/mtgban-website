@@ -188,7 +188,7 @@
                 {{if $edition}}
                     <label class="m-sleep-opts-label">
                         <input type="checkbox" id="{{$key}}" name="{{$key}}">
-                        {{if $edition.Keyrune}}<i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>{{end}}
+                        {{template "set-symbol" dict "Keyrune" $edition.Keyrune "Code" $edition.Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Size" 20 "Class" ""}}
                         {{$edition.Name}}
                     </label>
                 {{end}}

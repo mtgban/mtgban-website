@@ -25,7 +25,7 @@
                 {{range $edition := index $.EditionsByCategory $cat}}
                 <label data-name="{{$edition.Name}}" data-code="{{$edition.Code}}">
                     <input type="checkbox" name="{{$edition.Code}}">
-                    <i class="ss ss-{{$edition.Keyrune}} ss-fw"></i>
+                    {{template "set-symbol" dict "Keyrune" $edition.Keyrune "Code" $edition.Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Size" 20 "Class" ""}}
                     <span class="row-name">{{$edition.Name}}</span>
                 </label>
                 {{end}}
