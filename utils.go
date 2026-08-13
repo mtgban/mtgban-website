@@ -193,15 +193,6 @@ func loadRarityBadges() {
 	}
 }
 
-func rarityShape(rarity, code string) rarityBadge {
-	badge, found := rarityBadges[rarity]
-	if !found {
-		badge = rarityBadges[""]
-	}
-
-	return fitCode(badge, code)
-}
-
 type GenericCard struct {
 	UUID string
 	// ChartID is the id the UI passes to the chart system. uuid2card leaves it
