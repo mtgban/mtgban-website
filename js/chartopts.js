@@ -364,6 +364,10 @@ function saveLegendState(chart, storageKey) {
 const checkpointColors = {
     ban:        { line: 'rgba(217, 83, 79, 0.9)',  label: 'rgba(217, 83, 79, 0.9)'  },
     unban:      { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
+    // The published ban list says a card is legal again without saying which
+    // of the two it stopped being, so Magic's markers arrive as "legal" where
+    // a curated document would have said unban or unrestrict. Same green.
+    legal:      { line: 'rgba(92, 184, 92, 0.9)',  label: 'rgba(92, 184, 92, 0.9)'  },
     // Vintage restrictions are their own action, not a softer ban, so they get
     // their own hue rather than a shade of the ban red.
     restrict:   { line: 'rgba(13, 110, 253, 0.9)', label: 'rgba(13, 110, 253, 0.9)' },
@@ -381,6 +385,7 @@ const checkpointZ = {
     ban: 6,
     restrict: 5,
     unban: 4,
+    legal: 4,
     unrestrict: 3,
     reprint: 2,
     release: 1,
@@ -408,7 +413,7 @@ function checkpointTime(dateStr) {
 function checkpointToggleKey(type) {
     // Restrictions come from the same B&R announcement as bans, so they ride
     // the same toggle rather than adding a checkbox for a Vintage-only action.
-    if (type === 'unban' || type === 'restrict' || type === 'unrestrict') return 'ban';
+    if (type === 'unban' || type === 'legal' || type === 'restrict' || type === 'unrestrict') return 'ban';
     if (type === 'format') return 'release';
     return type;
 }
