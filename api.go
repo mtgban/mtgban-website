@@ -873,7 +873,9 @@ func LoadFromCloud(w http.ResponseWriter, r *http.Request) {
 		slices.Sort(failed)
 		msg := fmt.Sprintf("Server reloaded %s, %d did not load: %s", name, len(failed), strings.Join(failed, "; "))
 		ServerNotify("reload", msg, true)
-		w.Write([]byte(`{"status": "ok"}`))
+		// The caller is the scraper that just published, and a reload it
+		// asked for and did not get is its news as much as the channel's.
+		errorResponse(w, http.StatusInternalServerError, msg)
 		return
 	}
 
