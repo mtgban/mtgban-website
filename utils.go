@@ -325,7 +325,7 @@ func getSetKeyrunes() map[string]string {
 		if err != nil || set.KeyruneCode == "" {
 			continue
 		}
-		out[code] = "ss-" + strings.ToLower(set.KeyruneCode)
+		out[code] = keyruneClass(set.KeyruneCode)
 	}
 	return out
 }
