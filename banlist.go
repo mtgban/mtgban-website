@@ -109,6 +109,18 @@ func banlistCardName(name string) string {
 	return name
 }
 
+// FormatEvent is a game-wide marker configured by hand: a format launch, the
+// one thing no ban list reports. It lives in the config rather than the
+// checkpoints document because Magic no longer reads that document, and it
+// applies to Magic alone — every other game still says the same thing with a
+// "format" event in its own document.
+type FormatEvent struct {
+	Date   string `json:"date"`
+	Format string `json:"format"`
+	Title  string `json:"title,omitempty"`
+	URL    string `json:"url,omitempty"`
+}
+
 // banlistIndex is the loaded document turned inside out: one entry per card,
 // since every chart asks about a single card and walking 350-odd
 // announcements (some listing eighty cards) per render is wasted work. Keyed
@@ -228,6 +240,22 @@ func banlistCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
 			seen[cp] = true
 			out = append(out, cp)
 		}
+	}
+
+	// Format launches are game-wide: every chart shows "Pioneer announced"
+	// whatever card it is drawing.
+	for _, ev := range Config.FormatEvents {
+		if ev.Date < earliestStr {
+			continue
+		}
+		out = append(out, ChartCheckpoint{
+			Type:     "format",
+			Date:     ev.Date,
+			Title:    ev.Title,
+			Detail:   formatDetail(ev.Format),
+			URL:      ev.URL,
+			IconText: ev.Format,
+		})
 	}
 
 	return out
