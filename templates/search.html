@@ -1500,6 +1500,8 @@
 {{end}}
 
 {{define "extra-scripts"}}
+<script type="text/javascript" src="/js/offline/offline-images.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-images-ui.js?hash={{.Hash}}"></script>
 <script>lucide.createIcons();</script>
 <script>
 (function () {
@@ -1857,6 +1859,49 @@ body.modal-embed .cp-overlay { display: none !important; }
                 <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
                 <span>Hide the upsell reminder to download CSVs</span>
             </label>
+        </div>
+    </div>
+</section>
+
+<!-- Offline Mode - revealed by offline-mode.js only when the account has the flag -->
+<section class="settings-section expanded" id="settings-offline-section" style="display:none">
+    <div class="settings-section-header" data-role="section-toggle">
+        <h3>Offline Mode</h3>
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p id="offline-auth-notice" class="offline-auth-notice" hidden>
+            Offline mode is not part of your current subscription. Your saved
+            prices stay browsable, but syncing is paused until access is restored.
+        </p>
+        <p class="section-desc">Keep card prices available when the site is unreachable. Data syncs in the background while you browse; applies immediately, no Save needed.</p>
+        <label class="settings-toggle">
+            <input type="checkbox" id="settings-offline-toggle">
+            <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+            <span>Enable offline mode</span>
+        </label>
+        <div id="offlineSyncStatus" class="offline-sync-status" aria-live="polite"></div>
+        <p class="section-desc" id="settings-offline-usage"></p>
+        <!-- reserved for a future store subset picker -->
+        <div id="settings-offline-stores-mount"></div>
+        <!-- image corpus editions picker -->
+        <div id="settings-offline-editions-mount">
+        {{if .PickerID}}
+        <div class="offline-img-picker">
+            <p class="section-desc">Checked editions have their card images downloaded for offline use.</p>
+            {{template "editions-picker" .}}
+            <div class="offline-img-estimate" id="offline-img-estimate" aria-live="polite"></div>
+            <div class="offline-img-controls">
+                <button type="button" class="settings-btn primary" id="offline-img-sync-btn">Sync Images Now</button>
+                <button type="button" class="settings-btn" id="offline-img-pause-btn" hidden>Pause</button>
+            </div>
+            <div class="offline-img-progress" id="offline-img-progress" hidden>
+                <div class="offline-img-progress-bar"><div class="offline-img-progress-fill"></div></div>
+                <span class="offline-img-progress-label"></span>
+            </div>
+            <div class="offline-img-storage" id="offline-img-storage"></div>
+        </div>
+        {{end}}
         </div>
     </div>
 </section>

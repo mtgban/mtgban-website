@@ -83,7 +83,7 @@ var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 		case "":
 			return &simplecloud.FileBucket{}, cpPath, nil
 		case "b2":
-			bucket, err := simplecloud.NewB2Client(ctx, Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
+			bucket, err := newB2ClientFor(ctx, u.Host)
 			return bucket, cpPath, err
 		default:
 			return nil, "", fmt.Errorf("unsupported checkpoints path scheme: %s", u.Scheme)

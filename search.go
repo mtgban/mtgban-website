@@ -220,6 +220,15 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.HasAvailable = len(mtgmatcher.GetSealedUUIDs()) > 0
 
+	// Image corpus picker: only populate for entitled users.
+	if _, ok := offlineModeAllowed(r); ok {
+		pageVars.OfflineModeAllowed = true
+		editions := GetEditions()
+		pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
+		pageVars.EditionsByCategory = editions.AllEditionsByCategory
+		pageVars.PickerID = "offline-img-editions-picker"
+	}
+
 	// Populate all seller/vendor keys (for settings drawer and options page)
 	for _, seller := range GetSellers() {
 		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)

@@ -23,6 +23,9 @@
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+    {{if .OfflineModeAllowed}}
+    <script type="text/javascript" src="/js/offline/offline-settings-mobile.js?hash={{.Hash}}"></script>
+    {{end}}
     <script type="text/javascript" src="/js/copy2clip.js?hash={{.Hash}}"></script>
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     {{if .PatreonLogin}}
@@ -779,6 +782,25 @@
                     {{end}}
                 </div>
             </div>
+
+            {{/* Offline Mode - gated by server ACL and revealed by JS when available() */}}
+            {{if .OfflineModeAllowed}}
+            <div class="m-settings-section" id="m-offline-section" style="display:none">
+                <div class="m-settings-label">Offline Mode</div>
+                <p id="m-offline-auth-notice" class="m-offline-auth-notice" hidden>
+                    Offline access is not part of your current subscription. Saved prices stay
+                    browsable but syncing is paused until access is restored.
+                </p>
+                <p class="m-offline-desc">Keep card prices available when the site is unreachable.
+                    Syncs in the background; no Apply needed.</p>
+                <div class="m-settings-row">
+                    <span>Enable offline mode</span>
+                    <div class="m-settings-toggle" id="m-offline-toggle" onclick="OfflineSettingsMobile && OfflineSettingsMobile.handleToggle(this)"><span class="m-toggle-knob"></span></div>
+                </div>
+                <div id="m-offline-status" class="m-offline-status" aria-live="polite"></div>
+                <p class="m-offline-usage" id="m-offline-usage"></p>
+            </div>
+            {{end}}
 
             {{/* Apply */}}
             <button type="button" class="m-settings-apply" onclick="saveSettings()">Apply Settings</button>

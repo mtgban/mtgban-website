@@ -514,3 +514,27 @@
     text-overflow: ellipsis;
     max-width: 180px;
 }
+
+/* Offline-mode navbar toggle: orange accent when engaged. */
+.ban-offline-toggle.is-active {
+    color: var(--orange, orange);
+}
+
+/* On /offline the navbar is a Singles/Sealed mode switch. */
+.offline-nav .offline-mode-btn.active,
+.offline-nav .offline-mode-btn.active:hover {
+    color: var(--lightblack, #161616);
+    background: var(--green, #22c55e);
+    border-color: var(--green, #22c55e);
+}
+/* Hide the online section-bar nav (restored layout + promoted tools) so only
+   the Singles/Sealed mode buttons show; CSS-only, saved layout untouched. */
+.offline-nav .nav2-section-btn:not(.offline-mode-btn):not(.is-tools) {
+    display: none;
+}
+/* Keep the Tools dropdown reachable for the theme switch and external links,
+   but grey out the tool tiles that need the server. */
+.offline-nav .tools-tile {
+    opacity: 0.4;
+    pointer-events: none;
+}
