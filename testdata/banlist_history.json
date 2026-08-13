@@ -1,0 +1,63 @@
+{
+ "legacy": [
+  {
+   "date": "2026-08-10",
+   "url": "https://example.test/2026-08-10",
+   "changes": {
+    "Sowing Mycospawn": "banned",
+    "Reflection of Kiki-Jiki": "banned"
+   }
+  },
+  {
+   "date": "1999-01-01",
+   "url": "https://example.test/old",
+   "changes": {
+    "Black Lotus": "banned"
+   }
+  }
+ ],
+ "vintage": [
+  {
+   "date": "2026-08-10",
+   "url": "https://example.test/2026-08-10",
+   "changes": {
+    "Sowing Mycospawn": "restricted",
+    "Karn, the Great Creator": "legal"
+   }
+  }
+ ],
+ "unsets": [
+  {
+   "date": "2026-08-10",
+   "url": "https://example.test/x",
+   "changes": {
+    "Scavenger Hunt (a)": "banned",
+    "Scavenger Hunt (b)": "banned"
+   }
+  }
+ ],
+ "pauper": [
+  {
+   "date": "2026-08-10",
+   "url": "https://example.test/y",
+   "changes": {
+    "Scavenger Hunt (a)": "banned",
+    "Scavenger Hunt (b)": "banned",
+    "\"Name Sticker\" Goblin": "banned",
+    "Some Card": "specialized"
+   }
+  },
+  {
+   "url": "https://magic.wizards.com/en/announcing-pauper-2019-10-21",
+   "changes": {
+    "Launch Card": "banned"
+   }
+  },
+  {
+   "url": "https://example.test/no-date",
+   "changes": {
+    "Standing Card": "banned"
+   }
+  }
+ ]
+}

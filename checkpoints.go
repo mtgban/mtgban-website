@@ -91,7 +91,14 @@ var checkpointsStore = &bucketstore.Store[checkpointsFile]{
 	},
 }
 
+// reloadCheckpoints refreshes whatever this game draws its ban markers from.
+// Magic reads the published ban list, which is not ours to edit; every other
+// game reads the curated document on the bucket.
 func reloadCheckpoints() error {
+	if Config.Game == DefaultGame {
+		return reloadBanlist(context.Background())
+	}
+
 	if err := checkpointsStore.Load(context.Background()); err != nil {
 		return err
 	}
@@ -105,15 +112,23 @@ func reloadCheckpoints() error {
 }
 
 // saveCheckpoints pushes events to the bucket and, on success, atomically
-// swaps the in-memory cache.
+// swaps the in-memory cache. Magic derives its markers instead, and has
+// nothing here to write.
 func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
+	if Config.Game == DefaultGame {
+		return errors.New("Magic checkpoints come from the published ban list and cannot be edited")
+	}
 	return checkpointsStore.Save(ctx, checkpointsFile{Events: events})
 }
 
 // currentCheckpointsJSON returns the in-memory document serialized as JSON,
 // for display in the admin editor. An empty store still produces a valid
-// `{"events": []}` document.
+// `{"events": []}` document. Magic has no document to show: an empty string
+// is what tells the page to offer no editor at all.
 func currentCheckpointsJSON() (string, error) {
+	if Config.Game == DefaultGame {
+		return "", nil
+	}
 	return checkpointsStore.JSON()
 }
 
@@ -188,6 +203,10 @@ func multiCardCheckpoints(cardNames []string, earliest time.Time) []ChartCheckpo
 }
 
 func curatedCheckpoints(cardName string, earliest time.Time) []ChartCheckpoint {
+	if Config.Game == DefaultGame {
+		return banlistCheckpoints(cardName, earliest)
+	}
+
 	events := checkpointsStore.Get().Events
 
 	earliestStr := earliest.Format("2006-01-02")

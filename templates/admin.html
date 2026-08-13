@@ -271,6 +271,17 @@
                 <div id="checkpointsEditor"></div>
             </form>
         </div>
+        {{else}}
+        <div class="admin-config-wrap">
+            <div class="admin-config-header">
+                <h2>Chart Checkpoints</h2>
+                <span class="warn-tag">derived</span>
+            </div>
+            <p style="padding: 0 16px 16px; color: var(--text-dim);">
+                Ban and restriction markers come from the published ban list, refetched on reload,
+                so there is nothing to edit here.
+            </p>
+        </div>
         {{end}}
     </div>
 
@@ -372,7 +383,7 @@
                     <a class="admin-action" href="?reboot=config" onclick="return confirm('Reload config?')">
                         <span class="act-icon">⚙️</span> Reload Config
                     </a>
-                    <a class="admin-action" href="?reboot=checkpoints" onclick="return confirm('Reload chart checkpoints from B2?')">
+                    <a class="admin-action" href="?reboot=checkpoints" onclick="return confirm('Reload chart checkpoints?')">
                         <span class="act-icon">📌</span> Reload Checkpoints
                     </a>
                     <a class="admin-action" href="?reboot=snapshot" onclick="return confirm('Take a data snapshot?')">
