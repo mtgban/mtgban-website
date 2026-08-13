@@ -1602,7 +1602,17 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 	if err != nil {
 		return nil, "", err
 	}
-	resp, err := cleanhttp.DefaultClient().Do(req)
+	// The host check above only covers the first hop. A redirect would
+	// carry the request anywhere the target chose, including back at this
+	// network, so every hop has to satisfy the same rule.
+	client := cleanhttp.DefaultClient()
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" || req.URL.Host != "store.tcgplayer.com" {
+			return fmt.Errorf("refusing redirect to %s", req.URL.Redacted())
+		}
+		return nil
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, "", err
 	}

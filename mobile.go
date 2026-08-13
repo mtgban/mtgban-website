@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -48,14 +49,29 @@ func toggleMobileView(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	// Only honor same-origin relative redirect targets to avoid an open
-	// redirect: require a leading single slash (rejects "//evil.com",
-	// "https://evil.com", "javascript:", etc.).
 	redirect := r.FormValue("redirect")
-	if !strings.HasPrefix(redirect, "/") || strings.HasPrefix(redirect, "//") {
+	if !isLocalRedirect(redirect) {
 		redirect = "/"
 	}
 	http.Redirect(w, r, redirect, http.StatusFound)
+}
+
+// isLocalRedirect reports whether target is a path on this site, so that a
+// redirect parameter cannot send a visitor elsewhere.
+//
+// The leading slash is not enough on its own. "//evil.com" is
+// protocol-relative, and "/\evil.com" is the same thing to a browser, which
+// reads the backslash as a slash - that second one is what the old prefix
+// test let through. Anything naming a scheme or a host is refused outright.
+func isLocalRedirect(target string) bool {
+	if !strings.HasPrefix(target, "/") {
+		return false
+	}
+	if len(target) > 1 && (target[1] == '/' || target[1] == '\\') {
+		return false
+	}
+	u, err := url.Parse(target)
+	return err == nil && u.Scheme == "" && u.Host == ""
 }
 
 // Pages that have mobile templates - only these show in mobile nav.

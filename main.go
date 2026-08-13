@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
@@ -654,10 +655,52 @@ const (
 	DefaultSignatureDuration = 11 * 24 * time.Hour
 )
 
-// Cache for a week as these assets either never change or have a snapshot key in the URL
-func ServeFile(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "public, max-age=86400")
-	http.ServeFile(w, r, r.URL.Path[1:])
+// staticRoots are the directories the server hands out off disk. Each is
+// served through an http.Dir rooted at itself, so a request can only name a
+// file inside the tree it routed to and the requested path never reaches an
+// open call here: the constraint is the root, not a check that a later route
+// could widen past.
+var staticRoots = []string{"css", "img", "js"}
+
+// filesOnly is an http.FileSystem that serves files and refuses directories.
+// http.FileServer otherwise renders an index for a directory requested bare,
+// and none of these trees carries an index.html to cover one.
+type filesOnly struct{ fs http.FileSystem }
+
+func (only filesOnly) Open(name string) (http.File, error) {
+	f, err := only.fs.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	info, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	if info.IsDir() {
+		f.Close()
+		return nil, fs.ErrNotExist
+	}
+	return f, nil
+}
+
+// staticTree serves one directory. Cache for a week as these assets either
+// never change or have a snapshot key in the URL.
+func staticTree(root string) http.Handler {
+	files := http.FileServer(filesOnly{http.Dir(root)})
+	return http.StripPrefix("/"+root+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		files.ServeHTTP(w, r)
+	}))
+}
+
+// staticFile serves one fixed file. The name is fixed at registration, so the
+// request chooses whether it is served, never which file it is.
+func staticFile(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		http.ServeFile(w, r, name)
+	}
 }
 
 func genPageNav(activeTab, sig string) PageVars {
@@ -1226,11 +1269,13 @@ func main() {
 	}
 
 	// Serve everything in known folders as a file
-	http.HandleFunc("/css/", ServeFile)
-	http.HandleFunc("/img/", ServeFile)
-	http.HandleFunc("/js/", ServeFile)
-	http.HandleFunc("/favicon.ico", ServeFile)
-	http.HandleFunc("/robots.txt", ServeFile)
+	for _, root := range staticRoots {
+		http.Handle("/"+root+"/", staticTree(root))
+	}
+	// The browser asks for /favicon.ico on its own for anything not rendered
+	// through base.html, which links the real one under /img/favicon.
+	http.HandleFunc("/favicon.ico", staticFile("img/favicon/favicon.ico"))
+	http.HandleFunc("/robots.txt", staticFile("robots.txt"))
 
 	// custom redirector
 	http.HandleFunc("/go/", Redirect)

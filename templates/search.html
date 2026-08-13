@@ -1620,7 +1620,11 @@ body.modal-embed .cp-overlay { display: none !important; }
             if (a.dataset.modalDecorated === '1') return;
             var raw = a.getAttribute('href');
             if (!raw) return;
-            if (raw.charAt(0) === '#' || raw.indexOf('javascript:') === 0) return;
+            // Naming the dangerous schemes one at a time always misses one
+            // (data:, vbscript:, and whatever comes next). The origin test
+            // below already refuses every one of them - they parse to a null
+            // origin - so let it do the work and only skip in-page anchors.
+            if (raw.charAt(0) === '#') return;
             if (a.target === '_blank') return;
             var url;
             try { url = new URL(raw, window.location.href); } catch (e) { return; }

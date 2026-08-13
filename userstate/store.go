@@ -146,11 +146,33 @@ func (c *Client) Patch(ctx context.Context, emailHash, section string, payload j
 		)
 	}
 
-	// section is validated against validSections above; safe to interpolate.
-	q := fmt.Sprintf(`
+	// The column is chosen from a fixed set rather than interpolated, so no
+	// caller value reaches the query text even by accident. section was
+	// already checked against validSections above; this makes the query a
+	// constant either way, which is what a reader - and an analyzer - can
+	// see without tracing the check.
+	var q string
+	switch section {
+	case "favorites":
+		q = updateSectionQuery("favorites")
+	case "recents":
+		q = updateSectionQuery("recents")
+	case "preferences":
+		q = updateSectionQuery("preferences")
+	default:
+		return State{}, false, fmt.Errorf("userstate: unknown section %q", section)
+	}
+	return c.writeWithConflict(ctx, q, emailHash, []byte(jsonOrEmpty(payload, defaultFor(section))), expectedVersion)
+}
+
+// updateSectionQuery returns the write-or-read CTE for one column. The column
+// name is a constant supplied by the caller's switch, never a value from
+// outside this package.
+func updateSectionQuery(column string) string {
+	return `
 		WITH upd AS (
 			UPDATE user_state
-			   SET %s = $2, version = version + 1, updated_at = now()
+			   SET ` + column + ` = $2, version = version + 1, updated_at = now()
 			 WHERE email_hash = $1 AND version = $3
 			 RETURNING version, favorites, recents, preferences
 		)
@@ -158,8 +180,7 @@ func (c *Client) Patch(ctx context.Context, emailHash, section string, payload j
 		UNION ALL
 		SELECT FALSE AS updated, version, favorites, recents, preferences
 		  FROM user_state
-		 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM upd)`, section)
-	return c.writeWithConflict(ctx, q, emailHash, []byte(jsonOrEmpty(payload, defaultFor(section))), expectedVersion)
+		 WHERE email_hash = $1 AND NOT EXISTS (SELECT 1 FROM upd)`
 }
 
 func defaultFor(section string) string {
