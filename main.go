@@ -1054,6 +1054,7 @@ func main() {
 	tcgcsvFrom := flag.String("tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08; an explicit date fetches the whole range, bypassing the resume cursor)")
 	tcgcsvTo := flag.String("tcgcsv-to", "", "Backfill end date YYYY-MM-DD (default: today)")
 	tcgcsvForce := flag.Bool("tcgcsv-force", false, "Re-ingest dates already stored (ignore the resume cursor)")
+	tcgcsvCategories := flag.String("tcgcsv-categories", "", "Restrict the backfill to these TCGplayer category ids, comma-separated (default: every configured game)")
 	tcgcsvDaily := flag.Bool("tcgcsv-daily", false, "Run the daily tcgcsv ingest once, then exit")
 	tcgcsvProducts := flag.Bool("tcgcsv-products", false, "Sync the tcgcsv product catalog once, then exit")
 
@@ -1089,7 +1090,7 @@ func main() {
 		}
 		switch {
 		case *tcgcsvBackfill:
-			if err := runTCGCSVBackfill(context.Background(), *tcgcsvFrom, *tcgcsvTo, *tcgcsvForce); err != nil {
+			if err := runTCGCSVBackfill(context.Background(), *tcgcsvFrom, *tcgcsvTo, *tcgcsvCategories, *tcgcsvForce); err != nil {
 				log.Fatalln("tcgcsv backfill:", err)
 			}
 		case *tcgcsvDaily:
