@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 // nRealUUIDs returns n distinct UUIDs from the loaded mtgmatcher pool, or skips
@@ -281,5 +283,115 @@ func TestMergeMultiCardDatasetsCardWithNoDatasetsSkipsPaletteSlot(t *testing.T) 
 	if out[0].Color != multiCardPalette[1] {
 		t.Errorf("second card should use palette[1] (%q), got %q",
 			multiCardPalette[1], out[0].Color)
+	}
+}
+
+// withDatasets swaps in a dataset config for the duration of a test, restoring
+// both it and the derived provider registry afterwards.
+func withDatasets(t *testing.T, datasets []DatasetConfig) {
+	t.Helper()
+	prevConfig := Config.TimeseriesConfig
+	prevRegistry := providerRegistry
+	t.Cleanup(func() {
+		Config.TimeseriesConfig = prevConfig
+		providerRegistry = prevRegistry
+	})
+	Config.TimeseriesConfig = TimeseriesConfig{Datasets: datasets}
+}
+
+func TestFillDatasetProvidersDerivesFromIndex(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{PublicName: "Card Kingdom Retail", Index: 0},
+		{PublicName: "TCGplayer Low", Index: 2},
+		{PublicName: "Cool Stuff Inc Buylist", Index: 9},
+	})
+	fillDatasetProviders()
+
+	want := []int16{
+		timeseries.ProviderCKRetail,
+		timeseries.ProviderTCGLow,
+		timeseries.ProviderCSIBuylist,
+	}
+	for i, d := range Config.TimeseriesConfig.Datasets {
+		if d.Provider != want[i] {
+			t.Errorf("%s: provider = %d, want %d", d.PublicName, d.Provider, want[i])
+		}
+	}
+}
+
+func TestFillDatasetProvidersKeepsExplicitAndSkipsUnknownIndex(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		// An explicit provider overrides what the index would derive.
+		{PublicName: "Renamed", Index: 0, Provider: timeseries.ProviderSCGBuylist},
+		{PublicName: "Not a wide column", Index: 42},
+	})
+	fillDatasetProviders()
+
+	if got := Config.TimeseriesConfig.Datasets[0].Provider; got != timeseries.ProviderSCGBuylist {
+		t.Errorf("explicit provider overwritten: got %d", got)
+	}
+	if got := Config.TimeseriesConfig.Datasets[1].Provider; got != 0 {
+		t.Errorf("index 42 maps to no provider, got %d", got)
+	}
+}
+
+// A config that never had the long-form "provider" field added must still chart
+// every configured dataset — that omission used to collapse the registry to the
+// TCGplayer metrics wired in code, so a Magic chart drew only Low and Market.
+func TestFillDatasetProvidersThenRegistryCoversConfig(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{PublicName: "TCGplayer Low", Index: 2, Color: "red"},
+		{PublicName: "Card Kingdom Buylist", Index: 1, Color: "blue"},
+		{PublicName: "Cardmarket Trend", Index: 5, Color: "grey"},
+	})
+	fillDatasetProviders()
+	buildProviderRegistry()
+
+	for _, want := range []providerDisplay{
+		{timeseries.ProviderTCGLow, "TCGplayer Low", "red"},
+		{timeseries.ProviderCKBuylist, "Card Kingdom Buylist", "blue"},
+		{timeseries.ProviderMKMTrend, "Cardmarket Trend", "grey"},
+	} {
+		if !slices.Contains(providerRegistry, want) {
+			t.Errorf("registry missing %+v: %+v", want, providerRegistry)
+		}
+	}
+}
+
+func TestBuildProviderRegistryCoversEverySeededProvider(t *testing.T) {
+	withDatasets(t, nil)
+	buildProviderRegistry()
+
+	seen := map[int16]bool{}
+	for _, pd := range providerRegistry {
+		if seen[pd.Provider] {
+			t.Errorf("provider %d listed twice", pd.Provider)
+		}
+		if pd.Name == "" || pd.Color == "" {
+			t.Errorf("provider %d has an empty name or color: %+v", pd.Provider, pd)
+		}
+		seen[pd.Provider] = true
+	}
+	// Every id in db_migration/02_seed_providers.sql must be chartable.
+	for provider := int16(1); provider <= timeseries.ProviderSealedEV; provider++ {
+		if !seen[provider] {
+			t.Errorf("no display registered for provider %d", provider)
+		}
+	}
+}
+
+// The config's dataset order drives the legend, so a configured provider must
+// keep its position ahead of the built-in fallbacks.
+func TestBuildProviderRegistryConfigWinsOverDefault(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{PublicName: "Custom Market Name", Index: 3, Provider: timeseries.ProviderTCGMarket, Color: "pink"},
+	})
+	buildProviderRegistry()
+
+	if len(providerRegistry) == 0 || providerRegistry[0].Provider != timeseries.ProviderTCGMarket {
+		t.Fatalf("configured dataset should lead the registry: %+v", providerRegistry)
+	}
+	if providerRegistry[0].Name != "Custom Market Name" || providerRegistry[0].Color != "pink" {
+		t.Errorf("config display lost to the default: %+v", providerRegistry[0])
 	}
 }
