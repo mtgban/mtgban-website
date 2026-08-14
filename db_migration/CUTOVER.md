@@ -7,8 +7,13 @@ every step is reversible by flipping the flag back.
 
 ## 1. config.json additions (NOT in git — config.json is gitignored)
 
-Add a `provider` id to every `timeseries_config.datasets` entry, and the two
-flags on `timeseries_config`. The index→provider mapping (plan 17.5):
+Only the two flags on `timeseries_config` are required. Each dataset also carries
+a `provider` id, but the server derives it from the dataset's `index` when it is
+absent, so an untouched config keeps charting, writing, and aggregating every
+provider it did before (issue #282: a config missing the field used to chart only
+TCGplayer Low and Market). Set `provider` explicitly only to point a dataset at
+something its index doesn't imply. The index→provider mapping (plan 17.5), which
+`timeseries.ProviderForDatasetIndex` mirrors:
 
 | dataset `index` | column | `provider` |
 |---|---|---|
@@ -30,10 +35,15 @@ flags on `timeseries_config`. The index→provider mapping (plan 17.5):
     "datasets": [
         { "public_name": "TCGplayer Low", "index": 2, "provider": 3, ... },
         { "public_name": "TCGplayer Market", "index": 3, "provider": 4, ... },
-        // ... provider on every dataset ...
+        // ... "provider" optional; derived from "index" when omitted ...
     ]
 }
 ```
+
+A deployment that ran dual-write with the field missing wrote only the providers
+wired in code, leaving gaps in `prices` for the rest. Re-run `08_catchup.sql`
+with `-v since=<first dual-write day>` after deploying this; it is idempotent and
+fills only the missing (ban_id, date, provider) rows.
 
 Non-Magic providers are wired in code, not config (tcgcsv columns low/market/mid/
 high/direct_low → providers 3/4/5/6/7).

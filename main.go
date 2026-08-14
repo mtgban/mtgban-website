@@ -834,7 +834,9 @@ func loadVars(port, datastorePath, offlineKey string) error {
 		return err
 	}
 
-	// Build the game-agnostic chart provider registry from the dataset config.
+	// Derive any missing dataset provider ids, then build the game-agnostic
+	// chart provider registry from the dataset config.
+	fillDatasetProviders()
 	buildProviderRegistry()
 
 	// The -port and -ds flags, when provided, override whatever the config
