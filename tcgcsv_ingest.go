@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"slices"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -63,21 +66,64 @@ func priceToRow(date string, categoryID int, p tcgcsv.Price) timeseries.TCGPrice
 	}
 }
 
-// ensureTCGPartitions makes sure tcg_prices has a dedicated partition for every
-// configured game's category before any upsert. tcg_prices is LIST-partitioned
-// by category_id (games never share rows), so each game needs its own partition;
+// ensureTCGPartitions makes sure tcg_prices has a dedicated partition for each
+// game's category before any upsert. tcg_prices is LIST-partitioned by
+// category_id (games never share rows), so each game needs its own partition;
 // without one, that game's rows route to the catch-all default partition instead
 // of a per-game partition. EnsureTCGSchema already pre-creates partitions for the
 // known TCGplayer categories, so this is a no-op for them and mainly covers a
 // configured category not yet listed in the schema. Call it after EnsureTCGSchema,
 // before ingesting.
-func ensureTCGPartitions(ctx context.Context) error {
-	for _, g := range Config.TCGCSVConfig.Games {
+func ensureTCGPartitions(ctx context.Context, games []tcgcsv.GameConfig) error {
+	for _, g := range games {
 		if err := PricesArchiveDB.EnsureTCGCategoryPartition(ctx, g.CategoryID); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// backfillGames resolves the -tcgcsv-categories filter (comma-separated
+// TCGplayer category ids) against the configured registry. An empty spec means
+// every configured game. An id that isn't configured is an error rather than a
+// silent no-op run, since a typo would otherwise look like a clean backfill that
+// wrote nothing.
+func backfillGames(spec string) ([]tcgcsv.GameConfig, error) {
+	if strings.TrimSpace(spec) == "" {
+		return Config.TCGCSVConfig.Games, nil
+	}
+	var games []tcgcsv.GameConfig
+	seen := make(map[int]bool)
+	for _, field := range strings.Split(spec, ",") {
+		field = strings.TrimSpace(field)
+		if field == "" {
+			continue
+		}
+		cat, err := strconv.Atoi(field)
+		if err != nil {
+			return nil, fmt.Errorf("tcgcsv: bad -tcgcsv-categories %q: %q is not a category id", spec, field)
+		}
+		if seen[cat] {
+			continue
+		}
+		idx := slices.IndexFunc(Config.TCGCSVConfig.Games, func(g tcgcsv.GameConfig) bool {
+			return g.CategoryID == cat
+		})
+		if idx < 0 {
+			var configured []string
+			for _, g := range Config.TCGCSVConfig.Games {
+				configured = append(configured, fmt.Sprintf("%d (%s)", g.CategoryID, g.Name))
+			}
+			return nil, fmt.Errorf("tcgcsv: category %d is not a configured game; configured: %s",
+				cat, strings.Join(configured, ", "))
+		}
+		seen[cat] = true
+		games = append(games, Config.TCGCSVConfig.Games[idx])
+	}
+	if len(games) == 0 {
+		return nil, fmt.Errorf("tcgcsv: -tcgcsv-categories %q selected no games", spec)
+	}
+	return games, nil
 }
 
 // tcgcsvClient builds a client from the configured registry, or an error if
@@ -93,9 +139,16 @@ func tcgcsvClient() (*tcgcsv.Client, error) {
 }
 
 // runTCGCSVBackfill parses the optional from/to date strings (defaulting to the
-// archive epoch through today) and runs the backfill. Invoked by the
-// -tcgcsv-backfill maintenance flag.
-func runTCGCSVBackfill(ctx context.Context, fromStr, toStr string, force bool) error {
+// archive epoch through today) and the optional category filter, then runs the
+// backfill. Invoked by the -tcgcsv-backfill maintenance flag.
+func runTCGCSVBackfill(ctx context.Context, fromStr, toStr, categories string, force bool) error {
+	if Config.TCGCSVConfig == nil || len(Config.TCGCSVConfig.Games) == 0 {
+		return errors.New("tcgcsv: no tcgcsv_config games configured")
+	}
+	games, err := backfillGames(categories)
+	if err != nil {
+		return err
+	}
 	from := tcgcsv.ArchiveEpoch
 	explicitFrom := fromStr != ""
 	if explicitFrom {
@@ -123,16 +176,16 @@ func runTCGCSVBackfill(ctx context.Context, fromStr, toStr string, force bool) e
 	// by an earlier daily ingest) would be silently skipped. The upsert is
 	// idempotent, so re-covering already-stored days just overwrites them in place.
 	resume := !explicitFrom && !force
-	return backfillTCGCSV(ctx, from, to, resume)
+	return backfillTCGCSV(ctx, games, from, to, resume)
 }
 
-// backfillTCGCSV fills tcg_prices from tcgcsv's daily archives for every
-// configured game, one day at a time. When resume is set it skips a day for a
+// backfillTCGCSV fills tcg_prices from tcgcsv's daily archives for each of the
+// given games, one day at a time. When resume is set it skips a day for a
 // category once that category already has data on or after it (the default
 // backfill's per-category high-water mark); when resume is false it fetches
 // every day in [from, to]. Archives are downloaded only for days that at least
 // one category still needs, so resumed re-runs are cheap.
-func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error {
+func backfillTCGCSV(ctx context.Context, games []tcgcsv.GameConfig, from, to time.Time, resume bool) error {
 	client, err := tcgcsvClient()
 	if err != nil {
 		return err
@@ -146,7 +199,7 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 	if err := PricesArchiveDB.EnsureTCGSchema(ctx); err != nil {
 		return err
 	}
-	if err := ensureTCGPartitions(ctx); err != nil {
+	if err := ensureTCGPartitions(ctx, games); err != nil {
 		return err
 	}
 
@@ -154,7 +207,7 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 	// when resuming; an explicit range or force fetches every day in [from, to].
 	latest := make(map[int]time.Time)
 	if resume {
-		for _, g := range Config.TCGCSVConfig.Games {
+		for _, g := range games {
 			d, ok, err := PricesArchiveDB.GetTCGLatestDate(ctx, g.CategoryID)
 			if err != nil {
 				return fmt.Errorf("tcgcsv: latest date for category %d: %w", g.CategoryID, err)
@@ -166,13 +219,13 @@ func backfillTCGCSV(ctx context.Context, from, to time.Time, resume bool) error 
 	}
 
 	log.Printf("tcgcsv backfill: %s..%s across %d game(s), resume=%v",
-		from.Format("2006-01-02"), to.Format("2006-01-02"), len(Config.TCGCSVConfig.Games), resume)
+		from.Format("2006-01-02"), to.Format("2006-01-02"), len(games), resume)
 
 	var totalRows, daysWithData, daysEmpty, daysFailed int
 	for day := from; !day.After(to); day = day.AddDate(0, 0, 1) {
 		// Which categories still need this day?
 		need := make(map[int]bool)
-		for _, g := range Config.TCGCSVConfig.Games {
+		for _, g := range games {
 			if !resume || day.After(latest[g.CategoryID]) {
 				need[g.CategoryID] = true
 			}
@@ -317,7 +370,7 @@ func ingestTCGCSVLatest(ctx context.Context) error {
 	if err := PricesArchiveDB.EnsureTCGSchema(ctx); err != nil {
 		return err
 	}
-	if err := ensureTCGPartitions(ctx); err != nil {
+	if err := ensureTCGPartitions(ctx, Config.TCGCSVConfig.Games); err != nil {
 		return err
 	}
 
