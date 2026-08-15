@@ -127,7 +127,9 @@ func chartIDToSearchID(ctx context.Context, id string) string {
 	}
 	prefix, val := splitIDPrefix(id)
 
-	// ban: or a bare integer — our ban_id first, matching the chart resolver.
+	// ban: or a bare integer — our ban_id, on the chart resolver's precedence: a
+	// game-native id returned above already, and Lorcana numbers its cards, so an
+	// integer reaching here is not one of those.
 	if (prefix == "ban" || prefix == "") && PricesArchiveDB != nil {
 		if n, perr := strconv.ParseInt(val, 10, 64); perr == nil {
 			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok {
