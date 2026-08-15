@@ -24,6 +24,103 @@ func TestSplitIDPrefix(t *testing.T) {
 	}
 }
 
+// The finish shapes below are the ones Lorcana actually ships, paired with the
+// sub-types tcgcsv prices those products under: a plain foil sold as "Cold
+// Foil", one sold as "Holofoil" (LorcanaJSON's FreeForm1 printings), a card
+// with an extra foil sub-type on top of both, a foil-only card, and a card
+// whose foil has no listing yet.
+var tcgFinishCases = []struct {
+	name     string
+	subTypes []string          // what the product is priced under
+	finishes map[string]string // mtgmatcher finish -> uuid
+	want     map[string]string // uuid -> sub-type ("" = no data for that finish)
+}{
+	{
+		name:     "primary foil sold as cold foil",
+		subTypes: []string{"Normal", "Cold Foil"},
+		finishes: map[string]string{"nonfoil": "2790", "foil": "2790_f"},
+		want:     map[string]string{"2790": "Normal", "2790_f": "Cold Foil"},
+	},
+	{
+		name:     "primary foil sold as holofoil",
+		subTypes: []string{"Normal", "Holofoil"},
+		finishes: map[string]string{"nonfoil": "2206", "foil": "2206_f"},
+		want:     map[string]string{"2206": "Normal", "2206_f": "Holofoil"},
+	},
+	{
+		name:     "extra foil sub-type",
+		subTypes: []string{"Normal", "Cold Foil", "Holofoil"},
+		finishes: map[string]string{"nonfoil": "2800", "foil": "2800_f", "rainbowpillars": "2800_rainbowpillars"},
+		want:     map[string]string{"2800": "Normal", "2800_f": "Cold Foil", "2800_rainbowpillars": "Holofoil"},
+	},
+	{
+		name:     "foil-only card",
+		subTypes: []string{"Holofoil"},
+		finishes: map[string]string{"foil": "2937"},
+		want:     map[string]string{"2937": "Holofoil"},
+	},
+	{
+		name:     "foil not priced yet",
+		subTypes: []string{"Normal"},
+		finishes: map[string]string{"nonfoil": "2900", "foil": "2900_f"},
+		want:     map[string]string{"2900": "Normal", "2900_f": ""},
+	},
+	{
+		name:     "single foil sub-type, as riftbound names it",
+		subTypes: []string{"Normal", "Foil"},
+		finishes: map[string]string{"nonfoil": "abc_nonfoil", "foil": "abc_foil"},
+		want:     map[string]string{"abc_nonfoil": "Normal", "abc_foil": "Foil"},
+	},
+}
+
+// A non-Magic product is priced per finish under a sub-type, so a card's finish
+// has to pick its own variant — otherwise every finish charts the product's
+// canonical ("Normal") prices (issue #295).
+func TestTCGSubTypeForCard(t *testing.T) {
+	for _, tc := range tcgFinishCases {
+		subTypes := map[string]int64{}
+		for i, subType := range tc.subTypes {
+			subTypes[subType] = int64(i + 1)
+		}
+		for finish, uuid := range tc.finishes {
+			co := &mtgmatcher.CardObject{
+				Card: mtgmatcher.Card{UUID: uuid, FoilUUIDs: tc.finishes},
+				Foil: finish != "nonfoil",
+			}
+			if got := tcgSubTypeForCard(co, subTypes); got != tc.want[uuid] {
+				t.Errorf("%s: tcgSubTypeForCard(%s) = %q, want %q", tc.name, finish, got, tc.want[uuid])
+			}
+		}
+	}
+}
+
+// And back: charting a variant has to land on the card row of the finish its
+// sub-type names, not on the product's base printing.
+func TestTCGFinishIDForSubType(t *testing.T) {
+	for _, tc := range tcgFinishCases {
+		subTypes := map[string]int64{}
+		for i, subType := range tc.subTypes {
+			subTypes[subType] = int64(i + 1)
+		}
+		// The card mtgmatcher resolves a bare product id to, as the callers get it.
+		base := tc.finishes["nonfoil"]
+		if base == "" {
+			base = tc.finishes["foil"]
+		}
+		co := &mtgmatcher.CardObject{
+			Card: mtgmatcher.Card{UUID: base, FoilUUIDs: tc.finishes},
+		}
+		for uuid, subType := range tc.want {
+			if subType == "" {
+				continue // no variant to chart
+			}
+			if got := tcgFinishIDForSubType(co, subTypes, subType); got != uuid {
+				t.Errorf("%s: tcgFinishIDForSubType(%q) = %q, want %q", tc.name, subType, got, uuid)
+			}
+		}
+	}
+}
+
 // A ban_id names one finish, but the variants table stores the finish next to
 // the base uuid, so handing that uuid straight to the search used to render the
 // nonfoil row for a foil chart (issue #295).

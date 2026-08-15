@@ -65,6 +65,14 @@ type variantCache struct {
 	// of magic's uuid-keyed lookup, with no per-card DB round-trip. Mirrors
 	// LookupTCGBanID's precedence.
 	tcgByProduct sync.Map // int (product id) -> int64
+	// tcgSubTypesByProduct maps a TCGplayer product id to every sub-type it is
+	// priced under and that sub-type's ban_id. One product covers all of a card's
+	// finishes (Lorcana's "Normal" / "Cold Foil" / "Holofoil", Riftbound's
+	// "Normal" / "Foil"), so a caller that knows which finish it is rendering
+	// needs the whole set to pick its own row instead of the canonical one.
+	// Warm-time only, like tcgByProduct: the maps are built once and never
+	// mutated, so readers can use them without copying.
+	tcgSubTypesByProduct sync.Map // int (product id) -> map[string]int64
 }
 
 // WarmVariantCache bulk-loads every existing variant into the in-memory cache in
@@ -88,6 +96,7 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 		normal bool
 	}
 	byProduct := map[int]tcgBest{}
+	subTypesByProduct := map[int]map[string]int64{}
 
 	var loadedMagic, loadedTCG int
 	for rows.Next() {
@@ -121,6 +130,14 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 				(isNormal == cur.normal && banID < cur.banID) {
 				byProduct[pid] = tcgBest{banID: banID, normal: isNormal}
 			}
+			if subTypesByProduct[pid] == nil {
+				subTypesByProduct[pid] = map[string]int64{}
+			}
+			// A duplicate sub-type can only come from a second category filing
+			// the same product id; keep the smaller ban_id, as above.
+			if cur, ok := subTypesByProduct[pid][subType.String]; !ok || banID < cur {
+				subTypesByProduct[pid][subType.String] = banID
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -128,6 +145,9 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 	}
 	for pid, best := range byProduct {
 		c.variants.tcgByProduct.Store(pid, best.banID)
+	}
+	for pid, subTypes := range subTypesByProduct {
+		c.variants.tcgSubTypesByProduct.Store(pid, subTypes)
 	}
 	return nil
 }
@@ -143,6 +163,47 @@ func (c *Client) CachedTCGBanID(productID int) (int64, bool) {
 		return id.(int64), true
 	}
 	return 0, false
+}
+
+// CachedTCGSubTypeBanIDs returns every sub-type a product is priced under and
+// that sub-type's ban_id, from the in-memory cache. A card's finish is not in
+// the variants row itself — it is the sub-type — so this is what lets a caller
+// chart the foil printing instead of the product's canonical (usually "Normal")
+// one. The returned map is shared and must not be modified. A miss (new product,
+// unwarmed cache) returns ok=false.
+func (c *Client) CachedTCGSubTypeBanIDs(productID int) (map[string]int64, bool) {
+	if m, ok := c.variants.tcgSubTypesByProduct.Load(productID); ok {
+		return m.(map[string]int64), true
+	}
+	return nil, false
+}
+
+// LookupTCGSubTypeBanIDs is CachedTCGSubTypeBanIDs against the DB, for the
+// single-card paths where a round-trip is affordable and a cold cache (or a
+// product ingested since warm-up) should still chart the right finish.
+func (c *Client) LookupTCGSubTypeBanIDs(ctx context.Context, productID int) (map[string]int64, error) {
+	rows, err := c.db.QueryContext(ctx, `
+		SELECT ban_id, tcgp_sub_type FROM variants
+		 WHERE tcgp_product_id=$1 ORDER BY ban_id ASC`, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	subTypes := map[string]int64{}
+	for rows.Next() {
+		var banID int64
+		var subType sql.NullString
+		if err := rows.Scan(&banID, &subType); err != nil {
+			return nil, err
+		}
+		// Ascending ban_id, so the first row of a sub-type duplicated across
+		// categories wins, matching the warm cache.
+		if _, ok := subTypes[subType.String]; !ok {
+			subTypes[subType.String] = banID
+		}
+	}
+	return subTypes, rows.Err()
 }
 
 // ResolveMagicBanID returns the ban_id for a Magic variant, minting it if new.

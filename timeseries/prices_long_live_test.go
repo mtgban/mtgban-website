@@ -163,5 +163,22 @@ func TestLongFormLive(t *testing.T) {
 	if tcgBan2, err := c.ResolveTCGBanID(ctx, TCGVariant{CategoryID: liveSentinelCatLong, ProductID: liveSentinelProdLong, SubType: "Normal"}); err != nil || tcgBan2 != tcgBan {
 		t.Fatalf("tcg resolve not idempotent: %d vs %d err=%v", tcgBan, tcgBan2, err)
 	}
+
+	// A second sub-type on the same product: the finishes a non-Magic card is
+	// charted by, which the read path has to tell apart.
+	foilBan, err := c.ResolveTCGBanID(ctx, TCGVariant{CategoryID: liveSentinelCatLong, ProductID: liveSentinelProdLong, SubType: "Cold Foil"})
+	if err != nil {
+		t.Fatalf("ResolveTCGBanID (foil): %v", err)
+	}
+	if foilBan == tcgBan {
+		t.Fatalf("sub-types share a ban_id: %d", foilBan)
+	}
+	subTypes, err := c.LookupTCGSubTypeBanIDs(ctx, liveSentinelProdLong)
+	if err != nil {
+		t.Fatalf("LookupTCGSubTypeBanIDs: %v", err)
+	}
+	if subTypes["Normal"] != tcgBan || subTypes["Cold Foil"] != foilBan {
+		t.Errorf("LookupTCGSubTypeBanIDs = %+v, want Normal=%d Cold Foil=%d", subTypes, tcgBan, foilBan)
+	}
 	_ = banJa
 }
