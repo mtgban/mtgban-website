@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -158,6 +159,12 @@ func cachedBanIDForCard(co *mtgmatcher.CardObject) int64 {
 		return banID
 	}
 	if pid, ok := tcgProductID(co); ok {
+		// One product covers every finish, so the card's own sub-type decides
+		// which variant it charts; without it a foil would read the product's
+		// canonical ("Normal") prices.
+		if subTypes, ok := PricesArchiveDB.CachedTCGSubTypeBanIDs(pid); ok {
+			return tcgBanIDForCard(co, subTypes)
+		}
 		if banID, ok := PricesArchiveDB.CachedTCGBanID(pid); ok {
 			return banID
 		}
@@ -198,11 +205,132 @@ func resolveBanIDForCard(ctx context.Context, co *mtgmatcher.CardObject) int64 {
 		return 0
 	}
 	if pid, ok := tcgProductID(co); ok {
-		if vi, ok, err := PricesArchiveDB.LookupTCGBanID(ctx, pid); err == nil && ok {
-			return vi.BanID
+		if subTypes, err := PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, pid); err == nil {
+			return tcgBanIDForCard(co, subTypes)
 		}
 	}
 	return 0
+}
+
+// tcgBanIDForCard is the ban_id of the variant carrying a card's own finish, or
+// 0 when the product has no listing for it.
+func tcgBanIDForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) int64 {
+	subType := tcgSubTypeForCard(co, subTypes)
+	if subType == "" {
+		return 0
+	}
+	return subTypes[subType]
+}
+
+// TCGplayer prices one product under several sub-types, one per finish, and the
+// variants table keys a non-Magic printing on (product, sub-type) — so a
+// non-Magic card's finish lives in the sub-type, while mtgmatcher gives each
+// finish a uuid of its own. tcgSubTypeForCard and tcgFinishIDForSubType are
+// inverses that bridge the two, and both read the finish off the sub-types the
+// product is actually priced under, since the names vary by game: "Normal" is
+// the nonfoil, the first foil sub-type is the primary foil ("Foil" for
+// Riftbound, "Cold Foil" for Lorcana), and the ones after it are Lorcana's
+// extra foil sub-types, which TCGplayer calls "Holofoil" (mtgmatcher/lorcana's
+// selectFinish reads the same naming from the other direction).
+
+// foilSubTypes returns a product's foil sub-types in the order they pair with a
+// card's foil finishes: alphabetical, which puts the primary foil ("Cold Foil",
+// "Foil") ahead of the "Holofoil" the extra sub-types are sold as.
+func foilSubTypes(subTypes map[string]int64) []string {
+	foils := make([]string, 0, len(subTypes))
+	for subType := range subTypes {
+		if subType != "" && subType != "Normal" {
+			foils = append(foils, subType)
+		}
+	}
+	slices.Sort(foils)
+	return foils
+}
+
+// extraFoilFinishes returns the keys of a card's foil finishes past the primary
+// one (Lorcana's RainbowPillars and friends), ordered to match foilSubTypes.
+func extraFoilFinishes(co *mtgmatcher.CardObject) []string {
+	extras := make([]string, 0, len(co.FoilUUIDs))
+	for finish := range co.FoilUUIDs {
+		if finish != mtgmatcher.FinishNonfoil && finish != mtgmatcher.FinishFoil {
+			extras = append(extras, finish)
+		}
+	}
+	slices.Sort(extras)
+	return extras
+}
+
+// tcgSubTypeForCard names the sub-type a card's own finish is priced under.
+// Returns "" when the product carries no sub-type for that finish (a foil with
+// no foil listing yet), so the caller charts nothing rather than the wrong
+// finish's prices.
+func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) string {
+	if !co.Foil {
+		if _, ok := subTypes["Normal"]; ok {
+			return "Normal"
+		}
+		return ""
+	}
+	foils := foilSubTypes(subTypes)
+	if len(foils) == 0 {
+		return ""
+	}
+	for i, finish := range extraFoilFinishes(co) {
+		if co.FoilUUIDs[finish] != co.UUID {
+			continue
+		}
+		// An extra sub-type the product isn't priced under is not the primary
+		// foil's data in disguise, so leave it unmapped.
+		if i+1 < len(foils) {
+			return foils[i+1]
+		}
+		return ""
+	}
+	return foils[0]
+}
+
+// tcgFinishIDForSubType is the inverse: given a product's base card, the id of
+// the finish the sub-type names. An unknown sub-type resolves to the primary
+// foil, since "Normal" is the only nonfoil name.
+func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64, subType string) string {
+	if subType == "" || subType == "Normal" {
+		if id, ok := co.FoilUUIDs[mtgmatcher.FinishNonfoil]; ok {
+			return id
+		}
+		return co.UUID
+	}
+	if idx := slices.Index(foilSubTypes(subTypes), subType); idx > 0 {
+		if extras := extraFoilFinishes(co); idx-1 < len(extras) {
+			return co.FoilUUIDs[extras[idx-1]]
+		}
+	}
+	if id, ok := co.FoilUUIDs[mtgmatcher.FinishFoil]; ok {
+		return id
+	}
+	if id, err := mtgmatcher.MatchId(co.UUID, true); err == nil {
+		return id
+	}
+	return co.UUID
+}
+
+// tcgVariantSearchID maps a non-Magic variant to the mtgmatcher id of the card
+// and finish it names, for the results table the chart lives inside. ok=false
+// when mtgmatcher doesn't know the product (a game it doesn't carry, or a
+// product with no card).
+func tcgVariantSearchID(ctx context.Context, vi timeseries.VariantInfo) (string, bool) {
+	matched, err := mtgmatcher.MatchId(strconv.Itoa(vi.TCGProductID))
+	if err != nil {
+		return "", false
+	}
+	co, err := mtgmatcher.GetUUID(matched)
+	if err != nil {
+		return matched, true
+	}
+	subTypes, ok := PricesArchiveDB.CachedTCGSubTypeBanIDs(vi.TCGProductID)
+	if !ok {
+		subTypes, _ = PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, vi.TCGProductID)
+	}
+	return tcgFinishIDForSubType(co, subTypes, vi.TCGSubType), true
 }
 
 // tcgProductID extracts a card's TCGplayer product id from its identifiers.

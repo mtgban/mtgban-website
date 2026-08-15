@@ -135,8 +135,9 @@ func chartIDToSearchID(ctx context.Context, id string) string {
 					// Magic: the uuid, kept on the finish the ban_id names.
 					return magicFinishSearchID(vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched)
 				}
-				// Non-Magic: the product id maps back to the game's own card id.
-				if matched, merr := mtgmatcher.MatchId(strconv.Itoa(vi.TCGProductID)); merr == nil {
+				// Non-Magic: the product id maps back to the game's own card id,
+				// on the finish the variant's sub-type names.
+				if matched, ok := tcgVariantSearchID(ctx, vi); ok {
 					return matched
 				}
 				return id
