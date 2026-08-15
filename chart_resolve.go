@@ -39,10 +39,19 @@ type chartTarget struct {
 //
 // The integer id spaces overlap — a ban_id, a TCGplayer product id, and a game's
 // own numeric id (e.g. LorcanaJSON) can all be the same number — so a bare integer
-// is resolved most-specific first: our ban_id, then the game-native id through
-// mtgmatcher (a LorcanaJSON id matches directly, a TCGplayer id via the external
-// map), then a non-Magic product in the variants table. Prefix ban: or tcg: to
-// force one interpretation.
+// is resolved in this order: the game-native id through mtgmatcher, then our
+// ban_id, then a TCGplayer product (via mtgmatcher's external map, else the
+// variants table). Prefix ban: or tcg: to force one interpretation.
+//
+// The game's own id has to win, because it is the one that travels in urls: the
+// search UI charts a card by its mtgmatcher id ("Chart the top results", the
+// sidebar's foil switch, any shared link), and a game that numbers its cards
+// (LorcanaJSON) hands us a bare integer from the same small range our ban_id
+// sequence starts in — sampling 60 Lorcana ids against the live variants table,
+// all 60 also existed as a ban_id, so those links charted an unrelated card
+// rather than failing. A ban_id only ever leaves this process carrying its ban:
+// marker, so it loses nothing by yielding. Magic is untouched either way: an
+// mtgjson uuid never parses as an integer.
 func resolveChartTarget(ctx context.Context, raw string) (*chartTarget, error) {
 	// Every resolution branch can reach the variants table (targetFromBanID,
 	// targetFromTCGID, and matcherTarget's retired-uuid fallback dereference
@@ -71,13 +80,15 @@ func resolveChartTarget(ctx context.Context, raw string) (*chartTarget, error) {
 		}
 		return targetFromTCGID(ctx, n)
 	case "", "mtgjson", "scryfall":
-		// A bare integer tries our ban_id first (the internal primary key); on a
-		// miss it falls through to the game-native / product resolution below.
+		// An integer mtgmatcher doesn't carry as a card of its own can still be
+		// our ban_id; on a miss it falls through to the product resolution below.
 		if n, err := strconv.ParseInt(val, 10, 64); err == nil {
-			if t, berr := targetFromBanID(ctx, n); berr == nil {
-				return t, nil
-			} else if !errors.Is(berr, errChartIDNotFound) {
-				return nil, berr
+			if _, gerr := mtgmatcher.GetUUID(val); gerr != nil {
+				if t, berr := targetFromBanID(ctx, n); berr == nil {
+					return t, nil
+				} else if !errors.Is(berr, errChartIDNotFound) {
+					return nil, berr
+				}
 			}
 		}
 		return matcherTarget(ctx, val)
