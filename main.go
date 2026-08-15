@@ -30,6 +30,7 @@ import (
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/mtgban-website/tcgcsv"
+	"github.com/mtgban/mtgban-website/tcgcsvd"
 	"github.com/mtgban/mtgban-website/timeseries"
 	"github.com/mtgban/mtgban-website/userstate"
 
@@ -1083,24 +1084,28 @@ func main() {
 	loadRarityBadges()
 
 	// Maintenance mode: ingest tcgcsv prices, then exit without standing up the
-	// web server. Needs only the config and the price DB.
+	// web server. Needs only the config and the price DB. The same jobs run as
+	// their own process via cmd/tcgcsvd, which needs neither this binary nor its
+	// datastore; these flags stay for the deployments already driving them.
 	if *tcgcsvBackfill || *tcgcsvDaily || *tcgcsvProducts {
 		if err := openDBs(); err != nil {
 			log.Fatalln("error opening databases:", err)
 		}
+		if err := initTCGCSVService(); err != nil {
+			log.Fatalln("tcgcsv:", err)
+		}
 		switch {
 		case *tcgcsvBackfill:
-			if err := runTCGCSVBackfill(context.Background(), *tcgcsvFrom, *tcgcsvTo, *tcgcsvCategories, *tcgcsvForce); err != nil {
-				log.Fatalln("tcgcsv backfill:", err)
-			}
+			err = TCGCSVService.Backfill(context.Background(), tcgcsvd.BackfillOptions{
+				From: *tcgcsvFrom, To: *tcgcsvTo, Categories: *tcgcsvCategories, Force: *tcgcsvForce,
+			})
 		case *tcgcsvDaily:
-			if err := ingestTCGCSVLatest(context.Background()); err != nil {
-				log.Fatalln("tcgcsv daily ingest:", err)
-			}
+			err = TCGCSVService.IngestLatest(context.Background())
 		case *tcgcsvProducts:
-			if err := syncTCGProducts(context.Background()); err != nil {
-				log.Fatalln("tcgcsv product sync:", err)
-			}
+			err = TCGCSVService.SyncProducts(context.Background())
+		}
+		if err != nil {
+			log.Fatalln("tcgcsv:", err)
 		}
 		os.Exit(0)
 	}
@@ -1128,6 +1133,12 @@ func main() {
 	err = openDBs()
 	if err != nil {
 		log.Fatalln("error opening databases:", err)
+	}
+
+	// tcgcsv ingestion is optional: a deployment with no configured games or no
+	// price database simply doesn't get the crons or the admin button.
+	if err := initTCGCSVService(); err != nil {
+		log.Println("tcgcsv ingestion disabled:", err)
 	}
 
 	err = reloadCheckpoints()
@@ -1194,11 +1205,13 @@ func main() {
 
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
-		// newer snapshot regardless of the exact fire time.
-		// Gate on a configured game and a price DB too: without either,
-		// tcgcsvClient() errors on every fire, so registering the crons would
-		// only post a recurring spurious failure to the notification channel.
-		if Config.TCGCSVConfig != nil && len(Config.TCGCSVConfig.Games) > 0 && PricesArchiveDB != nil {
+		// newer snapshot regardless of the exact fire time. Registered only when
+		// the ingestion service came up: without a configured game or a price DB
+		// every fire would fail, posting a recurring spurious failure to the
+		// notification channel. Deployments that run cmd/tcgcsvd on its own can
+		// leave tcgcsv_config out here and let the crons stay unregistered; the
+		// standalone process takes the same cross-process crawl lock either way.
+		if TCGCSVService != nil {
 			c.AddFunc("0 21 * * *", stashTCGCSVPrices)
 			// Product metadata changes rarely; refresh the catalog weekly.
 			c.AddFunc("0 22 * * 1", stashTCGCSVProducts)
