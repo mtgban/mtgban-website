@@ -103,11 +103,24 @@ func isValidChartID(part string) bool {
 	return err == nil
 }
 
+// magicFinishSearchID re-tags an mtgjson uuid with the finish of the variant it
+// came from. The variants table stores the finish beside the base uuid, while
+// mtgmatcher gives each finish its own id ("_f", "_e"), so handing the bare uuid
+// back to the search always lands on the nonfoil printing. Falls back to the
+// uuid when the finish has no id of its own.
+func magicFinishSearchID(uuid string, foil, etched bool) string {
+	if matched, err := mtgmatcher.MatchId(uuid, foil, etched); err == nil {
+		return matched
+	}
+	return uuid
+}
+
 // chartIDToSearchID maps a chart-roster id to an id the results table (which the
 // embedded chart lives inside) can resolve to a card row, mirroring
 // resolveChartTarget's precedence so anything chartable also renders its row.
-// Magic resolves to an mtgjson uuid; non-Magic games (Lorcana, ...) to their
-// mtgmatcher-native id via the TCGplayer external id map.
+// Magic resolves to the mtgmatcher id of the variant's own finish; non-Magic
+// games (Lorcana, ...) to their mtgmatcher-native id via the TCGplayer external
+// id map.
 func chartIDToSearchID(ctx context.Context, id string) string {
 	if _, err := mtgmatcher.GetUUID(id); err == nil {
 		return id // already a matcher id (bare uuid / variant string)
@@ -119,7 +132,8 @@ func chartIDToSearchID(ctx context.Context, id string) string {
 		if n, perr := strconv.ParseInt(val, 10, 64); perr == nil {
 			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok {
 				if vi.MtgjsonUUID != "" {
-					return vi.MtgjsonUUID // Magic: the mtgjson uuid
+					// Magic: the uuid, kept on the finish the ban_id names.
+					return magicFinishSearchID(vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched)
 				}
 				// Non-Magic: the product id maps back to the game's own card id.
 				if matched, merr := mtgmatcher.MatchId(strconv.Itoa(vi.TCGProductID)); merr == nil {
@@ -930,23 +944,26 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 		// Sidebar foil/etched switch and Stocks link are inherently per-card,
 		// and sealed products have no foil/etched variants, so leave them empty
-		// and let the sidebar's self-checks hide them.
+		// and let the sidebar's self-checks hide them. The switches key off the
+		// resolved mtgmatcher id, since a ban:<id> roster entry means nothing to
+		// the matcher.
 		if !isMultiChart {
-			co, gerr := mtgmatcher.GetUUID(chartId)
+			searchId := chartSearchIDs[chartId]
+			co, gerr := mtgmatcher.GetUUID(searchId)
 			if gerr == nil && !co.Sealed {
 				altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
-					Id:   chartId,
+					Id:   searchId,
 					Foil: !co.Foil,
 				})
-				if err == nil && altId != chartId {
+				if err == nil && altId != searchId {
 					pageVars.Alternative = altId
 				}
 
 				altId, err = mtgmatcher.Match(&mtgmatcher.InputCard{
-					Id:        chartId,
+					Id:        searchId,
 					Variation: "Etched",
 				})
-				if err == nil && altId != chartId {
+				if err == nil && altId != searchId {
 					pageVars.AltEtchedId = altId
 				}
 
