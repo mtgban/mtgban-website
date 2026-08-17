@@ -36,3 +36,30 @@ document.addEventListener('click', function (event) {
 
     select.focus();
 });
+
+// Picking a store navigates to the option's value, so the value decides where
+// the visitor lands. Resolving it against the current page and comparing the
+// origin is what the browser itself would do, so nothing can look local and
+// resolve elsewhere: a browser strips a tab, newline or carriage return before
+// it parses, which is how "/\t/evil.com" reads as "//evil.com" and leaves.
+//
+// The store that is already active carries an empty value, and an empty value
+// resolves to this very page, so it needs saying that it goes nowhere.
+function goToStore(value) {
+    if (!value) {
+        return;
+    }
+
+    var url;
+    try {
+        url = new URL(value, window.location.href);
+    } catch (err) {
+        return;
+    }
+
+    if (url.origin !== window.location.origin) {
+        return;
+    }
+
+    window.location.href = url.href;
+}
