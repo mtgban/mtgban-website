@@ -82,6 +82,16 @@ func setupDiscord() error {
 	return nil
 }
 
+// discordRegionFilter keeps the bot to stores a reader can actually buy from,
+// which is a reason to drop a foreign shop and not a reason to drop a foreign
+// price reference — so the index scrapers are exempt. Cardmarket's are the
+// ones flagged EU, and without the exemption its prices never reach an embed.
+var discordRegionFilter = FilterStoreElem{
+	Name:         "region",
+	Values:       []string{"us"},
+	IncludeIndex: true,
+}
+
 // Cleanly close down the Discord session.
 func cleanupDiscord() {
 	if Config.DiscordToken == "" {
@@ -602,11 +612,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if allBls {
 		config := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
 
-		// Skip any store based outside of the US
-		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
-			Name:   "region",
-			Values: []string{"us"},
-		})
+		config.StoreFilters = append(config.StoreFilters, discordRegionFilter)
 
 		// Skip non-NM buylist prices
 		config.EntryFilters = append(config.EntryFilters, FilterEntryElem{
