@@ -239,16 +239,48 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	// Keep it secret. Keep it safe.
 	putSignatureInCookies(w, sig)
 
-	// Redirect to the URL indicated in this query param, or go to homepage
+	// Redirect, we're done here
+	redirectAfterAuth(w, r)
+}
+
+// redirectAfterAuth returns the visitor to the page indicated in the state
+// query param, or to the homepage.
+//
+// State rides through Patreon untouched and comes back as whatever the link
+// that opened the flow put there, so a crafted authorize URL names any site it
+// likes - and by the time we read it the session cookie is already set.
+// isLocalRedirect is no help here: templates build state out of
+// window.location.href, so a legitimate one is absolute.
+func redirectAfterAuth(w http.ResponseWriter, r *http.Request) {
 	redir := strings.Split(r.FormValue("state"), ";")[0]
 
-	// Go back home if empty or if coming back from a logout
-	if redir == "" || strings.Contains(redir, "errmsg=logout") {
+	// Go back home when coming back from a logout, and whenever the target is
+	// not ours - which is also how the empty state lands there
+	if strings.Contains(redir, "errmsg=logout") || !isServerOrigin(redir) {
 		redir = ServerURL
 	}
 
-	// Redirect, we're done here
 	http.Redirect(w, r, redir, http.StatusFound)
+}
+
+// isServerOrigin reports whether target is an absolute URL on this very site,
+// naming both the scheme and the host that ServerURL does.
+//
+// Comparing the parsed host is what refuses the spellings that only look like
+// ours: "https://www.mtgban.com@evil.com" parses with evil.com as the host,
+// and the schemeless, backslash and scheme-only forms parse with no host at
+// all. An unset ServerURL matches nothing, since without it there is no origin
+// to be part of.
+func isServerOrigin(target string) bool {
+	server, err := url.Parse(ServerURL)
+	if err != nil || server.Host == "" {
+		return false
+	}
+	u, err := url.Parse(target)
+	if err != nil {
+		return false
+	}
+	return u.Scheme == server.Scheme && u.Host == server.Host
 }
 
 func signHMACSHA1Base64(key []byte, data []byte) string {
