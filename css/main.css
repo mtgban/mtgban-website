@@ -1041,9 +1041,16 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
    property and cannot be outranked by a surface's own selector. The list
    lives here once instead of in each stylesheet.
 
-   Alpha is its own case; the rest are oversized printings. */
+   Alpha and the Collectors' Editions are each their own case; the rest are
+   oversized printings. */
 [data-set="LEA"] {
     --card-radius: 22px;
+}
+/* The two 1993 Collectors' Editions were cut with square corners - the tell
+   that they were never tournament legal - so any rounding at all is wrong on
+   them, rather than merely the wrong amount. */
+:is([data-set="CED"], [data-set="CEI"]) {
+    --card-radius: 0;
 }
 /* Every card in these sets is oversized, so the set alone selects them;
    adding a set is one more entry here. */
