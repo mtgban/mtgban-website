@@ -299,99 +299,61 @@ func withDatasets(t *testing.T, datasets []DatasetConfig) {
 	Config.TimeseriesConfig = TimeseriesConfig{Datasets: datasets}
 }
 
-func TestFillDatasetProvidersDerivesFromIndex(t *testing.T) {
+// The config owns the whole display: which providers chart, under what name and
+// color, in what order.
+func TestBuildProviderRegistryMirrorsConfig(t *testing.T) {
 	withDatasets(t, []DatasetConfig{
-		{PublicName: "Card Kingdom Retail", Index: 0},
-		{PublicName: "TCGplayer Low", Index: 2},
-		{PublicName: "Cool Stuff Inc Buylist", Index: 9},
+		{PublicName: "Custom Market Name", Index: 3, Provider: timeseries.ProviderTCGMarket, Color: "pink"},
+		{PublicName: "Card Kingdom Buylist", Index: 1, Provider: timeseries.ProviderCKBuylist, Color: "blue"},
+		{PublicName: "Cardmarket Trend", Index: 5, Provider: timeseries.ProviderMKMTrend, Color: "grey"},
 	})
-	fillDatasetProviders()
-
-	want := []int16{
-		timeseries.ProviderCKRetail,
-		timeseries.ProviderTCGLow,
-		timeseries.ProviderCSIBuylist,
-	}
-	for i, d := range Config.TimeseriesConfig.Datasets {
-		if d.Provider != want[i] {
-			t.Errorf("%s: provider = %d, want %d", d.PublicName, d.Provider, want[i])
-		}
-	}
-}
-
-func TestFillDatasetProvidersKeepsExplicitAndSkipsUnknownIndex(t *testing.T) {
-	withDatasets(t, []DatasetConfig{
-		// An explicit provider overrides what the index would derive.
-		{PublicName: "Renamed", Index: 0, Provider: timeseries.ProviderSCGBuylist},
-		{PublicName: "Not a wide column", Index: 42},
-	})
-	fillDatasetProviders()
-
-	if got := Config.TimeseriesConfig.Datasets[0].Provider; got != timeseries.ProviderSCGBuylist {
-		t.Errorf("explicit provider overwritten: got %d", got)
-	}
-	if got := Config.TimeseriesConfig.Datasets[1].Provider; got != 0 {
-		t.Errorf("index 42 maps to no provider, got %d", got)
-	}
-}
-
-// A config that never had the long-form "provider" field added must still chart
-// every configured dataset — that omission used to collapse the registry to the
-// TCGplayer metrics wired in code, so a Magic chart drew only Low and Market.
-func TestFillDatasetProvidersThenRegistryCoversConfig(t *testing.T) {
-	withDatasets(t, []DatasetConfig{
-		{PublicName: "TCGplayer Low", Index: 2, Color: "red"},
-		{PublicName: "Card Kingdom Buylist", Index: 1, Color: "blue"},
-		{PublicName: "Cardmarket Trend", Index: 5, Color: "grey"},
-	})
-	fillDatasetProviders()
 	buildProviderRegistry()
 
-	for _, want := range []providerDisplay{
-		{timeseries.ProviderTCGLow, "TCGplayer Low", "red"},
+	want := []providerDisplay{
+		{timeseries.ProviderTCGMarket, "Custom Market Name", "pink"},
 		{timeseries.ProviderCKBuylist, "Card Kingdom Buylist", "blue"},
 		{timeseries.ProviderMKMTrend, "Cardmarket Trend", "grey"},
-	} {
-		if !slices.Contains(providerRegistry, want) {
-			t.Errorf("registry missing %+v: %+v", want, providerRegistry)
-		}
+	}
+	if !slices.Equal(providerRegistry, want) {
+		t.Errorf("registry = %+v, want %+v", providerRegistry, want)
 	}
 }
 
-func TestBuildProviderRegistryCoversEverySeededProvider(t *testing.T) {
+// Nothing is substituted for a dataset missing its provider id: the chart drops
+// it, which is how a config mistake becomes visible instead of silent.
+func TestBuildProviderRegistrySkipsDatasetsWithoutProvider(t *testing.T) {
+	withDatasets(t, []DatasetConfig{
+		{PublicName: "TCGplayer Low", Index: 2, Provider: timeseries.ProviderTCGLow, Color: "red"},
+		{PublicName: "No provider id", Index: 6, Color: "black"},
+	})
+	buildProviderRegistry()
+
+	want := []providerDisplay{{timeseries.ProviderTCGLow, "TCGplayer Low", "red"}}
+	if !slices.Equal(providerRegistry, want) {
+		t.Errorf("registry = %+v, want %+v", providerRegistry, want)
+	}
+}
+
+func TestBuildProviderRegistryEmptyConfig(t *testing.T) {
 	withDatasets(t, nil)
 	buildProviderRegistry()
 
-	seen := map[int16]bool{}
-	for _, pd := range providerRegistry {
-		if seen[pd.Provider] {
-			t.Errorf("provider %d listed twice", pd.Provider)
-		}
-		if pd.Name == "" || pd.Color == "" {
-			t.Errorf("provider %d has an empty name or color: %+v", pd.Provider, pd)
-		}
-		seen[pd.Provider] = true
-	}
-	// Every id in db_migration/02_seed_providers.sql must be chartable.
-	for provider := int16(1); provider <= timeseries.ProviderSealedEV; provider++ {
-		if !seen[provider] {
-			t.Errorf("no display registered for provider %d", provider)
-		}
+	if len(providerRegistry) != 0 {
+		t.Errorf("a config with no datasets should register no providers: %+v", providerRegistry)
 	}
 }
 
-// The config's dataset order drives the legend, so a configured provider must
-// keep its position ahead of the built-in fallbacks.
-func TestBuildProviderRegistryConfigWinsOverDefault(t *testing.T) {
+// Two datasets can share a provider (the same column charted under two names);
+// the first one wins so the legend has no duplicate series.
+func TestBuildProviderRegistryDeduplicates(t *testing.T) {
 	withDatasets(t, []DatasetConfig{
-		{PublicName: "Custom Market Name", Index: 3, Provider: timeseries.ProviderTCGMarket, Color: "pink"},
+		{PublicName: "TCGplayer Low", Index: 2, Provider: timeseries.ProviderTCGLow, Color: "red"},
+		{PublicName: "TCGplayer Low (sealed)", Index: 8, Provider: timeseries.ProviderTCGLow, Color: "green"},
 	})
 	buildProviderRegistry()
 
-	if len(providerRegistry) == 0 || providerRegistry[0].Provider != timeseries.ProviderTCGMarket {
-		t.Fatalf("configured dataset should lead the registry: %+v", providerRegistry)
-	}
-	if providerRegistry[0].Name != "Custom Market Name" || providerRegistry[0].Color != "pink" {
-		t.Errorf("config display lost to the default: %+v", providerRegistry[0])
+	want := []providerDisplay{{timeseries.ProviderTCGLow, "TCGplayer Low", "red"}}
+	if !slices.Equal(providerRegistry, want) {
+		t.Errorf("registry = %+v, want %+v", providerRegistry, want)
 	}
 }

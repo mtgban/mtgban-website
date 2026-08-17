@@ -50,31 +50,6 @@ func providerForDatasetIndex(index int) (int16, bool) {
 	return 0, false
 }
 
-// fillDatasetProviders derives each dataset's provider id from its legacy index
-// when the config doesn't set one. The index -> provider mapping is fixed (it is
-// the same one PriceForDataset encodes), but "provider" arrived with the
-// long-form migration and lives in each deployment's own config, which is not in
-// git. A deployment that flipped long_form_reads on without hand-adding the field
-// to every dataset would otherwise lose those providers everywhere at once:
-// dropped from the chart registry, skipped by the long-form dual-write, and
-// unresolvable for buylist metrics and the screener. Deriving it makes the field
-// an override rather than a requirement. Call once after the config is decoded.
-func fillDatasetProviders() {
-	for i := range Config.TimeseriesConfig.Datasets {
-		d := &Config.TimeseriesConfig.Datasets[i]
-		if d.Provider != 0 {
-			continue
-		}
-		provider, ok := timeseries.ProviderForDatasetIndex(d.Index)
-		if !ok {
-			log.Printf("dataset %q has index %d, which maps to no provider; it won't chart under long-form reads",
-				d.PublicName, d.Index)
-			continue
-		}
-		d.Provider = provider
-	}
-}
-
 // earliestChartDate returns the oldest on-record date for a card (bounded by the
 // lookback), reading from the long tables or the legacy wide table per the flag.
 func earliestChartDate(ctx context.Context, uuid string, isFoil, isEtched bool, lb timeseries.Lookback) (time.Time, error) {
@@ -211,51 +186,39 @@ type providerDisplay struct {
 // providerRegistry is the ordered, game-agnostic list of chart providers. A chart
 // renders one dataset per provider that actually has data for the card, in this
 // order, so a new game (which reuses the shared TCGplayer providers) charts with
-// no extra code. Built once at startup from the dataset config (preserving the
-// existing display: names, colors, order) plus the TCGplayer metrics that have no
-// per-provider config.
+// no extra code. Built once at startup from the dataset config, which owns every
+// provider's id, name, color, and position: a provider a deployment wants on its
+// charts needs an entry in timeseries_config.datasets, including the TCGplayer
+// metrics a non-Magic deployment charts.
 var providerRegistry []providerDisplay
 
-// defaultProviderDisplays names and colors every seeded provider
-// (db_migration/02_seed_providers.sql). A chart renders whatever the price rows
-// hold, so any provider missing from this list would have data nobody can see:
-// the TCGplayer metrics have no dataset config at all, and the rest are only
-// described by a config field each deployment maintains by hand. Ordered
-// TCGplayer-first since that is the only group a non-Magic deployment charts; a
-// dataset config that covers a provider wins its name, color, and position.
-var defaultProviderDisplays = []providerDisplay{
-	{timeseries.ProviderTCGLow, "TCGplayer Low", "rgb(255, 99, 132)"},
-	{timeseries.ProviderTCGMarket, "TCGplayer Market", "rgb(255, 159, 64)"},
-	{timeseries.ProviderTCGMid, "TCGplayer Mid", "rgb(255, 206, 86)"},
-	{timeseries.ProviderTCGHigh, "TCGplayer High", "rgb(75, 192, 192)"},
-	{timeseries.ProviderTCGDirectLow, "TCGplayer Direct Low", "rgb(153, 102, 255)"},
-	{timeseries.ProviderCKRetail, "Card Kingdom Retail", "rgb(162, 235, 54)"},
-	{timeseries.ProviderCKBuylist, "Card Kingdom Buylist", "rgb(54, 162, 235)"},
-	{timeseries.ProviderMKMLow, "Cardmarket Low", "rgb(235, 205, 86)"},
-	{timeseries.ProviderMKMTrend, "Cardmarket Trend", "rgb(201, 203, 207)"},
-	{timeseries.ProviderSCGBuylist, "Star City Games Buylist", "rgb(23, 42, 72)"},
-	{timeseries.ProviderABUBuylist, "ABU Games Buylist", "rgb(153, 102, 255)"},
-	{timeseries.ProviderCSIBuylist, "Cool Stuff Inc Buylist", "rgb(124, 211, 224)"},
-	{timeseries.ProviderSealedEV, "Sealed EV (TCG Low)", "rgb(108, 117, 125)"},
-}
-
-// buildProviderRegistry (re)builds providerRegistry from the loaded config,
-// falling back to the built-in display for every provider the config leaves out.
-// Call it once after the config is parsed (and after fillDatasetProviders).
+// buildProviderRegistry (re)builds providerRegistry from the loaded config. Call
+// it once after the config is parsed. Nothing is substituted for a dataset the
+// config leaves incomplete: a missing provider id can't be matched against a
+// price row, so it is logged and skipped, and a config that sets none at all
+// leaves the registry empty rather than charting a display the config never
+// asked for.
 func buildProviderRegistry() {
+	longForm := Config.TimeseriesConfig.LongFormReads || Config.TimeseriesConfig.LongFormWrites
 	seen := map[int16]bool{}
-	registry := make([]providerDisplay, 0, len(Config.TimeseriesConfig.Datasets)+len(defaultProviderDisplays))
+	registry := make([]providerDisplay, 0, len(Config.TimeseriesConfig.Datasets))
 	for _, d := range Config.TimeseriesConfig.Datasets {
-		if d.Provider == 0 || seen[d.Provider] {
+		if d.Provider == 0 {
+			if longForm {
+				log.Printf("dataset %q (index %d) has no \"provider\" id in the config: it won't chart, dual-write, or screen",
+					d.PublicName, d.Index)
+			}
+			continue
+		}
+		if seen[d.Provider] {
+			log.Printf("dataset %q repeats provider id %d, keeping the first entry's display", d.PublicName, d.Provider)
 			continue
 		}
 		seen[d.Provider] = true
 		registry = append(registry, providerDisplay{d.Provider, d.PublicName, d.Color})
 	}
-	for _, extra := range defaultProviderDisplays {
-		if !seen[extra.Provider] {
-			registry = append(registry, extra)
-		}
+	if len(registry) == 0 && longForm {
+		log.Println("no chart providers configured: every timeseries_config.datasets entry needs a \"provider\" id")
 	}
 	providerRegistry = registry
 }

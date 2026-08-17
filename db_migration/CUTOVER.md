@@ -7,13 +7,15 @@ every step is reversible by flipping the flag back.
 
 ## 1. config.json additions (NOT in git — config.json is gitignored)
 
-Only the two flags on `timeseries_config` are required. Each dataset also carries
-a `provider` id, but the server derives it from the dataset's `index` when it is
-absent, so an untouched config keeps charting, writing, and aggregating every
-provider it did before (issue #282: a config missing the field used to chart only
-TCGplayer Low and Market). Set `provider` explicitly only to point a dataset at
-something its index doesn't imply. The index→provider mapping (plan 17.5), which
-`timeseries.ProviderForDatasetIndex` mirrors:
+Add a `provider` id to every `timeseries_config.datasets` entry, and the two
+flags on `timeseries_config`. Nothing is derived or defaulted in code: a dataset
+without a `provider` is dropped from the chart registry, skipped by the long-form
+dual-write, and unresolvable for buylist metrics and the screener (issue #282: a
+config missing the field charted only TCGplayer Low and Market, because those
+were the ids code still filled in). Startup logs one line per dataset it has to
+skip — grep the boot log for `has no "provider" id` before flipping any flag.
+
+The index→provider mapping (plan 17.5):
 
 | dataset `index` | column | `provider` |
 |---|---|---|
@@ -35,18 +37,28 @@ something its index doesn't imply. The index→provider mapping (plan 17.5), whi
     "datasets": [
         { "public_name": "TCGplayer Low", "index": 2, "provider": 3, ... },
         { "public_name": "TCGplayer Market", "index": 3, "provider": 4, ... },
-        // ... "provider" optional; derived from "index" when omitted ...
+        // ... provider on every dataset ...
     ]
 }
 ```
 
-A deployment that ran dual-write with the field missing wrote only the providers
-wired in code, leaving gaps in `prices` for the rest. Re-run `08_catchup.sql`
-with `-v since=<first dual-write day>` after deploying this; it is idempotent and
-fills only the missing (ban_id, date, provider) rows.
+A deployment that ran dual-write with the field missing left gaps in `prices` for
+every provider it skipped. Re-run `08_catchup.sql` with `-v since=<first
+dual-write day>` after fixing the config; it is idempotent and fills only the
+missing (ban_id, date, provider) rows.
 
-Non-Magic providers are wired in code, not config (tcgcsv columns low/market/mid/
-high/direct_low → providers 3/4/5/6/7).
+The tcgcsv (non-Magic) ingest writes providers 3/4/5/6/7 — columns low/market/
+mid/high/direct_low — and the chart renders whichever of those the config names.
+Mid, High, and Direct Low have no Magic dataset behind them, so a deployment that
+charts non-Magic products needs an entry for each; `index` goes unused on that
+path (pick ids past the wide columns), while `provider`, `public_name`, and
+`color` are what the chart reads:
+
+```jsonc
+{ "public_name": "TCGplayer Mid",        "index": 20, "provider": 5, "color": "rgb(255, 206, 86)" },
+{ "public_name": "TCGplayer High",       "index": 21, "provider": 6, "color": "rgb(75, 192, 192)" },
+{ "public_name": "TCGplayer Direct Low", "index": 22, "provider": 7, "color": "rgb(153, 102, 255)" },
+```
 
 ## 2. Turn on dual-write (`long_form_writes: true`), deploy
 

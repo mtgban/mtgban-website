@@ -25,30 +25,6 @@ const (
 	ProviderSealedEV     int16 = 13
 )
 
-// datasetIndexProvider maps a legacy wide-table dataset index to the provider id
-// holding the same prices in the long form. It is the sibling of
-// PriceForDataset's index -> column switch: both encode the same fixed mapping
-// (plan 17.5), so the two must be edited together.
-var datasetIndexProvider = map[int]int16{
-	0: ProviderCKRetail,
-	1: ProviderCKBuylist,
-	2: ProviderTCGLow,
-	3: ProviderTCGMarket,
-	4: ProviderMKMLow,
-	5: ProviderMKMTrend,
-	6: ProviderSCGBuylist,
-	7: ProviderABUBuylist,
-	8: ProviderSealedEV,
-	9: ProviderCSIBuylist,
-}
-
-// ProviderForDatasetIndex resolves a legacy dataset index to its provider id.
-// ok is false for an index with no wide-table column behind it.
-func ProviderForDatasetIndex(index int) (int16, bool) {
-	p, ok := datasetIndexProvider[index]
-	return p, ok
-}
-
 // MagicVariant is the language-aware, condition-agnostic identity of a Magic
 // printing in the variants table. NormalizeUUID / NormalizeLanguage must have
 // been applied before it is used as a cache key or a lookup, or the live write
