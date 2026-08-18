@@ -1101,6 +1101,7 @@ func main() {
 		if err := initTCGCSVService(); err != nil {
 			log.Fatalln("tcgcsv:", err)
 		}
+		var err error
 		switch {
 		case *tcgcsvBackfill:
 			err = TCGCSVService.Backfill(context.Background(), tcgcsvd.BackfillOptions{
