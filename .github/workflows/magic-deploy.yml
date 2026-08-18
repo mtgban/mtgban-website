@@ -1,4 +1,4 @@
-name: droplet-deploy
+name: magic-deploy
 
 on:
   push:
