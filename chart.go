@@ -21,8 +21,8 @@ type TimeseriesConfig struct {
 	// serves charts/analytics from the long tables instead of the wide ones.
 	// The cutover is: deploy with writes on + reads off, confirm parity, then
 	// flip reads on, then (later) drop the legacy write path. See db_migration/.
-	LongFormWrites bool `json:"long_form_writes,omitempty"`
-	LongFormReads  bool `json:"long_form_reads,omitempty"`
+	LongFormWrites bool `json:"long_form_writes"`
+	LongFormReads  bool `json:"long_form_reads"`
 }
 
 type DatasetConfig struct {

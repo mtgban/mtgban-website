@@ -17,11 +17,11 @@ const (
 
 type Item struct {
 	ScryfallID string `json:"scryfall_id"`
-	Condition  string `json:"condition,omitempty"`
-	Quantity   int    `json:"quantity,omitempty"`
-	Language   string `json:"language,omitempty"`
-	IsFoil     bool   `json:"is_foil,omitempty"`
-	IsEtched   bool   `json:"is_etched,omitempty"`
+	Condition  string `json:"condition"`
+	Quantity   int    `json:"quantity"`
+	Language   string `json:"language"`
+	IsFoil     bool   `json:"is_foil"`
+	IsEtched   bool   `json:"is_etched"`
 }
 
 type Payload struct {

@@ -117,8 +117,8 @@ func banlistCardName(name string) string {
 type FormatEvent struct {
 	Date   string `json:"date"`
 	Format string `json:"format"`
-	Title  string `json:"title,omitempty"`
-	URL    string `json:"url,omitempty"`
+	Title  string `json:"title"`
+	URL    string `json:"url"`
 }
 
 // banlistIndex is the loaded document turned inside out: one entry per card,
