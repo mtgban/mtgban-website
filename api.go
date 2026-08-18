@@ -47,11 +47,11 @@ func getLastSold(ctx context.Context, cardId string, anyLang bool) ([]tcgplayer.
 	}
 
 	// If we got an empty response, try again with all the possible languages
-	if len(latestSales.Data) == 0 && !anyLang {
+	if len(latestSales) == 0 && !anyLang {
 		return getLastSold(ctx, cardId, true)
 	}
 
-	return latestSales.Data, nil
+	return latestSales, nil
 }
 
 func getDirectQty(ctx context.Context, cardId string) ([]tcgplayer.ListingData, error) {
