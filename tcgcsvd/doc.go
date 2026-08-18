@@ -87,7 +87,10 @@ As a library, from a process that already has a *timeseries.Client:
 	svc, err := tcgcsvd.New(*cfg.TCGCSVConfig, db,
 	    tcgcsvd.WithLongFormWrites(true),
 	    tcgcsvd.WithNotifier(ServerNotify))
-	go svc.StashPrices()
+	go svc.StashPrices(ctx)
+
+The context is the caller's own shutdown one, not a request's: the run outlives
+whatever started it, but a stop should reach it mid-crawl.
 
 As a standalone process, one job per invocation, exiting when it finishes:
 
