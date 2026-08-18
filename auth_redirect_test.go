@@ -26,10 +26,16 @@ func TestRedirectAfterAuth(t *testing.T) {
 	}{
 		{"same page", "https://www.mtgban.com/search?q=lotus", "https://www.mtgban.com/search?q=lotus"},
 		{"same host root", home, home},
+		{"bare domain", "https://mtgban.com/search?q=lotus", "https://mtgban.com/search?q=lotus"},
+		{"sibling subdomain", "https://beta.mtgban.com/arbit", "https://beta.mtgban.com/arbit"},
+		{"explicit default port", "https://www.mtgban.com:443/search?q=lotus", "https://www.mtgban.com:443/search?q=lotus"},
+		{"uppercase sibling", "https://BETA.MTGBAN.COM/arbit", "https://BETA.MTGBAN.COM/arbit"},
 		{"empty", "", home},
 		{"logout", "https://www.mtgban.com/?errmsg=logout", home},
 		{"other host", "https://evil.com/", home},
 		{"host suffix", "https://www.mtgban.com.evil.com/", home},
+		{"domain suffix", "https://mtgban.com.evil.com/", home},
+		{"domain prefix", "https://notmtgban.com/", home},
 		{"scheme downgrade", "http://www.mtgban.com/", home},
 		{"userinfo", "https://www.mtgban.com@evil.com/", home},
 		{"protocol relative", "//evil.com/", home},
@@ -44,6 +50,61 @@ func TestRedirectAfterAuth(t *testing.T) {
 		w := httptest.NewRecorder()
 		// The client id rides along after a semicolon, the way the login links
 		// in the templates spell it
+		r := httptest.NewRequest(http.MethodGet, "/auth?code=code&state="+url.QueryEscape(tt.state+";web"), nil)
+		redirectAfterAuth(w, r)
+
+		got := w.Header().Get("Location")
+		if got != tt.want {
+			t.Errorf("%s: state %q redirected to %q, want %q", tt.name, tt.state, got, tt.want)
+		}
+	}
+}
+
+// A proxy is free to name the default port in X-Forwarded-Host, which latches
+// it into ServerURL, but no browser writes it in window.location.href. The
+// visitor still has to get back to the page they logged in from.
+func TestRedirectAfterAuthWithDefaultPort(t *testing.T) {
+	saved := ServerURL
+	t.Cleanup(func() { ServerURL = saved })
+	ServerURL = "https://www.mtgban.com:443"
+
+	for _, tt := range []struct {
+		name  string
+		state string
+		want  string
+	}{
+		{"portless same host", "https://www.mtgban.com/search?q=lotus", "https://www.mtgban.com/search?q=lotus"},
+		{"portless sibling", "https://beta.mtgban.com/arbit", "https://beta.mtgban.com/arbit"},
+		{"other host", "https://evil.com/", ServerURL},
+	} {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/auth?code=code&state="+url.QueryEscape(tt.state+";web"), nil)
+		redirectAfterAuth(w, r)
+
+		got := w.Header().Get("Location")
+		if got != tt.want {
+			t.Errorf("%s: state %q redirected to %q, want %q", tt.name, tt.state, got, tt.want)
+		}
+	}
+}
+
+// A dev session lives on a host-only cookie, so nothing but that host is ours,
+// and the port the dev server happens to run on is no part of the answer.
+func TestRedirectAfterAuthLocalhost(t *testing.T) {
+	saved := ServerURL
+	t.Cleanup(func() { ServerURL = saved })
+	ServerURL = "http://localhost:8080"
+
+	for _, tt := range []struct {
+		name  string
+		state string
+		want  string
+	}{
+		{"same host", "http://localhost:8080/search?q=lotus", "http://localhost:8080/search?q=lotus"},
+		{"other host", "http://evil.com/", ServerURL},
+		{"production host", "https://www.mtgban.com/", ServerURL},
+	} {
+		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/auth?code=code&state="+url.QueryEscape(tt.state+";web"), nil)
 		redirectAfterAuth(w, r)
 

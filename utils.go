@@ -994,6 +994,22 @@ func setForeverCookie(w http.ResponseWriter, cookieName, value string) {
 	setCookie(w, cookieName, value, tenYears, false)
 }
 
+// globalCookieDomain returns the domain a global cookie is written on: the
+// parent of the given hostname, which is what lets a single session span the
+// sibling mtgban.com hosts. It is empty for a hostname with no parent to climb
+// to, like localhost in dev, leaving the cookie on the host that set it.
+//
+// This is the one place that decides how wide "ours" is - isServerOrigin reads
+// the same answer to know which hosts a post-login redirect may name.
+func globalCookieDomain(hostname string) string {
+	fields := strings.Split(hostname, ".")
+	// Guard against hostname being "mtgban.com"
+	if fields[0] == "mtgban" {
+		return hostname
+	}
+	return strings.Join(fields[1:], ".")
+}
+
 // Set a cookie in the response with no expiration at the default root
 func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Time, global bool) {
 	u, err := url.Parse(ServerURL)
@@ -1004,11 +1020,7 @@ func setCookie(w http.ResponseWriter, cookieName, value string, expires time.Tim
 
 	domain := u.Hostname()
 	if global {
-		fields := strings.Split(domain, ".")
-		// Guard against hostname being "mtgban.com"
-		if fields[0] != "mtgban" {
-			domain = strings.Join(fields[1:], ".")
-		}
+		domain = globalCookieDomain(domain)
 	}
 
 	cookie := http.Cookie{

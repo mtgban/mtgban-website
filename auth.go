@@ -263,24 +263,48 @@ func redirectAfterAuth(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, redir, http.StatusFound)
 }
 
-// isServerOrigin reports whether target is an absolute URL on this very site,
-// naming both the scheme and the host that ServerURL does.
+// isServerOrigin reports whether target is an absolute URL on this site: the
+// scheme ServerURL names, on a hostname the session cookie already covers.
 //
-// Comparing the parsed host is what refuses the spellings that only look like
-// ours: "https://www.mtgban.com@evil.com" parses with evil.com as the host,
-// and the schemeless, backslash and scheme-only forms parse with no host at
-// all. An unset ServerURL matches nothing, since without it there is no origin
-// to be part of.
+// ServerURL is latched once per process from whichever trusted host arrived
+// first, while the state is the page's own window.location.href, so the two
+// legitimately name sibling hosts - mtgban.com, www, beta. The session spans
+// them because the cookie is written on the parent domain, so the redirect has
+// to span exactly the same set: globalCookieDomain is asked for it rather than
+// spelling out a second, drifting notion of ours. Comparing hostnames instead
+// of hosts keeps an explicit default port, which a proxy may put in
+// X-Forwarded-Host but a browser never writes, from failing every match.
+//
+// Comparing the parsed hostname is what refuses the spellings that only look
+// like ours: "https://www.mtgban.com@evil.com" parses with evil.com as the
+// host, "mtgban.com.evil.com" is under evil.com and not under ours, and the
+// schemeless, backslash and scheme-only forms parse with no host at all. An
+// unset ServerURL matches nothing, since without it there is no origin to be
+// part of.
 func isServerOrigin(target string) bool {
 	server, err := url.Parse(ServerURL)
-	if err != nil || server.Host == "" {
+	if err != nil || server.Hostname() == "" {
 		return false
 	}
 	u, err := url.Parse(target)
-	if err != nil {
+	if err != nil || u.Hostname() == "" || u.Scheme != server.Scheme {
 		return false
 	}
-	return u.Scheme == server.Scheme && u.Host == server.Host
+
+	// Hostnames are case insensitive, but url.Parse preserves whatever case
+	// the target was written in
+	host := strings.ToLower(u.Hostname())
+	name := strings.ToLower(server.Hostname())
+	if host == name {
+		return true
+	}
+
+	// An empty domain is a host-only cookie, which no sibling ever receives
+	domain := globalCookieDomain(name)
+	if domain == "" {
+		return false
+	}
+	return host == domain || strings.HasSuffix(host, "."+domain)
 }
 
 func signHMACSHA1Base64(key []byte, data []byte) string {
