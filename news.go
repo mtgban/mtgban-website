@@ -401,6 +401,47 @@ func GetNewspaperUUIDs() map[string]struct{} {
 	return *p
 }
 
+// refreshNewspaperEdition runs one edition of a page's query. The second
+// return value reports whether the results are good enough to replace what is
+// already cached: a failed query, an empty response, or a response that lost
+// more than half of the rows we had all keep the older data.
+func refreshNewspaperEdition(label, query string, cached []NewspaperResult) ([]NewspaperResult, bool) {
+	results, err := getResults(NewNewspaperDB, query)
+	if err != nil {
+		log.Println(query, err)
+		return nil, false
+	}
+	if len(results) == 0 {
+		ServerNotify("newspaper", label+" results are empty", true)
+		return nil, false
+	}
+	if cached != nil && len(results) < len(cached)/2 {
+		ServerNotify("newspaper", label+" too few results "+fmt.Sprint(len(results)), true)
+		return nil, false
+	}
+
+	log.Println(label, "has", len(results), "elements")
+	return results, true
+}
+
+// newspaperFilterValues collects the editions and the finishes present in a
+// set of results, for the dropdown filters.
+func newspaperFilterValues(results []NewspaperResult) (editions, variants []string) {
+	editions = []string{""}
+	variants = []string{""}
+	for _, result := range results {
+		if !slices.Contains(editions, result.Edition) {
+			editions = append(editions, result.Edition)
+		}
+		if !slices.Contains(variants, result.Variant) {
+			variants = append(variants, result.Variant)
+		}
+	}
+	sort.Strings(editions)
+	sort.Strings(variants)
+	return editions, variants
+}
+
 func cacheNewspaper() {
 	if Config.OfflineKey != "" || SkipNewspaper {
 		return
@@ -436,69 +477,26 @@ func cacheNewspaper() {
 
 		query := strings.ReplaceAll(next[i].Query, "__GAME__", game) + " ORDER BY ranking ASC;"
 
-		results, err := getResults(NewNewspaperDB, query)
-		if err != nil {
-			log.Println(query, err)
-			continue
-		}
-		if len(results) == 0 {
-			ServerNotify("newspaper", next[i].Option+" results are empty", true)
-			continue
-		}
-		if next[i].Results != nil && len(results) < len(next[i].Results)/2 {
-			ServerNotify("newspaper", next[i].Option+" too few results "+fmt.Sprint(len(results)), true)
-			continue
+		// Both editions are fetched independently: a bad refresh on one of
+		// them keeps the previously cached data for that edition instead of
+		// blanking the page or skipping the other edition entirely.
+		if results, ok := refreshNewspaperEdition(next[i].Option, query, next[i].Results); ok {
+			next[i].Results = results
+			next[i].AvailableEditions, next[i].PossibleFinish = newspaperFilterValues(results)
 		}
 
-		editions := []string{""}
-		variants := []string{""}
-		for _, result := range results {
-			if !slices.Contains(editions, result.Edition) {
-				editions = append(editions, result.Edition)
-			}
-			if !slices.Contains(variants, result.Variant) {
-				variants = append(variants, result.Variant)
-			}
+		query3day := strings.ReplaceAll(query, "0 DAY", "3 DAY")
+		if results, ok := refreshNewspaperEdition(next[i].Option+" (3day)", query3day, next[i].Results3Day); ok {
+			next[i].Results3Day = results
+			next[i].AvailableEditions3Day, next[i].PossibleFinish3Day = newspaperFilterValues(results)
 		}
-		sort.Strings(editions)
-		sort.Strings(variants)
-
-		log.Println(next[i].Option, "has", len(results), "elements")
-		next[i].Results = results
-		next[i].AvailableEditions = editions
-		next[i].PossibleFinish = variants
 
 		// Cache UUIDs from spike score pages for the "on:newspaper" search filter
 		if next[i].Option == "combined_spike_score" || next[i].Option == "spike_score" {
-			for _, result := range results {
+			for _, result := range next[i].Results {
 				newspaperUUIDs[result.UUID] = struct{}{}
 			}
 		}
-
-		query = strings.Replace(query, "0 DAY", "3 DAY", -1)
-		results3day, err := getResults(NewNewspaperDB, query)
-		if err != nil {
-			log.Println(query, err)
-			continue
-		}
-
-		editions3day := []string{""}
-		variants3day := []string{""}
-		for _, result := range results3day {
-			if !slices.Contains(editions3day, result.Edition) {
-				editions3day = append(editions3day, result.Edition)
-			}
-			if !slices.Contains(variants3day, result.Variant) {
-				variants3day = append(variants3day, result.Variant)
-			}
-		}
-		sort.Strings(editions3day)
-		sort.Strings(variants3day)
-
-		log.Println(next[i].Option, "(3day) has", len(results3day), "elements")
-		next[i].Results3Day = results3day
-		next[i].AvailableEditions3Day = editions3day
-		next[i].PossibleFinish3Day = variants3day
 	}
 
 	newspaperPagesPtr.Store(&next)
@@ -532,6 +530,37 @@ func init() {
 	newspaperPagesPtr.Store(&initial)
 }
 
+// newspaperCalcDateFilter builds the WHERE fragment that picks which stored
+// slice a page shows, and applies the page's own row filter.
+//
+// Every edition is anchored on the newest calc_date that actually has usable
+// rows for that page: the live edition uses "0 DAY" and cacheNewspaper rewrites
+// it to "3 DAY" for the delayed edition. Slices where the page's metric came
+// out NULL for every row are skipped rather than displayed as an empty table --
+// a gap in the price history leaves the 7-day checkpoint with nothing to
+// compare against, which wipes out a whole day of scores -- so an edition keeps
+// walking back until it finds a slice with data. If nothing is old enough,
+// it settles for the oldest usable slice.
+func newspaperCalcDateFilter(table, rowFilter string) string {
+	if rowFilter == "" {
+		rowFilter = "TRUE"
+	}
+	return fmt.Sprintf(`%[2]s
+                   AND calc_date = COALESCE(
+                       (SELECT MAX(calc_date)
+                          FROM %[1]s
+                         WHERE game_name = '__GAME__'
+                           AND %[2]s
+                           AND calc_date <= (SELECT MAX(calc_date)
+                                               FROM %[1]s
+                                              WHERE game_name = '__GAME__'
+                                                AND %[2]s) - INTERVAL '0 DAY'),
+                       (SELECT MIN(calc_date)
+                          FROM %[1]s
+                         WHERE game_name = '__GAME__'
+                           AND %[2]s))`, table, rowFilter)
+}
+
 var newspaperPagesInitial = []NewspaperPage{
 	{
 		Title:  "Top Singles by Combined Spike Score",
@@ -545,12 +574,7 @@ var newspaperPagesInitial = []NewspaperPage{
                        ck_retail_price, tcg_market_price, ck_buy_price
                   FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards
                  WHERE game_name = '__GAME__'
-                   AND calc_date = (SELECT MAX(calc_date)
-                                      FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards
-                                     WHERE game_name = '__GAME__'
-                                       AND calc_date <= (SELECT MAX(calc_date)
-                                                           FROM scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards
-                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')`,
+                   AND ` + newspaperCalcDateFilter("scripts__tcgplayersalesdata_plus_cardkingdom_spike_score_cards", ""),
 		Sort: "ranking ASC",
 		Head: []Heading{
 			{
@@ -630,12 +654,7 @@ var newspaperPagesInitial = []NewspaperPage{
                        current_price
                   FROM scripts__tcgplayersalesdata_spike_score_cards
                  WHERE game_name = '__GAME__'
-                   AND calc_date = (SELECT MAX(calc_date)
-                                      FROM scripts__tcgplayersalesdata_spike_score_cards
-                                     WHERE game_name = '__GAME__'
-                                       AND calc_date <= (SELECT MAX(calc_date)
-                                                           FROM scripts__tcgplayersalesdata_spike_score_cards
-                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')`,
+                   AND ` + newspaperCalcDateFilter("scripts__tcgplayersalesdata_spike_score_cards", ""),
 		Sort: "ranking ASC",
 		Head: []Heading{
 			{
@@ -701,13 +720,7 @@ var newspaperPagesInitial = []NewspaperPage{
                        sellers_Today, sellers_d7, sellers_d30, pct_gain_7d
                   FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
                  WHERE game_name = '__GAME__'
-                   AND calc_date = (SELECT MAX(calc_date)
-                                      FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
-                                     WHERE game_name = '__GAME__'
-                                       AND calc_date <= (SELECT MAX(calc_date)
-                                                           FROM scripts__tcgplayer_greatest_increase_in_vendor_listings_cards
-                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')
-                   AND pct_gain_7d <> 0`,
+                   AND ` + newspaperCalcDateFilter("scripts__tcgplayer_greatest_increase_in_vendor_listings_cards", "pct_gain_7d <> 0"),
 		Sort: "ranking ASC",
 		Head: []Heading{
 			{
@@ -779,13 +792,7 @@ var newspaperPagesInitial = []NewspaperPage{
                        sellers_Today, sellers_d7, sellers_d30, pct_drop_7d
                   FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
                  WHERE game_name = '__GAME__'
-                   AND calc_date = (SELECT MAX(calc_date)
-                                      FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
-                                     WHERE game_name = '__GAME__'
-                                       AND calc_date <= (SELECT MAX(calc_date)
-                                                           FROM scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards
-                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')
-                   AND pct_drop_7d <> 0`,
+                   AND ` + newspaperCalcDateFilter("scripts__tcgplayer_greatest_decrease_in_vendor_listings_cards", "pct_drop_7d <> 0"),
 		Sort: "ranking ASC",
 		Head: []Heading{
 			{
@@ -857,13 +864,7 @@ var newspaperPagesInitial = []NewspaperPage{
                        ck_buy_price, ck_buy_1d, ck_buy_7d, ck_buy_30d, pct_increase_7d
                   FROM scripts__cardkingdom_buylist_increase_score_cards
                  WHERE game_name = '__GAME__'
-                   AND calc_date = (SELECT MAX(calc_date)
-                                      FROM scripts__cardkingdom_buylist_increase_score_cards
-                                     WHERE game_name = '__GAME__'
-                                       AND calc_date <= (SELECT MAX(calc_date)
-                                                           FROM scripts__cardkingdom_buylist_increase_score_cards
-                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')
-                   AND pct_increase_7d <> 0`,
+                   AND ` + newspaperCalcDateFilter("scripts__cardkingdom_buylist_increase_score_cards", "pct_increase_7d <> 0"),
 		Sort: "ranking ASC",
 		Head: []Heading{
 			{
@@ -942,13 +943,7 @@ var newspaperPagesInitial = []NewspaperPage{
                        ck_buy_price, ck_buy_1d, ck_buy_7d, ck_buy_30d, pct_decrease_7d
                   FROM scripts__cardkingdom_buylist_decrease_score_cards
                  WHERE game_name = '__GAME__'
-                   AND calc_date = (SELECT MAX(calc_date)
-                                      FROM scripts__cardkingdom_buylist_decrease_score_cards
-                                     WHERE game_name = '__GAME__'
-                                       AND calc_date <= (SELECT MAX(calc_date)
-                                                           FROM scripts__cardkingdom_buylist_decrease_score_cards
-                                                          WHERE game_name = '__GAME__') - INTERVAL '0 DAY')
-                   AND pct_decrease_7d <> 0`,
+                   AND ` + newspaperCalcDateFilter("scripts__cardkingdom_buylist_decrease_score_cards", "pct_decrease_7d <> 0"),
 		Sort: "ranking ASC",
 		Head: []Heading{
 			{
@@ -1247,13 +1242,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			pageVars.CanFilterByPercentage = true
 		}
 
-		if newspage.Results == nil {
-			pageVars.InfoMessage = "This data is not ready yet, please try again in a few minutes"
-			pageVars.LastUpdate = time.Now()
-			render(w, "news.html", pageVars)
-			return
-		}
-
 		if newspage.HasBucket {
 			pageVars.Tiers = BucketNames
 		}
@@ -1265,6 +1253,15 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			results = newspage.Results3Day
 			pageVars.Editions = newspage.AvailableEditions3Day
 			pageVars.Finishes = newspage.PossibleFinish3Day
+		}
+
+		// Checked per edition: the delayed edition can be missing while the
+		// live one is cached, and an empty table reads as a broken page
+		if len(results) == 0 {
+			pageVars.InfoMessage = "This data is not ready yet, please try again in a few minutes"
+			pageVars.LastUpdate = time.Now()
+			render(w, "news.html", pageVars)
+			return
 		}
 
 		break
