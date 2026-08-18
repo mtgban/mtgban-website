@@ -412,11 +412,11 @@ func refreshNewspaperEdition(label, query string, cached []NewspaperResult) ([]N
 		return nil, false
 	}
 	if len(results) == 0 {
-		ServerNotify("newspaper", label+" results are empty", true)
+		log.Println("newspaper:", label, "results are empty, keeping the cached slice")
 		return nil, false
 	}
 	if cached != nil && len(results) < len(cached)/2 {
-		ServerNotify("newspaper", label+" too few results "+fmt.Sprint(len(results)), true)
+		log.Println("newspaper:", label, "returned", len(results), "rows against", len(cached), "cached, keeping the cached slice")
 		return nil, false
 	}
 
