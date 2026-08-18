@@ -233,15 +233,19 @@ func (s *Service) IsStashingPrices() bool { return s.pricesStashing.Load() }
 // tcg_prices. It is the cron/admin entry point: only one run proceeds at a time
 // per process, only the process holding the crawl lock crawls, and it no-ops
 // when the current snapshot is already stored.
-func (s *Service) StashPrices() {
+//
+// Pass a context that outlives a request but not the process — the caller's
+// shutdown context — so a stop ends the ingest where it is instead of leaving
+// it running into the exit.
+func (s *Service) StashPrices(ctx context.Context) {
 	if !s.pricesStashing.CompareAndSwap(false, true) {
 		log.Println("tcgcsv StashPrices: another ingest is already running, skipping")
 		return
 	}
 	defer s.pricesStashing.Store(false)
 
-	err := s.WithCrawlLock("tcgcsv StashPrices", func() error {
-		return s.IngestLatest(context.Background())
+	err := s.WithCrawlLock(ctx, "tcgcsv StashPrices", func() error {
+		return s.IngestLatest(ctx)
 	})
 	if err != nil {
 		log.Println("tcgcsv daily ingest:", err)

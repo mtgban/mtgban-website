@@ -49,12 +49,17 @@ func IsTCGCSVStashing() bool {
 // stashTCGCSVPrices and stashTCGCSVProducts are the cron and admin entry
 // points. They are registered only when the service exists, and stay nil-safe
 // so an admin button on an unconfigured deployment logs instead of panicking.
+//
+// Both run under ServerContext rather than a request's: the admin button starts
+// the ingest in a goroutine that outlives the request that pressed it, and a
+// cron fire has no request at all. What they must not outlive is the process,
+// hence not context.Background().
 func stashTCGCSVPrices() {
 	if TCGCSVService == nil {
 		log.Println("stashTCGCSVPrices: tcgcsv ingestion is not configured")
 		return
 	}
-	TCGCSVService.StashPrices()
+	TCGCSVService.StashPrices(ServerContext)
 }
 
 func stashTCGCSVProducts() {
@@ -62,7 +67,7 @@ func stashTCGCSVProducts() {
 		log.Println("stashTCGCSVProducts: tcgcsv ingestion is not configured")
 		return
 	}
-	TCGCSVService.StashProducts()
+	TCGCSVService.StashProducts(ServerContext)
 }
 
 // logTCGProductMatchReport reports how many synced products resolve to a loaded

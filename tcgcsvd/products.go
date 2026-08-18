@@ -32,16 +32,17 @@ func productToRow(categoryID int, p tcgcsv.Product) timeseries.TCGProduct {
 func (s *Service) IsStashingProducts() bool { return s.productsStashing.Load() }
 
 // StashProducts runs SyncProducts under the single-flight guard and the shared
-// crawl lock. It is the cron/CLI entry point.
-func (s *Service) StashProducts() {
+// crawl lock. It is the cron/CLI entry point, and takes the same kind of
+// context StashPrices does.
+func (s *Service) StashProducts(ctx context.Context) {
 	if !s.productsStashing.CompareAndSwap(false, true) {
 		log.Println("tcgcsv StashProducts: another product sync is already running, skipping")
 		return
 	}
 	defer s.productsStashing.Store(false)
 
-	err := s.WithCrawlLock("tcgcsv StashProducts", func() error {
-		return s.SyncProducts(context.Background())
+	err := s.WithCrawlLock(ctx, "tcgcsv StashProducts", func() error {
+		return s.SyncProducts(ctx)
 	})
 	if err != nil {
 		log.Println("tcgcsv product sync:", err)

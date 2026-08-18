@@ -165,12 +165,15 @@ const crawlLockKey = 0x7463675f_63726177 // "tcg_craw"
 // whose crons are still armed. Backfill is the one exception: it is
 // operator-driven and runs for hours, and holding the lock across that would
 // starve the daily pull, which is the run that must not be missed.
-func (s *Service) WithCrawlLock(job string, fn func() error) error {
+//
+// ctx covers taking the lock only; fn gets whatever context its caller closed
+// over, which is normally the same one.
+func (s *Service) WithCrawlLock(ctx context.Context, job string, fn func() error) error {
 	if s.store.ReadOnly() {
 		log.Printf("%s: price database is read-only, skipping", job)
 		return nil
 	}
-	acquired, release, err := s.store.TryAdvisoryLock(context.Background(), crawlLockKey)
+	acquired, release, err := s.store.TryAdvisoryLock(ctx, crawlLockKey)
 	if err != nil {
 		log.Printf("%s: could not acquire crawl lock: %v", job, err)
 		return nil

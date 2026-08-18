@@ -601,6 +601,13 @@ func loadTime(p *time.Time) time.Time {
 	return *p
 }
 
+// ServerContext lives as long as this process serves and is cancelled when the
+// shutdown signal arrives, at the same moment the HTTP server starts draining.
+// Background work that belongs to the process rather than to a request — the
+// crons, the admin buttons that hand a job to a goroutine — runs under it, so a
+// stop reaches a job that is mid-crawl instead of only reaching the listener.
+var ServerContext, stopServerContext = context.WithCancel(context.Background())
+
 var NewNewspaperDB *sql.DB
 
 var PricesArchiveDB *timeseries.Client
@@ -1345,6 +1352,10 @@ func main() {
 	}()
 
 	<-done
+
+	// Wind down the background jobs alongside the listener: an ingest that is
+	// mid-crawl stops at its next checkpoint instead of running into the exit.
+	stopServerContext()
 
 	// Close any zombie connection and perform any extra cleanup
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

@@ -167,9 +167,9 @@ func main() {
 		// Under the crawl lock, so a server whose crons are still armed and this
 		// process never crawl tcgcsv.com at the same time. A skipped run (the
 		// other process holds the lock) is logged and exits 0.
-		err = svc.WithCrawlLock("tcgcsvd -daily", func() error { return svc.IngestLatest(ctx) })
+		err = svc.WithCrawlLock(ctx, "tcgcsvd -daily", func() error { return svc.IngestLatest(ctx) })
 	case *products:
-		err = svc.WithCrawlLock("tcgcsvd -products", func() error { return svc.SyncProducts(ctx) })
+		err = svc.WithCrawlLock(ctx, "tcgcsvd -products", func() error { return svc.SyncProducts(ctx) })
 	case *backfill:
 		// Outside the lock on purpose: hours of archives under a session
 		// advisory lock would block every daily ingest for the whole run.
