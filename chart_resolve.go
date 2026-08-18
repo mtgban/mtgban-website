@@ -247,6 +247,15 @@ func tcgBanIDForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) int64
 // foilSubTypes returns a product's foil sub-types in the order they pair with a
 // card's foil finishes: alphabetical, which puts the primary foil ("Cold Foil",
 // "Foil") ahead of the "Holofoil" the extra sub-types are sold as.
+//
+// The pairing is positional over this list and the sorted one extraFoilFinishes
+// returns, so it rests on an invariant nothing in the data enforces: on a
+// product priced under more than one foil, the primary foil's name sorts before
+// the extras'. It holds for every name in use, but that is a naming coincidence
+// carrying structural weight — a new foil sub-type sorting ahead of "Cold Foil"
+// would re-pair every finish on its product. TestFoilSubTypeOrdering pins the
+// names we know, so a new one gets added there and the order gets checked
+// rather than assumed.
 func foilSubTypes(subTypes map[string]int64) []string {
 	foils := make([]string, 0, len(subTypes))
 	for subType := range subTypes {
@@ -260,6 +269,9 @@ func foilSubTypes(subTypes map[string]int64) []string {
 
 // extraFoilFinishes returns the keys of a card's foil finishes past the primary
 // one (Lorcana's RainbowPillars and friends), ordered to match foilSubTypes.
+// Sorted, so with more than one extra the pairing would also depend on the
+// finish keys sorting into the same order as the sub-type names; today no
+// product carries a second extra, so the ordering above is the live constraint.
 func extraFoilFinishes(co *mtgmatcher.CardObject) []string {
 	extras := make([]string, 0, len(co.FoilUUIDs))
 	for finish := range co.FoilUUIDs {
