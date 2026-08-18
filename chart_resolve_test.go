@@ -85,6 +85,25 @@ var tcgFinishCases = []struct {
 	},
 }
 
+// foilSubTypes and extraFoilFinishes pair positionally over two sorted lists,
+// so the mapping is only right while the primary foil's sub-type sorts before
+// the extras' on the same product. That is a property of the names, not of the
+// data, and a name breaking it would re-pair a product's finishes with nothing
+// else failing. These are the names TCGplayer prices our games under; a new one
+// belongs here, where the order is checked.
+func TestFoilSubTypeOrdering(t *testing.T) {
+	primaries := []string{"Cold Foil", "Foil"} // Lorcana, Riftbound
+	extras := []string{"Holofoil"}             // what Lorcana's extra foils are sold as
+	for _, primary := range primaries {
+		for _, extra := range extras {
+			if primary >= extra {
+				t.Errorf("primary foil sub-type %q does not sort before extra sub-type %q; "+
+					"the positional pairing in foilSubTypes would swap them", primary, extra)
+			}
+		}
+	}
+}
+
 // A non-Magic product is priced per finish under a sub-type, so a card's finish
 // has to pick its own variant — otherwise every finish charts the product's
 // canonical ("Normal") prices (issue #295).
