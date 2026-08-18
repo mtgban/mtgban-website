@@ -301,8 +301,9 @@ func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) str
 }
 
 // tcgFinishIDForSubType is the inverse: given a product's base card, the id of
-// the finish the sub-type names. An unknown sub-type resolves to the primary
-// foil, since "Normal" is the only nonfoil name.
+// the finish the sub-type names, or "" when the card carries no finish for it.
+// A sub-type the product doesn't list resolves to the primary foil, since
+// "Normal" is the only nonfoil name.
 func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64, subType string) string {
 	if subType == "" || subType == "Normal" {
 		if id, ok := co.FoilUUIDs[mtgmatcher.FinishNonfoil]; ok {
@@ -311,9 +312,16 @@ func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64,
 		return co.UUID
 	}
 	if idx := slices.Index(foilSubTypes(subTypes), subType); idx > 0 {
-		if extras := extraFoilFinishes(co); idx-1 < len(extras) {
-			return co.FoilUUIDs[extras[idx-1]]
+		extras := extraFoilFinishes(co)
+		if idx-1 >= len(extras) {
+			// The mirror of tcgSubTypeForCard's refusal to map an extra
+			// sub-type onto the primary foil: a product priced under one more
+			// foil than the card has finishes would otherwise hand both
+			// sub-types the same id, and a roster holding both would render
+			// two rows for one printing.
+			return ""
 		}
+		return co.FoilUUIDs[extras[idx-1]]
 	}
 	if id, ok := co.FoilUUIDs[mtgmatcher.FinishFoil]; ok {
 		return id
@@ -327,7 +335,8 @@ func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64,
 // tcgVariantSearchID maps a non-Magic variant to the mtgmatcher id of the card
 // and finish it names, for the results table the chart lives inside. ok=false
 // when mtgmatcher doesn't know the product (a game it doesn't carry, or a
-// product with no card).
+// product with no card), or when the card has no finish for the variant's
+// sub-type — charting the wrong finish is worse than charting nothing.
 func tcgVariantSearchID(ctx context.Context, vi timeseries.VariantInfo) (string, bool) {
 	matched, err := mtgmatcher.MatchId(strconv.Itoa(vi.TCGProductID))
 	if err != nil {
@@ -341,7 +350,11 @@ func tcgVariantSearchID(ctx context.Context, vi timeseries.VariantInfo) (string,
 	if !ok {
 		subTypes, _ = PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, vi.TCGProductID)
 	}
-	return tcgFinishIDForSubType(co, subTypes, vi.TCGSubType), true
+	id := tcgFinishIDForSubType(co, subTypes, vi.TCGSubType)
+	if id == "" {
+		return "", false
+	}
+	return id, true
 }
 
 // tcgProductID extracts a card's TCGplayer product id from its identifiers.

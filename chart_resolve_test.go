@@ -34,6 +34,7 @@ var tcgFinishCases = []struct {
 	subTypes []string          // what the product is priced under
 	finishes map[string]string // mtgmatcher finish -> uuid
 	want     map[string]string // uuid -> sub-type ("" = no data for that finish)
+	unmapped []string          // sub-types the card has no finish for
 }{
 	{
 		name:     "primary foil sold as cold foil",
@@ -52,6 +53,17 @@ var tcgFinishCases = []struct {
 		subTypes: []string{"Normal", "Cold Foil", "Holofoil"},
 		finishes: map[string]string{"nonfoil": "2800", "foil": "2800_f", "rainbowpillars": "2800_rainbowpillars"},
 		want:     map[string]string{"2800": "Normal", "2800_f": "Cold Foil", "2800_rainbowpillars": "Holofoil"},
+	},
+	{
+		// The product is priced under one more foil than the card has finishes,
+		// so nothing maps to "Holofoil" in either direction. Mapping it onto the
+		// plain foil would give a roster carrying both variants two rows for the
+		// same printing.
+		name:     "extra sub-type the card has no finish for",
+		subTypes: []string{"Normal", "Cold Foil", "Holofoil"},
+		finishes: map[string]string{"nonfoil": "2810", "foil": "2810_f"},
+		want:     map[string]string{"2810": "Normal", "2810_f": "Cold Foil"},
+		unmapped: []string{"Holofoil"},
 	},
 	{
 		name:     "foil-only card",
@@ -116,6 +128,13 @@ func TestTCGFinishIDForSubType(t *testing.T) {
 			}
 			if got := tcgFinishIDForSubType(co, subTypes, subType); got != uuid {
 				t.Errorf("%s: tcgFinishIDForSubType(%q) = %q, want %q", tc.name, subType, got, uuid)
+			}
+		}
+		// And the other half of the symmetry: a sub-type the card has no finish
+		// for maps to nothing, rather than landing on the primary foil.
+		for _, subType := range tc.unmapped {
+			if got := tcgFinishIDForSubType(co, subTypes, subType); got != "" {
+				t.Errorf("%s: tcgFinishIDForSubType(%q) = %q, want no id", tc.name, subType, got)
 			}
 		}
 	}
