@@ -160,9 +160,11 @@ const crawlLockKey = 0x7463675f_63726177 // "tcg_craw"
 // A read-only database can't ingest, so it skips without taking the lock (else
 // it could win the lock and starve the writable process).
 //
-// Wrap any crawling job in it — the daily ingest and the product sync do, and a
-// standalone process should too, so it stays coordinated with a server whose
-// crons are still armed.
+// Wrap the scheduled crawls in it — the daily ingest and the product sync do,
+// and a standalone process should too, so it stays coordinated with a server
+// whose crons are still armed. Backfill is the one exception: it is
+// operator-driven and runs for hours, and holding the lock across that would
+// starve the daily pull, which is the run that must not be missed.
 func (s *Service) WithCrawlLock(job string, fn func() error) error {
 	if s.store.ReadOnly() {
 		log.Printf("%s: price database is read-only, skipping", job)

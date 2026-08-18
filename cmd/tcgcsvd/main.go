@@ -1,9 +1,13 @@
 // Command tcgcsvd runs the tcgcsv ingestion jobs on their own, without the web
 // server: the daily price pull, the weekly product catalog sync, and the
 // historical backfill. It reads the same config.json the server does, uses only
-// the sql_config and tcgcsv_config sections of it, and takes the same
-// cross-process crawl lock, so it can run beside a server that still has its
-// crons enabled without both crawling tcgcsv.com at once.
+// the sql_config and tcgcsv_config sections of it, and runs the two scheduled
+// jobs under the same cross-process crawl lock, so it can run beside a server
+// that still has its crons enabled without both crawling tcgcsv.com at once.
+// The backfill stays outside that lock, as it does everywhere else: it is
+// operator-driven and runs for hours, and holding the lock for that long would
+// starve the daily pull. Time a long backfill so it doesn't sit on top of a
+// server's 21:00 ingest.
 //
 //	go install github.com/mtgban/mtgban-website/cmd/tcgcsvd@latest
 //
@@ -167,6 +171,8 @@ func main() {
 	case *products:
 		err = svc.WithCrawlLock("tcgcsvd -products", func() error { return svc.SyncProducts(ctx) })
 	case *backfill:
+		// Outside the lock on purpose: hours of archives under a session
+		// advisory lock would block every daily ingest for the whole run.
 		err = svc.Backfill(ctx, tcgcsvd.BackfillOptions{
 			From: *from, To: *to, Categories: *categories, Force: *force,
 		})
