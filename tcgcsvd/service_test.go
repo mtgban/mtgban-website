@@ -2,6 +2,8 @@ package tcgcsvd
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -156,5 +158,58 @@ func TestBackfillRejectsBadDates(t *testing.T) {
 		if err := svc.Backfill(context.Background(), opts); err == nil {
 			t.Errorf("want an error for %+v", opts)
 		}
+	}
+}
+
+// failingStore acquires the crawl lock and then fails the job's first step, so
+// the stash entry points run their error handling on an error we choose.
+type failingStore struct {
+	stubStore
+	err error
+}
+
+func (s failingStore) EnsureTCGSchema(context.Context) error         { return s.err }
+func (s failingStore) EnsureTCGProductsSchema(context.Context) error { return s.err }
+func (s failingStore) TryAdvisoryLock(context.Context, int64) (bool, func(), error) {
+	return true, func() {}, nil
+}
+
+// A stop cancels the context the crons run under, so an ingest in flight ends
+// with context.Canceled. That is the shutdown working — every deploy that lands
+// on top of one would otherwise post a failure nobody needs to act on — while a
+// real failure still has to reach the channel.
+func TestStashDoesNotNotifyOnShutdown(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		err        error
+		wantNotify bool
+	}{
+		{"cancelled by shutdown", context.Canceled, false},
+		{"wrapped cancellation", fmt.Errorf("upserting: %w", context.Canceled), false},
+		{"a real failure", errors.New("connection refused"), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, stash := range []struct {
+				kind string
+				run  func(*Service, context.Context)
+			}{
+				{"prices", func(s *Service, ctx context.Context) { s.StashPrices(ctx) }},
+				{"products", func(s *Service, ctx context.Context) { s.StashProducts(ctx) }},
+			} {
+				var notified []string
+				svc, err := New(tcgcsv.Config{Games: []tcgcsv.GameConfig{{Name: "Disney Lorcana", CategoryID: 71}}},
+					failingStore{err: tc.err},
+					WithNotifier(func(kind, message string) { notified = append(notified, message) }))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				stash.run(svc, context.Background())
+
+				if got := len(notified) > 0; got != tc.wantNotify {
+					t.Errorf("%s: notified=%v (%v), want %v", stash.kind, got, notified, tc.wantNotify)
+				}
+			}
+		})
 	}
 }

@@ -247,6 +247,12 @@ func (s *Service) StashPrices(ctx context.Context) {
 	err := s.WithCrawlLock(ctx, "tcgcsv StashPrices", func() error {
 		return s.IngestLatest(ctx)
 	})
+	if errors.Is(err, context.Canceled) {
+		// The process is going down and the run stopped with it. That is the
+		// shutdown working, not something to wake anyone for.
+		log.Println("tcgcsv daily ingest: stopped by shutdown")
+		return
+	}
 	if err != nil {
 		log.Println("tcgcsv daily ingest:", err)
 		s.notifyf("daily ingest error: %s", err)

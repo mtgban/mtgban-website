@@ -44,6 +44,12 @@ func (s *Service) StashProducts(ctx context.Context) {
 	err := s.WithCrawlLock(ctx, "tcgcsv StashProducts", func() error {
 		return s.SyncProducts(ctx)
 	})
+	if errors.Is(err, context.Canceled) {
+		// The process is going down and the run stopped with it. That is the
+		// shutdown working, not something to wake anyone for.
+		log.Println("tcgcsv product sync: stopped by shutdown")
+		return
+	}
 	if err != nil {
 		log.Println("tcgcsv product sync:", err)
 		s.notifyf("product sync error: %s", err)
