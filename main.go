@@ -1225,6 +1225,14 @@ func main() {
 			c.AddFunc("0 22 * * 1", stashTCGCSVProducts)
 		}
 
+		// Refresh the chart checkpoints. Magic reads its ban markers from a
+		// document published outside this project, so a B&R announcement only
+		// reaches the charts when something re-reads it -- and the boot-time
+		// load is not that, on a process that stays up for weeks. It doubles as
+		// the retry for a boot-time load that failed: a fetch that never
+		// succeeded leaves the index empty and every chart without its markers.
+		c.AddFunc("15 */6 * * *", refreshCheckpoints)
+
 		c.Start()
 	}
 
