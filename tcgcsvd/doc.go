@@ -86,7 +86,7 @@ As a library, from a process that already has a *timeseries.Client:
 
 	svc, err := tcgcsvd.New(*cfg.TCGCSVConfig, db,
 	    tcgcsvd.WithLongFormWrites(true),
-	    tcgcsvd.WithNotifier(ServerNotify))
+	    tcgcsvd.WithNotifier(func(kind, message string) { ServerNotify(kind, message) }))
 	go svc.StashPrices(ctx)
 
 The context is the caller's own shutdown one, not a request's: the run outlives
