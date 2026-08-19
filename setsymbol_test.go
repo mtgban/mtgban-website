@@ -49,7 +49,7 @@ func TestSetSymbolBlock(t *testing.T) {
 	Config.Game = "onepiece"
 	loadRarityBadges()
 
-	tmpl, err := tmplparse.ParseFiles("base.html", []string{"templates/base.html"}, funcMap)
+	tmpl, err := tmplparse.ParseFiles("set-symbol.html", []string{"templates/partials/set-symbol.html"}, funcMap)
 	if err != nil {
 		t.Fatal(err)
 	}

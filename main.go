@@ -1415,6 +1415,10 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	}
 	files = append(files, navbarPartial)
 
+	// The set symbol is drawn by desktop and mobile pages alike, and each is
+	// built from its own base, so the block cannot live in one of them.
+	files = append(files, "templates/partials/set-symbol.html")
+
 	// Include settings-modal partial only for desktop pages that define a "settings-content" block.
 	if !isMobile {
 		switch name {
