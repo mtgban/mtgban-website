@@ -1336,6 +1336,22 @@ func compareReleaseDate(filters []string, co *mtgmatcher.CardObject, cmpFunc fun
 	return cmpFunc(cardDate, releaseDate)
 }
 
+// promoTypeSlug renders a promo type as the token a query can carry: lower
+// case, with everything that is not a letter or a digit dropped. A query is
+// split on whitespace before a filter sees it, and an is: value again on
+// commas, so a tag only survives the trip as one word. Magic's types already
+// are ("boosterfun"), which is why is: has always worked there; this gives
+// the other games' tags the same shape.
+func promoTypeSlug(promoType string) string {
+	var out strings.Builder
+	for _, r := range strings.ToLower(promoType) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			out.WriteRune(r)
+		}
+	}
+	return out.String()
+}
+
 var isKnownPromo = map[string]string{
 	"bf":        magic.PromoTypeBoosterfun,
 	"v":         magic.PromoTypeBoosterfun,
@@ -1936,9 +1952,15 @@ func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
 				value = newValue
 			}
 
-			// Fall back to any promo type currently supported
-			if slices.Contains(mtgmatcher.AllPromoTypes(), value) {
-				if co.HasPromoType(value) {
+			// Fall back to any promo type the card itself carries. The
+			// comparison runs on a slug of the tag rather than the tag:
+			// Magic spells its types as one lower-case word already, so
+			// those are unaffected, while the other games spell theirs the
+			// way the storefront did - "best of", "Premium Card Collection
+			// -Best Selection Vol. 6-" - and a query is split on
+			// whitespace long before it arrives here.
+			for _, promoType := range co.PromoTypes {
+				if promoTypeSlug(promoType) == value {
 					return false
 				}
 			}
