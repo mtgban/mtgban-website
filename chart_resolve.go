@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"slices"
 	"strconv"
 	"strings"
@@ -360,7 +361,15 @@ func tcgVariantSearchID(ctx context.Context, vi timeseries.VariantInfo) (string,
 	}
 	subTypes, ok := PricesArchiveDB.CachedTCGSubTypeBanIDs(vi.TCGProductID)
 	if !ok {
-		subTypes, _ = PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, vi.TCGProductID)
+		// Without the product's sub-types there is nothing to pair the
+		// variant's own against, and tcgFinishIDForSubType reads an unknown
+		// sub-type as the primary foil — which is the wrong finish rather
+		// than no finish. Say so instead.
+		subTypes, err = PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, vi.TCGProductID)
+		if err != nil {
+			log.Printf("chart: sub-types for product %d: %v", vi.TCGProductID, err)
+			return "", false
+		}
 	}
 	id := tcgFinishIDForSubType(co, subTypes, vi.TCGSubType)
 	if id == "" {

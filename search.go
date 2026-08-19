@@ -115,15 +115,33 @@ func magicFinishSearchID(uuid string, foil, etched bool) string {
 	return uuid
 }
 
+// noteChartIDsDropped tells the reader that part of the roster could not be
+// matched to a printing, appending to whatever the page already said.
+func noteChartIDsDropped(pageVars *PageVars, dropped, total int) {
+	notice := fmt.Sprintf("%d of the %d charted cards could not be matched to a printing and were left out.", dropped, total)
+	if dropped == 1 {
+		notice = "One of the charted cards could not be matched to a printing and was left out."
+	}
+	if pageVars.InfoMessage == "" {
+		pageVars.InfoMessage = notice
+		return
+	}
+	pageVars.InfoMessage += " " + notice
+}
+
 // chartIDToSearchID maps a chart-roster id to an id the results table (which the
 // embedded chart lives inside) can resolve to a card row, mirroring
 // resolveChartTarget's precedence so anything chartable also renders its row.
 // Magic resolves to the mtgmatcher id of the variant's own finish; non-Magic
 // games (Lorcana, ...) to their mtgmatcher-native id via the TCGplayer external
 // id map.
-func chartIDToSearchID(ctx context.Context, id string) string {
+//
+// ok=false means nothing was resolved and the id is handed back as it came:
+// the results table will find no row for it, so the card drops out of the page
+// it was asked for. The caller says so rather than letting it vanish.
+func chartIDToSearchID(ctx context.Context, id string) (string, bool) {
 	if _, err := mtgmatcher.GetUUID(id); err == nil {
-		return id // already a matcher id (bare uuid / variant string)
+		return id, true // already a matcher id (bare uuid / variant string)
 	}
 	prefix, val := splitIDPrefix(id)
 
@@ -135,14 +153,14 @@ func chartIDToSearchID(ctx context.Context, id string) string {
 			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok {
 				if vi.MtgjsonUUID != "" {
 					// Magic: the uuid, kept on the finish the ban_id names.
-					return magicFinishSearchID(vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched)
+					return magicFinishSearchID(vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched), true
 				}
 				// Non-Magic: the product id maps back to the game's own card id,
 				// on the finish the variant's sub-type names.
 				if matched, ok := tcgVariantSearchID(ctx, vi); ok {
-					return matched
+					return matched, true
 				}
-				return id
+				return id, false
 			}
 			// Not a ban_id: fall through to the external-id lookup below.
 		}
@@ -151,9 +169,9 @@ func chartIDToSearchID(ctx context.Context, id string) string {
 	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
 	// id table (a TCGplayer product id, a Scryfall id, or an mtgjson uuid).
 	if matched, merr := mtgmatcher.MatchId(val); merr == nil {
-		return matched
+		return matched, true
 	}
-	return id
+	return id, false
 }
 
 // parseChartIDs splits a chart=... param (comma-separated UUIDs) into a
@@ -333,9 +351,21 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// ?chart=uuidA,%20uuidB doesn't leave card B off the results/remove
 			// controls just because fixupIDs won't trim the leading space.
 			searchIDs := make([]string, len(chartIds))
+			var unresolved int
 			for i, id := range chartIds {
-				searchIDs[i] = chartIDToSearchID(r.Context(), id)
+				searchID, ok := chartIDToSearchID(r.Context(), id)
+				if !ok {
+					unresolved++
+				}
+				searchIDs[i] = searchID
 				chartSearchIDs[id] = searchIDs[i]
+			}
+			// An id that resolved to nothing matches no row, so the card is
+			// simply absent from the table below the chart. Say which way it
+			// went: a roster the user built by hand, or a link they were sent,
+			// otherwise comes back quietly short.
+			if unresolved > 0 {
+				noteChartIDsDropped(&pageVars, unresolved, len(chartIds))
 			}
 			query = strings.Join(searchIDs, ",")
 			pageVars.Title = strings.Replace(pageVars.Title, "Search", "Chart", 1)
