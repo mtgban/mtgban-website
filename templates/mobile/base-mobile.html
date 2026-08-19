@@ -30,6 +30,8 @@
 </svg>
 {{template "navbar" .}}
 
+{{template "set-symbol-defs"}}
+
 <div class="page-content">
     {{if ne .ErrorMessage ""}}
         <div class="page-error">{{.ErrorMessage}}</div>
