@@ -82,16 +82,6 @@ func setupDiscord() error {
 	return nil
 }
 
-// discordRegionFilter keeps the bot to stores a reader can actually buy from,
-// which is a reason to drop a foreign shop and not a reason to drop a foreign
-// price reference — so the index scrapers are exempt. Cardmarket's are the
-// ones flagged EU, and without the exemption its prices never reach an embed.
-var discordRegionFilter = FilterStoreElem{
-	Name:         "region",
-	Values:       []string{"us"},
-	IncludeIndex: true,
-}
-
 // Cleanly close down the Discord session.
 func cleanupDiscord() {
 	if Config.DiscordToken == "" {
@@ -612,7 +602,20 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if allBls {
 		config := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
 
-		config.StoreFilters = append(config.StoreFilters, discordRegionFilter)
+		// Keep the bot to stores a reader can actually buy from. That is a
+		// reason to drop a foreign shop and not a reason to drop a foreign
+		// price reference, so the index scrapers are exempt — Cardmarket's are
+		// the ones flagged EU, and without the exemption its prices never reach
+		// an embed. Built here rather than shared: filter values are edited in
+		// place further down (parseSearchOptionsNG appends a trailing finish
+		// character to the last regexp filter's first value), so one Values
+		// slice handed to every message is a backing array the bot would be
+		// rewriting under itself.
+		config.StoreFilters = append(config.StoreFilters, FilterStoreElem{
+			Name:         "region",
+			Values:       []string{"us"},
+			IncludeIndex: true,
+		})
 
 		// Skip non-NM buylist prices
 		config.EntryFilters = append(config.EntryFilters, FilterEntryElem{

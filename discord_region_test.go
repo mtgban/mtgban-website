@@ -32,7 +32,12 @@ func TestDiscordRegionFilterKeepsIndexScrapers(t *testing.T) {
 		{"an EU index stays", seller("Cardmarket Low", "MKMLow", "EU", true), false},
 		{"a JP index stays", seller("Hareruya", "HAR", "JP", true), false},
 	} {
-		got := shouldSkipStoreNG(tc.scraper, []FilterStoreElem{discordRegionFilter})
+		// Mirrors the filter messageCreate appends.
+		got := shouldSkipStoreNG(tc.scraper, []FilterStoreElem{{
+			Name:         "region",
+			Values:       []string{"us"},
+			IncludeIndex: true,
+		}})
 		if got != tc.wantSkip {
 			t.Errorf("%s: skip=%v, want %v", tc.name, got, tc.wantSkip)
 		}
