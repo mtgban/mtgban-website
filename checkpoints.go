@@ -440,3 +440,14 @@ func containsFold(list []string, target string) bool {
 	}
 	return false
 }
+
+// refreshCheckpoints is reloadCheckpoints as the crons call it. A reload that
+// fails leaves the markers as they are -- an empty index when the boot-time
+// load failed too -- so it is worth reporting rather than only logging: for
+// Magic the source is a document on someone else's server, and a chart quietly
+// missing every ban marker looks like a chart with nothing to mark.
+func refreshCheckpoints() {
+	if err := reloadCheckpoints(); err != nil {
+		ServerNotify("checkpoints", "reload failed: "+err.Error(), true)
+	}
+}
