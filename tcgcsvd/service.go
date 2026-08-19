@@ -157,6 +157,10 @@ const crawlLockKey = 0x7463675f_63726177 // "tcg_craw"
 // WithCrawlLock runs fn only if this process can take the shared crawl lock,
 // and returns fn's error. A run that never happened is not a failure: when
 // another process holds the lock the reason is logged and the return is nil.
+// A database that cannot answer whether the lock is free is a different thing
+// and comes back as an error -- the run is just as skipped, but nobody chose to
+// skip it, and a daily ingest that quietly stops happening is what the
+// notification channel exists for.
 // A read-only database can't ingest, so it skips without taking the lock (else
 // it could win the lock and starve the writable process).
 //
@@ -175,8 +179,7 @@ func (s *Service) WithCrawlLock(ctx context.Context, job string, fn func() error
 	}
 	acquired, release, err := s.store.TryAdvisoryLock(ctx, crawlLockKey)
 	if err != nil {
-		log.Printf("%s: could not acquire crawl lock: %v", job, err)
-		return nil
+		return fmt.Errorf("%s: could not take the crawl lock: %w", job, err)
 	}
 	if !acquired {
 		log.Printf("%s: another process holds the tcgcsv crawl lock, skipping", job)

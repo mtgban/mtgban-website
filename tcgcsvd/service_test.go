@@ -213,3 +213,44 @@ func TestStashDoesNotNotifyOnShutdown(t *testing.T) {
 		})
 	}
 }
+
+// lockFailStore cannot answer whether the crawl lock is free.
+type lockFailStore struct {
+	stubStore
+	err error
+}
+
+func (s lockFailStore) TryAdvisoryLock(context.Context, int64) (bool, func(), error) {
+	return false, nil, s.err
+}
+
+// A lock another process holds is a skip, and a lock we could not ask about is
+// a failure. Both leave the ingest un-run, but only one of them was a decision:
+// a database that stops answering silently stops the daily pull, which is the
+// case the channel is for. A stop still stays quiet, as everywhere else.
+func TestCrawlLockErrorIsNotASilentSkip(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		store      Store
+		wantNotify bool
+	}{
+		{"another process holds the lock", stubStore{}, false},
+		{"the database cannot answer", lockFailStore{err: errors.New("connection refused")}, true},
+		{"cancelled by shutdown", lockFailStore{err: context.Canceled}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var notified []string
+			svc, err := New(tcgcsv.Config{Games: []tcgcsv.GameConfig{{Name: "Disney Lorcana", CategoryID: 71}}},
+				tc.store, WithNotifier(func(kind, message string) { notified = append(notified, message) }))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			svc.StashPrices(context.Background())
+
+			if got := len(notified) > 0; got != tc.wantNotify {
+				t.Errorf("notified=%v (%v), want %v", got, notified, tc.wantNotify)
+			}
+		})
+	}
+}
