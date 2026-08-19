@@ -401,6 +401,37 @@ func GetNewspaperUUIDs() map[string]struct{} {
 	return *p
 }
 
+// newspaperStaleAfter is how old the cached slices may get before the page says
+// so. The cache refreshes every three hours, so this is four missed runs: past
+// any single hiccup, and soon enough that a reader is told the same day.
+const newspaperStaleAfter = 12 * time.Hour
+
+// newspaperStaleNotice is what a page tells a reader when it has stopped
+// refreshing, or "" while it is current. Every page keeps its last good slice
+// through a bad refresh, which is what stops a gap in the scoring data from
+// blanking the tables -- but it also means the numbers look live when they are
+// not, and the reader is the one acting on them.
+func newspaperStaleNotice(last time.Time) string {
+	if last.IsZero() || time.Since(last) < newspaperStaleAfter {
+		return ""
+	}
+	return "these numbers last refreshed " + last.Format("Jan 2 15:04 MST") + " and are not current"
+}
+
+// noteNewspaperStaleness appends the notice to whatever the page was already
+// saying, since InfoMessage carries the page description.
+func noteNewspaperStaleness(pageVars *PageVars) {
+	notice := newspaperStaleNotice(pageVars.LastUpdate)
+	if notice == "" {
+		return
+	}
+	if pageVars.InfoMessage == "" {
+		pageVars.InfoMessage = notice
+		return
+	}
+	pageVars.InfoMessage += " — " + notice
+}
+
 // refreshNewspaperEdition runs one edition of a page's query. The second
 // return value reports whether the results are good enough to replace what is
 // already cached: a failed query, an empty response, or a response that lost
@@ -467,6 +498,10 @@ func cacheNewspaper() {
 	next := make([]NewspaperPage, len(current))
 	copy(next, current)
 
+	// How many editions actually took new rows this run. The update time is
+	// what the page shows as its own, so it may only move when something did.
+	var refreshed int
+
 	for i := range next {
 		if next[i].Query == "" {
 			continue
@@ -483,12 +518,14 @@ func cacheNewspaper() {
 		if results, ok := refreshNewspaperEdition(next[i].Option, query, next[i].Results); ok {
 			next[i].Results = results
 			next[i].AvailableEditions, next[i].PossibleFinish = newspaperFilterValues(results)
+			refreshed++
 		}
 
 		query3day := strings.ReplaceAll(query, "0 DAY", "3 DAY")
 		if results, ok := refreshNewspaperEdition(next[i].Option+" (3day)", query3day, next[i].Results3Day); ok {
 			next[i].Results3Day = results
 			next[i].AvailableEditions3Day, next[i].PossibleFinish3Day = newspaperFilterValues(results)
+			refreshed++
 		}
 
 		// Cache UUIDs from spike score pages for the "on:newspaper" search filter
@@ -503,7 +540,15 @@ func cacheNewspaper() {
 	newspaperUUIDsPtr.Store(&newspaperUUIDs)
 	log.Println("Newspaper UUIDs cached:", len(newspaperUUIDs))
 
-	SetLastNewspaperUpdate(time.Now())
+	// Only stamp a new update time when an edition actually took new rows.
+	// Every page keeps its last good slice through a bad refresh, so stamping
+	// unconditionally dated stale data to the minute the refresh failed, and the
+	// page then advertised it as current.
+	if refreshed > 0 {
+		SetLastNewspaperUpdate(time.Now())
+	} else {
+		log.Println("newspaper: no edition refreshed, leaving the update time at", GetLastNewspaperUpdate())
+	}
 	log.Println("Newspaper All Ready")
 }
 
@@ -1259,7 +1304,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		// live one is cached, and an empty table reads as a broken page
 		if len(results) == 0 {
 			pageVars.InfoMessage = "This data is not ready yet, please try again in a few minutes"
-			pageVars.LastUpdate = time.Now()
+			noteNewspaperStaleness(&pageVars)
 			render(w, "news.html", pageVars)
 			return
 		}
@@ -1354,5 +1399,6 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	noteNewspaperStaleness(&pageVars)
 	render(w, "news.html", pageVars)
 }
