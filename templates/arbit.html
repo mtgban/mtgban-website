@@ -217,6 +217,63 @@
             }
         </script>
 
+        {{/* The headline offer from every store, so what is worth scrolling to
+             is visible before any scrolling. Each row is the top row of its own
+             table, so the page's sort ranks these the same way it ranks
+             everything below - re-sort and this re-ranks with it. Global mode
+             compares one index against itself and has nothing to gather. A
+             store whose table carries no arbit columns has no "best" to name,
+             so it sits this out. */}}
+        {{if and (not $.GlobalMode) (gt (len $.Arb) 1)}}
+            <div class="arb-section arb-best-of">
+            <div class="arb-section-header">
+                <span class="arb-section-name">Best of each store</span>
+            </div>
+            <table class="table-data arb-table arb-best-table">
+                <thead>
+                    <tr>
+                        <th>Store</th>
+                        <th>Card</th>
+                        <th class="c">Sell Price</th>
+                        <th class="c">Buy Price</th>
+                        <th class="c">Diff</th>
+                        <th class="c">Spread</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {{range $.Arb}}
+                    {{if not .HasNoArbit}}
+                        {{$top := index .Arbit 0}}
+                        {{$card := index $.Metadata $top.CardId}}
+                        <tr>
+                            <td><a class="arb-best-store" href="#{{.Name}}">{{.Name}}</a></td>
+                            <td>
+                                <div class="arb-card-cell">
+                                    {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 24 "Class" "set-icon"}}
+                                    <span class="card-name-line">
+                                        <a href="{{$card.SearchURL}}" lang="{{$card.LangTag}}" target="_blank" rel="noopener">{{$card.Name}}</a>
+                                    </span>
+                                    <span class="card-edition">{{$card.Edition}}{{if not $card.Sealed}}{{if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}{{end}}</span>
+                                </div>
+                            </td>
+                            <td class="m">$ {{printf "%.2f" $top.InventoryEntry.Price}}</td>
+                            <td class="m">
+                                {{if eq $top.BuylistEntry.BuyPrice 0.0}}
+                                    $ {{printf "%.2f" $top.ReferenceEntry.Price}}
+                                {{else}}
+                                    $ {{printf "%.2f" $top.BuylistEntry.BuyPrice}}
+                                {{end}}
+                            </td>
+                            <td class="m">$ {{printf "%.2f" $top.Difference}}</td>
+                            <td class="m {{if gt $top.Spread 0.0}}arb-spread-up{{else}}arb-spread-down{{end}}">{{printf "%.2f" $top.Spread}} %</td>
+                        </tr>
+                    {{end}}
+                {{end}}
+                </tbody>
+            </table>
+            </div>
+        {{end}}
+
         {{range $i, $arb := .Arb}}
             <div class="arb-section">
             <span class="anchor" id="{{.Name}}"></span>

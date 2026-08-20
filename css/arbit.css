@@ -508,3 +508,32 @@ tr.arb-removed td:last-child { opacity: 1; }
 tr.arb-removed .card-name-line a { text-decoration: line-through; }
 tr.arb-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 .arb-row-check { cursor: pointer; }
+
+/* ── Best of each store ── */
+/* The summary table above the per-store sections. It is a normal arb-table,
+   narrower because it carries one row per store rather than per card, and
+   without the section nav arrows since it is not one of the sections they
+   step through. */
+.arb-best-of .arb-section-header { margin-bottom: 8px; }
+.arb-best-of .arb-section-name { font-size: var(--text-xl); }
+
+.arb-best-table { width: auto; min-width: min(100%, 720px); }
+.arb-best-table .arb-card-cell .set-icon { font-size: var(--text-xl); }
+
+/* The card reads as a label, not a figure, so it lines up with its heading
+   like it does in the tables below. Those get it from td:first-child, which
+   here reaches the store instead: the card is the second column. */
+.arb-best-table td:nth-child(2) { text-align: left; }
+
+.arb-best-store {
+    font-weight: 600;
+    color: var(--normal);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.arb-best-store:hover { color: var(--ainfo); }
+
+@media (max-width: 768px) {
+    .arb-best-table { min-width: 100%; }
+    .arb-best-table .arb-card-cell .set-icon { display: none; }
+}
