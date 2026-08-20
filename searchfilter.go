@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -1252,6 +1253,81 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 }
 
 const LargestIntValue = int(^uint(0) >> 1)
+
+// minPromoFallbackLen is the shortest query allowed to match a promo type by
+// substring. Two characters sit inside most of the list, so below this only an
+// exact token counts.
+const minPromoFallbackLen = 3
+
+// squeezePromo reduces a promo type or a query to the form they can be
+// compared in. A type is a token that lost its spaces so it could be typed
+// into a search ("cosmicfoil"), so the query gives up the same characters and
+// "cosmic foil" reaches it.
+func squeezePromo(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch r {
+		case ' ', '-', '_', '\'':
+			return -1
+		}
+		return unicode.ToLower(r)
+	}, s)
+}
+
+// promoTypeMatches names the promo types a bare query could have meant. An
+// exact token stands alone - asking for "metal" is not asking for every type
+// with "metal" inside it - and failing that every type carrying the query as a
+// substring comes back, which is how "foil" reaches all sixteen of them.
+func promoTypeMatches(query string) []string {
+	needle := squeezePromo(query)
+	if needle == "" {
+		return nil
+	}
+
+	all := mtgmatcher.AllPromoTypes()
+	for _, promoType := range all {
+		if squeezePromo(promoType) == needle {
+			return []string{promoType}
+		}
+	}
+	if len(needle) < minPromoFallbackLen {
+		return nil
+	}
+
+	var out []string
+	for _, promoType := range all {
+		if strings.Contains(squeezePromo(promoType), needle) {
+			out = append(out, promoType)
+		}
+	}
+	return out
+}
+
+// setCodeMatches names the sets a bare query could have meant, for the fallback
+// a search with no results takes. An exact code or an exact name stands alone;
+// failing that every set whose name carries the query as a substring comes
+// back, so "shadows" reaches both Shadows over Innistrad and its remaster.
+func setCodeMatches(query string) []string {
+	needle := squeezePromo(query)
+	if len(needle) < minPromoFallbackLen {
+		return nil
+	}
+
+	codes := mtgmatcher.GetAllSets()
+	var contains []string
+	for _, code := range codes {
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil {
+			continue
+		}
+		if squeezePromo(code) == needle || squeezePromo(set.Name) == needle {
+			return []string{code}
+		}
+		if strings.Contains(squeezePromo(set.Name), needle) {
+			contains = append(contains, code)
+		}
+	}
+	return contains
+}
 
 func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc func(a, b int) bool) bool {
 	if filters == nil {

@@ -88,6 +88,55 @@ func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (strin
 	})
 }
 
+// searchFallback re-reads a search whose name matched nothing, in the order a
+// searcher is likely to have meant it. "metal" names no card, but on the games
+// that print treatments as promo types it names a finish, and a storefront
+// lists the card under it. Failing that the word is read as a set: someone
+// typing "shadows" wants what is in the sets called that.
+//
+// Every filter the query already carried is kept, so "s:OGN metal" still means
+// that set; only the name is read a second way. A hashing search names its own
+// cards and is left alone.
+func searchFallback(config SearchConfig) []string {
+	if config.CleanQuery == "" || config.SearchMode == "hashing" {
+		return nil
+	}
+
+	query := config.CleanQuery
+	config.CleanQuery = ""
+	config.FullQuery = ""
+	base := slices.Clone(config.CardFilters)
+
+	if promoTypes := promoTypeMatches(query); len(promoTypes) > 0 {
+		config.CardFilters = append(slices.Clone(base), FilterElem{
+			Name:   "is",
+			Values: promoTypes,
+		})
+		if keys, err := searchAndFilter(config); err == nil && len(keys) > 0 {
+			return keys
+		}
+	}
+
+	// A set the query already narrowed to is not up for reinterpretation:
+	// "s:OGN shadows" asked about OGN, and answering with every set named
+	// shadows would throw away what the searcher did say.
+	if _, narrowed := editionSeedCodes(base); narrowed {
+		return nil
+	}
+
+	if codes := setCodeMatches(query); len(codes) > 0 {
+		config.CardFilters = append(slices.Clone(base), FilterElem{
+			Name:   "edition",
+			Values: codes,
+		})
+		if keys, err := searchAndFilter(config); err == nil && len(keys) > 0 {
+			return keys
+		}
+	}
+
+	return nil
+}
+
 // isValidChartID reports whether a chart= piece is a plausibly chartable id: a
 // mtgmatcher id or a ban:/tcg:/scryfall:/mtgjson: prefixed id (bare numbers are
 // TCGplayer ids). Full resolution happens at render time.
@@ -460,12 +509,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Perform search
 	allKeys, err := searchAndFilter(config)
 	if err != nil {
-		pageVars.InfoMessage = NoCardsMessage
-		pageVars.PopularSearches = getPopularSearches()
-		pageVars.CleanSearchQuery = config.CleanQuery
-		pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(query, config, pageVars.IsSealed)
-		render(w, "search.html", pageVars)
-		return
+		// No card carries the name, so read it another way before giving up.
+		// Only here: further down the results are empty because the cards that
+		// were found carry no listing, which is a fact about stock rather than
+		// an invitation to answer a different question.
+		allKeys = searchFallback(config)
+		if len(allKeys) == 0 {
+			pageVars.InfoMessage = NoCardsMessage
+			pageVars.PopularSearches = getPopularSearches()
+			pageVars.CleanSearchQuery = config.CleanQuery
+			pageVars.DidYouMean, pageVars.AltSearches = searchSuggestions(query, config, pageVars.IsSealed)
+			render(w, "search.html", pageVars)
+			return
+		}
 	}
 
 	// Limit results to avoid hogging the website with large queries
