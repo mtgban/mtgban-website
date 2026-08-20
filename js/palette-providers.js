@@ -216,6 +216,13 @@
     });
 
     // Property tags (is: and not: share the same list)
+    // Property tags (is: and not: share the same list).
+    //
+    // These are the predicates the search implements itself - a reserved-list
+    // check, a frame, a land cycle - so they are written out here. The promo
+    // types are not: every game declares its own, and there are 129 of them
+    // in Magic alone, so they are fetched from the datastore that is loaded
+    // and appended below.
     var isTagOptions = [
         { value: 'reserved', label: 'Reserved List', group: 'Legal' },
         { value: 'token', label: 'Token', group: 'Generic' },
@@ -249,66 +256,57 @@
         { value: 'power9', label: 'Power 9', sublabel: 'p9', group: 'Known sets' },
         { value: 'abu4h', label: 'ABU + 4 Horsemen', group: 'Known sets' },
         { value: 'promo', label: 'Any promo', group: 'Promo' },
-        { value: 'prerelease', label: 'Prerelease', sublabel: 'pre', group: 'Promo' },
-        { value: 'promopack', label: 'Promo Pack', sublabel: 'pp', group: 'Promo' },
-        { value: 'buyabox', label: 'Buy-a-Box', sublabel: 'bab', group: 'Promo' },
-        { value: 'bundle', label: 'Bundle', group: 'Promo' },
-        { value: 'release', label: 'Release / launch', group: 'Promo' },
-        { value: 'draftweekend', label: 'Draft Weekend', group: 'Promo' },
-        { value: 'gameday', label: 'Game Day', group: 'Promo' },
-        { value: 'fnm', label: 'Friday Night Magic', group: 'Promo' },
-        { value: 'judgegift', label: 'Judge Gift', sublabel: 'judge', group: 'Promo' },
-        { value: 'arenaleague', label: 'Arena League', sublabel: 'arena', group: 'Promo' },
-        { value: 'playerrewards', label: 'Player Rewards', sublabel: 'mpr', group: 'Promo' },
-        { value: 'wizardsplaynetwork', label: 'WPN / Gateway', group: 'Promo' },
-        { value: 'storechampionship', label: 'Store Championship', group: 'Promo' },
-        { value: 'convention', label: 'Convention', group: 'Promo' },
-        { value: 'tourney', label: 'Tournament', group: 'Promo' },
-        { value: 'intropack', label: 'Intro Pack', group: 'Promo' },
-        { value: 'starterdeck', label: 'Starter Deck', group: 'Promo' },
-        { value: 'glossy', label: 'Glossy', group: 'Promo' },
-        { value: 'serialized', label: 'Serialized', group: 'Promo' },
-        { value: 'concept', label: 'Concept art', group: 'Promo' },
-        { value: 'poster', label: 'Poster art', group: 'Promo' },
-        { value: 'scroll', label: 'Scroll', group: 'Promo' },
-        { value: 'schinesealtart', label: 'S-Chinese alt art', group: 'Promo' },
-        { value: 'draculaseries', label: 'Dracula series', group: 'Promo' },
-        { value: 'godzillaseries', label: 'Godzilla series', group: 'Promo' },
-        { value: 'ruderiders', label: 'Rude Riders', group: 'Promo' },
-        { value: 'boosterfun', label: 'Booster Fun', sublabel: 'bf', group: 'Promo' },
-        { value: 'altfoil', label: 'Any special foil', group: 'Foil' },
-        { value: 'surgefoil', label: 'Surge foil', sublabel: 'surge', group: 'Foil' },
-        { value: 'galaxyfoil', label: 'Galaxy foil', sublabel: 'galaxy', group: 'Foil' },
-        { value: 'ripplefoil', label: 'Ripple foil', sublabel: 'ripple', group: 'Foil' },
-        { value: 'rainbowfoil', label: 'Rainbow foil', sublabel: 'rainbow', group: 'Foil' },
-        { value: 'raisedfoil', label: 'Raised foil', sublabel: 'raised', group: 'Foil' },
-        { value: 'halofoil', label: 'Halo foil', sublabel: 'halo', group: 'Foil' },
-        { value: 'manafoil', label: 'Mana foil', sublabel: 'mana', group: 'Foil' },
-        { value: 'silverfoil', label: 'Silver foil', sublabel: 'silver', group: 'Foil' },
-        { value: 'fracturefoil', label: 'Fracture foil', sublabel: 'fracture', group: 'Foil' },
-        { value: 'confettifoil', label: 'Confetti foil', sublabel: 'confetti', group: 'Foil' },
-        { value: 'neonink', label: 'Neon Ink', sublabel: 'neon', group: 'Foil' },
-        { value: 'gilded', label: 'Gilded foil', group: 'Foil' },
-        { value: 'textured', label: 'Textured foil', group: 'Foil' },
-        { value: 'oilslick', label: 'Oil Slick foil', group: 'Foil' },
-        { value: 'invisibleink', label: 'Invisible Ink foil', group: 'Foil' },
-        { value: 'doubleexposure', label: 'Double Exposure', group: 'Foil' },
-        { value: 'doublerainbow', label: 'Double Rainbow', group: 'Foil' },
-        { value: 'stepandcompleat', label: 'Step-and-Compleat', group: 'Foil' },
-        { value: 'embossed', label: 'Embossed foil', group: 'Foil' },
-        { value: 'thick', label: 'Thick display', sublabel: 'thicc', group: 'Foil' }
+        { value: 'altfoil', label: 'Any special foil', group: 'Foil' }
     ];
+    // Promo types come from the loaded game rather than from a list written
+    // for one of them. Until the answer arrives the predicates above stand on
+    // their own, and if it never arrives they still do.
+    var promoTagsMerged = false;
+    var promosFetching = null;
+    function ensurePromoTags() {
+        if (promoTagsMerged || promosFetching) return promosFetching;
+        promosFetching = fetch('/api/palette/promos.json')
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (data) { mergePromoTags(data); })
+            .catch(function () { mergePromoTags([]); });
+        return promosFetching;
+    }
+    function mergePromoTags(promos) {
+        promoTagsMerged = true;
+        promosFetching = null;
+        var seen = {};
+        for (var i = 0; i < isTagOptions.length; i++) seen[isTagOptions[i].value] = true;
+        for (var j = 0; j < (promos || []).length; j++) {
+            var promo = promos[j];
+            if (!promo || !promo.value || seen[promo.value]) continue;
+            seen[promo.value] = true;
+            isTagOptions.push({
+                value: promo.value,
+                label: promo.label || promo.value,
+                sublabel: (promo.aliases || []).join(' '),
+                group: 'Promo'
+            });
+        }
+        fireOnDataReady();
+    }
+
     register({
         prefix: 'is:',
         name: 'Has Tag',
         icon: 'tag',
-        getCandidates: function (query) { return filterEntries(isTagOptions, query); }
+        getCandidates: function (query) {
+            ensurePromoTags();
+            return filterEntries(isTagOptions, query);
+        }
     });
     register({
         prefix: 'not:',
         name: "Doesn't Have Tag",
         icon: 'tag',
-        getCandidates: function (query) { return filterEntries(isTagOptions, query); }
+        getCandidates: function (query) {
+            ensurePromoTags();
+            return filterEntries(isTagOptions, query);
+        }
     });
 
     // Skip
