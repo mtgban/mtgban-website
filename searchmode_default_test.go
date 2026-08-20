@@ -26,6 +26,13 @@ func TestDefaultSearchModePerGame(t *testing.T) {
 		// An empty query with only a filter still seeds from the set index;
 		// search.go's edition-seed switch has to list the mode for that.
 		{"a filter-only query", "lorcana", "s:TFC", "any"},
+
+		// Scryfall knows only Magic, and only a Magic datastore resolves what
+		// it returns, so the mode is Magic's alone.
+		{"scryfall stands on magic", DefaultGame, "bolt sm:scryfall", "scryfall"},
+		{"scryfall is dropped on lorcana", "lorcana", "mickey sm:scryfall", "any"},
+		{"scryfall is dropped on riftbound", "riftbound", "yasuo sm:scryfall", "any"},
+		{"scryfall is dropped on onepiece", "onepiece", "luffy sm:scryfall", "any"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			Config.Game = tc.game
@@ -35,6 +42,22 @@ func TestDefaultSearchModePerGame(t *testing.T) {
 					tc.game, tc.query, config.SearchMode, tc.want)
 			}
 		})
+	}
+}
+
+// Dropping the mode must not leave its text in the query: the option is
+// stripped before the mode is read, so what is left is the name alone.
+func TestDroppedScryfallLeavesNoResidue(t *testing.T) {
+	prev := Config.Game
+	t.Cleanup(func() { Config.Game = prev })
+	Config.Game = "lorcana"
+
+	config := parseSearchOptionsNG("mickey sm:scryfall", nil, nil, nil)
+	if config.CleanQuery != "mickey" {
+		t.Errorf("CleanQuery = %q, want %q", config.CleanQuery, "mickey")
+	}
+	if config.SearchMode != "any" {
+		t.Errorf("SearchMode = %q, want the game default %q", config.SearchMode, "any")
 	}
 }
 

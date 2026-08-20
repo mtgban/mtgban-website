@@ -652,6 +652,15 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		// Options that modify the search engine
 		case "sm":
 			config.SearchMode = strings.ToLower(code)
+			// Scryfall is a Magic service, and what it returns is keyed by
+			// Scryfall ids that only a Magic datastore resolves, so anywhere
+			// else the mode spends a paginated network round trip to map
+			// every hit to nothing. Drop it and let the game's own default
+			// take the query, the way an unrecognised mode is already
+			// dropped by the search itself.
+			if config.SearchMode == "scryfall" && Config.Game != DefaultGame {
+				config.SearchMode = ""
+			}
 		case "skip":
 			switch strings.ToLower(code) {
 			case "retail":
