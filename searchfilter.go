@@ -1218,6 +1218,20 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		}
 	}
 
+	// A game other than Magic searches by substring unless the query said
+	// otherwise. Its card names carry a subtitle - "Mickey Mouse - Brave
+	// Little Tailor", "Monkey D. Luffy" - so the exact match the default mode
+	// tries almost never lands on what someone typed, and the prefix widening
+	// behind it only helps a query that started at the front of the name.
+	// Magic names are searched whole, so it keeps the exact-then-prefix path.
+	//
+	// Last, so the modes parsed out of the query above win, and so the checks
+	// above that read an unset mode - the Scryfall "|" syntax, the bare
+	// "<set> <number>" shorthand - still see the state they were written for.
+	if config.SearchMode == "" && Config.Game != DefaultGame {
+		config.SearchMode = "any"
+	}
+
 	config.CleanQuery = strings.TrimSpace(query)
 	config.CardFilters = filters
 	config.StoreFilters = filterStores

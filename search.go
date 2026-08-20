@@ -1414,7 +1414,7 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 		if codes, ok := editionSeedCodes(filters); ok {
 			for _, code := range codes {
 				switch config.SearchMode {
-				case "", "prefix":
+				case "", "prefix", "any":
 					uuids = append(uuids, mtgmatcher.GetUUIDsInSet(code)...)
 				case "sealed":
 					uuids = append(uuids, mtgmatcher.GetSealedUUIDsInSet(code)...)
