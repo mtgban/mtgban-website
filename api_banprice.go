@@ -887,29 +887,33 @@ func BanPrice2CSV(httpWriter http.ResponseWriter, pm map[string]map[string]*BanP
 // When uploadedData is nil, rows are derived from the price map keys (using
 // sorted for ordering if non-nil).
 func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploadedData []UploadEntry, sorted []string, preferFlavor bool) error {
+	// One pass over the registered scrapers for the index set, and a
+	// membership map for the seen scrapers: the loop below visits every
+	// (row, store) pair and slices.Contains made it quadratic.
+	metaOnly := map[string]bool{}
+	for _, scraper := range GetSellers() {
+		if scraper.Info().MetadataOnly {
+			metaOnly[scraper.Info().Shorthand] = true
+		}
+	}
+	for _, scraper := range GetVendors() {
+		if scraper.Info().MetadataOnly {
+			metaOnly[scraper.Info().Shorthand] = true
+		}
+	}
+
 	var allScrapers []string
-	var allIndexes []string
+	seen := map[string]bool{}
+	allIndexes := map[string]bool{}
 	for id := range pm {
 		for scraperKey := range pm[id] {
-			if slices.Contains(allScrapers, scraperKey) {
+			if seen[scraperKey] {
 				continue
 			}
-
-			for _, scraper := range GetSellers() {
-				if scraper.Info().Shorthand == scraperKey && scraper.Info().MetadataOnly {
-					if !slices.Contains(allIndexes, scraperKey) {
-						allIndexes = append(allIndexes, scraperKey)
-					}
-				}
+			seen[scraperKey] = true
+			if metaOnly[scraperKey] {
+				allIndexes[scraperKey] = true
 			}
-			for _, scraper := range GetVendors() {
-				if scraper.Info().Shorthand == scraperKey && scraper.Info().MetadataOnly {
-					if !slices.Contains(allIndexes, scraperKey) {
-						allIndexes = append(allIndexes, scraperKey)
-					}
-				}
-			}
-
 			allScrapers = append(allScrapers, scraperKey)
 		}
 	}
@@ -999,7 +1003,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 	return w.Error()
 }
 
-func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition string, preferFlavor, withSKU bool) ([]string, error) {
+func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers []string, allIndexes map[string]bool, condition string, preferFlavor, withSKU bool) ([]string, error) {
 	co, err := mtgmatcher.GetUUID(id)
 	if err != nil {
 		uuid := mtgmatcher.ExternalUUID(id)
@@ -1023,11 +1027,11 @@ func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, a
 			continue
 		}
 		cond := condition
-		if slices.Contains(allIndexes, scraper) {
+		if allIndexes[scraper] {
 			cond = ""
 		}
 		price := getPrice(entry, cond)
-		prices[i] = fmt.Sprintf("%0.2f", price)
+		prices[i] = strconv.FormatFloat(price, 'f', 2, 64)
 	}
 
 	scryfallID, found := co.Identifiers["scryfallId"]

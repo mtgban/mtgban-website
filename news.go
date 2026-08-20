@@ -1313,12 +1313,22 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if skipEditionsOpt != "" || rarity != "" || filter != "" || bucket != "" || finish != "" {
+		// Editions repeat across rows, so resolve each distinct one once
+		// rather than per row, and split the filter list once as well.
+		skipEditions := strings.Split(skipEditionsOpt, ",")
+		setCodeByEdition := map[string]string{}
 		var output []NewspaperResult
 		for _, result := range results {
 			if skipEditionsOpt != "" {
-				filters := strings.Split(skipEditionsOpt, ",")
-				set, err := mtgmatcher.GetSetByName(result.Edition)
-				if err == nil && slices.Contains(filters, set.Code) {
+				code, found := setCodeByEdition[result.Edition]
+				if !found {
+					set, err := mtgmatcher.GetSetByName(result.Edition)
+					if err == nil {
+						code = set.Code
+					}
+					setCodeByEdition[result.Edition] = code
+				}
+				if code != "" && slices.Contains(skipEditions, code) {
 					continue
 				}
 			}
@@ -1354,24 +1364,35 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			sort.SliceStable(results, func(i, j int) bool {
-				a := results[i].FieldValue(sorting)
-				b := results[j].FieldValue(sorting)
-				var af, bf float64
-				af, _ = strconv.ParseFloat(a, 64)
-				bf, _ = strconv.ParseFloat(b, 64)
-				numberSort := af != 0 || bf != 0
+			// FieldValue formats the field per call; resolve each row's
+			// sort key once instead of twice per comparison.
+			type decorated struct {
+				row NewspaperResult
+				str string
+				num float64
+			}
+			dec := make([]decorated, len(results))
+			for i := range results {
+				s := results[i].FieldValue(sorting)
+				f, _ := strconv.ParseFloat(s, 64)
+				dec[i] = decorated{row: results[i], str: s, num: f}
+			}
+			sort.SliceStable(dec, func(i, j int) bool {
+				numberSort := dec[i].num != 0 || dec[j].num != 0
 				if dir == "asc" {
 					if numberSort {
-						return af < bf
+						return dec[i].num < dec[j].num
 					}
-					return a < b
+					return dec[i].str < dec[j].str
 				}
 				if numberSort {
-					return af > bf
+					return dec[i].num > dec[j].num
 				}
-				return a > b
+				return dec[i].str > dec[j].str
 			})
+			for i := range dec {
+				results[i] = dec[i].row
+			}
 			break
 		}
 	}
