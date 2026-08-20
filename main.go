@@ -624,6 +624,9 @@ var ConfigBucket simplecloud.ReadWriter
 // paletteService wires the command-palette endpoints to the live scraper lists,
 // the newspaper page registry, and the arbit filter options.
 var paletteService = &palette.Service{
+	PromoAliases: func() map[string]string {
+		return isKnownPromo
+	},
 	Sellers: GetSellers,
 	Vendors: GetVendors,
 	NewspaperPages: func() []palette.NewspaperPage {
@@ -1042,6 +1045,7 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 	go updateStaticData()
 	go cacheNewspaper()
 	go paletteService.BuildSetsCache()
+	go paletteService.BuildPromosCache()
 
 	return nil
 }
@@ -1316,6 +1320,7 @@ func main() {
 	http.Handle("/api/palette/sealed/", noSigning(http.HandlerFunc(paletteService.Sealed)))
 	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(paletteService.Sets)))
 	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(paletteService.Stores)))
+	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(paletteService.Promos)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
 

@@ -44,8 +44,15 @@ type Service struct {
 	// ArbitFilters returns the arbitrage filter options, in display order.
 	ArbitFilters func() []ArbitFilter
 
+	// PromoAliases returns the shorthands a promo type also answers to, so
+	// the endpoint can offer them beside the type itself.
+	PromoAliases func() map[string]string
+
 	setsCache   []byte
 	setsCacheMu sync.RWMutex
+
+	promosCache   []byte
+	promosCacheMu sync.RWMutex
 }
 
 type Set struct {
@@ -101,6 +108,91 @@ func (s *Service) BuildSetsCache() {
 	s.setsCacheMu.Lock()
 	s.setsCache = data
 	s.setsCacheMu.Unlock()
+}
+
+// Promo is a promo type as the palette and the guide offer it: the token an
+// "is:" query carries, the words a reader is shown, and how much of the game
+// wears it.
+type Promo struct {
+	Value   string   `json:"value"`
+	Label   string   `json:"label"`
+	Count   int      `json:"count"`
+	Aliases []string `json:"aliases,omitempty"`
+}
+
+// BuildPromosCache rebuilds the promo type list from the loaded game. Called
+// on datastore load, beside the sets cache.
+//
+// The list is the loaded game's own: Magic answers with its 129 types,
+// Riftbound with 10, One Piece with 464. Nothing here knows which game it is
+// serving, which is the point - the guide and the palette can offer what the
+// datastore actually holds instead of a table written for one game.
+func (s *Service) BuildPromosCache() {
+	// One pass over the printings, rather than a scan per type: with a few
+	// hundred types and a few thousand printings the difference is real.
+	counts := map[string]int{}
+	for _, uuid := range mtgmatcher.GetUUIDs() {
+		co, err := mtgmatcher.GetUUID(uuid)
+		if err != nil {
+			continue
+		}
+		for _, promoType := range co.PromoTypes {
+			counts[promoType]++
+		}
+	}
+
+	var aliases map[string]string
+	if s.PromoAliases != nil {
+		aliases = s.PromoAliases()
+	}
+
+	promos := []Promo{}
+	for _, promoType := range mtgmatcher.AllPromoTypes() {
+		entry := Promo{
+			Value: promoType,
+			Label: mtgmatcher.PromoTypeLabel(promoType),
+			Count: counts[promoType],
+		}
+		for shorthand, target := range aliases {
+			if target == promoType {
+				entry.Aliases = append(entry.Aliases, shorthand)
+			}
+		}
+		sort.Strings(entry.Aliases)
+		promos = append(promos, entry)
+	}
+	// Commonest first, so a caller showing only the head of the list shows
+	// the types most of the game actually wears.
+	sort.Slice(promos, func(i, j int) bool {
+		if promos[i].Count != promos[j].Count {
+			return promos[i].Count > promos[j].Count
+		}
+		return promos[i].Value < promos[j].Value
+	})
+
+	data, err := json.Marshal(promos)
+	if err != nil {
+		return
+	}
+	s.promosCacheMu.Lock()
+	s.promosCache = data
+	s.promosCacheMu.Unlock()
+}
+
+// Promos returns the loaded game's promo types.
+func (s *Service) Promos(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	s.promosCacheMu.RLock()
+	data := s.promosCache
+	s.promosCacheMu.RUnlock()
+	// cache not warm - dont serve [] for an hour
+	if len(data) == 0 {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write([]byte(`[]`))
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Write(data)
 }
 
 type CardMetaResponse struct {
