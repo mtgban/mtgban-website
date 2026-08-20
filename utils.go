@@ -656,7 +656,12 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 				variant += strings.ToUpper(promoType) + " "
 				continue
 			}
-			variant += mtgmatcher.Title(promoType) + " "
+			// The promo type is a token so that it can be typed into a
+			// search, which cost it the spaces: title-casing it back gives
+			// "Bestof" where the storefront wrote "Best Of". Ask the game
+			// how it is spelled - Magic keeps no fuller spelling and falls
+			// back to the same title-casing, so nothing there moves.
+			variant += mtgmatcher.PromoTypeLabel(promoType) + " "
 		}
 	}
 	variant = strings.TrimSpace(variant)
