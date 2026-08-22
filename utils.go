@@ -94,6 +94,31 @@ var colorRarityMap = map[string]map[string]string{
 		"TR":  "#1FA7C9",
 		"PR":  "#652978",
 	},
+	// Flesh and Blood prints its rarity as a letter in a colored glyph at the
+	// bottom left, and these are sampled from those glyphs: a blue R, a
+	// crimson M, a bronze L, a green P, an amber diamond for fabled, gold for
+	// the treasures. Gold and Marvel sit on artwork rather than the black
+	// bar, so those two are read by eye rather than measured.
+	//
+	// Basic, common and token all carry the same grey, and super rare carries
+	// no glyph at all on the frame that has it, so those four are placed
+	// rather than sampled: common takes the theme's neutral like every other
+	// game, and the rest take neighbouring tiers' colors. The 139 cards with
+	// no rarity are left out and draw no badge.
+	"fleshandblood": {
+		"Common":       "var(--normal)",
+		"Basic":        "#707883",
+		"Token":        "#919495",
+		"Rare":         "#156FA6",
+		"Super Rare":   "#1FA7C9",
+		"Majestic":     "#821A1E",
+		"Legendary":    "#937131",
+		"Fabled":       "#8F6330",
+		"Marvel":       "#7B5BC0",
+		"Gold":         "#E0B84A",
+		"Pirate Booty": "#D4B055",
+		"Promo":        "#298233",
+	},
 }
 
 // badgeFont is the size the shapes are cut at, and the ceiling a set code is
