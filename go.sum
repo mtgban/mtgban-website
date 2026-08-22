@@ -159,6 +159,8 @@ github.com/mroth/weightedrand/v2 v2.1.0 h1:o1ascnB1CIVzsqlfArQQjeMy1U0NcIbBO5rfd
 github.com/mroth/weightedrand/v2 v2.1.0/go.mod h1:f2faGsfOGOwc1p94wzHKKZyTpcJUW7OJ/9U4yfiNAOU=
 github.com/mtgban/go-mtgban v0.7.8 h1:MkXstY8s3Hzuez4qmoFeHXimrhV/G1XP2Euy5F8Op14=
 github.com/mtgban/go-mtgban v0.7.8/go.mod h1:4qvfc2fe5KLGYgb808rT85Jpg7R5fcYtrKDgMu9x7B8=
+github.com/mtgban/go-mtgban v0.7.10-0.20260822114729-1a8715a3e184 h1:MWO0Qgiwry+s1hjSiD9UGTC03icROP6H058nTvH8F5E=
+github.com/mtgban/go-mtgban v0.7.10-0.20260822114729-1a8715a3e184/go.mod h1:4qvfc2fe5KLGYgb808rT85Jpg7R5fcYtrKDgMu9x7B8=
 github.com/mtgban/go-tcgplayer v0.1.0 h1:jHrqn8dA6O8Y0eDftsBdz7YrdHVLYgezwGF2JV+8MzQ=
 github.com/mtgban/go-tcgplayer v0.1.0/go.mod h1:KaXcyjC/Y1M9itmWcjGcZi0ao40RkHAGua1nLML+4xA=
 github.com/mtgban/simplecloud v0.0.11 h1:KkMyHnLtWVuypnasJeE/eTm3LIx0lCvwHQUwghS+gHI=

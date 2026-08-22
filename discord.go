@@ -320,7 +320,7 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 					break
 				}
 			}
-			cardId, err := mtgmatcher.MatchId(id, v.Get("Printing") == "Foil")
+			cardId, err := mtgmatcher.MatchID(id, v.Get("Printing") == "Foil")
 			if err != nil {
 				return "Your search"
 			}

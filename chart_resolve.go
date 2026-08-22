@@ -122,7 +122,7 @@ func matcherTarget(ctx context.Context, id string) (*chartTarget, error) {
 	co, err := mtgmatcher.GetUUID(id)
 	if err != nil {
 		// Not a direct mtgmatcher id; try the external id map (Scryfall/TCGplayer).
-		if matched, merr := mtgmatcher.MatchId(id); merr == nil {
+		if matched, merr := mtgmatcher.MatchID(id); merr == nil {
 			co, err = mtgmatcher.GetUUID(matched)
 		}
 	}
@@ -339,7 +339,7 @@ func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64,
 	if id, ok := co.FoilUUIDs[mtgmatcher.FinishFoil]; ok {
 		return id
 	}
-	if id, err := mtgmatcher.MatchId(co.UUID, true); err == nil {
+	if id, err := mtgmatcher.MatchID(co.UUID, true); err == nil {
 		return id
 	}
 	return co.UUID
@@ -351,7 +351,7 @@ func tcgFinishIDForSubType(co *mtgmatcher.CardObject, subTypes map[string]int64,
 // product with no card), or when the card has no finish for the variant's
 // sub-type — charting the wrong finish is worse than charting nothing.
 func tcgVariantSearchID(ctx context.Context, vi timeseries.VariantInfo) (string, bool) {
-	matched, err := mtgmatcher.MatchId(strconv.Itoa(vi.TCGProductID))
+	matched, err := mtgmatcher.MatchID(strconv.Itoa(vi.TCGProductID))
 	if err != nil {
 		return "", false
 	}
@@ -395,7 +395,7 @@ func tcgProductID(co *mtgmatcher.CardObject) (int, bool) {
 // Magic TCGplayer ids), otherwise a non-Magic product in the variants table.
 func targetFromTCGID(ctx context.Context, tcgID int) (*chartTarget, error) {
 	idStr := strconv.Itoa(tcgID)
-	if matched, err := mtgmatcher.MatchId(idStr); err == nil {
+	if matched, err := mtgmatcher.MatchID(idStr); err == nil {
 		if co, err := mtgmatcher.GetUUID(matched); err == nil {
 			return &chartTarget{
 				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,

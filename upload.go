@@ -1517,7 +1517,7 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 		// Try matching via TCGplayer product ID first
 		uuid := mtgmatcher.ExternalUUID(item.ProductID)
 		if uuid != "" {
-			cardId, matchErr = mtgmatcher.MatchId(uuid, item.IsFoil)
+			cardId, matchErr = mtgmatcher.MatchID(uuid, item.IsFoil)
 		}
 
 		// Fall back to name-based matching
@@ -1572,14 +1572,14 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 // on top.
 func resolveMoxItem(item moxfield.Item) (string, error) {
 	if item.ScryfallID != "" {
-		return mtgmatcher.MatchId(item.ScryfallID, item.IsFoil, item.IsEtched)
+		return mtgmatcher.MatchID(item.ScryfallID, item.IsFoil, item.IsEtched)
 	}
 
 	printings := mtgmatcher.MatchWithNumber(item.Name, strings.ToUpper(item.SetCode), item.Number)
 	if len(printings) == 0 {
 		return "", fmt.Errorf("unknown printing %s (%s) %s", item.Name, item.SetCode, item.Number)
 	}
-	return mtgmatcher.MatchId(printings[0].UUID, item.IsFoil, item.IsEtched)
+	return mtgmatcher.MatchID(printings[0].UUID, item.IsFoil, item.IsEtched)
 }
 
 func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {

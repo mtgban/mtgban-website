@@ -13,7 +13,7 @@ require (
 	github.com/lib/pq v1.11.1
 	github.com/mackerelio/go-osstat v0.2.4
 	github.com/mileusna/useragent v1.3.5
-	github.com/mtgban/go-mtgban v0.7.8
+	github.com/mtgban/go-mtgban v0.7.10-0.20260822114729-1a8715a3e184
 	github.com/mtgban/simplecloud v0.0.11
 	github.com/xuri/excelize/v2 v2.11.0
 	golang.org/x/oauth2 v0.36.0
