@@ -292,7 +292,7 @@ func init() {
 func arbitCardIds(entries []mtgban.ArbitEntry) []string {
 	cardIds := make([]string, len(entries))
 	for i := range entries {
-		cardIds[i] = entries[i].CardId
+		cardIds[i] = entries[i].CardID
 	}
 	return cardIds
 }
@@ -339,18 +339,18 @@ func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode, preferFlavo
 	case "edition":
 		sortData := resolveSortingData(arbitCardIds(entries))
 		return func(a, b *mtgban.ArbitEntry) bool {
-			if a.CardId == b.CardId {
+			if a.CardID == b.CardID {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
 			}
-			return cmpSets(sortData[a.CardId], sortData[b.CardId])
+			return cmpSets(sortData[a.CardID], sortData[b.CardID])
 		}
 	case "alpha":
 		sortData := resolveSortingData(arbitCardIds(entries))
 		return func(a, b *mtgban.ArbitEntry) bool {
-			if a.CardId == b.CardId {
+			if a.CardID == b.CardID {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
 			}
-			return cmpSetsAlphabetical(sortData[a.CardId], sortData[b.CardId], preferFlavor)
+			return cmpSetsAlphabetical(sortData[a.CardID], sortData[b.CardID], preferFlavor)
 		}
 	}
 	return nil
@@ -871,9 +871,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			for _, res := range arbit {
-				isSussy := invalidDirectIn(tcgMarket, res.CardId, res.ReferenceEntry.Price)
+				isSussy := invalidDirectIn(tcgMarket, res.CardID, res.ReferenceEntry.Price)
 				if isSussy {
-					sussy[res.CardId] = tcgMarketPriceIn(tcgMarket, res.CardId)
+					sussy[res.CardID] = tcgMarketPriceIn(tcgMarket, res.CardID)
 				}
 			}
 		}
@@ -881,9 +881,9 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			sussy = map[string]float64{}
 
 			for _, res := range arbit {
-				iqr := getTCGSimulationIQR(res.CardId)
+				iqr := getTCGSimulationIQR(res.CardID)
 				if iqr > 150 {
-					sussy[res.CardId] = iqr
+					sussy[res.CardID] = iqr
 				}
 			}
 		}
@@ -930,7 +930,7 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		pageVars.Arb = append(pageVars.Arb, entry)
 		for i := range arbit {
-			cardId := arbit[i].CardId
+			cardId := arbit[i].CardID
 			_, found := pageVars.Metadata[cardId]
 			if found {
 				continue

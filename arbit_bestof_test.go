@@ -30,7 +30,7 @@ func renderArbit(t *testing.T, pageVars PageVars) string {
 func arbitPageVars() PageVars {
 	entry := func(id string, sell, buy, diff, spread float64) mtgban.ArbitEntry {
 		return mtgban.ArbitEntry{
-			CardId:         id,
+			CardID:         id,
 			InventoryEntry: mtgban.InventoryEntry{Price: sell, Conditions: "NM", Quantity: 1},
 			BuylistEntry:   mtgban.BuylistEntry{BuyPrice: buy},
 			Difference:     diff,

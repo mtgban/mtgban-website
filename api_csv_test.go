@@ -33,7 +33,7 @@ func TestSimplePrice2CSVTCGSKU(t *testing.T) {
 	// One SKU per condition, so a wrong condition would pick the wrong one
 	inventory := mtgban.InventoryRecord{}
 	for cond, sku := range map[string]string{"NM": "111", "SP": "222"} {
-		inventory.Add(id, &mtgban.InventoryEntry{Conditions: cond, InstanceId: sku})
+		inventory.Add(id, &mtgban.InventoryEntry{Conditions: cond, InstanceID: sku})
 	}
 	prev := sellersPtr.Load()
 	t.Cleanup(func() { sellersPtr.Store(prev) })

@@ -409,7 +409,7 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 
 	idx, found = indexMap["id"]
 	if found && idx < len(record) {
-		res.Card.Id = record[idx]
+		res.Card.ID = record[idx]
 	}
 
 	// Try looking up using the TCGSkuId if we found an id and it's not among
@@ -419,7 +419,7 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 	idx, found = indexMap["tcgSku"]
 	if found && idx < len(record) && p.TCGSkuToUUID != nil {
 		tcgSkuId = record[idx]
-		res.Card.Id = p.TCGSkuToUUID(tcgSkuId)
+		res.Card.ID = p.TCGSkuToUUID(tcgSkuId)
 	}
 
 	res.Card.Name = record[indexMap["cardName"]]

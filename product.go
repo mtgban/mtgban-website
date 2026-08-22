@@ -765,7 +765,7 @@ func runSealedAnalysis() {
 
 	// Index every TCGplayer SKU (singles + sealed) to its card so callers can
 	// resolve a SKU in O(1) instead of scanning the whole inventory. The entry
-	// is keyed by its InstanceId (SKU); the card uuid is stashed in OriginalId,
+	// is keyed by its InstanceID (SKU); the card uuid is stashed in OriginalID,
 	// and Price/Conditions are preserved for callers that need them.
 	tcgSealed, _ := findSellerInventory("TCGSealed")
 	tcgPlayer, _ := findSellerInventory("TCGPlayer")
@@ -773,11 +773,11 @@ func runSealedAnalysis() {
 	for _, inv := range []mtgban.InventoryRecord{tcgPlayer, tcgSealed} {
 		for uuid, entries := range inv {
 			for _, entry := range entries {
-				if entry.InstanceId == "" {
+				if entry.InstanceID == "" {
 					continue
 				}
-				entry.OriginalId = uuid
-				skuIndex.Add(entry.InstanceId, &entry)
+				entry.OriginalID = uuid
+				skuIndex.Add(entry.InstanceID, &entry)
 			}
 		}
 	}

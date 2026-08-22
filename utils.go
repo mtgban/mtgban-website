@@ -497,7 +497,7 @@ func findTCGproductId(cardId string) string {
 			entries, found = tcgMarket[co.UUID]
 		}
 		if found {
-			tcgId = entries[0].OriginalId
+			tcgId = entries[0].OriginalID
 		}
 	}
 
@@ -509,7 +509,7 @@ func findInstanceId(sellerName, cardId, cond string) string {
 	tcgplayer, _ := findSellerInventory(sellerName)
 	for _, entry := range tcgplayer[cardId] {
 		if entry.Conditions == cond {
-			return entry.InstanceId
+			return entry.InstanceID
 		}
 	}
 	return ""
@@ -531,13 +531,13 @@ func uuid2TCGSKU(cardId string, sealed bool, cond string) string {
 
 // tcgSKU2UUID resolves a TCGplayer SKU (instance id) to a card uuid using the
 // precomputed "tcgskuid" index from runSealedAnalysis (O(1)), where the uuid is
-// stored in each entry's OriginalId. Returns "" if the SKU is unknown.
+// stored in each entry's OriginalID. Returns "" if the SKU is unknown.
 func tcgSKU2UUID(sku string) string {
 	entries := GetInfos()["tcgskuid"][sku]
 	if len(entries) == 0 {
 		return ""
 	}
-	return entries[0].OriginalId
+	return entries[0].OriginalID
 }
 
 // tcgSKU2Condition resolves a TCGplayer SKU (instance id) to the condition it
@@ -556,7 +556,7 @@ func findOriginalId(sellerName, cardId string) string {
 	tcgplayer, _ := findSellerInventory(sellerName)
 	entries, found := tcgplayer[cardId]
 	if found {
-		return entries[0].OriginalId
+		return entries[0].OriginalID
 	}
 	return ""
 }
