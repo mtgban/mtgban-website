@@ -252,7 +252,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 				// Check for nonfoil, foil, etched
 				[]bool{false, false}, []bool{true, false}, []bool{false, true},
 			} {
-				uuid, err := mtgmatcher.MatchId(base, opts...)
+				uuid, err := mtgmatcher.MatchID(base, opts...)
 				if err != nil {
 					continue
 				}

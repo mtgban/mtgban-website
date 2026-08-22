@@ -65,7 +65,7 @@ func getDirectQty(ctx context.Context, cardId string) ([]tcgplayer.ListingData, 
 		return nil, err
 	}
 
-	return tcgplayer.GetDirectQtysForProductId(ctx, tcgId, true), nil
+	return tcgplayer.GetDirectQtysForProductID(ctx, tcgId, true), nil
 }
 
 func getDecklist(uuid string) ([]string, error) {
@@ -186,7 +186,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		if !found {
 			continue
 		}
-		productId := blEntries[0].InstanceId
+		productId := blEntries[0].InstanceID
 		name := blEntries[0].CustomFields["SCGName"]
 		edition := blEntries[0].CustomFields["SCGEdition"]
 		language := blEntries[0].CustomFields["SCGLanguage"]

@@ -175,7 +175,7 @@ func TestMagicFinishSearchID(t *testing.T) {
 		if err != nil || co.Sealed || co.Foil || co.Etched {
 			continue
 		}
-		alt, err := mtgmatcher.MatchId(id, true)
+		alt, err := mtgmatcher.MatchID(id, true)
 		if err != nil || alt == id {
 			continue
 		}

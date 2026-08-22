@@ -64,7 +64,7 @@ func TestChartSearchIDDoesNotGuessBanIDs(t *testing.T) {
 		if id == "" {
 			continue
 		}
-		if _, merr := mtgmatcher.MatchId(id); merr == nil {
+		if _, merr := mtgmatcher.MatchID(id); merr == nil {
 			tcgID, card = id, co.Name
 			break
 		}

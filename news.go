@@ -332,7 +332,7 @@ func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 
 		// Override a few fields for better integration with the site
 		if db == NewNewspaperDB {
-			uuid, err := mtgmatcher.MatchId(raw[1], raw[6] != "Normal")
+			uuid, err := mtgmatcher.MatchID(raw[1], raw[6] != "Normal")
 			if err != nil {
 				LogPages["Newspaper"].Println("match", raw[1], raw[6], "as", raw[3], raw[4], raw[5], "failed:", err)
 				continue
@@ -1204,7 +1204,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 					URL:        entry.URL,
 				}
 				arbit = append(arbit, mtgban.ArbitEntry{
-					CardId:         cardId,
+					CardID:         cardId,
 					InventoryEntry: converted,
 					Quantity:       entry.Quantity,
 				})
@@ -1215,18 +1215,18 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		default:
 			sortData := resolveSortingData(arbitCardIds(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
-				if arbit[i].CardId == arbit[j].CardId {
+				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return cmpSets(sortData[arbit[i].CardId], sortData[arbit[j].CardId])
+				return cmpSets(sortData[arbit[i].CardID], sortData[arbit[j].CardID])
 			})
 		case "alpha":
 			sortData := resolveSortingData(arbitCardIds(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
-				if arbit[i].CardId == arbit[j].CardId {
+				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
 				}
-				return cmpSetsAlphabetical(sortData[arbit[i].CardId], sortData[arbit[j].CardId], preferFlavor)
+				return cmpSetsAlphabetical(sortData[arbit[i].CardID], sortData[arbit[j].CardID], preferFlavor)
 			})
 		case "available":
 			sort.Slice(arbit, func(i, j int) bool {
@@ -1249,11 +1249,11 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 		// runs to tens of thousands of cards and all the template reads are
 		// keyed by the paginated entries.
 		for _, entry := range arbit {
-			_, found := pageVars.Metadata[entry.CardId]
+			_, found := pageVars.Metadata[entry.CardID]
 			if found {
 				continue
 			}
-			pageVars.Metadata[entry.CardId] = uuid2card(entry.CardId, true, false, preferFlavor)
+			pageVars.Metadata[entry.CardID] = uuid2card(entry.CardID, true, false, preferFlavor)
 		}
 
 		entry := Arbitrage{

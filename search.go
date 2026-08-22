@@ -164,7 +164,7 @@ func isValidChartID(part string) bool {
 // back to the search always lands on the nonfoil printing. Falls back to the
 // uuid when the finish has no id of its own.
 func magicFinishSearchID(uuid string, foil, etched bool) string {
-	if matched, err := mtgmatcher.MatchId(uuid, foil, etched); err == nil {
+	if matched, err := mtgmatcher.MatchID(uuid, foil, etched); err == nil {
 		return matched
 	}
 	return uuid
@@ -219,7 +219,10 @@ func chartSearchID(id string, target *chartTarget) (string, bool) {
 	if prefix == "ban" {
 		return id, false
 	}
-	if matched, err := mtgmatcher.MatchId(val); err == nil {
+
+	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
+	// id table (a TCGplayer product id, a Scryfall id, or an mtgjson uuid).
+	if matched, merr := mtgmatcher.MatchID(val); merr == nil {
 		return matched, true
 	}
 	return id, false
@@ -860,7 +863,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				var link string
 
-				game := cardmarket.GameIdFromName(Config.Game)
+				game := cardmarket.GameFromName(Config.Game)
 				id, err := strconv.Atoi(co.Identifiers["mcmId"])
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the
@@ -1077,7 +1080,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			co, gerr := mtgmatcher.GetUUID(searchId)
 			if gerr == nil && !co.Sealed {
 				altId, err := mtgmatcher.Match(&mtgmatcher.InputCard{
-					Id:   searchId,
+					ID:   searchId,
 					Foil: !co.Foil,
 				})
 				if err == nil && altId != searchId {
@@ -1085,7 +1088,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				}
 
 				altId, err = mtgmatcher.Match(&mtgmatcher.InputCard{
-					Id:        searchId,
+					ID:        searchId,
 					Variation: "Etched",
 				})
 				if err == nil && altId != searchId {
@@ -1628,8 +1631,8 @@ func editionsForSearch(allKeys []string) []EditionEntry {
 // addFinishVariants appends id's foil and etched finishes to uuids, skipping
 // any that don't exist, equal id, or are already present.
 func addFinishVariants(uuids []string, id string) []string {
-	foilId, _ := mtgmatcher.MatchId(id, true)
-	etchedId, _ := mtgmatcher.MatchId(id, false, true)
+	foilId, _ := mtgmatcher.MatchID(id, true)
+	etchedId, _ := mtgmatcher.MatchID(id, false, true)
 	for _, otherFinishId := range []string{foilId, etchedId} {
 		if otherFinishId != "" && otherFinishId != id && !slices.Contains(uuids, otherFinishId) {
 			uuids = append(uuids, otherFinishId)

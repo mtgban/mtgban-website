@@ -18,7 +18,7 @@ import (
 )
 
 type Sleeper struct {
-	CardId string
+	CardID string
 	Level  int
 }
 
@@ -433,7 +433,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 
 			// Load the tiers
 			for i := range arbit {
-				tiers[arbit[i].CardId]++
+				tiers[arbit[i].CardID]++
 			}
 		}
 
@@ -442,7 +442,7 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 
 			// Load the tiers
 			for i := range mismatch {
-				tiers[mismatch[i].CardId]++
+				tiers[mismatch[i].CardID]++
 			}
 		}
 	}
@@ -493,7 +493,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 
 	// Filter out entries that are invalid
 	for i := range mismatch {
-		cardId := mismatch[i].CardId
+		cardId := mismatch[i].CardID
 
 		co, err := mtgmatcher.GetUUID(cardId)
 		if err != nil {
@@ -537,7 +537,7 @@ func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
 	for c := range tiers {
 		if tiers[c] > 1 {
 			results = append(results, Sleeper{
-				CardId: c,
+				CardID: c,
 				Level:  tiers[c],
 			})
 		}
@@ -576,7 +576,7 @@ func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
 		level := int(math.Floor(r*exp) + maxrange)
 
 		if DevMode {
-			cc, _ := mtgmatcher.GetUUID(res.CardId)
+			cc, _ := mtgmatcher.GetUUID(res.CardID)
 			log.Println(level, res.Level, cc)
 		}
 
@@ -586,7 +586,7 @@ func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
 
 		letter := SleeperLetters[level]
 
-		sleepers[letter] = append(sleepers[letter], res.CardId)
+		sleepers[letter] = append(sleepers[letter], res.CardID)
 	}
 
 	// Sort sleepers by price

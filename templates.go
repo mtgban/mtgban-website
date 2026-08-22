@@ -176,7 +176,7 @@ var funcMap = template.FuncMap{
 		if !found {
 			return ""
 		}
-		return entries[0].OriginalId
+		return entries[0].OriginalID
 	},
 	"uuid2tcgid": func(s string) string {
 		return findTCGproductId(s)

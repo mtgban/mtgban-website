@@ -325,7 +325,7 @@ var moverCardId = func(row timeseries.MoverRow, subTypes map[string]int64) (stri
 	// Holofoil, and both would land on the same card. tcgFinishIDForSubType
 	// pairs them off the sub-types the product is actually priced under, the
 	// same way the chart read path does.
-	base, err := mtgmatcher.MatchId(strconv.Itoa(row.TCGProductID))
+	base, err := mtgmatcher.MatchID(strconv.Itoa(row.TCGProductID))
 	if err != nil {
 		return "", false, false
 	}
@@ -624,7 +624,7 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 
 	for _, res := range paged {
 		// DB uuid is finish-agnostic; resolve the priced foil/etched variant.
-		cardId, err := mtgmatcher.MatchId(res.UUID, res.IsFoil, res.IsEtched)
+		cardId, err := mtgmatcher.MatchID(res.UUID, res.IsFoil, res.IsEtched)
 		if err != nil {
 			cardId = res.UUID
 		}

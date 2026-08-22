@@ -13,9 +13,9 @@ func TestTCGSKU2UUID(t *testing.T) {
 
 	infos := map[string]mtgban.InventoryRecord{
 		"tcgskuid": {
-			"12345": {{OriginalId: "uuid-aaa"}},
+			"12345": {{OriginalID: "uuid-aaa"}},
 			// Multiple entries for one SKU: the first one wins.
-			"67890": {{OriginalId: "uuid-bbb"}, {OriginalId: "uuid-ccc"}},
+			"67890": {{OriginalID: "uuid-bbb"}, {OriginalID: "uuid-ccc"}},
 		},
 	}
 	infosPtr.Store(&infos)
