@@ -119,6 +119,59 @@ var colorRarityMap = map[string]map[string]string{
 		"Pirate Booty": "#D4B055",
 		"Promo":        "#298233",
 	},
+	// Yu-Gi-Oh marks no rarity on the card at all: it is a finish, the name
+	// foiled silver or gold and the art holographic, so there is nothing to
+	// sample and no shape to cut. What it does have is 35 rarities, most of
+	// them a treatment of another one, which no palette could tell apart by
+	// hue. They group by the tier their name claims — a Prismatic Secret Rare
+	// is a secret rare, a Duel Terminal Normal Parallel Rare is a rare — and
+	// each group climbs the ladder the other games already use.
+	"yugioh": {
+		"Common":                          "var(--normal)",
+		"Duel Terminal Technology Common": "var(--normal)",
+
+		"Duel Terminal Normal Parallel Rare": "#707883",
+		"Duel Terminal Rare Parallel Rare":   "#707883",
+		"Mosaic Rare":                        "#707883",
+		"Parallel Rare":                      "#707883",
+		"Rare":                               "#707883",
+		"Shatterfoil Rare":                   "#707883",
+		"Starfoil Rare":                      "#707883",
+
+		"Duel Terminal Super Parallel Rare": "#919495",
+		"Platinum Rare":                     "#919495",
+		"Super Rare":                        "#919495",
+
+		"Duel Terminal Technology Ultra Rare": "#B06435",
+		"Duel Terminal Ultra Parallel Rare":   "#B06435",
+		"Emblazoned Ultra Rare":               "#B06435",
+		"Ultra Pharaoh’s Rare":                "#B06435",
+		"Ultra Rare":                          "#B06435",
+
+		"Prismatic Ultimate Rare": "#C63A4D",
+		"Ultimate Rare":           "#C63A4D",
+
+		"10000 Secret Rare":           "#1FA7C9",
+		"Emblazoned Secret Rare":      "#1FA7C9",
+		"Gold Secret Rare":            "#1FA7C9",
+		"Platinum Secret Rare":        "#1FA7C9",
+		"Prismatic Secret Rare":       "#1FA7C9",
+		"Quarter Century Secret Rare": "#1FA7C9",
+		"Secret Pharaoh’s Rare":       "#1FA7C9",
+		"Secret Rare":                 "#1FA7C9",
+
+		"Collector's Rare":           "#B45A96",
+		"Prismatic Collector's Rare": "#B45A96",
+
+		"Ghost Rare":      "#6F75AA",
+		"Ghost/Gold Rare": "#6F75AA",
+		"Starlight Rare":  "#6F75AA",
+
+		"Gold Rare":         "#BA9900",
+		"Premium Gold Rare": "#BA9900",
+
+		"Promo": "#652978",
+	},
 }
 
 // badgeFont is the size the shapes are cut at, and the ceiling a set code is
