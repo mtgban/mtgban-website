@@ -15,18 +15,6 @@
         return s + ' ' + units[u];
     }
 
-    // Bundle entries are flat <key>.jpg; key is the image key (scryfallId or p-<CODE>-<tcgId>).
-    function entryMeta(name) {
-        var m = /^([^\/]+)\.(webp|jpe?g)$/i.exec(name);
-        if (!m) return null;
-        var webp = m[2].toLowerCase() === 'webp';
-        return {
-            key: m[1],
-            url: '/api/offline/images/' + m[1] + (webp ? '.webp' : '.jpg'),
-            type: webp ? 'image/webp' : 'image/jpeg',
-        };
-    }
-
     function computeWorkList(images, sel, states) {
         var work = [];
         var totalBytes = 0;
@@ -58,22 +46,109 @@
         return { bytes: bytes, count: count, missing: missing };
     }
 
-    // Sealed images are TCGplayer's jpg; singles are Scryfall's webp, so the
-    // extension a key is cached under is derived from the key rather than
-    // written out at each call site.
+    // Sealed images are TCGplayer's jpg; singles are Scryfall's webp. The
+    // extension is part of the url the cache is keyed on, so it is derived
+    // from the key rather than written out at each call site.
     function imageURL(key) {
         var ext = key.indexOf('p-') === 0 ? '.jpg' : '.webp';
         return '/api/offline/images/' + encodeURIComponent(key) + ext;
     }
 
-    // Marks the errors that must end the whole run rather than cost one edition.
+    // A corpus this size meets transient 5xx and dropped connections as a
+    // matter of course, so each bundle gets its own retries before the set it
+    // belongs to counts as failed.
+    var MAX_ATTEMPTS = 3;
+    var RETRY_BASE_MS = 500;
+
+    function delay(ms) {
+        return new Promise(function (resolve) { self.setTimeout(resolve, ms); });
+    }
+
+    // Marks the errors that must end the whole run rather than cost one set.
     function fatalError(message) {
         var err = new Error(message);
         err.fatal = true;
         return err;
     }
 
-    // Downloads and unpacks each stale bundle; imgstate rows are the resume point.
+    // Where one set's bundle lives, under the base the server authorized us
+    // for. The token rides in the url because the bucket has no other way to
+    // take it; it is short-lived and scoped to the image tree.
+    function bundleURL(auth, code, hash) {
+        return auth.base + '/bundles/' + encodeURIComponent(code + '-' + hash) + '.zip' +
+            '?Authorization=' + encodeURIComponent(auth.token);
+    }
+
+    // Maps a zip entry to where it is cached. The cache is keyed on this
+    // site's own url rather than on the bucket url the bytes arrived from, so
+    // a rotating token never strands a cached image and the renderers keep
+    // pointing at one stable address that outlives any of this.
+    function entryMeta(name) {
+        var m = /^([A-Za-z0-9._-]+)\.(webp|jpg)$/.exec(name);
+        if (!m) return null;
+        return {
+            key: m[1],
+            url: '/api/offline/images/' + encodeURIComponent(m[1]) + '.' + m[2],
+            type: m[2] === 'webp' ? 'image/webp' : 'image/jpeg',
+        };
+    }
+
+    // Downloads one set's bundle. Null means the mirror has not published one
+    // for this set yet, which is a skip rather than a failure.
+    async function fetchBundle(auth, item) {
+        var url = bundleURL(auth, item.code, item.hash);
+        for (var attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            var resp = null;
+            try {
+                // No credentials: this is another origin, and the token in the
+                // url is the whole of our authorization.
+                resp = await self.fetch(url);
+            } catch (err) {
+                if (attempt === MAX_ATTEMPTS) throw err;
+                await delay(RETRY_BASE_MS * attempt);
+                continue;
+            }
+            // An expired or revoked token fails every remaining set the same
+            // way, so stop rather than grinding through the whole selection.
+            if (resp.status === 401 || resp.status === 403) {
+                throw fatalError('bucket authorization rejected');
+            }
+            if (resp.status === 404) return null;
+            if (resp.ok) return new Uint8Array(await resp.arrayBuffer());
+            if (attempt === MAX_ATTEMPTS) {
+                throw new Error('bundle ' + item.code + ': HTTP ' + resp.status);
+            }
+            await delay(RETRY_BASE_MS * attempt);
+        }
+        return null;
+    }
+
+    // Unpacks one bundle into the cache, returning the keys it stored.
+    async function unpackBundle(cache, code, buf) {
+        var entries = self.fflate.unzipSync(buf);
+        var names = Object.keys(entries);
+        var keys = [];
+        for (var j = 0; j < names.length; j++) {
+            var meta = entryMeta(names[j]);
+            if (!meta) continue;
+            try {
+                await cache.put(new Request(meta.url), new Response(entries[names[j]], {
+                    headers: { 'Content-Type': meta.type },
+                }));
+            } catch (err) {
+                if (err && err.name === 'QuotaExceededError') {
+                    throw fatalError('storage quota exceeded while unpacking ' + code);
+                }
+                throw err;
+            }
+            keys.push(meta.key);
+        }
+        return keys;
+    }
+
+    // Downloads and unpacks each stale set's bundle; imgstate rows are the
+    // resume point. Bundles come straight from the bucket: one request per set
+    // instead of one per image, and none of them through the site.
     async function syncImages(deps) {
         var plan = computeWorkList(deps.images, deps.sel, deps.states);
         var total = plan.work.length;
@@ -92,54 +167,39 @@
             }
         }
 
+        // One authorization covers the whole run. Asking per set would put the
+        // site back in the path for every set, which is what this avoids.
+        var auth = await deps.getBucketAuth();
+        if (!auth || !auth.base || !auth.token) {
+            throw new Error('no bucket authorization; cannot sync images');
+        }
+
         var cache = await self.caches.open(IMAGE_CACHE);
         for (var i = 0; i < plan.work.length; i++) {
             if (deps.cancelled()) return { done: done, total: total, bytes: bytes, paused: true, missing: plan.missing, failed: failed };
             var item = plan.work[i];
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
 
-            var buf = null;
-            var entries = null;
-            try {
-                var resp = await self.fetch('/api/offline/imagebundles/' + item.code + '.zip',
-                    { credentials: 'same-origin' });
-                // Auth is gone, not this one set: every remaining bundle would
-                // fail the same way, so stop rather than grinding through them.
-                if (resp.status === 403) throw fatalError('forbidden');
-                if (!resp.ok) throw new Error('bundle ' + item.code + ': HTTP ' + resp.status);
-                buf = new Uint8Array(await resp.arrayBuffer());
-                bytes += buf.byteLength;
+            // Mark in progress first so an interrupted unpack retries next sync.
+            await deps.putImgState({ code: item.code, hash: item.hash, done: false });
 
-                // Mark in progress first so an interrupted unpack retries next sync.
-                await deps.putImgState({ code: item.code, hash: item.hash, done: false });
-                entries = self.fflate.unzipSync(buf);
-                var names = Object.keys(entries);
-                var keys = [];
-                for (var j = 0; j < names.length; j++) {
-                    var meta = entryMeta(names[j]);
-                    if (!meta) continue;
-                    try {
-                        await cache.put(new Request(meta.url), new Response(entries[names[j]], {
-                            headers: { 'Content-Type': meta.type },
-                        }));
-                    } catch (err) {
-                        if (err && err.name === 'QuotaExceededError') {
-                            throw fatalError('storage quota exceeded while unpacking ' + item.code);
-                        }
-                        throw err;
-                    }
-                    keys.push(meta.key);
+            var buf = null;
+            try {
+                buf = await fetchBundle(auth, item);
+                if (buf !== null) {
+                    bytes += buf.byteLength;
+                    var keys = await unpackBundle(cache, item.code, buf);
+                    await deps.putImgState({ code: item.code, hash: item.hash, done: true, keys: keys });
                 }
-                await deps.putImgState({ code: item.code, hash: item.hash, done: true, keys: keys });
             } catch (err) {
                 if (err && err.fatal) throw err;
-                // One bad bundle costs that edition, not the rest of the
-                // selection; its row stays not-done so the next sync retries it.
+                // One bad set costs that set, not the rest of the selection.
+                // Its row stays not-done, so the next sync picks it up again.
                 failed++;
             }
-            // two bundles must not be co-resident across the next await
+            // Two bundles must not be co-resident across the next await.
             buf = null;
-            entries = null;
+
             done++;
             deps.post({ type: 'progress', stage: 'images', done: done, total: total, code: item.code, bytes: bytes });
         }
@@ -173,8 +233,10 @@
     self.OfflineImages = {
         IMAGE_CACHE: IMAGE_CACHE,
         formatBytes: formatBytes,
-        entryMeta: entryMeta,
         imageURL: imageURL,
+        entryMeta: entryMeta,
+        bundleURL: bundleURL,
+        fetchBundle: fetchBundle,
         computeWorkList: computeWorkList,
         estimateSelection: estimateSelection,
         syncImages: syncImages,

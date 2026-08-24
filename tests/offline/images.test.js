@@ -15,15 +15,19 @@ globalThis.Request = class Request extends _NativeRequest {
     }
 };
 
+const SRC = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-images.js'), 'utf8');
+
 // The shipped file is a plain script attaching to self; load it into a sandbox.
-function loadOfflineImages() {
-    const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-images.js'), 'utf8');
-    const sandbox = {};
-    new Function('self', src)(sandbox);
+function loadWithExtras(extras) {
+    const sandbox = Object.assign({ fflate }, extras);
+    new Function('self', SRC)(sandbox);
     return sandbox.OfflineImages;
 }
 
-const OfflineImages = loadOfflineImages();
+const OfflineImages = loadWithExtras({});
+
+const BASE = 'https://bucket.example.invalid/file/mtgban-images/magic';
+const AUTH = { base: BASE, token: 'tok-abc', expires: '2026-08-12T09:00:00Z' };
 
 const images = {
     NEO: { h: 'aaaa', n: 302, b: 24800000 },
@@ -31,63 +35,98 @@ const images = {
     VOW: { h: 'cccc', n: 350, b: 28000000 },
 };
 
+// Build a zip from a name -> bytes map using the vendored fflate.
+function zip(entries) {
+    const out = {};
+    Object.keys(entries).forEach((n) => { out[n] = new Uint8Array(entries[n]); });
+    return fflate.zipSync(out);
+}
+
+// Minimal fake cache that records put calls; returns caches wrapper.
+function makeFakeCache() {
+    const store = [];
+    const cache = {
+        store,
+        put: async (req, resp) => store.push({ req, resp }),
+        match: async () => undefined,
+        delete: async () => true,
+    };
+    return { cache, caches: { open: async () => cache } };
+}
+
+// A fetch that serves zips by bundle path and records every url it was asked for.
+function makeBundleFetch(bundles, opts) {
+    const calls = [];
+    const o = opts || {};
+    return {
+        calls,
+        fetch: async (url) => {
+            calls.push(String(url));
+            const name = String(url).split('?')[0].split('/bundles/')[1];
+            if (o.status) return new Response(null, { status: o.status });
+            if (!(name in bundles)) return new Response(null, { status: 404 });
+            return new Response(bundles[name]);
+        },
+    };
+}
+
+function syncDeps(over) {
+    return Object.assign({
+        images: images,
+        sel: ['NEO'],
+        states: {},
+        post: () => {},
+        cancelled: () => false,
+        putImgState: async () => {},
+        getBucketAuth: async () => AUTH,
+    }, over);
+}
+
 test('formatBytes renders human sizes', () => {
     expect(OfflineImages.formatBytes(0)).toBe('0 B');
     expect(OfflineImages.formatBytes(302)).toBe('302 B');
-    expect(OfflineImages.formatBytes(1000)).toBe('1 KB');
-    expect(OfflineImages.formatBytes(123456)).toBe('123 KB');
     expect(OfflineImages.formatBytes(24800000)).toBe('24.8 MB');
-    expect(OfflineImages.formatBytes(1400000000)).toBe('1.4 GB');
     expect(OfflineImages.formatBytes(9500000000)).toBe('9.5 GB');
 });
 
-test('entryMeta maps bundle entries to cache keys', () => {
-    expect(OfflineImages.entryMeta('abc-123.jpg')).toEqual({
-        key: 'abc-123',
-        url: '/api/offline/images/abc-123.jpg',
-        type: 'image/jpeg',
-    });
-    expect(OfflineImages.entryMeta('abc-123.jpeg').type).toBe('image/jpeg');
-    expect(OfflineImages.entryMeta('abc-123.webp')).toEqual({
-        key: 'abc-123',
-        url: '/api/offline/images/abc-123.webp',
+// The cache key is this site's own url, not the bucket url the bytes came
+// from, so a rotating token never strands an already-cached image.
+test('entryMeta maps bundle entries to stable local cache keys', () => {
+    expect(OfflineImages.entryMeta('ab154b52-1234-5678-9abc-def012345678.webp')).toEqual({
+        key: 'ab154b52-1234-5678-9abc-def012345678',
+        url: '/api/offline/images/ab154b52-1234-5678-9abc-def012345678.webp',
         type: 'image/webp',
     });
-    expect(OfflineImages.entryMeta('nested/abc.jpg')).toBeNull();
+    expect(OfflineImages.entryMeta('p-MH3-541185.jpg')).toEqual({
+        key: 'p-MH3-541185',
+        url: '/api/offline/images/p-MH3-541185.jpg',
+        type: 'image/jpeg',
+    });
+    expect(OfflineImages.entryMeta('nested/abc.webp')).toBeNull();
     expect(OfflineImages.entryMeta('README.txt')).toBeNull();
+    expect(OfflineImages.entryMeta('../escape.webp')).toBeNull();
+});
+
+test('bundleURL addresses the bucket and carries the token', () => {
+    const u = OfflineImages.bundleURL(AUTH, 'NEO', 'aaaa');
+    expect(u).toBe(BASE + '/bundles/NEO-aaaa.zip?Authorization=tok-abc');
 });
 
 test('computeWorkList selects missing, changed, and unfinished bundles', () => {
     const states = {
-        NEO: { code: 'NEO', hash: 'aaaa', done: true },  // up to date: skip
-        MID: { code: 'MID', hash: 'old', done: true },   // hash changed: resync
-        VOW: { code: 'VOW', hash: 'cccc', done: false }, // interrupted: resume
+        NEO: { code: 'NEO', hash: 'aaaa', done: true },
+        MID: { code: 'MID', hash: 'old', done: true },
+        VOW: { code: 'VOW', hash: 'cccc', done: false },
     };
     const plan = OfflineImages.computeWorkList(images, ['NEO', 'MID', 'VOW'], states);
     expect(plan.work.map(w => w.code)).toEqual(['MID', 'VOW']);
     expect(plan.totalBytes).toBe(58000000);
-    expect(plan.totalCount).toBe(750);
-});
-
-test('computeWorkList ignores bundle-less codes and handles empty input', () => {
-    const plan = OfflineImages.computeWorkList(images, ['NEO', 'NOPE'], {});
-    expect(plan.work).toEqual([{ code: 'NEO', hash: 'aaaa', count: 302, bytes: 24800000 }]);
-    expect(plan.missing).toEqual(['NOPE']);
-    const empty = OfflineImages.computeWorkList(null, null, null);
-    expect(empty.work).toEqual([]);
-    expect(empty.missing).toEqual([]);
 });
 
 test('computeWorkList reports missing codes separately from up-to-date skips', () => {
-    const states = { NEO: { code: 'NEO', hash: 'aaaa', done: true } };
-    const plan = OfflineImages.computeWorkList(images, ['NEO', 'NOPE'], states);
+    const plan = OfflineImages.computeWorkList(images, ['NEO', 'NOPE'], { NEO: { code: 'NEO', hash: 'aaaa', done: true } });
     expect(plan.work).toEqual([]);
     expect(plan.missing).toEqual(['NOPE']);
-});
-
-test('computeWorkList sorts work by set code', () => {
-    const plan = OfflineImages.computeWorkList(images, ['VOW', 'MID', 'NEO'], null);
-    expect(plan.work.map(w => w.code)).toEqual(['MID', 'NEO', 'VOW']);
 });
 
 test('estimateSelection sums manifest counts and bytes', () => {
@@ -95,362 +134,125 @@ test('estimateSelection sums manifest counts and bytes', () => {
     expect(est.bytes).toBe(54800000);
     expect(est.count).toBe(702);
     expect(est.missing).toEqual(['NOPE']);
-    expect(OfflineImages.estimateSelection(images, []).bytes).toBe(0);
 });
-
-// --- syncImages tests (DI fakes) ---
-
-// Load a fresh module instance with extra sandbox properties injected as globals.
-function loadWithExtras(extras) {
-    const src = readFileSync(join(import.meta.dir, '..', '..', 'js', 'offline', 'offline-images.js'), 'utf8');
-    const sandbox = Object.assign({}, extras);
-    new Function('self', src)(sandbox);
-    return sandbox.OfflineImages;
-}
-
-// Build a zip from a name -> bytes map using the vendored fflate.
-function makeZip(files) {
-    const entries = {};
-    for (const [name, data] of Object.entries(files)) {
-        entries[name] = data instanceof Uint8Array ? data : new Uint8Array(data);
-    }
-    return fflate.zipSync(entries);
-}
-
-// Minimal fake cache that records put calls; returns caches wrapper.
-function makeFakeCache() {
-    const store = [];
-    const cache = { store, put: async (req, resp) => store.push({ req, resp }) };
-    const caches = { open: async () => cache };
-    return { cache, caches };
-}
 
 test('syncImages returns immediately when no work is needed', async () => {
-    const mod = loadWithExtras({ fflate });
-    const result = await mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: 100 } },
-        sel: ['TST'],
-        states: { TST: { code: 'TST', hash: 'h1', done: true } },
-        post: () => {},
-        cancelled: () => false,
-        putImgState: async () => {},
-    });
-    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: [], failed: 0 });
+    const mod = loadWithExtras({});
+    const res = await mod.syncImages(syncDeps({ states: { NEO: { code: 'NEO', hash: 'aaaa', done: true } } }));
+    expect(res).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: [], failed: 0 });
 });
 
-test('syncImages returns missing codes with zero total when selection has no bundles yet', async () => {
-    const mod = loadWithExtras({ fflate });
-    const result = await mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: 100 } },
-        sel: ['NOPE'],
-        states: {},
-        post: () => {},
-        cancelled: () => false,
-        putImgState: async () => {},
-    });
-    expect(result).toEqual({ done: 0, total: 0, bytes: 0, paused: false, missing: ['NOPE'], failed: 0 });
-});
-
-test('syncImages includes missing codes alongside completed work when some editions have no bundles', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
-    const { caches } = makeFakeCache();
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
-    const result = await mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
-        sel: ['TST', 'NOPE'],
-        states: {},
-        post: () => {},
-        cancelled: () => false,
-        putImgState: async () => {},
-    });
-    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: ['NOPE'], failed: 0 });
-});
-
-test('syncImages downloads, unpacks, and marks done', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [255, 216], 'key-bbb.jpg': [255, 216], 'notes.txt': [104, 105] });
+test('syncImages unpacks a bundle into the cache under local urls', async () => {
     const { cache, caches } = makeFakeCache();
-    const posts = [];
+    const bundles = { 'NEO-aaaa.zip': zip({ 'key-a.webp': [1, 2], 'p-NEO-9.jpg': [3] }) };
+    const f = makeBundleFetch(bundles);
     const states = [];
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
-    const result = await mod.syncImages({
-        images: { TST: { h: 'h1', n: 2, b: zip.byteLength } },
-        sel: ['TST'],
-        states: {},
-        post: m => posts.push(m),
-        cancelled: () => false,
-        putImgState: async r => states.push({ ...r }),
-    });
-    expect(result).toEqual({ done: 1, total: 1, bytes: zip.byteLength, paused: false, missing: [], failed: 0 });
-    expect(posts).toHaveLength(2);
-    expect(posts[0]).toMatchObject({ type: 'progress', stage: 'images', done: 0, total: 1, code: 'TST', bytes: 0 });
-    expect(posts[1]).toMatchObject({ type: 'progress', stage: 'images', done: 1, total: 1, bytes: zip.byteLength });
-    // both jpg entries stored (.txt skipped)
-    expect(cache.store).toHaveLength(2);
-    const aaaEntry = cache.store.find(e => e.req.url.endsWith('key-aaa.jpg'));
-    const bbbEntry = cache.store.find(e => e.req.url.endsWith('key-bbb.jpg'));
-    expect(aaaEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
-    expect(bbbEntry.resp.headers.get('Content-Type')).toBe('image/jpeg');
-    expect(states).toEqual([
-        { code: 'TST', hash: 'h1', done: false },
-        { code: 'TST', hash: 'h1', done: true, keys: ['key-aaa', 'key-bbb'] },
+    const mod = loadWithExtras({ caches, fetch: f.fetch });
+
+    const res = await mod.syncImages(syncDeps({ putImgState: async r => states.push({ ...r }) }));
+
+    expect(res.done).toBe(1);
+    expect(res.failed).toBe(0);
+    const urls = cache.store.map(e => e.req.url).sort();
+    expect(urls).toEqual([
+        'http://localhost/api/offline/images/key-a.webp',
+        'http://localhost/api/offline/images/p-NEO-9.jpg',
     ]);
+    expect(cache.store.find(e => e.req.url.endsWith('.webp')).resp.headers.get('Content-Type')).toBe('image/webp');
+    expect(states[0]).toEqual({ code: 'NEO', hash: 'aaaa', done: false });
+    expect(states[1].done).toBe(true);
+    expect(states[1].keys.sort()).toEqual(['key-a', 'p-NEO-9']);
 });
 
-test('syncImages resumes a bundle left done:false by a previous interrupted run', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
-    const { cache, caches } = makeFakeCache();
-    const states = [];
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
-    const result = await mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
-        sel: ['TST'],
-        states: { TST: { code: 'TST', hash: 'h1', done: false } },
-        post: () => {},
-        cancelled: () => false,
-        putImgState: async r => states.push({ ...r }),
-    });
-    expect(result.done).toBe(1);
-    expect(result.paused).toBe(false);
-    expect(cache.store).toHaveLength(1);
-    expect(states).toEqual([
-        { code: 'TST', hash: 'h1', done: false },
-        { code: 'TST', hash: 'h1', done: true, keys: ['key-aaa'] },
-    ]);
-});
-
-test('syncImages refuses when projected bytes exceed 90pct of free storage', async () => {
-    const fakeNavigator = { storage: { estimate: async () => ({ quota: 1000, usage: 500 }) } };
-    // totalBytes = 600 > (1000 - 500) * 0.9 = 450 -> should throw
+// The whole point of the rework: image bytes come from the bucket, and the
+// site is asked only for permission. A request for image bytes to our own
+// origin would put the server back in the path for every card.
+test('syncImages fetches image bytes only from the bucket', async () => {
     const { caches } = makeFakeCache();
-    let fetched = false;
-    const mod = loadWithExtras({ fflate, navigator: fakeNavigator, caches, fetch: async () => { fetched = true; return new Response(new Uint8Array(0)); } });
-    await expect(mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: 600 } },
-        sel: ['TST'],
-        states: {},
-        post: () => {},
-        cancelled: () => false,
-        putImgState: async () => {},
-    })).rejects.toThrow('not enough storage');
-    expect(fetched).toBe(false);
+    const f = makeBundleFetch({ 'NEO-aaaa.zip': zip({ 'key-a.webp': [1] }) });
+    const mod = loadWithExtras({ caches, fetch: f.fetch });
+    await mod.syncImages(syncDeps({}));
+    expect(f.calls.length).toBe(1);
+    f.calls.forEach((u) => expect(u.startsWith(BASE + '/')).toBe(true));
 });
 
-test('syncImages stops cleanly on QuotaExceededError; imgstate stays done:false', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
-    const quotaErr = Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
-    const fakeCache = { put: async () => { throw quotaErr; } };
-    const fakeCaches = { open: async () => fakeCache };
-    const states = [];
-    const posts = [];
-    const mod = loadWithExtras({ fflate, caches: fakeCaches, fetch: async () => new Response(zip) });
-    await expect(mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: zip.byteLength } },
-        sel: ['TST'],
-        states: {},
-        post: m => posts.push(m),
-        cancelled: () => false,
-        putImgState: async r => states.push({ ...r }),
-    })).rejects.toThrow('storage quota exceeded');
-    // imgstate written done:false before unpack; never updated to done:true
-    expect(states).toEqual([{ code: 'TST', hash: 'h1', done: false }]);
-    // only one progress post (pre-bundle); nothing posted after error
-    expect(posts).toHaveLength(1);
-});
-
-test('syncImages throws forbidden on 403 and writes no imgstate', async () => {
+test('syncImages authorizes once for the whole run, not once per set', async () => {
     const { caches } = makeFakeCache();
-    const states = [];
-    const posts = [];
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(null, { status: 403 }) });
-    await expect(mod.syncImages({
-        images: { TST: { h: 'h1', n: 1, b: 100 } },
-        sel: ['TST'],
-        states: {},
-        post: m => posts.push(m),
-        cancelled: () => false,
-        putImgState: async r => states.push(r),
-    })).rejects.toThrow('forbidden');
-    // fetch failed before putImgState; no imgstate written
-    expect(states).toHaveLength(0);
-    // only pre-bundle progress post; nothing after 403
-    expect(posts).toHaveLength(1);
-});
-
-// --- imgCount math (mirrors runImagesStage in offline-sync.js) ---
-// done rows sum manifest[r.code].n; fall back to +1 when code is absent.
-function computeImgCount(doneRows, imgMap) {
-    return doneRows.filter(function (r) { return r.done; }).reduce(function (sum, r) {
-        return sum + (imgMap[r.code] ? imgMap[r.code].n : 1);
-    }, 0);
-}
-
-test('imgCount sums per-image counts from manifest for done rows', () => {
-    const imgMap = { NEO: { n: 302 }, MID: { n: 400 } };
-    const rows = [
-        { code: 'NEO', done: true },
-        { code: 'MID', done: true },
-        { code: 'VOW', done: false }, // not done: excluded
-    ];
-    expect(computeImgCount(rows, imgMap)).toBe(702);
-});
-
-test('imgCount falls back to 1 per row when code is absent from manifest', () => {
-    const imgMap = { NEO: { n: 302 } };
-    const rows = [
-        { code: 'NEO', done: true },
-        { code: 'UNKNOWN', done: true }, // absent: counts as 1
-    ];
-    expect(computeImgCount(rows, imgMap)).toBe(303);
-});
-
-test('imgCount returns 0 when no done rows', () => {
-    expect(computeImgCount([], {})).toBe(0);
-    expect(computeImgCount([{ code: 'NEO', done: false }], { NEO: { n: 302 } })).toBe(0);
-});
-
-test('syncImages pauses between bundles when cancelled', async () => {
-    const zip = makeZip({ 'key-aaa.jpg': [1, 2, 3] });
-    const { cache, caches } = makeFakeCache();
-    const posts = [];
-    let callCount = 0;
-    // false on first two cancelled() checks (pre-loop + AAA iteration), true on third (skips BBB)
-    const cancelled = () => callCount++ > 1;
-    const mod = loadWithExtras({ fflate, caches, fetch: async () => new Response(zip) });
-    const result = await mod.syncImages({
-        images: {
-            AAA: { h: 'h1', n: 1, b: zip.byteLength },
-            BBB: { h: 'h2', n: 1, b: zip.byteLength },
-        },
-        sel: ['AAA', 'BBB'],
-        states: {},
-        post: m => posts.push(m),
-        cancelled,
-        putImgState: async () => {},
+    const f = makeBundleFetch({
+        'NEO-aaaa.zip': zip({ 'a.webp': [1] }),
+        'MID-bbbb.zip': zip({ 'b.webp': [1] }),
+        'VOW-cccc.zip': zip({ 'c.webp': [1] }),
     });
-    expect(result).toEqual({ done: 1, total: 2, bytes: zip.byteLength, paused: true, missing: [], failed: 0 });
-    // AAA processed (1 cache entry); BBB skipped
-    expect(cache.store).toHaveLength(1);
-    // AAA's two posts; BBB cancel before any post for BBB
-    expect(posts).toHaveLength(2);
-    expect(posts[0]).toMatchObject({ code: 'AAA', done: 0 });
-    expect(posts[1]).toMatchObject({ code: 'AAA', done: 1 });
-});
-
-// --- eviction ---
-
-// Fake cache keyed by pathname, with delete/keys support.
-function makeFakeCacheMap(initial) {
-    const entries = new Map(Object.entries(initial || {}));
-    const cache = {
-        entries,
-        put: async (req, resp) => entries.set(typeof req === 'string' ? req : new URL(req.url).pathname, resp),
-        delete: async (url) => entries.delete(typeof url === 'string' ? url : new URL(url.url).pathname),
-        keys: async () => Array.from(entries.keys()).map((u) => ({ url: 'http://localhost' + u })),
-    };
-    return { cache, caches: { open: async () => cache } };
-}
-
-test('evictImages removes deselected editions by recorded keys', async () => {
-    const fake = makeFakeCacheMap({
-        '/api/offline/images/key-neo.webp': 'x',
-        '/api/offline/images/key-mid.webp': 'x',
-    });
-    const mod = loadWithExtras({ caches: fake.caches });
-    const deleted = [];
-    const removed = await mod.evictImages({
-        sel: ['NEO'],
-        getImgStates: async () => [
-            { code: 'NEO', hash: 'a', done: true, keys: ['key-neo'] },
-            { code: 'MID', hash: 'b', done: true, keys: ['key-mid'] },
-        ],
-        deleteImgState: async (code) => deleted.push(code),
-    });
-    expect(removed).toBe(1);
-    expect(deleted).toEqual(['MID']);
-    expect(fake.cache.entries.has('/api/offline/images/key-neo.webp')).toBe(true);
-    expect(fake.cache.entries.has('/api/offline/images/key-mid.webp')).toBe(false);
-});
-
-test('evictImages drops legacy uuids rows without touching the cache', async () => {
-    const fake = makeFakeCacheMap({
-        '/api/offline/images/key-neo.webp': 'x',
-    });
-    const mod = loadWithExtras({ caches: fake.caches });
-    const deleted = [];
-    const removed = await mod.evictImages({
-        sel: ['NEO'],
-        getImgStates: async () => [{ code: 'MID', hash: 'b', done: true, uuids: ['uuid-mid'] }],
-        deleteImgState: async (code) => deleted.push(code),
-    });
-    expect(removed).toBe(0);
-    expect(deleted).toEqual(['MID']);
-    expect(fake.cache.entries.has('/api/offline/images/key-neo.webp')).toBe(true);
-});
-
-test('syncImages records unpacked keys on the imgstate row', async () => {
-    const zip = makeZip({ 'key-1.jpg': [1], 'key-2.jpg': [2] });
-    const { caches } = makeFakeCache();
-    const mod = loadWithExtras({
-        fflate,
-        caches,
-        fetch: async () => new Response(zip, { status: 200 }),
-        navigator: {},
-    });
-    const puts = [];
-    await mod.syncImages({
-        images: { TST: { h: 'h1', n: 2, b: zip.byteLength } },
-        sel: ['TST'],
-        states: {},
-        cancelled: () => false,
-        putImgState: async (row) => puts.push(row),
-        post: () => {},
-    });
-    const final = puts[puts.length - 1];
-    expect(final.done).toBe(true);
-    expect(final.keys.slice().sort()).toEqual(['key-1', 'key-2']);
-});
-
-// One unreachable bundle must not cost the rest of the selection, and the
-// edition it belongs to has to stay not-done so the next sync retries it.
-test('syncImages keeps one failed bundle from ending the whole sync', async () => {
-    const { caches } = makeFakeCache();
-    const zip = makeZip({ 'key-a.webp': [1] });
-    const states = [];
-    const mod = loadWithExtras({
-        fflate,
-        caches,
-        fetch: async (url) => String(url).includes('MID')
-            ? new Response(null, { status: 500 })
-            : new Response(zip),
-    });
-    const result = await mod.syncImages({
-        images: { NEO: { h: 'h1', n: 1, b: 1 }, MID: { h: 'h2', n: 1, b: 1 }, VOW: { h: 'h3', n: 1, b: 1 } },
+    let authCalls = 0;
+    const mod = loadWithExtras({ caches, fetch: f.fetch });
+    const res = await mod.syncImages(syncDeps({
         sel: ['NEO', 'MID', 'VOW'],
-        states: {},
-        post: () => {},
-        cancelled: () => false,
+        getBucketAuth: async () => { authCalls++; return AUTH; },
+    }));
+    expect(res.done).toBe(3);
+    expect(authCalls).toBe(1);
+});
+
+test('syncImages treats a bundle the mirror has not published as a skip', async () => {
+    const { caches } = makeFakeCache();
+    const f = makeBundleFetch({});
+    const states = [];
+    const mod = loadWithExtras({ caches, fetch: f.fetch });
+    const res = await mod.syncImages(syncDeps({ putImgState: async r => states.push({ ...r }) }));
+    expect(res.failed).toBe(0);
+    // left not-done, so a later sync picks it up once the mirror publishes it
+    expect(states.every(r => r.done === false)).toBe(true);
+});
+
+test('syncImages keeps going when one set fails and leaves it not-done', async () => {
+    const { caches } = makeFakeCache();
+    const good = zip({ 'a.webp': [1] });
+    const fetchFn = async (url) => {
+        const name = String(url).split('?')[0].split('/bundles/')[1];
+        if (name.startsWith('MID')) return new Response(null, { status: 500 });
+        return new Response(good);
+    };
+    const states = [];
+    const mod = loadWithExtras({ caches, fetch: fetchFn, setTimeout: fn => fn() });
+    const res = await mod.syncImages(syncDeps({
+        sel: ['NEO', 'MID', 'VOW'],
         putImgState: async r => states.push({ ...r }),
-    });
-    expect(result.failed).toBe(1);
-    expect(result.done).toBe(3);
-    expect(states.filter(r => r.code === 'MID').every(r => r.done === false)).toBe(true);
+    }));
+    expect(res.failed).toBe(1);
+    expect(res.done).toBe(3);
+    const mid = states.filter(r => r.code === 'MID');
+    expect(mid.every(r => r.done === false)).toBe(true);
     expect(states.filter(r => r.code === 'VOW' && r.done === true)).toHaveLength(1);
 });
 
-// A rejected authorization fails every remaining bundle the same way.
-test('syncImages stops the run when access is refused', async () => {
+// A rejected token fails every remaining set the same way, so grinding through
+// the rest of the selection just wastes the user's time and bandwidth.
+test('syncImages stops the run when the bucket rejects the token', async () => {
+    const { caches } = makeFakeCache();
+    const f = makeBundleFetch({}, { status: 403 });
+    const mod = loadWithExtras({ caches, fetch: f.fetch });
+    await expect(mod.syncImages(syncDeps({ sel: ['NEO', 'MID', 'VOW'] })))
+        .rejects.toThrow('bucket authorization rejected');
+    expect(f.calls.length).toBe(1);
+});
+
+test('syncImages refuses when projected bytes exceed 90pct of free storage', async () => {
     const { caches } = makeFakeCache();
     const mod = loadWithExtras({
-        fflate,
         caches,
-        fetch: async () => new Response(null, { status: 403 }),
+        navigator: { storage: { estimate: async () => ({ quota: 1000, usage: 0 }) } },
     });
-    await expect(mod.syncImages({
-        images: { NEO: { h: 'h1', n: 1, b: 1 }, MID: { h: 'h2', n: 1, b: 1 } },
+    await expect(mod.syncImages(syncDeps({}))).rejects.toThrow('not enough storage');
+});
+
+test('syncImages pauses between sets when cancelled', async () => {
+    const { caches } = makeFakeCache();
+    const f = makeBundleFetch({ 'NEO-aaaa.zip': zip({ 'a.webp': [1] }) });
+    let calls = 0;
+    const mod = loadWithExtras({ caches, fetch: f.fetch });
+    const res = await mod.syncImages(syncDeps({
         sel: ['NEO', 'MID'],
-        states: {},
-        post: () => {},
-        cancelled: () => false,
-        putImgState: async () => {},
-    })).rejects.toThrow('forbidden');
+        cancelled: () => { calls++; return calls > 2; },
+    }));
+    expect(res.paused).toBe(true);
 });

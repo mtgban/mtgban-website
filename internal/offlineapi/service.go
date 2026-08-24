@@ -109,8 +109,6 @@ func (s *Service) Handle(w http.ResponseWriter, r *http.Request) {
 		s.servePrices(w, r, email, strings.TrimPrefix(endpoint, "prices/"))
 	case endpoint == "bucket-auth":
 		s.serveBucketAuth(w, r)
-	case strings.HasPrefix(endpoint, "imagebundles/"):
-		s.serveImageBundle(w, r, strings.TrimPrefix(endpoint, "imagebundles/"))
 	default:
 		http.NotFound(w, r)
 	}
