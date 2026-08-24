@@ -137,6 +137,7 @@ type PageVars struct {
 	ReverseMode    bool
 	DefaultTab     string
 	DefaultView    string
+	SearchLayout   string
 
 	Page               string
 	Subtitle           string
