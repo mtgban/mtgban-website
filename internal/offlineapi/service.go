@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -46,7 +47,12 @@ type Deps struct {
 	ManifestBucket       func(ctx context.Context) (simplecloud.ReadWriter, string, error)
 	ImagesManifestBucket func(ctx context.Context) (simplecloud.ReadWriter, string, error)
 	// ImagesBucket returns the bucket and BASE path for the image tree.
-	ImagesBucket           func(ctx context.Context) (simplecloud.ReadWriter, string, error)
+	ImagesBucket func(ctx context.Context) (simplecloud.ReadWriter, string, error)
+	// ImagesDownloadAuth issues a time-limited authorization to read the image
+	// tree straight from the bucket: the base URL objects hang off, a token to
+	// present with it, and when that stops working. Nil where the backing store
+	// cannot issue one, which leaves clients with no way to sync images.
+	ImagesDownloadAuth     func(ctx context.Context, valid time.Duration) (base, token string, expires time.Time, err error)
 	ManifestPathConfigured func() bool
 	ImagesPathConfigured   func() bool
 
@@ -101,8 +107,8 @@ func (s *Service) Handle(w http.ResponseWriter, r *http.Request) {
 		s.serveCatalog(w, r)
 	case strings.HasPrefix(endpoint, "prices/"):
 		s.servePrices(w, r, email, strings.TrimPrefix(endpoint, "prices/"))
-	case strings.HasPrefix(endpoint, "images/"):
-		s.serveImage(w, r, strings.TrimPrefix(endpoint, "images/"))
+	case endpoint == "bucket-auth":
+		s.serveBucketAuth(w, r)
 	case strings.HasPrefix(endpoint, "imagebundles/"):
 		s.serveImageBundle(w, r, strings.TrimPrefix(endpoint, "imagebundles/"))
 	default:

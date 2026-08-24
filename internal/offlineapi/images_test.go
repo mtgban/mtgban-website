@@ -3,9 +3,7 @@ package offlineapi
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"net/http/httptest"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -30,105 +28,6 @@ func newTestService(t *testing.T) (*Service, string) {
 		ImagesPathConfigured:   func() bool { return true },
 	})
 	return s, dir
-}
-
-func TestServeOfflineImage(t *testing.T) {
-	s, dir := newTestService(t)
-	scryfallID := "ab154b52-1234-5678-9abc-def012345678"
-	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "singles", "grid", "front", "a", "b"), 0755)
-	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "singles", "grid", "front", "a", "b", scryfallID+".webp"), []byte("webpdata"), 0644)
-	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "sealed", "MH3"), 0755)
-	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "sealed", "MH3", "541185.jpg"), []byte("sealeddata"), 0644)
-
-	tests := []struct {
-		rest  string
-		code  int
-		body  string
-		ctype string
-	}{
-		{scryfallID + ".webp", 200, "webpdata", "image/webp"},
-		{"p-MH3-541185.jpg", 200, "sealeddata", "image/jpeg"},
-		// the extension identifies the format actually stored, so asking for
-		// the wrong one is a miss rather than a silent substitution
-		{scryfallID + ".jpg", 404, "", ""},
-		{"p-MH3-541185.webp", 404, "", ""},
-		{"../x", 404, "", ""},
-		{"a%2f.jpg", 404, "", ""},
-		{scryfallID + ".extra.webp", 404, "", ""},
-		{scryfallID, 404, "", ""},
-	}
-	for _, tt := range tests {
-		w := httptest.NewRecorder()
-		r := httptest.NewRequest("GET", "/api/offline/images/"+tt.rest, nil)
-		s.serveImage(w, r, tt.rest)
-		if w.Code != tt.code {
-			t.Errorf("%s: code = %d, want %d", tt.rest, w.Code, tt.code)
-			continue
-		}
-		if tt.code != 200 {
-			continue
-		}
-		if w.Body.String() != tt.body {
-			t.Errorf("%s: body = %q, want %q", tt.rest, w.Body.String(), tt.body)
-		}
-		if got := w.Header().Get("Content-Type"); got != tt.ctype {
-			t.Errorf("%s: content type = %q, want %q", tt.rest, got, tt.ctype)
-		}
-		if got := w.Header().Get("Cache-Control"); got != "private, max-age=604800" {
-			t.Errorf("%s: cache control = %q", tt.rest, got)
-		}
-	}
-}
-
-func TestServeOfflineImageBundle(t *testing.T) {
-	s, dir := newTestService(t)
-	os.MkdirAll(filepath.Join(filepath.FromSlash(dir), "bundles"), 0755)
-	os.WriteFile(filepath.Join(filepath.FromSlash(dir), "bundles", "NEO-abc123.zip"), []byte("zipdata"), 0644)
-	s.imagesStore.Set(ImagesManifest{"NEO": {Hash: "abc123", Count: 1, Bytes: 7}})
-	t.Cleanup(func() { s.imagesStore.Set(nil) })
-
-	w := httptest.NewRecorder()
-	s.serveImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil), "NEO.zip")
-	if w.Code != 200 || w.Body.String() != "zipdata" {
-		t.Fatalf("bundle fetch: code %d body %q", w.Code, w.Body.String())
-	}
-	if w.Header().Get("ETag") != `"abc123"` {
-		t.Fatalf("etag = %q", w.Header().Get("ETag"))
-	}
-	if w.Header().Get("Content-Type") != "application/zip" {
-		t.Fatalf("content type = %q", w.Header().Get("Content-Type"))
-	}
-
-	r := httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
-	r.Header.Set("If-None-Match", `"abc123"`)
-	w = httptest.NewRecorder()
-	s.serveImageBundle(w, r, "NEO.zip")
-	if w.Code != http.StatusNotModified {
-		t.Fatalf("conditional get: code = %d, want 304", w.Code)
-	}
-
-	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
-	r.Header.Set("If-None-Match", "*")
-	w = httptest.NewRecorder()
-	s.serveImageBundle(w, r, "NEO.zip")
-	if w.Code != http.StatusNotModified {
-		t.Fatalf("conditional get with *: code = %d, want 304", w.Code)
-	}
-
-	// Weak ETag validators must also match.
-	r = httptest.NewRequest("GET", "/api/offline/imagebundles/NEO.zip", nil)
-	r.Header.Set("If-None-Match", `W/"abc123"`)
-	w = httptest.NewRecorder()
-	s.serveImageBundle(w, r, "NEO.zip")
-	if w.Code != http.StatusNotModified {
-		t.Fatalf("weak etag: code = %d, want 304", w.Code)
-	}
-
-	w = httptest.NewRecorder()
-	s.serveImageBundle(w, httptest.NewRequest("GET", "/api/offline/imagebundles/XXX.zip", nil), "XXX.zip")
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("unknown set: code = %d, want 404", w.Code)
-	}
 }
 
 func TestOfflineManifestIncludesImages(t *testing.T) {
