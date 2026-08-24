@@ -2451,3 +2451,89 @@ body.m-setpicker-lock {
 .m-fav-sort .fav-sort-pill svg { width: 16px; height: 16px; }
 .m-fav-sort .fav-sort-pill .fav-sort-dir.asc,
 .m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
+
+/* === Expanded layout: all conditions and both panels visible === */
+
+/* Panel labels replace the hidden tabs */
+.m-layout-expanded .m-tab-panel::before {
+    content: "Sellers";
+    display: block;
+    padding: 0.4em 0.75em;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--greytext);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    background: rgba(30, 144, 255, 0.05);
+}
+
+.m-layout-expanded .m-tab-panel[id^="buyers"]::before {
+    content: "Buyers";
+}
+
+/* Condition band on every group */
+.m-layout-expanded .m-cond-group::before {
+    content: attr(data-cond);
+    display: block;
+    padding: 0.2em 0.75em;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--greytext);
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--border);
+}
+
+.light-theme .m-layout-expanded .m-cond-group::before {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.m-layout-expanded .m-cond-group[data-cond="INDEX"]::before {
+    content: "Index";
+}
+
+/* Sealed products have no real conditions to label */
+.m-layout-expanded .m-sealed .m-cond-group::before {
+    display: none;
+}
+
+/* No per-group fade: everything is visible at once */
+.m-layout-expanded .m-cond-group.active {
+    animation: none;
+}
+
+/* Tighter rows: no longer the primary tap-to-reveal surface */
+.m-layout-expanded .m-vendor-row summary,
+.m-layout-expanded .m-vendor-row.m-vendor-flat {
+    min-height: 36px;
+}
+
+.m-layout-expanded .m-vendor-row .m-detail-row {
+    min-height: 28px;
+}
+
+.m-layout-expanded .m-vendor-locked {
+    min-height: 40px;
+}
+
+/* Long pages: skip layout/paint of off-screen cards */
+.m-layout-expanded .m-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 600px;
+}
+
+/* Buyers-first stacking for SearchDefaultTab=buyers (portrait only;
+   landscape places panels side by side via its own grid) */
+@media (orientation: portrait) {
+    .m-layout-expanded .m-card.m-buyers-first {
+        display: flex;
+        flex-direction: column;
+    }
+    .m-layout-expanded .m-card.m-buyers-first > .m-card-header {
+        order: -3;
+    }
+    .m-layout-expanded .m-card.m-buyers-first > .m-tab-panel[id^="buyers"] {
+        order: -1;
+    }
+}
