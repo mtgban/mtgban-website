@@ -852,6 +852,15 @@ document.querySelectorAll('.m-filter-pills').forEach(function(group) {
     });
 });
 
+// Cross-device: adopt the synced layout pref over a stale local cookie
+(function() {
+    var synced = null;
+    try { synced = localStorage.getItem('mtgban_search_layout'); } catch (e) {}
+    if (synced && synced !== (getCookie('SearchLayout') || '')) {
+        setCookie('SearchLayout', synced, 1000);
+    }
+})();
+
 function selectSet(e) {
     var li = e.currentTarget;
     var picker = document.getElementById('m-filter-set');
