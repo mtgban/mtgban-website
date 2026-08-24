@@ -174,7 +174,7 @@
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
     margin-bottom: 1em;
-    overflow: hidden;
+    overflow: clip;
     background: var(--background);
     max-width: 100%;
     box-sizing: border-box;
@@ -2535,5 +2535,15 @@ body.m-setpicker-lock {
     }
     .m-layout-expanded .m-card.m-buyers-first > .m-tab-panel[id^="buyers"] {
         order: -1;
+    }
+}
+
+/* Keep the card name visible while scrolling a long expanded card */
+@media (orientation: portrait) {
+    .m-layout-expanded .m-card-header {
+        position: sticky;
+        top: 100px; /* fixed nav 48px + fixed search bar ~52px */
+        z-index: 3;
+        background: var(--background);
     }
 }
