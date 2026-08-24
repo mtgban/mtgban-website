@@ -73,13 +73,15 @@ func TestServeBucketAuthAbsentWhenTheStoreCannotSign(t *testing.T) {
 	}
 }
 
-// Single images are read from the bucket now, never from here. Whole bundles
-// still come through this server until the client is moved across.
-func TestSingleImagesAreNotServedByThisServer(t *testing.T) {
+// Image bytes are read from the bucket, never from here. This is the guard on
+// that: the route existing again would quietly put the origin back in the path
+// for every image, which is the whole cost the bundle sync exists to avoid.
+func TestImagesAreNotServedByThisServer(t *testing.T) {
 	s := authService(nil)
 	for _, path := range []string{
 		"/api/offline/images/ab154b52-1234-5678-9abc-def012345678.webp",
 		"/api/offline/images/p-MH3-541185.jpg",
+		"/api/offline/imagebundles/NEO.zip",
 	} {
 		w := httptest.NewRecorder()
 		s.Handle(w, httptest.NewRequest("GET", path, nil))

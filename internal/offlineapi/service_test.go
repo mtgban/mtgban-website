@@ -15,7 +15,6 @@ func TestHandleDeniesWithoutACL(t *testing.T) {
 		"/api/offline/catalog.json",
 		"/api/offline/prices/NEO.bin",
 		"/api/offline/images/uuid.jpg",
-		"/api/offline/imagebundles/NEO.zip",
 	} {
 		w := httptest.NewRecorder()
 		s.Handle(w, httptest.NewRequest("GET", path, nil))

@@ -148,11 +148,15 @@ self.addEventListener('fetch', function (e) {
     // Health probes must always hit the network.
     if (url.pathname === '/healthz') return;
 
-    // Card images: cache-first with network fallback (the image sync fills the cache).
+    // Card images resolve from the cache the bundle sync filled, and only from
+    // there. Nothing serves this path any more: the site hands out a bucket
+    // authorization and the client reads the image tree itself, so a miss means
+    // the set has not been synced, not that the network is down. Falling back
+    // to fetch would spend a request to be told 404 for every uncached card.
     if (url.pathname.indexOf('/api/offline/images/') === 0) {
         e.respondWith(caches.open(IMAGE_CACHE).then(function (c) {
             return c.match(req).then(function (hit) {
-                return hit || fetch(req).catch(function () { return Response.error(); });
+                return hit || new Response(null, { status: 404, statusText: 'not synced' });
             });
         }));
         return;

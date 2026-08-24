@@ -2,15 +2,12 @@ package offlineapi
 
 import (
 	"context"
-	"io"
 	"log"
-	"net/http"
-	"strings"
-
-	"github.com/mtgban/simplecloud"
 )
 
-// refreshImagesManifest reloads the worker-written images manifest.
+// refreshImagesManifest reloads the worker-written images manifest. It is the
+// only thing this server does with the image tree: the bytes themselves are
+// read by clients straight from the bucket, authorized by serveBucketAuth.
 func (s *Service) refreshImagesManifest() {
 	if !s.deps.ImagesPathConfigured() {
 		return
@@ -18,62 +15,4 @@ func (s *Service) refreshImagesManifest() {
 	if err := s.imagesStore.Load(context.Background()); err != nil {
 		log.Println("offline: images manifest load failed:", err)
 	}
-}
-
-func (s *Service) openImageObject(ctx context.Context, dir, name string) (io.ReadCloser, error) {
-	bucket, base, err := s.deps.ImagesBucket(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return simplecloud.InitReader(ctx, bucket, joinBucketPath(base, dir, name))
-}
-
-// etagMatches reports whether an If-None-Match header matches etag.
-// Weak validators (W/"...") on the header side are accepted per RFC 7232 §3.2.
-func etagMatches(header, etag string) bool {
-	if strings.TrimSpace(header) == "*" {
-		return true
-	}
-	for _, part := range strings.Split(header, ",") {
-		p := strings.TrimPrefix(strings.TrimSpace(part), "W/")
-		if p == etag {
-			return true
-		}
-	}
-	return false
-}
-
-// serveImageBundle streams the current per-set zip with ETag support.
-func (s *Service) serveImageBundle(w http.ResponseWriter, r *http.Request, rest string) {
-	code := strings.TrimSuffix(rest, ".zip")
-	if code == "" || code == rest || strings.ContainsAny(code, "/\\.%") {
-		http.NotFound(w, r)
-		return
-	}
-
-	info, found := s.imagesStore.Get()[code]
-	if !found {
-		http.NotFound(w, r)
-		return
-	}
-
-	etag := `"` + info.Hash + `"`
-	inm := r.Header.Get("If-None-Match")
-	if inm != "" && etagMatches(inm, etag) {
-		w.Header().Set("ETag", etag)
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-
-	reader, err := s.openImageObject(r.Context(), "bundles", code+"-"+info.Hash+".zip")
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	defer reader.Close()
-
-	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("ETag", etag)
-	w.Header().Set("Cache-Control", "private, max-age=300")
-	io.Copy(w, reader)
 }

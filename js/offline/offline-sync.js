@@ -37,6 +37,14 @@ function fetchChecked(url, stage, opts) {
 }
 
 // Images stage: runs after prices within the same sync message.
+// Asks the site for permission to read the image tree from the bucket. This
+// is the only image-related request that goes to the site; the bytes never do.
+async function fetchBucketAuth() {
+    var resp = await fetch('/api/offline/bucket-auth', { credentials: 'same-origin' });
+    if (!resp.ok) throw new Error('bucket authorization: HTTP ' + resp.status);
+    return await resp.json();
+}
+
 async function runImagesStage(manifest, imgEditions, isCancelled) {
     var sel = Array.isArray(imgEditions) ? imgEditions : [];
     // Deselected editions release their cached images before new work starts.
@@ -58,6 +66,7 @@ async function runImagesStage(manifest, imgEditions, isCancelled) {
         states: states,
         cancelled: isCancelled,
         putImgState: function (row) { return OfflineDB.putRow('imgstate', row); },
+        getBucketAuth: fetchBucketAuth,
         post: function (msg) { self.postMessage(msg); },
     });
     // Refresh the status snapshot: imgCount is per-image, summed from manifest.
