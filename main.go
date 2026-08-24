@@ -683,6 +683,38 @@ func offlineImagesFactory(ctx context.Context) (simplecloud.ReadWriter, string, 
 	return bucket, base, nil
 }
 
+// offlineImagesDownloadAuth issues a B2 download authorization covering the
+// mirrored image tree, along with the URL those objects hang off, so clients
+// read image bytes straight from the bucket instead of through this process.
+// Only a B2-backed tree can issue one; anything else has no way to hand out
+// scoped, expiring read access.
+func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string, string, time.Time, error) {
+	bucket, base, err := offlineImagesFactory(ctx)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	b2bucket, ok := bucket.(*simplecloud.B2Bucket)
+	if !ok {
+		return "", "", time.Time{}, fmt.Errorf("offline: %s cannot issue download authorizations", base)
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	prefix := strings.TrimPrefix(u.Path, "/")
+	token, err := b2bucket.Bucket.AuthToken(ctx, prefix, valid)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	downloadBase := strings.TrimSuffix(b2bucket.Bucket.BaseURL(), "/") + "/file/" + b2bucket.Bucket.Name()
+	if prefix != "" {
+		downloadBase += "/" + prefix
+	}
+	// B2 dates the window from when it issued the token, so this is the
+	// client's cue to re-ask rather than a guarantee.
+	return downloadBase, token, time.Now().Add(valid), nil
+}
+
 // offlineService wires the offline API endpoints to the live scraper state.
 var offlineService = offlineapi.NewService(offlineapi.Deps{
 	Allow: offlineModeAllowed,
@@ -775,6 +807,8 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	},
 
 	ImagesBucket: offlineImagesFactory,
+
+	ImagesDownloadAuth: offlineImagesDownloadAuth,
 
 	ManifestPathConfigured: func() bool { return Config.Offline.ManifestPath != "" },
 	ImagesPathConfigured:   func() bool { return Config.Offline.ImagesPath != "" },
