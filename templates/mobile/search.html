@@ -620,6 +620,15 @@
         <div class="m-settings-content">
             <h3>Search Settings</h3>
 
+            {{/* Layout */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Layout</div>
+                <div class="m-settings-pills" id="m-set-layout">
+                    <button type="button" class="m-settings-pill active" data-val="expanded">Expanded</button>
+                    <button type="button" class="m-settings-pill" data-val="compact">Compact</button>
+                </div>
+            </div>
+
             {{/* Default Tab */}}
             <div class="m-settings-section">
                 <div class="m-settings-label">Default Tab</div>
@@ -630,7 +639,7 @@
             </div>
 
             {{/* Default View - which condition (or Index) is initially active in result cards */}}
-            <div class="m-settings-section">
+            <div class="m-settings-section" id="m-set-default-view-section">
                 <div class="m-settings-label">Default View</div>
                 <div class="m-settings-pills" id="m-set-default-view">
                     <button type="button" class="m-settings-pill active" data-val="NM">NM</button>
@@ -1056,6 +1065,17 @@ document.querySelectorAll('.m-settings-pills').forEach(function(group) {
     });
 });
 
+// Default View only applies to the compact layout
+function updateDefaultViewVisibility() {
+    var pill = document.querySelector('#m-set-layout .m-settings-pill.active');
+    var section = document.getElementById('m-set-default-view-section');
+    if (!section) return;
+    section.style.display = (pill && pill.getAttribute('data-val') === 'compact') ? '' : 'none';
+}
+document.querySelectorAll('#m-set-layout .m-settings-pill').forEach(function(p) {
+    p.addEventListener('click', updateDefaultViewVisibility);
+});
+
 // Bulk select/clear for store checkboxes
 function mSettingsBulk(containerId, selectAll) {
     var container = document.getElementById(containerId);
@@ -1066,6 +1086,14 @@ function mSettingsBulk(containerId, selectAll) {
 
 // Load current cookie values into the settings UI
 function loadSettings() {
+    // Layout
+    var layout = getCookie('SearchLayout') || 'expanded';
+    var layoutGroup = document.getElementById('m-set-layout');
+    layoutGroup.querySelectorAll('.m-settings-pill').forEach(function(p) {
+        p.classList.toggle('active', p.getAttribute('data-val') === layout);
+    });
+    updateDefaultViewVisibility();
+
     // Default Tab
     var tab = getCookie('SearchDefaultTab');
     if (tab) {
@@ -1129,6 +1157,12 @@ function loadSettings() {
 
 // Save all settings to cookies and show toast
 function saveSettings() {
+    // Layout
+    var layoutPill = document.querySelector('#m-set-layout .m-settings-pill.active');
+    var layoutVal = layoutPill ? layoutPill.getAttribute('data-val') : 'expanded';
+    setCookie('SearchLayout', layoutVal, 1000);
+    try { localStorage.setItem('mtgban_search_layout', layoutVal); } catch (e) {}
+
     // Default Tab
     var tabPill = document.querySelector('#m-set-default-tab .m-settings-pill.active');
     setCookie('SearchDefaultTab', tabPill ? tabPill.getAttribute('data-val') : 'sellers', 1000);
