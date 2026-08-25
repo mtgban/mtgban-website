@@ -30,6 +30,32 @@ func TestServiceWorkerPrecachesShellAssets(t *testing.T) {
 	}
 }
 
+// The precached shell outlives the session that installed it - it is what a
+// failed navigation falls back to for whoever is at the browser later - and
+// /offline renders the navbar, which names the signed-in account. So the
+// precache fetch must not carry the installer's cookies.
+func TestServiceWorkerPrecachesAnonymously(t *testing.T) {
+	sw, err := os.ReadFile("sw.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// From the shell loop only: the CDN helpers above it fetch the same shape,
+	// cross-origin, where cookies never travel anyway.
+	body := string(sw)
+	loop := strings.Index(body, "SHELL_URLS.map(")
+	if loop < 0 {
+		t.Fatal("no SHELL_URLS loop found; did the install handler change shape?")
+	}
+	fetchRE := regexp.MustCompile(`fetch\(new Request\(url, \{([^}]*)\}\)\)`)
+	m := fetchRE.FindStringSubmatch(body[loop:])
+	if m == nil {
+		t.Fatal("no precache fetch found; did the install handler change shape?")
+	}
+	if !strings.Contains(m[1], "credentials: 'omit'") {
+		t.Errorf("precache fetch options are {%s}, want credentials: 'omit'", m[1])
+	}
+}
+
 func TestServeServiceWorker(t *testing.T) {
 	r := httptest.NewRequest("GET", "/sw.js", nil)
 	w := httptest.NewRecorder()
