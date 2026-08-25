@@ -25,7 +25,7 @@
     {{block "extra-head" .}}{{end}}
 </head>
 
-<body class="light-theme{{if .ModalMode}} modal-embed{{end}}">
+<body class="light-theme{{if .ModalMode}} modal-embed{{end}}" data-game="{{game}}">
 <script>
 (function() {
     var v = localStorage.getItem('theme');

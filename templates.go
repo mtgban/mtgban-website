@@ -134,6 +134,11 @@ var funcMap = template.FuncMap{
 	"game_title": func() string {
 		return gameMap[Config.Game]
 	},
+	// game is the slug the deployment serves, for the places that style or
+	// address a game rather than name it.
+	"game": func() string {
+		return Config.Game
+	},
 	"card_back": func() string {
 		return "/img/backs/" + Config.Game + ".webp"
 	},
