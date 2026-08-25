@@ -1,4 +1,4 @@
-name: test
+name: ci
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
     env:
       # MTGJSON AllPrintings is public, so the URL is inlined here. It used to
