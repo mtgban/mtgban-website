@@ -327,16 +327,14 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 // serving game's uuid, with the sub-type naming which finish of that card the
 // row is about.
 func TestMoverCardIdResolvesTCGRows(t *testing.T) {
-	ctx := context.Background()
-
 	// Magic rows pass through untouched
-	uuid, isFoil, ok := moverCardId(ctx, timeseries.MoverRow{MtgjsonUUID: "abc", IsFoil: true})
+	uuid, isFoil, ok := moverCardId(timeseries.MoverRow{MtgjsonUUID: "abc", IsFoil: true}, nil)
 	if !ok || uuid != "abc" || !isFoil {
 		t.Errorf("magic row = %q/%v/%v, want abc/true/true", uuid, isFoil, ok)
 	}
 
 	// A row with no identity at all resolves to nothing
-	if _, _, ok := moverCardId(ctx, timeseries.MoverRow{}); ok {
+	if _, _, ok := moverCardId(timeseries.MoverRow{}, nil); ok {
 		t.Error("identity-less row should not resolve")
 	}
 
@@ -371,7 +369,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 		t.Skip("no card sold in both finishes with a tcgplayer product id")
 	}
 
-	uuid, isFoil, ok = moverCardId(ctx, timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Normal"})
+	uuid, isFoil, ok = moverCardId(timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Normal"}, nil)
 	if !ok || isFoil {
 		t.Fatalf("tcg row did not resolve: %q/%v/%v", uuid, isFoil, ok)
 	}
@@ -381,7 +379,7 @@ func TestMoverCardIdResolvesTCGRows(t *testing.T) {
 
 	// A foil sub-type reaches a foil printing, and the finish comes from the
 	// printing that was resolved rather than from the sub-type's name.
-	foilUUID, isFoil, ok := moverCardId(ctx, timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Foil"})
+	foilUUID, isFoil, ok := moverCardId(timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Foil"}, nil)
 	if !ok {
 		t.Fatal("foil sub-type did not resolve")
 	}

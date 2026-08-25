@@ -257,6 +257,76 @@ func (c *Client) LookupTCGSubTypeBanIDs(ctx context.Context, productID int) (map
 	return subTypes, rows.Err()
 }
 
+// tcgSubTypeBatch is how many products one batched lookup asks for. Postgres
+// caps a statement at 65535 parameters; this leaves the query far short of it
+// and keeps any single round-trip small.
+const tcgSubTypeBatch = 1000
+
+// LookupTCGSubTypeBanIDsBatch is LookupTCGSubTypeBanIDs for many products at
+// once, for the paths that resolve a whole result set rather than one card.
+// The screener reads thousands of mover rows, and a cache that misses them -
+// products ingested since warm-up, or a warm that never ran - would otherwise
+// cost a round-trip each. Products with no rows are simply absent from the
+// result, so callers can tell "asked and found nothing" from "never asked".
+func (c *Client) LookupTCGSubTypeBanIDsBatch(ctx context.Context, productIDs []int) (map[int]map[string]int64, error) {
+	out := make(map[int]map[string]int64, len(productIDs))
+	for start := 0; start < len(productIDs); start += tcgSubTypeBatch {
+		end := min(start+tcgSubTypeBatch, len(productIDs))
+		chunk := productIDs[start:end]
+
+		query, args := buildTCGSubTypeBatchQuery(chunk)
+		err := c.scanTCGSubTypeBanIDs(ctx, query, args, out)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// buildTCGSubTypeBatchQuery renders one chunk of product ids as a statement.
+// Ascending ban_id is what lets the scan keep the first row of a sub-type
+// duplicated across categories, matching both the single lookup and the warm
+// cache.
+func buildTCGSubTypeBatchQuery(productIDs []int) (string, []any) {
+	placeholders := make([]string, len(productIDs))
+	args := make([]any, len(productIDs))
+	for i, id := range productIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	return `SELECT tcgp_product_id, ban_id, tcgp_sub_type FROM variants
+		 WHERE tcgp_product_id IN (` + strings.Join(placeholders, ",") + `)
+		 ORDER BY ban_id ASC`, args
+}
+
+func (c *Client) scanTCGSubTypeBanIDs(ctx context.Context, query string, args []any, out map[int]map[string]int64) error {
+	rows, err := c.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var productID int
+		var banID int64
+		var subType sql.NullString
+		if err := rows.Scan(&productID, &banID, &subType); err != nil {
+			return err
+		}
+		bySubType := out[productID]
+		if bySubType == nil {
+			bySubType = map[string]int64{}
+			out[productID] = bySubType
+		}
+		// Ascending ban_id, so the first row of a sub-type duplicated across
+		// categories wins, matching the warm cache.
+		if _, ok := bySubType[subType.String]; !ok {
+			bySubType[subType.String] = banID
+		}
+	}
+	return rows.Err()
+}
+
 // ResolveMagicBanID returns the ban_id for a Magic variant, minting it if new.
 // Reads/writes the in-memory cache; a miss upserts (ON CONFLICT DO NOTHING) so
 // concurrent callers and other processes converge on one row.

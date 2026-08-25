@@ -1,6 +1,7 @@
 package timeseries
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -89,5 +90,23 @@ func TestBuildWarmVariantQuery(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// The batched lookup is what keeps a whole-result-set path off one round-trip
+// per product, so it has to ask for every id in the chunk, in order, with the
+// ascending ban_id the dedup in the scan relies on.
+func TestBuildTCGSubTypeBatchQuery(t *testing.T) {
+	query, args := buildTCGSubTypeBatchQuery([]int{11, 22, 33})
+
+	if !strings.Contains(query, "tcgp_product_id IN ($1,$2,$3)") {
+		t.Errorf("query does not ask for the whole chunk:\n%s", query)
+	}
+	if !strings.Contains(query, "ORDER BY ban_id ASC") {
+		t.Errorf("query is unordered, so the first sub-type row is arbitrary:\n%s", query)
+	}
+	want := []any{11, 22, 33}
+	if !slices.Equal(args, want) {
+		t.Errorf("args = %v, want %v", args, want)
 	}
 }

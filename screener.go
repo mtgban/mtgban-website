@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
 	"sort"
@@ -305,9 +306,10 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 
 // moverCardId resolves a mover row to this game's uuid: Magic rows carry the
 // mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
-// through the external id map with the sub-type picking the finish.
-// Overridable in tests.
-var moverCardId = func(ctx context.Context, row timeseries.MoverRow) (string, bool, bool) {
+// through the external id map with the sub-type picking the finish. subTypes is
+// the row's product's sub-type map, gathered for the whole result set by
+// moverSubTypes; nil resolves on the card object alone. Overridable in tests.
+var moverCardId = func(row timeseries.MoverRow, subTypes map[string]int64) (string, bool, bool) {
 	if row.MtgjsonUUID != "" {
 		return row.MtgjsonUUID, row.IsFoil, true
 	}
@@ -329,14 +331,6 @@ var moverCardId = func(ctx context.Context, row timeseries.MoverRow) (string, bo
 	co, err := mtgmatcher.GetUUID(base)
 	if err != nil {
 		return "", false, false
-	}
-
-	var subTypes map[string]int64
-	if PricesArchiveDB != nil {
-		var cached bool
-		if subTypes, cached = PricesArchiveDB.CachedTCGSubTypeBanIDs(row.TCGProductID); !cached {
-			subTypes, _ = PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, row.TCGProductID)
-		}
 	}
 
 	uuid := tcgFinishIDForSubType(co, subTypes, row.TCGSubType)
@@ -368,6 +362,46 @@ var screenerClassify = func(uuid string) (screenerMeta, bool) {
 	return screenerMeta{Sealed: co.Sealed, SetCode: co.SetCode, Edition: co.Edition}, true
 }
 
+// moverSubTypes gathers the sub-type maps the TCG-keyed rows in raw need, warm
+// cache first and one batched query for the rest. Resolving row by row asked
+// the table per miss, which is a round-trip each across a result set that runs
+// to tens of thousands - fine for the single-card paths the lookup was written
+// for, not for a whole screener page rebuilt on a cold cache.
+func moverSubTypes(ctx context.Context, raw []timeseries.MoverRow) map[int]map[string]int64 {
+	if PricesArchiveDB == nil {
+		return nil
+	}
+	out := map[int]map[string]int64{}
+	var missing []int
+	for _, row := range raw {
+		if row.MtgjsonUUID != "" || row.TCGProductID == 0 {
+			continue
+		}
+		// A nil entry still counts as seen, so a product asked for once is not
+		// asked for again.
+		if _, seen := out[row.TCGProductID]; seen {
+			continue
+		}
+		m, cached := PricesArchiveDB.CachedTCGSubTypeBanIDs(row.TCGProductID)
+		out[row.TCGProductID] = m
+		if !cached {
+			missing = append(missing, row.TCGProductID)
+		}
+	}
+	if len(missing) == 0 {
+		return out
+	}
+	found, err := PricesArchiveDB.LookupTCGSubTypeBanIDsBatch(ctx, missing)
+	if err != nil {
+		log.Println("screener: batched sub-type lookup failed:", err)
+		return out
+	}
+	for productID, m := range found {
+		out[productID] = m
+	}
+	return out
+}
+
 func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	key := screenerCacheKey(metric, window, minPrice, minPriorPrice)
 
@@ -382,11 +416,12 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPri
 	if err != nil {
 		return nil, err
 	}
+	subTypes := moverSubTypes(ctx, raw)
 	rows := make([]screenerRow, 0, len(raw))
 	for _, row := range raw {
 		// Resolve non-Magic rows to this game's uuid so the rest of the
 		// pipeline (classification, dedup keys, links) is id-uniform
-		uuid, isFoil, ok := moverCardId(ctx, row)
+		uuid, isFoil, ok := moverCardId(row, subTypes[row.TCGProductID])
 		if !ok {
 			continue
 		}
