@@ -1,0 +1,103 @@
+/* Offline search shell chrome. Result markup is styled by search.css. */
+
+/* The shared .search-layout tucks under the online navbar with a -40px margin;
+   on the offline page the banner sits above it, so cancel the pull to avoid overlap. */
+.offline-shell .search-layout {
+    margin-top: 0;
+}
+
+/* Sort pills show a direction arrow on the active pill: green asc, red desc (rotated). */
+.offline-shell .search-sort-dir {
+    display: none;
+    align-items: center;
+}
+.offline-shell .search-sort-dir svg {
+    width: 14px;
+    height: 14px;
+}
+.offline-shell .search-sort-pill.active .search-sort-dir {
+    display: inline-flex;
+    color: #22c55e;
+}
+.offline-shell .search-sort-pill.active.reversed .search-sort-dir {
+    color: #ef4444;
+    transform: rotate(180deg);
+}
+
+/* Offline banner: data age, auth notice, back-online affordance */
+.offline-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75em;
+    padding: 0.55em var(--page-gutter, 3vw);
+    font-size: 0.9em;
+    background: var(--lightblack, #161616);
+    color: var(--darkgrey, #dddddd);
+    border-bottom: 1px solid var(--verydarkgrey, #393939);
+}
+.light-theme .offline-banner {
+    background: var(--lightgrey, #eaeaea);
+    color: var(--quasiblack, #292929);
+    border-bottom-color: var(--darkgrey, #dddddd);
+}
+.offline-banner-dot {
+    flex: none;
+    width: 0.6em;
+    height: 0.6em;
+    border-radius: 50%;
+    background: var(--orange, orange);
+}
+.offline-banner.offline-banner-stale {
+    background: #7c2d12;
+    color: var(--realwhite, #fcfcfc);
+}
+.light-theme .offline-banner.offline-banner-stale {
+    background: var(--lightyellow, #f2e9a2);
+    color: var(--quasiblack, #292929);
+}
+.offline-banner-stale .offline-banner-dot {
+    background: var(--red, red);
+}
+.offline-banner-auth {
+    font-weight: 600;
+}
+.offline-banner-back {
+    margin-left: auto;
+    padding: 0.3em 0.9em;
+    border-radius: 1em;
+    background: #22c55e;
+    color: var(--lightblack, #161616);
+    font-weight: 600;
+    text-decoration: none;
+}
+.offline-banner-back:hover {
+    filter: brightness(1.1);
+}
+
+.offline-notice {
+    margin: 1em 0;
+    padding: 0.6em 1em;
+    font-size: var(--text-sm);
+    color: var(--normal);
+    background: var(--surface-2, rgba(0, 0, 0, 0.05));
+    border: 1px solid var(--border-moderate, rgba(0, 0, 0, 0.12));
+    border-left: 0.25em solid var(--search-link, #3b6fd4);
+    border-radius: 0.4em;
+}
+.offline-notice-warn {
+    border-left-color: var(--warning, #d4a03b);
+}
+.offline-notice-missing {
+    border-left-color: var(--error, #d43b3b);
+}
+
+.offline-empty {
+    padding-top: 2em;
+    color: var(--activetext);
+    font-size: var(--text-3xl);
+    text-align: center;
+}
+
+/* Condition label for sealed offline results (mirrors search.html condHeader) */
+.m-page .m-cond-label { padding: 0.3em 0.75em; font-size: 0.8em; color: var(--activetext); }

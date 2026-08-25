@@ -18,6 +18,7 @@
         'mtgban_fav_sort', 'mtgban_fav_sort_dir',
         'theme', 'chartDateRange', 'mtgban_nav_layout_v1',
         'chartReleasesLongRange', 'chartCheckpointTypes',
+        'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
         'mtgban_search_layout'
     ];
 

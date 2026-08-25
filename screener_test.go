@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"strconv"
 	"testing"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -318,5 +320,129 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCacheMu.Unlock()
 	if n > screenerCacheMax {
 		t.Errorf("cache size %d exceeds cap %d", n, screenerCacheMax)
+	}
+}
+
+// Non-Magic mover rows arrive keyed by TCGplayer product; they resolve to the
+// serving game's uuid, with the sub-type naming which finish of that card the
+// row is about.
+func TestMoverCardIdResolvesTCGRows(t *testing.T) {
+	ctx := context.Background()
+
+	// Magic rows pass through untouched
+	uuid, isFoil, ok := moverCardId(ctx, timeseries.MoverRow{MtgjsonUUID: "abc", IsFoil: true})
+	if !ok || uuid != "abc" || !isFoil {
+		t.Errorf("magic row = %q/%v/%v, want abc/true/true", uuid, isFoil, ok)
+	}
+
+	// A row with no identity at all resolves to nothing
+	if _, _, ok := moverCardId(ctx, timeseries.MoverRow{}); ok {
+		t.Error("identity-less row should not resolve")
+	}
+
+	// TCG-keyed rows resolve through the id map (needs the datastore)
+	uuids := mtgmatcher.GetUUIDs()
+	if len(uuids) == 0 {
+		t.Skip("datastore not loaded")
+	}
+	// A card that is sold in both finishes, so the two sub-types have two
+	// printings to land on. One with no foil at all would prove nothing.
+	var pid int
+	var want, wantFoil string
+	for _, u := range uuids {
+		co, err := mtgmatcher.GetUUID(u)
+		if err != nil || co.Foil || co.Etched || co.Sealed {
+			continue
+		}
+		foil, hasFoil := co.FoilUUIDs[mtgmatcher.FinishFoil]
+		if !hasFoil || foil == co.UUID {
+			continue
+		}
+		pidStr, found := co.Identifiers["tcgplayerProductId"]
+		if !found {
+			continue
+		}
+		if n, err := strconv.Atoi(pidStr); err == nil {
+			pid, want, wantFoil = n, co.UUID, foil
+			break
+		}
+	}
+	if pid == 0 {
+		t.Skip("no card sold in both finishes with a tcgplayer product id")
+	}
+
+	uuid, isFoil, ok = moverCardId(ctx, timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Normal"})
+	if !ok || isFoil {
+		t.Fatalf("tcg row did not resolve: %q/%v/%v", uuid, isFoil, ok)
+	}
+	if uuid != want {
+		t.Errorf("resolved %q, want %q", uuid, want)
+	}
+
+	// A foil sub-type reaches a foil printing, and the finish comes from the
+	// printing that was resolved rather than from the sub-type's name.
+	foilUUID, isFoil, ok := moverCardId(ctx, timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Foil"})
+	if !ok {
+		t.Fatal("foil sub-type did not resolve")
+	}
+	if !isFoil {
+		t.Errorf("foil sub-type resolved %q as unfoiled", foilUUID)
+	}
+	if foilUUID != wantFoil {
+		t.Errorf("foil sub-type resolved %q, want the foil printing %q", foilUUID, wantFoil)
+	}
+}
+
+// Two foil sub-types on one product are two printings, not one. Reading the
+// finish as "anything but Normal" collapsed them onto a single card, so a
+// Lorcana screener showed one row where the archive holds two.
+func TestMoverCardIdSeparatesFoilSubTypes(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("datastore not loaded")
+	}
+
+	// A card whose product is priced under more than one foil sub-type: its
+	// extra finishes each need an id of their own.
+	co := &mtgmatcher.CardObject{}
+	subTypes := map[string]int64{"Normal": 1, "Cold Foil": 2, "Holofoil": 3}
+
+	seen := map[string]string{}
+	for _, subType := range []string{"Normal", "Cold Foil", "Holofoil"} {
+		id := tcgFinishIDForSubType(co, subTypes, subType)
+		if prev, dup := seen[id]; dup && id != "" {
+			t.Errorf("sub-types %q and %q both resolve to %q", prev, subType, id)
+		}
+		seen[id] = subType
+	}
+}
+
+// The archive is scoped per game via TCGplayer category, read from the
+// catalog dump the game loads at startup. Only the default game may fall back
+// to a category without one; every other game refuses to guess.
+func TestGameTCGCategory(t *testing.T) {
+	prevGame := Config.Game
+	prevCatalog := tcgCatalogPtr.Load()
+	t.Cleanup(func() {
+		Config.Game = prevGame
+		tcgCatalogPtr.Store(prevCatalog)
+	})
+
+	// A loaded catalog names the category, whatever the game is called.
+	tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryID: 71, CategoryName: "Lorcana TCG"})
+	Config.Game = "lorcana"
+	if got := gameTCGCategory(); got != 71 {
+		t.Errorf("lorcana category = %d, want 71 (from the catalog)", got)
+	}
+
+	// Without one, only the default game has an answer.
+	tcgCatalogPtr.Store(nil)
+	Config.Game = DefaultGame
+	if got := gameTCGCategory(); got != timeseries.CategoryMagic {
+		t.Errorf("default game category = %d, want %d", got, timeseries.CategoryMagic)
+	}
+
+	Config.Game = "unknowngame"
+	if got := gameTCGCategory(); got != -1 {
+		t.Errorf("catalog-less non-default game = %d, want -1", got)
 	}
 }

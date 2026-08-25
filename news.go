@@ -376,13 +376,18 @@ func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 	return results, nil
 }
 
+// gameMap names every game a deployment can be configured as. A game missing
+// from it panics the newspaper cache at startup, so an entry has to exist
+// before an instance of that game is stood up - which is why the games
+// mtgmatcher registers are all here whether or not one is deployed yet.
 var gameMap = map[string]string{
-	"magic":     "Magic: The Gathering",
-	"lorcana":   "Disney Lorcana",
-	"onepiece":  "One Piece Card Game",
-	"yugioh":    "YuGiOh",
-	"riftbound": "Riftbound: League of Legends Trading Card Game",
-	"pokemon":   "Pokemon",
+	"magic":         "Magic: The Gathering",
+	"lorcana":       "Disney Lorcana",
+	"onepiece":      "One Piece Card Game",
+	"yugioh":        "YuGiOh",
+	"riftbound":     "Riftbound: League of Legends Trading Card Game",
+	"fleshandblood": "Flesh and Blood",
+	"pokemon":       "Pokemon",
 }
 
 // Cache of card UUIDs that appear in the newspaper spike score pages.

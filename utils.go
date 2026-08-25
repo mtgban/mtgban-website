@@ -94,6 +94,84 @@ var colorRarityMap = map[string]map[string]string{
 		"TR":  "#1FA7C9",
 		"PR":  "#652978",
 	},
+	// Flesh and Blood prints its rarity as a letter in a colored glyph at the
+	// bottom left, and these are sampled from those glyphs: a blue R, a
+	// crimson M, a bronze L, a green P, an amber diamond for fabled, gold for
+	// the treasures. Gold and Marvel sit on artwork rather than the black
+	// bar, so those two are read by eye rather than measured.
+	//
+	// Basic, common and token all carry the same grey, and super rare carries
+	// no glyph at all on the frame that has it, so those four are placed
+	// rather than sampled: common takes the theme's neutral like every other
+	// game, and the rest take neighbouring tiers' colors. The 139 cards with
+	// no rarity are left out and draw no badge.
+	"fleshandblood": {
+		"Common":       "var(--normal)",
+		"Basic":        "#707883",
+		"Token":        "#919495",
+		"Rare":         "#156FA6",
+		"Super Rare":   "#1FA7C9",
+		"Majestic":     "#821A1E",
+		"Legendary":    "#937131",
+		"Fabled":       "#8F6330",
+		"Marvel":       "#7B5BC0",
+		"Gold":         "#E0B84A",
+		"Pirate Booty": "#D4B055",
+		"Promo":        "#298233",
+	},
+	// Yu-Gi-Oh marks no rarity on the card at all: it is a finish, the name
+	// foiled silver or gold and the art holographic, so there is nothing to
+	// sample and no shape to cut. What it does have is 35 rarities, most of
+	// them a treatment of another one, which no palette could tell apart by
+	// hue. They group by the tier their name claims — a Prismatic Secret Rare
+	// is a secret rare, a Duel Terminal Normal Parallel Rare is a rare — and
+	// each group climbs the ladder the other games already use.
+	"yugioh": {
+		"Common":                          "var(--normal)",
+		"Duel Terminal Technology Common": "var(--normal)",
+
+		"Duel Terminal Normal Parallel Rare": "#707883",
+		"Duel Terminal Rare Parallel Rare":   "#707883",
+		"Mosaic Rare":                        "#707883",
+		"Parallel Rare":                      "#707883",
+		"Rare":                               "#707883",
+		"Shatterfoil Rare":                   "#707883",
+		"Starfoil Rare":                      "#707883",
+
+		"Duel Terminal Super Parallel Rare": "#919495",
+		"Platinum Rare":                     "#919495",
+		"Super Rare":                        "#919495",
+
+		"Duel Terminal Technology Ultra Rare": "#B06435",
+		"Duel Terminal Ultra Parallel Rare":   "#B06435",
+		"Emblazoned Ultra Rare":               "#B06435",
+		"Ultra Pharaoh’s Rare":                "#B06435",
+		"Ultra Rare":                          "#B06435",
+
+		"Prismatic Ultimate Rare": "#C63A4D",
+		"Ultimate Rare":           "#C63A4D",
+
+		"10000 Secret Rare":           "#1FA7C9",
+		"Emblazoned Secret Rare":      "#1FA7C9",
+		"Gold Secret Rare":            "#1FA7C9",
+		"Platinum Secret Rare":        "#1FA7C9",
+		"Prismatic Secret Rare":       "#1FA7C9",
+		"Quarter Century Secret Rare": "#1FA7C9",
+		"Secret Pharaoh’s Rare":       "#1FA7C9",
+		"Secret Rare":                 "#1FA7C9",
+
+		"Collector's Rare":           "#B45A96",
+		"Prismatic Collector's Rare": "#B45A96",
+
+		"Ghost Rare":      "#6F75AA",
+		"Ghost/Gold Rare": "#6F75AA",
+		"Starlight Rare":  "#6F75AA",
+
+		"Gold Rare":         "#BA9900",
+		"Premium Gold Rare": "#BA9900",
+
+		"Promo": "#652978",
+	},
 }
 
 // badgeFont is the size the shapes are cut at, and the ceiling a set code is
