@@ -180,5 +180,37 @@ func TestLongFormLive(t *testing.T) {
 	if subTypes["Normal"] != tcgBan || subTypes["Cold Foil"] != foilBan {
 		t.Errorf("LookupTCGSubTypeBanIDs = %+v, want Normal=%d Cold Foil=%d", subTypes, tcgBan, foilBan)
 	}
+
+	// --- scoped warm: one category, on a cold client ---
+	// The Magic half is deliberately not warmed here: a Magic-scoped warm pulls
+	// every uuid-keyed row, which is the ~190k-row load this scoping exists to
+	// keep off the non-Magic sites. What matters is that the category predicate
+	// runs and excludes everything else, so the sentinel product arrives and the
+	// sentinel uuid does not.
+	c3, err := NewClient(liveConfig(t))
+	if err != nil {
+		t.Fatalf("NewClient 3: %v", err)
+	}
+	defer c3.Close()
+	counts, err := c3.WarmVariantCache(ctx, VariantScope{TCGCategoryIDs: []int{liveSentinelCatLong}})
+	if err != nil {
+		t.Fatalf("WarmVariantCache scoped: %v", err)
+	}
+	if counts.Magic != 0 {
+		t.Errorf("category-scoped warm loaded %d magic variants, want 0", counts.Magic)
+	}
+	if counts.TCG != 2 {
+		t.Errorf("category-scoped warm loaded %d non-magic variants, want the 2 sentinels", counts.TCG)
+	}
+	if got, ok := c3.CachedTCGBanID(liveSentinelProdLong); !ok || got != tcgBan {
+		t.Errorf("CachedTCGBanID = %d (ok=%v), want %d after a scoped warm", got, ok, tcgBan)
+	}
+	if warmed, ok := c3.CachedTCGSubTypeBanIDs(liveSentinelProdLong); !ok ||
+		warmed["Normal"] != tcgBan || warmed["Cold Foil"] != foilBan {
+		t.Errorf("CachedTCGSubTypeBanIDs = %+v (ok=%v), want Normal=%d Cold Foil=%d", warmed, ok, tcgBan, foilBan)
+	}
+	if got, ok := c3.CachedMagicBanID(base); ok {
+		t.Errorf("category-scoped warm cached magic variant %d; it should not have been read", got)
+	}
 	_ = banJa
 }
