@@ -307,20 +307,48 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 // mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
 // through the external id map with the sub-type picking the finish.
 // Overridable in tests.
-var moverCardId = func(row timeseries.MoverRow) (string, bool, bool) {
+var moverCardId = func(ctx context.Context, row timeseries.MoverRow) (string, bool, bool) {
 	if row.MtgjsonUUID != "" {
 		return row.MtgjsonUUID, row.IsFoil, true
 	}
 	if row.TCGProductID == 0 {
 		return "", false, false
 	}
-	// TCGplayer names the unfoiled printing "Normal" in every category, while
-	// the foiled one varies by game ("Foil" here, "Holofoil" and friends
-	// elsewhere), so test against the stable half of the pair.
-	isFoil := row.TCGSubType != "Normal"
-	uuid, err := mtgmatcher.MatchId(strconv.Itoa(row.TCGProductID), isFoil)
+
+	// One product covers every finish of a card, so the sub-type is where the
+	// finish lives - and which sub-type names which finish varies by game.
+	// Reading it as "anything but Normal is the foil" collapses a game with
+	// more than one onto a single printing: Lorcana prices Cold Foil and
+	// Holofoil, and both would land on the same card. tcgFinishIDForSubType
+	// pairs them off the sub-types the product is actually priced under, the
+	// same way the chart read path does.
+	base, err := mtgmatcher.MatchId(strconv.Itoa(row.TCGProductID))
 	if err != nil {
 		return "", false, false
+	}
+	co, err := mtgmatcher.GetUUID(base)
+	if err != nil {
+		return "", false, false
+	}
+
+	var subTypes map[string]int64
+	if PricesArchiveDB != nil {
+		var cached bool
+		if subTypes, cached = PricesArchiveDB.CachedTCGSubTypeBanIDs(row.TCGProductID); !cached {
+			subTypes, _ = PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, row.TCGProductID)
+		}
+	}
+
+	uuid := tcgFinishIDForSubType(co, subTypes, row.TCGSubType)
+	if uuid == "" {
+		return "", false, false
+	}
+
+	// The finish belongs to the printing that was resolved, not to the name of
+	// the sub-type that led there.
+	isFoil := false
+	if finished, ferr := mtgmatcher.GetUUID(uuid); ferr == nil {
+		isFoil = finished.Foil || finished.Etched
 	}
 	return uuid, isFoil, true
 }
@@ -358,7 +386,7 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPri
 	for _, row := range raw {
 		// Resolve non-Magic rows to this game's uuid so the rest of the
 		// pipeline (classification, dedup keys, links) is id-uniform
-		uuid, isFoil, ok := moverCardId(row)
+		uuid, isFoil, ok := moverCardId(ctx, row)
 		if !ok {
 			continue
 		}
