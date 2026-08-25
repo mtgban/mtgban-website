@@ -1387,14 +1387,20 @@ func getPrice(banPrice *BanPrice, conds string) float64 {
 				price = banPrice.Conditions.Get(conds + "_etched")
 			}
 		}
-		// MetadataOnly sources (TCGLow / TCGMarket / MKM*) never
-		// populate Conditions — they carry a single flat price in
-		// Regular/Foil/Etched. Fall back so a caller passing the
-		// row's condition still gets that flat price instead of 0.
-		// Sources that DO have per-condition data (real sellers and
-		// vendors) keep the original "return 0 if this specific
-		// condition isn't listed" semantic.
-		if price == 0 && banPrice.Conditions == nil {
+		// A source with no grades of its own carries one price, filed under
+		// whatever condition its scraper happens to use - the TCGplayer
+		// indexes file everything under "NM". Asking it for the grade in
+		// hand finds nothing, which is not the same answer as a store that
+		// lists per grade and does not stock this one, so fall back to the
+		// flat price rather than report it as unavailable.
+		//
+		// Cond is what tells them apart: processEntry stamps it from the
+		// entry only for a source that reports a real grade, so an empty one
+		// means there is a single price here whatever the caller asked for.
+		// Conditions cannot answer this - it is built for any source once
+		// conditions are requested at all, an index included, so testing it
+		// for nil never fired for the sources this fallback is here for.
+		if price == 0 && banPrice.Cond == "" {
 			price = banPrice.Regular
 			if price == 0 {
 				price = banPrice.Foil
