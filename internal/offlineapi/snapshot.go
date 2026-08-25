@@ -69,6 +69,16 @@ func (s *Service) computeFingerprints() map[string]string {
 func (s *Service) refreshManifest() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Neither of these is made of prices: the catalog is cards and sets out
+	// of the datastore, with only its store list coming from the scrapers,
+	// and the images manifest is written by the mirror worker. They ran
+	// below the scraper check, so a site whose scrapers had not landed (or
+	// never load at all) served "catalog not ready" for as long as that was
+	// true, though most of the answer was sitting in memory.
+	s.refreshCatalog()
+	s.refreshImagesManifest()
+
 	if len(s.deps.Sellers()) == 0 && len(s.deps.Vendors()) == 0 {
 		log.Println("offline: no scrapers loaded, skipping manifest refresh")
 		return
@@ -89,9 +99,6 @@ func (s *Service) refreshManifest() {
 		next.Sets[code] = setVersion{Fingerprint: fp, Version: now}
 		changed++
 	}
-
-	s.refreshCatalog()
-	s.refreshImagesManifest()
 
 	err := s.manifestStore.Save(context.Background(), next)
 	if err != nil {
