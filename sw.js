@@ -102,9 +102,14 @@ function cacheKeyrune(c) {
 
 self.addEventListener('install', function (e) {
     // cache: 'reload' bypasses HTTP caches so precache never picks up a stale edge/browser hit.
+    // credentials: 'omit' keeps whoever installed this out of the entries: /offline
+    // renders the navbar, which names the signed-in account, and this cache
+    // outlives the session that filled it - it is what every failed navigation
+    // falls back to, for whoever is at the browser by then. The shell is chrome
+    // either way; its data comes from IndexedDB, not from the page.
     e.waitUntil(caches.open(SHELL_CACHE).then(function (c) {
         return Promise.all(SHELL_URLS.map(function (url) {
-            return fetch(new Request(url, { cache: 'reload' })).then(function (res) {
+            return fetch(new Request(url, { cache: 'reload', credentials: 'omit' })).then(function (res) {
                 if (!res.ok) throw new Error('precache fetch failed: ' + url);
                 return c.put(url, res);
             });
