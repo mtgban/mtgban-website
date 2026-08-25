@@ -35,11 +35,26 @@
     border-radius: 50%;
     border: 2px solid rgba(229,57,53,0.3);
 }
+/* Stacks the wordmark over the game the deployment serves. On Magic the
+   badge is absent and the column collapses back to the wordmark alone. */
+.landing-brand-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
 .landing-brand-text {
     font-size: 28px; font-weight: 800;
     letter-spacing: -0.04em;
+    line-height: 1;
 }
 .landing-brand-text .ban { color: var(--ban-red); }
+.landing-brand-game {
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+}
 
 .landing-tagline {
     font-family: var(--font-display);
@@ -277,6 +292,7 @@
 /* ═══ Responsive ═══ */
 @media (max-width: 640px) {
     .landing-brand-text { font-size: 22px; }
+    .landing-brand-game { font-size: 11px; letter-spacing: 0.1em; }
     .landing-search-wrap { display: flex; flex-direction: column; gap: 8px; }
     .landing-search { font-size: 15px; padding: 14px 18px 14px 42px; }
     .landing-lucky {

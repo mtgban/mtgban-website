@@ -15,7 +15,10 @@
 <div class="m-home">
     <div class="m-home-brand">
         <img src="/img/logo/ban-stroop.png" alt="BAN">
-        <span class="m-home-brand-text">MTG<span class="m-nav-ban">BAN</span></span>
+        <div class="m-home-brand-lockup">
+            <span class="m-home-brand-text">MTG<span class="m-nav-ban">BAN</span></span>
+            {{with game_badge}}<span class="m-home-brand-game">{{.}}</span>{{end}}
+        </div>
     </div>
 
     <div class="m-home-search-wrap">

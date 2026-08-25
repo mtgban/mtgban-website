@@ -4,7 +4,10 @@
 
     <a class="nav2-brand" href="/" title="Home">
         <img src="/img/logo/ban-stroop.png" alt="BAN">
-        <span class="nav2-brand-text">MTG<span class="ban">BAN</span></span>
+        <span class="nav2-brand-lockup">
+            <span class="nav2-brand-text">MTG<span class="ban">BAN</span></span>
+            {{with game_badge}}<span class="nav2-brand-game">{{.}}</span>{{end}}
+        </span>
     </a>
 
     <div class="nav2-search autocomplete">
