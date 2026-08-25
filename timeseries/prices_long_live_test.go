@@ -182,6 +182,20 @@ func TestLongFormLive(t *testing.T) {
 		t.Errorf("LookupTCGSubTypeBanIDs = %+v, want Normal=%d Cold Foil=%d", subTypes, tcgBan, foilBan)
 	}
 
+	// The batched form answers the same for a product that has rows, and says
+	// nothing at all about one that has none - callers tell "asked and found
+	// nothing" from "never asked" by the key being absent.
+	batched, err := c.LookupTCGSubTypeBanIDsBatch(ctx, []int{liveSentinelProdLong, liveSentinelProdLong + 1})
+	if err != nil {
+		t.Fatalf("LookupTCGSubTypeBanIDsBatch: %v", err)
+	}
+	if got := batched[liveSentinelProdLong]; got["Normal"] != tcgBan || got["Cold Foil"] != foilBan {
+		t.Errorf("batched = %+v, want Normal=%d Cold Foil=%d", got, tcgBan, foilBan)
+	}
+	if _, found := batched[liveSentinelProdLong+1]; found {
+		t.Errorf("product with no rows is present in the batch result: %+v", batched)
+	}
+
 	// --- scoped warm: one category, on a cold client ---
 	// The Magic half is deliberately not warmed here: a Magic-scoped warm pulls
 	// every uuid-keyed row, which is the ~190k-row load this scoping exists to
