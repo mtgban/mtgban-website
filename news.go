@@ -390,6 +390,19 @@ var gameMap = map[string]string{
 	"pokemon":       "Pokemon",
 }
 
+// gameBadgeMap is the short form the brand wears under the wordmark on a
+// non-Magic deployment. gameMap's full names are what prose wants and what a
+// two-line lockup cannot hold: "Riftbound: League of Legends Trading Card
+// Game" is wider than the navbar leaves for the logo.
+var gameBadgeMap = map[string]string{
+	"lorcana":       "Lorcana",
+	"onepiece":      "One Piece",
+	"yugioh":        "YuGiOh",
+	"riftbound":     "Riftbound",
+	"fleshandblood": "Flesh and Blood",
+	"pokemon":       "Pokemon",
+}
+
 // Cache of card UUIDs that appear in the newspaper spike score pages.
 // Published atomically alongside newspaperPagesPtr so readers always see a
 // fully-built map.

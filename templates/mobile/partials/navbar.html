@@ -2,7 +2,10 @@
 <nav class="m-nav">
     <a class="m-nav-home" href="/">
         <img class="m-nav-logo-img" src="/img/logo/ban-stroop.png" alt="BAN">
-        <span class="m-nav-logo">MTG<span class="m-nav-ban">BAN</span></span>
+        <span class="m-nav-logo-lockup">
+            <span class="m-nav-logo">MTG<span class="m-nav-ban">BAN</span></span>
+            {{with game_badge}}<span class="m-nav-logo-game">{{.}}</span>{{end}}
+        </span>
     </a>
     <div class="m-nav-search">
         <form class="autocomplete" action="" autocomplete="off" spellcheck="false" id="navsearchform">

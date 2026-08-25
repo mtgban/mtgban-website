@@ -134,6 +134,15 @@ var funcMap = template.FuncMap{
 	"game_title": func() string {
 		return gameMap[Config.Game]
 	},
+	// game_badge names the game a deployment serves for the brand lockup,
+	// where the wordmark alone says nothing about which site this is. Empty
+	// on Magic, whose logo already reads MTGBAN.
+	"game_badge": func() string {
+		if Config.Game == DefaultGame {
+			return ""
+		}
+		return gameBadgeMap[Config.Game]
+	},
 	// game is the slug the deployment serves, for the places that style or
 	// address a game rather than name it.
 	"game": func() string {
