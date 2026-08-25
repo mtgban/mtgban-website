@@ -95,6 +95,15 @@ func (s *Service) refreshCatalog() {
 		addCard(uuid)
 	}
 
+	// The store list is allowed to be empty - the scrapers land after the
+	// datastore - but a catalog with no cards is not a catalog. Storing one
+	// would answer sync requests with an empty world instead of saying the
+	// server is not ready yet.
+	if len(cards) == 0 {
+		log.Println("offline: no cards loaded, catalog not rebuilt")
+		return
+	}
+
 	sets := map[string]catalogSet{}
 	for _, code := range mtgmatcher.GetAllSets() {
 		set, err := mtgmatcher.GetSet(code)
