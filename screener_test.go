@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
@@ -442,5 +445,72 @@ func TestGameTCGCategory(t *testing.T) {
 	Config.Game = "unknowngame"
 	if got := gameTCGCategory(); got != -1 {
 		t.Errorf("catalog-less non-default game = %d, want -1", got)
+	}
+}
+
+// A cache miss costs an archive read plus a resolve pass over every row it
+// returns, and the entry only lands at the end of it. Every request that
+// arrives in that window used to start its own copy of the same work.
+func TestCachedMoversCollapsesConcurrentBuilds(t *testing.T) {
+	prevFetch, prevClassify := screenerFetch, screenerClassify
+	t.Cleanup(func() {
+		screenerFetch, screenerClassify = prevFetch, prevClassify
+		screenerCacheMu.Lock()
+		screenerCache = map[string]screenerCacheEntry{}
+		screenerCacheMu.Unlock()
+	})
+	screenerCacheMu.Lock()
+	screenerCache = map[string]screenerCacheEntry{}
+	screenerCacheMu.Unlock()
+
+	var calls atomic.Int32
+	arrived := make(chan struct{}, 1)
+	release := make(chan struct{})
+	screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
+		calls.Add(1)
+		select {
+		case arrived <- struct{}{}:
+		default:
+		}
+		// Hold the build open so the other callers are all asking at once,
+		// which is the state this collapses.
+		<-release
+		return []timeseries.MoverRow{{MtgjsonUUID: "good", Current: 100, Prior: 50}}, nil
+	}
+	screenerClassify = func(uuid string) (screenerMeta, bool) {
+		return screenerMeta{SetCode: "STX", Edition: "Strixhaven"}, true
+	}
+
+	const callers = 8
+	var wg sync.WaitGroup
+	rows := make([][]screenerRow, callers)
+	errs := make([]error, callers)
+	for i := range callers {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			rows[i], errs[i] = cachedMovers(context.Background(), 2, 30, 5, 0)
+		}(i)
+	}
+
+	<-arrived
+	// The first caller is inside the read; give the rest a moment to queue up
+	// behind it. Arriving late is harmless - they find the filled cache - so a
+	// slow scheduler costs the test its point, never a false failure.
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	wg.Wait()
+
+	if got := calls.Load(); got != 1 {
+		t.Errorf("the archive was read %d times for one key, want 1", got)
+	}
+	for i := range callers {
+		if errs[i] != nil {
+			t.Errorf("caller %d: %v", i, errs[i])
+			continue
+		}
+		if len(rows[i]) != 1 || rows[i][0].MtgjsonUUID != "good" {
+			t.Errorf("caller %d got %+v, want the one built row", i, rows[i])
+		}
 	}
 }

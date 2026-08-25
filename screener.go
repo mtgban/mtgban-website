@@ -14,6 +14,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
+	"golang.org/x/sync/singleflight"
 )
 
 type ScreenerMetric struct {
@@ -402,16 +403,46 @@ func moverSubTypes(ctx context.Context, raw []timeseries.MoverRow) map[int]map[s
 	return out
 }
 
+// screenerFlight collapses concurrent builds of the same key. The window
+// between a cache entry expiring and the next one landing is a whole archive
+// read plus a resolve pass over tens of thousands of rows, and every request
+// that arrived during it used to run its own copy.
+var screenerFlight singleflight.Group
+
+// cachedScreenerRows returns a live cache entry, if there is one.
+func cachedScreenerRows(key string) ([]screenerRow, bool) {
+	screenerCacheMu.Lock()
+	defer screenerCacheMu.Unlock()
+	e, ok := screenerCache[key]
+	return e.rows, ok && time.Since(e.fetched) < screenerCacheTTL
+}
+
 func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	key := screenerCacheKey(metric, window, minPrice, minPriorPrice)
 
-	screenerCacheMu.Lock()
-	e, ok := screenerCache[key]
-	screenerCacheMu.Unlock()
-	if ok && time.Since(e.fetched) < screenerCacheTTL {
-		return e.rows, nil
+	if rows, live := cachedScreenerRows(key); live {
+		return rows, nil
 	}
 
+	// The flight's own context is the one that started it, so a caller that
+	// goes away takes the build with it only if it was the one doing it -
+	// the others get its error and can ask again.
+	built, err, _ := screenerFlight.Do(key, func() (any, error) {
+		// A build that just finished while this one queued is a hit now.
+		if rows, live := cachedScreenerRows(key); live {
+			return rows, nil
+		}
+		return buildMovers(ctx, key, metric, window, minPrice, minPriorPrice)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return built.([]screenerRow), nil
+}
+
+// buildMovers reads a page of movers, resolves every row to this game's uuid,
+// and caches the result under key.
+func buildMovers(ctx context.Context, key string, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	raw, err := screenerFetch(ctx, metric, window, minPrice, minPriorPrice)
 	if err != nil {
 		return nil, err
