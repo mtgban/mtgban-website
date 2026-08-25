@@ -1107,15 +1107,19 @@
                                     {{range $conditions := $.CondKeys}}
                                         {{if and (eq $conditions "INDEX") $card.Sealed}}
                                             {{$entries := (index $condsEntry $conditions)}}
-                                            {{if $entries}}
-                                                {{if $card.Sealed}}
-                                                    <div class="price-row price-index-header">
-                                                        <span class="store-name" style="visibility:hidden">&nbsp;</span>
-                                                        <span class="index-label index-label-1">EV</span>
-                                                        <span class="index-label index-label-2">Sim (Median)</span>
-                                                        <span class="index-label index-label-3">Sim (StdDev)</span>
-                                                    </div>
-                                                {{end}}
+                                            {{/* Only the expected-value rows fill these three columns, and a
+                                                 product can carry index rows without any: naming them over a
+                                                 column of "n/a" reads as data that failed to load rather than
+                                                 a product nobody simulates. */}}
+                                            {{$hasEV := false}}
+                                            {{range $entries}}{{if .IsEV}}{{$hasEV = true}}{{end}}{{end}}
+                                            {{if $hasEV}}
+                                                <div class="price-row price-index-header">
+                                                    <span class="store-name" style="visibility:hidden">&nbsp;</span>
+                                                    <span class="index-label index-label-1">EV</span>
+                                                    <span class="index-label index-label-2">Sim (Median)</span>
+                                                    <span class="index-label index-label-3">Sim (StdDev)</span>
+                                                </div>
                                             {{end}}
                                             {{range $entries}}
                                                 <div class="price-row{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>

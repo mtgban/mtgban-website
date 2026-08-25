@@ -69,6 +69,11 @@ type SearchEntry struct {
 
 	Secondary float64
 
+	// IsEV marks a row produced by the sealed expected-value collapse. The
+	// EV/Median/StdDev columns only mean anything for those, so the header
+	// naming them follows this rather than the mere presence of index rows.
+	IsEV bool
+
 	ExtraValues map[string]float64
 
 	Locked bool
@@ -1183,6 +1188,7 @@ func collapseSealedEV(entries []SearchEntry, evShorts []string) (rows []SearchEn
 			rows = append(rows, entries[i])
 			idx = len(rows) - 1
 			pos[id] = idx
+			rows[idx].IsEV = true
 		}
 
 		if strings.Contains(entries[i].ScraperName, " Sim") {
