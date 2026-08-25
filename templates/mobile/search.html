@@ -148,7 +148,7 @@
 {{end}}
 
 {{define "m-search-results"}}
-{{$expanded := ne .SearchLayout "compact"}}
+{{$expanded := ne .MobileSearchLayout "compact"}}
 {{$defaultBuyers := or (eq .DefaultTab "buyers") (eq .SearchSort "buylist")}}
 <div class="m-page{{if $expanded}} m-layout-expanded{{end}}">
     {{/* Sticky search bar */}}
@@ -878,8 +878,8 @@ document.querySelectorAll('.m-filter-pills').forEach(function(group) {
 (function() {
     var synced = null;
     try { synced = localStorage.getItem('mtgban_search_layout'); } catch (e) {}
-    if (synced && synced !== (getCookie('SearchLayout') || '')) {
-        setCookie('SearchLayout', synced, 1000);
+    if (synced && synced !== (getCookie('MobileSearchLayout') || '')) {
+        setCookie('MobileSearchLayout',synced, 1000);
     }
 })();
 
@@ -1118,7 +1118,7 @@ function mSettingsBulk(containerId, selectAll) {
 // Load current cookie values into the settings UI
 function loadSettings() {
     // Layout
-    var layout = getCookie('SearchLayout') || 'expanded';
+    var layout = getCookie('MobileSearchLayout') || 'expanded';
     var layoutGroup = document.getElementById('m-set-layout');
     layoutGroup.querySelectorAll('.m-settings-pill').forEach(function(p) {
         p.classList.toggle('active', p.getAttribute('data-val') === layout);
@@ -1191,7 +1191,7 @@ function saveSettings() {
     // Layout
     var layoutPill = document.querySelector('#m-set-layout .m-settings-pill.active');
     var layoutVal = layoutPill ? layoutPill.getAttribute('data-val') : 'expanded';
-    setCookie('SearchLayout', layoutVal, 1000);
+    setCookie('MobileSearchLayout',layoutVal, 1000);
     try { localStorage.setItem('mtgban_search_layout', layoutVal); } catch (e) {}
 
     // Default Tab

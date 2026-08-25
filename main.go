@@ -131,17 +131,17 @@ type PageVars struct {
 	HasAffiliate   bool
 	CanDownloadCSV bool
 
-	Arb            []Arbitrage
-	ArbitOptKeys   []string
-	ArbitOptConfig map[string]FilterOpt
-	ArbitFilters   map[string]bool
-	ArbitOptTests  map[string]bool
-	SortOption     string
-	GlobalMode     bool
-	ReverseMode    bool
-	DefaultTab     string
-	DefaultView    string
-	SearchLayout   string
+	Arb                []Arbitrage
+	ArbitOptKeys       []string
+	ArbitOptConfig     map[string]FilterOpt
+	ArbitFilters       map[string]bool
+	ArbitOptTests      map[string]bool
+	SortOption         string
+	GlobalMode         bool
+	ReverseMode        bool
+	DefaultTab         string
+	DefaultView        string
+	MobileSearchLayout string
 
 	Page               string
 	Subtitle           string
