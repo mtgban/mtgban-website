@@ -30,6 +30,27 @@ func TestServiceWorkerPrecachesShellAssets(t *testing.T) {
 	}
 }
 
+// The other direction of the check above: an entry naming a file that is no
+// longer there fails the install (a precache fetch that is not ok throws), and
+// a failed install takes offline mode down with it - silently, since nothing
+// server side ever reads this list.
+func TestServiceWorkerPrecachesExistingFiles(t *testing.T) {
+	sw, err := os.ReadFile("sw.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	urlRE := regexp.MustCompile(`'(/(?:js|css|img)/[^'?]+)`)
+	matches := urlRE.FindAllStringSubmatch(string(sw), -1)
+	if len(matches) == 0 {
+		t.Fatal("no asset entries found; did the precache list change shape?")
+	}
+	for _, m := range matches {
+		if _, err := os.Stat(strings.TrimPrefix(m[1], "/")); err != nil {
+			t.Errorf("precached %s does not exist: %v", m[1], err)
+		}
+	}
+}
+
 // The precached shell outlives the session that installed it - it is what a
 // failed navigation falls back to for whoever is at the browser later - and
 // /offline renders the navbar, which names the signed-in account. So the
