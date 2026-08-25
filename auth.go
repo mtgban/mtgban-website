@@ -626,6 +626,15 @@ func enforceSigning(next http.Handler) http.Handler {
 					return
 				}
 
+				// A section hidden from the nav is not reachable by typing its
+				// url either, the same as its subpages below.
+				if nav.ShouldHide != nil && nav.ShouldHide() {
+					pageVars := genPageNav("Error", sig)
+					pageVars.Title = "Unauthorized"
+					render(w, "home.html", pageVars)
+					return
+				}
+
 				// Check if link is a subpage, and validate if viewing conditions are met
 				for _, subPage := range nav.SubPages {
 					if targetsSubPage(r, subPage.Link) &&

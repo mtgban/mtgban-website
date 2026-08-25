@@ -426,6 +426,15 @@ func init() {
 			Handle:      Newspaper,
 			Page:        "news.html",
 			HasSettings: true,
+			// Every page of it is built from the cached uuids, so with none
+			// the section is a stack of empty tables. A game with no
+			// newspaper data, or one whose database was never configured,
+			// gets no entry rather than a dead end. The cron rebuilds the
+			// cache every three hours, so it appears on its own once the
+			// data does.
+			ShouldHide: func() bool {
+				return len(GetNewspaperUUIDs()) == 0
+			},
 			SubPages: []NavElem{
 				{
 					Name:        "TCG Syp List",
@@ -939,6 +948,12 @@ func genPageNav(activeTab, sig string) PageVars {
 		}
 
 		if Config.OfflineKey != "" && !ExtraNavs[feat].AllowOffline {
+			continue
+		}
+
+		// A hidden section takes its subpages with it: they are reached
+		// through it, and half a section is worse than none.
+		if ExtraNavs[feat].ShouldHide != nil && ExtraNavs[feat].ShouldHide() {
 			continue
 		}
 
