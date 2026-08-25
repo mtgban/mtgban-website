@@ -1115,9 +1115,11 @@ func openDBs() (err error) {
 		}
 		// Prime the variant->ban_id cache: the write path resolves/mints on it,
 		// and the read path stamps a cached ban_id onto each rendered card so
-		// charts open by ban:<id> without a per-card round-trip. Non-fatal.
+		// charts open by ban:<id> without a per-card round-trip. Scoped to this
+		// process's own game and ingests, since the table holds every game's.
+		// Non-fatal.
 		if Config.TimeseriesConfig.LongFormWrites || Config.TimeseriesConfig.LongFormReads {
-			if serr := PricesArchiveDB.WarmVariantCache(context.Background()); serr != nil {
+			if serr := warmVariantCache(context.Background()); serr != nil {
 				log.Println("warning: could not warm variant cache:", serr)
 			}
 		}

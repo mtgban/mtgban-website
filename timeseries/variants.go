@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -75,16 +76,66 @@ type variantCache struct {
 	tcgSubTypesByProduct sync.Map // int (product id) -> map[string]int64
 }
 
-// WarmVariantCache bulk-loads every existing variant into the in-memory cache in
+// VariantScope names the slice of the variants table a process actually uses.
+// Every deployment shares one table, so warming it whole is not the harmless
+// default it looks like: it hands a Lorcana site Magic's uuids and nine other
+// games' products, ~120MB of maps it can only miss on. The zero value does load
+// everything, for a caller that cannot name its game.
+type VariantScope struct {
+	// Magic includes every mtgjson-keyed variant.
+	Magic bool
+	// TCGCategoryIDs includes the non-Magic variants filed under those
+	// TCGplayer categories: the site's own game, plus every category the
+	// process ingests (an ingest resolves a ban_id per price row, and a row
+	// outside the cache costs a round-trip).
+	TCGCategoryIDs []int
+}
+
+// VariantCounts reports what a warm loaded, per identity kind. The package does
+// no logging of its own, so this is how a caller sees whether its scope
+// resolved to the rows it expected — a category id that matches nothing loads
+// zero and degrades to a per-card round-trip rather than failing.
+type VariantCounts struct {
+	Magic int
+	TCG   int
+}
+
+const warmVariantSelect = `SELECT ban_id, mtgjson_uuid, is_foil, is_etched, is_alt, language,
+		       tcgp_category_id, tcgp_product_id, tcgp_sub_type
+		FROM variants`
+
+// buildWarmVariantQuery renders the scope as a WHERE clause. Both predicates
+// match a partial unique index (variants_mtg_uk on mtgjson_uuid IS NOT NULL,
+// variants_tcg_uk leading with tcgp_category_id), so a single-game scope reads
+// its own rows rather than the table.
+func buildWarmVariantQuery(scope VariantScope) (string, []any) {
+	var conds []string
+	var args []any
+	if scope.Magic {
+		conds = append(conds, "mtgjson_uuid IS NOT NULL")
+	}
+	if len(scope.TCGCategoryIDs) > 0 {
+		placeholders := make([]string, len(scope.TCGCategoryIDs))
+		for i, id := range scope.TCGCategoryIDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+1)
+			args = append(args, id)
+		}
+		conds = append(conds, "tcgp_category_id IN ("+strings.Join(placeholders, ",")+")")
+	}
+	if len(conds) == 0 {
+		return warmVariantSelect, nil
+	}
+	return warmVariantSelect + "\n\t\t WHERE " + strings.Join(conds, " OR "), args
+}
+
+// WarmVariantCache bulk-loads the scoped variants into the in-memory cache in
 // one query, so a stash of ~150k printings resolves without ~150k round-trips.
 // Only genuinely new printings then miss and mint. Safe to call repeatedly.
-func (c *Client) WarmVariantCache(ctx context.Context) error {
-	rows, err := c.db.QueryContext(ctx, `
-		SELECT ban_id, mtgjson_uuid, is_foil, is_etched, is_alt, language,
-		       tcgp_category_id, tcgp_product_id, tcgp_sub_type
-		FROM variants`)
+func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (VariantCounts, error) {
+	query, args := buildWarmVariantQuery(scope)
+	rows, err := c.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return err
+		return VariantCounts{}, err
 	}
 	defer rows.Close()
 
@@ -98,7 +149,7 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 	byProduct := map[int]tcgBest{}
 	subTypesByProduct := map[int]map[string]int64{}
 
-	var loadedMagic, loadedTCG int
+	var counts VariantCounts
 	for rows.Next() {
 		var banID int64
 		var uuid sql.NullString
@@ -108,20 +159,20 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 		var subType sql.NullString
 		if err := rows.Scan(&banID, &uuid, &isFoil, &isEtched, &isAlt, &language,
 			&catID, &prodID, &subType); err != nil {
-			return err
+			return VariantCounts{}, err
 		}
 		if uuid.Valid {
 			c.variants.magic.Store(MagicVariant{
 				MtgjsonUUID: uuid.String, IsFoil: isFoil, IsEtched: isEtched,
 				IsAlt: isAlt, Language: language,
 			}, banID)
-			loadedMagic++
+			counts.Magic++
 		} else if prodID.Valid {
 			c.variants.tcg.Store(TCGVariant{
 				CategoryID: int(catID.Int64), ProductID: int(prodID.Int64),
 				SubType: subType.String,
 			}, banID)
-			loadedTCG++
+			counts.TCG++
 
 			pid := int(prodID.Int64)
 			isNormal := subType.String == "Normal"
@@ -141,7 +192,7 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return VariantCounts{}, err
 	}
 	for pid, best := range byProduct {
 		c.variants.tcgByProduct.Store(pid, best.banID)
@@ -149,7 +200,7 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 	for pid, subTypes := range subTypesByProduct {
 		c.variants.tcgSubTypesByProduct.Store(pid, subTypes)
 	}
-	return nil
+	return counts, nil
 }
 
 // CachedTCGBanID returns the canonical ban_id for a non-Magic TCGplayer product
