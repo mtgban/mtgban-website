@@ -51,6 +51,28 @@ const (
 	CategoryRiftbound         = 89
 )
 
+// gameCategories maps a site's game slug (config's "game", the same value that
+// picks the templates and image folders) to the TCGplayer category its cards
+// are filed under in the shared price tables. Magic is absent for the same
+// reason it has no constant above: its prices are keyed by mtgjson uuid.
+var gameCategories = map[string]int{
+	"fleshandblood": CategoryFleshAndBlood,
+	"lorcana":       CategoryLorcana,
+	"onepiece":      CategoryOnePiece,
+	"pokemon":       CategoryPokemon,
+	"riftbound":     CategoryRiftbound,
+	"yugioh":        CategoryYuGiOh,
+}
+
+// CategoryForGame returns the TCGplayer category a game slug is filed under.
+// ok=false for Magic, which has no category here, and for a game we don't
+// carry — a caller that needs to narrow a query by category has to widen it
+// again rather than read an empty result as "this game has nothing".
+func CategoryForGame(game string) (int, bool) {
+	id, ok := gameCategories[game]
+	return id, ok
+}
+
 // GameConfig names a single game to ingest and the TCGplayer category it maps
 // to. Adding a game is one more entry.
 type GameConfig struct {

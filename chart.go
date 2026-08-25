@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
+	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -591,13 +592,52 @@ func stashInTimeseries() {
 	ServerNotify("timeseries", msg)
 }
 
+// variantCacheScope is the slice of the shared variants table this process can
+// use: the game it serves, plus every category it ingests, since the tcgcsv
+// ingest resolves a ban_id for each price row it writes and a row outside the
+// cache costs a round-trip. A game with no known TCGplayer category falls back
+// to the whole table, which is slow and fat but always correct — add the game
+// to tcgcsv.CategoryForGame rather than leaving it there.
+func variantCacheScope() timeseries.VariantScope {
+	var scope timeseries.VariantScope
+	if Config.Game == DefaultGame {
+		scope.Magic = true
+	} else if id, ok := tcgcsv.CategoryForGame(Config.Game); ok {
+		scope.TCGCategoryIDs = append(scope.TCGCategoryIDs, id)
+	} else {
+		log.Printf("variant cache: no TCGplayer category known for game %q, warming every game", Config.Game)
+		return timeseries.VariantScope{}
+	}
+	if Config.TCGCSVConfig != nil {
+		for _, game := range Config.TCGCSVConfig.Games {
+			if !slices.Contains(scope.TCGCategoryIDs, game.CategoryID) {
+				scope.TCGCategoryIDs = append(scope.TCGCategoryIDs, game.CategoryID)
+			}
+		}
+	}
+	return scope
+}
+
+// warmVariantCache warms this process's slice of the variants table and reports
+// what it loaded. Both callers log the counts: a scope that resolves to no rows
+// does not fail, it just misses on every lookup afterwards, so the count is the
+// only place a category that stopped matching shows up.
+func warmVariantCache(ctx context.Context) error {
+	counts, err := PricesArchiveDB.WarmVariantCache(ctx, variantCacheScope())
+	if err != nil {
+		return err
+	}
+	log.Printf("variant cache warmed: %d magic, %d non-magic", counts.Magic, counts.TCG)
+	return nil
+}
+
 // stashLongForm mirrors the accumulated wide rows into the long prices table. It
 // warms the variant cache once, resolves each row's ban_id (minting new
 // printings on the fly), and emits one LongPrice per set provider column with a
 // positive price (zeros are omitted, matching the backfill). Returns the number
 // of price rows upserted.
 func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.PriceRow) (int, error) {
-	if err := PricesArchiveDB.WarmVariantCache(ctx); err != nil {
+	if err := warmVariantCache(ctx); err != nil {
 		return 0, fmt.Errorf("warm variant cache: %w", err)
 	}
 	longRows := make([]timeseries.LongPrice, 0, len(accumulated)*4)
