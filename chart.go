@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/mtgban-website/tcgcsv"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -595,17 +594,21 @@ func stashInTimeseries() {
 // variantCacheScope is the slice of the shared variants table this process can
 // use: the game it serves, plus every category it ingests, since the tcgcsv
 // ingest resolves a ban_id for each price row it writes and a row outside the
-// cache costs a round-trip. A game with no known TCGplayer category falls back
-// to the whole table, which is slow and fat but always correct — add the game
-// to tcgcsv.CategoryForGame rather than leaving it there.
+// cache costs a round-trip.
+//
+// The game's own category comes from the loaded catalog, which names it - the
+// same source GetTCGCategoryID exists to provide, so enabling a game stays a
+// matter of shipping its dump. That means the scope is only complete once the
+// catalog is in, which is why the warm waits for it; a call made before then
+// falls back to the whole table, correct but fat.
 func variantCacheScope() timeseries.VariantScope {
 	var scope timeseries.VariantScope
 	if Config.Game == DefaultGame {
 		scope.Magic = true
-	} else if id, ok := tcgcsv.CategoryForGame(Config.Game); ok {
+	} else if id := GetTCGCategoryID(); id != 0 {
 		scope.TCGCategoryIDs = append(scope.TCGCategoryIDs, id)
 	} else {
-		log.Printf("variant cache: no TCGplayer category known for game %q, warming every game", Config.Game)
+		log.Printf("variant cache: no catalog loaded for game %q, warming every game", Config.Game)
 		return timeseries.VariantScope{}
 	}
 	if Config.TCGCSVConfig != nil {
@@ -622,6 +625,22 @@ func variantCacheScope() timeseries.VariantScope {
 // what it loaded. Both callers log the counts: a scope that resolves to no rows
 // does not fail, it just misses on every lookup afterwards, so the count is the
 // only place a category that stopped matching shows up.
+// warmVariantCacheIfEnabled warms the cache when the long form is in use,
+// reporting a failure rather than returning it: every caller is past the point
+// where it could do anything about one, and a cold cache costs round-trips
+// rather than answers.
+func warmVariantCacheIfEnabled() {
+	if !Config.TimeseriesConfig.LongFormWrites && !Config.TimeseriesConfig.LongFormReads {
+		return
+	}
+	if PricesArchiveDB == nil {
+		return
+	}
+	if err := warmVariantCache(context.Background()); err != nil {
+		log.Println("warning: could not warm variant cache:", err)
+	}
+}
+
 func warmVariantCache(ctx context.Context) error {
 	counts, err := PricesArchiveDB.WarmVariantCache(ctx, variantCacheScope())
 	if err != nil {

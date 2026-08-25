@@ -1113,16 +1113,6 @@ func openDBs() (err error) {
 				log.Println("warning: could not ensure next price partition:", serr)
 			}
 		}
-		// Prime the variant->ban_id cache: the write path resolves/mints on it,
-		// and the read path stamps a cached ban_id onto each rendered card so
-		// charts open by ban:<id> without a per-card round-trip. Scoped to this
-		// process's own game and ingests, since the table holds every game's.
-		// Non-fatal.
-		if Config.TimeseriesConfig.LongFormWrites || Config.TimeseriesConfig.LongFormReads {
-			if serr := warmVariantCache(context.Background()); serr != nil {
-				log.Println("warning: could not warm variant cache:", serr)
-			}
-		}
 	}
 
 	if Config.UserStateConfig == nil {
@@ -1305,6 +1295,11 @@ func main() {
 		if err := initTCGCSVService(); err != nil {
 			log.Fatalln("tcgcsv:", err)
 		}
+		// The ingest resolves a ban_id per price row, so warm the categories
+		// it is about to write. No catalog is loaded on this path and none is
+		// needed: config names every category, and there is no site here whose
+		// own game would add one.
+		warmVariantCacheIfEnabled()
 		var err error
 		switch {
 		case *tcgcsvBackfill:
@@ -1396,6 +1391,10 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
+			// runSealedAnalysis loads the catalog, which is what names this
+			// site's own TCGplayer category, so the variant scope is only
+			// complete now.
+			warmVariantCacheIfEnabled()
 			offlineService.RefreshManifest()
 		}()
 	} else {
@@ -1408,6 +1407,10 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
+			// runSealedAnalysis loads the catalog, which is what names this
+			// site's own TCGplayer category, so the variant scope is only
+			// complete now.
+			warmVariantCacheIfEnabled()
 			offlineService.RefreshManifest()
 		}()
 	}

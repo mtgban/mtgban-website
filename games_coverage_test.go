@@ -36,28 +36,33 @@ func TestEveryRegisteredGameIsNamed(t *testing.T) {
 	}
 }
 
-// A game with no TCGplayer category can't scope its variant cache warm, so it
-// silently falls back to loading every game's variants -- the ~120MB startup
-// that OOMs the small instances. Catch the missing entry here instead.
-func TestEveryRegisteredGameHasAVariantScope(t *testing.T) {
+// A non-Magic site names its own category through the catalog it ships, so
+// there is no table here to fall out of step with the games the matcher
+// registers - only a dump to ship. What still has to hold is that the scope
+// degrades safely when no catalog is loaded: it widens to the whole table
+// rather than resolving to nothing.
+func TestVariantScopeWithoutCatalog(t *testing.T) {
+	origGame := Config.Game
+	t.Cleanup(func() { Config.Game = origGame })
+
 	for _, game := range registeredGames {
-		id, found := tcgcsv.CategoryForGame(game)
-		switch {
-		case game == DefaultGame:
-			if found {
-				t.Errorf("magic has TCGplayer category %d; its variants are keyed by mtgjson uuid", id)
-			}
-		case !found:
-			t.Errorf("game %q has no tcgcsv.CategoryForGame entry; its variant cache would warm every game", game)
-		case id == 0:
-			t.Errorf("game %q maps to category 0", game)
+		if game == DefaultGame {
+			continue
+		}
+		Config.Game = game
+		scope := variantCacheScope()
+		if scope.Magic || len(scope.TCGCategoryIDs) != 0 {
+			t.Errorf("game %q with no catalog: scope is %+v, want the unscoped fallback", game, scope)
 		}
 	}
 }
 
 func TestVariantCacheScope(t *testing.T) {
-	origGame, origTCGCSV := Config.Game, Config.TCGCSVConfig
-	t.Cleanup(func() { Config.Game, Config.TCGCSVConfig = origGame, origTCGCSV })
+	origGame, origTCGCSV, origCatalog := Config.Game, Config.TCGCSVConfig, tcgCatalogPtr.Load()
+	t.Cleanup(func() {
+		Config.Game, Config.TCGCSVConfig = origGame, origTCGCSV
+		tcgCatalogPtr.Store(origCatalog)
+	})
 
 	ingesting := &tcgcsv.Config{Games: []tcgcsv.GameConfig{
 		{Name: "Disney Lorcana", CategoryID: tcgcsv.CategoryLorcana},
@@ -65,10 +70,13 @@ func TestVariantCacheScope(t *testing.T) {
 	}}
 
 	cases := []struct {
-		name   string
-		game   string
-		tcgcsv *tcgcsv.Config
-		want   timeseries.VariantScope
+		name string
+		game string
+		// catalog is the TCGplayer category the loaded dump names, which is
+		// how a non-Magic site learns its own; 0 stands for no dump loaded.
+		catalog int
+		tcgcsv  *tcgcsv.Config
+		want    timeseries.VariantScope
 	}{
 		{
 			name: "magic reads only the uuid-keyed rows",
@@ -76,22 +84,25 @@ func TestVariantCacheScope(t *testing.T) {
 			want: timeseries.VariantScope{Magic: true},
 		},
 		{
-			name: "a non-magic site reads only its own category",
-			game: "lorcana",
-			want: timeseries.VariantScope{TCGCategoryIDs: []int{tcgcsv.CategoryLorcana}},
+			name:    "a non-magic site reads only its own category",
+			game:    "lorcana",
+			catalog: tcgcsv.CategoryLorcana,
+			want:    timeseries.VariantScope{TCGCategoryIDs: []int{tcgcsv.CategoryLorcana}},
 		},
 		{
-			name:   "an ingesting site also reads what it writes",
-			game:   "onepiece",
-			tcgcsv: ingesting,
+			name:    "an ingesting site also reads what it writes",
+			game:    "onepiece",
+			catalog: tcgcsv.CategoryOnePiece,
+			tcgcsv:  ingesting,
 			want: timeseries.VariantScope{TCGCategoryIDs: []int{
 				tcgcsv.CategoryOnePiece, tcgcsv.CategoryLorcana, tcgcsv.CategoryRiftbound,
 			}},
 		},
 		{
-			name:   "the site's own category is not repeated",
-			game:   "lorcana",
-			tcgcsv: ingesting,
+			name:    "the site's own category is not repeated",
+			game:    "lorcana",
+			catalog: tcgcsv.CategoryLorcana,
+			tcgcsv:  ingesting,
 			want: timeseries.VariantScope{TCGCategoryIDs: []int{
 				tcgcsv.CategoryLorcana, tcgcsv.CategoryRiftbound,
 			}},
@@ -105,8 +116,8 @@ func TestVariantCacheScope(t *testing.T) {
 			}},
 		},
 		{
-			name: "an unknown game falls back to the whole table",
-			game: "notagame",
+			name: "a site whose catalog has not loaded falls back to the whole table",
+			game: "lorcana",
 			want: timeseries.VariantScope{},
 		},
 		{
@@ -114,8 +125,8 @@ func TestVariantCacheScope(t *testing.T) {
 			// what this process ingests: the site's own game is the one thing
 			// the ingest list does not name, and dropping it would cost every
 			// rendered card its ban_id.
-			name:   "an unknown game that ingests still reads everything",
-			game:   "notagame",
+			name:   "and still reads everything even when it ingests",
+			game:   "lorcana",
 			tcgcsv: ingesting,
 			want:   timeseries.VariantScope{},
 		},
@@ -123,6 +134,11 @@ func TestVariantCacheScope(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			Config.Game, Config.TCGCSVConfig = tc.game, tc.tcgcsv
+			if tc.catalog != 0 {
+				tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryID: tc.catalog})
+			} else {
+				tcgCatalogPtr.Store(nil)
+			}
 			got := variantCacheScope()
 			if got.Magic != tc.want.Magic {
 				t.Errorf("Magic = %v, want %v", got.Magic, tc.want.Magic)
