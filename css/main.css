@@ -1078,6 +1078,16 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
     --card-radius: 18px;
 }
 
+/* Yu-Gi-Oh cards are cut square, so rounding any of them is wrong. That is the
+   whole game rather than a handful of printings, which is why this keys on the
+   deployment's game instead of a set. The second selector carries it past the
+   rules above: those name Magic sets, and a Yu-Gi-Oh set sharing a code would
+   otherwise inherit a Magic printing's rounding. */
+body[data-game="yugioh"],
+body[data-game="yugioh"] [data-set] {
+    --card-radius: 0;
+}
+
 
 /* ── Content-warning blur ── */
 /* Applies to wrapper divs (.foil-wrap, .sidebar-img-wrap) and standalone <img> elements.
