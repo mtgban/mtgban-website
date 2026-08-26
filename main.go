@@ -536,7 +536,10 @@ type ConfigType struct {
 		ImagesPath   string `json:"images_path"`
 	} `json:"offline"`
 	BucketKeys map[string]BucketKey `json:"bucket_keys"`
-	Game       string               `json:"game"`
+
+	Game         string `json:"game"`
+	InstanceName string `json:"instance_name"`
+
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
 	// from the ban list document or the set registry.
@@ -573,17 +576,15 @@ type ConfigType struct {
 
 	Uploader map[string]string `json:"uploader"`
 
-	// The location of the configuation file
-	sourcePath string
-
-	SqlConfig           *timeseries.SqlConfig `json:"sql_config"`
-	UserStateConfig     *userstate.SqlConfig  `json:"user_state_config"`
-	ObservabilityConfig *timeseries.SqlConfig `json:"observability_config"`
-	InstanceName        string                `json:"instance_name"`
-	TCGCSVConfig        *tcgcsv.Config        `json:"tcgcsv_config"`
-
-	// Structured form of new_newspaper_config_line; wins when both are set
+	SqlConfig             *timeseries.SqlConfig `json:"sql_config"`
+	UserStateConfig       *userstate.SqlConfig  `json:"user_state_config"`
+	ObservabilityConfig   *timeseries.SqlConfig `json:"observability_config"`
 	NewNewspaperSqlConfig *timeseries.SqlConfig `json:"new_newspaper_sql_config"`
+
+	TCGCSVConfig *tcgcsv.Config `json:"tcgcsv_config"`
+
+	// The location of the configuation file (always last)
+	sourcePath string
 }
 
 var DevMode bool
