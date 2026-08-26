@@ -23,6 +23,7 @@ import (
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 const (
@@ -953,29 +954,34 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// UI's identity for favorites/roster/legend); the ban_id is internal.
 			var earliest time.Time
 			var ids, names []string
-			var targets []*chartTarget
+			var series []map[string]timeseries.ProviderPrices
 			for _, id := range chartIds {
 				target, terr := resolveChartTarget(r.Context(), id)
 				if terr != nil {
 					continue
 				}
+				// Read each card once and take the axis from what came back: a
+				// roster used to cost two archive round-trips per card, and
+				// against a hundred-partition prices table a round-trip is
+				// mostly planning.
+				results := fetchChartPrices(r.Context(), target, lb)
 				ids = append(ids, id)
 				names = append(names, target.Name)
-				targets = append(targets, target)
-				if e, _ := chartTargetEarliest(r.Context(), target, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
+				series = append(series, results)
+				if e := earliestChartedDate(results, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
 					earliest = e
 				}
 			}
-			if len(targets) == 0 || earliest.IsZero() {
+			if len(series) == 0 || earliest.IsZero() {
 				pageVars.InfoMessage = "No chart data available"
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)
-				cards := make([]multiCardInput, len(targets))
-				for i, target := range targets {
+				cards := make([]multiCardInput, len(series))
+				for i, results := range series {
 					cards[i] = multiCardInput{
 						CardID:   ids[i],
 						Name:     names[i],
-						Datasets: getChartDatasets(r.Context(), target, pageVars.AxisLabels, lb),
+						Datasets: chartDatasetsFrom(results, pageVars.AxisLabels),
 					}
 				}
 				if isMultiChart {

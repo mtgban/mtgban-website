@@ -223,21 +223,14 @@ func buildProviderRegistry() {
 	providerRegistry = registry
 }
 
-// chartTargetEarliest returns the oldest on-record date for a resolved target:
-// a precise ban_id, or the Magic canonical (uuid, foil, etched) path.
-func chartTargetEarliest(ctx context.Context, target *chartTarget, lb timeseries.Lookback) (time.Time, error) {
-	if target.BanID != 0 {
-		return PricesArchiveDB.GetEarliestDateByBanID(ctx, target.BanID, lb)
-	}
-	return PricesArchiveDB.GetEarliestDateLong(ctx, target.UUID, target.Foil, target.Etched, lb)
-}
-
-// getChartDatasets builds a card's chart datasets, game-agnostic: it fetches the
-// series once (by exact ban_id, else the canonical uuid path) and emits one
-// dataset per registry provider that has data, in registry order. Adding a game
-// needs no code here — its providers just show up. Long-form reads only; the
-// legacy path stays in getDatasets.
-func getChartDatasets(ctx context.Context, target *chartTarget, labels []string, lb timeseries.Lookback) []Dataset {
+// fetchChartPrices reads one resolved target's series: by exact ban_id when the
+// target has one, else the Magic canonical (uuid, foil, etched) path.
+//
+// This is the only read the chart path makes. The axis used to come from a
+// second query asking the archive for the card's oldest date, which cost a
+// round-trip to learn something the rows themselves say - and against a
+// hundred-partition prices table a round-trip is mostly planning, not data.
+func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lookback) map[string]timeseries.ProviderPrices {
 	if PricesArchiveDB == nil {
 		return nil
 	}
@@ -252,7 +245,36 @@ func getChartDatasets(ctx context.Context, target *chartTarget, labels []string,
 		log.Println(err)
 		return nil
 	}
+	return results
+}
 
+// earliestChartedDate is the oldest date a fetched series holds, which is where
+// the axis starts. Empty series fall back to the lookback boundary, the same
+// answer the archive gave when it was asked directly.
+//
+// The dates are ISO, so the lexicographic minimum is the chronological one.
+func earliestChartedDate(results map[string]timeseries.ProviderPrices, lb timeseries.Lookback) time.Time {
+	var oldest string
+	for date := range results {
+		if oldest == "" || date < oldest {
+			oldest = date
+		}
+	}
+	if oldest == "" {
+		return lb.Since()
+	}
+	parsed, err := time.Parse("2006-01-02", oldest)
+	if err != nil {
+		return lb.Since()
+	}
+	return parsed
+}
+
+// chartDatasetsFrom projects a fetched series onto the axis, game-agnostic: one
+// dataset per registry provider that has data, in registry order. Adding a game
+// needs no code here — its providers just show up. Long-form reads only; the
+// legacy path stays in getDatasets.
+func chartDatasetsFrom(results map[string]timeseries.ProviderPrices, labels []string) []Dataset {
 	// Only providers with data for this card render — that is what makes it
 	// game-agnostic and also drops sealed-vs-single applicability out of config
 	// (e.g. Sealed EV only has data for sealed products, so it only shows there).
