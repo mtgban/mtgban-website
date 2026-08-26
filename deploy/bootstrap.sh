@@ -36,7 +36,51 @@ if [ "$(id -u)" = 0 ]; then
     echo "!! run as the deploy user (e.g. koda), not root — the script uses sudo itself" >&2
     exit 1
 fi
-command -v go        >/dev/null || { echo "!! go not found in PATH ($PATH)" >&2; exit 1; }
+
+# 0. Prerequisites. Installing only what is missing keeps a re-run quiet, and
+#    keeps this script the single answer to "what does a fresh droplet need".
+ensure_packages() {
+    local missing=() pkg
+    for pkg in git nginx build-essential curl; do
+        dpkg -s "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
+    done
+    if [ ${#missing[@]} -eq 0 ]; then
+        echo "==> packages       : present"
+        return
+    fi
+    echo "==> installing packages: ${missing[*]}"
+    sudo apt-get update -qq
+    sudo apt-get install -y "${missing[@]}"
+}
+
+# The Go the module asks for, from go.dev rather than apt: the distro packages
+# trail the toolchain by whole releases, and this repo builds with what go.mod
+# names. An already-installed Go that is new enough is left alone, so this only
+# downloads on a fresh host or a version bump.
+ensure_go() {
+    local want have arch tarball
+    want=go$(awk '/^go [0-9]/{print $2; exit}' "$REPO_DIR/go.mod")
+    have=$(command -v go >/dev/null 2>&1 && go env GOVERSION || echo go0)
+    if [ "$(printf '%s\n%s\n' "$want" "$have" | sort -V | head -1)" = "$want" ]; then
+        echo "==> go             : $have (needs $want)"
+        return
+    fi
+
+    arch=$(dpkg --print-architecture)
+    tarball="${want}.linux-${arch}.tar.gz"
+    echo "==> installing $want ($arch), replacing ${have#go0}"
+    curl -fsSL -o "/tmp/${tarball}" "https://go.dev/dl/${tarball}"
+    sudo rm -rf /usr/local/go
+    sudo tar -C /usr/local -xzf "/tmp/${tarball}"
+    rm -f "/tmp/${tarball}"
+    # Onto the default PATH, so a plain `ssh droplet go version` works. deploy.sh
+    # exports the path too, but only for itself.
+    sudo ln -sf /usr/local/go/bin/go /usr/local/bin/go
+}
+
+ensure_packages
+ensure_go
+command -v go        >/dev/null || { echo "!! go still not found in PATH ($PATH)" >&2; exit 1; }
 SYSTEMCTL=$(command -v systemctl)
 NGINX=$(command -v nginx || echo /usr/sbin/nginx)
 DEPLOY_USER=$(id -un)

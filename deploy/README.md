@@ -26,10 +26,15 @@ datastore + logs persist across deploys.
 ## One-time droplet setup
 
 The quick path: run **`./deploy/bootstrap.sh`** from the control repo (as the
-deploy user, not root). It's idempotent and handles the checkouts, systemd unit,
-placeholder secrets file, sudoers rule, nginx upstream include, and the boot
-instance — then prints the manual follow-ups (real secrets, the nginx server
-block edit, retiring any old unit, GitHub deploy key/secrets).
+deploy user, not root). It's idempotent and handles the packages (git, nginx,
+build-essential, curl), the Go toolchain go.mod asks for, the checkouts,
+systemd unit, placeholder secrets file, sudoers rule, nginx upstream include,
+and the boot instance — then prints the manual follow-ups (real secrets, the
+nginx server block edit, retiring any old unit, GitHub deploy key/secrets).
+
+So a fresh droplet needs nothing installed beforehand: clone the repo and run
+it. An existing host keeps whatever it already has — packages already present
+are left alone, and a Go newer than go.mod's is not downgraded.
 
 The steps below document what it does, for reference or manual setup.
 
