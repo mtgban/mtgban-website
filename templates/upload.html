@@ -324,8 +324,8 @@
                     <h3>Reading Results</h3>
                     <p>Each card shows prices from all selected stores. A per-store <strong>total</strong> row appears at the bottom with quantity-adjusted sums.</p>
                     <p>Below totals: count of cards not found per store, plus an estimated missing value via TCG Low.</p>
-                    <p>The <strong>Index Overview</strong> shows popular aggregate prices. TCG Direct is condition-adjusted, falling back to TCG Direct Low.</p>
-                    <div class="upload-help-note">If price or quantity data exists in your upload, it displays above results. Condition data adjusts reported prices and can determine foiling status.</div>
+                    <p>The <strong>Index Overview</strong> shows popular aggregate prices. These describe the printing, not your copy: TCG Low and TCG Market carry a single price whatever condition you loaded. TCG Direct is the exception and is condition-adjusted, falling back to TCG Direct Low.</p>
+                    <div class="upload-help-note">If price or quantity data exists in your upload, it displays above results. Condition data adjusts store prices and can determine foiling status.</div>
                 </div>
 
                 <div class="upload-help-card">
@@ -756,7 +756,7 @@
             {{range $storeKeys}}
                 <th class="r">{{scraper_name .}}</th>
             {{end}}
-            {{if $indexKeys}}<th>Index</th>{{end}}
+            {{if $indexKeys}}<th title="Reference prices for the printing as a whole. Unlike the store columns, these are not adjusted for the condition in the Cond column.">Index<span class="ures-index-note">per printing</span></th>{{end}}
         </tr>
     </thead>
     <tbody>
