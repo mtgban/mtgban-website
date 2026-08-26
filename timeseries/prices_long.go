@@ -239,6 +239,94 @@ func buildMoverAnchorQuery(provider int16, tcgCategory int, before *time.Time) (
 		 LIMIT 1`, args
 }
 
+// moverAnchorSteps bounds the fast path: how many of the provider's dates it
+// checks, newest first, before handing over to the scan. A game normally has
+// rows on the provider's newest date or within a day or two of it, and a game
+// that has fallen further behind than this is better served by the scan than by
+// another round-trip per date.
+const moverAnchorSteps = 8
+
+// providerLatestDateQuery finds the newest date a provider wrote, optionally
+// no later (or strictly earlier) than a bound. It reads nothing but the
+// prices_provider_date index and answers in milliseconds whatever the table
+// holds, because no join stands between it and the answer.
+func providerLatestDateQuery(bounded, strict bool) string {
+	query := `SELECT max(date) FROM prices WHERE provider=$1`
+	if !bounded {
+		return query
+	}
+	if strict {
+		return query + ` AND date < $2`
+	}
+	return query + ` AND date <= $2`
+}
+
+// gameHasRowsOnQuery asks whether one game wrote anything on one exact date.
+// The equality on date is what makes it cheap: the planner nested-loops from
+// the day's index entries into variants by primary key and stops at the first
+// row that belongs to this game - 3ms against the live archive, where asking
+// the same question as "the newest date of this game" costs seconds.
+func gameHasRowsOnQuery(tcgCategory int) string {
+	scope, _ := moverScope(tcgCategory, 3)
+	return `SELECT 1 FROM prices p
+		  JOIN variants v ON v.ban_id = p.ban_id
+		 WHERE p.provider=$1 AND p.date=$2 AND ` + scope + ` LIMIT 1`
+}
+
+// moverAnchor returns the newest date this game has under this provider, at or
+// before the given bound.
+//
+// It walks the provider's own dates newest-first and asks, per date, whether
+// this game wrote anything - two index reads a step, against a table where
+// finding "the newest row of this game" directly means scanning past every
+// newer row that belongs to another one. Games normally sit on the same date
+// or a day apart, so this settles in a step or two.
+//
+// Beyond moverAnchorSteps it gives up and scans, which is slower but bounded
+// by nothing: a game whose ingest died months ago still gets its answer.
+func (c *Client) moverAnchor(ctx context.Context, provider int16, tcgCategory int, before *time.Time) (sql.NullTime, error) {
+	probe := gameHasRowsOnQuery(tcgCategory)
+	_, scopeArgs := moverScope(tcgCategory, 3)
+
+	cursor := before
+	for step := 0; step < moverAnchorSteps; step++ {
+		args := []any{provider}
+		if cursor != nil {
+			args = append(args, *cursor)
+		}
+		var date sql.NullTime
+		err := c.db.QueryRowContext(ctx, providerLatestDateQuery(cursor != nil, step > 0), args...).Scan(&date)
+		if err != nil && err != sql.ErrNoRows {
+			return sql.NullTime{}, err
+		}
+		if !date.Valid {
+			// The provider has nothing older, so neither has this game.
+			return sql.NullTime{}, nil
+		}
+
+		var found int
+		probeArgs := append([]any{provider, date.Time}, scopeArgs...)
+		err = c.db.QueryRowContext(ctx, probe, probeArgs...).Scan(&found)
+		if err == nil {
+			return date, nil
+		}
+		if err != sql.ErrNoRows {
+			return sql.NullTime{}, err
+		}
+		next := date.Time
+		cursor = &next
+	}
+
+	// Too far behind for the step-by-step walk; let the scan settle it.
+	query, args := buildMoverAnchorQuery(provider, tcgCategory, before)
+	var date sql.NullTime
+	err := c.db.QueryRowContext(ctx, query, args...).Scan(&date)
+	if err != nil && err != sql.ErrNoRows {
+		return sql.NullTime{}, err
+	}
+	return date, nil
+}
+
 // buildMoverRowsQuery pairs each of this game's prices on the two anchor dates.
 func buildMoverRowsQuery(provider int16, tcgCategory int, latest, prior time.Time, minPrice, minPriorPrice float64) (string, []any) {
 	args := []any{provider, latest, prior, minPrice, minPriorPrice}
@@ -268,10 +356,8 @@ func buildMoverRowsQuery(provider int16, tcgCategory int, latest, prior time.Tim
 // latest date, and a game has no data on another game's latest date. See
 // moverScope for the scoping the three queries share.
 func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays int, minPrice, minPriorPrice float64, tcgCategory int) ([]MoverRow, error) {
-	latestQuery, latestArgs := buildMoverAnchorQuery(provider, tcgCategory, nil)
-	var latest sql.NullTime
-	err := c.db.QueryRowContext(ctx, latestQuery, latestArgs...).Scan(&latest)
-	if err != nil && err != sql.ErrNoRows {
+	latest, err := c.moverAnchor(ctx, provider, tcgCategory, nil)
+	if err != nil {
 		return nil, err
 	}
 	if !latest.Valid {
@@ -279,10 +365,8 @@ func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays i
 	}
 	target := latest.Time.AddDate(0, 0, -windowDays)
 
-	priorQuery, priorArgs := buildMoverAnchorQuery(provider, tcgCategory, &target)
-	var prior sql.NullTime
-	err = c.db.QueryRowContext(ctx, priorQuery, priorArgs...).Scan(&prior)
-	if err != nil && err != sql.ErrNoRows {
+	prior, err := c.moverAnchor(ctx, provider, tcgCategory, &target)
+	if err != nil {
 		return nil, err
 	}
 	if !prior.Valid {

@@ -138,3 +138,30 @@ func TestBuildMoverRowsQueryArgs(t *testing.T) {
 		t.Errorf("args = %v, want %v", args, want)
 	}
 }
+
+// The fast path asks two cheap questions per step: what is the provider's
+// newest date (an index read with no join in the way), and did this game write
+// anything on it (an equality on date, so the planner can nested-loop into
+// variants and stop at the first hit).
+func TestMoverAnchorFastPathQueries(t *testing.T) {
+	if q := providerLatestDateQuery(false, false); strings.Contains(q, "date <") || strings.Contains(q, "JOIN") {
+		t.Errorf("unbounded latest-date query is not plain:\n%s", q)
+	}
+	if q := providerLatestDateQuery(true, false); !strings.Contains(q, "date <= $2") {
+		t.Errorf("bounded query does not include its bound:\n%s", q)
+	}
+	if q := providerLatestDateQuery(true, true); !strings.Contains(q, "date < $2") {
+		t.Errorf("stepping query does not exclude the date it just tried:\n%s", q)
+	}
+
+	// The probe must pin one date and stop at one row, or it is the scan again.
+	probe := gameHasRowsOnQuery(CategoryMagic)
+	for _, want := range []string{"p.date=$2", "LIMIT 1", "v.mtgjson_uuid IS NOT NULL"} {
+		if !strings.Contains(probe, want) {
+			t.Errorf("magic probe is missing %q:\n%s", want, probe)
+		}
+	}
+	if probe := gameHasRowsOnQuery(71); !strings.Contains(probe, "v.tcgp_category_id = $3") {
+		t.Errorf("non-magic probe does not carry its category at $3:\n%s", probe)
+	}
+}
