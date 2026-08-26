@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Provider ids in the providers lookup table (see db_migration/02_seed_providers.sql).
@@ -74,6 +75,16 @@ type variantCache struct {
 	// Warm-time only, like tcgByProduct: the maps are built once and never
 	// mutated, so readers can use them without copying.
 	tcgSubTypesByProduct sync.Map // int (product id) -> map[string]int64
+	// byBanID is the reverse of the maps above: what a ban_id is. Built whole
+	// by the warm pass and published in one store, so a read is a pointer load
+	// and needs no lock - and a re-warm swaps a new map in rather than mutating
+	// the one readers hold.
+	//
+	// It is worth its memory because a miss is not a millisecond, it is a
+	// round-trip: ~50MB on a Magic deployment (VariantInfo is 80 bytes plus a
+	// uuid, times ~390k rows) against ~60ms per lookup when the app and the
+	// archive are in different regions, on the hottest path the site has.
+	byBanID atomic.Pointer[map[int64]VariantInfo]
 }
 
 // VariantScope names the slice of the variants table a process actually uses.
@@ -148,6 +159,7 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 	}
 	byProduct := map[int]tcgBest{}
 	subTypesByProduct := map[int]map[string]int64{}
+	byBanID := map[int64]VariantInfo{}
 
 	var counts VariantCounts
 	for rows.Next() {
@@ -160,6 +172,12 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 		if err := rows.Scan(&banID, &uuid, &isFoil, &isEtched, &isAlt, &language,
 			&catID, &prodID, &subType); err != nil {
 			return VariantCounts{}, err
+		}
+		byBanID[banID] = VariantInfo{
+			BanID: banID, MtgjsonUUID: uuid.String,
+			IsFoil: isFoil, IsEtched: isEtched, IsAlt: isAlt, Language: language,
+			TCGCategoryID: int(catID.Int64), TCGProductID: int(prodID.Int64),
+			TCGSubType: subType.String,
 		}
 		if uuid.Valid {
 			c.variants.magic.Store(MagicVariant{
@@ -200,6 +218,9 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 	for pid, subTypes := range subTypesByProduct {
 		c.variants.tcgSubTypesByProduct.Store(pid, subTypes)
 	}
+	// One store, after the scan: readers either see the previous map or this
+	// one, never a half-built one.
+	c.variants.byBanID.Store(&byBanID)
 	return counts, nil
 }
 
@@ -383,6 +404,15 @@ func (v VariantInfo) IsMagic() bool { return v.MtgjsonUUID != "" }
 // LookupVariant returns the identity for a ban_id, ok=false if no such variant.
 // Used to chart/display a ban: id and to route Magic vs non-Magic handling.
 func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, bool, error) {
+	// The warm pass read this exact row; ask it before crossing the network.
+	// A miss - a variant minted since the warm, or a client that never warmed -
+	// falls through to the query.
+	if warmed := c.variants.byBanID.Load(); warmed != nil {
+		if v, ok := (*warmed)[banID]; ok {
+			return v, true, nil
+		}
+	}
+
 	v := VariantInfo{BanID: banID}
 	var uuid, subType sql.NullString
 	var catID, prodID sql.NullInt64

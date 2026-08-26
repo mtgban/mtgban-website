@@ -234,6 +234,14 @@ func TestLongFormLive(t *testing.T) {
 	if got, ok := c3.CachedTCGBanID(liveSentinelProdLong); !ok || got != tcgBan {
 		t.Errorf("CachedTCGBanID = %d (ok=%v), want %d after a scoped warm", got, ok, tcgBan)
 	}
+	// The warm pass also indexes what each ban_id is, which is what keeps a
+	// chart page from asking the archive that question per card.
+	if byBanID := c3.variants.byBanID.Load(); byBanID == nil {
+		t.Error("warm pass published no ban_id index")
+	} else if vi, ok := (*byBanID)[tcgBan]; !ok || vi.TCGProductID != liveSentinelProdLong {
+		t.Errorf("ban_id index has %+v for %d, want the sentinel product", vi, tcgBan)
+	}
+
 	if warmed, ok := c3.CachedTCGSubTypeBanIDs(liveSentinelProdLong); !ok ||
 		warmed["Normal"] != tcgBan || warmed["Cold Foil"] != foilBan {
 		t.Errorf("CachedTCGSubTypeBanIDs = %+v (ok=%v), want Normal=%d Cold Foil=%d", warmed, ok, tcgBan, foilBan)
