@@ -88,7 +88,9 @@ async function runSync(msg) {
         post({ type: 'progress', stage: 'manifest', done: 1, total: 1 });
 
         // Opt-in provisions the key; regenerate defensively if it is missing.
-        var fullResync = false;
+        // msg.full is the settings "force resync" button: take everything the
+        // manifest lists rather than only what changed since last time.
+        var fullResync = !!msg.full;
         var key = await self.OfflineDB.getMeta('aesKey');
         if (!key) {
             key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);

@@ -695,6 +695,7 @@ body.settings-open {
 .editions-group-size { font-size: 0.8em; opacity: 0.7; margin-right: 0.5em; white-space: nowrap; }
 .offline-img-estimate { margin: 0.75em 0 0.25em; font-size: 0.9em; }
 .offline-img-controls { display: flex; gap: 0.5em; margin: 0.5em 0; }
+.offline-maintenance { display: flex; gap: 0.5em; margin: 0.5em 0; }
 .offline-img-progress { margin: 0.5em 0; }
 .offline-img-progress-bar { width: 100%; height: 0.6em; border-radius: 0.3em; background: rgba(128, 128, 128, 0.25); overflow: hidden; }
 .offline-img-progress-fill { height: 100%; width: 0; background: var(--accent, #4a90d9); transition: width 0.2s ease; }

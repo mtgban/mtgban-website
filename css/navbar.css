@@ -535,12 +535,14 @@
     color: var(--orange, orange);
 }
 
-/* On /offline the navbar is a Singles/Sealed mode switch. */
+/* On /offline the navbar is a Singles/Sealed mode switch. The selected one is
+   marked with the navbar's own emphasis rather than a colour of its own: it is
+   the same kind of state as any other selected section button. */
 .offline-nav .offline-mode-btn.active,
 .offline-nav .offline-mode-btn.active:hover {
-    color: var(--lightblack, #161616);
-    background: var(--green, #22c55e);
-    border-color: var(--green, #22c55e);
+    color: var(--normal);
+    background: var(--surface-3, var(--navbackground));
+    border-color: var(--border-moderate);
 }
 /* Hide the online section-bar nav (restored layout + promoted tools) so only
    the Singles/Sealed mode buttons show; CSS-only, saved layout untouched. */

@@ -227,17 +227,22 @@
         }
     }
 
-    function sync() {
+    // opts.images opts the image stage in. Prices and the catalog are small
+    // enough to refresh on any page load; images are a whole corpus, so they
+    // only move when someone asks for them and can watch it happen.
+    function sync(opts) {
         if (syncing || !enabled()) return;
+        var withImages = !!(opts && opts.images);
         setSyncing(true);
         setSyncStatus('syncing: starting');
         Promise.all([
             OfflineDB.getMeta('storesSel'),
             OfflineDB.getMeta('editionsSel'),
-            OfflineDB.getMeta('imgEditionsSel'),
+            withImages ? OfflineDB.getMeta('imgEditionsSel') : Promise.resolve([]),
         ]).then(function(sel) {
             ensureWorker().postMessage({
                 type: 'sync',
+                full: !!(opts && opts.full),
                 stores: sel[0] || [],
                 editions: sel[1] || [],
                 imgEditions: sel[2] || [],
@@ -331,6 +336,41 @@
         });
     }
 
+    // Re-download everything currently selected, whatever the local state
+    // says. The price side is a flag the worker reads; images track their own
+    // per-edition rows, so those are dropped here to give the diff work to do.
+    function forceResync() {
+        if (syncing || !enabled()) return Promise.resolve();
+        setSyncStatus('syncing: starting');
+        return OfflineDB.getAllRows('imgstate').then(function (rows) {
+            return Promise.all(rows.map(function (r) {
+                return OfflineDB.deleteRow('imgstate', r.code);
+            }));
+        }).catch(function () {}).then(function () {
+            sync({ full: true, images: true });
+        });
+    }
+
+    // Everything this device stores: the database, the caches, and the worker
+    // that fills them. The preference is left alone, so the next sync starts
+    // from nothing rather than the feature switching itself off.
+    function wipeLocal() {
+        if (syncWorker) {
+            syncWorker.terminate();
+            syncWorker = null;
+        }
+        setSyncing(false);
+        setSyncStatus('deleting offline data...');
+        return cleanupLocal().then(function () {
+            state = { lastSync: null, setCount: 0, imgCount: 0, bytes: 0, syncing: false, authLapsed: false };
+            setSyncStatus('offline data deleted');
+            paintUsage();
+        }).catch(function (err) {
+            setSyncStatus('delete failed: ' + (err && err.message || err));
+            throw err;
+        });
+    }
+
     // Settings modal glue: reveal the Offline section only when available().
     function initSettingsUI() {
         var section = document.getElementById('settings-offline-section');
@@ -356,6 +396,26 @@
                 paint();
             });
         });
+        var resyncBtn = document.getElementById('offline-resync-btn');
+        if (resyncBtn) {
+            resyncBtn.addEventListener('click', function () {
+                resyncBtn.disabled = true;
+                forceResync().catch(function () {}).then(function () { resyncBtn.disabled = false; });
+            });
+        }
+
+        var wipeBtn = document.getElementById('offline-wipe-btn');
+        if (wipeBtn) {
+            wipeBtn.addEventListener('click', function () {
+                if (!window.confirm('Delete all offline data on this device? Prices, cards and card images will be downloaded again on the next sync.')) return;
+                wipeBtn.disabled = true;
+                wipeLocal().catch(function () {}).then(function () {
+                    wipeBtn.disabled = false;
+                    paint();
+                });
+            });
+        }
+
         paint();
     }
 
@@ -365,6 +425,8 @@
         enable: enable,
         disable: disable,
         sync: sync,
+        forceResync: forceResync,
+        wipeLocal: wipeLocal,
         cancelSync: cancelSync,
         status: status,
         syncStatusText: syncStatusText
