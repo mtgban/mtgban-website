@@ -148,7 +148,9 @@
 {{end}}
 
 {{define "m-search-results"}}
-<div class="m-page">
+{{$expanded := ne .MobileSearchLayout "compact"}}
+{{$defaultBuyers := or (eq .DefaultTab "buyers") (eq .SearchSort "buylist")}}
+<div class="m-page{{if $expanded}} m-layout-expanded{{end}}">
     {{/* Sticky search bar */}}
     <div class="m-search-bar-sticky">
         <div class="m-search-wrap">
@@ -200,7 +202,7 @@
     {{/* Results */}}
     {{range $i, $cardId := .AllKeys}}
         {{$card := (index $.Metadata $cardId)}}
-        <div class="m-card"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
+        <div class="m-card{{if $card.Sealed}} m-sealed{{end}}{{if and $expanded $defaultBuyers}} m-buyers-first{{end}}"{{if $card.RarityColor}} style="--rarity-color: {{$card.RarityColor}}"{{end}}>
             {{/* Card header - tap to show image drawer */}}
             <div class="m-card-header"
                  data-card-id="{{$cardId}}"
@@ -294,7 +296,6 @@
 
             {{$hasSellers := (index $.FoundSellers $cardId)}}
             {{$hasBuyers := (index $.FoundVendors $cardId)}}
-            {{$defaultBuyers := or (eq $.DefaultTab "buyers") (eq $.SearchSort "buylist")}}
 
             {{/* Resolve the active condition view for this card: user preference, falling back to NM if unavailable. */}}
             {{$sellerConds := (index $.FoundSellers $cardId)}}
@@ -307,7 +308,7 @@
             {{if not $hasDefault}}{{$defView = "NM"}}{{end}}
 
             {{/* Condition pills - default driven by user preference, hidden for sealed products */}}
-            {{if not $card.Sealed}}
+            {{if and (not $card.Sealed) (not $expanded)}}
             <div class="m-cond-pills" data-card="{{$cardId}}">
                 <span class="m-cond-pills-left">
                 {{range $conditions := $.CondKeys}}
@@ -333,23 +334,25 @@
             {{end}}
 
             {{/* Seller/Buyer tab toggle */}}
+            {{if not $expanded}}
             <div class="m-tabs" data-card="{{$cardId}}">
                 {{if $hasSellers}}<button class="m-tab{{if not $defaultBuyers}} active{{end}}" data-target="sellers-{{$cardId}}">Sellers</button>{{end}}
                 {{if $hasBuyers}}<button class="m-tab{{if $defaultBuyers}} active{{end}}" data-target="buyers-{{$cardId}}">Buyers</button>{{end}}
             </div>
+            {{end}}
 
             {{/* Inline card image - hidden in portrait, visible in landscape */}}
             <img class="m-card-img-landscape{{if $card.HasContentWarning}} content-warning{{end}}" src="{{$card.ImageURL}}" loading="lazy" alt="{{$card.Name}}"{{if $card.HasContentWarning}} onclick="this.classList.add('cw-revealed')"{{end}}>
 
             {{/* Sellers panel */}}
             {{if $hasSellers}}
-            <div class="m-tab-panel{{if not $defaultBuyers}} active{{end}}" id="sellers-{{$cardId}}">
+            <div class="m-tab-panel{{if or $expanded (not $defaultBuyers)}} active{{end}}" id="sellers-{{$cardId}}">
                 {{$condsEntry := (index $.FoundSellers $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                        <div class="m-cond-group{{if eq $defView "INDEX"}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
+                        <div class="m-cond-group{{if or $expanded (eq $defView "INDEX")}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -373,7 +376,7 @@
                             {{end}}
                         </div>
                         {{else}}
-                        <div class="m-cond-group{{if eq $conditions $defView}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
+                        <div class="m-cond-group{{if or $expanded (eq $conditions $defView)}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -430,13 +433,13 @@
 
             {{/* Buyers panel */}}
             {{if $hasBuyers}}
-            <div class="m-tab-panel{{if $defaultBuyers}} active{{end}}" id="buyers-{{$cardId}}">
+            <div class="m-tab-panel{{if or $expanded $defaultBuyers}} active{{end}}" id="buyers-{{$cardId}}">
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
                     {{if $entries}}
                         {{if eq $conditions "INDEX"}}
-                        <div class="m-cond-group{{if eq $defView "INDEX"}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
+                        <div class="m-cond-group{{if or $expanded (eq $defView "INDEX")}} active{{end}}" data-cond="INDEX" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -460,7 +463,7 @@
                             {{end}}
                         </div>
                         {{else}}
-                        <div class="m-cond-group{{if eq $conditions $defView}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
+                        <div class="m-cond-group{{if or $expanded (eq $conditions $defView)}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
                                 <div class="m-vendor-row m-vendor-locked">
@@ -620,6 +623,15 @@
         <div class="m-settings-content">
             <h3>Search Settings</h3>
 
+            {{/* Layout */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Layout</div>
+                <div class="m-settings-pills" id="m-set-layout">
+                    <button type="button" class="m-settings-pill active" data-val="expanded">Expanded</button>
+                    <button type="button" class="m-settings-pill" data-val="compact">Compact</button>
+                </div>
+            </div>
+
             {{/* Default Tab */}}
             <div class="m-settings-section">
                 <div class="m-settings-label">Default Tab</div>
@@ -630,7 +642,7 @@
             </div>
 
             {{/* Default View - which condition (or Index) is initially active in result cards */}}
-            <div class="m-settings-section">
+            <div class="m-settings-section" id="m-set-default-view-section">
                 <div class="m-settings-label">Default View</div>
                 <div class="m-settings-pills" id="m-set-default-view">
                     <button type="button" class="m-settings-pill active" data-val="NM">NM</button>
@@ -862,6 +874,15 @@ document.querySelectorAll('.m-filter-pills').forEach(function(group) {
     });
 });
 
+// Cross-device: adopt the synced layout pref over a stale local cookie
+(function() {
+    var synced = null;
+    try { synced = localStorage.getItem('mtgban_search_layout'); } catch (e) {}
+    if (synced && synced !== (getCookie('MobileSearchLayout') || '')) {
+        setCookie('MobileSearchLayout', synced, 1000);
+    }
+})();
+
 function selectSet(e) {
     var li = e.currentTarget;
     var picker = document.getElementById('m-filter-set');
@@ -1012,59 +1033,38 @@ function hideCardDrawer() {
     });
 })();
 
-// Recalculate BEST badge across all active groups (including INDEX) per panel
+// Recalculate BEST badge per active condition group in each panel
 function recalcBestBadges(card) {
     card.querySelectorAll('.m-tab-panel').forEach(function(panel) {
         // Remove all existing best badges and styling
         panel.querySelectorAll('.m-best-price').forEach(function(r) { r.classList.remove('m-best-price'); });
         panel.querySelectorAll('.m-best-badge').forEach(function(b) { b.remove(); });
 
-        // Find lowest price across all active groups in this panel
-        var bestPrice = Infinity;
-        var bestRow = null;
-        panel.querySelectorAll('.m-cond-group.active .m-vendor-row:not(.m-vendor-locked)').forEach(function(row) {
-            var priceEl = row.querySelector('.m-vendor-price');
-            if (!priceEl) return;
-            var summary = row.querySelector('summary');
-            var target = summary || row;
-            var price = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-            if (!isNaN(price) && price > 0) {
-                var isBuyPanel = panel.id && panel.id.indexOf('buyers-') === 0;
+        var isBuyPanel = panel.id && panel.id.indexOf('buyers-') === 0;
+        panel.querySelectorAll('.m-cond-group.active').forEach(function(group) {
+            var bestPrice = isBuyPanel ? -Infinity : Infinity;
+            var bestRow = null;
+            group.querySelectorAll('.m-vendor-row:not(.m-vendor-locked)').forEach(function(row) {
+                var priceEl = row.querySelector('.m-vendor-price');
+                if (!priceEl) return;
+                var price = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
+                if (isNaN(price) || price <= 0) return;
                 if (isBuyPanel ? price > bestPrice : price < bestPrice) {
                     bestPrice = price;
                     bestRow = row;
                 }
-                // Reset: for buyers, we want highest price
-                if (isBuyPanel && bestPrice === Infinity) {
-                    bestPrice = -Infinity;
+            });
+            if (bestRow) {
+                bestRow.classList.add('m-best-price');
+                var nameEl = bestRow.querySelector('.m-vendor-name');
+                if (nameEl && !nameEl.querySelector('.m-best-badge')) {
+                    var badge = document.createElement('span');
+                    badge.className = 'm-best-badge';
+                    badge.textContent = 'Best';
+                    nameEl.appendChild(badge);
                 }
             }
         });
-        // Re-init for buyers: find highest
-        if (panel.id && panel.id.indexOf('buyers-') === 0) {
-            bestPrice = -Infinity;
-            bestRow = null;
-            panel.querySelectorAll('.m-cond-group.active .m-vendor-row:not(.m-vendor-locked)').forEach(function(row) {
-                var priceEl = row.querySelector('.m-vendor-price');
-                if (!priceEl) return;
-                var price = parseFloat(priceEl.textContent.trim().replace('$', '').trim());
-                if (!isNaN(price) && price > bestPrice) {
-                    bestPrice = price;
-                    bestRow = row;
-                }
-            });
-        }
-
-        if (bestRow) {
-            bestRow.classList.add('m-best-price');
-            var nameEl = bestRow.querySelector('.m-vendor-name');
-            if (nameEl && !nameEl.querySelector('.m-best-badge')) {
-                var badge = document.createElement('span');
-                badge.className = 'm-best-badge';
-                badge.textContent = 'Best';
-                nameEl.appendChild(badge);
-            }
-        }
     });
 }
 
@@ -1096,6 +1096,17 @@ document.querySelectorAll('.m-settings-pills').forEach(function(group) {
     });
 });
 
+// Default View only applies to the compact layout
+function updateDefaultViewVisibility() {
+    var pill = document.querySelector('#m-set-layout .m-settings-pill.active');
+    var section = document.getElementById('m-set-default-view-section');
+    if (!section) return;
+    section.style.display = (pill && pill.getAttribute('data-val') === 'compact') ? '' : 'none';
+}
+document.querySelectorAll('#m-set-layout .m-settings-pill').forEach(function(p) {
+    p.addEventListener('click', updateDefaultViewVisibility);
+});
+
 // Bulk select/clear for store checkboxes
 function mSettingsBulk(containerId, selectAll) {
     var container = document.getElementById(containerId);
@@ -1106,6 +1117,14 @@ function mSettingsBulk(containerId, selectAll) {
 
 // Load current cookie values into the settings UI
 function loadSettings() {
+    // Layout
+    var layout = getCookie('MobileSearchLayout') || 'expanded';
+    var layoutGroup = document.getElementById('m-set-layout');
+    layoutGroup.querySelectorAll('.m-settings-pill').forEach(function(p) {
+        p.classList.toggle('active', p.getAttribute('data-val') === layout);
+    });
+    updateDefaultViewVisibility();
+
     // Default Tab
     var tab = getCookie('SearchDefaultTab');
     if (tab) {
@@ -1169,6 +1188,12 @@ function loadSettings() {
 
 // Save all settings to cookies and show toast
 function saveSettings() {
+    // Layout
+    var layoutPill = document.querySelector('#m-set-layout .m-settings-pill.active');
+    var layoutVal = layoutPill ? layoutPill.getAttribute('data-val') : 'expanded';
+    setCookie('MobileSearchLayout', layoutVal, 1000);
+    try { localStorage.setItem('mtgban_search_layout', layoutVal); } catch (e) {}
+
     // Default Tab
     var tabPill = document.querySelector('#m-set-default-tab .m-settings-pill.active');
     setCookie('SearchDefaultTab', tabPill ? tabPill.getAttribute('data-val') : 'sellers', 1000);
