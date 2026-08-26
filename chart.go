@@ -234,15 +234,29 @@ func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lo
 	if PricesArchiveDB == nil {
 		return nil
 	}
-	var results map[string]timeseries.ProviderPrices
-	var err error
 	if target.BanID != 0 {
-		results, err = PricesArchiveDB.HGetAllByBanID(ctx, target.BanID, lb)
-	} else {
-		results, err = PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, lb)
+		results, err := PricesArchiveDB.HGetAllByBanID(ctx, target.BanID, lb)
+		if err != nil {
+			log.Printf("chart: ban_id %d (%s): %v", target.BanID, target.Name, err)
+			return nil
+		}
+		return results
 	}
+
+	// No ban_id and no uuid to fall back on means this printing has no identity
+	// the archive can be asked about - a non-Magic finish the product carries no
+	// sub-type for, most often. Asking anyway is not an empty chart, it is a
+	// type error the caller cannot tell apart from one.
+	if !hasCanonicalIdentity(target) {
+		log.Printf("chart: %q (%s) resolved to no ban_id and is not an mtgjson uuid, so the archive has no identity to look it up by",
+			target.UUID, target.Name)
+		return nil
+	}
+
+	results, err := PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, lb)
 	if err != nil {
-		log.Println(err)
+		log.Printf("chart: uuid %s foil=%t etched=%t (%s): %v",
+			target.UUID, target.Foil, target.Etched, target.Name, err)
 		return nil
 	}
 	return results

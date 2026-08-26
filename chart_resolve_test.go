@@ -274,3 +274,30 @@ func TestTCGSubTypeForCardPositionalFallback(t *testing.T) {
 		t.Errorf("primary foil: got %q, want \"Cold Foil\"", got)
 	}
 }
+
+// The canonical read path keys on a Postgres uuid column, so a target that
+// resolved to no ban_id has to be judged before it is asked about: the id a
+// non-Magic game hands back is a type error waiting to happen, not a miss.
+func TestHasCanonicalIdentity(t *testing.T) {
+	tests := []struct {
+		name string
+		uuid string
+		want bool
+	}{
+		{"magic uuid", "00010d56-fe38-5e35-8aed-518019aa36a5", true},
+		{"magic uuid tagged with a finish", "00010d56-fe38-5e35-8aed-518019aa36a5_f", true},
+		{"flesh and blood id", "omn071_695162_rainbow", false},
+		{"lorcana id", "1459_f", false},
+		{"bare product id", "695162", false},
+		{"empty", "", false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := hasCanonicalIdentity(&chartTarget{UUID: test.uuid})
+			if got != test.want {
+				t.Errorf("hasCanonicalIdentity(%q) = %t, want %t", test.uuid, got, test.want)
+			}
+		})
+	}
+}

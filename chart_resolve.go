@@ -119,6 +119,18 @@ func maybeUUIDString(s string) bool {
 	return len(s) == 36 && strings.Count(s, "-") == 4
 }
 
+// hasCanonicalIdentity reports whether a target that resolved to no ban_id can
+// still be read by the canonical path. That path keys on mtgjson_uuid, which is
+// a Postgres uuid column, so only a Magic uuid qualifies: a non-Magic card
+// arrives carrying its mtgmatcher id ("omn071_695162_rainbow"), and handing that
+// to a uuid column earns a 22P02 rather than an empty result.
+//
+// Normalise first, since mtgmatcher tags the finish onto the id it hands back
+// ("<uuid>_f") while the archive stores the base uuid beside a finish flag.
+func hasCanonicalIdentity(target *chartTarget) bool {
+	return maybeUUIDString(timeseries.NormalizeUUID(target.UUID))
+}
+
 // matcherTarget resolves a game-native card id through mtgmatcher — an mtgjson
 // uuid or mtgmatcher variant string (Magic), a LorcanaJSON id (Lorcana), or an
 // external id (Scryfall / TCGplayer) via the matcher's id map. mtgmatcher holds
