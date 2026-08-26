@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -319,6 +320,31 @@ func extraFoilFinishes(co *mtgmatcher.CardObject) []string {
 // no foil listing yet), so the caller charts nothing rather than the wrong
 // finish's prices.
 func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) string {
+	// Ask the names first, before foilness is consulted at all. A game that
+	// keys a printing by the very thing TCGplayer prices it under - Flesh and
+	// Blood's "rainbowfoil" against "Rainbow Foil", Yu-Gi-Oh's "1stedition"
+	// against "1st Edition" - answers exactly, with none of the pairing below
+	// and none of its assumptions.
+	//
+	// It has to come before the foilness split because a sub-type need not be a
+	// finish at all: Yu-Gi-Oh prices print runs, so there is no "Normal" for the
+	// nonfoil branch to find and no foil sub-type for the pairing to walk.
+	//
+	// The generic names are left to that existing logic. They are aliases a game
+	// registers beside the specific one - Flesh and Blood's "foil" and
+	// "rainbowfoil" can name the same printing - so letting them match here
+	// would make the answer depend on which one was looked at first.
+	for _, subType := range slices.Sorted(maps.Keys(subTypes)) {
+		finish := mtgmatcher.NormalizeFinish(subType)
+		if finish == mtgmatcher.FinishNonfoil || finish == mtgmatcher.FinishFoil {
+			continue
+		}
+		id, ok := co.FoilUUIDs[finish]
+		if ok && id == co.UUID {
+			return subType
+		}
+	}
+
 	if !co.Foil {
 		if _, ok := subTypes["Normal"]; ok {
 			return "Normal"
@@ -328,17 +354,6 @@ func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) str
 	foils := foilSubTypes(subTypes)
 	if len(foils) == 0 {
 		return ""
-	}
-
-	// Ask the names first. A game that keys a finish by the treatment TCGplayer
-	// prices it under - Flesh and Blood's "rainbowfoil" against "Rainbow Foil",
-	// Lorcana's "coldfoil" against "Cold Foil" - answers exactly, and needs
-	// none of the positional pairing below or the assumptions it rests on.
-	for _, subType := range foils {
-		id, ok := co.FoilUUIDs[mtgmatcher.NormalizeFinish(subType)]
-		if ok && id == co.UUID {
-			return subType
-		}
 	}
 
 	for i, finish := range extraFoilFinishes(co) {

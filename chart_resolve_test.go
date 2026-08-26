@@ -301,3 +301,57 @@ func TestHasCanonicalIdentity(t *testing.T) {
 		})
 	}
 }
+
+// Yu-Gi-Oh prices print runs rather than finishes, so its products carry no
+// "Normal" sub-type and no foil one either. Resolution has to come from the
+// names: the matcher keys each run by the same words TCGplayer sells it under.
+func TestTCGSubTypeForCardPrintRuns(t *testing.T) {
+	subTypes := map[string]int64{"1st Edition": 1, "Unlimited": 2, "Limited": 3}
+
+	// Both flag values resolve to the default run's uuid, so the run - not
+	// foilness - is what names the sub-type. Check it holds either way.
+	for _, foil := range []bool{false, true} {
+		co := &mtgmatcher.CardObject{Foil: foil}
+		co.UUID = "hac1-en105_265004_1e"
+		co.FoilUUIDs = map[string]string{
+			"1stedition": "hac1-en105_265004_1e",
+			"unlimited":  "hac1-en105_265004_unl",
+			"limited":    "hac1-en105_265004_ltd",
+		}
+
+		got := tcgSubTypeForCard(co, subTypes)
+		if got != "1st Edition" {
+			t.Errorf("foil=%t: got %q, want \"1st Edition\"", foil, got)
+		}
+
+		co.UUID = "hac1-en105_265004_unl"
+		got = tcgSubTypeForCard(co, subTypes)
+		if got != "Unlimited" {
+			t.Errorf("foil=%t: got %q, want \"Unlimited\"", foil, got)
+		}
+	}
+}
+
+// A game whose sub-types are the generic finish names keeps the foilness logic:
+// nothing about "Normal" or "Foil" names a printing on its own.
+func TestTCGSubTypeForCardGenericNames(t *testing.T) {
+	subTypes := map[string]int64{"Normal": 1, "Foil": 2}
+
+	co := &mtgmatcher.CardObject{Foil: false}
+	co.UUID = "rft001"
+	co.FoilUUIDs = map[string]string{
+		mtgmatcher.FinishNonfoil: "rft001",
+		mtgmatcher.FinishFoil:    "rft001_foil",
+	}
+	got := tcgSubTypeForCard(co, subTypes)
+	if got != "Normal" {
+		t.Errorf("nonfoil: got %q, want \"Normal\"", got)
+	}
+
+	co.Foil = true
+	co.UUID = "rft001_foil"
+	got = tcgSubTypeForCard(co, subTypes)
+	if got != "Foil" {
+		t.Errorf("foil: got %q, want \"Foil\"", got)
+	}
+}
