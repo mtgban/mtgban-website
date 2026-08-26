@@ -1,0 +1,27 @@
+# Template for a site's systemd unit. bootstrap.sh substitutes the @NAME@
+# placeholders and installs the result as mtgban@.service (magic) or
+# mtgban-<game>@.service, where %i is the port. Not a unit file as it stands —
+# systemd never reads this one.
+[Unit]
+Description=mtgban website - @GAME@ (port %i)
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5s
+User=@USER@
+Group=@USER@
+# Each port runs from its own checkout so a deploy never mutates the live
+# instance's on-disk templates / static assets.
+WorkingDirectory=@CO_PREFIX@%i
+# Secrets (BAN_SECRET, BAN_CONFIG_KEY, BAN_CONFIG_SECRET) live here on the
+# droplet only — never committed. Create it once, chmod 600. See deploy/README.md.
+# Shared by every site on the host: they read one config bucket between them.
+EnvironmentFile=/etc/mtgban.env
+ExecStart=@CO_PREFIX@%i/mtgban-website -port %i -cfg @CFG@ -log logs
+KillSignal=SIGTERM
+TimeoutStopSec=15s
+
+[Install]
+WantedBy=multi-user.target

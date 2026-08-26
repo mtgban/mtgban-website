@@ -23,6 +23,49 @@ mutates files under the live instance (templates are cached at boot, but
 `git checkout --force` resets only tracked files, so each checkout's untracked
 datastore + logs persist across deploys.
 
+## More than one site on a droplet
+
+A droplet can serve several games at once. `deploy/games.sh` is the one place
+that says who owns what — a port pair, a checkout prefix, a systemd unit, an
+nginx upstream — and both scripts read it, so adding a game is one line there:
+
+```
+magic          8081/8082   mtgban@          upstream mtgban
+beta           8083/8084   mtgban-beta@     upstream mtgban_beta
+yugioh         8091/8092   mtgban-yugioh@   upstream mtgban_yugioh
+lorcana        8093/8094   ...
+```
+
+Every command takes the site as an environment variable, defaulting to magic:
+
+```bash
+GAME=yugioh ./deploy/bootstrap.sh      # once per game, on the droplet
+GAME=yugioh deploy/deploy.sh <ref>     # what the workflow runs
+```
+
+It is an environment variable rather than an argument so that a caller passing
+only a ref cannot have the ref read as a game name, or the reverse. A `GAME`
+that names no allocation is refused rather than guessed at.
+
+Magic keeps every name it was set up with before any of this existed —
+`mtgban-website-<port>`, the bare `mtgban@` unit, `upstream mtgban` — so its
+droplet needs no migration. The sites share one `/etc/mtgban.env`, since they
+read one config bucket between them; everything else is per-site, including the
+sudoers rule, which would otherwise be overwritten by the next game bootstrapped.
+
+## Provisioning a new droplet
+
+`deploy/cloud-init.sh` goes in the **User data** box when creating the droplet
+(or `doctl compute droplet create --user-data-file deploy/cloud-init.sh`). Set
+`GAME` on the second line first. It runs once as root and prepares the host:
+deploy user with the keys DO injected, packages, the Go toolchain, the control
+repo, and an empty `/etc/mtgban.env`.
+
+It stops before secrets on purpose. User data stays readable for the life of
+the droplet through the metadata service at `169.254.169.254`, so anything
+pasted there is readable by every process on the box. The login banner names
+the two steps left: fill in `/etc/mtgban.env`, then run `bootstrap.sh`.
+
 ## One-time droplet setup
 
 The quick path: run **`./deploy/bootstrap.sh`** from the control repo (as the
@@ -40,8 +83,16 @@ The steps below document what it does, for reference or manual setup.
 
 ### 1. Install the template unit, remove the old single unit
 
+`deploy/mtgban.service.in` is a template, not a unit: `bootstrap.sh` fills in
+the site's user, checkout prefix and config path and installs the result as
+`mtgban@.service` (magic) or `mtgban-<game>@.service`. To do it by hand:
+
 ```bash
-sudo cp /home/koda/src/mtgban-website/deploy/mtgban@.service /etc/systemd/system/
+cd /home/koda/src/mtgban-website
+sed -e 's|@GAME@|magic|' -e 's|@USER@|koda|g' \
+    -e 's|@CO_PREFIX@|/home/koda/src/mtgban-website-|g' \
+    -e 's|@CFG@|b2://mtgban-config/magic/config.json|' \
+    deploy/mtgban.service.in | sudo tee /etc/systemd/system/mtgban@.service
 sudo systemctl daemon-reload
 
 # retire the old single-instance unit
