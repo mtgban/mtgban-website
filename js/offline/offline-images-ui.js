@@ -147,7 +147,7 @@
             labelEl.textContent = plan.work.length
                 ? 'Syncing ' + plan.work.length + ' editions (' + fmt(plan.totalBytes) + ')...'
                 : 'Images already up to date.';
-            window.OfflineMode.sync();
+            window.OfflineMode.sync({ images: true });
         }).catch(function (err) {
             syncing = false;
             labelEl.textContent = 'Image sync failed: ' + (err && err.message || err);
