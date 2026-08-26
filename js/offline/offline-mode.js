@@ -178,6 +178,12 @@
         else window.removeEventListener('beforeunload', onBeforeUnload);
     }
 
+    // Drop the guard without claiming the sync ended, for a navigation the user
+    // asked for. What is in flight is not lost: the boot path syncs again.
+    function releaseUnloadGuard() {
+        window.removeEventListener('beforeunload', onBeforeUnload);
+    }
+
     function setSyncStatus(text) {
         var el = document.getElementById('offlineSyncStatus');
         if (el) el.textContent = text;
@@ -386,16 +392,21 @@
             refreshStatus().then(paintUsage);
         }
 
-        toggle.addEventListener('change', function () {
-            toggle.disabled = true;
-            var op = toggle.checked ? enable() : disable();
-            op.catch(function (err) {
-                console.warn('offline mode:', err && err.message);
-            }).then(function () {
-                toggle.disabled = false;
-                paint();
+        // The toggle stages like every other setting instead of applying on
+        // change, so Save is what turns offline mode on or off. Save reloads,
+        // and that reload is what puts the cloud button in the navbar.
+        if (window.Settings && window.Settings.register) {
+            window.Settings.register({
+                load: paint,
+                serialize: function () { return 'offline_mode=' + toggle.checked; },
+                save: function () {
+                    if (toggle.checked === enabled()) return;
+                    return (toggle.checked ? enable() : disable()).catch(function (err) {
+                        console.warn('offline mode:', err && err.message);
+                    });
+                },
             });
-        });
+        }
         var resyncBtn = document.getElementById('offline-resync-btn');
         if (resyncBtn) {
             resyncBtn.addEventListener('click', function () {
@@ -428,6 +439,7 @@
         forceResync: forceResync,
         wipeLocal: wipeLocal,
         cancelSync: cancelSync,
+        releaseUnloadGuard: releaseUnloadGuard,
         status: status,
         syncStatusText: syncStatusText
     };
