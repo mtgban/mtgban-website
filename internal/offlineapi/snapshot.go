@@ -100,6 +100,15 @@ func (s *Service) refreshManifest() {
 		changed++
 	}
 
+	// An empty manifest is never worth storing: it says the same thing as no
+	// manifest at all, and saving one over a good one tells every client
+	// there is nothing to sync. Scrapers being loaded is not the same as
+	// their holding prices, so this happens whenever a reload is in flight.
+	if len(next.Sets) == 0 {
+		log.Println("offline: manifest refresh found no priced sets, not saving")
+		return
+	}
+
 	err := s.manifestStore.Save(context.Background(), next)
 	if err != nil {
 		log.Println("offline: manifest save failed:", err)

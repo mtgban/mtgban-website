@@ -1,6 +1,7 @@
 package offlineapi
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -47,3 +48,34 @@ func TestCatalogIsNotBuiltWithoutCards(t *testing.T) {
 		t.Errorf("catalog version is %q with no datastore, want it unbuilt", v)
 	}
 }
+
+// Scrapers being loaded is not the same as their holding prices: a reload in
+// flight leaves them empty for a moment. Saving that empty result over a good
+// manifest tells every client there is nothing to sync, and the next populated
+// refresh finds no versions to carry forward, so every client re-downloads the
+// whole corpus.
+func TestRefreshDoesNotSaveAnEmptyManifest(t *testing.T) {
+	s, _ := newTestService(t)
+	before := manifestFile{Sets: map[string]setVersion{
+		"NEO": {Fingerprint: "abc123", Version: "2026-08-26T14:20:01Z"},
+	}}
+	s.manifestStore.Set(before)
+	t.Cleanup(func() { s.manifestStore.Set(manifestFile{}) })
+
+	s.deps.Sellers = func() []mtgban.Seller { return []mtgban.Seller{emptySeller{}} }
+	s.deps.Vendors = func() []mtgban.Vendor { return nil }
+
+	s.refreshManifest()
+
+	got := s.manifestStore.Get()
+	if len(got.Sets) != 1 || got.Sets["NEO"].Version != "2026-08-26T14:20:01Z" {
+		t.Errorf("manifest = %+v, want the previous one untouched", got.Sets)
+	}
+}
+
+// emptySeller is a scraper that has loaded but holds no prices yet.
+type emptySeller struct{}
+
+func (emptySeller) Inventory() mtgban.InventoryRecord { return mtgban.InventoryRecord{} }
+func (emptySeller) Load(context.Context) error        { return nil }
+func (emptySeller) Info() mtgban.ScraperInfo          { return mtgban.ScraperInfo{Shorthand: "EMPTY"} }
