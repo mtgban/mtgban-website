@@ -711,7 +711,7 @@ func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
-	prefix := strings.TrimPrefix(u.Path, "/")
+	prefix := strings.Trim(u.Path, "/")
 	token, err := b2bucket.Bucket.AuthToken(ctx, prefix, valid)
 	if err != nil {
 		return "", "", time.Time{}, err
