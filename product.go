@@ -756,11 +756,31 @@ func runSealedAnalysis() {
 	infos := map[string]mtgban.InventoryRecord{}
 
 	runRawSetValue(infos, tcgInventory, tcgDirect, ckBuylist, directNetBuylist)
-	for label, record := range buylistMetrics("CK", map[string]buylistReducer{
+
+	reducers := map[string]buylistReducer{
 		"hotlist": hotlistReducer,
 		"highest": highestBuylistPrice,
 		"goodP90": goodBuylistPrice,
-	}) {
+	}
+	metrics := buylistMetrics("CK", reducers)
+	previous := infosPtr.Load()
+	for label := range reducers {
+		record := metrics[label]
+
+		// An empty metric means this run could not compute one, not that no
+		// card qualifies - buylistMetrics gives up whole, on a missing store
+		// or a missing archive alike. Since the store below replaces the
+		// snapshot rather than merging into it, publishing the empty record
+		// would clear working badges until the next run, half a day away at
+		// worst. Keep the last answer that had something in it instead.
+		if len(record) == 0 && previous != nil {
+			kept := (*previous)[label]
+			if len(kept) > 0 {
+				log.Printf("%s came up empty, keeping the %d entries from the previous run", label, len(kept))
+				record = kept
+			}
+		}
+
 		infos[label] = record
 	}
 
