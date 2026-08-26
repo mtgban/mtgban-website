@@ -75,7 +75,11 @@
     // for. The token rides in the url because the bucket has no other way to
     // take it; it is short-lived and scoped to the image tree.
     function bundleURL(auth, code, hash) {
-        return auth.base + '/bundles/' + encodeURIComponent(code + '-' + hash) + '.zip' +
+        // The base is trimmed rather than trusted: a bucket path is written by
+        // hand and may end in a slash, and B2 reads the doubled separator as
+        // part of the object name and answers 404 for an object that is there.
+        var base = String(auth.base).replace(/\/+$/, '');
+        return base + '/bundles/' + encodeURIComponent(code + '-' + hash) + '.zip' +
             '?Authorization=' + encodeURIComponent(auth.token);
     }
 

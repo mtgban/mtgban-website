@@ -698,6 +698,26 @@ func offlineImagesFactory(ctx context.Context) (simplecloud.ReadWriter, string, 
 // read image bytes straight from the bucket instead of through this process.
 // Only a B2-backed tree can issue one; anything else has no way to hand out
 // scoped, expiring read access.
+// bucketObjectPrefix turns the path part of an images_path into the object
+// name prefix it refers to. B2 object names are literal strings rather than a
+// directory tree, so a configured "/magic/" and "/magic" have to mean the same
+// prefix; left as written, the trailing slash reappears in every url built
+// from it as an empty path segment.
+func bucketObjectPrefix(urlPath string) string {
+	return strings.Trim(urlPath, "/")
+}
+
+// bucketDownloadBase is the url every mirrored object hangs off. It never ends
+// in a slash: callers append "/<object>", and B2 would read the doubled
+// separator as part of the name and answer 404 for an object that is there.
+func bucketDownloadBase(downloadURI, bucketName, prefix string) string {
+	base := strings.TrimSuffix(downloadURI, "/") + "/file/" + bucketName
+	if prefix != "" {
+		base += "/" + prefix
+	}
+	return base
+}
+
 func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string, string, time.Time, error) {
 	bucket, base, err := offlineImagesFactory(ctx)
 	if err != nil {
@@ -711,15 +731,12 @@ func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
-	prefix := strings.TrimPrefix(u.Path, "/")
+	prefix := bucketObjectPrefix(u.Path)
 	token, err := b2bucket.Bucket.AuthToken(ctx, prefix, valid)
 	if err != nil {
 		return "", "", time.Time{}, err
 	}
-	downloadBase := strings.TrimSuffix(b2bucket.Bucket.BaseURL(), "/") + "/file/" + b2bucket.Bucket.Name()
-	if prefix != "" {
-		downloadBase += "/" + prefix
-	}
+	downloadBase := bucketDownloadBase(b2bucket.Bucket.BaseURL(), b2bucket.Bucket.Name(), prefix)
 	// B2 dates the window from when it issued the token, so this is the
 	// client's cue to re-ask rather than a guarantee.
 	return downloadBase, token, time.Now().Add(valid), nil

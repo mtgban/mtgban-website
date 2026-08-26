@@ -256,3 +256,14 @@ test('syncImages pauses between sets when cancelled', async () => {
     }));
     expect(res.paused).toBe(true);
 });
+
+// A bucket path is written by hand and may end in a slash. B2 object names are
+// literal, so the doubled separator becomes part of the name and the object is
+// reported missing — as a CORS failure, since B2 sends no CORS headers on a 404.
+test('bundleURL tolerates a base that ends in a slash', () => {
+    const withSlash = { base: BASE + '/', token: 'tok-abc' };
+    expect(OfflineImages.bundleURL(withSlash, 'NEO', 'aaaa'))
+        .toBe(BASE + '/bundles/NEO-aaaa.zip?Authorization=tok-abc');
+    expect(OfflineImages.bundleURL({ base: BASE + '///', token: 'tok-abc' }, 'NEO', 'aaaa'))
+        .toBe(BASE + '/bundles/NEO-aaaa.zip?Authorization=tok-abc');
+});
