@@ -546,7 +546,6 @@ type ConfigType struct {
 	FormatEvents           []FormatEvent      `json:"format_events,omitempty"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
 	DiscordHook            string             `json:"discord_hook"`
 	DiscordNotifHook       string             `json:"discord_notif_hook"`
 	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
@@ -1160,13 +1159,8 @@ func openDBs() (err error) {
 		if err != nil {
 			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
 		}
-	} else if Config.NewNewspaperConfigLine == "" {
-		log.Println("no DB address set, Newspaper won't be loaded")
 	} else {
-		NewNewspaperDB, err = sql.Open("postgres", Config.NewNewspaperConfigLine)
-		if err != nil {
-			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
-		}
+		log.Println("no DB address set, Newspaper won't be loaded")
 	}
 
 	return nil
