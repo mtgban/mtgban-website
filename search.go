@@ -184,46 +184,25 @@ func noteChartIDsDropped(pageVars *PageVars, dropped, total int) {
 	pageVars.InfoMessage += " " + notice
 }
 
-// chartIDToSearchID maps a chart-roster id to an id the results table (which the
-// embedded chart lives inside) can resolve to a card row, mirroring
-// resolveChartTarget's precedence so anything chartable also renders its row.
-// Magic resolves to the mtgmatcher id of the variant's own finish; non-Magic
-// games (Lorcana, ...) to their mtgmatcher-native id via the TCGplayer external
-// id map.
+// chartSearchID names the results-table row for a roster id. The resolved
+// target already knows it - resolving is what reads the archive, and the chart
+// needs that same answer - so the table and the chart cannot disagree about
+// which printing a roster id means.
 //
-// ok=false means nothing was resolved and the id is handed back as it came:
-// the results table will find no row for it, so the card drops out of the page
-// it was asked for. The caller says so rather than letting it vanish.
-func chartIDToSearchID(ctx context.Context, id string) (string, bool) {
+// A target is nil when nothing resolved, and on a deployment with no archive at
+// all, where the matcher can still map a plain id. ok=false means the id is
+// handed back as it came: the results table will find no row for it, so the
+// card drops out of the page it was asked for. The caller says so rather than
+// letting it vanish.
+func chartSearchID(id string, target *chartTarget) (string, bool) {
+	if target != nil && target.SearchID != "" {
+		return target.SearchID, true
+	}
 	if _, err := mtgmatcher.GetUUID(id); err == nil {
 		return id, true // already a matcher id (bare uuid / variant string)
 	}
-	prefix, val := splitIDPrefix(id)
-
-	// ban: or a bare integer — our ban_id, on the chart resolver's precedence: a
-	// game-native id returned above already, and Lorcana numbers its cards, so an
-	// integer reaching here is not one of those.
-	if (prefix == "ban" || prefix == "") && PricesArchiveDB != nil {
-		if n, perr := strconv.ParseInt(val, 10, 64); perr == nil {
-			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok {
-				if vi.MtgjsonUUID != "" {
-					// Magic: the uuid, kept on the finish the ban_id names.
-					return magicFinishSearchID(vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched), true
-				}
-				// Non-Magic: the product id maps back to the game's own card id,
-				// on the finish the variant's sub-type names.
-				if matched, ok := tcgVariantSearchID(ctx, vi); ok {
-					return matched, true
-				}
-				return id, false
-			}
-			// Not a ban_id: fall through to the external-id lookup below.
-		}
-	}
-
-	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
-	// id table (a TCGplayer product id, a Scryfall id, or an mtgjson uuid).
-	if matched, merr := mtgmatcher.MatchId(val); merr == nil {
+	_, val := splitIDPrefix(id)
+	if matched, err := mtgmatcher.MatchId(val); err == nil {
 		return matched, true
 	}
 	return id, false
@@ -391,6 +370,25 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// resolution costs a DB round-trip and each id is consulted three times
 	// (results query, display query, metadata aliasing).
 	chartSearchIDs := map[string]string{}
+
+	// Roster id -> chart target, resolved once per request. The results table
+	// and the chart both need this, and it is the archive round-trip that makes
+	// it worth doing once: the page used to ask for the same card twice, and a
+	// roster did so per card. Owned by this request alone, so a plain map with
+	// no locking - a nil entry is a resolution that already failed and is not
+	// retried.
+	chartTargets := map[string]*chartTarget{}
+	chartTargetFor := func(id string) *chartTarget {
+		if target, asked := chartTargets[id]; asked {
+			return target
+		}
+		target, err := resolveChartTarget(r.Context(), id)
+		if err != nil {
+			target = nil
+		}
+		chartTargets[id] = target
+		return target
+	}
 	if len(chartIds) > 0 && !pageVars.DisableChart {
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
@@ -418,7 +416,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			searchIDs := make([]string, len(chartIds))
 			var unresolved int
 			for i, id := range chartIds {
-				searchID, ok := chartIDToSearchID(r.Context(), id)
+				searchID, ok := chartSearchID(id, chartTargetFor(id))
 				if !ok {
 					unresolved++
 				}
@@ -956,8 +954,8 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			var ids, names []string
 			var series []map[string]timeseries.ProviderPrices
 			for _, id := range chartIds {
-				target, terr := resolveChartTarget(r.Context(), id)
-				if terr != nil {
+				target := chartTargetFor(id)
+				if target == nil {
 					continue
 				}
 				// Read each card once and take the axis from what came back: a

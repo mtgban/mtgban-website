@@ -28,6 +28,13 @@ type chartTarget struct {
 	Foil   bool
 	Etched bool
 	Name   string
+	// SearchID is the mtgmatcher id of this exact printing, which is what the
+	// results table below the chart resolves a row from. Resolving a roster id
+	// answers both questions at once - the chart's target and the table's row -
+	// and they have to agree, or a card is charted with no row beneath it.
+	// Empty when nothing in the matcher corresponds to it, e.g. a uuid the
+	// datastore retired but the archive still has prices for.
+	SearchID string
 }
 
 // resolveChartTarget turns any supported id string into a chartable target.
@@ -119,10 +126,12 @@ func maybeUUIDString(s string) bool {
 // doesn't know the id it falls back to our own price history: a retired Magic
 // uuid, or a non-Magic TCGplayer product id.
 func matcherTarget(ctx context.Context, id string) (*chartTarget, error) {
+	searchID := id
 	co, err := mtgmatcher.GetUUID(id)
 	if err != nil {
 		// Not a direct mtgmatcher id; try the external id map (Scryfall/TCGplayer).
 		if matched, merr := mtgmatcher.MatchId(id); merr == nil {
+			searchID = matched
 			co, err = mtgmatcher.GetUUID(matched)
 		}
 	}
@@ -132,7 +141,8 @@ func matcherTarget(ctx context.Context, id string) (*chartTarget, error) {
 		// product leaves BanID 0 and the canonical uuid path takes over.
 		return &chartTarget{
 			UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
-			BanID: resolveBanIDForCard(ctx, co),
+			BanID:    resolveBanIDForCard(ctx, co),
+			SearchID: searchID,
 		}, nil
 	}
 
@@ -399,7 +409,8 @@ func targetFromTCGID(ctx context.Context, tcgID int) (*chartTarget, error) {
 		if co, err := mtgmatcher.GetUUID(matched); err == nil {
 			return &chartTarget{
 				UUID: co.UUID, Foil: co.Foil, Etched: co.Etched, Name: co.Name,
-				BanID: resolveBanIDForCard(ctx, co),
+				BanID:    resolveBanIDForCard(ctx, co),
+				SearchID: matched,
 			}, nil
 		}
 	}
@@ -429,6 +440,8 @@ func targetFromBanID(ctx context.Context, banID int64) (*chartTarget, error) {
 			UUID:   vi.MtgjsonUUID,
 			Foil:   vi.IsFoil,
 			Etched: vi.IsEtched,
+			// The uuid, kept on the finish the ban_id names.
+			SearchID: magicFinishSearchID(vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched),
 		}
 		// Display name comes from mtgmatcher; the base uuid suffices since the
 		// name is finish-independent (the chart uses BanID for data).
@@ -445,6 +458,11 @@ func targetFromBanID(ctx context.Context, banID int64) (*chartTarget, error) {
 // base ("Normal").
 func nonMagicTarget(ctx context.Context, vi timeseries.VariantInfo) *chartTarget {
 	t := &chartTarget{BanID: vi.BanID}
+	// The product id maps back to the game's own card id, on the finish the
+	// variant's sub-type names.
+	if searchID, ok := tcgVariantSearchID(ctx, vi); ok {
+		t.SearchID = searchID
+	}
 	if p, ok, _ := PricesArchiveDB.GetTCGProduct(ctx, vi.TCGProductID); ok {
 		t.Name = p.Name
 		if vi.TCGSubType != "" && vi.TCGSubType != "Normal" {
