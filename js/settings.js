@@ -261,7 +261,11 @@
     }
 
     function loadAll() { bindings.forEach(function (b) { b.load(); }); }
-    function saveAll() { bindings.forEach(function (b) { b.save(); }); }
+    // A binding whose save is more than a cookie write returns a promise, so
+    // the reload that follows a save cannot cut that work short.
+    function saveAll() {
+        return Promise.all(bindings.map(function (b) { return b.save(); }));
+    }
     function serializeAll() {
         return bindings.map(function (b) { return b.serialize(); }).join('|');
     }
@@ -331,14 +335,20 @@
 
     function saveAndClose() {
         if (!hasBindings()) { closeModal(); return; }
-        saveAll();
-        try { sessionStorage.setItem('settingsSavedToast', '1'); } catch (e) {}
-        // Re-process upload results with new settings if available
-        if (typeof window.reprocessUploadResults === 'function') {
-            window.reprocessUploadResults();
-        } else {
-            window.location.reload();
-        }
+        saveAll().then(function () {
+            try { sessionStorage.setItem('settingsSavedToast', '1'); } catch (e) {}
+            // The reload below is asked for, so a running sync must not turn it
+            // into a "leave site?" confirmation.
+            if (window.OfflineMode && window.OfflineMode.releaseUnloadGuard) {
+                window.OfflineMode.releaseUnloadGuard();
+            }
+            // Re-process upload results with new settings if available
+            if (typeof window.reprocessUploadResults === 'function') {
+                window.reprocessUploadResults();
+            } else {
+                window.location.reload();
+            }
+        });
     }
 
     function showSavedToast() {
@@ -441,4 +451,8 @@
     // Globals used by the nav gear's inline onclick fallback.
     window.openSettings = openSettings;
     window.closeSettings = closeModal;
+
+    // A section whose control needs more than a cookie write registers its own
+    // binding: offline mode has a service worker to install before it is on.
+    window.Settings = { register: addBinding };
 })();
