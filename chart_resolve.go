@@ -284,11 +284,19 @@ func foilSubTypes(subTypes map[string]int64) []string {
 // finish keys sorting into the same order as the sub-type names; today no
 // product carries a second extra, so the ordering above is the live constraint.
 func extraFoilFinishes(co *mtgmatcher.CardObject) []string {
+	nonfoil := co.FoilUUIDs[mtgmatcher.FinishNonfoil]
 	extras := make([]string, 0, len(co.FoilUUIDs))
-	for finish := range co.FoilUUIDs {
-		if finish != mtgmatcher.FinishNonfoil && finish != mtgmatcher.FinishFoil {
-			extras = append(extras, finish)
+	for finish, id := range co.FoilUUIDs {
+		if finish == mtgmatcher.FinishNonfoil || finish == mtgmatcher.FinishFoil {
+			continue
 		}
+		// A game that also keys each printing by its own treatment name spells
+		// the plain one "normal", which is not a second name for a foil finish
+		// and must not take a place in the pairing below.
+		if id != "" && id == nonfoil {
+			continue
+		}
+		extras = append(extras, finish)
 	}
 	slices.Sort(extras)
 	return extras
@@ -309,6 +317,18 @@ func tcgSubTypeForCard(co *mtgmatcher.CardObject, subTypes map[string]int64) str
 	if len(foils) == 0 {
 		return ""
 	}
+
+	// Ask the names first. A game that keys a finish by the treatment TCGplayer
+	// prices it under - Flesh and Blood's "rainbowfoil" against "Rainbow Foil",
+	// Lorcana's "coldfoil" against "Cold Foil" - answers exactly, and needs
+	// none of the positional pairing below or the assumptions it rests on.
+	for _, subType := range foils {
+		id, ok := co.FoilUUIDs[mtgmatcher.NormalizeFinish(subType)]
+		if ok && id == co.UUID {
+			return subType
+		}
+	}
+
 	for i, finish := range extraFoilFinishes(co) {
 		if co.FoilUUIDs[finish] != co.UUID {
 			continue
