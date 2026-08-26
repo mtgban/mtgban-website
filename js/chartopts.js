@@ -780,18 +780,24 @@ function getKeyruneCanvas(code, glyphColor) {
     return canvas;
 }
 
-// Resolve a Keyrune CSS class ("ss-dsk") to its rendered glyph character. The
-// Keyrune stylesheet is already loaded on the search page (see
-// templates/search.html "extra-css"). We read the ::before content of a hidden
-// element to extract the codepoint, then drop the element. The character is
-// drawn into an off-screen canvas via `font: '... Keyrune'`.
+// Resolve a Keyrune set code ("dsk") or its full class ("ss-dsk") to the glyph
+// character the font draws for it. The Keyrune stylesheet is already loaded on
+// the search page (see templates/search.html "extra-css"). We read the ::before
+// content of a hidden element to extract the codepoint, then drop the element.
+// The character is drawn into an off-screen canvas via `font: '... Keyrune'`.
+//
+// Both spellings are accepted because both arrive: the palette and offline
+// catalog send a bare code, while a chart checkpoint carries EditionEntry's
+// Keyrune, which keyruneClass has already prefixed for the templates. Prefixing
+// that a second time asks for ss-ss-dsk, which the font does not define, so
+// every marker fell back to the generic glyph on .ss.
 const keyruneCharCache = new Map();
 function getKeyruneChar(code) {
     if (!code) return '';
     if (keyruneCharCache.has(code)) return keyruneCharCache.get(code);
 
     var el = document.createElement('i');
-    el.className = 'ss ss-' + code;
+    el.className = 'ss ' + (/^ss-/.test(code) ? code : 'ss-' + code);
     el.style.position = 'absolute';
     el.style.left = '-9999px';
     el.style.visibility = 'hidden';
