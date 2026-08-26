@@ -874,12 +874,18 @@ document.querySelectorAll('.m-filter-pills').forEach(function(group) {
     });
 });
 
-// Cross-device: adopt the synced layout pref over a stale local cookie
+// Cross-device: adopt the synced layout pref over a stale local cookie. The
+// page is already rendered from the cookie - which layout it is arrives as
+// markup, not just as css - so adopting one has to be followed by a reload to
+// mean anything. Only when the cookie actually took, so a browser refusing it
+// cannot spin here.
 (function() {
     var synced = null;
     try { synced = localStorage.getItem('mtgban_search_layout'); } catch (e) {}
-    if (synced && synced !== (getCookie('MobileSearchLayout') || '')) {
-        setCookie('MobileSearchLayout', synced, 1000);
+    if (!synced || synced === (getCookie('MobileSearchLayout') || '')) return;
+    setCookie('MobileSearchLayout', synced, 1000);
+    if (getCookie('MobileSearchLayout') === synced) {
+        window.location.reload();
     }
 })();
 
