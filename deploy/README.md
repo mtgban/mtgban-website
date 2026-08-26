@@ -175,6 +175,20 @@ manual run (any ref) from the Actions tab via `workflow_dispatch`.
 
 ## Rollback
 
-Re-deploy the previous tag — `git push origin v1.2.2` (or run the workflow
-manually with that ref). The script just builds and flips to whatever ref it's
-given, so rolling back is the same path as rolling forward.
+**A failed deploy rolls itself back.** Whatever goes wrong — the build, a
+startup that never reaches `/healthz`, an instance that dies in the first
+seconds of real traffic — the script restores the nginx upstream, restarts and
+re-enables the previous instance, stops the new one, and exits non-zero. The
+site is left on the release that was working, and the log says which one that
+is. The idle checkout is deliberately left at the failed ref so it can be
+inspected; the next deploy overwrites it.
+
+Two things make that possible: the old instance is not stopped until the new
+one has served for `SETTLE_SECONDS` past the flip, and boot autostart is not
+moved until then either, so a reboot mid-failure comes back on the good
+release.
+
+**To roll back a deploy that succeeded** — one that passed its checks and only
+looked wrong later — re-deploy the previous tag: `git push origin v1.2.2` (or
+run the workflow manually with that ref). The script builds and flips to
+whatever ref it is given, so rolling back is the same path as rolling forward.
