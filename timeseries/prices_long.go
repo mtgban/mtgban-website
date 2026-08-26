@@ -27,6 +27,18 @@ const longColsPerRow = 4
 // longMaxBatch keeps a bulk upsert under Postgres's bind-parameter cap.
 const longMaxBatch = pgMaxParams / longColsPerRow
 
+// hgetAllLongQuery is the hottest read the site makes. NewClient keeps it
+// prepared, and the text stays here for the fallback path (see Client.query).
+const hgetAllLongQuery = `
+		WITH canon AS (
+			SELECT ban_id FROM variants
+			 WHERE mtgjson_uuid=$1 AND is_foil=$2 AND is_etched=$3
+			 ORDER BY (language='' AND is_alt=false) DESC, ban_id ASC
+			 LIMIT 1
+		)
+		SELECT date, provider, price FROM prices
+		 WHERE ban_id = (SELECT ban_id FROM canon) AND date >= $4`
+
 // HGetAllLong returns a single card's price history over the lookback window,
 // pivoted to date -> (provider -> price). The read identity (uuid, foil, etched)
 // is coarser than a ban_id, so a CTE resolves the canonical printing first:
@@ -41,16 +53,7 @@ const longMaxBatch = pgMaxParams / longColsPerRow
 func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched bool, lb Lookback) (map[string]ProviderPrices, error) {
 	uuid = NormalizeUUID(uuid)
 	result := make(map[string]ProviderPrices)
-	rows, err := c.db.QueryContext(ctx, `
-		WITH canon AS (
-			SELECT ban_id FROM variants
-			 WHERE mtgjson_uuid=$1 AND is_foil=$2 AND is_etched=$3
-			 ORDER BY (language='' AND is_alt=false) DESC, ban_id ASC
-			 LIMIT 1
-		)
-		SELECT date, provider, price FROM prices
-		 WHERE ban_id = (SELECT ban_id FROM canon) AND date >= $4`,
-		uuid, isFoil, isEtched, lb.Since())
+	rows, err := c.query(ctx, c.stmtHGetAllLong, hgetAllLongQuery, uuid, isFoil, isEtched, lb.Since())
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +76,10 @@ func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched 
 	return result, rows.Err()
 }
 
+const hgetAllByBanIDQuery = `
+		SELECT date, provider, price FROM prices
+		 WHERE ban_id=$1 AND date >= $2`
+
 // HGetAllByBanID returns one exact variant's price history over the lookback
 // window, pivoted to date -> (provider -> price). Unlike HGetAllLong it does no
 // canonical resolution: the caller already holds the precise ban_id (a ban: id,
@@ -80,9 +87,7 @@ func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched 
 // a specific language/finish/alt or a non-Magic sub-type.
 func (c *Client) HGetAllByBanID(ctx context.Context, banID int64, lb Lookback) (map[string]ProviderPrices, error) {
 	result := make(map[string]ProviderPrices)
-	rows, err := c.db.QueryContext(ctx, `
-		SELECT date, provider, price FROM prices
-		 WHERE ban_id=$1 AND date >= $2`, banID, lb.Since())
+	rows, err := c.query(ctx, c.stmtHGetAllByBanID, hgetAllByBanIDQuery, banID, lb.Since())
 	if err != nil {
 		return nil, err
 	}

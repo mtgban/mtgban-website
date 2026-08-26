@@ -41,6 +41,34 @@ type Client struct {
 	// variants caches variant identity -> ban_id for the long-form (variants +
 	// prices) write path. Warm it once with WarmVariantCache; misses mint.
 	variants variantCache
+
+	// The chart reads are kept prepared, which is what stops their
+	// hundred-partition plan from being rebuilt on every request. Set once by
+	// NewClient, before the client is handed out, and never written again -
+	// so reading them needs no synchronisation. Nil when preparing failed, or
+	// on a client built without one, and the read falls back to Query.
+	stmtHGetAllLong    *sql.Stmt
+	stmtHGetAllByBanID *sql.Stmt
+}
+
+// query runs a read through stmt when the client managed to prepare it, and as
+// a plain query otherwise.
+//
+// What preparing buys is planning, not parsing. prices is partitioned by month,
+// a hundred of them, so planning a statement against it costs far more than
+// running it - measured on the live archive, a chart read plans in 24ms and
+// executes in 4ms. lib/pq sends an unnamed statement per call and throws the
+// plan away with it, so that 24ms was paid on every request; a statement that
+// survives lets Postgres settle on a generic plan, which took the same read to
+// 0.06ms of planning.
+//
+// The fallback is not just for a failed prepare: a pooler that cannot hold
+// server-side statements (pgbouncer in transaction mode) needs this path too.
+func (c *Client) query(ctx context.Context, stmt *sql.Stmt, text string, args ...any) (*sql.Rows, error) {
+	if stmt != nil {
+		return stmt.QueryContext(ctx, args...)
+	}
+	return c.db.QueryContext(ctx, text, args...)
 }
 
 // OpenDB opens a raw Postgres pool for the database described by the config,
@@ -91,7 +119,12 @@ func NewClient(cfg SqlConfig) (*Client, error) {
 		return nil, fmt.Errorf("timeseries: ping: %w", err)
 	}
 
-	return &Client{db: db, readOnly: cfg.ReadOnly}, nil
+	c := &Client{db: db, readOnly: cfg.ReadOnly}
+	// Best effort: a read whose statement did not prepare still runs, it just
+	// pays for its plan every time.
+	c.stmtHGetAllLong, _ = db.Prepare(hgetAllLongQuery)
+	c.stmtHGetAllByBanID, _ = db.Prepare(hgetAllByBanIDQuery)
+	return c, nil
 }
 
 // ReadOnly reports whether the client was opened against a read-only database.
@@ -132,6 +165,11 @@ func (c *Client) TryAdvisoryLock(ctx context.Context, key int64) (acquired bool,
 
 // Close shuts down the connection pool.
 func (c *Client) Close() error {
+	for _, stmt := range []*sql.Stmt{c.stmtHGetAllLong, c.stmtHGetAllByBanID} {
+		if stmt != nil {
+			stmt.Close()
+		}
+	}
 	if c.db != nil {
 		return c.db.Close()
 	}

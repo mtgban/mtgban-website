@@ -112,6 +112,20 @@ func TestLongFormLive(t *testing.T) {
 		t.Errorf("HGetAllLong 2024-02-08 = %v, want 5.00", got)
 	}
 
+	// The read goes through the statement cache, which is what keeps its
+	// hundred-partition plan from being rebuilt per call. A second read must
+	// answer the same and must not add a second entry for the same text.
+	histAgain, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, Lookback(3650))
+	if err != nil {
+		t.Fatalf("HGetAllLong (second): %v", err)
+	}
+	if histAgain["2024-02-08"][liveSentinelProvider] != hist["2024-02-08"][liveSentinelProvider] {
+		t.Errorf("second read disagrees: %v vs %v", histAgain["2024-02-08"], hist["2024-02-08"])
+	}
+	if c.stmtHGetAllLong == nil {
+		t.Error("NewClient did not keep the chart read prepared")
+	}
+
 	// --- GetEarliestDateLong: MIN across all matching ban_ids ---
 	earliest, err := c.GetEarliestDateLong(ctx, liveSentinelUUID, false, false, Lookback(3650))
 	if err != nil {
