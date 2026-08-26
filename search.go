@@ -195,13 +195,30 @@ func noteChartIDsDropped(pageVars *PageVars, dropped, total int) {
 // card drops out of the page it was asked for. The caller says so rather than
 // letting it vanish.
 func chartSearchID(id string, target *chartTarget) (string, bool) {
-	if target != nil && target.SearchID != "" {
-		return target.SearchID, true
+	if target != nil {
+		if target.SearchID != "" {
+			return target.SearchID, true
+		}
+		// The resolver already tried every id space it knows and came back
+		// without a row id, so there is no row. Asking the matcher again
+		// from the raw string second-guesses that, and the raw string is
+		// exactly what cannot be read twice: a ban_id and a TCGplayer
+		// product id can be the same number, which is the trap
+		// resolveChartTarget's precedence exists to avoid.
+		return id, false
 	}
+
+	// Nothing resolved, so there is no archive to have resolved against -
+	// a deployment without one, where the matcher still places a plain id.
 	if _, err := mtgmatcher.GetUUID(id); err == nil {
 		return id, true // already a matcher id (bare uuid / variant string)
 	}
-	_, val := splitIDPrefix(id)
+	prefix, val := splitIDPrefix(id)
+	// ban: names our own surrogate. That integer means nothing to the
+	// matcher's external map, where the same number belongs to a product.
+	if prefix == "ban" {
+		return id, false
+	}
 	if matched, err := mtgmatcher.MatchId(val); err == nil {
 		return matched, true
 	}
