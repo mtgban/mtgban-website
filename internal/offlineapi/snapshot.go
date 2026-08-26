@@ -100,6 +100,18 @@ func (s *Service) refreshManifest() {
 		changed++
 	}
 
+	// Scrapers being present is not the same as their holding prices: a
+	// reload in flight leaves them empty for a moment, and fingerprinting
+	// nothing yields no sets. Saving that replaces a good manifest with an
+	// empty one, which tells every offline client there is nothing to sync,
+	// and the recovery is worse than the outage: the next populated refresh
+	// finds no previous version to carry timestamps from, so it stamps every
+	// set as changed and each client re-downloads the whole corpus.
+	if len(next.Sets) == 0 && len(prev) > 0 {
+		log.Printf("offline: manifest refresh found no priced sets while %d are known, keeping the previous manifest", len(prev))
+		return
+	}
+
 	err := s.manifestStore.Save(context.Background(), next)
 	if err != nil {
 		log.Println("offline: manifest save failed:", err)
