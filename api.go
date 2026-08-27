@@ -893,15 +893,20 @@ func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = loadDatastore(DatastoreBucket, Config.DatastorePath)
-	if err != nil {
-		errorResponse(w, http.StatusInternalServerError, "Failed to reload datastore: "+err.Error())
+	// Answer as soon as the reload is under way. Loading takes minutes, and
+	// a caller that waits for it holds a connection open long enough that
+	// whatever sits in front gives up and reports a gateway error against a
+	// reload that is running perfectly well. What the load then did is on
+	// the admin page, and in the server notifications.
+	state := datastoreReloads.Status()
+	if !StartDatastoreReload(DatastoreBucket, Config.DatastorePath, "api") {
+		w.WriteHeader(http.StatusAccepted)
+		fmt.Fprintf(w, `{"status": "ok", "state": "already running", "started": %q}`, state.StartedAt.UTC().Format(time.RFC3339))
 		return
 	}
 
-	ServerNotify("reload", "Datastore reloaded from "+Config.DatastorePath)
-	offlineService.RequestRefresh()
-	w.Write([]byte(`{"status": "ok"}`))
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte(`{"status": "ok", "state": "started"}`))
 }
 
 // Simple function to check a simple signature, the body is just the timestamp

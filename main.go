@@ -45,6 +45,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	_ "github.com/mtgban/go-mtgban/mtgmatcher/games"
+	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"github.com/mtgban/simplecloud"
 
 	_ "net/http/pprof"
@@ -1253,6 +1254,27 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 	go paletteService.BuildPromosCache()
 
 	return nil
+}
+
+// datastoreReloads owns the one datastore reload that may be under way.
+var datastoreReloads dsreload.Tracker
+
+// StartDatastoreReload loads the datastore in the background, reporting
+// whether this call is the one that started it. See dsreload.Tracker.Start.
+func StartDatastoreReload(bucket simplecloud.Reader, path, source string) bool {
+	return datastoreReloads.Start(source, path, func() error {
+		err := loadDatastore(bucket, path)
+		if err != nil {
+			return err
+		}
+		// What the endpoint used to do once the load returned. The offline
+		// manifest is derived from the datastore, so a reload that leaves it
+		// alone leaves it describing the previous one; the admin action never
+		// asked for the refresh at all, and now does.
+		ServerNotify("reload", "Datastore reloaded from "+path)
+		offlineService.RequestRefresh()
+		return nil
+	})
 }
 
 // datastoreGame names the game whose loader reads this site's datastore. An

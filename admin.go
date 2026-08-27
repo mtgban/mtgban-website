@@ -158,8 +158,11 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 				bucket = backupBucket
 			}
 		}
-		loadDatastore(bucket, dsPath)
-		pageVars.InfoMessage = "Datastore reloaded..."
+		if StartDatastoreReload(bucket, dsPath, "admin") {
+			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
+		} else {
+			pageVars.InfoMessage = "A datastore reload is already running"
+		}
 
 	case "update":
 		v = url.Values{}
