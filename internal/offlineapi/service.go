@@ -42,6 +42,12 @@ type Deps struct {
 	ScraperName       func(shorthand string) string
 	CardObjectSources func(co *mtgmatcher.CardObject) []string
 
+	// Game names the card game this deployment serves. It decides how image
+	// keys are derived, because Magic's mirror keys on the scryfall id while
+	// every other game keys on the card's own datastore uuid. Nil or empty
+	// means Magic, which is what a deployment that never set it is.
+	Game func() string
+
 	// Bucket factories: paths are read per call so config edits are picked
 	// up without rebuilding the service.
 	ManifestBucket       func(ctx context.Context) (simplecloud.ReadWriter, string, error)
@@ -87,6 +93,16 @@ func NewService(deps Deps) *Service {
 	}
 	s.refreshSignal = make(chan struct{}, 1)
 	return s
+}
+
+// magicImageKeys reports whether this deployment's images are filed under
+// scryfall ids rather than datastore uuids.
+func (s *Service) magicImageKeys() bool {
+	if s.deps.Game == nil {
+		return true
+	}
+	game := s.deps.Game()
+	return game == "" || game == "magic"
 }
 
 // Handle dispatches /api/offline/ endpoints.

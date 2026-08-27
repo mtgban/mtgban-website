@@ -46,12 +46,12 @@
         return { bytes: bytes, count: count, missing: missing };
     }
 
-    // Sealed images are TCGplayer's jpg; singles are Scryfall's webp. The
-    // extension is part of the url the cache is keyed on, so it is derived
-    // from the key rather than written out at each call site.
+    // Every mirrored image is webp, whatever its source served, so the
+    // extension carries no information and there is nothing to work out from
+    // the key. It stays in the url only because that url is what the cache is
+    // keyed on and what the renderers point at.
     function imageURL(key) {
-        var ext = key.indexOf('p-') === 0 ? '.jpg' : '.webp';
-        return '/api/offline/images/' + encodeURIComponent(key) + ext;
+        return '/api/offline/images/' + encodeURIComponent(key) + '.webp';
     }
 
     // A corpus this size meets transient 5xx and dropped connections as a
@@ -84,13 +84,9 @@
     // a rotating token never strands a cached image and the renderers keep
     // pointing at one stable address that outlives any of this.
     function entryMeta(name) {
-        var m = /^([A-Za-z0-9._-]+)\.(webp|jpg)$/.exec(name);
+        var m = /^([A-Za-z0-9._-]+)\.webp$/.exec(name);
         if (!m) return null;
-        return {
-            key: m[1],
-            url: '/api/offline/images/' + encodeURIComponent(m[1]) + '.' + m[2],
-            type: m[2] === 'webp' ? 'image/webp' : 'image/jpeg',
-        };
+        return { key: m[1], url: imageURL(m[1]), type: 'image/webp' };
     }
 
     // Downloads one set's bundle. Null means the mirror has not published one

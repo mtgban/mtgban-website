@@ -820,6 +820,8 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 
 	ImagesDownloadAuth: offlineImagesDownloadAuth,
 
+	Game: func() string { return Config.Game },
+
 	ManifestPathConfigured: func() bool { return Config.Offline.ManifestPath != "" },
 	ImagesPathConfigured:   func() bool { return Config.Offline.ImagesPath != "" },
 

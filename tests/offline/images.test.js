@@ -97,11 +97,14 @@ test('entryMeta maps bundle entries to stable local cache keys', () => {
         url: '/api/offline/images/ab154b52-1234-5678-9abc-def012345678.webp',
         type: 'image/webp',
     });
-    expect(OfflineImages.entryMeta('p-MH3-541185.jpg')).toEqual({
+    // Sealed is webp too: the mirror converts everything on the way in, so
+    // there is no longer a format to work out from the key.
+    expect(OfflineImages.entryMeta('p-MH3-541185.webp')).toEqual({
         key: 'p-MH3-541185',
-        url: '/api/offline/images/p-MH3-541185.jpg',
-        type: 'image/jpeg',
+        url: '/api/offline/images/p-MH3-541185.webp',
+        type: 'image/webp',
     });
+    expect(OfflineImages.entryMeta('p-MH3-541185.jpg')).toBeNull();
     expect(OfflineImages.entryMeta('nested/abc.webp')).toBeNull();
     expect(OfflineImages.entryMeta('README.txt')).toBeNull();
     expect(OfflineImages.entryMeta('../escape.webp')).toBeNull();
@@ -144,7 +147,7 @@ test('syncImages returns immediately when no work is needed', async () => {
 
 test('syncImages unpacks a bundle into the cache under local urls', async () => {
     const { cache, caches } = makeFakeCache();
-    const bundles = { 'NEO-aaaa.zip': zip({ 'key-a.webp': [1, 2], 'p-NEO-9.jpg': [3] }) };
+    const bundles = { 'NEO-aaaa.zip': zip({ 'key-a.webp': [1, 2], 'p-NEO-9.webp': [3] }) };
     const f = makeBundleFetch(bundles);
     const states = [];
     const mod = loadWithExtras({ caches, fetch: f.fetch });
@@ -156,7 +159,7 @@ test('syncImages unpacks a bundle into the cache under local urls', async () => 
     const urls = cache.store.map(e => e.req.url).sort();
     expect(urls).toEqual([
         'http://localhost/api/offline/images/key-a.webp',
-        'http://localhost/api/offline/images/p-NEO-9.jpg',
+        'http://localhost/api/offline/images/p-NEO-9.webp',
     ]);
     expect(cache.store.find(e => e.req.url.endsWith('.webp')).resp.headers.get('Content-Type')).toBe('image/webp');
     expect(states[0]).toEqual({ code: 'NEO', hash: 'aaaa', done: false });

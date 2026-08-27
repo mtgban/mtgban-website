@@ -27,24 +27,54 @@ type catalogCard struct {
 	Image    string   `json:"i,omitempty"`
 }
 
-// imageKey derives the offline image bucket key from a card's full-image URL.
-func imageKey(imagesFull, setCode string, sealed bool) string {
-	if imagesFull == "" {
+// imageKey is the key the mirror filed this card's image under, and so what
+// the client looks for in a downloaded bundle.
+//
+// Magic and every other game disagree on what that is. Magic's mirror keys on
+// the scryfall id, which is what its image URL is named for, and there are
+// 120k objects filed that way. Every other game is mirrored out of mtgban's
+// own datastore and keyed on the card's uuid, because those URLs are their
+// CDN's own filenames and name nothing the rest of the system knows.
+func imageKey(co *mtgmatcher.CardObject, magic bool) string {
+	if co.Images["full"] == "" {
 		return ""
 	}
-	base := path.Base(imagesFull)
+	if !magic {
+		if co.Sealed {
+			return "p-" + co.UUID
+		}
+		return basePrintingID(co.UUID)
+	}
+	base := path.Base(co.Images["full"])
 	base = strings.TrimSuffix(base, ".jpg")
 	if base == "" || base == "." || base == "/" {
 		return ""
 	}
-	if sealed {
-		return "p-" + setCode + "-" + base
+	if co.Sealed {
+		return "p-" + co.SetCode + "-" + base
 	}
 	return base
 }
 
+// basePrintingID strips the finish suffix off a datastore uuid.
+//
+// A printing's finishes are uuids of their own — Lorcana files 1854 and
+// 1854_f, Riftbound ogn-066-298_nonfoil and ..._foil — and they all share one
+// image, which the mirror stores once under the printing's id. This is the
+// trim that finds it, and the mirror documents the same rule from its side.
+//
+// It is not a tidying detail. Riftbound's base id is not in the uuid map at
+// all, only its finishes are, so every one of its cards needs this; without it
+// the game resolves no images whatsoever.
+func basePrintingID(uuid string) string {
+	if i := strings.LastIndex(uuid, "_"); i > 0 {
+		return uuid[:i]
+	}
+	return uuid
+}
+
 // newCatalogCard builds a catalog entry from a card object and its store list.
-func newCatalogCard(co *mtgmatcher.CardObject, products []string) catalogCard {
+func newCatalogCard(co *mtgmatcher.CardObject, products []string, magic bool) catalogCard {
 	return catalogCard{
 		Name:     co.Name,
 		Number:   co.Number,
@@ -54,7 +84,7 @@ func newCatalogCard(co *mtgmatcher.CardObject, products []string) catalogCard {
 		Etched:   co.Etched,
 		Sealed:   co.Sealed,
 		Products: products,
-		Image:    imageKey(co.Images["full"], co.SetCode, co.Sealed),
+		Image:    imageKey(co, magic),
 	}
 }
 
@@ -81,12 +111,13 @@ type catalogCache struct {
 // mtgmatcher datastore and scraper list.
 func (s *Service) refreshCatalog() {
 	cards := map[string]catalogCard{}
+	magic := s.magicImageKeys()
 	addCard := func(uuid string) {
 		co, err := mtgmatcher.GetUUID(uuid)
 		if err != nil {
 			return
 		}
-		cards[uuid] = newCatalogCard(co, s.deps.CardObjectSources(co))
+		cards[uuid] = newCatalogCard(co, s.deps.CardObjectSources(co), magic)
 	}
 	for _, uuid := range mtgmatcher.GetUUIDs() {
 		addCard(uuid)
