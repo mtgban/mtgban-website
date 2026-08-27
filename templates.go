@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"html/template"
 	"slices"
 	"strconv"
@@ -41,6 +42,12 @@ func csvWithout(csv, drop string) string {
 }
 
 var funcMap = template.FuncMap{
+	// The datastore reload runs in the background, so the page that reports
+	// it asks at render time rather than being handed a copy that is stale
+	// by the time it is drawn.
+	"datastore_reload": func() dsreload.State {
+		return datastoreReloads.Status()
+	},
 	"inc": func(i, j int) int {
 		return i + j
 	},
