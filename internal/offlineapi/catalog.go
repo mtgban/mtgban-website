@@ -7,7 +7,6 @@ import (
 	"hash/fnv"
 	"log"
 	"net/http"
-	"path"
 	"slices"
 	"strconv"
 	"strings"
@@ -30,11 +29,11 @@ type catalogCard struct {
 // imageKey is the key the mirror filed this card's image under, and so what
 // the client looks for in a downloaded bundle.
 //
-// Magic and every other game disagree on what that is. Magic's mirror keys on
-// the scryfall id, which is what its image URL is named for, and there are
-// 120k objects filed that way. Every other game is mirrored out of mtgban's
-// own datastore and keyed on the card's uuid, because those URLs are their
-// CDN's own filenames and name nothing the rest of the system knows.
+// Every game keys on an identifier the card carries, never on anything about
+// the url its artwork happens to live at. Which identifier differs: Magic is
+// mirrored from MTGJSON crossed with Scryfall's bulk data and keyed on the
+// scryfall id, while every other game is mirrored out of mtgban's own
+// datastore and keyed on the card's uuid there.
 func imageKey(co *mtgmatcher.CardObject, magic bool) string {
 	if co.Images["full"] == "" {
 		return ""
@@ -45,15 +44,17 @@ func imageKey(co *mtgmatcher.CardObject, magic bool) string {
 		}
 		return basePrintingID(co.UUID)
 	}
-	base := path.Base(co.Images["full"])
-	base = strings.TrimSuffix(base, ".jpg")
-	if base == "" || base == "." || base == "/" {
-		return ""
-	}
 	if co.Sealed {
-		return "p-" + co.SetCode + "-" + base
+		// TCGplayer names a product image for its own product id, so this
+		// reads the identifier rather than that url for the same reason the
+		// single below does, not because they ever disagree.
+		id := co.Identifiers["tcgplayerProductId"]
+		if id == "" {
+			return ""
+		}
+		return "p-" + co.SetCode + "-" + id
 	}
-	return base
+	return co.Identifiers["scryfallId"]
 }
 
 // basePrintingID strips the finish suffix off a datastore uuid.
