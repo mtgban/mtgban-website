@@ -1237,10 +1237,12 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 	}
 	defer reader.Close()
 
-	err = mtgmatcher.LoadDatastore(reader)
+	// LoadDatastore would read the file whole and try every registered loader.
+	backend, err := mtgmatcher.Open(datastoreGame(), reader)
 	if err != nil {
 		return err
 	}
+	mtgmatcher.SetGlobalDatastore(backend)
 
 	ServerNotify("init", "Datastore installed")
 	SetLastDatastoreUpdate(time.Now())
@@ -1251,6 +1253,16 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 	go paletteService.BuildPromosCache()
 
 	return nil
+}
+
+// datastoreGame names the game whose loader reads this site's datastore. An
+// unset game is the default one, the same reading the rest of the site gives
+// it.
+func datastoreGame() string {
+	if Config.Game == "" {
+		return DefaultGame
+	}
+	return Config.Game
 }
 
 func main() {
