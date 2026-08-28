@@ -408,6 +408,44 @@ func getSetKeyrunes() map[string]string {
 	return out
 }
 
+// finishLabels spells the finishes finishLabel's rule below cannot: a name
+// that is not a foil at all, or one whose words do not split on the suffix.
+var finishLabels = map[string]string{
+	"1stedition":     "1st Edition",
+	"rainbowpillars": "Rainbow Pillars",
+}
+
+// finishLabel spells the finish a card actually carries, or "" for one the
+// Foil and Etched flags already describe as well as anything could.
+//
+// A game with finishes of its own names them in CardObject.Finish, and the
+// matcher spells a finish the way it spells a promo type: one lowercase word,
+// so it can be typed into a search. That costs the spaces, so "coldfoil" comes
+// back where a person writes "Cold Foil". Split the trailing foil off and
+// title-case what is left, which is the same rule uuid2card already applies to
+// Magic's promo foils.
+//
+// Magic itself never reaches the rule: its CanonicalFinish answers only with
+// the three shared names, and its foil types live in PromoTypes. "normal" and
+// "nofoil" are here because a game spelling its plain printing that way means
+// the same nothing as the shared constant.
+func finishLabel(co *mtgmatcher.CardObject) string {
+	switch co.Finish {
+	case "", "normal", "nofoil",
+		mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+		return ""
+	}
+	label, found := finishLabels[co.Finish]
+	if found {
+		return label
+	}
+	base := strings.TrimSuffix(co.Finish, "foil")
+	if base != co.Finish && base != "" {
+		return mtgmatcher.Title(base) + " Foil"
+	}
+	return mtgmatcher.Title(co.Finish)
+}
+
 func editionTitle(cardId string) string {
 	co, err := mtgmatcher.GetUUID(cardId)
 	if err != nil {
@@ -427,9 +465,13 @@ func editionTitle(cardId string) string {
 	}
 
 	finish := ""
-	if co.Etched {
+	label := finishLabel(co)
+	switch {
+	case label != "":
+		finish = " " + label
+	case co.Etched:
 		finish = " Etched"
-	} else if co.Foil {
+	case co.Foil:
 		finish = " Foil"
 	}
 
@@ -709,6 +751,13 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	} else if co.Foil {
 		finishTag = "Foil"
 		finishClass = "foil"
+	}
+	// A game that named its own finish says it better than the flag does. Only
+	// the wording changes: a cold foil is that game's ordinary foil, not an
+	// alternate treatment, so it keeps the plain foil styling.
+	named := finishLabel(co)
+	if named != "" {
+		finishTag = named
 	}
 
 	// Loop through the supported promo types, skipping Boosterfun already processed above
