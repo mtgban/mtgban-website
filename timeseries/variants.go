@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 // Provider ids in the providers lookup table (see db_migration/02_seed_providers.sql).
@@ -73,18 +75,78 @@ type variantCache struct {
 	// Warm-time only, like tcgByProduct: the maps are built once and never
 	// mutated, so readers can use them without copying.
 	tcgSubTypesByProduct sync.Map // int (product id) -> map[string]int64
+	// byBanID is the reverse of the maps above: what a ban_id is. Built whole
+	// by the warm pass and published in one store, so a read is a pointer load
+	// and needs no lock - and a re-warm swaps a new map in rather than mutating
+	// the one readers hold.
+	//
+	// It is worth its memory because a miss is not a millisecond, it is a
+	// round-trip: ~50MB on a Magic deployment (VariantInfo is 80 bytes plus a
+	// uuid, times ~390k rows) against ~60ms per lookup when the app and the
+	// archive are in different regions, on the hottest path the site has.
+	byBanID atomic.Pointer[map[int64]VariantInfo]
 }
 
-// WarmVariantCache bulk-loads every existing variant into the in-memory cache in
+// VariantScope names the slice of the variants table a process actually uses.
+// Every deployment shares one table, so warming it whole is not the harmless
+// default it looks like: it hands a Lorcana site Magic's uuids and nine other
+// games' products, ~120MB of maps it can only miss on. The zero value does load
+// everything, for a caller that cannot name its game.
+type VariantScope struct {
+	// Magic includes every mtgjson-keyed variant.
+	Magic bool
+	// TCGCategoryIDs includes the non-Magic variants filed under those
+	// TCGplayer categories: the site's own game, plus every category the
+	// process ingests (an ingest resolves a ban_id per price row, and a row
+	// outside the cache costs a round-trip).
+	TCGCategoryIDs []int
+}
+
+// VariantCounts reports what a warm loaded, per identity kind. The package does
+// no logging of its own, so this is how a caller sees whether its scope
+// resolved to the rows it expected — a category id that matches nothing loads
+// zero and degrades to a per-card round-trip rather than failing.
+type VariantCounts struct {
+	Magic int
+	TCG   int
+}
+
+const warmVariantSelect = `SELECT ban_id, mtgjson_uuid, is_foil, is_etched, is_alt, language,
+		       tcgp_category_id, tcgp_product_id, tcgp_sub_type
+		FROM variants`
+
+// buildWarmVariantQuery renders the scope as a WHERE clause. Both predicates
+// match a partial unique index (variants_mtg_uk on mtgjson_uuid IS NOT NULL,
+// variants_tcg_uk leading with tcgp_category_id), so a single-game scope reads
+// its own rows rather than the table.
+func buildWarmVariantQuery(scope VariantScope) (string, []any) {
+	var conds []string
+	var args []any
+	if scope.Magic {
+		conds = append(conds, "mtgjson_uuid IS NOT NULL")
+	}
+	if len(scope.TCGCategoryIDs) > 0 {
+		placeholders := make([]string, len(scope.TCGCategoryIDs))
+		for i, id := range scope.TCGCategoryIDs {
+			placeholders[i] = fmt.Sprintf("$%d", i+1)
+			args = append(args, id)
+		}
+		conds = append(conds, "tcgp_category_id IN ("+strings.Join(placeholders, ",")+")")
+	}
+	if len(conds) == 0 {
+		return warmVariantSelect, nil
+	}
+	return warmVariantSelect + "\n\t\t WHERE " + strings.Join(conds, " OR "), args
+}
+
+// WarmVariantCache bulk-loads the scoped variants into the in-memory cache in
 // one query, so a stash of ~150k printings resolves without ~150k round-trips.
 // Only genuinely new printings then miss and mint. Safe to call repeatedly.
-func (c *Client) WarmVariantCache(ctx context.Context) error {
-	rows, err := c.db.QueryContext(ctx, `
-		SELECT ban_id, mtgjson_uuid, is_foil, is_etched, is_alt, language,
-		       tcgp_category_id, tcgp_product_id, tcgp_sub_type
-		FROM variants`)
+func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (VariantCounts, error) {
+	query, args := buildWarmVariantQuery(scope)
+	rows, err := c.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return err
+		return VariantCounts{}, err
 	}
 	defer rows.Close()
 
@@ -97,8 +159,9 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 	}
 	byProduct := map[int]tcgBest{}
 	subTypesByProduct := map[int]map[string]int64{}
+	byBanID := map[int64]VariantInfo{}
 
-	var loadedMagic, loadedTCG int
+	var counts VariantCounts
 	for rows.Next() {
 		var banID int64
 		var uuid sql.NullString
@@ -108,20 +171,26 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 		var subType sql.NullString
 		if err := rows.Scan(&banID, &uuid, &isFoil, &isEtched, &isAlt, &language,
 			&catID, &prodID, &subType); err != nil {
-			return err
+			return VariantCounts{}, err
+		}
+		byBanID[banID] = VariantInfo{
+			BanID: banID, MtgjsonUUID: uuid.String,
+			IsFoil: isFoil, IsEtched: isEtched, IsAlt: isAlt, Language: language,
+			TCGCategoryID: int(catID.Int64), TCGProductID: int(prodID.Int64),
+			TCGSubType: subType.String,
 		}
 		if uuid.Valid {
 			c.variants.magic.Store(MagicVariant{
 				MtgjsonUUID: uuid.String, IsFoil: isFoil, IsEtched: isEtched,
 				IsAlt: isAlt, Language: language,
 			}, banID)
-			loadedMagic++
+			counts.Magic++
 		} else if prodID.Valid {
 			c.variants.tcg.Store(TCGVariant{
 				CategoryID: int(catID.Int64), ProductID: int(prodID.Int64),
 				SubType: subType.String,
 			}, banID)
-			loadedTCG++
+			counts.TCG++
 
 			pid := int(prodID.Int64)
 			isNormal := subType.String == "Normal"
@@ -141,7 +210,7 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 		}
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return VariantCounts{}, err
 	}
 	for pid, best := range byProduct {
 		c.variants.tcgByProduct.Store(pid, best.banID)
@@ -149,7 +218,10 @@ func (c *Client) WarmVariantCache(ctx context.Context) error {
 	for pid, subTypes := range subTypesByProduct {
 		c.variants.tcgSubTypesByProduct.Store(pid, subTypes)
 	}
-	return nil
+	// One store, after the scan: readers either see the previous map or this
+	// one, never a half-built one.
+	c.variants.byBanID.Store(&byBanID)
+	return counts, nil
 }
 
 // CachedTCGBanID returns the canonical ban_id for a non-Magic TCGplayer product
@@ -204,6 +276,76 @@ func (c *Client) LookupTCGSubTypeBanIDs(ctx context.Context, productID int) (map
 		}
 	}
 	return subTypes, rows.Err()
+}
+
+// tcgSubTypeBatch is how many products one batched lookup asks for. Postgres
+// caps a statement at 65535 parameters; this leaves the query far short of it
+// and keeps any single round-trip small.
+const tcgSubTypeBatch = 1000
+
+// LookupTCGSubTypeBanIDsBatch is LookupTCGSubTypeBanIDs for many products at
+// once, for the paths that resolve a whole result set rather than one card.
+// The screener reads thousands of mover rows, and a cache that misses them -
+// products ingested since warm-up, or a warm that never ran - would otherwise
+// cost a round-trip each. Products with no rows are simply absent from the
+// result, so callers can tell "asked and found nothing" from "never asked".
+func (c *Client) LookupTCGSubTypeBanIDsBatch(ctx context.Context, productIDs []int) (map[int]map[string]int64, error) {
+	out := make(map[int]map[string]int64, len(productIDs))
+	for start := 0; start < len(productIDs); start += tcgSubTypeBatch {
+		end := min(start+tcgSubTypeBatch, len(productIDs))
+		chunk := productIDs[start:end]
+
+		query, args := buildTCGSubTypeBatchQuery(chunk)
+		err := c.scanTCGSubTypeBanIDs(ctx, query, args, out)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// buildTCGSubTypeBatchQuery renders one chunk of product ids as a statement.
+// Ascending ban_id is what lets the scan keep the first row of a sub-type
+// duplicated across categories, matching both the single lookup and the warm
+// cache.
+func buildTCGSubTypeBatchQuery(productIDs []int) (string, []any) {
+	placeholders := make([]string, len(productIDs))
+	args := make([]any, len(productIDs))
+	for i, id := range productIDs {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	return `SELECT tcgp_product_id, ban_id, tcgp_sub_type FROM variants
+		 WHERE tcgp_product_id IN (` + strings.Join(placeholders, ",") + `)
+		 ORDER BY ban_id ASC`, args
+}
+
+func (c *Client) scanTCGSubTypeBanIDs(ctx context.Context, query string, args []any, out map[int]map[string]int64) error {
+	rows, err := c.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var productID int
+		var banID int64
+		var subType sql.NullString
+		if err := rows.Scan(&productID, &banID, &subType); err != nil {
+			return err
+		}
+		bySubType := out[productID]
+		if bySubType == nil {
+			bySubType = map[string]int64{}
+			out[productID] = bySubType
+		}
+		// Ascending ban_id, so the first row of a sub-type duplicated across
+		// categories wins, matching the warm cache.
+		if _, ok := bySubType[subType.String]; !ok {
+			bySubType[subType.String] = banID
+		}
+	}
+	return rows.Err()
 }
 
 // ResolveMagicBanID returns the ban_id for a Magic variant, minting it if new.
@@ -262,6 +404,15 @@ func (v VariantInfo) IsMagic() bool { return v.MtgjsonUUID != "" }
 // LookupVariant returns the identity for a ban_id, ok=false if no such variant.
 // Used to chart/display a ban: id and to route Magic vs non-Magic handling.
 func (c *Client) LookupVariant(ctx context.Context, banID int64) (VariantInfo, bool, error) {
+	// The warm pass read this exact row; ask it before crossing the network.
+	// A miss - a variant minted since the warm, or a client that never warmed -
+	// falls through to the query.
+	if warmed := c.variants.byBanID.Load(); warmed != nil {
+		if v, ok := (*warmed)[banID]; ok {
+			return v, true, nil
+		}
+	}
+
 	v := VariantInfo{BanID: banID}
 	var uuid, subType sql.NullString
 	var catID, prodID sql.NullInt64

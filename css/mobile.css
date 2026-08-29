@@ -26,10 +26,25 @@
     width: auto;
 }
 
+/* Stacks the wordmark over the game the deployment serves; on Magic the
+   badge is absent and the column is the wordmark alone. */
+.m-nav-logo-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.05;
+}
 .m-nav-logo {
     font-weight: 800;
     font-size: 1.1rem;
     color: var(--text);
+}
+.m-nav-logo-game {
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--greytext);
 }
 
 .light-theme .m-nav-logo {
@@ -290,11 +305,28 @@ body.mobile:has(.m-home) .m-nav-home {
     height: 48px;
 }
 
+.m-home-brand-lockup {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
 .m-home-brand-text {
     font-family: 'DM Sans', sans-serif;
     font-size: 1.8rem;
     font-weight: 800;
     color: var(--activetext);
+    line-height: 1;
+}
+
+.m-home-brand-game {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--greytext);
 }
 
 .m-home-search-wrap {

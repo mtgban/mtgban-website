@@ -223,36 +223,72 @@ func buildProviderRegistry() {
 	providerRegistry = registry
 }
 
-// chartTargetEarliest returns the oldest on-record date for a resolved target:
-// a precise ban_id, or the Magic canonical (uuid, foil, etched) path.
-func chartTargetEarliest(ctx context.Context, target *chartTarget, lb timeseries.Lookback) (time.Time, error) {
-	if target.BanID != 0 {
-		return PricesArchiveDB.GetEarliestDateByBanID(ctx, target.BanID, lb)
-	}
-	return PricesArchiveDB.GetEarliestDateLong(ctx, target.UUID, target.Foil, target.Etched, lb)
-}
-
-// getChartDatasets builds a card's chart datasets, game-agnostic: it fetches the
-// series once (by exact ban_id, else the canonical uuid path) and emits one
-// dataset per registry provider that has data, in registry order. Adding a game
-// needs no code here — its providers just show up. Long-form reads only; the
-// legacy path stays in getDatasets.
-func getChartDatasets(ctx context.Context, target *chartTarget, labels []string, lb timeseries.Lookback) []Dataset {
+// fetchChartPrices reads one resolved target's series: by exact ban_id when the
+// target has one, else the Magic canonical (uuid, foil, etched) path.
+//
+// This is the only read the chart path makes. The axis used to come from a
+// second query asking the archive for the card's oldest date, which cost a
+// round-trip to learn something the rows themselves say - and against a
+// hundred-partition prices table a round-trip is mostly planning, not data.
+func fetchChartPrices(ctx context.Context, target *chartTarget, lb timeseries.Lookback) map[string]timeseries.ProviderPrices {
 	if PricesArchiveDB == nil {
 		return nil
 	}
-	var results map[string]timeseries.ProviderPrices
-	var err error
 	if target.BanID != 0 {
-		results, err = PricesArchiveDB.HGetAllByBanID(ctx, target.BanID, lb)
-	} else {
-		results, err = PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, lb)
+		results, err := PricesArchiveDB.HGetAllByBanID(ctx, target.BanID, lb)
+		if err != nil {
+			log.Printf("chart: ban_id %d (%s): %v", target.BanID, target.Name, err)
+			return nil
+		}
+		return results
 	}
-	if err != nil {
-		log.Println(err)
+
+	// No ban_id and no uuid to fall back on means this printing has no identity
+	// the archive can be asked about - a non-Magic finish the product carries no
+	// sub-type for, most often. Asking anyway is not an empty chart, it is a
+	// type error the caller cannot tell apart from one.
+	if !hasCanonicalIdentity(target) {
+		log.Printf("chart: %q (%s) resolved to no ban_id and is not an mtgjson uuid, so the archive has no identity to look it up by",
+			target.UUID, target.Name)
 		return nil
 	}
 
+	results, err := PricesArchiveDB.HGetAllLong(ctx, target.UUID, target.Foil, target.Etched, lb)
+	if err != nil {
+		log.Printf("chart: uuid %s foil=%t etched=%t (%s): %v",
+			target.UUID, target.Foil, target.Etched, target.Name, err)
+		return nil
+	}
+	return results
+}
+
+// earliestChartedDate is the oldest date a fetched series holds, which is where
+// the axis starts. Empty series fall back to the lookback boundary, the same
+// answer the archive gave when it was asked directly.
+//
+// The dates are ISO, so the lexicographic minimum is the chronological one.
+func earliestChartedDate(results map[string]timeseries.ProviderPrices, lb timeseries.Lookback) time.Time {
+	var oldest string
+	for date := range results {
+		if oldest == "" || date < oldest {
+			oldest = date
+		}
+	}
+	if oldest == "" {
+		return lb.Since()
+	}
+	parsed, err := time.Parse("2006-01-02", oldest)
+	if err != nil {
+		return lb.Since()
+	}
+	return parsed
+}
+
+// chartDatasetsFrom projects a fetched series onto the axis, game-agnostic: one
+// dataset per registry provider that has data, in registry order. Adding a game
+// needs no code here — its providers just show up. Long-form reads only; the
+// legacy path stays in getDatasets.
+func chartDatasetsFrom(results map[string]timeseries.ProviderPrices, labels []string) []Dataset {
 	// Only providers with data for this card render — that is what makes it
 	// game-agnostic and also drops sealed-vs-single applicability out of config
 	// (e.g. Sealed EV only has data for sealed products, so it only shows there).
@@ -591,13 +627,72 @@ func stashInTimeseries() {
 	ServerNotify("timeseries", msg)
 }
 
+// variantCacheScope is the slice of the shared variants table this process can
+// use: the game it serves, plus every category it ingests, since the tcgcsv
+// ingest resolves a ban_id for each price row it writes and a row outside the
+// cache costs a round-trip.
+//
+// The game's own category comes from the loaded catalog, which names it - the
+// same source GetTCGCategoryID exists to provide, so enabling a game stays a
+// matter of shipping its dump. That means the scope is only complete once the
+// catalog is in, which is why the warm waits for it; a call made before then
+// falls back to the whole table, correct but fat.
+func variantCacheScope() timeseries.VariantScope {
+	var scope timeseries.VariantScope
+	if Config.Game == DefaultGame {
+		scope.Magic = true
+	} else if id := GetTCGCategoryID(); id != 0 {
+		scope.TCGCategoryIDs = append(scope.TCGCategoryIDs, id)
+	} else {
+		log.Printf("variant cache: no catalog loaded for game %q, warming every game", Config.Game)
+		return timeseries.VariantScope{}
+	}
+	if Config.TCGCSVConfig != nil {
+		for _, game := range Config.TCGCSVConfig.Games {
+			if !slices.Contains(scope.TCGCategoryIDs, game.CategoryID) {
+				scope.TCGCategoryIDs = append(scope.TCGCategoryIDs, game.CategoryID)
+			}
+		}
+	}
+	return scope
+}
+
+// warmVariantCache warms this process's slice of the variants table and reports
+// what it loaded. Both callers log the counts: a scope that resolves to no rows
+// does not fail, it just misses on every lookup afterwards, so the count is the
+// only place a category that stopped matching shows up.
+// warmVariantCacheIfEnabled warms the cache when the long form is in use,
+// reporting a failure rather than returning it: every caller is past the point
+// where it could do anything about one, and a cold cache costs round-trips
+// rather than answers.
+func warmVariantCacheIfEnabled() {
+	if !Config.TimeseriesConfig.LongFormWrites && !Config.TimeseriesConfig.LongFormReads {
+		return
+	}
+	if PricesArchiveDB == nil {
+		return
+	}
+	if err := warmVariantCache(context.Background()); err != nil {
+		log.Println("warning: could not warm variant cache:", err)
+	}
+}
+
+func warmVariantCache(ctx context.Context) error {
+	counts, err := PricesArchiveDB.WarmVariantCache(ctx, variantCacheScope())
+	if err != nil {
+		return err
+	}
+	log.Printf("variant cache warmed: %d magic, %d non-magic", counts.Magic, counts.TCG)
+	return nil
+}
+
 // stashLongForm mirrors the accumulated wide rows into the long prices table. It
 // warms the variant cache once, resolves each row's ban_id (minting new
 // printings on the fly), and emits one LongPrice per set provider column with a
 // positive price (zeros are omitted, matching the backfill). Returns the number
 // of price rows upserted.
 func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.PriceRow) (int, error) {
-	if err := PricesArchiveDB.WarmVariantCache(ctx); err != nil {
+	if err := warmVariantCache(ctx); err != nil {
 		return 0, fmt.Errorf("warm variant cache: %w", err)
 	}
 	longRows := make([]timeseries.LongPrice, 0, len(accumulated)*4)

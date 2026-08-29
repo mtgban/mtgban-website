@@ -175,6 +175,7 @@
     border-radius: 8px;
     margin-bottom: 1em;
     overflow: hidden;
+    overflow: clip;
     background: var(--background);
     max-width: 100%;
     box-sizing: border-box;
@@ -439,6 +440,34 @@
     background: #7c3aed;
     border-color: #7c3aed;
     box-shadow: 0 0 6px rgba(124, 58, 237, 0.3);
+}
+
+/* Mode toggle pill row in the mobile offline shell */
+.m-offline-mode-pills {
+    display: flex;
+    gap: 0.4em;
+    padding: 0.3em 0 0.1em;
+}
+
+.m-offline-mode-pills .m-cond-pill {
+    text-decoration: none;
+    flex: 1;
+    text-align: center;
+    font-size: 0.78rem;
+    padding: 0.3em 0.6em;
+    justify-content: center;
+}
+
+.m-offline-mode-pills .m-cond-pill.active {
+    background: var(--dodgerblue);
+    border-color: var(--dodgerblue);
+    color: white;
+    box-shadow: 0 0 6px rgba(30, 144, 255, 0.25);
+}
+
+/* Extra padding when the offline pill row is present; 52px is inherited from .m-search-bar-sticky rule above */
+.m-page:has(.m-offline-mode-pills) {
+    padding-top: calc(52px + 2.2em);
 }
 
 /* Condition groups (show/hide by active pill) */
@@ -2451,3 +2480,134 @@ body.m-setpicker-lock {
 .m-fav-sort .fav-sort-pill svg { width: 16px; height: 16px; }
 .m-fav-sort .fav-sort-pill .fav-sort-dir.asc,
 .m-fav-sort .fav-sort-pill .fav-sort-dir.desc { color: var(--ainfo, #5b8def); }
+
+/* Offline mode section in the settings drawer */
+#m-offline-section .m-offline-auth-notice {
+    font-size: 0.85em;
+    color: var(--color-warn, #b45309);
+    margin: 0.4em 0 0.6em;
+    padding: 0.5em 0.75em;
+    background: var(--color-warn-bg, #fef3c7);
+    border-radius: 0.4em;
+}
+
+#m-offline-section .m-offline-desc {
+    font-size: 0.85em;
+    color: var(--text-muted, #666);
+    margin: 0 0 0.6em;
+    line-height: 1.4;
+}
+
+#m-offline-section .m-offline-status {
+    font-size: 0.8em;
+    color: var(--text-muted, #666);
+    min-height: 1.2em;
+    margin-top: 0.3em;
+}
+
+#m-offline-section .m-offline-usage {
+    font-size: 0.8em;
+    color: var(--text-muted, #666);
+    margin: 0.25em 0 0;
+}
+
+/* Busy state during async enable/disable */
+.m-toggle-busy {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* === Expanded layout: all conditions and both panels visible === */
+
+/* Panel labels replace the hidden tabs */
+.m-layout-expanded .m-tab-panel::before {
+    content: "Sellers";
+    display: block;
+    padding: 0.4em 0.75em;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--greytext);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    background: rgba(30, 144, 255, 0.05);
+}
+
+.m-layout-expanded .m-tab-panel[id^="buyers"]::before {
+    content: "Buyers";
+}
+
+/* Condition band on every group */
+.m-layout-expanded .m-cond-group::before {
+    content: attr(data-cond);
+    display: block;
+    padding: 0.2em 0.75em;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--greytext);
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--border);
+}
+
+.light-theme .m-layout-expanded .m-cond-group::before {
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.m-layout-expanded .m-cond-group[data-cond="INDEX"]::before {
+    content: "Index";
+}
+
+/* Sealed products have no real conditions to label */
+.m-layout-expanded .m-sealed .m-cond-group::before {
+    display: none;
+}
+
+/* No per-group fade: everything is visible at once */
+.m-layout-expanded .m-cond-group.active {
+    animation: none;
+}
+
+/* Tighter rows: no longer the primary tap-to-reveal surface */
+.m-layout-expanded .m-vendor-row summary,
+.m-layout-expanded .m-vendor-row.m-vendor-flat {
+    min-height: 36px;
+}
+
+.m-layout-expanded .m-vendor-row .m-detail-row {
+    min-height: 28px;
+}
+
+.m-layout-expanded .m-vendor-locked {
+    min-height: 40px;
+}
+
+/* Long pages: skip layout/paint of off-screen cards */
+.m-layout-expanded .m-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 900px;
+}
+
+/* Buyers-first stacking, portrait only; landscape grid handles side by side */
+@media (orientation: portrait) {
+    .m-layout-expanded .m-card.m-buyers-first {
+        display: flex;
+        flex-direction: column;
+    }
+    .m-layout-expanded .m-card.m-buyers-first > .m-card-header {
+        order: -3;
+    }
+    .m-layout-expanded .m-card.m-buyers-first > .m-tab-panel[id^="buyers"] {
+        order: -1;
+    }
+}
+
+/* Keep the card name visible while scrolling a long expanded card */
+@media (orientation: portrait) {
+    .m-layout-expanded .m-card-header {
+        position: sticky;
+        top: 100px; /* fixed nav 48px + fixed search bar ~52px */
+        z-index: 3;
+        background: var(--background);
+    }
+}

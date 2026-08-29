@@ -3,6 +3,7 @@ package timeseries
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 // TestLongFormLive exercises the long-form (variants + prices) code end to end
@@ -111,6 +112,20 @@ func TestLongFormLive(t *testing.T) {
 		t.Errorf("HGetAllLong 2024-02-08 = %v, want 5.00", got)
 	}
 
+	// The read goes through the statement cache, which is what keeps its
+	// hundred-partition plan from being rebuilt per call. A second read must
+	// answer the same and must not add a second entry for the same text.
+	histAgain, err := c.HGetAllLong(ctx, liveSentinelUUID, false, false, Lookback(3650))
+	if err != nil {
+		t.Fatalf("HGetAllLong (second): %v", err)
+	}
+	if histAgain["2024-02-08"][liveSentinelProvider] != hist["2024-02-08"][liveSentinelProvider] {
+		t.Errorf("second read disagrees: %v vs %v", histAgain["2024-02-08"], hist["2024-02-08"])
+	}
+	if c.stmtHGetAllLong == nil {
+		t.Error("NewClient did not keep the chart read prepared")
+	}
+
 	// --- GetEarliestDateLong: MIN across all matching ban_ids ---
 	earliest, err := c.GetEarliestDateLong(ctx, liveSentinelUUID, false, false, Lookback(3650))
 	if err != nil {
@@ -138,7 +153,7 @@ func TestLongFormLive(t *testing.T) {
 	}
 
 	// --- GetMoversLong: 2024-02-08 -> 2024-02-20 for the sentinel ---
-	movers, err := c.GetMoversLong(ctx, liveSentinelProvider, 7, 0, 0)
+	movers, err := c.GetMoversLong(ctx, liveSentinelProvider, 7, 0, 0, CategoryMagic)
 	if err != nil {
 		t.Fatalf("GetMoversLong: %v", err)
 	}
@@ -180,5 +195,162 @@ func TestLongFormLive(t *testing.T) {
 	if subTypes["Normal"] != tcgBan || subTypes["Cold Foil"] != foilBan {
 		t.Errorf("LookupTCGSubTypeBanIDs = %+v, want Normal=%d Cold Foil=%d", subTypes, tcgBan, foilBan)
 	}
+
+	// The batched form answers the same for a product that has rows, and says
+	// nothing at all about one that has none - callers tell "asked and found
+	// nothing" from "never asked" by the key being absent.
+	batched, err := c.LookupTCGSubTypeBanIDsBatch(ctx, []int{liveSentinelProdLong, liveSentinelProdLong + 1})
+	if err != nil {
+		t.Fatalf("LookupTCGSubTypeBanIDsBatch: %v", err)
+	}
+	if got := batched[liveSentinelProdLong]; got["Normal"] != tcgBan || got["Cold Foil"] != foilBan {
+		t.Errorf("batched = %+v, want Normal=%d Cold Foil=%d", got, tcgBan, foilBan)
+	}
+	if _, found := batched[liveSentinelProdLong+1]; found {
+		t.Errorf("product with no rows is present in the batch result: %+v", batched)
+	}
+
+	// --- scoped warm: one category, on a cold client ---
+	// The Magic half is deliberately not warmed here: a Magic-scoped warm pulls
+	// every uuid-keyed row, which is the ~190k-row load this scoping exists to
+	// keep off the non-Magic sites. What matters is that the category predicate
+	// runs and excludes everything else, so the sentinel product arrives and the
+	// sentinel uuid does not.
+	c3, err := NewClient(liveConfig(t))
+	if err != nil {
+		t.Fatalf("NewClient 3: %v", err)
+	}
+	defer c3.Close()
+	counts, err := c3.WarmVariantCache(ctx, VariantScope{TCGCategoryIDs: []int{liveSentinelCatLong}})
+	if err != nil {
+		t.Fatalf("WarmVariantCache scoped: %v", err)
+	}
+	if counts.Magic != 0 {
+		t.Errorf("category-scoped warm loaded %d magic variants, want 0", counts.Magic)
+	}
+	if counts.TCG != 2 {
+		t.Errorf("category-scoped warm loaded %d non-magic variants, want the 2 sentinels", counts.TCG)
+	}
+	if got, ok := c3.CachedTCGBanID(liveSentinelProdLong); !ok || got != tcgBan {
+		t.Errorf("CachedTCGBanID = %d (ok=%v), want %d after a scoped warm", got, ok, tcgBan)
+	}
+	// The warm pass also indexes what each ban_id is, which is what keeps a
+	// chart page from asking the archive that question per card.
+	if byBanID := c3.variants.byBanID.Load(); byBanID == nil {
+		t.Error("warm pass published no ban_id index")
+	} else if vi, ok := (*byBanID)[tcgBan]; !ok || vi.TCGProductID != liveSentinelProdLong {
+		t.Errorf("ban_id index has %+v for %d, want the sentinel product", vi, tcgBan)
+	}
+
+	if warmed, ok := c3.CachedTCGSubTypeBanIDs(liveSentinelProdLong); !ok ||
+		warmed["Normal"] != tcgBan || warmed["Cold Foil"] != foilBan {
+		t.Errorf("CachedTCGSubTypeBanIDs = %+v (ok=%v), want Normal=%d Cold Foil=%d", warmed, ok, tcgBan, foilBan)
+	}
+	if got, ok := c3.CachedMagicBanID(base); ok {
+		t.Errorf("category-scoped warm cached magic variant %d; it should not have been read", got)
+	}
 	_ = banJa
+}
+
+// Sentinels for the game-scoping test, distinct from TestLongFormLive's so the
+// two never see each other's rows regardless of order.
+const (
+	scopeSentinelUUID     = "ffffffff-0000-0000-0000-000000000011"
+	scopeSentinelCat      = 999003
+	scopeSentinelProd     = 888112
+	scopeSentinelProvider = int16(998)
+)
+
+// TestMoversLongGameScopingLive pins the anchor dates to the requested game.
+// One provider carries every game's rows, written by producers on unrelated
+// schedules, so the games routinely sit a day apart. Here Magic is a day ahead
+// of the sentinel TCG category, which is exactly the state that made the
+// non-Magic screener return nothing: anchoring on the provider's newest date
+// picked Magic's day, on which the TCG category has no rows at all.
+func TestMoversLongGameScopingLive(t *testing.T) {
+	ctx := context.Background()
+	c, err := NewClient(liveConfig(t))
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+
+	clear := func() {
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, scopeSentinelProvider)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid=$1 OR tcgp_category_id=$2`,
+			scopeSentinelUUID, scopeSentinelCat)
+		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, scopeSentinelProvider)
+	}
+	clear()
+	t.Cleanup(clear)
+
+	if _, err := c.db.ExecContext(ctx, `
+		INSERT INTO providers (id, shorthand, public_name, kind, currency)
+		VALUES ($1,'SENTINEL2','Sentinel Scope','retail','USD')
+		ON CONFLICT (id) DO NOTHING`, scopeSentinelProvider); err != nil {
+		t.Fatalf("insert sentinel provider: %v", err)
+	}
+
+	// Magic runs a day ahead of the TCG category on both anchors.
+	const (
+		magicCur   = "2024-06-20"
+		magicPrior = "2024-06-13"
+		tcgCur     = "2024-06-19"
+		tcgPrior   = "2024-06-12"
+	)
+	for _, day := range []string{magicCur, magicPrior, tcgCur, tcgPrior} {
+		d, err := time.Parse("2006-01-02", day)
+		if err != nil {
+			t.Fatalf("parse %s: %v", day, err)
+		}
+		if err := c.EnsurePricePartition(ctx, d); err != nil {
+			t.Fatalf("EnsurePricePartition %s: %v", day, err)
+		}
+	}
+
+	magicBan, err := c.ResolveMagicBanID(ctx, MagicVariant{MtgjsonUUID: scopeSentinelUUID})
+	if err != nil {
+		t.Fatalf("ResolveMagicBanID: %v", err)
+	}
+	tcgBan, err := c.ResolveTCGBanID(ctx, TCGVariant{
+		CategoryID: scopeSentinelCat, ProductID: scopeSentinelProd, SubType: "Normal",
+	})
+	if err != nil {
+		t.Fatalf("ResolveTCGBanID: %v", err)
+	}
+
+	rows := []LongPrice{
+		{BanID: magicBan, Date: magicCur, Provider: scopeSentinelProvider, Price: 10.00},
+		{BanID: magicBan, Date: magicPrior, Provider: scopeSentinelProvider, Price: 5.00},
+		{BanID: tcgBan, Date: tcgCur, Provider: scopeSentinelProvider, Price: 20.00},
+		{BanID: tcgBan, Date: tcgPrior, Provider: scopeSentinelProvider, Price: 8.00},
+	}
+	if _, err := c.UpsertLongPrices(ctx, rows, 0); err != nil {
+		t.Fatalf("UpsertLongPrices: %v", err)
+	}
+
+	// The regression: the TCG category must anchor on its own 06-19/06-12, not
+	// on Magic's 06-20, which holds none of its rows.
+	movers, err := c.GetMoversLong(ctx, scopeSentinelProvider, 7, 0, 0, scopeSentinelCat)
+	if err != nil {
+		t.Fatalf("GetMoversLong(tcg): %v", err)
+	}
+	if len(movers) != 1 {
+		t.Fatalf("tcg movers = %+v, want exactly the sentinel product", movers)
+	}
+	if got := movers[0]; got.TCGProductID != scopeSentinelProd || got.Current != 20.00 || got.Prior != 8.00 {
+		t.Errorf("tcg mover = %+v, want product %d current 20 prior 8", got, scopeSentinelProd)
+	}
+
+	// The Magic side keeps its own anchors and never sees the TCG rows.
+	movers, err = c.GetMoversLong(ctx, scopeSentinelProvider, 7, 0, 0, CategoryMagic)
+	if err != nil {
+		t.Fatalf("GetMoversLong(magic): %v", err)
+	}
+	if len(movers) != 1 {
+		t.Fatalf("magic movers = %+v, want exactly the sentinel uuid", movers)
+	}
+	if got := movers[0]; got.MtgjsonUUID != scopeSentinelUUID || got.Current != 10.00 || got.Prior != 5.00 {
+		t.Errorf("magic mover = %+v, want uuid %s current 10 prior 5", got, scopeSentinelUUID)
+	}
 }

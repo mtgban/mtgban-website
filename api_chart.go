@@ -115,7 +115,10 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 	lb := chartLookback(sig)
 	maxDays := lb.Days()
 
-	earliest, _ := chartTargetEarliest(r.Context(), target, lb)
+	// One read: the series carries its own oldest date, so the axis needs no
+	// query of its own.
+	results := fetchChartPrices(r.Context(), target, lb)
+	earliest := earliestChartedDate(results, lb)
 
 	if rangeStr := r.FormValue("range"); rangeStr != "" {
 		if days, err := strconv.Atoi(rangeStr); err == nil && days > 0 {
@@ -130,7 +133,7 @@ func chartDataAPILong(w http.ResponseWriter, r *http.Request, rawID string) {
 	}
 
 	axisLabels := getDateAxisValues(earliest)
-	datasets := getChartDatasets(r.Context(), target, axisLabels, lb)
+	datasets := chartDatasetsFrom(results, axisLabels)
 
 	var apiDatasets []ChartAPIDataset
 	for _, ds := range datasets {

@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"html/template"
 	"slices"
 	"strconv"
@@ -41,6 +42,12 @@ func csvWithout(csv, drop string) string {
 }
 
 var funcMap = template.FuncMap{
+	// The datastore reload runs in the background, so the page that reports
+	// it asks at render time rather than being handed a copy that is stale
+	// by the time it is drawn.
+	"datastore_reload": func() dsreload.State {
+		return datastoreReloads.Status()
+	},
 	"inc": func(i, j int) int {
 		return i + j
 	},
@@ -133,6 +140,20 @@ var funcMap = template.FuncMap{
 	},
 	"game_title": func() string {
 		return gameMap[Config.Game]
+	},
+	// game_badge names the game a deployment serves for the brand lockup,
+	// where the wordmark alone says nothing about which site this is. Empty
+	// on Magic, whose logo already reads MTGBAN.
+	"game_badge": func() string {
+		if Config.Game == DefaultGame {
+			return ""
+		}
+		return gameBadgeMap[Config.Game]
+	},
+	// game is the slug the deployment serves, for the places that style or
+	// address a game rather than name it.
+	"game": func() string {
+		return Config.Game
 	},
 	"card_back": func() string {
 		return "/img/backs/" + Config.Game + ".webp"

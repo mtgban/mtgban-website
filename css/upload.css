@@ -1092,6 +1092,15 @@
 .ures-index .idx-label { color: var(--text-dim); font-size: var(--text-xs); }
 .ures-index .idx-val { flex: 1; text-align: right; }
 
+/* The Cond badge sits on the same row, so say out loud that the index
+   prices are the one thing on it that the condition does not move. */
+.ures-index-note {
+    display: block;
+    font-size: var(--text-xs);
+    font-weight: 400;
+    color: var(--text-dim);
+}
+
 .cond-badge {
     display: inline-block;
     padding: 1px 6px;

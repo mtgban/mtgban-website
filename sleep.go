@@ -39,6 +39,27 @@ var SleeperColors = []string{
 	"#ff7f7f", "#ffbf7f", "#ffff7f", "#7fff7f", "#7fbfff", "#7f7fff", "#ff7fff",
 }
 
+// sleepersLanguages are the printings that trade on the English market: plain
+// English, plus the flavour languages the datastore files separately. A
+// Phyrexian or Quenya card is sold like any other, so it belongs in the
+// tiers; a French or Japanese one has listings too thin for a sleeper call to
+// mean anything.
+//
+// Listed rather than derived by dropping the flagged languages, so a
+// language nobody has seen yet stays out until someone looks at it.
+// TestSleepersLanguagesCoverFlavourPrintings says when that happens.
+var sleepersLanguages = []string{
+	"English",
+	"Ancient Greek",
+	"Arabic",
+	"Dwarvish",
+	"Hebrew",
+	"Latin",
+	"Phyrexian",
+	"Quenya",
+	"Sanskrit",
+}
+
 func Sleepers(w http.ResponseWriter, r *http.Request) {
 	sig := getSignatureFromCookies(r)
 
@@ -373,6 +394,10 @@ func getTiers(blocklistRetail, blocklistBuylist, skipEditions []string) map[stri
 		Conditions:       []string{"MP", "HP", "PO"},
 		MaxPriceRatio:    MaxPriceRatio,
 		CustomCardFilter: noOversize,
+		// Safe to ask outright rather than name what to drop: the loop
+		// below skips sealed sellers, and sealed is the one thing the
+		// datastore files with no language at all.
+		OnlyLanguages: sleepersLanguages,
 	}
 
 	for _, seller := range sellersSnapshot {
@@ -458,6 +483,8 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 		Editions:         skipEditions,
 		CustomCardFilter: noOversize,
 		Conditions:       []string{"MP", "HP", "PO"},
+		// Same reasoning as getTiers: sealed sellers are skipped above.
+		OnlyLanguages: sleepersLanguages,
 	}
 
 	mismatch := mtgban.Mismatch(opts, referenceSeller, targetSeller)

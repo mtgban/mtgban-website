@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -192,5 +193,165 @@ func TestMagicFinishSearchID(t *testing.T) {
 	}
 	if got := magicFinishSearchID(uuid, false, false); got != uuid {
 		t.Errorf("magicFinishSearchID(%q, nonfoil) = %q, want %q", uuid, got, uuid)
+	}
+}
+
+// fabCard builds the FoilUUIDs shape mtgmatcher/fleshandblood produces for a
+// product sold in Normal + Rainbow Foil: the generic nonfoil/foil keys, plus
+// one key per entry's own treatment name (NormalizeFinish, so "Normal" becomes
+// "normal" and "Rainbow Foil" becomes "rainbowfoil").
+func fabCard(uuid string, foil bool) *mtgmatcher.CardObject {
+	co := &mtgmatcher.CardObject{Foil: foil}
+	co.UUID = uuid
+	co.FoilUUIDs = map[string]string{
+		mtgmatcher.FinishNonfoil: "omn071_695162",
+		mtgmatcher.FinishFoil:    "omn071_695162_rainbow",
+		"normal":                 "omn071_695162",
+		"rainbowfoil":            "omn071_695162_rainbow",
+	}
+	return co
+}
+
+// A finish whose own name is the sub-type's name resolves by name. This used to
+// go through the positional pairing, which counted "normal" as a foil finish
+// and then paired past the end of the product's single foil sub-type, so a
+// rainbow foil resolved to no sub-type, no ban_id, and a chart read that asked
+// a uuid column about "omn071_695162_rainbow".
+func TestTCGSubTypeForCardByName(t *testing.T) {
+	subTypes := map[string]int64{"Normal": 1001, "Rainbow Foil": 1002}
+
+	tests := []struct {
+		name string
+		co   *mtgmatcher.CardObject
+		want string
+	}{
+		{"rainbow foil", fabCard("omn071_695162_rainbow", true), "Rainbow Foil"},
+		{"nonfoil", fabCard("omn071_695162", false), "Normal"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := tcgSubTypeForCard(test.co, subTypes)
+			if got != test.want {
+				t.Errorf("got %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+// The treatment name a game gives its plain printing is not a foil finish, and
+// counting it as one shifts every pairing by a place.
+func TestExtraFoilFinishesSkipsNonfoilAliases(t *testing.T) {
+	got := extraFoilFinishes(fabCard("omn071_695162_rainbow", true))
+	want := []string{"rainbowfoil"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// Lorcana keeps the positional pairing: "Holofoil" does not name the finish key
+// ("rainbowpillars") the way Flesh and Blood's treatments name theirs, so the
+// extras still pair against the sub-types past the primary foil.
+func TestTCGSubTypeForCardPositionalFallback(t *testing.T) {
+	subTypes := map[string]int64{"Normal": 1, "Cold Foil": 2, "Holofoil": 3}
+
+	co := &mtgmatcher.CardObject{Foil: true}
+	co.UUID = "1459_rainbowpillars"
+	co.FoilUUIDs = map[string]string{
+		mtgmatcher.FinishNonfoil: "1459",
+		mtgmatcher.FinishFoil:    "1459_f",
+		"rainbowpillars":         "1459_rainbowpillars",
+	}
+
+	got := tcgSubTypeForCard(co, subTypes)
+	if got != "Holofoil" {
+		t.Errorf("got %q, want \"Holofoil\"", got)
+	}
+
+	co.UUID = "1459_f"
+	got = tcgSubTypeForCard(co, subTypes)
+	if got != "Cold Foil" {
+		t.Errorf("primary foil: got %q, want \"Cold Foil\"", got)
+	}
+}
+
+// The canonical read path keys on a Postgres uuid column, so a target that
+// resolved to no ban_id has to be judged before it is asked about: the id a
+// non-Magic game hands back is a type error waiting to happen, not a miss.
+func TestHasCanonicalIdentity(t *testing.T) {
+	tests := []struct {
+		name string
+		uuid string
+		want bool
+	}{
+		{"magic uuid", "00010d56-fe38-5e35-8aed-518019aa36a5", true},
+		{"magic uuid tagged with a finish", "00010d56-fe38-5e35-8aed-518019aa36a5_f", true},
+		{"flesh and blood id", "omn071_695162_rainbow", false},
+		{"lorcana id", "1459_f", false},
+		{"bare product id", "695162", false},
+		{"empty", "", false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := hasCanonicalIdentity(&chartTarget{UUID: test.uuid})
+			if got != test.want {
+				t.Errorf("hasCanonicalIdentity(%q) = %t, want %t", test.uuid, got, test.want)
+			}
+		})
+	}
+}
+
+// Yu-Gi-Oh prices print runs rather than finishes, so its products carry no
+// "Normal" sub-type and no foil one either. Resolution has to come from the
+// names: the matcher keys each run by the same words TCGplayer sells it under.
+func TestTCGSubTypeForCardPrintRuns(t *testing.T) {
+	subTypes := map[string]int64{"1st Edition": 1, "Unlimited": 2, "Limited": 3}
+
+	// Both flag values resolve to the default run's uuid, so the run - not
+	// foilness - is what names the sub-type. Check it holds either way.
+	for _, foil := range []bool{false, true} {
+		co := &mtgmatcher.CardObject{Foil: foil}
+		co.UUID = "hac1-en105_265004_1e"
+		co.FoilUUIDs = map[string]string{
+			"1stedition": "hac1-en105_265004_1e",
+			"unlimited":  "hac1-en105_265004_unl",
+			"limited":    "hac1-en105_265004_ltd",
+		}
+
+		got := tcgSubTypeForCard(co, subTypes)
+		if got != "1st Edition" {
+			t.Errorf("foil=%t: got %q, want \"1st Edition\"", foil, got)
+		}
+
+		co.UUID = "hac1-en105_265004_unl"
+		got = tcgSubTypeForCard(co, subTypes)
+		if got != "Unlimited" {
+			t.Errorf("foil=%t: got %q, want \"Unlimited\"", foil, got)
+		}
+	}
+}
+
+// A game whose sub-types are the generic finish names keeps the foilness logic:
+// nothing about "Normal" or "Foil" names a printing on its own.
+func TestTCGSubTypeForCardGenericNames(t *testing.T) {
+	subTypes := map[string]int64{"Normal": 1, "Foil": 2}
+
+	co := &mtgmatcher.CardObject{Foil: false}
+	co.UUID = "rft001"
+	co.FoilUUIDs = map[string]string{
+		mtgmatcher.FinishNonfoil: "rft001",
+		mtgmatcher.FinishFoil:    "rft001_foil",
+	}
+	got := tcgSubTypeForCard(co, subTypes)
+	if got != "Normal" {
+		t.Errorf("nonfoil: got %q, want \"Normal\"", got)
+	}
+
+	co.Foil = true
+	co.UUID = "rft001_foil"
+	got = tcgSubTypeForCard(co, subTypes)
+	if got != "Foil" {
+		t.Errorf("foil: got %q, want \"Foil\"", got)
 	}
 }

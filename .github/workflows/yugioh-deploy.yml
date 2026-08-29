@@ -1,0 +1,23 @@
+name: yugioh-deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'yugioh-*'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2.5.2
+        with:
+          token: ${{ secrets.DO_API_TOKEN }}
+
+      - name: Create deployment
+        run: doctl apps create-deployment ${{ secrets.DO_YUGIOH_APP_ID }} --wait
+

@@ -17,7 +17,9 @@
     var PREF_KEYS = [
         'mtgban_fav_sort', 'mtgban_fav_sort_dir',
         'theme', 'chartDateRange', 'mtgban_nav_layout_v1',
-        'chartReleasesLongRange', 'chartCheckpointTypes'
+        'chartReleasesLongRange', 'chartCheckpointTypes',
+        'offline_mode', 'offline_stores', 'offline_editions', 'offline_img_editions',
+        'mtgban_search_layout'
     ];
 
     // MTGBAN auth cookie is not HttpOnly; presence is a cheap signed-in gate.

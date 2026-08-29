@@ -21,7 +21,7 @@
     {{block "extra-head" .}}{{end}}
 </head>
 
-<body class="light-theme mobile">
+<body class="light-theme mobile" data-game="{{game}}">
 <svg width="0" height="0" aria-hidden="true" style="position:absolute">
   <filter id="grain" color-interpolation-filters="sRGB">
     <feTurbulence type="fractalNoise" baseFrequency="0.97" numOctaves="4"/>
@@ -41,5 +41,10 @@
 </div>
 
 {{block "extra-scripts" .}}{{end}}
+<script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-prefer.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-db.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-mode.js?hash={{.Hash}}"></script>
+<script type="text/javascript" src="/js/offline/offline-watch.js?hash={{.Hash}}"></script>
 </body>
 </html>

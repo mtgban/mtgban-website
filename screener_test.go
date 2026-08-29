@@ -2,8 +2,13 @@ package main
 
 import (
 	"context"
+	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
 )
 
@@ -318,5 +323,194 @@ func TestCachedMoversCachesAndEvicts(t *testing.T) {
 	screenerCacheMu.Unlock()
 	if n > screenerCacheMax {
 		t.Errorf("cache size %d exceeds cap %d", n, screenerCacheMax)
+	}
+}
+
+// Non-Magic mover rows arrive keyed by TCGplayer product; they resolve to the
+// serving game's uuid, with the sub-type naming which finish of that card the
+// row is about.
+func TestMoverCardIdResolvesTCGRows(t *testing.T) {
+	// Magic rows pass through untouched
+	uuid, isFoil, ok := moverCardId(timeseries.MoverRow{MtgjsonUUID: "abc", IsFoil: true}, nil)
+	if !ok || uuid != "abc" || !isFoil {
+		t.Errorf("magic row = %q/%v/%v, want abc/true/true", uuid, isFoil, ok)
+	}
+
+	// A row with no identity at all resolves to nothing
+	if _, _, ok := moverCardId(timeseries.MoverRow{}, nil); ok {
+		t.Error("identity-less row should not resolve")
+	}
+
+	// TCG-keyed rows resolve through the id map (needs the datastore)
+	uuids := mtgmatcher.GetUUIDs()
+	if len(uuids) == 0 {
+		t.Skip("datastore not loaded")
+	}
+	// A card that is sold in both finishes, so the two sub-types have two
+	// printings to land on. One with no foil at all would prove nothing.
+	var pid int
+	var want, wantFoil string
+	for _, u := range uuids {
+		co, err := mtgmatcher.GetUUID(u)
+		if err != nil || co.Foil || co.Etched || co.Sealed {
+			continue
+		}
+		foil, hasFoil := co.FoilUUIDs[mtgmatcher.FinishFoil]
+		if !hasFoil || foil == co.UUID {
+			continue
+		}
+		pidStr, found := co.Identifiers["tcgplayerProductId"]
+		if !found {
+			continue
+		}
+		if n, err := strconv.Atoi(pidStr); err == nil {
+			pid, want, wantFoil = n, co.UUID, foil
+			break
+		}
+	}
+	if pid == 0 {
+		t.Skip("no card sold in both finishes with a tcgplayer product id")
+	}
+
+	uuid, isFoil, ok = moverCardId(timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Normal"}, nil)
+	if !ok || isFoil {
+		t.Fatalf("tcg row did not resolve: %q/%v/%v", uuid, isFoil, ok)
+	}
+	if uuid != want {
+		t.Errorf("resolved %q, want %q", uuid, want)
+	}
+
+	// A foil sub-type reaches a foil printing, and the finish comes from the
+	// printing that was resolved rather than from the sub-type's name.
+	foilUUID, isFoil, ok := moverCardId(timeseries.MoverRow{TCGProductID: pid, TCGSubType: "Foil"}, nil)
+	if !ok {
+		t.Fatal("foil sub-type did not resolve")
+	}
+	if !isFoil {
+		t.Errorf("foil sub-type resolved %q as unfoiled", foilUUID)
+	}
+	if foilUUID != wantFoil {
+		t.Errorf("foil sub-type resolved %q, want the foil printing %q", foilUUID, wantFoil)
+	}
+}
+
+// Two foil sub-types on one product are two printings, not one. Reading the
+// finish as "anything but Normal" collapsed them onto a single card, so a
+// Lorcana screener showed one row where the archive holds two.
+func TestMoverCardIdSeparatesFoilSubTypes(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("datastore not loaded")
+	}
+
+	// A card whose product is priced under more than one foil sub-type: its
+	// extra finishes each need an id of their own.
+	co := &mtgmatcher.CardObject{}
+	subTypes := map[string]int64{"Normal": 1, "Cold Foil": 2, "Holofoil": 3}
+
+	seen := map[string]string{}
+	for _, subType := range []string{"Normal", "Cold Foil", "Holofoil"} {
+		id := tcgFinishIDForSubType(co, subTypes, subType)
+		if prev, dup := seen[id]; dup && id != "" {
+			t.Errorf("sub-types %q and %q both resolve to %q", prev, subType, id)
+		}
+		seen[id] = subType
+	}
+}
+
+// The archive is scoped per game via TCGplayer category, read from the
+// catalog dump the game loads at startup. Only the default game may fall back
+// to a category without one; every other game refuses to guess.
+func TestGameTCGCategory(t *testing.T) {
+	prevGame := Config.Game
+	prevCatalog := tcgCatalogPtr.Load()
+	t.Cleanup(func() {
+		Config.Game = prevGame
+		tcgCatalogPtr.Store(prevCatalog)
+	})
+
+	// A loaded catalog names the category, whatever the game is called.
+	tcgCatalogPtr.Store(&tcgCatalogSnapshot{CategoryID: 71, CategoryName: "Lorcana TCG"})
+	Config.Game = "lorcana"
+	if got := gameTCGCategory(); got != 71 {
+		t.Errorf("lorcana category = %d, want 71 (from the catalog)", got)
+	}
+
+	// Without one, only the default game has an answer.
+	tcgCatalogPtr.Store(nil)
+	Config.Game = DefaultGame
+	if got := gameTCGCategory(); got != timeseries.CategoryMagic {
+		t.Errorf("default game category = %d, want %d", got, timeseries.CategoryMagic)
+	}
+
+	Config.Game = "unknowngame"
+	if got := gameTCGCategory(); got != -1 {
+		t.Errorf("catalog-less non-default game = %d, want -1", got)
+	}
+}
+
+// A cache miss costs an archive read plus a resolve pass over every row it
+// returns, and the entry only lands at the end of it. Every request that
+// arrives in that window used to start its own copy of the same work.
+func TestCachedMoversCollapsesConcurrentBuilds(t *testing.T) {
+	prevFetch, prevClassify := screenerFetch, screenerClassify
+	t.Cleanup(func() {
+		screenerFetch, screenerClassify = prevFetch, prevClassify
+		screenerCacheMu.Lock()
+		screenerCache = map[string]screenerCacheEntry{}
+		screenerCacheMu.Unlock()
+	})
+	screenerCacheMu.Lock()
+	screenerCache = map[string]screenerCacheEntry{}
+	screenerCacheMu.Unlock()
+
+	var calls atomic.Int32
+	arrived := make(chan struct{}, 1)
+	release := make(chan struct{})
+	screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
+		calls.Add(1)
+		select {
+		case arrived <- struct{}{}:
+		default:
+		}
+		// Hold the build open so the other callers are all asking at once,
+		// which is the state this collapses.
+		<-release
+		return []timeseries.MoverRow{{MtgjsonUUID: "good", Current: 100, Prior: 50}}, nil
+	}
+	screenerClassify = func(uuid string) (screenerMeta, bool) {
+		return screenerMeta{SetCode: "STX", Edition: "Strixhaven"}, true
+	}
+
+	const callers = 8
+	var wg sync.WaitGroup
+	rows := make([][]screenerRow, callers)
+	errs := make([]error, callers)
+	for i := range callers {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			rows[i], errs[i] = cachedMovers(context.Background(), 2, 30, 5, 0)
+		}(i)
+	}
+
+	<-arrived
+	// The first caller is inside the read; give the rest a moment to queue up
+	// behind it. Arriving late is harmless - they find the filled cache - so a
+	// slow scheduler costs the test its point, never a false failure.
+	time.Sleep(50 * time.Millisecond)
+	close(release)
+	wg.Wait()
+
+	if got := calls.Load(); got != 1 {
+		t.Errorf("the archive was read %d times for one key, want 1", got)
+	}
+	for i := range callers {
+		if errs[i] != nil {
+			t.Errorf("caller %d: %v", i, errs[i])
+			continue
+		}
+		if len(rows[i]) != 1 || rows[i][0].MtgjsonUUID != "good" {
+			t.Errorf("caller %d got %+v, want the one built row", i, rows[i])
+		}
 	}
 }

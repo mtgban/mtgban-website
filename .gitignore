@@ -24,6 +24,9 @@ cache_*
 # Configuration files
 *.json
 
+# Offline-mode wire-format fixtures (exempt from the *.json ignore above)
+!tests/offline/fixtures/*.json
+
 # Logs directory
 logs/
 
@@ -40,3 +43,6 @@ pg-data/
 
 # Claude Workspaces
 .claude
+
+# Visual parity harness package manifest (exempt from the *.json ignore above)
+!scripts/visual-diff/package.json

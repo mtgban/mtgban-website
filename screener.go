@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"slices"
 	"sort"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/timeseries"
+	"golang.org/x/sync/singleflight"
 )
 
 type ScreenerMetric struct {
@@ -268,6 +270,25 @@ func screenerCacheKey(metric, window int, minPrice, minPriorPrice float64) strin
 	return fmt.Sprintf("%d:%d:%.2f:%.2f", metric, window, minPrice, minPriorPrice)
 }
 
+// gameTCGCategory returns the TCGplayer category of the serving game, used to
+// scope shared-archive reads to this site's rows. It comes from the catalog
+// dump the game already loads at startup, which names its own category, so a
+// new game site needs no case here - only its dump.
+//
+// The default game falls back to Magic when no catalog is loaded, since it
+// predates the dumps and screens fine without one. Any other game without a
+// catalog returns -1: its rows are indistinguishable from every other game's
+// in the shared archive, and callers refuse to guess.
+func gameTCGCategory() int {
+	if id := GetTCGCategoryID(); id > 0 {
+		return id
+	}
+	if Config.Game == DefaultGame {
+		return timeseries.CategoryMagic
+	}
+	return -1
+}
+
 // overridable in tests
 var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]timeseries.MoverRow, error) {
 	if Config.TimeseriesConfig.LongFormReads {
@@ -275,9 +296,56 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 		if !ok {
 			return nil, fmt.Errorf("screener: no provider configured for metric %d", metric)
 		}
-		return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice)
+		category := gameTCGCategory()
+		if category < 0 {
+			return nil, fmt.Errorf("screener: no TCGplayer category known for game %q", Config.Game)
+		}
+		return PricesArchiveDB.GetMoversLong(ctx, provider, window, minPrice, minPriorPrice, category)
 	}
 	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice, minPriorPrice)
+}
+
+// moverCardId resolves a mover row to this game's uuid: Magic rows carry the
+// mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
+// through the external id map with the sub-type picking the finish. subTypes is
+// the row's product's sub-type map, gathered for the whole result set by
+// moverSubTypes; nil resolves on the card object alone. Overridable in tests.
+var moverCardId = func(row timeseries.MoverRow, subTypes map[string]int64) (string, bool, bool) {
+	if row.MtgjsonUUID != "" {
+		return row.MtgjsonUUID, row.IsFoil, true
+	}
+	if row.TCGProductID == 0 {
+		return "", false, false
+	}
+
+	// One product covers every finish of a card, so the sub-type is where the
+	// finish lives - and which sub-type names which finish varies by game.
+	// Reading it as "anything but Normal is the foil" collapses a game with
+	// more than one onto a single printing: Lorcana prices Cold Foil and
+	// Holofoil, and both would land on the same card. tcgFinishIDForSubType
+	// pairs them off the sub-types the product is actually priced under, the
+	// same way the chart read path does.
+	base, err := mtgmatcher.MatchId(strconv.Itoa(row.TCGProductID))
+	if err != nil {
+		return "", false, false
+	}
+	co, err := mtgmatcher.GetUUID(base)
+	if err != nil {
+		return "", false, false
+	}
+
+	uuid := tcgFinishIDForSubType(co, subTypes, row.TCGSubType)
+	if uuid == "" {
+		return "", false, false
+	}
+
+	// The finish belongs to the printing that was resolved, not to the name of
+	// the sub-type that led there.
+	isFoil := false
+	if finished, ferr := mtgmatcher.GetUUID(uuid); ferr == nil {
+		isFoil = finished.Foil || finished.Etched
+	}
+	return uuid, isFoil, true
 }
 
 type screenerMeta struct {
@@ -295,22 +363,101 @@ var screenerClassify = func(uuid string) (screenerMeta, bool) {
 	return screenerMeta{Sealed: co.Sealed, SetCode: co.SetCode, Edition: co.Edition}, true
 }
 
+// moverSubTypes gathers the sub-type maps the TCG-keyed rows in raw need, warm
+// cache first and one batched query for the rest. Resolving row by row asked
+// the table per miss, which is a round-trip each across a result set that runs
+// to tens of thousands - fine for the single-card paths the lookup was written
+// for, not for a whole screener page rebuilt on a cold cache.
+func moverSubTypes(ctx context.Context, raw []timeseries.MoverRow) map[int]map[string]int64 {
+	if PricesArchiveDB == nil {
+		return nil
+	}
+	out := map[int]map[string]int64{}
+	var missing []int
+	for _, row := range raw {
+		if row.MtgjsonUUID != "" || row.TCGProductID == 0 {
+			continue
+		}
+		// A nil entry still counts as seen, so a product asked for once is not
+		// asked for again.
+		if _, seen := out[row.TCGProductID]; seen {
+			continue
+		}
+		m, cached := PricesArchiveDB.CachedTCGSubTypeBanIDs(row.TCGProductID)
+		out[row.TCGProductID] = m
+		if !cached {
+			missing = append(missing, row.TCGProductID)
+		}
+	}
+	if len(missing) == 0 {
+		return out
+	}
+	found, err := PricesArchiveDB.LookupTCGSubTypeBanIDsBatch(ctx, missing)
+	if err != nil {
+		log.Println("screener: batched sub-type lookup failed:", err)
+		return out
+	}
+	for productID, m := range found {
+		out[productID] = m
+	}
+	return out
+}
+
+// screenerFlight collapses concurrent builds of the same key. The window
+// between a cache entry expiring and the next one landing is a whole archive
+// read plus a resolve pass over tens of thousands of rows, and every request
+// that arrived during it used to run its own copy.
+var screenerFlight singleflight.Group
+
+// cachedScreenerRows returns a live cache entry, if there is one.
+func cachedScreenerRows(key string) ([]screenerRow, bool) {
+	screenerCacheMu.Lock()
+	defer screenerCacheMu.Unlock()
+	e, ok := screenerCache[key]
+	return e.rows, ok && time.Since(e.fetched) < screenerCacheTTL
+}
+
 func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	key := screenerCacheKey(metric, window, minPrice, minPriorPrice)
 
-	screenerCacheMu.Lock()
-	e, ok := screenerCache[key]
-	screenerCacheMu.Unlock()
-	if ok && time.Since(e.fetched) < screenerCacheTTL {
-		return e.rows, nil
+	if rows, live := cachedScreenerRows(key); live {
+		return rows, nil
 	}
 
+	// The flight's own context is the one that started it, so a caller that
+	// goes away takes the build with it only if it was the one doing it -
+	// the others get its error and can ask again.
+	built, err, _ := screenerFlight.Do(key, func() (any, error) {
+		// A build that just finished while this one queued is a hit now.
+		if rows, live := cachedScreenerRows(key); live {
+			return rows, nil
+		}
+		return buildMovers(ctx, key, metric, window, minPrice, minPriorPrice)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return built.([]screenerRow), nil
+}
+
+// buildMovers reads a page of movers, resolves every row to this game's uuid,
+// and caches the result under key.
+func buildMovers(ctx context.Context, key string, metric, window int, minPrice, minPriorPrice float64) ([]screenerRow, error) {
 	raw, err := screenerFetch(ctx, metric, window, minPrice, minPriorPrice)
 	if err != nil {
 		return nil, err
 	}
+	subTypes := moverSubTypes(ctx, raw)
 	rows := make([]screenerRow, 0, len(raw))
 	for _, row := range raw {
+		// Resolve non-Magic rows to this game's uuid so the rest of the
+		// pipeline (classification, dedup keys, links) is id-uniform
+		uuid, isFoil, ok := moverCardId(row, subTypes[row.TCGProductID])
+		if !ok {
+			continue
+		}
+		row.MtgjsonUUID = uuid
+		row.IsFoil = isFoil
 		if meta, ok := screenerClassify(row.MtgjsonUUID); ok {
 			rows = append(rows, screenerRow{MoverRow: row, Sealed: meta.Sealed, SetCode: meta.SetCode, Edition: meta.Edition})
 		}

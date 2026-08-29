@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"slices"
 	"sort"
@@ -873,12 +874,14 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 	// Postgres computes the stats; each reducer just selects the field it
 	// cares about.
 	var statsByCard map[timeseries.AggregatePriceKey]timeseries.AggregatePriceStats
+	source := fmt.Sprintf("dataset %d", datasetIndex)
 	if Config.TimeseriesConfig.LongFormReads {
 		provider, ok := providerForDatasetIndex(datasetIndex)
 		if !ok {
 			log.Println(store, "has no provider configured for long-form reads")
 			return nil
 		}
+		source = fmt.Sprintf("provider %d", provider)
 		statsByCard, err = PricesArchiveDB.GetAggregatePriceStatsLong(context.Background(), provider, threeMonthsAgo)
 	} else {
 		statsByCard, err = PricesArchiveDB.GetAggregatePriceStats(context.Background(), datasetIndex, threeMonthsAgo)
@@ -886,6 +889,15 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 	if err != nil {
 		log.Println(err)
 		return nil
+	}
+
+	// Every metric here is a reduction over this history, so with none they all
+	// come out empty and say nothing about why. The usual cause is the archive
+	// holding this store's prices under a different provider than the dataset
+	// names, which is invisible from "Found 0 entries".
+	if len(statsByCard) == 0 {
+		log.Printf("%s: %s has no price history since %s, so every metric below will be empty",
+			store, source, threeMonthsAgo.Format("2006-01-02"))
 	}
 
 	out := make(map[string]mtgban.InventoryRecord, len(reducers))
@@ -926,7 +938,8 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 	}
 
 	for label, record := range out {
-		log.Printf("Found %d %s entries", len(record), label)
+		log.Printf("Found %d %s entries (%d cards on the buylist, %d with %s history)",
+			len(record), label, len(bl), len(statsByCard), source)
 	}
 	return out
 }

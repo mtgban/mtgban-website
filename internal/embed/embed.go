@@ -281,7 +281,44 @@ func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 		fields = append(fields, field)
 	}
 
+	// Pad now that the values are final. The first pass sizes the padding
+	// from the scraper name alone, but the index merge then rewrites a pair
+	// of rows into one carrying a tag ("TCG" + "Low/Market"), clears the
+	// padding it no longer describes, and the rename below changes a width
+	// again - so what was measured up there is not what gets printed.
+	for i := range fields {
+		alignValues(&fields[i])
+	}
+
 	return
+}
+
+// renderedNameWidth is how wide a value's name reads once the bot prints it:
+// the scraper name, and the tag beside it in its own brackets, both inside a
+// single code span (see the format string in prepareCard).
+func renderedNameWidth(value FieldValue) int {
+	width := len(value.ScraperName)
+	if value.Tag != "" {
+		width += len(value.Tag) + len(" ()")
+	}
+	return width
+}
+
+// alignValues pads every value in a field out to the widest one, so the prices
+// start in the same column. Field.Length is kept in step because it decides
+// where the value spills into a continuation field.
+func alignValues(field *Field) {
+	var longest int
+	for _, value := range field.Values {
+		if width := renderedNameWidth(value); width > longest {
+			longest = width
+		}
+	}
+	for i := range field.Values {
+		field.Length -= fieldValueLength(field.Values[i])
+		field.Values[i].ExtraSpaces = strings.Repeat(" ", longest-renderedNameWidth(field.Values[i]))
+		field.Length += fieldValueLength(field.Values[i])
+	}
 }
 
 // Obtain the length of the scraper with the longest name

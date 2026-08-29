@@ -1,4 +1,4 @@
-name: test
+name: 'Run CI'
 
 on:
   pull_request:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
     env:
       # MTGJSON AllPrintings is public, so the URL is inlined here. It used to
@@ -20,6 +20,14 @@ jobs:
       DATASTORE_URL: https://mtgjson.com/api/v5/AllPrintings.json.xz
     steps:
       - uses: actions/checkout@v6
+
+      # The offline mode tests are javascript and need no datastore, so they
+      # run before the 400 MB download the go steps wait on.
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: bun test tests/
+        run: bun test tests/
 
       - name: Set up Go
         uses: actions/setup-go@v6

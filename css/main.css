@@ -1078,6 +1078,16 @@ th[role=columnheader]:not([data-sort-method='none']):hover:after {
     --card-radius: 18px;
 }
 
+/* Yu-Gi-Oh cards are cut square, so rounding any of them is wrong. That is the
+   whole game rather than a handful of printings, which is why this keys on the
+   deployment's game instead of a set. The second selector carries it past the
+   rules above: those name Magic sets, and a Yu-Gi-Oh set sharing a code would
+   otherwise inherit a Magic printing's rounding. */
+body[data-game="yugioh"],
+body[data-game="yugioh"] [data-set] {
+    --card-radius: 0;
+}
+
 
 /* ── Content-warning blur ── */
 /* Applies to wrapper divs (.foil-wrap, .sidebar-img-wrap) and standalone <img> elements.
@@ -1416,3 +1426,45 @@ table.tiers td div {
 .legal ul { padding-left: 20px; }
 .legal li { margin-bottom: 8px; }
 .legal a { color: var(--ainfo); }
+
+/* Offline failover toast (js/offline/offline-watch.js) */
+.offline-watch-toast {
+    position: fixed;
+    bottom: 2vh;
+    right: -100%;
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    max-width: 90vw;
+    padding: 0.7em 1.1em;
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+    background: var(--lightblack, #161616);
+    color: var(--darkgrey, #dddddd);
+    border: 1px solid var(--orange, orange);
+    border-radius: 0.5em;
+    box-shadow: 0 0.4em 1.4em rgba(0, 0, 0, 0.4);
+    z-index: 9500;
+    transition: right 300ms cubic-bezier(0.2, 0.9, 0.35, 1.1);
+}
+.light-theme .offline-watch-toast {
+    background: var(--realwhite, #fcfcfc);
+    color: var(--quasiblack, #292929);
+    box-shadow: 0 0.3em 1em rgba(0, 0, 0, 0.15);
+}
+.offline-watch-toast.show {
+    right: 2vw;
+}
+.offline-watch-toast a {
+    color: var(--blue, #559eff);
+    font-weight: 600;
+}
+.offline-watch-toast button {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.1em;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0.1em 0.3em;
+}

@@ -287,6 +287,18 @@ func updateSellers(scraper mtgban.Scraper) {
 }
 
 func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]mtgban.Seller, error) {
+	inv := seller.Inventory()
+
+	// A dump holding nothing is the most broken one there is, and it used to be
+	// the only one accepted without question: the shrink check below asks for
+	// half the previous size, which no empty dump can fail, and a first
+	// registration is not checked at all. Refuse it here, so a scraper that
+	// published nothing keeps serving what it had instead of answering every
+	// lookup with "no".
+	if len(inv) == 0 {
+		return nil, errors.New("new inventory has no entries")
+	}
+
 	if i < 0 {
 		next := make([]mtgban.Seller, len(current)+1)
 		copy(next, current)
@@ -306,9 +318,8 @@ func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]m
 		return nil, errors.New("new inventory is older than current one")
 	}
 
-	inv := seller.Inventory()
 	old := current[i].Inventory()
-	if len(inv) > 0 && len(inv) < len(old)/2 && len(old) > 100 {
+	if len(inv) < len(old)/2 && len(old) > 100 {
 		return nil, errors.New("new inventory is missing too many entries")
 	}
 
@@ -347,6 +358,16 @@ func updateVendors(scraper mtgban.Scraper) {
 }
 
 func buildNextVendors(current []mtgban.Vendor, vendor mtgban.Vendor, i int) ([]mtgban.Vendor, error) {
+	bl := vendor.Buylist()
+
+	// Empty is refused for the same reason as an inventory, and it matters more
+	// here: the buylist metrics reduce over whatever this record holds, so an
+	// empty one does not report "no card qualifies", it reports nothing at all
+	// and takes the hotlist down with it.
+	if len(bl) == 0 {
+		return nil, errors.New("new buylist has no entries")
+	}
+
 	if i < 0 {
 		next := make([]mtgban.Vendor, len(current)+1)
 		copy(next, current)
@@ -366,9 +387,8 @@ func buildNextVendors(current []mtgban.Vendor, vendor mtgban.Vendor, i int) ([]m
 		return nil, errors.New("new buylist is older than current one")
 	}
 
-	bl := vendor.Buylist()
 	old := current[i].Buylist()
-	if len(bl) > 0 && len(bl) < len(old)/2 && len(old) > 100 {
+	if len(bl) < len(old)/2 && len(old) > 100 {
 		return nil, errors.New("new buylist is missing too many entries")
 	}
 

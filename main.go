@@ -15,8 +15,10 @@ import (
 	"os/signal"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -25,6 +27,8 @@ import (
 
 	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
+	"github.com/mtgban/mtgban-website/internal/offline"
+	"github.com/mtgban/mtgban-website/internal/offlineapi"
 	"github.com/mtgban/mtgban-website/internal/palette"
 	"github.com/mtgban/mtgban-website/internal/suggest"
 	"github.com/mtgban/mtgban-website/internal/tmplparse"
@@ -41,6 +45,7 @@ import (
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	_ "github.com/mtgban/go-mtgban/mtgmatcher/games"
+	"github.com/mtgban/mtgban-website/internal/dsreload"
 	"github.com/mtgban/simplecloud"
 
 	_ "net/http/pprof"
@@ -127,16 +132,17 @@ type PageVars struct {
 	HasAffiliate   bool
 	CanDownloadCSV bool
 
-	Arb            []Arbitrage
-	ArbitOptKeys   []string
-	ArbitOptConfig map[string]FilterOpt
-	ArbitFilters   map[string]bool
-	ArbitOptTests  map[string]bool
-	SortOption     string
-	GlobalMode     bool
-	ReverseMode    bool
-	DefaultTab     string
-	DefaultView    string
+	Arb                []Arbitrage
+	ArbitOptKeys       []string
+	ArbitOptConfig     map[string]FilterOpt
+	ArbitFilters       map[string]bool
+	ArbitOptTests      map[string]bool
+	SortOption         string
+	GlobalMode         bool
+	ReverseMode        bool
+	DefaultTab         string
+	DefaultView        string
+	MobileSearchLayout string
 
 	Page               string
 	Subtitle           string
@@ -161,6 +167,7 @@ type PageVars struct {
 	EditionsCategories []string
 	EditionsByCategory map[string][]EditionEntry
 	PickerID           string
+	OfflineModeAllowed bool
 
 	CanFilterByPrice bool
 	FilterMinPrice   float64
@@ -360,6 +367,7 @@ var OptionalFields = []string{
 	"AnySpread",
 	"APImode",
 	"SleepersCYOA",
+	"SearchOfflineMode",
 }
 
 // The key matches the query parameter of the permissions defined in sign()
@@ -420,6 +428,15 @@ func init() {
 			Handle:      Newspaper,
 			Page:        "news.html",
 			HasSettings: true,
+			// Every page of it is built from the cached uuids, so with none
+			// the section is a stack of empty tables. A game with no
+			// newspaper data, or one whose database was never configured,
+			// gets no entry rather than a dead end. The cron rebuilds the
+			// cache every three hours, so it appears on its own once the
+			// data does.
+			ShouldHide: func() bool {
+				return len(GetNewspaperUUIDs()) == 0
+			},
 			SubPages: []NavElem{
 				{
 					Name:        "TCG Syp List",
@@ -515,14 +532,21 @@ type ConfigType struct {
 		BucketSecretKey string `json:"bucket_access_secret"`
 		CheckpointsPath string `json:"checkpoints_path"`
 	} `json:"datastore"`
-	Game string `json:"game"`
+	Offline struct {
+		ManifestPath string `json:"manifest_path"`
+		ImagesPath   string `json:"images_path"`
+	} `json:"offline"`
+	BucketKeys map[string]BucketKey `json:"bucket_keys"`
+
+	Game         string `json:"game"`
+	InstanceName string `json:"instance_name"`
+
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
 	// from the ban list document or the set registry.
 	FormatEvents           []FormatEvent      `json:"format_events,omitempty"`
 	ScraperConfig          ScraperConfig      `json:"scraper_config"`
 	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	NewNewspaperConfigLine string             `json:"new_newspaper_config_line"`
 	DiscordHook            string             `json:"discord_hook"`
 	DiscordNotifHook       string             `json:"discord_notif_hook"`
 	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
@@ -552,17 +576,15 @@ type ConfigType struct {
 
 	Uploader map[string]string `json:"uploader"`
 
-	// The location of the configuation file
-	sourcePath string
-
-	SqlConfig           *timeseries.SqlConfig `json:"sql_config"`
-	UserStateConfig     *userstate.SqlConfig  `json:"user_state_config"`
-	ObservabilityConfig *timeseries.SqlConfig `json:"observability_config"`
-	InstanceName        string                `json:"instance_name"`
-	TCGCSVConfig        *tcgcsv.Config        `json:"tcgcsv_config"`
-
-	// Structured form of new_newspaper_config_line; wins when both are set
+	SqlConfig             *timeseries.SqlConfig `json:"sql_config"`
+	UserStateConfig       *userstate.SqlConfig  `json:"user_state_config"`
+	ObservabilityConfig   *timeseries.SqlConfig `json:"observability_config"`
 	NewNewspaperSqlConfig *timeseries.SqlConfig `json:"new_newspaper_sql_config"`
+
+	TCGCSVConfig *tcgcsv.Config `json:"tcgcsv_config"`
+
+	// The location of the configuation file (always last)
+	sourcePath string
 }
 
 var DevMode bool
@@ -620,6 +642,195 @@ var ObservabilityRecorder *observability.Recorder
 var GoogleDocsClient *http.Client
 
 var ConfigBucket simplecloud.ReadWriter
+
+// Cache for offlineImagesFactory: the bucket client is reused because image requests are hot.
+var (
+	offlineImagesBucketMu     sync.Mutex
+	offlineImagesBucketCur    simplecloud.ReadWriter
+	offlineImagesBucketBase   string
+	offlineImagesBucketKey    string
+	offlineImagesBucketSecret string
+)
+
+func offlineImagesFactory(ctx context.Context) (simplecloud.ReadWriter, string, error) {
+	base := Config.Offline.ImagesPath
+	if base == "" {
+		return nil, "", errors.New("offline.images_path not configured")
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		return nil, "", err
+	}
+	var key, secret string
+	if u.Scheme == "b2" {
+		key, secret = bucketCredentials(u.Host)
+	}
+
+	offlineImagesBucketMu.Lock()
+	defer offlineImagesBucketMu.Unlock()
+	if offlineImagesBucketCur != nil && offlineImagesBucketBase == base &&
+		offlineImagesBucketKey == key && offlineImagesBucketSecret == secret {
+		return offlineImagesBucketCur, base, nil
+	}
+
+	var bucket simplecloud.ReadWriter
+	switch {
+	// A one-letter scheme is a Windows drive path; fail loud so misconfigured
+	// Windows absolute paths (broken by simplecloud v0.0.9) are caught early.
+	case len(u.Scheme) == 1:
+		return nil, "", errors.New("offline.images_path: Windows absolute paths are broken by simplecloud v0.0.9 (drive letter stripped); use a relative path until the upstream fix lands")
+	case u.Scheme == "":
+		bucket = &simplecloud.FileBucket{}
+	case u.Scheme == "b2":
+		bucket, err = simplecloud.NewB2Client(ctx, key, secret, u.Host)
+		if err != nil {
+			return nil, "", err
+		}
+	default:
+		return nil, "", fmt.Errorf("unsupported offline images path scheme: %s", u.Scheme)
+	}
+	offlineImagesBucketCur, offlineImagesBucketBase = bucket, base
+	offlineImagesBucketKey, offlineImagesBucketSecret = key, secret
+	return bucket, base, nil
+}
+
+// offlineImagesDownloadAuth issues a B2 download authorization covering the
+// mirrored image tree, along with the URL those objects hang off, so clients
+// read image bytes straight from the bucket instead of through this process.
+// Only a B2-backed tree can issue one; anything else has no way to hand out
+// scoped, expiring read access.
+func offlineImagesDownloadAuth(ctx context.Context, valid time.Duration) (string, string, time.Time, error) {
+	bucket, base, err := offlineImagesFactory(ctx)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	b2bucket, ok := bucket.(*simplecloud.B2Bucket)
+	if !ok {
+		return "", "", time.Time{}, fmt.Errorf("offline: %s cannot issue download authorizations", base)
+	}
+	u, err := url.Parse(base)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	prefix := strings.Trim(u.Path, "/")
+	token, err := b2bucket.Bucket.AuthToken(ctx, prefix, valid)
+	if err != nil {
+		return "", "", time.Time{}, err
+	}
+	downloadBase := strings.TrimSuffix(b2bucket.Bucket.BaseURL(), "/") + "/file/" + b2bucket.Bucket.Name()
+	if prefix != "" {
+		downloadBase += "/" + prefix
+	}
+	// B2 dates the window from when it issued the token, so this is the
+	// client's cue to re-ask rather than a guarantee.
+	return downloadBase, token, time.Now().Add(valid), nil
+}
+
+// offlineService wires the offline API endpoints to the live scraper state.
+var offlineService = offlineapi.NewService(offlineapi.Deps{
+	Allow: offlineModeAllowed,
+
+	CanonicalSetCode: func(setCode string) (string, error) {
+		set, err := mtgmatcher.GetSet(setCode)
+		if err != nil {
+			return "", err
+		}
+		return set.Code, nil
+	},
+
+	BuildSetPayload: func(setCode string, stores []string) (*offline.SetPayload, error) {
+		set, err := mtgmatcher.GetSet(setCode)
+		if err != nil {
+			return nil, err
+		}
+		retail := getSellerPrices("", stores, set.Code, nil, "", true, true, false, "")
+		buylist := getVendorPrices("", stores, set.Code, nil, "", true, true, false, "")
+		for id, m := range getSellerPrices("", stores, set.Code, nil, "", true, true, true, "") {
+			if retail[id] == nil {
+				retail[id] = m
+				continue
+			}
+			for store, entry := range m {
+				retail[id][store] = entry
+			}
+		}
+		for id, m := range getVendorPrices("", stores, set.Code, nil, "", true, true, true, "") {
+			if buylist[id] == nil {
+				buylist[id] = m
+				continue
+			}
+			for store, entry := range m {
+				buylist[id][store] = entry
+			}
+		}
+		return banprice2offline(set.Code, time.Now().UTC(), retail, buylist), nil
+	},
+
+	EnabledStores: func() []string {
+		var all []string
+		for _, seller := range GetSellers() {
+			shorthand := seller.Info().Shorthand
+			if !slices.Contains(Config.SearchRetailBlockList, shorthand) && !slices.Contains(all, shorthand) {
+				all = append(all, shorthand)
+			}
+		}
+		for _, vendor := range GetVendors() {
+			shorthand := vendor.Info().Shorthand
+			if !slices.Contains(Config.SearchBuylistBlockList, shorthand) && !slices.Contains(all, shorthand) {
+				all = append(all, shorthand)
+			}
+		}
+		return all
+	},
+
+	Sellers: GetSellers,
+	Vendors: GetVendors,
+
+	ScraperName:       scraperName,
+	CardObjectSources: cardobject2sources,
+
+	ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
+		omPath := Config.Offline.ManifestPath
+		if omPath == "" {
+			return nil, "", errors.New("offline.manifest_path not configured")
+		}
+		u, err := url.Parse(omPath)
+		if err != nil {
+			return nil, "", err
+		}
+		switch {
+		case u.Scheme == "" || len(u.Scheme) == 1:
+			return &simplecloud.FileBucket{}, omPath, nil
+		case u.Scheme == "b2":
+			bucket, err := newB2ClientFor(ctx, u.Host)
+			return bucket, omPath, err
+		default:
+			return nil, "", fmt.Errorf("unsupported offline manifest path scheme: %s", u.Scheme)
+		}
+	},
+
+	ImagesManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
+		bucket, base, err := offlineImagesFactory(ctx)
+		if err != nil {
+			return nil, "", err
+		}
+		return bucket, offlineapi.JoinBucketPath(base, "images-manifest.json"), nil
+	},
+
+	ImagesBucket: offlineImagesFactory,
+
+	ImagesDownloadAuth: offlineImagesDownloadAuth,
+
+	Game: func() string { return Config.Game },
+
+	ManifestPathConfigured: func() bool { return Config.Offline.ManifestPath != "" },
+	ImagesPathConfigured:   func() bool { return Config.Offline.ImagesPath != "" },
+
+	WatermarkSecret: func() []byte { return []byte(os.Getenv("BAN_SECRET")) },
+
+	RetailBlockList:  func() []string { return Config.SearchRetailBlockList },
+	BuylistBlockList: func() []string { return Config.SearchBuylistBlockList },
+})
 
 // paletteService wires the command-palette endpoints to the live scraper lists,
 // the newspaper page registry, and the arbit filter options.
@@ -741,6 +952,12 @@ func genPageNav(activeTab, sig string) PageVars {
 		}
 
 		if Config.OfflineKey != "" && !ExtraNavs[feat].AllowOffline {
+			continue
+		}
+
+		// A hidden section takes its subpages with it: they are reached
+		// through it, and half a section is worse than none.
+		if ExtraNavs[feat].ShouldHide != nil && ExtraNavs[feat].ShouldHide() {
 			continue
 		}
 
@@ -915,14 +1132,6 @@ func openDBs() (err error) {
 				log.Println("warning: could not ensure next price partition:", serr)
 			}
 		}
-		// Prime the variant->ban_id cache: the write path resolves/mints on it,
-		// and the read path stamps a cached ban_id onto each rendered card so
-		// charts open by ban:<id> without a per-card round-trip. Non-fatal.
-		if Config.TimeseriesConfig.LongFormWrites || Config.TimeseriesConfig.LongFormReads {
-			if serr := PricesArchiveDB.WarmVariantCache(context.Background()); serr != nil {
-				log.Println("warning: could not warm variant cache:", serr)
-			}
-		}
 	}
 
 	if Config.UserStateConfig == nil {
@@ -953,13 +1162,8 @@ func openDBs() (err error) {
 		if err != nil {
 			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
 		}
-	} else if Config.NewNewspaperConfigLine == "" {
-		log.Println("no DB address set, Newspaper won't be loaded")
 	} else {
-		NewNewspaperDB, err = sql.Open("postgres", Config.NewNewspaperConfigLine)
-		if err != nil {
-			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
-		}
+		log.Println("no DB address set, Newspaper won't be loaded")
 	}
 
 	return nil
@@ -1011,7 +1215,7 @@ func newReadBucket(path string) (simplecloud.Reader, error) {
 	case "":
 		return &simplecloud.FileBucket{}, nil
 	case "b2":
-		b2Bucket, err := simplecloud.NewB2Client(context.Background(), Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey, u.Host)
+		b2Bucket, err := newB2ClientFor(context.Background(), u.Host)
 		if err != nil {
 			return nil, err
 		}
@@ -1034,10 +1238,12 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 	}
 	defer reader.Close()
 
-	err = mtgmatcher.LoadDatastore(reader)
+	// LoadDatastore would read the file whole and try every registered loader.
+	backend, err := mtgmatcher.Open(datastoreGame(), reader)
 	if err != nil {
 		return err
 	}
+	mtgmatcher.SetGlobalDatastore(backend)
 
 	ServerNotify("init", "Datastore installed")
 	SetLastDatastoreUpdate(time.Now())
@@ -1048,6 +1254,37 @@ func loadDatastore(bucket simplecloud.Reader, ds string) error {
 	go paletteService.BuildPromosCache()
 
 	return nil
+}
+
+// datastoreReloads owns the one datastore reload that may be under way.
+var datastoreReloads dsreload.Tracker
+
+// StartDatastoreReload loads the datastore in the background, reporting
+// whether this call is the one that started it. See dsreload.Tracker.Start.
+func StartDatastoreReload(bucket simplecloud.Reader, path, source string) bool {
+	return datastoreReloads.Start(source, path, func() error {
+		err := loadDatastore(bucket, path)
+		if err != nil {
+			return err
+		}
+		// What the endpoint used to do once the load returned. The offline
+		// manifest is derived from the datastore, so a reload that leaves it
+		// alone leaves it describing the previous one; the admin action never
+		// asked for the refresh at all, and now does.
+		ServerNotify("reload", "Datastore reloaded from "+path)
+		offlineService.RequestRefresh()
+		return nil
+	})
+}
+
+// datastoreGame names the game whose loader reads this site's datastore. An
+// unset game is the default one, the same reading the rest of the site gives
+// it.
+func datastoreGame() string {
+	if Config.Game == "" {
+		return DefaultGame
+	}
+	return Config.Game
 }
 
 func main() {
@@ -1105,6 +1342,11 @@ func main() {
 		if err := initTCGCSVService(); err != nil {
 			log.Fatalln("tcgcsv:", err)
 		}
+		// The ingest resolves a ban_id per price row, so warm the categories
+		// it is about to write. No catalog is loaded on this path and none is
+		// needed: config names every category, and there is no site here whose
+		// own game would add one.
+		warmVariantCacheIfEnabled()
 		var err error
 		switch {
 		case *tcgcsvBackfill:
@@ -1158,6 +1400,14 @@ func main() {
 		log.Printf("checkpoints: initial load failed: %v", err)
 	}
 
+	if sec := os.Getenv("BAN_SECRET"); !DevMode && (sec == "" || sec == DefaultSecret) {
+		log.Println("offline: BAN_SECRET is defaulted, price watermarks are predictable")
+	}
+
+	if err := offlineService.LoadPersisted(context.Background()); err != nil {
+		log.Println("offline: manifest load failed:", err)
+	}
+
 	// Parse templates once in production
 	TemplateCache, err = buildTemplateCache()
 	if err != nil {
@@ -1188,6 +1438,11 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
+			// runSealedAnalysis loads the catalog, which is what names this
+			// site's own TCGplayer category, so the variant scope is only
+			// complete now.
+			warmVariantCacheIfEnabled()
+			offlineService.RefreshManifest()
 		}()
 	} else {
 		go func() {
@@ -1199,8 +1454,16 @@ func main() {
 
 			// Update set values after loading prices
 			runSealedAnalysis()
+			// runSealedAnalysis loads the catalog, which is what names this
+			// site's own TCGplayer category, so the variant scope is only
+			// complete now.
+			warmVariantCacheIfEnabled()
+			offlineService.RefreshManifest()
 		}()
 	}
+
+	// Runtime manifest refreshes funnel through one debounced goroutine.
+	offlineService.StartRefresher()
 
 	if !DevMode {
 		// Set up new refreshes as needed
@@ -1214,6 +1477,9 @@ func main() {
 
 		// Reload DB Newspaper every 3 hours
 		c.AddFunc("33 */3 * * *", cacheNewspaper)
+
+		// Backstop refresh; reloads normally drive this via RequestRefresh.
+		c.AddFunc("20 */12 * * *", offlineService.RequestRefresh)
 
 		// Pull the latest tcgcsv snapshot daily (after its ~20:00 UTC refresh).
 		// The job gates on tcgcsv's last-updated, so it no-ops until there's a
@@ -1251,6 +1517,8 @@ func main() {
 	http.HandleFunc("/js/", ServeFile)
 	http.HandleFunc("/favicon.ico", ServeFile)
 	http.HandleFunc("/robots.txt", ServeFile)
+	// Dedicated handler: the service worker must revalidate on every deploy
+	http.HandleFunc("/sw.js", ServeServiceWorker)
 
 	// custom redirector
 	http.HandleFunc("/go/", Redirect)
@@ -1270,6 +1538,9 @@ func main() {
 
 	// Public privacy policy (cookie + Amazon Associates disclosures)
 	http.Handle("/privacy", noSigning(http.HandlerFunc(Privacy)))
+
+	// Offline shell page, precached by the service worker
+	http.Handle("/offline", noSigning(http.HandlerFunc(OfflinePage)))
 
 	// Mobile/desktop view toggle
 	http.HandleFunc("/toggle-mobile", toggleMobileView)
@@ -1321,6 +1592,7 @@ func main() {
 	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(paletteService.Sets)))
 	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(paletteService.Stores)))
 	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(paletteService.Promos)))
+	http.Handle("/api/offline/", noSigning(http.HandlerFunc(offlineService.Handle)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
 
@@ -1435,7 +1707,13 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	// Include settings-modal partial only for desktop pages that define a "settings-content" block.
 	if !isMobile {
 		switch name {
-		case "search.html", "arbit.html":
+		case "search.html":
+			files = append(files,
+				"templates/partials/settings-modal.html",
+				"templates/partials/settings-stores-grouped.html",
+				"templates/partials/editions-picker.html",
+			)
+		case "arbit.html":
 			files = append(files,
 				"templates/partials/settings-modal.html",
 				"templates/partials/settings-stores-grouped.html",

@@ -23,6 +23,7 @@ import (
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
+	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 const (
@@ -68,6 +69,11 @@ type SearchEntry struct {
 	Country string
 
 	Secondary float64
+
+	// IsEV marks a row produced by the sealed expected-value collapse. The
+	// EV/Median/StdDev columns only mean anything for those, so the header
+	// naming them follows this rather than the mere presence of index rows.
+	IsEV bool
 
 	ExtraValues map[string]float64
 
@@ -178,41 +184,40 @@ func noteChartIDsDropped(pageVars *PageVars, dropped, total int) {
 	pageVars.InfoMessage += " " + notice
 }
 
-// chartIDToSearchID maps a chart-roster id to an id the results table (which the
-// embedded chart lives inside) can resolve to a card row, mirroring
-// resolveChartTarget's precedence so anything chartable also renders its row.
-// Magic resolves to the mtgmatcher id of the variant's own finish; non-Magic
-// games (Lorcana, ...) to their mtgmatcher-native id via the TCGplayer external
-// id map.
+// chartSearchID names the results-table row for a roster id. The resolved
+// target already knows it - resolving is what reads the archive, and the chart
+// needs that same answer - so the table and the chart cannot disagree about
+// which printing a roster id means.
 //
-// ok=false means nothing was resolved and the id is handed back as it came:
-// the results table will find no row for it, so the card drops out of the page
-// it was asked for. The caller says so rather than letting it vanish.
-func chartIDToSearchID(ctx context.Context, id string) (string, bool) {
+// A target is nil when nothing resolved, and on a deployment with no archive at
+// all, where the matcher can still map a plain id. ok=false means the id is
+// handed back as it came: the results table will find no row for it, so the
+// card drops out of the page it was asked for. The caller says so rather than
+// letting it vanish.
+func chartSearchID(id string, target *chartTarget) (string, bool) {
+	if target != nil {
+		if target.SearchID != "" {
+			return target.SearchID, true
+		}
+		// The resolver already tried every id space it knows and came back
+		// without a row id, so there is no row. Asking the matcher again
+		// from the raw string second-guesses that, and the raw string is
+		// exactly what cannot be read twice: a ban_id and a TCGplayer
+		// product id can be the same number, which is the trap
+		// resolveChartTarget's precedence exists to avoid.
+		return id, false
+	}
+
+	// Nothing resolved, so there is no archive to have resolved against -
+	// a deployment without one, where the matcher still places a plain id.
 	if _, err := mtgmatcher.GetUUID(id); err == nil {
 		return id, true // already a matcher id (bare uuid / variant string)
 	}
 	prefix, val := splitIDPrefix(id)
-
-	// ban: or a bare integer — our ban_id, on the chart resolver's precedence: a
-	// game-native id returned above already, and Lorcana numbers its cards, so an
-	// integer reaching here is not one of those.
-	if (prefix == "ban" || prefix == "") && PricesArchiveDB != nil {
-		if n, perr := strconv.ParseInt(val, 10, 64); perr == nil {
-			if vi, ok, _ := PricesArchiveDB.LookupVariant(ctx, n); ok {
-				if vi.MtgjsonUUID != "" {
-					// Magic: the uuid, kept on the finish the ban_id names.
-					return magicFinishSearchID(vi.MtgjsonUUID, vi.IsFoil, vi.IsEtched), true
-				}
-				// Non-Magic: the product id maps back to the game's own card id,
-				// on the finish the variant's sub-type names.
-				if matched, ok := tcgVariantSearchID(ctx, vi); ok {
-					return matched, true
-				}
-				return id, false
-			}
-			// Not a ban_id: fall through to the external-id lookup below.
-		}
+	// ban: names our own surrogate. That integer means nothing to the
+	// matcher's external map, where the same number belongs to a product.
+	if prefix == "ban" {
+		return id, false
 	}
 
 	// tcg:, scryfall:, mtgjson:, or a bare id mtgmatcher maps through its external
@@ -304,6 +309,15 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.HasAvailable = len(mtgmatcher.GetSealedUUIDs()) > 0
 
+	// Image corpus picker: only populate for entitled users.
+	if _, ok := offlineModeAllowed(r); ok {
+		pageVars.OfflineModeAllowed = true
+		editions := GetEditions()
+		pageVars.EditionsCategories = editions.AllEditionsCategoriesSorted
+		pageVars.EditionsByCategory = editions.AllEditionsByCategory
+		pageVars.PickerID = "offline-img-editions-picker"
+	}
+
 	// Populate all seller/vendor keys (for settings drawer and options page)
 	for _, seller := range GetSellers() {
 		pageVars.SellerKeys = append(pageVars.SellerKeys, seller.Info().Shorthand)
@@ -348,6 +362,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") != "stores")
 	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
 	pageVars.DefaultView = readCookie(r, "SearchDefaultView")
+	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
 
 	// Load whether a user can download CSV and validate the query parameter
 	canDownloadCSV, _ := strconv.ParseBool(GetParamFromSig(sig, "SearchDownloadCSV"))
@@ -375,6 +390,25 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// resolution costs a DB round-trip and each id is consulted three times
 	// (results query, display query, metadata aliasing).
 	chartSearchIDs := map[string]string{}
+
+	// Roster id -> chart target, resolved once per request. The results table
+	// and the chart both need this, and it is the archive round-trip that makes
+	// it worth doing once: the page used to ask for the same card twice, and a
+	// roster did so per card. Owned by this request alone, so a plain map with
+	// no locking - a nil entry is a resolution that already failed and is not
+	// retried.
+	chartTargets := map[string]*chartTarget{}
+	chartTargetFor := func(id string) *chartTarget {
+		if target, asked := chartTargets[id]; asked {
+			return target
+		}
+		target, err := resolveChartTarget(r.Context(), id)
+		if err != nil {
+			target = nil
+		}
+		chartTargets[id] = target
+		return target
+	}
 	if len(chartIds) > 0 && !pageVars.DisableChart {
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
@@ -402,7 +436,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			searchIDs := make([]string, len(chartIds))
 			var unresolved int
 			for i, id := range chartIds {
-				searchID, ok := chartIDToSearchID(r.Context(), id)
+				searchID, ok := chartSearchID(id, chartTargetFor(id))
 				if !ok {
 					unresolved++
 				}
@@ -938,29 +972,34 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// UI's identity for favorites/roster/legend); the ban_id is internal.
 			var earliest time.Time
 			var ids, names []string
-			var targets []*chartTarget
+			var series []map[string]timeseries.ProviderPrices
 			for _, id := range chartIds {
-				target, terr := resolveChartTarget(r.Context(), id)
-				if terr != nil {
+				target := chartTargetFor(id)
+				if target == nil {
 					continue
 				}
+				// Read each card once and take the axis from what came back: a
+				// roster used to cost two archive round-trips per card, and
+				// against a hundred-partition prices table a round-trip is
+				// mostly planning.
+				results := fetchChartPrices(r.Context(), target, lb)
 				ids = append(ids, id)
 				names = append(names, target.Name)
-				targets = append(targets, target)
-				if e, _ := chartTargetEarliest(r.Context(), target, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
+				series = append(series, results)
+				if e := earliestChartedDate(results, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
 					earliest = e
 				}
 			}
-			if len(targets) == 0 || earliest.IsZero() {
+			if len(series) == 0 || earliest.IsZero() {
 				pageVars.InfoMessage = "No chart data available"
 			} else {
 				pageVars.AxisLabels = getDateAxisValues(earliest)
-				cards := make([]multiCardInput, len(targets))
-				for i, target := range targets {
+				cards := make([]multiCardInput, len(series))
+				for i, results := range series {
 					cards[i] = multiCardInput{
 						CardID:   ids[i],
 						Name:     names[i],
-						Datasets: getChartDatasets(r.Context(), target, pageVars.AxisLabels, lb),
+						Datasets: chartDatasetsFrom(results, pageVars.AxisLabels),
 					}
 				}
 				if isMultiChart {
@@ -1174,6 +1213,7 @@ func collapseSealedEV(entries []SearchEntry, evShorts []string) (rows []SearchEn
 			rows = append(rows, entries[i])
 			idx = len(rows) - 1
 			pos[id] = idx
+			rows[idx].IsEV = true
 		}
 
 		if strings.Contains(entries[i].ScraperName, " Sim") {

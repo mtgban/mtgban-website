@@ -4,7 +4,10 @@
 
     <a class="nav2-brand" href="/" title="Home">
         <img src="/img/logo/ban-stroop.png" alt="BAN">
-        <span class="nav2-brand-text">MTG<span class="ban">BAN</span></span>
+        <span class="nav2-brand-lockup">
+            <span class="nav2-brand-text">MTG<span class="ban">BAN</span></span>
+            {{with game_badge}}<span class="nav2-brand-game">{{.}}</span>{{end}}
+        </span>
     </a>
 
     <div class="nav2-search autocomplete">
@@ -122,6 +125,20 @@
  * load — this script only handles initial restoration.
  */
 (function() {
+    // On /offline the navbar is a Singles/Sealed mode switch: mark it and hide the
+    // online section nav inline before first paint, then skip layout restoration.
+    // Hiding inline (not only via CSS) keeps it hidden even if a stale cached
+    // stylesheet lacks the rule; navbar.js injects the mode buttons. Read-only.
+    if (location.pathname === '/offline') {
+        var offNav = document.querySelector('.navbar-v2');
+        if (offNav) {
+            offNav.classList.add('offline-nav');
+            offNav.querySelectorAll('.nav2-sections .nav2-section-btn:not(.is-tools)').forEach(function (b) {
+                b.style.display = 'none';
+            });
+        }
+        return;
+    }
     var saved;
     try { saved = JSON.parse(localStorage.getItem('mtgban_nav_layout_v1') || 'null'); } catch (e) { return; }
     if (!saved || !Array.isArray(saved.sections) || !Array.isArray(saved.grid)) return;

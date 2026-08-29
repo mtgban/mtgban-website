@@ -514,10 +514,24 @@ tr.arb-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
    narrower because it carries one row per store rather than per card, and
    without the section nav arrows since it is not one of the sections they
    step through. */
-.arb-best-of .arb-section-header { margin-bottom: 8px; }
+/* The table is sized to its contents rather than to the column, so shrink
+   the whole block to it and centre that. The heading and the rule beneath
+   it then span the table instead of the page. The width floor lives here
+   rather than on the table so a short table still holds its shape. */
+.arb-best-of {
+    width: fit-content;
+    min-width: min(100%, 720px);
+    max-width: 100%;
+    margin-inline: auto;
+}
+
+.arb-best-of .arb-section-header {
+    margin-bottom: 8px;
+    justify-content: center;
+}
 .arb-best-of .arb-section-name { font-size: var(--text-xl); }
 
-.arb-best-table { width: auto; min-width: min(100%, 720px); }
+.arb-best-table { width: 100%; }
 .arb-best-table .arb-card-cell .set-icon { font-size: var(--text-xl); }
 
 /* The card reads as a label, not a figure, so it lines up with its heading
@@ -534,6 +548,5 @@ tr.arb-removed { background-color: rgba(255, 0, 0, 0.06) !important; }
 .arb-best-store:hover { color: var(--ainfo); }
 
 @media (max-width: 768px) {
-    .arb-best-table { min-width: 100%; }
     .arb-best-table .arb-card-cell .set-icon { display: none; }
 }

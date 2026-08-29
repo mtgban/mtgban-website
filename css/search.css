@@ -297,6 +297,10 @@
 .sidebar-printings a { color: var(--search-link); text-decoration: none; }
 .sidebar-printings a:hover { text-decoration: underline; }
 .sidebar-printings i[class*="ss-"] { color: var(--normal); margin: 0 1px; }
+/* The keyrune glyphs and the filter input already centre on the same line,
+   but a generated set badge is a replaced element and rides the baseline,
+   leaving the filter hanging below it on games with no keyrune symbols. */
+.sidebar-printings a.pagination svg { vertical-align: middle; }
 
 /* Printings overflow filter input */
 .sidebar-printings-filter {

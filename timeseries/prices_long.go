@@ -27,6 +27,18 @@ const longColsPerRow = 4
 // longMaxBatch keeps a bulk upsert under Postgres's bind-parameter cap.
 const longMaxBatch = pgMaxParams / longColsPerRow
 
+// hgetAllLongQuery is the hottest read the site makes. NewClient keeps it
+// prepared, and the text stays here for the fallback path (see Client.query).
+const hgetAllLongQuery = `
+		WITH canon AS (
+			SELECT ban_id FROM variants
+			 WHERE mtgjson_uuid=$1 AND is_foil=$2 AND is_etched=$3
+			 ORDER BY (language='' AND is_alt=false) DESC, ban_id ASC
+			 LIMIT 1
+		)
+		SELECT date, provider, price FROM prices
+		 WHERE ban_id = (SELECT ban_id FROM canon) AND date >= $4`
+
 // HGetAllLong returns a single card's price history over the lookback window,
 // pivoted to date -> (provider -> price). The read identity (uuid, foil, etched)
 // is coarser than a ban_id, so a CTE resolves the canonical printing first:
@@ -41,16 +53,7 @@ const longMaxBatch = pgMaxParams / longColsPerRow
 func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched bool, lb Lookback) (map[string]ProviderPrices, error) {
 	uuid = NormalizeUUID(uuid)
 	result := make(map[string]ProviderPrices)
-	rows, err := c.db.QueryContext(ctx, `
-		WITH canon AS (
-			SELECT ban_id FROM variants
-			 WHERE mtgjson_uuid=$1 AND is_foil=$2 AND is_etched=$3
-			 ORDER BY (language='' AND is_alt=false) DESC, ban_id ASC
-			 LIMIT 1
-		)
-		SELECT date, provider, price FROM prices
-		 WHERE ban_id = (SELECT ban_id FROM canon) AND date >= $4`,
-		uuid, isFoil, isEtched, lb.Since())
+	rows, err := c.query(ctx, c.stmtHGetAllLong, hgetAllLongQuery, uuid, isFoil, isEtched, lb.Since())
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +76,10 @@ func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched 
 	return result, rows.Err()
 }
 
+const hgetAllByBanIDQuery = `
+		SELECT date, provider, price FROM prices
+		 WHERE ban_id=$1 AND date >= $2`
+
 // HGetAllByBanID returns one exact variant's price history over the lookback
 // window, pivoted to date -> (provider -> price). Unlike HGetAllLong it does no
 // canonical resolution: the caller already holds the precise ban_id (a ban: id,
@@ -80,9 +87,7 @@ func (c *Client) HGetAllLong(ctx context.Context, uuid string, isFoil, isEtched 
 // a specific language/finish/alt or a non-Magic sub-type.
 func (c *Client) HGetAllByBanID(ctx context.Context, banID int64, lb Lookback) (map[string]ProviderPrices, error) {
 	result := make(map[string]ProviderPrices)
-	rows, err := c.db.QueryContext(ctx, `
-		SELECT date, provider, price FROM prices
-		 WHERE ban_id=$1 AND date >= $2`, banID, lb.Since())
+	rows, err := c.query(ctx, c.stmtHGetAllByBanID, hgetAllByBanIDQuery, banID, lb.Since())
 	if err != nil {
 		return nil, err
 	}
@@ -173,32 +178,162 @@ func (c *Client) GetAggregatePriceStatsLong(ctx context.Context, provider int16,
 	return result, rows.Err()
 }
 
-// GetMoversLong returns the largest per-card price moves for one provider over a
-// window. Anchored to the provider's own latest date (a lagging metric has no
-// data on the global latest). Restricted to canonical English variants
-// (language=”), so each (uuid, foil, etched, is_alt) is a single ban_id and cur
-// vs prior compare the same printing (plan 17.2).
-func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays int, minPrice, minPriorPrice float64) ([]MoverRow, error) {
-	var latest sql.NullTime
-	if err := c.db.QueryRowContext(ctx,
-		`SELECT max(date) FROM prices WHERE provider=$1`, provider).Scan(&latest); err != nil {
-		return nil, err
-	}
-	if !latest.Valid {
-		return nil, nil
-	}
-	target := latest.Time.AddDate(0, 0, -windowDays)
+// CategoryMagic is TCGplayer's own category id for Magic. Magic rows are keyed
+// by mtgjson uuid rather than by TCGplayer product, so this doubles as the
+// discriminator between the two identities a mover row can carry.
+const CategoryMagic = 1
 
-	var prior sql.NullTime
-	if err := c.db.QueryRowContext(ctx,
-		`SELECT max(date) FROM prices WHERE provider=$1 AND date <= $2`, provider, target).Scan(&prior); err != nil {
-		return nil, err
+// moverScope renders the game predicate over an aliased `v` of variants, and
+// the arguments it needs, numbered from next. It is one statement per game
+// rather than one statement carrying both: a predicate the planner can read as
+// a constant is what lets the anchor queries below stop at the first row they
+// find, and a `($1 AND ...) OR (NOT $1 AND ...)` cannot be read that way.
+//
+// CategoryMagic selects the Magic rows, keyed by mtgjson uuid and restricted to
+// canonical English variants (empty language), so each (uuid, foil, etched,
+// is_alt) is a single ban_id and cur vs prior compare the same printing (plan
+// 17.2). Any other category selects that TCGplayer category's rows, which have
+// no mtgjson uuid and are keyed by their product + sub-type - already one
+// ban_id per identity.
+func moverScope(tcgCategory, next int) (string, []any) {
+	if tcgCategory == CategoryMagic {
+		return "v.mtgjson_uuid IS NOT NULL AND v.language=''", nil
 	}
-	if !prior.Valid {
-		return nil, nil
+	return fmt.Sprintf("v.mtgjson_uuid IS NULL AND v.tcgp_category_id = $%d", next), []any{tcgCategory}
+}
+
+// buildMoverAnchorQuery asks for the newest date this game has under this
+// provider, optionally no later than before.
+//
+// It reads the date off the first row rather than aggregating: `max(date)` over
+// a join has to visit every price row the provider holds, across every monthly
+// partition, before it can name the largest - which is what this query used to
+// do, and what made a screener page cost two full scans before it read a single
+// price. Ordering by date descending and stopping at the first row lets the
+// planner walk prices_provider_date backwards and quit as soon as a row belongs
+// to this game.
+//
+// The anchor is per game, not per provider: one provider carries every game's
+// prices, written by producers on unrelated schedules - the per-site snapshot
+// stash for Magic, the TCGplayer archive ingest for the others - so a
+// provider's newest date routinely belongs to a game other than the one being
+// asked about. Anchoring provider-wide and filtering afterwards returns nothing
+// at all whenever the games sit a day apart: the normal state for part of every
+// day, and the lasting state whenever one game's ingest fails, since the daily
+// ingest is deliberately per-category and non-fatal.
+func buildMoverAnchorQuery(provider int16, tcgCategory int, before *time.Time) (string, []any) {
+	args := []any{provider}
+	scope, scopeArgs := moverScope(tcgCategory, len(args)+1)
+	args = append(args, scopeArgs...)
+
+	query := `SELECT p.date
+		  FROM prices p
+		  JOIN variants v ON v.ban_id = p.ban_id
+		 WHERE p.provider = $1 AND ` + scope
+	if before != nil {
+		args = append(args, *before)
+		query += fmt.Sprintf(" AND p.date <= $%d", len(args))
+	}
+	return query + `
+		 ORDER BY p.date DESC
+		 LIMIT 1`, args
+}
+
+// moverAnchorSteps bounds the fast path: how many of the provider's dates it
+// checks, newest first, before handing over to the scan. A game normally has
+// rows on the provider's newest date or within a day or two of it, and a game
+// that has fallen further behind than this is better served by the scan than by
+// another round-trip per date.
+const moverAnchorSteps = 8
+
+// providerLatestDateQuery finds the newest date a provider wrote, optionally
+// no later (or strictly earlier) than a bound. It reads nothing but the
+// prices_provider_date index and answers in milliseconds whatever the table
+// holds, because no join stands between it and the answer.
+func providerLatestDateQuery(bounded, strict bool) string {
+	query := `SELECT max(date) FROM prices WHERE provider=$1`
+	if !bounded {
+		return query
+	}
+	if strict {
+		return query + ` AND date < $2`
+	}
+	return query + ` AND date <= $2`
+}
+
+// gameHasRowsOnQuery asks whether one game wrote anything on one exact date.
+// The equality on date is what makes it cheap: the planner nested-loops from
+// the day's index entries into variants by primary key and stops at the first
+// row that belongs to this game - 3ms against the live archive, where asking
+// the same question as "the newest date of this game" costs seconds.
+func gameHasRowsOnQuery(tcgCategory int) string {
+	scope, _ := moverScope(tcgCategory, 3)
+	return `SELECT 1 FROM prices p
+		  JOIN variants v ON v.ban_id = p.ban_id
+		 WHERE p.provider=$1 AND p.date=$2 AND ` + scope + ` LIMIT 1`
+}
+
+// moverAnchor returns the newest date this game has under this provider, at or
+// before the given bound.
+//
+// It walks the provider's own dates newest-first and asks, per date, whether
+// this game wrote anything - two index reads a step, against a table where
+// finding "the newest row of this game" directly means scanning past every
+// newer row that belongs to another one. Games normally sit on the same date
+// or a day apart, so this settles in a step or two.
+//
+// Beyond moverAnchorSteps it gives up and scans, which is slower but bounded
+// by nothing: a game whose ingest died months ago still gets its answer.
+func (c *Client) moverAnchor(ctx context.Context, provider int16, tcgCategory int, before *time.Time) (sql.NullTime, error) {
+	probe := gameHasRowsOnQuery(tcgCategory)
+	_, scopeArgs := moverScope(tcgCategory, 3)
+
+	cursor := before
+	for step := 0; step < moverAnchorSteps; step++ {
+		args := []any{provider}
+		if cursor != nil {
+			args = append(args, *cursor)
+		}
+		var date sql.NullTime
+		err := c.db.QueryRowContext(ctx, providerLatestDateQuery(cursor != nil, step > 0), args...).Scan(&date)
+		if err != nil && err != sql.ErrNoRows {
+			return sql.NullTime{}, err
+		}
+		if !date.Valid {
+			// The provider has nothing older, so neither has this game.
+			return sql.NullTime{}, nil
+		}
+
+		var found int
+		probeArgs := append([]any{provider, date.Time}, scopeArgs...)
+		err = c.db.QueryRowContext(ctx, probe, probeArgs...).Scan(&found)
+		if err == nil {
+			return date, nil
+		}
+		if err != sql.ErrNoRows {
+			return sql.NullTime{}, err
+		}
+		next := date.Time
+		cursor = &next
 	}
 
-	q := `
+	// Too far behind for the step-by-step walk; let the scan settle it.
+	query, args := buildMoverAnchorQuery(provider, tcgCategory, before)
+	var date sql.NullTime
+	err := c.db.QueryRowContext(ctx, query, args...).Scan(&date)
+	if err != nil && err != sql.ErrNoRows {
+		return sql.NullTime{}, err
+	}
+	return date, nil
+}
+
+// buildMoverRowsQuery pairs each of this game's prices on the two anchor dates.
+func buildMoverRowsQuery(provider int16, tcgCategory int, latest, prior time.Time, minPrice, minPriorPrice float64) (string, []any) {
+	args := []any{provider, latest, prior, minPrice, minPriorPrice}
+	scope, scopeArgs := moverScope(tcgCategory, len(args)+1)
+	args = append(args, scopeArgs...)
+
+	return `
 		WITH cur AS (
 			SELECT ban_id, price FROM prices
 			 WHERE provider=$1 AND date=$2 AND price >= $4
@@ -207,11 +342,39 @@ func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays i
 			SELECT ban_id, price FROM prices
 			 WHERE provider=$1 AND date=$3 AND price >= $5
 		)
-		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched, cur.price, old.price
+		SELECT v.mtgjson_uuid, v.is_foil, v.is_etched,
+		       v.tcgp_product_id, v.tcgp_sub_type,
+		       cur.price, old.price
 		  FROM cur JOIN old USING (ban_id)
 		  JOIN variants v ON v.ban_id = cur.ban_id
-		 WHERE v.mtgjson_uuid IS NOT NULL AND v.language=''`
-	rows, err := c.db.QueryContext(ctx, q, provider, latest.Time, prior.Time, minPrice, minPriorPrice)
+		 WHERE ` + scope, args
+}
+
+// GetMoversLong returns the largest per-card price moves for one provider over
+// a window, for the game picked by tcgCategory. It is anchored to that game's
+// own latest date for that provider: a lagging metric has no data on the global
+// latest date, and a game has no data on another game's latest date. See
+// moverScope for the scoping the three queries share.
+func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays int, minPrice, minPriorPrice float64, tcgCategory int) ([]MoverRow, error) {
+	latest, err := c.moverAnchor(ctx, provider, tcgCategory, nil)
+	if err != nil {
+		return nil, err
+	}
+	if !latest.Valid {
+		return nil, nil
+	}
+	target := latest.Time.AddDate(0, 0, -windowDays)
+
+	prior, err := c.moverAnchor(ctx, provider, tcgCategory, &target)
+	if err != nil {
+		return nil, err
+	}
+	if !prior.Valid {
+		return nil, nil
+	}
+
+	rowsQuery, rowsArgs := buildMoverRowsQuery(provider, tcgCategory, latest.Time, prior.Time, minPrice, minPriorPrice)
+	rows, err := c.db.QueryContext(ctx, rowsQuery, rowsArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -220,9 +383,18 @@ func (c *Client) GetMoversLong(ctx context.Context, provider int16, windowDays i
 	var result []MoverRow
 	for rows.Next() {
 		var m MoverRow
-		if err := rows.Scan(&m.MtgjsonUUID, &m.IsFoil, &m.IsEtched, &m.Current, &m.Prior); err != nil {
+		var uuid, subType sql.NullString
+		var isFoil, isEtched sql.NullBool
+		var productID sql.NullInt64
+		err = rows.Scan(&uuid, &isFoil, &isEtched, &productID, &subType, &m.Current, &m.Prior)
+		if err != nil {
 			return nil, err
 		}
+		m.MtgjsonUUID = uuid.String
+		m.IsFoil = isFoil.Bool
+		m.IsEtched = isEtched.Bool
+		m.TCGProductID = int(productID.Int64)
+		m.TCGSubType = subType.String
 		result = append(result, m)
 	}
 	return result, rows.Err()
