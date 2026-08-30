@@ -15,14 +15,7 @@
 # a systemd instance name on every host already running it.
 game_ports() {
     case "$1" in
-        magic)         echo "8081 8082" ;;
-        beta)          echo "8083 8084" ;;
-        yugioh)        echo "8091 8092" ;;
-        lorcana)       echo "8093 8094" ;;
-        onepiece)      echo "8095 8096" ;;
-        riftbound)     echo "8097 8098" ;;
-        fleshandblood) echo "8099 8100" ;;
-        *)             return 1 ;;
+        *)         echo "8081 8082" ;;
     esac
 }
 
