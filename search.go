@@ -1722,20 +1722,16 @@ func searchParallelNG(cardIDs []string, config SearchConfig) (foundSellers map[s
 	foundVendors = map[string]map[string][]SearchEntry{}
 
 	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
+	wg.Go(func() {
 		if !config.SkipRetail {
 			foundSellers = searchSellersNG(cardIDs, config)
 		}
-		wg.Done()
-	}()
-	go func() {
+	})
+	wg.Go(func() {
 		if !config.SkipBuylist {
 			foundVendors = searchVendorsNG(cardIDs, config)
 		}
-		wg.Done()
-	}()
+	})
 
 	wg.Wait()
 

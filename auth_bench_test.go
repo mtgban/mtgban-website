@@ -62,14 +62,12 @@ func TestGetParamFromSigConcurrent(t *testing.T) {
 	shared := benchSig("shared")
 	var wg sync.WaitGroup
 	for g := range 4 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for i := range 500 {
 				GetParamFromSig(shared, "UserTier")
 				GetParamFromSig(benchSig(strconv.Itoa(g*1000+i)), "UserEmail")
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	if got := GetParamFromSig(shared, "UserTier"); got != "Vintage" {

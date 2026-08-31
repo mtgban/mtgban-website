@@ -831,16 +831,14 @@ func runningWorkflows() []string {
 
 	var wg sync.WaitGroup
 	for i, state := range states {
-		wg.Add(1)
-		go func(i int, state string) {
-			defer wg.Done()
+		wg.Go(func() {
 			names, err := gaFetch(state)
 			if err != nil {
 				log.Println(err)
 				return
 			}
 			results[i] = names
-		}(i, state)
+		})
 	}
 	wg.Wait()
 

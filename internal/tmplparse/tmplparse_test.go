@@ -61,12 +61,19 @@ func TestCollapseIndentKeepsActions(t *testing.T) {
 
 // ParseFiles keeps html/template's naming rules, and renders the data it
 // is given untouched even where the template around it was collapsed.
+func mustWrite(t *testing.T, path string, data []byte, perm os.FileMode) {
+	t.Helper()
+	if err := os.WriteFile(path, data, perm); err != nil {
+		t.Fatalf("writing fixture %s: %v", path, err)
+	}
+}
+
 func TestParseFilesNamesAndRenders(t *testing.T) {
 	dir := t.TempDir()
 	base := filepath.Join(dir, "base.html")
 	page := filepath.Join(dir, "page.html")
-	os.WriteFile(base, []byte("{{ define \"base.html\" }}\n    <main>\n        {{ template \"page.html\" . }}\n    </main>\n{{ end }}"), 0o600)
-	os.WriteFile(page, []byte("{{ define \"page.html\" }}\n    <span>{{ upper .Name }}</span>\n    <span>tail</span>\n{{ end }}"), 0o600)
+	mustWrite(t, base, []byte("{{ define \"base.html\" }}\n    <main>\n        {{ template \"page.html\" . }}\n    </main>\n{{ end }}"), 0o600)
+	mustWrite(t, page, []byte("{{ define \"page.html\" }}\n    <span>{{ upper .Name }}</span>\n    <span>tail</span>\n{{ end }}"), 0o600)
 
 	funcs := template.FuncMap{"upper": strings.ToUpper}
 	tmpl, err := ParseFiles("base.html", []string{base, page}, funcs)

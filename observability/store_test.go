@@ -31,7 +31,7 @@ func testClient(t *testing.T) *Client {
 		t.Fatalf("NewClient: %v", err)
 	}
 	t.Cleanup(func() {
-		c.db.Exec("DELETE FROM events WHERE path LIKE '__test__%'")
+		_, _ = c.db.Exec("DELETE FROM events WHERE path LIKE '__test__%'")
 		c.Close()
 	})
 	return c

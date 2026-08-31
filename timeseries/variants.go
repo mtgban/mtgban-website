@@ -232,7 +232,8 @@ func (c *Client) WarmVariantCache(ctx context.Context, scope VariantScope) (Vari
 // to the game-native id.
 func (c *Client) CachedTCGBanID(productID int) (int64, bool) {
 	if id, ok := c.variants.tcgByProduct.Load(productID); ok {
-		return id.(int64), true
+		banID, isInt := id.(int64)
+		return banID, isInt
 	}
 	return 0, false
 }
@@ -245,7 +246,8 @@ func (c *Client) CachedTCGBanID(productID int) (int64, bool) {
 // unwarmed cache) returns ok=false.
 func (c *Client) CachedTCGSubTypeBanIDs(productID int) (map[string]int64, bool) {
 	if m, ok := c.variants.tcgSubTypesByProduct.Load(productID); ok {
-		return m.(map[string]int64), true
+		byType, isMap := m.(map[string]int64)
+		return byType, isMap
 	}
 	return nil, false
 }
@@ -354,7 +356,9 @@ func (c *Client) scanTCGSubTypeBanIDs(ctx context.Context, query string, args []
 func (c *Client) ResolveMagicBanID(ctx context.Context, v MagicVariant) (int64, error) {
 	v = v.normalized()
 	if id, ok := c.variants.magic.Load(v); ok {
-		return id.(int64), nil
+		if banID, isInt := id.(int64); isInt {
+			return banID, nil
+		}
 	}
 	// Insert-returning on a fresh variant (one round-trip); on conflict it returns
 	// no rows and we fetch the existing id in a second, separately-committed
@@ -489,7 +493,8 @@ func (c *Client) LookupTCGBanID(ctx context.Context, productID int) (VariantInfo
 func (c *Client) CachedMagicBanID(v MagicVariant) (int64, bool) {
 	v = v.normalized()
 	if id, ok := c.variants.magic.Load(v); ok {
-		return id.(int64), true
+		banID, isInt := id.(int64)
+		return banID, isInt
 	}
 	return 0, false
 }
@@ -497,7 +502,9 @@ func (c *Client) CachedMagicBanID(v MagicVariant) (int64, bool) {
 // ResolveTCGBanID returns the ban_id for a non-Magic variant, minting it if new.
 func (c *Client) ResolveTCGBanID(ctx context.Context, v TCGVariant) (int64, error) {
 	if id, ok := c.variants.tcg.Load(v); ok {
-		return id.(int64), nil
+		if cached, isInt := id.(int64); isInt {
+			return cached, nil
+		}
 	}
 	var banID int64
 	err := c.db.QueryRowContext(ctx, `

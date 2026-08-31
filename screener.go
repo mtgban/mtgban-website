@@ -437,7 +437,11 @@ func cachedMovers(ctx context.Context, metric, window int, minPrice, minPriorPri
 	if err != nil {
 		return nil, err
 	}
-	return built.([]screenerRow), nil
+	rows, ok := built.([]screenerRow)
+	if !ok {
+		return nil, fmt.Errorf("screener flight built %T, not rows", built)
+	}
+	return rows, nil
 }
 
 // buildMovers reads a page of movers, resolves every row to this game's uuid,

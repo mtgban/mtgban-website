@@ -47,7 +47,10 @@ func TestEveryRegisteredGameHasABadge(t *testing.T) {
 	prev := Config.Game
 	t.Cleanup(func() { Config.Game = prev })
 
-	badge := funcMap["game_badge"].(func() string)
+	badge, ok := funcMap["game_badge"].(func() string)
+	if !ok {
+		t.Fatalf("game_badge is %T, not func() string", funcMap["game_badge"])
+	}
 	for _, game := range registeredGames {
 		Config.Game = game
 		got := badge()

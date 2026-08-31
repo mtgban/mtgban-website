@@ -21,19 +21,16 @@ func TestPriceFilterCacheConcurrent(t *testing.T) {
 		Stores:      []string{"SCR1"},
 	}
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		runPriceFilterRequest(500, filter)
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		filters := []*FilterPriceElem{filter}
 		for c := range 500 {
 			cardID := "bench-card-" + strconv.Itoa(c)
 			shouldSkipPriceNG(cardID, mtgban.BuylistEntry{BuyPrice: 6.0, Conditions: "NM"}, filters, "SCR050")
 		}
-	}()
+	})
 	wg.Wait()
 }
 

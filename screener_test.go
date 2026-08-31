@@ -486,11 +486,9 @@ func TestCachedMoversCollapsesConcurrentBuilds(t *testing.T) {
 	rows := make([][]screenerRow, callers)
 	errs := make([]error, callers)
 	for i := range callers {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			rows[i], errs[i] = cachedMovers(context.Background(), 2, 30, 5, 0)
-		}(i)
+		})
 	}
 
 	<-arrived

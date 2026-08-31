@@ -4,6 +4,7 @@ package tcgcatalog
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"strconv"
 )
@@ -64,7 +65,10 @@ func Load(r io.Reader) (map[string]Entry, *Category, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		key, _ := keyToken.(string)
+		key, ok := keyToken.(string)
+		if !ok {
+			return nil, nil, fmt.Errorf("catalog stream key is %T, not a string", keyToken)
+		}
 		switch key {
 		case "category":
 			var cat struct {
