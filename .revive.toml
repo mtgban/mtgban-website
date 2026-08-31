@@ -1,9 +1,5 @@
-# Style rules the tree already satisfies, so a regression is caught at review
-# time rather than found in a later sweep. The go-mtgban config is the model;
-# only the rules this tree is clean on are enabled.
-#
-# Deliberately absent:
-#   exported - 46 exported names still want a doc comment; sweep first.
+# Style rules the tree already satisfies, so that a regression is caught at
+# review time rather than found in a later sweep. Mirrors go-mtgban's config.
 
 ignoreGeneratedHeader = false
 severity = "error"
@@ -11,4 +7,48 @@ confidence = 0.8
 errorCode = 1
 warningCode = 1
 
+[rule.blank-imports]
+[rule.context-as-argument]
+[rule.context-keys-type]
+[rule.dot-imports]
+[rule.empty-block]
+[rule.error-naming]
+[rule.error-return]
+[rule.error-strings]
+[rule.errorf]
+[rule.exported]
+[rule.increment-decrement]
+[rule.indent-error-flow]
+[rule.package-comments]
+[rule.range]
+[rule.receiver-naming]
+[rule.redefines-builtin-id]
+[rule.superfluous-else]
+[rule.time-naming]
+[rule.unexported-return]
+[rule.unnecessary-format]
+[rule.unchecked-type-assertion]
+[rule.use-any]
+[rule.use-errors-new]
+[rule.use-waitgroup-go]
+# The families named here report nothing a caller could act on. A server
+# that failed to write its response has no one left to tell: the encoders
+# and writers aimed at a ResponseWriter fail only when the client is gone,
+# a bytes.Buffer documents a nil error, a Close on the way out is cleanup,
+# and a form that fails to parse reads as an empty form the handler then
+# validates. Naming them keeps a real dropped error visible among them.
+[rule.unhandled-error]
+  arguments = ["fmt.Fprint.*", "fmt.Print.*", "strings.Builder.*",
+               "bytes.Buffer.*", "io.Writer.Write", "io.Closer.Close", "os.File.Close",
+               "os.Setenv", "encoding/csv.Writer.Write",
+               "net/http.ResponseWriter.Write", "net/http.Request.ParseForm",
+               "net/http.Request.ParseMultipartForm",
+               "encoding/json.Encoder.Encode", "encoding/xml.Encoder.Encode",
+               "compress/gzip.Writer.Write", "compress/gzip.Writer.Close",
+               "database/sql.DB.Close", "database/sql.Conn.Close",
+               "database/sql.Stmt.Close", "database/sql.Rows.Close",
+               "userstate.Client.Close", "observability.Client.Close",
+               "timeseries.Client.Close"]
+[rule.unreachable-code]
+[rule.var-declaration]
 [rule.var-naming]
