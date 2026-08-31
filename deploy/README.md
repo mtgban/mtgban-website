@@ -45,6 +45,22 @@ identically:
 deploy/deploy.sh <ref>
 ```
 
+## Host packages
+
+`deploy/host-packages.sh` is the list of what the droplet needs from the
+distro — nginx and its brotli modules, certbot and its nginx plugin,
+build-essential, git, curl. One list, read by `cloud-init.sh` on a new droplet
+and by `bootstrap.sh` on every run, and idempotent either way:
+
+```bash
+./deploy/host-packages.sh      # as the deploy user, or as root
+```
+
+Run it on its own to pick up a package added to the list without re-running
+the whole bootstrap. The Go toolchain is deliberately not in it: that comes
+from go.dev at the version `go.mod` names, which is `bootstrap.sh`'s job
+because `bootstrap.sh` is what has the repo to read it from.
+
 ## Provisioning a new droplet
 
 `deploy/cloud-init.sh` goes in the **User data** box when creating the droplet
@@ -61,8 +77,8 @@ the two steps left: fill in `/etc/mtgban.env`, then run `bootstrap.sh`.
 ## One-time droplet setup
 
 The quick path: run **`./deploy/bootstrap.sh`** from the control repo (as the
-deploy user, not root). It's idempotent and handles the packages (git, nginx,
-build-essential, curl), the Go toolchain go.mod asks for, the checkouts,
+deploy user, not root). It's idempotent and handles the distro packages (via
+`host-packages.sh`), the Go toolchain go.mod asks for, the checkouts,
 systemd unit, placeholder secrets file, sudoers rule, nginx upstream include,
 and the boot instance — then prints the manual follow-ups (real secrets, the
 nginx server block edit, retiring any old unit, GitHub deploy key/secrets).

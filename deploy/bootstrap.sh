@@ -50,21 +50,9 @@ if [ "$(id -u)" = 0 ]; then
     exit 1
 fi
 
-# 0. Prerequisites. Installing only what is missing keeps a re-run quiet, and
-#    keeps this script the single answer to "what does a fresh droplet need".
-ensure_packages() {
-    local missing=() pkg
-    for pkg in git nginx build-essential curl; do
-        dpkg -s "$pkg" >/dev/null 2>&1 || missing+=("$pkg")
-    done
-    if [ ${#missing[@]} -eq 0 ]; then
-        echo "==> packages       : present"
-        return
-    fi
-    echo "==> installing packages: ${missing[*]}"
-    sudo apt-get update -qq
-    sudo apt-get install -y "${missing[@]}"
-}
+# 0. Prerequisites. The distro packages are host-packages.sh's list - one place
+#    that answers "what does a fresh droplet need", shared with cloud-init.sh -
+#    and both are idempotent, so a re-run is quiet.
 
 # The Go the module asks for, from go.dev rather than apt: the distro packages
 # trail the toolchain by whole releases, and this repo builds with what go.mod
@@ -91,7 +79,7 @@ ensure_go() {
     sudo ln -sf /usr/local/go/bin/go /usr/local/bin/go
 }
 
-ensure_packages
+"$SCRIPT_DIR/host-packages.sh"
 ensure_go
 command -v go        >/dev/null || { echo "!! go still not found in PATH ($PATH)" >&2; exit 1; }
 SYSTEMCTL=$(command -v systemctl)
