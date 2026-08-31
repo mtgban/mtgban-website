@@ -4,12 +4,13 @@
 #
 # Run as the deploy user (koda), NOT with sudo — it calls sudo itself for the
 # privileged bits:
-#     ./deploy/bootstrap.sh                # magic
-#     GAME=yugioh ./deploy/bootstrap.sh    # any other site
+#     ./deploy/bootstrap.sh                 # magic
+#     GAME=yugioh ./deploy/bootstrap.sh     # any other game
 #
-# Several sites can share a droplet: each gets its own port pair, checkouts,
-# unit, upstream include and sudoers rule, all named by deploy/games.sh. Run
-# this once per game. The secrets file is the one thing they share.
+# One game per droplet, so every host uses the same ports, checkouts, unit and
+# upstream. GAME settles which config the unit starts the binary with, and that
+# is the only thing about a host that its game decides — which is why deploy.sh
+# needs no game at all.
 #
 # It sets up: the two per-port checkouts, the systemd template unit, the
 # secrets env file (placeholders), the scoped sudoers rule, the nginx upstream
@@ -21,8 +22,17 @@ set -euo pipefail
 
 # --- config (override via env if needed) -----------------------------------
 GAME=${GAME:-magic}
+PORTS=(8081 8082)
+BOOT_PORT=${PORTS[0]}                            # the instance enabled at boot
+UNIT=${UNIT:-mtgban}                             # systemd template: ${UNIT}@<port>
+UPSTREAM_NAME=${UPSTREAM_NAME:-mtgban}           # what the server block proxy_passes to
+UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}
+SUDOERS_FILE=${SUDOERS_FILE:-/etc/sudoers.d/mtgban-deploy}
 ENV_FILE=${ENV_FILE:-/etc/mtgban.env}
 READY_TIMEOUT=${READY_TIMEOUT:-300}
+# The one name a game decides. Every game reads its own config from the bucket
+# under its own name, so all a droplet holds is the key to that bucket.
+CFG=${CFG:-b2://mtgban-config/${GAME}/config.json}
 export PATH="/usr/local/go/bin:${HOME}/go/bin:${PATH}"
 # ---------------------------------------------------------------------------
 
@@ -31,17 +41,8 @@ export PATH="/usr/local/go/bin:${HOME}/go/bin:${PATH}"
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_DIR=$(dirname "$SCRIPT_DIR")
 SRC_DIR=$(dirname "$REPO_DIR")
-
-# Sets PORT_BLUE, PORT_GREEN, CO_PREFIX, UNIT, UPSTREAM_NAME, UPSTREAM_CONF, CFG.
-# shellcheck source=deploy/games.sh
-. "$SCRIPT_DIR/games.sh"
-game_env "$GAME" "$SRC_DIR"
-
-PORTS=("$PORT_BLUE" "$PORT_GREEN")
-BOOT_PORT=$PORT_BLUE                             # the instance enabled at boot
-# One rule per site, or the second game to be bootstrapped would replace the
-# first one's. magic keeps the name its rule already has.
-SUDOERS_FILE=${SUDOERS_FILE:-/etc/sudoers.d/${UNIT}-deploy}
+REPO_NAME=$(basename "$REPO_DIR")               # e.g. mtgban-website
+CO_PREFIX=${CO_PREFIX:-$SRC_DIR/${REPO_NAME}-}  # -> .../mtgban-website-8081
 
 if [ "$(id -u)" = 0 ]; then
     echo "!! run as the deploy user (e.g. koda), not root — the script uses sudo itself" >&2
@@ -97,7 +98,7 @@ NGINX=$(command -v nginx || echo /usr/sbin/nginx)
 DEPLOY_USER=$(id -un)
 ORIGIN=$(git -C "$REPO_DIR" remote get-url origin)
 
-echo "==> site          : $GAME  (unit ${UNIT}@, upstream $UPSTREAM_NAME)"
+echo "==> game          : $GAME  (unit ${UNIT}@, upstream $UPSTREAM_NAME)"
 echo "==> control repo  : $REPO_DIR"
 echo "==> origin        : $ORIGIN"
 echo "==> config        : $CFG"
@@ -116,9 +117,9 @@ for port in "${PORTS[@]}"; do
     mkdir -p "$co/logs"
 done
 
-# 2. systemd template unit, rendered for this site. Substituting rather than
-#    copying is what lets one template serve every game, and what keeps the
-#    deploy user out of the repo.
+# 2. systemd template unit, rendered for this host. Substituting rather than
+#    copying is what lets one template serve every game - the -cfg is the whole
+#    of the difference - and what keeps the deploy user out of the repo.
 echo "==> installing systemd unit -> /etc/systemd/system/${UNIT}@.service"
 sed -e "s|@GAME@|${GAME}|" \
     -e "s|@USER@|${DEPLOY_USER}|g" \
@@ -190,7 +191,7 @@ Bootstrap done. Remaining MANUAL steps:
   1. Put real values in $ENV_FILE (if it still has XXX), then:
        sudo systemctl restart ${UNIT}@${BOOT_PORT}
 
-  2. Point nginx at the upstream — in this site's server block set:
+  2. Point nginx at the upstream — in this host's server block set:
        proxy_pass http://${UPSTREAM_NAME};
      then:  sudo nginx -t && sudo systemctl reload nginx
 
@@ -201,6 +202,6 @@ Bootstrap done. Remaining MANUAL steps:
      DROPLET_SSH_KEY) — see deploy/README.md.
 
 Then push a tag to trigger a deploy. The workflow runs:
-     GAME=${GAME} deploy/deploy.sh <ref>
+     deploy/deploy.sh <ref>
 ================================================================
 EOF

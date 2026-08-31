@@ -23,35 +23,27 @@ mutates files under the live instance (templates are cached at boot, but
 `git checkout --force` resets only tracked files, so each checkout's untracked
 datastore + logs persist across deploys.
 
-## More than one site on a droplet
+## One game per droplet
 
-A droplet can serve several games at once. `deploy/games.sh` is the one place
-that says who owns what — a port pair, a checkout prefix, a systemd unit, an
-nginx upstream — and both scripts read it, so adding a game is one line there:
+A droplet serves exactly one game, so every host uses the same names — ports
+8081/8082, the `mtgban@` unit, `upstream mtgban`, checkouts at
+`mtgban-website-<port>`. Nothing about a host's layout depends on which game
+it serves.
 
-```
-magic          8081/8082   mtgban@          upstream mtgban
-beta           8083/8084   mtgban-beta@     upstream mtgban_beta
-yugioh         8091/8092   mtgban-yugioh@   upstream mtgban_yugioh
-lorcana        8093/8094   ...
-```
-
-Every command takes the site as an environment variable, defaulting to magic:
+The one thing that does is the config the binary is started with, and that is
+settled once, at setup:
 
 ```bash
-GAME=yugioh ./deploy/bootstrap.sh      # once per game, on the droplet
-GAME=yugioh deploy/deploy.sh <ref>     # what the workflow runs
+GAME=yugioh ./deploy/bootstrap.sh     # bakes -cfg b2://mtgban-config/yugioh/config.json
+                                      # into the unit it installs
 ```
 
-It is an environment variable rather than an argument so that a caller passing
-only a ref cannot have the ref read as a game name, or the reverse. A `GAME`
-that names no allocation is refused rather than guessed at.
+Which is why `deploy.sh` takes no game and every workflow invokes it
+identically:
 
-Magic keeps every name it was set up with before any of this existed —
-`mtgban-website-<port>`, the bare `mtgban@` unit, `upstream mtgban` — so its
-droplet needs no migration. The sites share one `/etc/mtgban.env`, since they
-read one config bucket between them; everything else is per-site, including the
-sudoers rule, which would otherwise be overwritten by the next game bootstrapped.
+```bash
+deploy/deploy.sh <ref>
+```
 
 ## Provisioning a new droplet
 
@@ -84,8 +76,8 @@ The steps below document what it does, for reference or manual setup.
 ### 1. Install the template unit, remove the old single unit
 
 `deploy/mtgban.service.in` is a template, not a unit: `bootstrap.sh` fills in
-the site's user, checkout prefix and config path and installs the result as
-`mtgban@.service` (magic) or `mtgban-<game>@.service`. To do it by hand:
+the deploy user, the checkout prefix and the game's config path, and installs
+the result as `mtgban@.service`. To do it by hand:
 
 ```bash
 cd /home/koda/src/mtgban-website
