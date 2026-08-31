@@ -1175,12 +1175,11 @@ func loadGoogleCredentials() (*http.Client, error) {
 		return nil, nil
 	}
 
-	u, err := url.Parse(Config.GoogleCredentials)
-	if err != nil {
-		return nil, err
-	}
-
-	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, u.Path)
+	// By its own path rather than through ConfigBucket: this read used to take
+	// the url apart and ask the config bucket for the path half, so credentials
+	// named in another bucket were fetched from the config one, and a local
+	// path was read from wherever the config happened to live.
+	reader, err := openBucketPath(context.Background(), Config.GoogleCredentials)
 	if err != nil {
 		return nil, err
 	}
