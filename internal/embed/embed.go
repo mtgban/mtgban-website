@@ -63,7 +63,7 @@ type OEmbed struct {
 
 type SearchResult struct {
 	Invalid         bool
-	CardId          string
+	CardID          string
 	ResultsIndex    []Entry
 	ResultsSellers  []Entry
 	ResultsVendors  []Entry
@@ -164,7 +164,7 @@ func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 			// Build url for our redirect
 			kind := strings.ToLower(string(fieldNames[i][0]))
 			store := entry.Shorthand
-			value.Link = s.BaseURL() + "/" + path.Join("go", kind, store, searchRes.CardId)
+			value.Link = s.BaseURL() + "/" + path.Join("go", kind, store, searchRes.CardID)
 
 			if entry.Ratio > 60 {
 				value.SuffixEmoji += "🔥"
@@ -334,13 +334,13 @@ func longestName(results []Entry) (out int) {
 
 // LastSoldFields renders the latest sales for a card in the given language.
 // Called from a discord session, so there is no context information available.
-func (s *Service) LastSoldFields(cardId string, lang string) ([]Field, error) {
+func (s *Service) LastSoldFields(cardID string, lang string) ([]Field, error) {
 	var fields []Field
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	lastSales, err := s.LastSold(ctx, cardId)
+	lastSales, err := s.LastSold(ctx, cardID)
 	if err != nil {
 		return nil, err
 	}
@@ -389,8 +389,8 @@ func (s *Service) Generate(allKeys []string, indexResults []Entry) *OEmbed {
 	htmlBody := ""
 	var results []SearchResult
 
-	for i, cardId := range allKeys {
-		co, err := mtgmatcher.GetUUID(cardId)
+	for i, cardID := range allKeys {
+		co, err := mtgmatcher.GetUUID(cardID)
 		if err != nil {
 			continue
 		}
@@ -410,10 +410,10 @@ func (s *Service) Generate(allKeys []string, indexResults []Entry) *OEmbed {
 			img = co.Images["full"]
 		}
 
-		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, s.EditionTitle(cardId))
+		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, s.EditionTitle(cardID))
 
 		results = append(results, SearchResult{
-			CardId:        cardId,
+			CardID:        cardID,
 			ResultsIndex:  indexResults,
 			NamesOverride: []string{fieldName},
 		})

@@ -213,17 +213,17 @@ func cachedBanIDForCard(co *mtgmatcher.CardObject) int64 {
 // variant-cache lookup per call, so it is invoked only while rendering pages
 // that chart cards (search results) — not from uuid2card, which also feeds
 // chartless pages (upload, arbit, news, ...) at thousands of cards a request.
-func chartIDForCard(cardId string) string {
+func chartIDForCard(cardID string) string {
 	if !Config.TimeseriesConfig.LongFormReads {
-		return cardId
+		return cardID
 	}
-	co, err := mtgmatcher.GetUUID(cardId)
+	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
-		return cardId
+		return cardID
 	}
 	banID := cachedBanIDForCard(co)
 	if banID == 0 {
-		return cardId
+		return cardID
 	}
 	return "ban:" + strconv.FormatInt(banID, 10)
 }

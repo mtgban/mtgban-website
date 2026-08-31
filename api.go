@@ -30,42 +30,42 @@ import (
 
 var ErrMissingTCGId = errors.New("tcg id not found")
 
-func getLastSold(ctx context.Context, cardId string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
-	co, err := mtgmatcher.GetUUID(cardId)
+func getLastSold(ctx context.Context, cardID string, anyLang bool) ([]tcgplayer.LatestSalesData, error) {
+	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
 		return nil, err
 	}
 
-	tcgId := findTCGproductId(cardId)
-	if tcgId == "" {
+	tcgID := findTCGproductID(cardID)
+	if tcgID == "" {
 		return nil, ErrMissingTCGId
 	}
 
-	latestSales, err := tcgplayer.LatestSales(ctx, tcgId, co.Foil || co.Etched, anyLang)
+	latestSales, err := tcgplayer.LatestSales(ctx, tcgID, co.Foil || co.Etched, anyLang)
 	if err != nil {
 		return nil, err
 	}
 
 	// If we got an empty response, try again with all the possible languages
 	if len(latestSales) == 0 && !anyLang {
-		return getLastSold(ctx, cardId, true)
+		return getLastSold(ctx, cardID, true)
 	}
 
 	return latestSales, nil
 }
 
-func getDirectQty(ctx context.Context, cardId string) ([]tcgplayer.ListingData, error) {
-	tcgProductId := findTCGproductId(cardId)
-	if tcgProductId == "" {
+func getDirectQty(ctx context.Context, cardID string) ([]tcgplayer.ListingData, error) {
+	tcgProductID := findTCGproductID(cardID)
+	if tcgProductID == "" {
 		return nil, ErrMissingTCGId
 	}
 
-	tcgId, err := strconv.Atoi(tcgProductId)
+	tcgID, err := strconv.Atoi(tcgProductID)
 	if err != nil {
 		return nil, err
 	}
 
-	return tcgplayer.GetDirectQtysForProductID(ctx, tcgId, true), nil
+	return tcgplayer.GetDirectQtysForProductID(ctx, tcgID, true), nil
 }
 
 func getDecklist(uuid string) ([]string, error) {
@@ -84,23 +84,23 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	isDirectQty := strings.Contains(r.URL.Path, "directqty")
 	isDecklist := strings.Contains(r.URL.Path, "decklist")
 
-	cardId := r.URL.Path
-	cardId = strings.TrimPrefix(cardId, "/api/tcgplayer/lastsold/")
-	cardId = strings.TrimPrefix(cardId, "/api/tcgplayer/directqty/")
-	cardId = strings.TrimPrefix(cardId, "/api/tcgplayer/decklist/")
+	cardID := r.URL.Path
+	cardID = strings.TrimPrefix(cardID, "/api/tcgplayer/lastsold/")
+	cardID = strings.TrimPrefix(cardID, "/api/tcgplayer/directqty/")
+	cardID = strings.TrimPrefix(cardID, "/api/tcgplayer/decklist/")
 
 	var data any
 	var err error
 	var useCSV bool
 	if isLastSold {
-		UserNotify("tcgLastSold", cardId)
-		data, err = getLastSold(r.Context(), cardId, false)
+		UserNotify("tcgLastSold", cardID)
+		data, err = getLastSold(r.Context(), cardID, false)
 	} else if isDirectQty {
-		UserNotify("tcgDirectQty", cardId)
-		data, err = getDirectQty(r.Context(), cardId)
+		UserNotify("tcgDirectQty", cardID)
+		data, err = getDirectQty(r.Context(), cardID)
 	} else if isDecklist {
-		UserNotify("tcgDecklist", cardId)
-		data, err = getDecklist(cardId)
+		UserNotify("tcgDecklist", cardID)
+		data, err = getDecklist(cardID)
 		useCSV = true
 	} else {
 		err = errors.New("invalid endpoint")
@@ -112,7 +112,7 @@ func TCGHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if useCSV {
-		co, _ := mtgmatcher.GetUUID(cardId)
+		co, _ := mtgmatcher.GetUUID(cardID)
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
@@ -186,7 +186,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 		if !found {
 			continue
 		}
-		productId := blEntries[0].InstanceID
+		productID := blEntries[0].InstanceID
 		name := blEntries[0].CustomFields["SCGName"]
 		edition := blEntries[0].CustomFields["SCGEdition"]
 		language := blEntries[0].CustomFields["SCGLanguage"]
@@ -196,7 +196,7 @@ func UUID2SCGCSV(w *csv.Writer, ids, qtys []string) error {
 			quantity = qtys[i]
 		}
 
-		err = w.Write([]string{quantity, productId, name, edition, language, finish})
+		err = w.Write([]string{quantity, productID, name, edition, language, finish})
 		if err != nil {
 			return err
 		}
@@ -213,7 +213,7 @@ func SCGRetailRedirect(ctx context.Context, ids, qtys, conds []string) (string, 
 		if err != nil {
 			continue
 		}
-		sku := findInstanceId("SCG", hash, conds[i])
+		sku := findInstanceID("SCG", hash, conds[i])
 
 		data.WriteString(qtys[i])
 		data.WriteString(" ")
@@ -238,7 +238,7 @@ func SCGRetailRedirect(ctx context.Context, ids, qtys, conds []string) (string, 
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("X-API-KEY", Config.Api["scg_mass_entry"])
+	req.Header.Set("X-API-KEY", Config.API["scg_mass_entry"])
 
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
@@ -247,14 +247,14 @@ func SCGRetailRedirect(ctx context.Context, ids, qtys, conds []string) (string, 
 	defer resp.Body.Close()
 
 	var responsePayload struct {
-		AffiliateDataId string `json:"affiliateDataId"`
+		AffiliateDataID string `json:"affiliateDataId"`
 	}
 	err = json.NewDecoder(resp.Body).Decode(&responsePayload)
 	if err != nil {
 		return "", err
 	}
 
-	return responsePayload.AffiliateDataId, nil
+	return responsePayload.AffiliateDataID, nil
 }
 
 var tcgcsvHeader = []string{
@@ -352,15 +352,15 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 			continue
 		}
 
-		var tcgSkuId string
+		var tcgSkuID string
 		if co.Sealed {
-			tcgSkuId = findInstanceId("TCGSealed", id, cond)
+			tcgSkuID = findInstanceID("TCGSealed", id, cond)
 			for _, entry := range sealed[id] {
 				prices[0] = entry.Price
 				break
 			}
 		} else {
-			tcgSkuId = findInstanceId("TCGPlayer", id, cond)
+			tcgSkuID = findInstanceID("TCGPlayer", id, cond)
 			for j, inv := range []mtgban.InventoryRecord{market, direct, low} {
 				for _, entry := range inv[id] {
 					if entry.Conditions == cond {
@@ -376,10 +376,10 @@ func UUID2TCGCSV(w *csv.Writer, ids, qtys, conds []string) error {
 			condLong += " Foil"
 		}
 
-		tcgEntry := tcgProducts[findTCGproductId(id)]
+		tcgEntry := tcgProducts[findTCGproductID(id)]
 
 		record := make([]string, 0, len(tcgcsvHeader))
-		record = append(record, tcgSkuId)
+		record = append(record, tcgSkuID)
 		record = append(record, productLine)
 		record = append(record, tcgEntry.Edition)
 		record = append(record, tcgEntry.Name)
@@ -411,15 +411,15 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 
 	isDecklist := strings.Contains(r.URL.Path, "decklist")
 
-	cardId := r.URL.Path
-	cardId = strings.TrimPrefix(cardId, "/api/cardmarket/decklist/")
+	cardID := r.URL.Path
+	cardID = strings.TrimPrefix(cardID, "/api/cardmarket/decklist/")
 
 	var data any
 	var err error
 	var useCSV bool
 	if isDecklist {
-		UserNotify("mkmDecklist", cardId)
-		data, err = getDecklist(cardId)
+		UserNotify("mkmDecklist", cardID)
+		data, err = getDecklist(cardID)
 		useCSV = true
 	} else {
 		err = errors.New("invalid endpoint")
@@ -431,7 +431,7 @@ func MKMHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if useCSV {
-		co, _ := mtgmatcher.GetUUID(cardId)
+		co, _ := mtgmatcher.GetUUID(cardID)
 		w.Header().Set("Content-Type", "text/csv")
 		w.Header().Set("Content-Disposition", "attachment; filename=\""+co.Name+".csv\"")
 
@@ -499,7 +499,7 @@ func UUID2MKMCSV(w *csv.Writer, ids, qtys, conds []string) error {
 
 	// Track total quantity, and skip repeats
 	qty := map[string]int{}
-	var cleanedIds []string
+	var cleanedIDs []string
 	for i, id := range ids {
 		quantity := 1
 		if qtys != nil {
@@ -514,13 +514,13 @@ func UUID2MKMCSV(w *csv.Writer, ids, qtys, conds []string) error {
 		}
 		qty[id+cond] += quantity
 
-		if slices.Contains(cleanedIds, id) {
+		if slices.Contains(cleanedIDs, id) {
 			continue
 		}
-		cleanedIds = append(cleanedIds, id)
+		cleanedIDs = append(cleanedIDs, id)
 	}
 
-	for i, id := range cleanedIds {
+	for i, id := range cleanedIDs {
 		cond := "NM"
 		if conds != nil && conds[i] != "" {
 			cond = conds[i]
@@ -531,9 +531,9 @@ func UUID2MKMCSV(w *csv.Writer, ids, qtys, conds []string) error {
 			continue
 		}
 
-		mkmId := findOriginalId("MKMTrend", id)
-		if mkmId == "" {
-			mkmId = findOriginalId("MKMLow", id)
+		mkmID := findOriginalID("MKMTrend", id)
+		if mkmID == "" {
+			mkmID = findOriginalID("MKMLow", id)
 		}
 
 		var price float64
@@ -552,7 +552,7 @@ func UUID2MKMCSV(w *csv.Writer, ids, qtys, conds []string) error {
 
 		record := make([]string, 0, len(mkmcsvHeader))
 
-		record = append(record, mkmId)
+		record = append(record, mkmID)
 		record = append(record, fmt.Sprint(qty[id+cond]))
 		record = append(record, co.Name)
 		record = append(record, co.Edition)
@@ -778,7 +778,7 @@ func SearchAPI(w http.ResponseWriter, r *http.Request) {
 	demoFilter := func(name string, forSeller bool) []FilterStoreElem {
 		return []FilterStoreElem{{
 			Name:          name,
-			Values:        fixupStoreCodeNG(strings.Join(Config.ApiDemoStores, ",")),
+			Values:        fixupStoreCodeNG(strings.Join(Config.APIDemoStores, ",")),
 			OnlyForSeller: forSeller,
 			OnlyForVendor: !forSeller,
 		}}

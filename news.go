@@ -1189,14 +1189,14 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var cardIds []string
-		for cardId := range syp {
-			cardIds = append(cardIds, cardId)
+		var cardIDs []string
+		for cardID := range syp {
+			cardIDs = append(cardIDs, cardID)
 		}
 
 		var arbit []mtgban.ArbitEntry
-		for _, cardId := range cardIds {
-			for _, entry := range syp[cardId] {
+		for _, cardID := range cardIDs {
+			for _, entry := range syp[cardID] {
 				converted := mtgban.InventoryEntry{
 					Price:      entry.BuyPrice,
 					Quantity:   entry.Quantity,
@@ -1204,7 +1204,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 					URL:        entry.URL,
 				}
 				arbit = append(arbit, mtgban.ArbitEntry{
-					CardID:         cardId,
+					CardID:         cardID,
 					InventoryEntry: converted,
 					Quantity:       entry.Quantity,
 				})
@@ -1213,7 +1213,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 
 		switch sorting {
 		default:
-			sortData := resolveSortingData(arbitCardIds(arbit))
+			sortData := resolveSortingData(arbitCardIDs(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions
@@ -1221,7 +1221,7 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 				return cmpSets(sortData[arbit[i].CardID], sortData[arbit[j].CardID])
 			})
 		case "alpha":
-			sortData := resolveSortingData(arbitCardIds(arbit))
+			sortData := resolveSortingData(arbitCardIDs(arbit))
 			sort.Slice(arbit, func(i, j int) bool {
 				if arbit[i].CardID == arbit[j].CardID {
 					return arbit[i].InventoryEntry.Conditions < arbit[j].InventoryEntry.Conditions

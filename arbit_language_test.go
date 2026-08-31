@@ -65,8 +65,8 @@ func TestSleepersDropForeignPrintings(t *testing.T) {
 		t.Skip("no scrapers loaded, nothing to filter")
 	}
 	for name, tiers := range results {
-		for cardId := range tiers {
-			co, err := mtgmatcher.GetUUID(cardId)
+		for cardID := range tiers {
+			co, err := mtgmatcher.GetUUID(cardID)
 			if err != nil {
 				continue
 			}

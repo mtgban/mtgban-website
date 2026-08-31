@@ -15,7 +15,7 @@ var deckboxHeader = []string{
 	"Printing Id", "Printing Note", "Tags", "My Price",
 }
 
-func deckboxIdConvert(w *csv.Writer, uploadedData []UploadEntry) error {
+func deckboxIDConvert(w *csv.Writer, uploadedData []UploadEntry) error {
 	err := w.Write(deckboxHeader)
 	if err != nil {
 		return err
@@ -25,18 +25,18 @@ func deckboxIdConvert(w *csv.Writer, uploadedData []UploadEntry) error {
 			continue
 		}
 
-		co, err := mtgmatcher.GetUUID(uploadedData[i].CardId)
+		co, err := mtgmatcher.GetUUID(uploadedData[i].CardID)
 		if err != nil {
 			continue
 		}
 
-		deckboxId, found := co.Identifiers["deckboxId"]
+		deckboxID, found := co.Identifiers["deckboxId"]
 		cardName := co.Name
 		tags := ""
 
 		// If id is missing instead tag the cards with the information available
 		if !found {
-			deckboxId = ""
+			deckboxID = ""
 			tags = co.SetCode + "\\t" + co.Number
 		}
 
@@ -78,7 +78,7 @@ func deckboxIdConvert(w *csv.Writer, uploadedData []UploadEntry) error {
 		}
 
 		err = w.Write([]string{
-			qty, qty, cardName, "", "", "", cond, lang, foil, "", "", "", "", "", "", deckboxId, "", tags, price,
+			qty, qty, cardName, "", "", "", cond, lang, foil, "", "", "", "", "", "", deckboxID, "", tags, price,
 		})
 		if err != nil {
 			return err

@@ -124,7 +124,7 @@ func chartLookback(sig string) timeseries.Lookback {
 // language=nil, lookback) result set, so we fetch HGetAll exactly once and
 // fan the rows out to every per-dataset render rather than firing N
 // identical SQL queries (and discarding 15/16 of each result).
-func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string, lb timeseries.Lookback) []Dataset {
+func getDatasets(ctx context.Context, cardID string, sealed bool, keys []string, lb timeseries.Lookback) []Dataset {
 	if PricesArchiveDB == nil {
 		return nil
 	}
@@ -145,7 +145,7 @@ func getDatasets(ctx context.Context, cardId string, sealed bool, keys []string,
 		return nil
 	}
 
-	co, err := mtgmatcher.GetUUID(cardId)
+	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
 		log.Println(err)
 		return nil
@@ -426,10 +426,10 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 // multi-card chart, plus the list of distinct reference names that have at
 // least one non-empty dataset. UUIDs that fail to resolve are skipped so a
 // single bad input doesn't take the whole chart down.
-func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
-	cards := make([]multiCardInput, 0, len(cardIds))
-	for _, cardId := range cardIds {
-		co, err := mtgmatcher.GetUUID(cardId)
+func getDatasetsForMulti(ctx context.Context, cardIDs []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
+	cards := make([]multiCardInput, 0, len(cardIDs))
+	for _, cardID := range cardIDs {
+		co, err := mtgmatcher.GetUUID(cardID)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -452,9 +452,9 @@ func getDatasetsForMulti(ctx context.Context, cardIds []string, labels []string,
 		}
 
 		cards = append(cards, multiCardInput{
-			CardID:   cardId,
+			CardID:   cardID,
 			Name:     cardName,
-			Datasets: getDatasets(ctx, cardId, co.Sealed, labels, lb),
+			Datasets: getDatasets(ctx, cardID, co.Sealed, labels, lb),
 		})
 	}
 

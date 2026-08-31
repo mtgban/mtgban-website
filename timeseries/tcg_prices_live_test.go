@@ -23,7 +23,7 @@ import (
 //	go test ./timeseries/ -run TestTCGPricesLive -v
 const liveSentinelCategory = 999001
 
-func liveConfig(t *testing.T) SqlConfig {
+func liveConfig(t *testing.T) SQLConfig {
 	t.Helper()
 	host := os.Getenv("TCGLIVE_HOST")
 	if host == "" {
@@ -33,7 +33,7 @@ func liveConfig(t *testing.T) SqlConfig {
 	if port == 0 {
 		port = 5432
 	}
-	return SqlConfig{
+	return SQLConfig{
 		Host:     host,
 		Port:     port,
 		User:     os.Getenv("TCGLIVE_USER"),

@@ -11,8 +11,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// SqlConfig reuses the timeseries shape so observability_config matches sql_config.
-type SqlConfig = timeseries.SqlConfig
+// SQLConfig reuses the timeseries shape so observability_config matches sql_config.
+type SQLConfig = timeseries.SQLConfig
 
 // Client wraps a Postgres connection pool for the telemetry tables.
 type Client struct {
@@ -20,7 +20,7 @@ type Client struct {
 }
 
 // NewClient opens a pool, applies small pool caps, pings, and ensures the schema.
-func NewClient(cfg SqlConfig) (*Client, error) {
+func NewClient(cfg SQLConfig) (*Client, error) {
 	db, err := sql.Open("postgres", cfg.DSN())
 	if err != nil {
 		return nil, fmt.Errorf("observability: open: %w", err)

@@ -9,7 +9,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type SqlConfig struct {
+type SQLConfig struct {
 	Host                   string `json:"host"`
 	Port                   int    `json:"port"`
 	User                   string `json:"user"`
@@ -22,7 +22,7 @@ type SqlConfig struct {
 	ConnMaxLifetimeSeconds int    `json:"conn_max_lifetime_seconds"`
 }
 
-func (c SqlConfig) DSN() string {
+func (c SQLConfig) DSN() string {
 	sslMode := c.SSLMode
 	if sslMode == "" {
 		sslMode = "disable"
@@ -79,7 +79,7 @@ func (c *Client) query(ctx context.Context, stmt *sql.Stmt, text string, args ..
 // handshakes, and connections recycle periodically so stale ones behind load
 // balancers / failovers get dropped. Defaults apply when the corresponding
 // config field is zero.
-func (c SqlConfig) OpenDB() (*sql.DB, error) {
+func (c SQLConfig) OpenDB() (*sql.DB, error) {
 	db, err := sql.Open("postgres", c.DSN())
 	if err != nil {
 		return nil, err
@@ -105,7 +105,7 @@ func (c SqlConfig) OpenDB() (*sql.DB, error) {
 }
 
 // NewClient opens a connection pool to the Postgres database described by cfg.
-func NewClient(cfg SqlConfig) (*Client, error) {
+func NewClient(cfg SQLConfig) (*Client, error) {
 	db, err := cfg.OpenDB()
 	if err != nil {
 		return nil, fmt.Errorf("timeseries: open: %w", err)

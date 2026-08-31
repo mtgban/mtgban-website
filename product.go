@@ -567,13 +567,13 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 			continue
 		}
 
-		// Skip processed cards (using scryfallId to catch foil/nonfoil)
-		scryfallId := co.Identifiers["scryfallId"]
-		_, found := dupes[scryfallId]
+		// Skip processed cards (using scryfallID to catch foil/nonfoil)
+		scryfallID := co.Identifiers["scryfallId"]
+		_, found := dupes[scryfallID]
 		if found {
 			continue
 		}
-		dupes[scryfallId] = struct{}{}
+		dupes[scryfallID] = struct{}{}
 
 		// Load the date for the card
 		printDate, err := mtgmatcher.CardReleaseDate(co.UUID)
@@ -905,14 +905,14 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 		out[label] = mtgban.InventoryRecord{}
 	}
 
-	for cardId, entries := range bl {
+	for cardID, entries := range bl {
 		// Skip cards too recent to have a meaningful 90-day window
-		cardDate, err := mtgmatcher.CardReleaseDate(cardId)
+		cardDate, err := mtgmatcher.CardReleaseDate(cardID)
 		if err != nil || cardDate.After(threeMonthsAgo) {
 			continue
 		}
 
-		co, err := mtgmatcher.GetUUID(cardId)
+		co, err := mtgmatcher.GetUUID(cardID)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -933,7 +933,7 @@ func buylistMetrics(store string, reducers map[string]buylistReducer) map[string
 			if !ok {
 				continue
 			}
-			out[label][cardId] = []mtgban.InventoryEntry{{Price: value}}
+			out[label][cardID] = []mtgban.InventoryEntry{{Price: value}}
 		}
 	}
 

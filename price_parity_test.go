@@ -38,9 +38,9 @@ func parityCards(t *testing.T) (regular, foil, sealed string) {
 			break
 		}
 	}
-	sealedIds := mtgmatcher.GetSealedUUIDs()
-	if len(sealedIds) > 0 {
-		sealed = sealedIds[0]
+	sealedIDs := mtgmatcher.GetSealedUUIDs()
+	if len(sealedIDs) > 0 {
+		sealed = sealedIDs[0]
 	}
 	if regular == "" || foil == "" || sealed == "" {
 		t.Skip("could not find suitable printings")
@@ -94,8 +94,8 @@ func seedParityScrapers(t *testing.T, regular, foil string) {
 
 // searchPrice returns the price of the first row for the given store and
 // condition bucket, or -1 when the bucket has no row for it.
-func searchPrice(found map[string]map[string][]SearchEntry, cardId, cond, shorthand string) float64 {
-	for _, res := range found[cardId][cond] {
+func searchPrice(found map[string]map[string][]SearchEntry, cardID, cond, shorthand string) float64 {
+	for _, res := range found[cardID][cond] {
 		if res.Shorthand == shorthand {
 			return res.Price
 		}
@@ -107,11 +107,11 @@ func TestPriceParityRetail(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
 
-	cardIds := []string{regular, foil}
+	cardIDs := []string{regular, foil}
 	config := parseSearchOptionsNG(regular, nil, nil, nil)
-	found := searchSellersNG(cardIds, config)
+	found := searchSellersNG(cardIDs, config)
 
-	api := getSellerPrices("", []string{"PARITYA", "PARITYIDX"}, "", cardIds, "", true, true, false, "")
+	api := getSellerPrices("", []string{"PARITYA", "PARITYIDX"}, "", cardIDs, "", true, true, false, "")
 
 	// Parity: the search row per condition and the API conditions map must
 	// carry the same numbers.
@@ -175,17 +175,17 @@ func TestWalkRepeatedIds(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
 
-	cardIds := []string{regular, regular, regular, regular}
+	cardIDs := []string{regular, regular, regular, regular}
 	config := parseSearchOptionsNG(regular, nil, nil, nil)
 
-	found := searchSellersNG(cardIds, config)
+	found := searchSellersNG(cardIDs, config)
 	for _, cond := range []string{"NM", "SP", "PO"} {
 		if got := len(found[regular][cond]); got != 1 {
 			t.Errorf("sellers %s rows = %d, want 1", cond, got)
 		}
 	}
 
-	foundBl := searchVendorsNG(cardIds, config)
+	foundBl := searchVendorsNG(cardIDs, config)
 	for _, cond := range []string{"NM", "SP"} {
 		if got := len(foundBl[regular][cond]); got != 1 {
 			t.Errorf("vendors %s rows = %d, want 1", cond, got)
@@ -197,11 +197,11 @@ func TestPriceParityBuylist(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
 
-	cardIds := []string{regular}
+	cardIDs := []string{regular}
 	config := parseSearchOptionsNG(regular, nil, nil, nil)
-	found := searchVendorsNG(cardIds, config)
+	found := searchVendorsNG(cardIDs, config)
 
-	api := getVendorPrices("", []string{"PARITYV"}, "", cardIds, "", true, true, false, "")
+	api := getVendorPrices("", []string{"PARITYV"}, "", cardIDs, "", true, true, false, "")
 
 	// Parity: raw buylist prices must match; the credit multiplier is a
 	// search-side display value layered on the same base number.
@@ -233,11 +233,11 @@ func TestFinishPredicateParity(t *testing.T) {
 	regular, foil, sealed := parityCards(t)
 	seedParityScrapers(t, regular, foil)
 
-	cardIds := []string{regular, foil}
+	cardIDs := []string{regular, foil}
 	stores := []string{"PARITYA", "PARITYIDX"}
 
 	// Funnel path (hash filter): finish=foil keeps only the foil printing
-	api := getSellerPrices("", stores, "", cardIds, "foil", false, false, false, "")
+	api := getSellerPrices("", stores, "", cardIDs, "foil", false, false, false, "")
 	if _, found := api[regular]; found {
 		t.Error("regular printing should be dropped by finish=foil")
 	}
@@ -280,14 +280,14 @@ func TestSearchDownloadFilters(t *testing.T) {
 	regular, foil, _ := parityCards(t)
 	seedParityScrapers(t, regular, foil)
 
-	cardIds := []string{regular}
+	cardIDs := []string{regular}
 
 	// A positive seller filter (query "seller:paritya") excludes the index
 	// seller from the download
 	config := SearchConfig{StoreFilters: []FilterStoreElem{{
 		Name: "seller", Values: []string{"paritya"}, OnlyForSeller: true,
 	}}}
-	api := banPricesFromRows(cardIds, searchSellersNG(cardIds, config), "", "", true, true, false)
+	api := banPricesFromRows(cardIDs, searchSellersNG(cardIDs, config), "", "", true, true, false)
 	if _, found := api[regular]["PARITYIDX"]; found {
 		t.Error("seller filter should exclude PARITYIDX from the output")
 	}
@@ -300,7 +300,7 @@ func TestSearchDownloadFilters(t *testing.T) {
 	config = SearchConfig{EntryFilters: []FilterEntryElem{{
 		Name: "condition", Values: []string{"NM"}, OnlyForVendor: true,
 	}}}
-	bl := banPricesFromRows(cardIds, searchVendorsNG(cardIds, config), "", "", true, true, true)
+	bl := banPricesFromRows(cardIDs, searchVendorsNG(cardIDs, config), "", "", true, true, true)
 	if got := bl[regular]["PARITYV"].Conditions.Get("NM"); got != 5 {
 		t.Errorf("conditions[NM] = %v, want 5", got)
 	}

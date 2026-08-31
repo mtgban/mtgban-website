@@ -143,7 +143,7 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 		storesOpt = "DEV_ACCESS"
 	}
 	if sig == "" && storesOpt == "" {
-		storesOpt = strings.Join(Config.ApiDemoStores, ",")
+		storesOpt = strings.Join(Config.APIDemoStores, ",")
 		// Disable a few endpoints for this specific mode
 		if strings.Contains(urlPath, "all.") || strings.Contains(urlPath, "retail.") || strings.Contains(urlPath, "buylist.") {
 			out.Error = "Invalid endpoint or missing signature"
@@ -359,16 +359,16 @@ func PriceAPI(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&out)
 }
 
-// getIdFromMode returns the id the given output mode uses for a card, or ""
+// getIDFromMode returns the id the given output mode uses for a card, or ""
 // when the card lacks one. This is a plain switch rather than a returned
 // closure on purpose: processEntry calls it once per (store, card), and the
 // former func-value call both allocated a closure per call and forced the
 // freshly copied CardObject to escape to the heap, dominating full-dump
 // allocations.
-func getIdFromMode(mode string, co *mtgmatcher.CardObject) string {
+func getIDFromMode(mode string, co *mtgmatcher.CardObject) string {
 	switch mode {
 	case "tcg":
-		return findTCGproductId(co.UUID)
+		return findTCGproductID(co.UUID)
 	case "scryfall":
 		return co.Identifiers["scryfallId"]
 	case "mtgjson":
@@ -458,7 +458,7 @@ func apiSearchConfig(uuids, enabledStores []string, filterByFinish string, seale
 // zero base price drops the store; Conditions are last-write-wins within a
 // grade exactly like the entry loop. INDEX rows are metadata prices whose
 // underlying grade is always NM.
-func banPricesFromRows(cardIds []string, found map[string]map[string][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
+func banPricesFromRows(cardIDs []string, found map[string]map[string][]SearchEntry, idMode, tagName string, qty, conds, vendorSide bool) map[string]map[string]*BanPrice {
 	// Rows carry neither MetadataOnly (the vendor qty rule needs it: sealed
 	// metadata vendors keep their grade bucket, so INDEX membership is not
 	// a reliable proxy) nor the raw scraper name (SearchEntry.ScraperName
@@ -480,16 +480,16 @@ func banPricesFromRows(cardIds []string, found map[string]map[string][]SearchEnt
 	}
 
 	out := map[string]map[string]*BanPrice{}
-	for _, cardId := range cardIds {
-		buckets := found[cardId]
+	for _, cardID := range cardIDs {
+		buckets := found[cardID]
 		if len(buckets) == 0 {
 			continue
 		}
-		co, err := mtgmatcher.GetUUID(cardId)
+		co, err := mtgmatcher.GetUUID(cardID)
 		if err != nil {
 			continue
 		}
-		id := getIdFromMode(idMode, co)
+		id := getIDFromMode(idMode, co)
 		if id == "" {
 			continue
 		}
@@ -606,11 +606,11 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 	if filterByEdition != "" || filterByHash != nil {
 		uuids := resolveEditionFilter(filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(uuids, enabledStores, filterByFinish, sealed)
-		cardIds, err := searchAndFilter(config)
+		cardIDs, err := searchAndFilter(config)
 		if err != nil {
 			return out
 		}
-		return banPricesFromRows(cardIds, searchSellersNG(cardIds, config), mode, tagName, qty, conds, false)
+		return banPricesFromRows(cardIDs, searchSellersNG(cardIDs, config), mode, tagName, qty, conds, false)
 	}
 
 	var finishFilter []string
@@ -650,8 +650,8 @@ func getSellerPrices(mode string, enabledStores []string, filterByEdition string
 		rule := EntryRule{
 			Finish: finishFilter,
 		}
-		for cardId := range inventory {
-			processEntry(out, inventory[cardId], mode, cardId, sellerTag, shouldQty, conds, shouldBaseCond, rule)
+		for cardID := range inventory {
+			processEntry(out, inventory[cardID], mode, cardID, sellerTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 	}
 
@@ -667,7 +667,7 @@ type EntryRule struct {
 	Rate     float64
 }
 
-func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, idMode, cardId, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
+func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, entries []T, idMode, cardID, scraperTag string, qty, conds, shouldBaseCond bool, rules ...EntryRule) {
 	// Zero-priced listings are ignored throughout, matching the search walk
 	// the filtered endpoints ride (shouldSkipPriceNG drops them before they
 	// become rows): the base price is the first nonzero entry, and zero
@@ -683,11 +683,11 @@ func processEntry[T mtgban.GenericEntry](out map[string]map[string]*BanPrice, en
 	if base == -1 {
 		return
 	}
-	co, err := mtgmatcher.GetUUID(cardId)
+	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
 		return
 	}
-	id := getIdFromMode(idMode, co)
+	id := getIDFromMode(idMode, co)
 	if id == "" {
 		return
 	}
@@ -824,11 +824,11 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 	if filterByEdition != "" || filterByHash != nil {
 		uuids := resolveEditionFilter(filterByEdition, filterByHash, sealed)
 		config := apiSearchConfig(uuids, enabledStores, filterByFinish, sealed)
-		cardIds, err := searchAndFilter(config)
+		cardIDs, err := searchAndFilter(config)
 		if err != nil {
 			return out
 		}
-		return banPricesFromRows(cardIds, searchVendorsNG(cardIds, config), mode, tagName, qty, conds, true)
+		return banPricesFromRows(cardIDs, searchVendorsNG(cardIDs, config), mode, tagName, qty, conds, true)
 	}
 
 	var finishFilter []string
@@ -866,8 +866,8 @@ func getVendorPrices(mode string, enabledStores []string, filterByEdition string
 		rule := EntryRule{
 			Finish: finishFilter,
 		}
-		for cardId := range buylist {
-			processEntry(out, buylist[cardId], mode, cardId, vendorTag, shouldQty, conds, shouldBaseCond, rule)
+		for cardID := range buylist {
+			processEntry(out, buylist[cardID], mode, cardID, vendorTag, shouldQty, conds, shouldBaseCond, rule)
 		}
 	}
 
@@ -949,7 +949,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 				continue
 			}
 
-			id := uploadedData[j].CardId
+			id := uploadedData[j].CardID
 			if _, found := pm[id]; !found {
 				continue
 			}

@@ -26,7 +26,7 @@ func testClient(t *testing.T) *Client {
 	if os.Getenv("USERSTATE_TEST") == "" {
 		t.Skip("USERSTATE_TEST not set; skipping DB integration test")
 	}
-	cfg := SqlConfig{
+	cfg := SQLConfig{
 		Host: "127.0.0.1", Port: 5432, User: "mtgban",
 		Password: "mtgban", DBName: "user_state", SSLMode: "disable",
 	}

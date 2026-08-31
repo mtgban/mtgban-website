@@ -22,7 +22,7 @@ func moversTestClient(t *testing.T) *Client {
 		t.Skip("TIMESERIES_TEST not set; skipping DB integration test")
 	}
 	port, _ := strconv.Atoi(getenvOr("TS_PORT", "5432"))
-	cfg := SqlConfig{
+	cfg := SQLConfig{
 		Host:     getenvOr("TS_HOST", "127.0.0.1"),
 		Port:     port,
 		User:     getenvOr("TS_USER", "mtgelmo666"),

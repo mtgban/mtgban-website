@@ -46,7 +46,7 @@ func TestUploadSealedCSV(t *testing.T) {
 		if res.MismatchError != nil {
 			t.Errorf("id path %q: MismatchError = %v", row[1], res.MismatchError)
 		}
-		if res.CardId == "" {
+		if res.CardID == "" {
 			t.Errorf("id path %q: empty CardId", row[1])
 		}
 	}
@@ -63,15 +63,15 @@ func TestUploadSealedCSV(t *testing.T) {
 			t.Errorf("name path %q: MismatchError = %v", row[1], res.MismatchError)
 			continue
 		}
-		if res.CardId == "" {
+		if res.CardID == "" {
 			t.Errorf("name path %q: empty CardId", row[1])
 			continue
 		}
-		co, err := mtgmatcher.GetUUID(res.CardId)
+		co, err := mtgmatcher.GetUUID(res.CardID)
 		if err != nil || !co.Sealed {
-			t.Errorf("name path %q: resolved to non-sealed %q", row[1], res.CardId)
+			t.Errorf("name path %q: resolved to non-sealed %q", row[1], res.CardID)
 		}
-		t.Logf("name path %q -> %s (%s)", row[1], res.CardId, co.Name)
+		t.Logf("name path %q -> %s (%s)", row[1], res.CardID, co.Name)
 	}
 }
 
@@ -85,11 +85,11 @@ func TestResolveMoxItemPrinting(t *testing.T) {
 
 	check := func(item moxfield.Item, wantNumber string, wantFoil bool) string {
 		t.Helper()
-		cardId, err := resolveMoxItem(item)
+		cardID, err := resolveMoxItem(item)
 		if err != nil {
 			t.Fatalf("resolve %+v: %s", item, err)
 		}
-		co, err := mtgmatcher.GetUUID(cardId)
+		co, err := mtgmatcher.GetUUID(cardID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,7 +97,7 @@ func TestResolveMoxItemPrinting(t *testing.T) {
 			t.Errorf("resolved to %s %s foil=%v, want UNF %s foil=%v",
 				co.SetCode, co.Number, co.Foil, wantNumber, wantFoil)
 		}
-		return cardId
+		return cardID
 	}
 
 	// The galaxy-foil printing is its own collector number

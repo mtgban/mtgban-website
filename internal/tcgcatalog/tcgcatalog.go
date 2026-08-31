@@ -33,9 +33,9 @@ type Entry struct {
 // everything else (the skus array above all) is skipped during decoding and
 // never retained.
 type product struct {
-	ProductId    int    `json:"productId"`
+	ProductID    int    `json:"productId"`
 	Name         string `json:"name"`
-	GroupId      int    `json:"groupId"`
+	GroupID      int    `json:"groupId"`
 	ExtendedData []struct {
 		Name  string `json:"name"`
 		Value string `json:"value"`
@@ -68,17 +68,17 @@ func Load(r io.Reader) (map[string]Entry, *Category, error) {
 		switch key {
 		case "category":
 			var cat struct {
-				CategoryId int    `json:"categoryId"`
+				CategoryID int    `json:"categoryId"`
 				Name       string `json:"name"`
 			}
 			err := dec.Decode(&cat)
 			if err != nil {
 				return nil, nil, err
 			}
-			category = Category{ID: cat.CategoryId, Name: cat.Name}
+			category = Category{ID: cat.CategoryID, Name: cat.Name}
 		case "groups":
 			var groups []struct {
-				GroupId int    `json:"groupId"`
+				GroupID int    `json:"groupId"`
 				Name    string `json:"name"`
 			}
 			err := dec.Decode(&groups)
@@ -86,7 +86,7 @@ func Load(r io.Reader) (map[string]Entry, *Category, error) {
 				return nil, nil, err
 			}
 			for _, group := range groups {
-				groupNames[group.GroupId] = group.Name
+				groupNames[group.GroupID] = group.Name
 			}
 		case "products":
 			// Opening bracket of the array
@@ -101,7 +101,7 @@ func Load(r io.Reader) (map[string]Entry, *Category, error) {
 				}
 				entry := Entry{
 					Name:    prod.Name,
-					Edition: groupNames[prod.GroupId],
+					Edition: groupNames[prod.GroupID],
 				}
 				for _, data := range prod.ExtendedData {
 					switch data.Name {
@@ -111,7 +111,7 @@ func Load(r io.Reader) (map[string]Entry, *Category, error) {
 						entry.Rarity = data.Value
 					}
 				}
-				products[strconv.Itoa(prod.ProductId)] = entry
+				products[strconv.Itoa(prod.ProductID)] = entry
 			}
 			// Closing bracket of the array
 			if _, err := dec.Token(); err != nil {

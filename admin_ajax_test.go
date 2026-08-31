@@ -12,10 +12,10 @@ import (
 
 func stubGAFetch(t *testing.T, fetch func(string) ([]string, error)) {
 	t.Helper()
-	prevFetch, prevAPI := gaFetch, Config.Api
-	t.Cleanup(func() { gaFetch, Config.Api = prevFetch, prevAPI })
+	prevFetch, prevAPI := gaFetch, Config.API
+	t.Cleanup(func() { gaFetch, Config.API = prevFetch, prevAPI })
 	gaFetch = fetch
-	Config.Api = map[string]string{"github_action_token": "test-token"}
+	Config.API = map[string]string{"github_action_token": "test-token"}
 }
 
 // The poll answers with both states, and asks for them at the same time: run
@@ -68,7 +68,7 @@ func TestRunningWorkflowsSkipsWithoutToken(t *testing.T) {
 		atomic.AddInt32(&calls, 1)
 		return []string{state}, nil
 	})
-	Config.Api = map[string]string{}
+	Config.API = map[string]string{}
 
 	if got := runningWorkflows(); got != nil {
 		t.Errorf("running = %v, want nil", got)
