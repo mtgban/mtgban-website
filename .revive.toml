@@ -1,0 +1,14 @@
+# Style rules the tree already satisfies, so a regression is caught at review
+# time rather than found in a later sweep. The go-mtgban config is the model;
+# only the rules this tree is clean on are enabled.
+#
+# Deliberately absent:
+#   exported - 46 exported names still want a doc comment; sweep first.
+
+ignoreGeneratedHeader = false
+severity = "error"
+confidence = 0.8
+errorCode = 1
+warningCode = 1
+
+[rule.var-naming]
