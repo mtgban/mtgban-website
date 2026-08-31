@@ -172,6 +172,60 @@ var colorRarityMap = map[string]map[string]string{
 
 		"Promo": "#652978",
 	},
+	// Pokemon marks rarity with a symbol after the collector number, and it
+	// is the clearest shape language of any of these games: a filled circle
+	// for common, a diamond for uncommon, a star for rare, two for the double
+	// and ultra tiers, three for hyper. Colour, though, it mostly withholds —
+	// those symbols are black — and only the top tiers tint theirs: gold for
+	// the illustration and hyper stars, pink for ACE SPEC, red for radiant.
+	//
+	// So the four that are coloured are taken from the card and the rest are
+	// placed on the ladder the other games use, grouped the way Yu-Gi-Oh's
+	// are: a shiny holo rare is a shiny rare, a mega hyper rare is a hyper
+	// rare. The 197 cards marked None or Unconfirmed are left out and draw no
+	// badge; code cards, which are filler rather than a tier, take a grey
+	// darker than common's.
+	"pokemon": {
+		"Common": "var(--normal)",
+
+		"Uncommon": "#707883",
+
+		"Code Card": "#4B5158",
+
+		"Classic Collection": "#919495",
+		"Rare":               "#919495",
+
+		"Amazing Rare": "#B06435",
+		"Holo Rare":    "#B06435",
+		"Rare Ace":     "#B06435",
+		"Rare BREAK":   "#B06435",
+
+		"Double Rare":      "#C63A4D",
+		"Mega Attack Rare": "#C63A4D",
+		"Radiant Rare":     "#C63A4D",
+
+		"Prism Rare":       "#B45A96",
+		"Shiny Ultra Rare": "#B45A96",
+		"Ultra Rare":       "#B45A96",
+
+		"Shiny Holo Rare": "#1FA7C9",
+		"Shiny Rare":      "#1FA7C9",
+
+		"Illustration Rare":         "#CDB55E",
+		"Special Illustration Rare": "#CDB55E",
+
+		"Hyper Rare":      "#E0B84A",
+		"Mega Hyper Rare": "#E0B84A",
+		"Rainbow Rare":    "#E0B84A",
+
+		"Black White Rare": "#6F75AA",
+		"Futuristic Rare":  "#6F75AA",
+		"Secret Rare":      "#6F75AA",
+
+		"ACE SPEC Rare": "#B65B92",
+
+		"Promo": "#652978",
+	},
 }
 
 // badgeFont is the size the shapes are cut at, and the ceiling a set code is
