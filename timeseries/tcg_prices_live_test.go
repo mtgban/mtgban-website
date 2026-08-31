@@ -60,13 +60,13 @@ func TestTCGPricesLive(t *testing.T) {
 	}
 
 	// Start clean and delete our sentinel rows when the test finishes.
-	clear := func() {
+	cleanup := func() {
 		if _, err := c.db.ExecContext(ctx, `DELETE FROM tcgplayer_nonmagic_product_prices WHERE category_id = $1`, liveSentinelCategory); err != nil {
 			t.Errorf("cleanup delete: %v", err)
 		}
 	}
-	clear()
-	t.Cleanup(clear)
+	cleanup()
+	t.Cleanup(cleanup)
 
 	const product = 111222333
 	rows := []TCGPriceRow{

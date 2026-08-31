@@ -3,6 +3,7 @@ package collectr
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -227,7 +228,7 @@ func Load(ctx context.Context, proxyBase, link, game string, maxRows int) ([]Ite
 		case lastBodyHint != "":
 			return nil, fmt.Errorf("no products found in showcase (response: %s)", lastBodyHint)
 		default:
-			return nil, fmt.Errorf("no products found in showcase")
+			return nil, errors.New("no products found in showcase")
 		}
 	}
 
@@ -261,10 +262,10 @@ func fetchPage(ctx context.Context, client *http.Client, pageURL string) (string
 // "no products found" error can carry a clue about what we actually received
 // (e.g. a Cloudflare interstitial, an empty shell, or a login page).
 func bodyHint(body string) string {
-	const max = 240
+	const maxLen = 240
 	cleaned := strings.Join(strings.Fields(body), " ")
-	if len(cleaned) > max {
-		cleaned = cleaned[:max] + "…"
+	if len(cleaned) > maxLen {
+		cleaned = cleaned[:maxLen] + "…"
 	}
 	return cleaned
 }
@@ -285,7 +286,7 @@ func parseProducts(body string, categoryName string, maxRows int) ([]Item, error
 	}
 
 	if len(items) == 0 {
-		return nil, fmt.Errorf("no product data found in page")
+		return nil, errors.New("no product data found in page")
 	}
 
 	return items, nil

@@ -310,10 +310,10 @@ func (c *Client) wait() {
 }
 
 func snippet(b []byte) string {
-	const max = 200
+	const maxLen = 200
 	s := strings.TrimSpace(string(b))
-	if len(s) > max {
-		return s[:max] + "..."
+	if len(s) > maxLen {
+		return s[:maxLen] + "..."
 	}
 	return s
 }

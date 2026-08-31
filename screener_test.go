@@ -36,10 +36,10 @@ func TestFilterScreenerRowsUp(t *testing.T) {
 		t.Errorf("expected a and b, got %v", set)
 	}
 	if set["c"] {
-		t.Errorf("c is a drop, should be excluded for up")
+		t.Error("c is a drop, should be excluded for up")
 	}
 	if set["d"] {
-		t.Errorf("d is below the $5 floor, should be excluded")
+		t.Error("d is below the $5 floor, should be excluded")
 	}
 }
 
@@ -259,7 +259,7 @@ func TestCachedMoversFiltersUnresolvable(t *testing.T) {
 			t.Errorf("unresolvable UUID not filtered: %s", r.MtgjsonUUID)
 		}
 		if r.MtgjsonUUID == "box" && !r.Sealed {
-			t.Errorf("box should be flagged sealed")
+			t.Error("box should be flagged sealed")
 		}
 	}
 }

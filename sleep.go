@@ -284,7 +284,7 @@ func getBulks(skipEditions []string) map[string]int {
 				blPrice = blEntries[0].BuyPrice
 			}
 			if blPrice > SleepersMinPrice {
-				tiers[uuid] += 1
+				tiers[uuid]++
 			}
 		}
 	}
@@ -554,16 +554,16 @@ func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
 	maxrange := float64(SleeperSize - 1)
 	minrange := float64(0)
 	exp := float64(minrange - maxrange)
-	max := float64(results[0].Level)
-	min := float64(results[len(results)-1].Level)
+	maxLevel := float64(results[0].Level)
+	minLevel := float64(results[len(results)-1].Level)
 
 	if DevMode {
-		log.Println("Max value:", max)
-		log.Println("Min value:", min)
+		log.Println("Max value:", maxLevel)
+		log.Println("Min value:", minLevel)
 	}
 
 	// Avoid a division by 0
-	if max == min {
+	if maxLevel == minLevel {
 		return nil, errors.New("invalid range")
 	}
 
@@ -571,7 +571,7 @@ func sleepersLayout(tiers map[string]int) (map[string][]string, error) {
 	for _, res := range results {
 		value := float64(res.Level)
 		// Normalize between 0,1
-		r := (value - min) / (max - min)
+		r := (value - minLevel) / (maxLevel - minLevel)
 		// Scale to the size of the table
 		level := int(math.Floor(r*exp) + maxrange)
 

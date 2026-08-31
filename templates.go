@@ -273,11 +273,11 @@ var funcMap = template.FuncMap{
 	"palette_reverse_targets":   func() template.JS { return paletteService.ArbitTargetsJSON("reverse") },
 	"palette_global_targets":    func() template.JS { return paletteService.ArbitTargetsJSON("global") },
 	"guide_stores":              guideStoresJSON,
-	"dict": func(values ...interface{}) (map[string]interface{}, error) {
+	"dict": func(values ...any) (map[string]any, error) {
 		if len(values)%2 != 0 {
 			return nil, errors.New("dict requires even number of args")
 		}
-		m := make(map[string]interface{}, len(values)/2)
+		m := make(map[string]any, len(values)/2)
 		for i := 0; i < len(values); i += 2 {
 			k, ok := values[i].(string)
 			if !ok {

@@ -3,7 +3,7 @@ package patreon
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -29,7 +29,7 @@ const (
 
 func GetAuthToken(ctx context.Context, clientID, secret, redirectURI, code string) (*AuthToken, error) {
 	if clientID == "" || secret == "" {
-		return nil, fmt.Errorf("missing client or secret information")
+		return nil, errors.New("missing client or secret information")
 	}
 
 	payload := url.Values{
