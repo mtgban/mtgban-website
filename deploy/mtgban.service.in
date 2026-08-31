@@ -1,7 +1,8 @@
-# Template for a site's systemd unit. bootstrap.sh substitutes the @NAME@
-# placeholders and installs the result as mtgban@.service (magic) or
-# mtgban-<game>@.service, where %i is the port. Not a unit file as it stands —
-# systemd never reads this one.
+# Template for the site's systemd unit. bootstrap.sh substitutes the @NAME@
+# placeholders and installs the result as mtgban@.service, where %i is the
+# port. One game per droplet, so @CFG@ - which config the binary is started
+# with - is the whole of what one host's unit says differently from another's.
+# Not a unit file as it stands: systemd never reads this one.
 [Unit]
 Description=mtgban website - @GAME@ (port %i)
 After=network.target

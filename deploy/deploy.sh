@@ -9,12 +9,12 @@
 #
 # Invoked over SSH by the GitHub Actions workflow (which has already checked
 # out <ref> in the control repo so this is the right script version):
-#     deploy.sh <git-ref>              # magic, the original single-site host
-#     GAME=yugioh deploy.sh <git-ref>  # any other site on a shared droplet
+#     deploy.sh <git-ref>
 #
-# The site is an environment variable rather than an argument so that a stale
-# caller passing only a ref cannot have its ref read as a game name, or the
-# reverse. deploy/games.sh maps the game to its ports, checkouts and unit.
+# The same on every host, whichever game it serves: one game per droplet, so
+# the ports, the checkouts, the unit and the upstream are the same names
+# everywhere. Which game a host serves is settled once, by bootstrap.sh, in the
+# -cfg the unit starts the binary with; nothing at deploy time needs to know.
 #
 # git checkout --force only resets TRACKED files, so each checkout's untracked
 # datastore + logs survive across deploys.
@@ -23,29 +23,29 @@ set -euo pipefail
 
 # --- config ----------------------------------------------------------------
 # Every name below is overridable, so the script can be exercised off the
-# droplet and a host set up before games.sh existed stays deployable.
-GAME=${GAME:-magic}
+# droplet and a host set up by hand stays deployable.
 DRAIN_SECONDS=${DRAIN_SECONDS:-5}        # let nginx finish routing to the new port before stopping old
 READY_TIMEOUT=${READY_TIMEOUT:-300}      # max seconds to wait for the new instance's datastore
 SETTLE_SECONDS=${SETTLE_SECONDS:-20}     # watch the new instance after the flip, while the old one can still take over
+PORT_BLUE=${PORT_BLUE:-8081}
+PORT_GREEN=${PORT_GREEN:-8082}
+UNIT=${UNIT:-mtgban}                     # systemd template: ${UNIT}@<port>
+UPSTREAM_NAME=${UPSTREAM_NAME:-mtgban}   # the nginx server block proxy_passes to this
+UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}   # chown'd to the deploy user, see README
 
 # The per-port checkouts sit beside this control repo, so the deploy user's
 # home is read off this script's own location rather than assumed.
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SRC_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
-
-# Sets PORT_BLUE, PORT_GREEN, CO_PREFIX, UNIT, UPSTREAM_NAME, UPSTREAM_CONF.
-# shellcheck source=deploy/games.sh
-. "$SCRIPT_DIR/games.sh"
-game_env "$GAME" "$SRC_DIR"
+CO_PREFIX=${CO_PREFIX:-${SRC_DIR}/mtgban-website-}   # per-port checkouts: ${CO_PREFIX}8081 / ...8082
 
 # Go isn't on the non-interactive SSH PATH by default; adjust to `which go`.
 export PATH="/usr/local/go/bin:${HOME}/go/bin:${PATH}"
 # ---------------------------------------------------------------------------
 
 REF="${1:-}"
-[ -n "$REF" ] || { echo "usage: [GAME=<game>] deploy.sh <git-ref>"; exit 2; }
-echo "==> deploying $GAME at ref: $REF"
+[ -n "$REF" ] || { echo "usage: deploy.sh <git-ref>"; exit 2; }
+echo "==> deploying ref: $REF"
 
 # 1. Determine the current live port, flip to the idle one.
 CUR=$(grep -oE '127\.0\.0\.1:[0-9]+' "$UPSTREAM_CONF" | cut -d: -f2)
