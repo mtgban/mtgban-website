@@ -306,7 +306,7 @@ func getResults(db *sql.DB, query string) ([]NewspaperResult, error) {
 	rawResult := make([][]byte, len(cols))
 
 	// A temporary interface{} slice, containing a variable number of fields
-	dest := make([]interface{}, len(cols))
+	dest := make([]any, len(cols))
 	for e := range rawResult {
 		// Put pointers to each string in the interface slice
 		dest[e] = &rawResult[e]
@@ -1112,17 +1112,18 @@ func Newspaper(w http.ResponseWriter, r *http.Request) {
 	}
 
 	enabled := GetParamFromSig(sig, "NewsEnabled")
-	if enabled == "1day" {
+	switch {
+	case enabled == "1day":
 		pageVars.IsOneDay = true
-	} else if enabled == "3day" {
-		// do nothing
-	} else if enabled == "0day" || (DevMode && !SigCheck) {
+	case enabled == "3day":
+		// the default newspaper view needs no flag
+	case enabled == "0day" || (DevMode && !SigCheck):
 		force3day := readSetFlag(w, r, "force3day", "BanNewspaperPref")
 		if !force3day {
 			pageVars.IsOneDay = true
 		}
 		pageVars.CanSwitchDay = true
-	} else {
+	default:
 		pageVars.Title = "This feature is BANned"
 		pageVars.ErrorMessage = ErrMsgDenied
 

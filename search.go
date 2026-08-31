@@ -1943,9 +1943,8 @@ func cmpSets(sortingI, sortingJ *SortingData) bool {
 			return true
 		} else if sortingJ.parentCode == "" && sortingI.parentCode != "" {
 			return false
-		} else {
-			return sortingI.editionLower < sortingJ.editionLower
 		}
+		return sortingI.editionLower < sortingJ.editionLower
 	}
 
 	return setDateI.After(setDateJ)

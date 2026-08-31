@@ -1092,7 +1092,7 @@ func loadVars(port, datastorePath, offlineKey string) error {
 	// Load from env
 	v := os.Getenv("BAN_SECRET")
 	if v == "" {
-		log.Printf("BAN_SECRET not set, using a default one")
+		log.Println("BAN_SECRET not set, using a default one")
 		os.Setenv("BAN_SECRET", DefaultSecret)
 	}
 

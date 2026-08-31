@@ -32,15 +32,15 @@ func TestLongFormLive(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 
-	clear := func() {
+	cleanup := func() {
 		// prices first (FK -> providers, variants), then variants, then provider.
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, liveSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid IN ($1,$2) OR tcgp_category_id=$3`,
 			liveSentinelUUID, liveSentinelUUIDAlt, liveSentinelCatLong)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, liveSentinelProvider)
 	}
-	clear() // start clean (removes any leftover sentinel rows from a prior run)
-	t.Cleanup(clear)
+	cleanup() // start clean (removes any leftover sentinel rows from a prior run)
+	t.Cleanup(cleanup)
 
 	// Sentinel provider so per-provider scans only see this test's rows. Inserted
 	// AFTER the initial clear so it survives into the test body.
@@ -275,14 +275,14 @@ func TestMoversLongGameScopingLive(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = c.Close() })
 
-	clear := func() {
+	cleanup := func() {
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM prices WHERE provider=$1`, scopeSentinelProvider)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM variants WHERE mtgjson_uuid=$1 OR tcgp_category_id=$2`,
 			scopeSentinelUUID, scopeSentinelCat)
 		_, _ = c.db.ExecContext(ctx, `DELETE FROM providers WHERE id=$1`, scopeSentinelProvider)
 	}
-	clear()
-	t.Cleanup(clear)
+	cleanup()
+	t.Cleanup(cleanup)
 
 	if _, err := c.db.ExecContext(ctx, `
 		INSERT INTO providers (id, shorthand, public_name, kind, currency)

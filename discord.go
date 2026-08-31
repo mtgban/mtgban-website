@@ -252,7 +252,7 @@ type AffiliateConfig struct {
 	URLFunc func(*url.URL) *url.URL
 }
 
-var AffiliateStores []AffiliateConfig = []AffiliateConfig{
+var AffiliateStores = []AffiliateConfig{
 	{
 		Trigger:       "cardkingdom.com/mtg",
 		Name:          "Card Kingdom",
