@@ -3,13 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -994,7 +994,11 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 	apiUsersMutex.RUnlock()
 
 	if !found {
-		key = randomString(15)
+		var err error
+		key, err = randomString(15)
+		if err != nil {
+			return "", err
+		}
 
 		if Config.APIUserSecrets == nil {
 			return "", errors.New("config not loaded")
@@ -1039,11 +1043,27 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 	return base64.StdEncoding.EncodeToString([]byte(v.Encode())), nil
 }
 
-// 32-126 are the printable characters in ashii, 33 excludes space
-func randomString(l int) string {
-	bytes := make([]byte, l)
-	for i := 0; i < l; i++ {
-		bytes[i] = byte(33 + rand.Intn(126-33))
+// randomString returns l printable ASCII characters (33 through 125) read
+// from crypto/rand: the result names an API secret, so it has to be
+// unpredictable, not merely uniform.
+func randomString(l int) (string, error) {
+	out := make([]byte, 0, l)
+	buf := make([]byte, 64)
+	for len(out) < l {
+		if _, err := rand.Read(buf); err != nil {
+			return "", err
+		}
+		for _, b := range buf {
+			// 93 characters divide 255 unevenly; rejecting the tail past
+			// their largest multiple keeps the draw uniform.
+			if b >= 186 {
+				continue
+			}
+			out = append(out, 33+b%93)
+			if len(out) == l {
+				break
+			}
+		}
 	}
-	return string(bytes)
+	return string(out), nil
 }
