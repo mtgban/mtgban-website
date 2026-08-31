@@ -28,6 +28,7 @@ UNIT=${UNIT:-mtgban}                             # systemd template: ${UNIT}@<po
 UPSTREAM_NAME=${UPSTREAM_NAME:-mtgban}           # what the server block proxy_passes to
 UPSTREAM_CONF=${UPSTREAM_CONF:-/etc/nginx/conf.d/mtgban_upstream.conf}
 SUDOERS_FILE=${SUDOERS_FILE:-/etc/sudoers.d/mtgban-deploy}
+UNIT_FILE=${UNIT_FILE:-/etc/systemd/system/${UNIT}@.service}
 ENV_FILE=${ENV_FILE:-/etc/mtgban.env}
 READY_TIMEOUT=${READY_TIMEOUT:-300}
 # The one name a game decides. Every game reads its own config from the bucket
@@ -120,12 +121,12 @@ done
 # 2. systemd template unit, rendered for this host. Substituting rather than
 #    copying is what lets one template serve every game - the -cfg is the whole
 #    of the difference - and what keeps the deploy user out of the repo.
-echo "==> installing systemd unit -> /etc/systemd/system/${UNIT}@.service"
+echo "==> installing systemd unit -> $UNIT_FILE"
 sed -e "s|@GAME@|${GAME}|" \
     -e "s|@USER@|${DEPLOY_USER}|g" \
     -e "s|@CO_PREFIX@|${CO_PREFIX}|g" \
     -e "s|@CFG@|${CFG}|" \
-    "$REPO_DIR/deploy/mtgban.service.in" | sudo tee "/etc/systemd/system/${UNIT}@.service" >/dev/null
+    "$REPO_DIR/deploy/mtgban.service.in" | sudo tee "$UNIT_FILE" >/dev/null
 sudo "$SYSTEMCTL" daemon-reload
 
 # 3. Secrets env file (placeholders only — never overwrite real values).
@@ -180,13 +181,28 @@ for ((i=0; i<READY_TIMEOUT; i++)); do
     if curl -fs "http://127.0.0.1:${BOOT_PORT}/healthz" >/dev/null 2>&1; then ready=1; break; fi
     sleep 1
 done
-[ "$ready" = 1 ] && echo "==> ${UNIT}@${BOOT_PORT} healthy" \
-                 || echo "!! ${UNIT}@${BOOT_PORT} not healthy yet — check: journalctl -u ${UNIT}@${BOOT_PORT} -n 40"
+if [ "$ready" = 1 ]; then
+    echo "==> ${UNIT}@${BOOT_PORT} healthy"
+else
+    # The usual cause by far, on a droplet cloud-init has just prepared: the
+    # instance cannot fetch its config without the bucket key, so it exits and
+    # systemd restarts it forever. Say that outright rather than handing over
+    # a log to read, and fall back to the log for anything else.
+    echo "!! ${UNIT}@${BOOT_PORT} never answered /healthz in ${READY_TIMEOUT}s"
+    if sudo grep -q '=XXX' "$ENV_FILE" 2>/dev/null; then
+        echo "!! $ENV_FILE still holds placeholders, which is reason enough"
+    else
+        echo "!! last 40 log lines:"
+        sudo journalctl -q -u "${UNIT}@${BOOT_PORT}" -n 40 --no-pager | sed 's/^/     /'
+    fi
+fi
 
+# Printed on both paths: the steps below are what is left either way, and the
+# first of them is what an unhealthy instance is usually waiting for.
 cat <<EOF
 
 ================================================================
-Bootstrap done. Remaining MANUAL steps:
+Remaining MANUAL steps:
 
   1. Put real values in $ENV_FILE (if it still has XXX), then:
        sudo systemctl restart ${UNIT}@${BOOT_PORT}
@@ -205,3 +221,15 @@ Then push a tag to trigger a deploy. The workflow runs:
      deploy/deploy.sh <ref>
 ================================================================
 EOF
+
+# A host whose instance never came up is not set up, whatever else succeeded.
+# Said last and with the exit code, so a caller - or a person scrolling past
+# the steps above - cannot read this run as having worked.
+if [ "$ready" != 1 ]; then
+    echo
+    echo "!! bootstrap FAILED: ${UNIT}@${BOOT_PORT} is not serving"
+    exit 1
+fi
+
+echo
+echo "==> bootstrap complete: ${UNIT}@${BOOT_PORT} is serving"
