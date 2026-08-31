@@ -899,7 +899,7 @@ func LoadDatastoreFromCloud(w http.ResponseWriter, r *http.Request) {
 	// reload that is running perfectly well. What the load then did is on
 	// the admin page, and in the server notifications.
 	state := datastoreReloads.Status()
-	if !StartDatastoreReload(DatastoreBucket, Config.DatastorePath, "api") {
+	if !StartDatastoreReload(Config.DatastorePath, "api") {
 		w.WriteHeader(http.StatusAccepted)
 		fmt.Fprintf(w, `{"status": "ok", "state": "already running", "started": %q}`, state.StartedAt.UTC().Format(time.RFC3339))
 		return

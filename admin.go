@@ -144,21 +144,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	switch reboot {
 	case "datastore", "datastore-backup":
 		dsPath := Config.DatastorePath
-		bucket := DatastoreBucket
 		if reboot == "datastore-backup" {
+			// The backup may live somewhere else entirely, which used to mean
+			// building a second bucket by hand. The path names where it is.
 			dsPath = Config.Datastore.BackupPath
 			if dsPath == "" {
 				v = url.Values{}
 				v.Set("msg", "No BackupPath set in config")
 				doReboot = true
 			}
-			// The backup may live somewhere else entirely
-			backupBucket, err := newReadBucket(dsPath)
-			if err == nil {
-				bucket = backupBucket
-			}
 		}
-		if StartDatastoreReload(bucket, dsPath, "admin") {
+		if StartDatastoreReload(dsPath, "admin") {
 			pageVars.InfoMessage = "Reloading the datastore, this page will say when it is done..."
 		} else {
 			pageVars.InfoMessage = "A datastore reload is already running"

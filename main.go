@@ -25,7 +25,6 @@ import (
 
 	"database/sql"
 
-	"github.com/hashicorp/go-cleanhttp"
 	_ "github.com/lib/pq"
 	"github.com/mtgban/mtgban-website/internal/offline"
 	"github.com/mtgban/mtgban-website/internal/offlineapi"
@@ -1200,38 +1199,10 @@ func loadGoogleCredentials() (*http.Client, error) {
 
 // Bucket serving the datastore and any other file living alongside it,
 // created once at startup
-var DatastoreBucket simplecloud.Reader
-
-// newReadBucket returns a bucket able to serve the given path according to
-// its scheme, using the datastore credentials for remote ones.
-func newReadBucket(path string) (simplecloud.Reader, error) {
-	u, err := url.Parse(path)
-	if err != nil {
-		return nil, err
-	}
-
-	switch u.Scheme {
-	case "":
-		return &simplecloud.FileBucket{}, nil
-	case "b2":
-		b2Bucket, err := newB2ClientFor(context.Background(), u.Host)
-		if err != nil {
-			return nil, err
-		}
-		b2Bucket.ConcurrentDownloads = 20
-
-		return b2Bucket, nil
-	case "http", "https":
-		return simplecloud.NewHTTPBucket(cleanhttp.DefaultClient(), path)
-	}
-
-	return nil, fmt.Errorf("unsupported path scheme %s", u.Scheme)
-}
-
-func loadDatastore(bucket simplecloud.Reader, ds string) error {
+func loadDatastore(ds string) error {
 	log.Println("Loading datastore from", ds)
 
-	reader, err := simplecloud.InitReader(context.Background(), bucket, ds)
+	reader, err := openBucketPath(context.Background(), ds)
 	if err != nil {
 		return err
 	}
@@ -1260,9 +1231,12 @@ var datastoreReloads dsreload.Tracker
 
 // StartDatastoreReload loads the datastore in the background, reporting
 // whether this call is the one that started it. See dsreload.Tracker.Start.
-func StartDatastoreReload(bucket simplecloud.Reader, path, source string) bool {
+//
+// The path is all it takes: openBucketPath reads the backend off the scheme,
+// so a datastore and a backup living in different places are the same call.
+func StartDatastoreReload(path, source string) bool {
 	return datastoreReloads.Start(source, path, func() error {
-		err := loadDatastore(bucket, path)
+		err := loadDatastore(path)
 		if err != nil {
 			return err
 		}
@@ -1414,12 +1388,8 @@ func main() {
 	}
 
 	// load website up
-	DatastoreBucket, err = newReadBucket(Config.DatastorePath)
-	if err != nil {
-		log.Fatalln("error creating the datastore bucket:", err)
-	}
 	go func() {
-		err := loadDatastore(DatastoreBucket, Config.DatastorePath)
+		err := loadDatastore(Config.DatastorePath)
 		if err != nil {
 			log.Fatalln("error loading datastore:", err)
 		}
