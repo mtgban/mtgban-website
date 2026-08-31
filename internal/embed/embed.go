@@ -17,14 +17,17 @@ import (
 )
 
 const (
-	// Overflow prevention for field.Value size
+	// MaxCustomEntries caps the rows one embed field carries, keeping its
+	// value under Discord's size limit.
 	MaxCustomEntries = 7
 
-	// Discord API constants
+	// MaxEmbedFieldsValueLength is Discord's cap on one field's value.
 	MaxEmbedFieldsValueLength = 1024
-	MaxEmbedFieldsNumber      = 25
+	// MaxEmbedFieldsNumber is Discord's cap on fields per embed.
+	MaxEmbedFieldsNumber = 25
 
-	// Maximum number of printings shown before truncating the list
+	// MaxPrintings is how many printings are listed before the line
+	// truncates to "and more".
 	MaxPrintings = 12
 )
 
@@ -49,6 +52,7 @@ type Entry struct {
 	Ratio       float64
 }
 
+// OEmbed is the oEmbed envelope Discord fetches to unfurl a link.
 type OEmbed struct {
 	Version         string `json:"version"`
 	ProviderName    string `json:"provider_name"`
@@ -61,6 +65,8 @@ type OEmbed struct {
 	ThumbnailHeight int    `json:"thumbnail_height"`
 }
 
+// SearchResult is one search summarized for an embed: the index, retail
+// and buylist rows found for a card.
 type SearchResult struct {
 	Invalid         bool
 	CardID          string
@@ -71,6 +77,7 @@ type SearchResult struct {
 	NamesOverride   []string
 }
 
+// Field is one embed field, a titled column of aligned rows.
 type Field struct {
 	Name   string
 	Values []FieldValue
@@ -79,6 +86,8 @@ type Field struct {
 	Inline bool
 }
 
+// FieldValue is one row of a field: a store, its price, and where the
+// price links to.
 type FieldValue struct {
 	ScraperName string
 	Tag         string
@@ -107,6 +116,8 @@ func PrintingsLine(printings []string) string {
 	return line
 }
 
+// FormatSearchResult renders a search as embed fields, one each for the
+// index, retail and buylist results.
 func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 	// Add two embed fields, one for retail and one for buylist
 	for i, results := range [][]Entry{

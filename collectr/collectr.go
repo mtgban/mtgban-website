@@ -1,3 +1,4 @@
+// Package collectr reads product listings off Collectr showcase pages.
 package collectr
 
 import (
@@ -26,6 +27,7 @@ var CategoryFilter = map[string]string{
 	"lorcana": "Lorcana",
 }
 
+// Item is one product listing read off a showcase page.
 type Item struct {
 	ProductID string
 	Name      string

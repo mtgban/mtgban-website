@@ -1,4 +1,6 @@
 // observability/store.go
+// Package observability records page visits in Postgres and answers the
+// admin dashboard's usage aggregates.
 package observability
 
 import (
@@ -42,12 +44,14 @@ type PathAgg struct {
 	Uniques int64
 }
 
+// TierAgg is one tier's visit counts.
 type TierAgg struct {
 	Tier    string
 	Hits    int64
 	Uniques int64
 }
 
+// DeviceAgg is one path's visit counts split by device.
 type DeviceAgg struct {
 	Path    string
 	Device  string

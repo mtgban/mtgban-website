@@ -1,3 +1,5 @@
+// Package timeseries keeps price history in Postgres and answers the
+// chart and mover queries the site draws from it.
 package timeseries
 
 import (
@@ -50,10 +52,12 @@ type PriceRow struct {
 // Lookback is a number of days of history to consider.
 type Lookback int
 
+// Days returns the lookback as a day count.
 func (l Lookback) Days() int {
 	return int(l)
 }
 
+// Since returns the moment the lookback starts from.
 func (l Lookback) Since() time.Time {
 	return time.Now().AddDate(0, 0, -l.Days())
 }

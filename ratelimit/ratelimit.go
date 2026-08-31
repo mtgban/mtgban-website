@@ -1,3 +1,4 @@
+// Package ratelimit throttles requests per visitor IP.
 package ratelimit
 
 import (
@@ -17,6 +18,7 @@ type visitor struct {
 	lastSeen atomic.Int64 // unix nanos of the last Allow
 }
 
+// Limiter rate-limits by visitor IP, forgetting a visitor who stays away.
 type Limiter struct {
 	sync.RWMutex
 
@@ -25,6 +27,8 @@ type Limiter struct {
 	visitors map[string]*visitor
 }
 
+// NewLimiter returns a limiter allowing rate r with the given burst for
+// each visitor.
 func NewLimiter(r rate.Limit, burst int) *Limiter {
 	l := &Limiter{
 		rate:     r,
@@ -77,6 +81,8 @@ func (l *Limiter) janitor(interval, maxAge time.Duration) {
 	}
 }
 
+// IPAddress extracts the caller's IP, trusting the forwarding headers
+// before the socket.
 func IPAddress(r *http.Request) (net.IP, error) {
 	// Try headers first
 	xff := r.Header.Get("X-Forwarded-For")

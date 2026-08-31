@@ -40,6 +40,7 @@ import (
 )
 
 const (
+	// FormatVersion is the wire version Encode stamps and Decode requires.
 	FormatVersion = byte(1)
 	MsgTypeFull   = byte(1)
 	// MsgTypeDelta is reserved so entry level deltas stay a non breaking add.
@@ -48,6 +49,7 @@ const (
 
 var magic = []byte{0x4F, 0x46, 0x50, 0x31}
 
+// PriceEntry is one card's regular and foil prices.
 type PriceEntry struct {
 	Regular float64
 	Foil    float64
@@ -142,6 +144,7 @@ func dictionaries(p *SetPayload) (stores, tags []string) {
 	return stores, tags
 }
 
+// Encode packs a set's prices into the offline wire format.
 func Encode(p *SetPayload) ([]byte, error) {
 	stores, tags := dictionaries(p)
 	storeIdx := map[string]uint64{}
@@ -312,6 +315,7 @@ func (r *reader) str() (string, error) {
 	return string(b), nil
 }
 
+// Decode unpacks what Encode produced.
 func Decode(data []byte) (*SetPayload, error) {
 	if len(data) < 6 || !bytes.Equal(data[:4], magic) {
 		return nil, errors.New("bad magic")

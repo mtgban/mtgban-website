@@ -12,6 +12,7 @@ type Fingerprint struct {
 	count uint64
 }
 
+// Add folds one price row into the fingerprint.
 func (f *Fingerprint) Add(uuid, store, tag string, cents uint64, qty int) {
 	h := fnv.New64a()
 	var nums [16]byte

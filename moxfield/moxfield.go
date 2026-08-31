@@ -1,3 +1,4 @@
+// Package moxfield reads decks and collections off Moxfield's API.
 package moxfield
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/hashicorp/go-cleanhttp"
 )
 
+// Item is one card pulled out of a deck or collection.
 type Item struct {
 	// ScryfallID identifies the printing when the source carries one;
 	// deck per-copy printings carry Name+SetCode+Number instead
@@ -33,6 +35,7 @@ func (i Item) sortKey() string {
 	return i.ScryfallID + i.Name + i.SetCode + i.Number + fmt.Sprint(i.IsFoil, i.IsEtched)
 }
 
+// Deck is Moxfield's deck payload: boards of cards by name.
 type Deck struct {
 	Name   string `json:"name"`
 	Boards map[string]struct {
@@ -128,6 +131,7 @@ func prepareDecklist(deck *Deck, maxRows int) []Item {
 	return items
 }
 
+// Collection is one page of a user's collection.
 type Collection struct {
 	PageNumber   int `json:"pageNumber"`
 	PageSize     int `json:"pageSize"`
