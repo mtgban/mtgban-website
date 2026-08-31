@@ -176,11 +176,11 @@ func Sleepers(w http.ResponseWriter, r *http.Request) {
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
 
 	pageVars.Metadata = map[string]GenericCard{}
-	for _, cardIds := range sleepers {
-		for _, cardId := range cardIds {
-			_, found := pageVars.Metadata[cardId]
+	for _, cardIDs := range sleepers {
+		for _, cardID := range cardIDs {
+			_, found := pageVars.Metadata[cardID]
 			if !found {
-				pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
+				pageVars.Metadata[cardID] = uuid2card(cardID, true, false, preferFlavor)
 			}
 		}
 	}
@@ -300,7 +300,7 @@ func getHotlist(skipEditions []string) map[string]int {
 	// Skip bad editions
 	skipEditions = append(skipEditions, "30A", "PTK", "CED", "CEI", "CMB1", "CMB2")
 
-	for cardId, hotlistEntries := range GetInfos()["hotlist"] {
+	for cardID, hotlistEntries := range GetInfos()["hotlist"] {
 		// Make sure the older price is set, otherwise a lot of cards that were
 		// previously not being bought will show up and pollute results
 		oldPrice := hotlistEntries[0].Price
@@ -308,13 +308,13 @@ func getHotlist(skipEditions []string) map[string]int {
 			continue
 		}
 
-		co, err := mtgmatcher.GetUUID(cardId)
+		co, err := mtgmatcher.GetUUID(cardID)
 		if err != nil || slices.Contains(skipEditions, co.SetCode) {
 			continue
 		}
 
 		var currentPrice float64
-		currentEntries, found := bl[cardId]
+		currentEntries, found := bl[cardID]
 		if found {
 			currentPrice = currentEntries[0].BuyPrice
 		}
@@ -327,7 +327,7 @@ func getHotlist(skipEditions []string) map[string]int {
 		// formula in go-mtgban and upload.go now uses log10. Left as ln deliberately:
 		// these integer tier buckets are calibrated against this scale, so switching
 		// to log10 would shift every tier. Revisit if/when the tiers are recalibrated.
-		tiers[cardId] = int(100 * difference / (currentPrice + 10) * math.Log(1+spread))
+		tiers[cardID] = int(100 * difference / (currentPrice + 10) * math.Log(1+spread))
 	}
 
 	return tiers
@@ -493,9 +493,9 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 
 	// Filter out entries that are invalid
 	for i := range mismatch {
-		cardId := mismatch[i].CardID
+		cardID := mismatch[i].CardID
 
-		co, err := mtgmatcher.GetUUID(cardId)
+		co, err := mtgmatcher.GetUUID(cardID)
 		if err != nil {
 			continue
 		}
@@ -506,7 +506,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 		// Validate prices, skip in case anything is sus
 		if ref == "TCGLow" {
 			checkPrice := 0.0
-			entries, found := marketCheck[cardId]
+			entries, found := marketCheck[cardID]
 			if found {
 				checkPrice = entries[0].Price
 			}
@@ -518,7 +518,7 @@ func getGap(blocklistRetail []string, ref, target string, skipEditions []string)
 
 		// Multiply by 100 to preseve the mantissa and have more
 		// values to distribute across the table
-		tiers[cardId] = int(mismatch[i].Spread * 100)
+		tiers[cardID] = int(mismatch[i].Spread * 100)
 	}
 
 	return tiers

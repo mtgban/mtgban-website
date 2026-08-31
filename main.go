@@ -69,7 +69,7 @@ type PageVars struct {
 	ExtraNav []NavElem
 	BetaNav  *NavElem
 
-	PatreonIds   map[string]string
+	PatreonIDs   map[string]string
 	PatreonURL   string
 	PatreonLogin bool
 	Hash         string
@@ -211,7 +211,7 @@ type PageVars struct {
 	ModalMode       bool
 	Alternative     string
 	StocksURL       string
-	AltEtchedId     string
+	AltEtchedID     string
 
 	EditionSort       []string
 	EditionList       map[string][]EditionEntry
@@ -554,8 +554,8 @@ type ConfigType struct {
 	Affiliate              map[string]string  `json:"affiliate"`
 	AffiliatesList         []string           `json:"affiliates_list"`
 	AffiliatesBuylistList  []string           `json:"affiliates_buylist_list"`
-	Api                    map[string]string  `json:"api"`
-	ApiDemoStores          []string           `json:"api_demo_stores"`
+	API                    map[string]string  `json:"api"`
+	APIDemoStores          []string           `json:"api_demo_stores"`
 	DiscordToken           string             `json:"discord_token"`
 	ArbitDefaultSellers    []string           `json:"arbit_default_sellers"`
 	ArbitBlockVendors      []string           `json:"arbit_block_vendors"`
@@ -566,7 +566,7 @@ type ConfigType struct {
 	GlobalAllowList        []string           `json:"global_allow_list"`
 	GlobalProbeList        []string           `json:"global_probe_list"`
 	Patreon                PatreonConfig      `json:"patreon"`
-	ApiUserSecrets         map[string]string  `json:"api_user_secrets"`
+	APIUserSecrets         map[string]string  `json:"api_user_secrets"`
 	GoogleCredentials      string             `json:"google_credentials"`
 	BuylistMarketCredit    map[string]float64 `json:"buylist_market_credit"`
 
@@ -576,10 +576,10 @@ type ConfigType struct {
 
 	Uploader map[string]string `json:"uploader"`
 
-	SqlConfig             *timeseries.SqlConfig `json:"sql_config"`
-	UserStateConfig       *userstate.SqlConfig  `json:"user_state_config"`
-	ObservabilityConfig   *timeseries.SqlConfig `json:"observability_config"`
-	NewNewspaperSqlConfig *timeseries.SqlConfig `json:"new_newspaper_sql_config"`
+	SQLConfig             *timeseries.SQLConfig `json:"sql_config"`
+	UserStateConfig       *userstate.SQLConfig  `json:"user_state_config"`
+	ObservabilityConfig   *timeseries.SQLConfig `json:"observability_config"`
+	NewNewspaperSQLConfig *timeseries.SQLConfig `json:"new_newspaper_sql_config"`
 
 	TCGCSVConfig *tcgcsv.Config `json:"tcgcsv_config"`
 
@@ -904,7 +904,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		Title:        "BAN " + activeTab,
 		ErrorMessage: msg,
 
-		PatreonIds:   Config.Patreon.Client,
+		PatreonIDs:   Config.Patreon.Client,
 		PatreonURL:   ServerURL + "/auth",
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,
@@ -1100,10 +1100,10 @@ func loadVars(port, datastorePath, offlineKey string) error {
 }
 
 func openDBs() (err error) {
-	if Config.SqlConfig == nil {
+	if Config.SQLConfig == nil {
 		log.Println("no SQL configuration set, Charts won't be available")
 	} else {
-		PricesArchiveDB, err = timeseries.NewClient(*Config.SqlConfig)
+		PricesArchiveDB, err = timeseries.NewClient(*Config.SQLConfig)
 		if err != nil {
 			return fmt.Errorf("error opening the timeseries SQL client: %w", err)
 		}
@@ -1157,8 +1157,8 @@ func openDBs() (err error) {
 		log.Println("observability telemetry enabled")
 	}
 
-	if Config.NewNewspaperSqlConfig != nil {
-		NewNewspaperDB, err = Config.NewNewspaperSqlConfig.OpenDB()
+	if Config.NewNewspaperSQLConfig != nil {
+		NewNewspaperDB, err = Config.NewNewspaperSQLConfig.OpenDB()
 		if err != nil {
 			return fmt.Errorf("error opening the new_newspaper SQL client: %w", err)
 		}

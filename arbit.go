@@ -287,14 +287,14 @@ func init() {
 	}
 }
 
-// arbitCardIds collects the card id of every entry, for resolving their
+// arbitCardIDs collects the card id of every entry, for resolving their
 // sorting data in one pass.
-func arbitCardIds(entries []mtgban.ArbitEntry) []string {
-	cardIds := make([]string, len(entries))
+func arbitCardIDs(entries []mtgban.ArbitEntry) []string {
+	cardIDs := make([]string, len(entries))
 	for i := range entries {
-		cardIds[i] = entries[i].CardID
+		cardIDs[i] = entries[i].CardID
 	}
-	return cardIds
+	return cardIDs
 }
 
 // arbitLess returns the comparator for sorting entries in the given
@@ -337,7 +337,7 @@ func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode, preferFlavo
 			return a.Spread > b.Spread
 		}
 	case "edition":
-		sortData := resolveSortingData(arbitCardIds(entries))
+		sortData := resolveSortingData(arbitCardIDs(entries))
 		return func(a, b *mtgban.ArbitEntry) bool {
 			if a.CardID == b.CardID {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
@@ -345,7 +345,7 @@ func arbitLess(entries []mtgban.ArbitEntry, mode string, globalMode, preferFlavo
 			return cmpSets(sortData[a.CardID], sortData[b.CardID])
 		}
 	case "alpha":
-		sortData := resolveSortingData(arbitCardIds(entries))
+		sortData := resolveSortingData(arbitCardIDs(entries))
 		return func(a, b *mtgban.ArbitEntry) bool {
 			if a.CardID == b.CardID {
 				return a.InventoryEntry.Conditions < b.InventoryEntry.Conditions
@@ -930,12 +930,12 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 
 		pageVars.Arb = append(pageVars.Arb, entry)
 		for i := range arbit {
-			cardId := arbit[i].CardID
-			_, found := pageVars.Metadata[cardId]
+			cardID := arbit[i].CardID
+			_, found := pageVars.Metadata[cardID]
 			if found {
 				continue
 			}
-			pageVars.Metadata[cardId] = uuid2card(cardId, true, false, preferFlavor)
+			pageVars.Metadata[cardID] = uuid2card(cardID, true, false, preferFlavor)
 		}
 	}
 

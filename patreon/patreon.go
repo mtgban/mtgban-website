@@ -27,14 +27,14 @@ const (
 	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title"
 )
 
-func GetAuthToken(ctx context.Context, clientId, secret, redirectURI, code string) (*AuthToken, error) {
-	if clientId == "" || secret == "" {
+func GetAuthToken(ctx context.Context, clientID, secret, redirectURI, code string) (*AuthToken, error) {
+	if clientID == "" || secret == "" {
 		return nil, fmt.Errorf("missing client or secret information")
 	}
 
 	payload := url.Values{
 		"grant_type":    {"authorization_code"},
-		"client_id":     {clientId},
+		"client_id":     {clientID},
 		"client_secret": {secret},
 		"redirect_uri":  {redirectURI + "/auth"},
 		"code":          {code},
@@ -88,12 +88,12 @@ type UserData struct {
 		Relationships struct {
 			Memberships struct {
 				Data []struct {
-					Id   string `json:"id"`
+					ID   string `json:"id"`
 					Type string `json:"type"`
 				} `json:"data"`
 			} `json:"memberships"`
 		} `json:"relationships"`
-		IdV1 string `json:"id"`
+		IDV1 string `json:"id"`
 	} `json:"data"`
 }
 
@@ -129,7 +129,7 @@ type MembershipData struct {
 		Relationships struct {
 			CurrentlyEntitledTiers struct {
 				Data []struct {
-					Id   string `json:"id"`
+					ID   string `json:"id"`
 					Type string `json:"type"`
 				} `json:"data"`
 			} `json:"currently_entitled_tiers"`
@@ -139,13 +139,13 @@ type MembershipData struct {
 		Attributes struct {
 			Title string `json:"title"`
 		} `json:"attributes"`
-		Id   string `json:"id"`
+		ID   string `json:"id"`
 		Type string `json:"type"`
 	} `json:"included"`
 }
 
-func (c *Client) GetMembershipData(ctx context.Context, userId string) (*MembershipData, error) {
-	link := PatreonMemberURL + userId + PatreonMemberOpts
+func (c *Client) GetMembershipData(ctx context.Context, userID string) (*MembershipData, error) {
+	link := PatreonMemberURL + userID + PatreonMemberOpts
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, http.NoBody)
 	if err != nil {
 		return nil, err

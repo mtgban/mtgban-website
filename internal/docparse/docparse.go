@@ -28,7 +28,7 @@ type Entry struct {
 	Card mtgmatcher.InputCard
 
 	// The UUID of the card
-	CardId string
+	CardID string
 
 	// Error when mtgmatcher.Match() fails
 	MismatchError error
@@ -93,9 +93,9 @@ func GetQuantity(qty string) (int, error) {
 // PartitionEntries splits entries into singles, sealed, and notFound. Entries
 // with a match error go to notFound; matched entries split by membership in
 // sealedIds.
-func PartitionEntries(entries []Entry, sealedIds []string) (singles, sealed, notFound []Entry) {
-	sealedSet := make(map[string]bool, len(sealedIds))
-	for _, id := range sealedIds {
+func PartitionEntries(entries []Entry, sealedIDs []string) (singles, sealed, notFound []Entry) {
+	sealedSet := make(map[string]bool, len(sealedIDs))
+	for _, id := range sealedIDs {
 		sealedSet[id] = true
 	}
 
@@ -103,7 +103,7 @@ func PartitionEntries(entries []Entry, sealedIds []string) (singles, sealed, not
 		switch {
 		case e.MismatchError != nil:
 			notFound = append(notFound, e)
-		case sealedSet[e.CardId]:
+		case sealedSet[e.CardID]:
 			sealed = append(sealed, e)
 		default:
 			singles = append(singles, e)
@@ -120,13 +120,13 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 
 	for i := range uploadedData {
 		// Preserve empty results (for errors and whatnot)
-		if uploadedData[i].CardId == "" {
+		if uploadedData[i].CardID == "" {
 			uploadedDataClean = append(uploadedDataClean, uploadedData[i])
 			continue
 		}
 
 		// Use id + condition to mimic a "sku"
-		sku := uploadedData[i].CardId + uploadedData[i].OriginalCondition
+		sku := uploadedData[i].CardID + uploadedData[i].OriginalCondition
 
 		if duplicatedHashes[sku] {
 			qty := 1
@@ -136,7 +136,7 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 
 			// Iterate on the already added cards to update the quantity
 			for j := range uploadedDataClean {
-				if uploadedData[i].CardId == uploadedDataClean[j].CardId &&
+				if uploadedData[i].CardID == uploadedDataClean[j].CardID &&
 					uploadedData[i].OriginalCondition == uploadedDataClean[j].OriginalCondition {
 					if uploadedDataClean[j].Quantity == 0 {
 						uploadedDataClean[j].Quantity++
@@ -276,12 +276,12 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 	}
 
 	// If this field is present we don't need safe defaults
-	_, foundId := indexMap["id"]
-	_, foundTcgId := indexMap["tcgSku"]
+	_, foundID := indexMap["id"]
+	_, foundTcgID := indexMap["tcgSku"]
 
 	// Set some default values for the mandatory fields
 	_, foundName := indexMap["cardName"]
-	if !foundName && !foundId && !foundTcgId {
+	if !foundName && !foundID && !foundTcgID {
 		indexMap["cardName"] = 0
 		// Used by some formats that do not set a card name
 		i, found := indexMap["title"]
@@ -291,12 +291,12 @@ func (p *Parser) ParseHeader(first []string) (map[string]int, error) {
 		}
 	}
 	_, foundEdition := indexMap["edition"]
-	if !foundEdition && !foundId {
+	if !foundEdition && !foundID {
 		indexMap["edition"] = 1
 	}
 
 	// If nothing at all was found, send an error to reprocess the first line
-	if !foundName && !foundEdition && !foundId {
+	if !foundName && !foundEdition && !foundID {
 		p.logf("Fake Header map: %v", indexMap)
 		return indexMap, ErrReloadFirstRow
 	}
@@ -415,11 +415,11 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 	// Try looking up using the TCGSkuId if we found an id and it's not among
 	// the supported ones - this needs to happen before the normal Match
 	// or name matching might interfere with actual results
-	var tcgSkuId string
+	var tcgSkuID string
 	idx, found = indexMap["tcgSku"]
 	if found && idx < len(record) && p.TCGSkuToUUID != nil {
-		tcgSkuId = record[idx]
-		res.Card.ID = p.TCGSkuToUUID(tcgSkuId)
+		tcgSkuID = record[idx]
+		res.Card.ID = p.TCGSkuToUUID(tcgSkuID)
 	}
 
 	res.Card.Name = record[indexMap["cardName"]]
@@ -484,8 +484,8 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 
 	// A TCGplayer SKU encodes its condition; when the source carried no
 	// condition column, infer it from the SKU rather than leaving it blank.
-	if res.OriginalCondition == "" && tcgSkuId != "" && p.TCGSkuToCondition != nil {
-		res.OriginalCondition = p.TCGSkuToCondition(tcgSkuId)
+	if res.OriginalCondition == "" && tcgSkuID != "" && p.TCGSkuToCondition != nil {
+		res.OriginalCondition = p.TCGSkuToCondition(tcgSkuID)
 	}
 
 	idx, found = indexMap["notes"]
@@ -501,13 +501,13 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 	// sealed fallback below
 	ogName := res.Card.Name
 
-	cardId, err := mtgmatcher.Match(&res.Card)
+	cardID, err := mtgmatcher.Match(&res.Card)
 
 	// When the lookup fails, retry against the sealed pool for a 1:1 match
 	if err != nil {
 		hits, _ := mtgmatcher.SearchSealedEquals(ogName)
 		if len(hits) > 0 {
-			cardId = hits[0]
+			cardID = hits[0]
 			err = nil
 		}
 	}
@@ -521,13 +521,13 @@ func (p *Parser) ParseRow(indexMap map[string]int, record []string) (Entry, erro
 				return p.PreferredPrinting(aliases[i], aliases[j])
 			})
 		}
-		cardId = aliases[0]
+		cardID = aliases[0]
 		res.MismatchAlias = true
 		res.PossibleAliases = aliases
 	} else {
 		res.MismatchError = err
 	}
-	res.CardId = cardId
+	res.CardID = cardID
 
 	return res, nil
 }

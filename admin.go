@@ -679,7 +679,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	// -- People: API Users --
 	var emails []string
-	for person := range Config.ApiUserSecrets {
+	for person := range Config.APIUserSecrets {
 		emails = append(emails, person)
 	}
 	sort.Strings(emails)
@@ -753,7 +753,7 @@ func queryGithubAction(key, state string) (int, error) {
 		return 0, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+Config.Api["github_action_token"])
+	req.Header.Set("Authorization", "Bearer "+Config.API["github_action_token"])
 
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
@@ -790,7 +790,7 @@ func sendGithubAction(key string) error {
 		return err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+Config.Api["github_action_token"])
+	req.Header.Set("Authorization", "Bearer "+Config.API["github_action_token"])
 
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
@@ -822,7 +822,7 @@ func serveRunningWorkflows(w http.ResponseWriter) {
 // wait. Empty without a token to ask with, and on failure - the dashboard
 // simply leaves its rows as rendered.
 func runningWorkflows() []string {
-	if Config.Api["github_action_token"] == "" {
+	if Config.API["github_action_token"] == "" {
 		return nil
 	}
 
@@ -863,7 +863,7 @@ func snapshotGithubAction(state string) ([]string, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("Authorization", "Bearer "+Config.Api["github_action_token"])
+	req.Header.Set("Authorization", "Bearer "+Config.API["github_action_token"])
 
 	resp, err := cleanhttp.DefaultClient().Do(req)
 	if err != nil {
@@ -992,18 +992,18 @@ func generateAPIKey(ctx context.Context, user string, duration time.Duration) (s
 	}
 
 	apiUsersMutex.RLock()
-	key, found := Config.ApiUserSecrets[user]
+	key, found := Config.APIUserSecrets[user]
 	apiUsersMutex.RUnlock()
 
 	if !found {
 		key = randomString(15)
 
-		if Config.ApiUserSecrets == nil {
+		if Config.APIUserSecrets == nil {
 			return "", errors.New("config not loaded")
 		}
 
 		apiUsersMutex.Lock()
-		Config.ApiUserSecrets[user] = key
+		Config.APIUserSecrets[user] = key
 		apiUsersMutex.Unlock()
 
 		writer, err := simplecloud.InitWriter(ctx, ConfigBucket, Config.sourcePath)

@@ -179,7 +179,7 @@ var funcMap = template.FuncMap{
 		return entries[0].OriginalID
 	},
 	"uuid2tcgid": func(s string) string {
-		return findTCGproductId(s)
+		return findTCGproductID(s)
 	},
 	"isSussy": func(m map[string]float64, s string) bool {
 		_, found := m[s]

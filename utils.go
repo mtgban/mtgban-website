@@ -348,8 +348,8 @@ func fileExists(filename string) bool {
 	return !fi.IsDir()
 }
 
-func keyruneForCardSet(cardId string) string {
-	co, err := mtgmatcher.GetUUID(cardId)
+func keyruneForCardSet(cardID string) string {
+	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
 		return ""
 	}
@@ -446,8 +446,8 @@ func finishLabel(co *mtgmatcher.CardObject) string {
 	return mtgmatcher.Title(co.Finish)
 }
 
-func editionTitle(cardId string) string {
-	co, err := mtgmatcher.GetUUID(cardId)
+func editionTitle(cardID string) string {
+	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
 		return ""
 	}
@@ -596,38 +596,38 @@ func findVendorBuylistByName(name string, sealed bool) (mtgban.BuylistRecord, er
 }
 
 // Look for a TCGproductId in all available places
-func findTCGproductId(cardId string) string {
-	co, err := mtgmatcher.GetUUID(cardId)
+func findTCGproductID(cardID string) string {
+	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
 		return ""
 	}
 
-	tcgId := co.Identifiers["tcgplayerProductId"]
+	tcgID := co.Identifiers["tcgplayerProductId"]
 	if co.Etched {
 		id, found := co.Identifiers["tcgplayerEtchedProductId"]
 		if found {
-			tcgId = id
+			tcgID = id
 		}
 	}
-	if tcgId == "" {
+	if tcgID == "" {
 		tcgLow, _ := findSellerInventory("TCGLow")
-		entries, found := tcgLow[cardId]
+		entries, found := tcgLow[cardID]
 		if !found {
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			entries, found = tcgMarket[co.UUID]
 		}
 		if found {
-			tcgId = entries[0].OriginalID
+			tcgID = entries[0].OriginalID
 		}
 	}
 
-	return tcgId
+	return tcgID
 }
 
 // Look for the instance id (sku) of a card in a given inventory
-func findInstanceId(sellerName, cardId, cond string) string {
+func findInstanceID(sellerName, cardID, cond string) string {
 	tcgplayer, _ := findSellerInventory(sellerName)
-	for _, entry := range tcgplayer[cardId] {
+	for _, entry := range tcgplayer[cardID] {
 		if entry.Conditions == cond {
 			return entry.InstanceID
 		}
@@ -639,14 +639,14 @@ func findInstanceId(sellerName, cardId, cond string) string {
 // a card in a given condition, picking the inventory the product lives in.
 // Sources that carry no condition are assumed to be NM, the same way the
 // TCGplayer CSV export does. Returns "" when the card has no SKU on file.
-func uuid2TCGSKU(cardId string, sealed bool, cond string) string {
+func uuid2TCGSKU(cardID string, sealed bool, cond string) string {
 	if cond == "" {
 		cond = "NM"
 	}
 	if sealed {
-		return findInstanceId("TCGSealed", cardId, cond)
+		return findInstanceID("TCGSealed", cardID, cond)
 	}
-	return findInstanceId("TCGPlayer", cardId, cond)
+	return findInstanceID("TCGPlayer", cardID, cond)
 }
 
 // tcgSKU2UUID resolves a TCGplayer SKU (instance id) to a card uuid using the
@@ -672,9 +672,9 @@ func tcgSKU2Condition(sku string) string {
 }
 
 // Look for the original id (product id) of a card in a given inventory
-func findOriginalId(sellerName, cardId string) string {
+func findOriginalID(sellerName, cardID string) string {
 	tcgplayer, _ := findSellerInventory(sellerName)
-	entries, found := tcgplayer[cardId]
+	entries, found := tcgplayer[cardID]
 	if found {
 		return entries[0].OriginalID
 	}
@@ -694,16 +694,16 @@ var allLanguageFlags = map[string]string{
 	"Spanish":             "🇪🇸",
 }
 
-func showVariant(cardId string) bool {
-	setDate, err := mtgmatcher.CardReleaseDate(cardId)
+func showVariant(cardID string) bool {
+	setDate, err := mtgmatcher.CardReleaseDate(cardID)
 	if err != nil {
 		return false
 	}
 	return setDate.After(mtgmatcher.PromosForEverybodyYay)
 }
 
-func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) GenericCard {
-	co, err := mtgmatcher.GetUUID(cardId)
+func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) GenericCard {
+	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
 		return GenericCard{}
 	}
@@ -713,7 +713,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 
 	syp, err := findVendorBuylist("SYP")
 	if err == nil {
-		_, sypList = syp[cardId]
+		_, sypList = syp[cardID]
 	}
 
 	inv, _ := findSellerInventory("STKS")
@@ -724,11 +724,11 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 
 	var newspaper bool
 	if uuids := GetNewspaperUUIDs(); uuids != nil {
-		_, newspaper = uuids[cardId]
+		_, newspaper = uuids[cardID]
 	}
 
 	variant := ""
-	if showVariant(cardId) {
+	if showVariant(cardID) {
 		switch {
 		case co.HasFrameEffect(magic.FrameEffectShowcase):
 			variant = "Showcase "
@@ -884,7 +884,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		}
 	}
 
-	tcgId := findTCGproductId(co.UUID)
+	tcgID := findTCGproductID(co.UUID)
 
 	// Retrieve the CK URL from the in memory api list, which uses mtgjson ids
 	var restockURL string
@@ -904,28 +904,28 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 	}
 
 	deckboxURL := "https://deckbox.org/mtg/" + url.QueryEscape(co.Name) + "?fromqs=true"
-	deckboxId, found := co.Identifiers["deckboxId"]
+	deckboxID, found := co.Identifiers["deckboxId"]
 	if found {
-		deckboxURL += "&printing=" + deckboxId
+		deckboxURL += "&printing=" + deckboxID
 	}
 
 	var rarityColor string
-	keyrune := keyruneForCardSet(cardId)
+	keyrune := keyruneForCardSet(cardID)
 	if keyrune == "" {
 		rarityColor = colorRarityMap[Config.Game][co.Rarity]
 	}
 
 	var hotlistStore string
-	_, found = GetInfos()["hotlist"][cardId]
+	_, found = GetInfos()["hotlist"][cardID]
 	if found {
 		hotlistStore = "CK"
 	}
-	goodBuylist := getGoodBuylistPrice(cardId)
-	highestBuylist := getHighestBuylistPrice(cardId)
+	goodBuylist := getGoodBuylistPrice(cardID)
+	highestBuylist := getHighestBuylistPrice(cardID)
 
 	return GenericCard{
 		UUID:         co.UUID,
-		ChartID:      cardId,
+		ChartID:      cardID,
 		Name:         name,
 		FlavorName:   flavor,
 		Edition:      co.Edition,
@@ -940,7 +940,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		Treatments:   treatments,
 		Keyrune:      keyrune,
 		ImageURL:     imgURL,
-		Title:        editionTitle(cardId),
+		Title:        editionTitle(cardID),
 		Reserved:     co.Card.IsReserved,
 		SearchURL:    fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query)),
 		SypList:      sypList,
@@ -949,7 +949,7 @@ func uuid2card(cardId string, useThumbs, genPrints, preferFlavorName bool) Gener
 		Printings:    printings,
 		Products:     products,
 		NumProducts:  numProducts,
-		TCGId:        tcgId,
+		TCGId:        tcgID,
 		Date:         co.OriginalReleaseDate,
 		Sealed:       co.Sealed,
 		Booster:      canBoosterGen,
@@ -1282,18 +1282,18 @@ func Paginate[T any](slice []T, pageIndex, maxResults, maxTotalResults int) ([]T
 }
 
 // Retrieve the TCGplayer Market price of any given card
-func getTCGMarketPrice(cardId string) float64 {
+func getTCGMarketPrice(cardID string) float64 {
 	inv, err := findSellerInventory("TCGMarket")
 	if err != nil {
 		return 0
 	}
-	return tcgMarketPriceIn(inv, cardId)
+	return tcgMarketPriceIn(inv, cardID)
 }
 
 // tcgMarketPriceIn probes an already-resolved TCGMarket inventory, so
 // per-row loops resolve the seller once instead of per card.
-func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardId string) float64 {
-	entries, found := inv[cardId]
+func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardID string) float64 {
+	entries, found := inv[cardID]
 	if !found {
 		return 0
 	}
@@ -1303,8 +1303,8 @@ func tcgMarketPriceIn(inv mtgban.InventoryRecord, cardId string) float64 {
 // getGoodBuylistPrice returns the "good" buylist threshold for a card — Card
 // Kingdom's latest 90-day P90 buylist price (goodP90) — or 0 when unavailable.
 // A buylist offer at or above this is worth flagging to the user.
-func getGoodBuylistPrice(cardId string) float64 {
-	entries, found := GetInfos()["goodP90"][cardId]
+func getGoodBuylistPrice(cardID string) float64 {
+	entries, found := GetInfos()["goodP90"][cardID]
 	if !found || len(entries) == 0 {
 		return 0
 	}
@@ -1313,8 +1313,8 @@ func getGoodBuylistPrice(cardId string) float64 {
 
 // getHighestBuylistPrice returns Card Kingdom's peak buylist price for a card
 // over the last 90 days (the "highest" metric), or 0 when unavailable.
-func getHighestBuylistPrice(cardId string) float64 {
-	entries, found := GetInfos()["highest"][cardId]
+func getHighestBuylistPrice(cardID string) float64 {
+	entries, found := GetInfos()["highest"][cardID]
 	if !found || len(entries) == 0 {
 		return 0
 	}
@@ -1322,12 +1322,12 @@ func getHighestBuylistPrice(cardId string) float64 {
 }
 
 // Retrieve the IQR of the simulation using TCGplayer Low as base
-func getTCGSimulationIQR(productId string) float64 {
+func getTCGSimulationIQR(productID string) float64 {
 	inv, err := findSellerInventory("TCGLowSim")
 	if err != nil {
 		return 0
 	}
-	entries, found := inv[productId]
+	entries, found := inv[productID]
 	if !found {
 		return 0
 	}

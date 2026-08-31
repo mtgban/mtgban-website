@@ -137,7 +137,7 @@ body.modal-embed .landing-brand { margin-bottom: 18px; }
                         return "http://www.patreon.com/oauth2/authorize?response_type=code&client_id=" + patreonId + "&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=" + encodeURIComponent(window.location.href + ";" + client);
                     }
                 </script>
-                {{range $ref, $id := .PatreonIds}}
+                {{range $ref, $id := .PatreonIDs}}
                     <a class="landing-login-btn patreon" href="javascript:window.location = getPatreonURL('{{$id}}', '{{$ref}}')">Log in</a>
                     <noscript>
                         <a class="landing-login-btn patreon" href="http://www.patreon.com/oauth2/authorize?response_type=code&client_id={{$id}}&redirect_uri={{$.PatreonURL}}&scope=identity%20identity%5Bemail%5D%20campaigns%20campaigns.members&state=;{{$ref}}">

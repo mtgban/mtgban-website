@@ -26,13 +26,13 @@ func firstPlainCard(t *testing.T) string {
 // its TCG Low prices while the NM rows kept theirs (the "spotty" shape: an
 // index filing under NM answers NM and nothing else).
 func TestIndexPriceIgnoresRowCondition(t *testing.T) {
-	cardId := firstPlainCard(t)
+	cardID := firstPlainCard(t)
 
 	for _, indexCond := range []string{"NM", "INDEX"} {
 		out := map[string]map[string]*BanPrice{}
 		processEntry(out, []mtgban.InventoryEntry{{Conditions: indexCond, Price: 4.20}},
-			"", cardId, "TCGLow", false, true /* conds */, false /* shouldBaseCond: an index */)
-		price := out[cardId]["TCGLow"]
+			"", cardID, "TCGLow", false, true /* conds */, false /* shouldBaseCond: an index */)
+		price := out[cardID]["TCGLow"]
 
 		// Every grade gets the one price the index carries, including the
 		// grades it files nothing under.
@@ -48,14 +48,14 @@ func TestIndexPriceIgnoresRowCondition(t *testing.T) {
 // the row's condition: answering an MP row with the NM price would overstate
 // what is actually for sale.
 func TestRealStoreKeepsRowCondition(t *testing.T) {
-	cardId := firstPlainCard(t)
+	cardID := firstPlainCard(t)
 
 	out := map[string]map[string]*BanPrice{}
 	processEntry(out, []mtgban.InventoryEntry{
 		{Conditions: "NM", Price: 10.00, Quantity: 1},
 		{Conditions: "SP", Price: 7.00, Quantity: 1},
-	}, "", cardId, "TCGDirect", false, true /* conds */, true /* shouldBaseCond: a real store */)
-	price := out[cardId]["TCGDirect"]
+	}, "", cardID, "TCGDirect", false, true /* conds */, true /* shouldBaseCond: a real store */)
+	price := out[cardID]["TCGDirect"]
 
 	for _, tc := range []struct {
 		cond string

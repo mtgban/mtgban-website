@@ -43,13 +43,13 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 	results := map[string]PriceResult{}
 
 	// Clean the ids once up front
-	cardIds := make([]string, 0, len(ids))
-	for _, cardId := range ids {
-		cardId = strings.TrimSpace(cardId)
-		if cardId == "" {
+	cardIDs := make([]string, 0, len(ids))
+	for _, cardID := range ids {
+		cardID = strings.TrimSpace(cardID)
+		if cardID == "" {
 			continue
 		}
-		cardIds = append(cardIds, cardId)
+		cardIDs = append(cardIDs, cardID)
 	}
 
 	// Walk each store once for all ids, rather than every store per id:
@@ -66,8 +66,8 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 			name = override
 		}
 		inventory := seller.Inventory()
-		for _, cardId := range cardIds {
-			entries, found := inventory[cardId]
+		for _, cardID := range cardIDs {
+			entries, found := inventory[cardID]
 			if !found {
 				continue
 			}
@@ -75,13 +75,13 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 				if entry.Conditions != "NM" {
 					continue
 				}
-				best := bestSell[cardId]
+				best := bestSell[cardID]
 				// Lowest NM sell price wins
 				if entry.Price > 0 && (best.SellPrice == nil || entry.Price < *best.SellPrice) {
 					price := entry.Price
 					best.SellPrice = &price
 					best.SellVendor = name
-					bestSell[cardId] = best
+					bestSell[cardID] = best
 				}
 			}
 		}
@@ -98,8 +98,8 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 			name = override
 		}
 		buylist := vendor.Buylist()
-		for _, cardId := range cardIds {
-			entries, found := buylist[cardId]
+		for _, cardID := range cardIDs {
+			entries, found := buylist[cardID]
 			if !found {
 				continue
 			}
@@ -107,28 +107,28 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 				if entry.Conditions != "NM" {
 					continue
 				}
-				best := bestBuy[cardId]
+				best := bestBuy[cardID]
 				// Highest NM buy price wins
 				if entry.BuyPrice > 0 && (best.BuyPrice == nil || entry.BuyPrice > *best.BuyPrice) {
 					price := entry.BuyPrice
 					best.BuyPrice = &price
 					best.BuyVendor = name
-					bestBuy[cardId] = best
+					bestBuy[cardID] = best
 				}
 			}
 		}
 	}
 
-	for _, cardId := range cardIds {
+	for _, cardID := range cardIDs {
 		result := PriceResult{
-			SellPrice:  bestSell[cardId].SellPrice,
-			SellVendor: bestSell[cardId].SellVendor,
-			BuyPrice:   bestBuy[cardId].BuyPrice,
-			BuyVendor:  bestBuy[cardId].BuyVendor,
+			SellPrice:  bestSell[cardID].SellPrice,
+			SellVendor: bestSell[cardID].SellVendor,
+			BuyPrice:   bestBuy[cardID].BuyPrice,
+			BuyVendor:  bestBuy[cardID].BuyVendor,
 		}
 
 		// Prefer thumbnail for inline favorites/recents render; fall back to full.
-		if co, err := mtgmatcher.GetUUID(cardId); err == nil {
+		if co, err := mtgmatcher.GetUUID(cardID); err == nil {
 			if img, ok := co.Images["thumbnail"]; ok && img != "" {
 				result.ImageURL = img
 			} else if img, ok := co.Images["full"]; ok {
@@ -136,7 +136,7 @@ func BatchPricesAPI(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		results[cardId] = result
+		results[cardID] = result
 	}
 
 	// A response carrying no data at all (every id unknown or priceless)

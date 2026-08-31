@@ -56,8 +56,8 @@ func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]Searc
 	var results []SearchEntry
 
 	sortedKeysSeller := make([]string, 0, len(foundSellers))
-	for cardId := range foundSellers {
-		sortedKeysSeller = append(sortedKeysSeller, cardId)
+	for cardID := range foundSellers {
+		sortedKeysSeller = append(sortedKeysSeller, cardID)
 	}
 	if len(sortedKeysSeller) > 1 {
 		sortData := resolveSortingData(sortedKeysSeller)
@@ -66,14 +66,14 @@ func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]Searc
 		})
 	}
 
-	cardId := sortedKeysSeller[0]
+	cardID := sortedKeysSeller[0]
 	if index {
-		results = foundSellers[cardId]["INDEX"]
+		results = foundSellers[cardID]["INDEX"]
 
 		// Add the TCGplayer Direct to the Index section too, considering conditions
 		for _, cond := range []string{"NM", "SP"} {
 			done := false
-			foundResults := foundSellers[cardId][cond]
+			foundResults := foundSellers[cardID][cond]
 			for _, result := range foundResults {
 				if result.ScraperName == "TCGDirect" {
 					results = append(results, result)
@@ -89,7 +89,7 @@ func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]Searc
 		founders := map[string]string{}
 		// Query results with the known (ordered) conditions
 		for _, cond := range mtgban.DefaultGradeTags {
-			foundResults := foundSellers[cardId][cond]
+			foundResults := foundSellers[cardID][cond]
 
 			// Loop through the results, keep track of the precessed
 			// elements in the map (and skip lower condition ones)
@@ -128,8 +128,8 @@ func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]Searc
 	}
 
 	sortedKeysVendor := make([]string, 0, len(foundVendors))
-	for cardId := range foundVendors {
-		sortedKeysVendor = append(sortedKeysVendor, cardId)
+	for cardID := range foundVendors {
+		sortedKeysVendor = append(sortedKeysVendor, cardID)
 	}
 	if len(sortedKeysVendor) > 1 {
 		sortData := resolveSortingData(sortedKeysVendor)

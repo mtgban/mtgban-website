@@ -18,7 +18,7 @@ func testClient(t *testing.T) *Client {
 		t.Skip("OBSERVABILITY_TEST not set; skipping DB integration test")
 	}
 	port, _ := strconv.Atoi(getenv("OBS_PORT", "5432"))
-	cfg := SqlConfig{
+	cfg := SQLConfig{
 		Host:     getenv("OBS_HOST", "127.0.0.1"),
 		Port:     port,
 		User:     getenv("OBS_USER", "observability_app"),

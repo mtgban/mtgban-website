@@ -761,10 +761,10 @@
     </thead>
     <tbody>
         {{range .Entries}}
-            {{$cardId := .CardId}}
-            {{$card := (index $root.Metadata .CardId)}}
-            {{$scraperEntries := (index $root.ResultPrices (print .CardId .OriginalCondition))}}
-            <tr data-hash="{{.CardId}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
+            {{$cardId := .CardID}}
+            {{$card := (index $root.Metadata .CardID)}}
+            {{$scraperEntries := (index $root.ResultPrices (print .CardID .OriginalCondition))}}
+            <tr data-hash="{{.CardID}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
                 {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                 <td>
                     <div class="ures-card-cell">
@@ -779,7 +779,7 @@
                             <span class="ures-card-set">{{$card.Edition}} &middot; #{{$card.Number}}</span>
                             {{if .MismatchAlias}}
                             <button type="button" class="ures-pick-btn"
-                                data-hash="{{.CardId}}"
+                                data-hash="{{.CardID}}"
                                 data-aliases="{{range $i, $a := .PossibleAliases}}{{if $i}},{{end}}{{$a}}{{end}}"
                                 onclick="openPrintingPicker(this)">Select printing</button>
                             {{end}}
@@ -1078,7 +1078,7 @@
                         {{if and (not $.IsBuylist) (eq $sourceKey "CK")}}
                             <form action="https://www.cardkingdom.com/builder?utm_campaign={{load_partner $sourceKey}}&utm_medium=arbit&utm_source={{load_partner $sourceKey}}" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}||{{end}}"/>
+                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}||{{end}}"/>
                                 <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load at {{$sourceKey}}"/>
@@ -1088,7 +1088,7 @@
                         {{if and (not $.IsBuylist) (eq $sourceKey "CSI")}}
                             <form action="https://www.coolstuffinc.com/main_deckBuilder.php" method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="partner" value="{{load_partner $sourceKey}}"/>
-                                <input type="hidden" name="sList" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardId).Name}}|{{end}}"/>
+                                <input type="hidden" name="sList" value="{{range $entries}}{{.Quantity}} {{(index $.Metadata .CardID).Name}}|{{end}}"/>
                                 <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at {{$sourceKey}}</a>
                                 <noscript>
                                     <input type="submit" value="Load at {{$sourceKey}}"/>
@@ -1098,7 +1098,7 @@
                         {{if and (not $.IsBuylist) (has_prefix $sourceKey "TCG")}}
                             <form action='https://api.tcgplayer.com/massentry' method="post" id="{{$sourceKey}}deckbuilder" style="display: inline;" target="_blank">
                                 <input type="hidden" name="affiliateurl" value='https://tcgplayer.pxf.io/c/{{load_partner "TCG"}}/1830156/21018'/>
-                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{uuid2tcgid .CardId}}||{{end}}"/>
+                                <input type="hidden" name="c" value="{{range $entries}}{{.Quantity}}-{{uuid2tcgid .CardID}}||{{end}}"/>
                                 <a class="opt-btn load" href='javascript:void(0)' onclick='document.getElementById("{{$sourceKey}}deckbuilder").submit();'>Load at TCG</a>
                                 <noscript>
                                     <input type="submit" value="Load at TCG"/>
@@ -1108,7 +1108,7 @@
                         {{if and (not $.IsBuylist) (eq $sourceKey "MP")}}
                             {{$deck := ""}}
                             {{range $entries}}
-                                {{$card := (index $.Metadata .CardId)}}
+                                {{$card := (index $.Metadata .CardID)}}
                                 {{$entry := printf "%d %s [%s] %s" .Quantity $card.Name $card.SetCode $card.Number}}
                                 {{if eq $deck ""}}
                                     {{$deck = $entry}}
@@ -1130,7 +1130,7 @@
                                 <input type="hidden" name="tag" value="{{$sourceKey}}Retail"/>
                                 <input type="hidden" name="mode" value="false"/>
                                 {{range $entries}}
-                                    <input type="hidden" name="{{$sourceKey}}Retailhashes" value="{{.CardId}}"/>
+                                    <input type="hidden" name="{{$sourceKey}}Retailhashes" value="{{.CardID}}"/>
                                     <input type="hidden" name="{{$sourceKey}}RetailhashesQtys" value="{{.Quantity}}"/>
                                     <input type="hidden" name="{{$sourceKey}}RetailhashesCond" value="{{.Condition}}"/>
                                 {{end}}
@@ -1147,7 +1147,7 @@
                                     {"contents": [
                                         {{range $entries}}
                                         {
-                                           "id": {{uuid2ckid .CardId}},
+                                           "id": {{uuid2ckid .CardID}},
                                             "qty": {{.Quantity}}
                                         },
                                         {{end}}
@@ -1166,7 +1166,7 @@
                                 <input type="hidden" name="tag" value="{{$scraperKey}}"/>
                                 <input type="hidden" name="mode" value="false"/>
                                 {{range $entries}}
-                                    <input type="hidden" name="{{$scraperKey}}hashes" value="{{.CardId}}"/>
+                                    <input type="hidden" name="{{$scraperKey}}hashes" value="{{.CardID}}"/>
                                     <input type="hidden" name="{{$scraperKey}}hashesQtys" value="{{.Quantity}}"/>
                                 {{end}}
                                 <a class="opt-btn csv" href='javascript:void(0)' onclick='document.getElementById("{{$scraperKey}}hashes").submit();'>Download {{$scraperKey}} CSV</a>
@@ -1179,7 +1179,7 @@
                         <form action="/upload" method="post" id="TCG{{$scraperKey}}hashes" style="display: inline;">
                             <input type="hidden" name="tag" value="TCG"/>
                             {{range $entries}}
-                                <input type="hidden" name="TCGhashes" value="{{.CardId}}"/>
+                                <input type="hidden" name="TCGhashes" value="{{.CardID}}"/>
                                 <input type="hidden" name="TCGhashesQtys" value="-{{.Quantity}}"/>
                                 <input type="hidden" name="TCGhashesCond" value="{{.Condition}}"/>
                             {{end}}
@@ -1204,10 +1204,10 @@
                         </tr></thead>
                         <tbody>
                         {{range $entries}}
-                            {{$card := (index $.Metadata .CardId)}}
-                            {{$scraperEntries := (index $.ResultPrices (print .CardId .Condition))}}
+                            {{$card := (index $.Metadata .CardID)}}
+                            {{$scraperEntries := (index $.ResultPrices (print .CardID .Condition))}}
                             {{$price := (index $scraperEntries $scraperKey)}}
-                            <tr data-opt-id="{{.CardId}}" data-opt-qty="{{.Quantity}}" data-opt-cond="{{.Condition}}" data-opt-name="{{(index $.Metadata .CardId).Name}}" data-opt-ckid="{{uuid2ckid .CardId}}" onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
+                            <tr data-opt-id="{{.CardID}}" data-opt-qty="{{.Quantity}}" data-opt-cond="{{.Condition}}" data-opt-name="{{(index $.Metadata .CardID).Name}}" data-opt-ckid="{{uuid2ckid .CardID}}" onmouseover="document.getElementById('hoverImage').src={{$card.ImageURL}};var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','{{$card.Foil}}');hw.setAttribute('data-etched','{{$card.Etched}}');hw.setAttribute('data-set','{{$card.SetCode}}');hw.setAttribute('data-date','{{$card.Date}}');hw.setAttribute('data-name','{{$card.Name}}');hw.classList.toggle('content-warning',{{$card.HasContentWarning}});">
                                 <td class="opt-name">
                                     <span class="emoji" style="cursor: pointer;" onclick="copyAndBlink(this, '{{$card.Name}}')" title="Copy to clipboard">&#128221;</span>&nbsp;
                                     <a href="{{$card.SearchURL}}" target="_blank" lang="{{$card.LangTag}}">{{$card.Name}}</a>{{buylist_badge $scraperKey $card.HotlistStore}}
@@ -1217,8 +1217,8 @@
                                     {{template "set-symbol" dict "Keyrune" $card.Keyrune "Code" $card.SetCode "Rarity" $card.Rarity "Color" $card.RarityColor "Foil" $card.Foil "Size" 20 "Class" ""}} {{$card.SetCode}} #{{$card.Number}}{{if $card.Etched}} · Etched{{else if $card.Foil}} · Foil{{end}}
                                 </td>
                                 <td>{{buylist_detail $scraperKey $card.HotlistStore $price $card.GoodBuylist $card.HighestBuylist true}}</td>
-                                <td class="opt-offer"><span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardId}}" target="_blank">{{printf "%.2f" $price}}</a></span></td>
-                                <td class="opt-loaded"><span class="loaded-wrap">{{if .Price}}<span class="loaded">$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}{{printf "%.2f" .Price}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardId}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}</span>{{end}}<span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
+                                <td class="opt-offer"><span class="offer">$ <a href="/go/b/{{$scraperKey}}/{{.CardID}}" target="_blank">{{printf "%.2f" $price}}</a></span></td>
+                                <td class="opt-loaded"><span class="loaded-wrap">{{if .Price}}<span class="loaded">$ {{if $.IgnorePrices}}<a href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank">{{printf "%.2f" .Price}}</a>{{else}}{{printf "%.2f" .Price}}<a class="opt-altlink" href="/go/{{.CompareSource}}/{{.CardID}}" target="_blank" title="Open the {{.CompareSource}} page">&#128279;</a>{{end}}</span>{{end}}<span class="opt-icons">{{if .Price}}{{if and $.CanFilterByPrice (lt .VisualPrice $price)}}&#9888;&#65039;{{end}}{{end}}</span></span></td>
                                 <td class="opt-spread {{if gt .Spread 80.0}}hot{{else}}ok{{end}}">
                                     {{if .Price}}
                                         {{printf "%.2f" .Spread}}%

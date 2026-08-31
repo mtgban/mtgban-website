@@ -305,12 +305,12 @@ var screenerFetch = func(ctx context.Context, metric, window int, minPrice, minP
 	return PricesArchiveDB.GetMovers(ctx, metric, window, minPrice, minPriorPrice)
 }
 
-// moverCardId resolves a mover row to this game's uuid: Magic rows carry the
+// moverCardID resolves a mover row to this game's uuid: Magic rows carry the
 // mtgjson uuid already, non-Magic rows carry their TCGplayer product, resolved
 // through the external id map with the sub-type picking the finish. subTypes is
 // the row's product's sub-type map, gathered for the whole result set by
 // moverSubTypes; nil resolves on the card object alone. Overridable in tests.
-var moverCardId = func(row timeseries.MoverRow, subTypes map[string]int64) (string, bool, bool) {
+var moverCardID = func(row timeseries.MoverRow, subTypes map[string]int64) (string, bool, bool) {
 	if row.MtgjsonUUID != "" {
 		return row.MtgjsonUUID, row.IsFoil, true
 	}
@@ -452,7 +452,7 @@ func buildMovers(ctx context.Context, key string, metric, window int, minPrice, 
 	for _, row := range raw {
 		// Resolve non-Magic rows to this game's uuid so the rest of the
 		// pipeline (classification, dedup keys, links) is id-uniform
-		uuid, isFoil, ok := moverCardId(row, subTypes[row.TCGProductID])
+		uuid, isFoil, ok := moverCardID(row, subTypes[row.TCGProductID])
 		if !ok {
 			continue
 		}
@@ -624,13 +624,13 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 
 	for _, res := range paged {
 		// DB uuid is finish-agnostic; resolve the priced foil/etched variant.
-		cardId, err := mtgmatcher.MatchID(res.UUID, res.IsFoil, res.IsEtched)
+		cardID, err := mtgmatcher.MatchID(res.UUID, res.IsFoil, res.IsEtched)
 		if err != nil {
-			cardId = res.UUID
+			cardID = res.UUID
 		}
-		c := uuid2card(cardId, true, false, preferFlavor)
+		c := uuid2card(cardID, true, false, preferFlavor)
 		pageVars.Cards = append(pageVars.Cards, c)
-		pageVars.CardHashes = append(pageVars.CardHashes, cardId)
+		pageVars.CardHashes = append(pageVars.CardHashes, cardID)
 	}
 
 	if len(paged) == 0 {

@@ -31,7 +31,7 @@ func priceColumn(v FieldValue) int {
 func TestIndexValuesAlign(t *testing.T) {
 	svc := &Service{BaseURL: func() string { return "https://example.test" }}
 	res := &SearchResult{
-		CardId: "abcd",
+		CardID: "abcd",
 		ResultsIndex: []Entry{
 			{ScraperName: "TCG Low", Shorthand: "TCGLow", Price: 1.00},
 			{ScraperName: "TCG Market", Shorthand: "TCGMarket", Price: 2.00},
@@ -66,7 +66,7 @@ func TestIndexValuesAlign(t *testing.T) {
 func TestFieldLengthMatchesValues(t *testing.T) {
 	svc := &Service{BaseURL: func() string { return "https://example.test" }}
 	res := &SearchResult{
-		CardId: "abcd",
+		CardID: "abcd",
 		ResultsIndex: []Entry{
 			{ScraperName: "TCG Low", Shorthand: "TCGLow", Price: 1.00},
 			{ScraperName: "TCG Market", Shorthand: "TCGMarket", Price: 2.00},

@@ -44,7 +44,7 @@ import (
 // config is the subset of the server's config.json this service reads. Unknown
 // keys are ignored, so it loads the deployment's existing file unchanged.
 type config struct {
-	SqlConfig        *timeseries.SqlConfig `json:"sql_config"`
+	SQLConfig        *timeseries.SQLConfig `json:"sql_config"`
 	TCGCSVConfig     *tcgcsv.Config        `json:"tcgcsv_config"`
 	DiscordNotifHook string                `json:"discord_notif_hook"`
 
@@ -93,7 +93,7 @@ func loadConfig(ctx context.Context, path string) (*config, error) {
 	if err := json.NewDecoder(reader).Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
-	if cfg.SqlConfig == nil {
+	if cfg.SQLConfig == nil {
 		return nil, fmt.Errorf("%s: no sql_config section; there is no price database to write to", path)
 	}
 	if cfg.TCGCSVConfig == nil || len(cfg.TCGCSVConfig.Games) == 0 {
@@ -136,7 +136,7 @@ func main() {
 		log.Fatalln("tcgcsvd:", err)
 	}
 
-	db, err := timeseries.NewClient(*cfg.SqlConfig)
+	db, err := timeseries.NewClient(*cfg.SQLConfig)
 	if err != nil {
 		log.Fatalln("tcgcsvd: opening the price database:", err)
 	}

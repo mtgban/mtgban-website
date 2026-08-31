@@ -52,13 +52,13 @@ type PatreonConfig struct {
 }
 
 type PatreonUserData struct {
-	UserId       string
-	MembershipId string
+	UserID       string
+	MembershipID string
 	FullName     string
 	Email        string
 }
 
-func getUserIds(ctx context.Context, client *patreon.Client) (*PatreonUserData, error) {
+func getUserIDs(ctx context.Context, client *patreon.Client) (*PatreonUserData, error) {
 	userData, err := client.GetUserData(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("cannot retrieve user data: %w", err)
@@ -70,24 +70,24 @@ func getUserIds(ctx context.Context, client *patreon.Client) (*PatreonUserData, 
 	}
 
 	// Look for the membership id of the user and this account
-	membershipId := ""
+	membershipID := ""
 	for _, memberData := range userData.Data.Relationships.Memberships.Data {
 		if memberData.Type == "member" {
-			membershipId = memberData.Id
+			membershipID = memberData.ID
 			break
 		}
 	}
 
 	return &PatreonUserData{
-		UserId:       userData.Data.IdV1,
-		MembershipId: membershipId,
+		UserID:       userData.Data.IDV1,
+		MembershipID: membershipID,
 		FullName:     userData.Data.Attributes.FullName,
 		Email:        strings.ToLower(userData.Data.Attributes.Email),
 	}, nil
 }
 
-func getUserTier(ctx context.Context, client *patreon.Client, userId string) (string, error) {
-	membershipData, err := client.GetMembershipData(ctx, userId)
+func getUserTier(ctx context.Context, client *patreon.Client, userID string) (string, error) {
+	membershipData, err := client.GetMembershipData(ctx, userID)
 	if err != nil {
 		return "", fmt.Errorf("cannot decode membership data: %w", err)
 	}
@@ -98,10 +98,10 @@ func getUserTier(ctx context.Context, client *patreon.Client, userId string) (st
 	}
 
 	// Look for the tier id of the user
-	tierId := ""
+	tierID := ""
 	for _, tierData := range membershipData.Data.Relationships.CurrentlyEntitledTiers.Data {
 		if tierData.Type == "tier" {
-			tierId = tierData.Id
+			tierID = tierData.ID
 			break
 		}
 	}
@@ -109,7 +109,7 @@ func getUserTier(ctx context.Context, client *patreon.Client, userId string) (st
 	// Get a human-readable name for the tier
 	tierTitle := ""
 	for _, tierData := range membershipData.Included {
-		if tierData.Type == "tier" && tierId == tierData.Id {
+		if tierData.Type == "tier" && tierID == tierData.ID {
 			tierTitle = tierData.Attributes.Title
 		}
 	}
@@ -175,9 +175,9 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 
 	// Get the access token for this connection
 	source := Config.Patreon.Source
-	clientId := Config.Patreon.Client[source]
+	clientID := Config.Patreon.Client[source]
 	secret := Config.Patreon.Secret[source]
-	tokens, err := patreon.GetAuthToken(r.Context(), clientId, secret, ServerURL, code)
+	tokens, err := patreon.GetAuthToken(r.Context(), clientID, secret, ServerURL, code)
 	if err != nil {
 		LogPages["Admin"].Println("getUserToken", err.Error())
 		http.Redirect(w, r, ServerURL+"?errmsg=TokenNotFound", http.StatusFound)
@@ -188,7 +188,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 	client := patreon.NewPatreonClient(r.Context(), tokens.AccessToken)
 
 	// Retrieve information about the user who just authenticated
-	userData, err := getUserIds(r.Context(), client)
+	userData, err := getUserIDs(r.Context(), client)
 	if err != nil {
 		LogPages["Admin"].Println("getUserId", err.Error())
 		http.Redirect(w, r, ServerURL+"?errmsg=UserNotFound", http.StatusFound)
@@ -207,7 +207,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 
 	// Else, load the tier from the API
 	if tierTitle == "" {
-		foundTitle, err := getUserTier(r.Context(), client, userData.MembershipId)
+		foundTitle, err := getUserTier(r.Context(), client, userData.MembershipID)
 		if err != nil {
 			LogPages["Admin"].Println("getUserTier error", err)
 		}
@@ -422,10 +422,10 @@ func enforceAPISigning(next http.Handler) http.Handler {
 
 		secret := os.Getenv("BAN_SECRET")
 		apiUsersMutex.RLock()
-		user_secret, found := Config.ApiUserSecrets[v.Get("UserEmail")]
+		userSecret, found := Config.APIUserSecrets[v.Get("UserEmail")]
 		apiUsersMutex.RUnlock()
 		if found {
-			secret = user_secret
+			secret = userSecret
 		}
 
 		var expires int64

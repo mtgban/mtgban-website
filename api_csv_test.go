@@ -46,7 +46,7 @@ func TestSimplePrice2CSVTCGSKU(t *testing.T) {
 	}
 
 	header, row := runPrice2CSV(t, pm, []UploadEntry{
-		{CardId: id, OriginalCondition: "SP"},
+		{CardID: id, OriginalCondition: "SP"},
 	})
 	if header[0] != "UUID" || header[1] != "TCGplayer SKU" {
 		t.Fatalf("SKU column is not next to the uuid: %v", header)

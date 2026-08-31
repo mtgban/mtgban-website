@@ -211,10 +211,10 @@ func parseMessage(content string, sealed bool) (*EmbedSearchResult, string) {
 	sort.Slice(uuids, func(i, j int) bool {
 		return cmpSets(sortData[uuids[i]], sortData[uuids[j]])
 	})
-	cardId := uuids[0]
+	cardID := uuids[0]
 
 	return &EmbedSearchResult{
-		CardId:          cardId,
+		CardID:          cardID,
 		EditionSearched: editionSearched,
 	}, ""
 }
@@ -320,11 +320,11 @@ var AffiliateStores []AffiliateConfig = []AffiliateConfig{
 					break
 				}
 			}
-			cardId, err := mtgmatcher.MatchID(id, v.Get("Printing") == "Foil")
+			cardID, err := mtgmatcher.MatchID(id, v.Get("Printing") == "Foil")
 			if err != nil {
 				return "Your search"
 			}
-			co, err := mtgmatcher.GetUUID(cardId)
+			co, err := mtgmatcher.GetUUID(cardID)
 			if err != nil {
 				return "Your search"
 			}
@@ -591,7 +591,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
-	co, err := mtgmatcher.GetUUID(searchRes.CardId)
+	co, err := mtgmatcher.GetUUID(searchRes.CardID)
 	if err != nil {
 		return
 	}
@@ -600,7 +600,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	var channel chan *discordgo.MessageEmbed
 
 	if allBls {
-		config := parseSearchOptionsNG(searchRes.CardId, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
+		config := parseSearchOptionsNG(searchRes.CardID, DiscordRetailBlocklist, DiscordBuylistBlocklist, nil)
 
 		// Keep the bot to stores a reader can actually buy from. That is a
 		// reason to drop a foreign shop and not a reason to drop a foreign
@@ -624,8 +624,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			OnlyForVendor: true,
 		})
 
-		cardIds, _ := searchAndFilter(config)
-		foundSellers, foundVendors := searchParallelNG(cardIds, config)
+		cardIDs, _ := searchAndFilter(config)
+		foundSellers, foundVendors := searchParallelNG(cardIDs, config)
 
 		searchRes.ResultsIndex = ProcessEmbedSearchResultsSellers(foundSellers, true)
 		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(foundSellers, false)
@@ -638,7 +638,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		go func() {
 			channel = make(chan *discordgo.MessageEmbed)
 			var errMsg string
-			ogFields, err = embedService.LastSoldFields(searchRes.CardId, co.Language)
+			ogFields, err = embedService.LastSoldFields(searchRes.CardID, co.Language)
 			if err != nil {
 				if errors.Is(err, ErrMissingTCGId) {
 					errMsg = fmt.Sprintf("\"%s\" does not have any identifier set, I don't know what to do %s", content, emoteShurg)
@@ -687,7 +687,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
-func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId string, lastSold bool) *discordgo.MessageEmbed {
+func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID string, lastSold bool) *discordgo.MessageEmbed {
 	// Convert search results into proper fields
 	var fields []*discordgo.MessageEmbedField
 	for _, field := range ogFields {
@@ -712,8 +712,8 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	}
 
 	// Prepare card data
-	card := uuid2card(searchRes.CardId, true, false, false)
-	co, _ := mtgmatcher.GetUUID(searchRes.CardId)
+	card := uuid2card(searchRes.CardID, true, false, false)
+	co, _ := mtgmatcher.GetUUID(searchRes.CardID)
 
 	printings := embed.PrintingsLine(co.Printings)
 	if searchRes.EditionSearched != "" && len(co.Variations) > 0 {
@@ -742,7 +742,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	if co.Sealed {
 		searchEndpoint = "sealed"
 	}
-	link := "https://www.mtgban.com/" + searchEndpoint + "?q=" + co.UUID + "&utm_source=banbot&utm_affiliate=" + guildId
+	link := "https://www.mtgban.com/" + searchEndpoint + "?q=" + co.UUID + "&utm_source=banbot&utm_affiliate=" + guildID
 
 	// Set title of the main message
 	name := card.Name
@@ -754,13 +754,13 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	if lastSold {
 		title = "TCG Last Sold prices for " + name
 
-		tcgId := findTCGproductId(co.UUID)
-		productId, _ := strconv.Atoi(tcgId)
+		tcgID := findTCGproductID(co.UUID)
+		productID, _ := strconv.Atoi(tcgID)
 		printing := "Normal"
 		if co.Etched || co.Foil {
 			printing = "Foil"
 		}
-		link = tcgplayer.GenerateProductURL(productId, printing, Config.Affiliate["TCG"], "", co.Language, false)
+		link = tcgplayer.GenerateProductURL(productID, printing, Config.Affiliate["TCG"], "", co.Language, false)
 	}
 
 	// Add a tag for ease of debugging
@@ -809,7 +809,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildId st
 	}
 
 	// Show data source on non-ban servers
-	if guildId != MainDiscordID {
+	if guildID != MainDiscordID {
 		embed.Footer.IconURL = poweredByFooter.IconURL
 		embed.Footer.Text += poweredByFooter.Text
 	}

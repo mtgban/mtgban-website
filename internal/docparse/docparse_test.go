@@ -8,10 +8,10 @@ import (
 
 func TestPartitionEntries(t *testing.T) {
 	errEntry := Entry{MismatchError: errors.New("not found")}
-	s1 := Entry{CardId: "single1"}
-	s2 := Entry{CardId: "single2"}
-	sealed1 := Entry{CardId: "sealed1"}
-	sealedIds := []string{"sealed1", "sealed2"}
+	s1 := Entry{CardID: "single1"}
+	s2 := Entry{CardID: "single2"}
+	sealed1 := Entry{CardID: "sealed1"}
+	sealedIDs := []string{"sealed1", "sealed2"}
 
 	tests := []struct {
 		name         string
@@ -59,7 +59,7 @@ func TestPartitionEntries(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gotSingles, gotSealed, gotNotFound := PartitionEntries(tc.entries, sealedIds)
+			gotSingles, gotSealed, gotNotFound := PartitionEntries(tc.entries, sealedIDs)
 			if !reflect.DeepEqual(gotSingles, tc.wantSingles) {
 				t.Errorf("singles = %v, want %v", gotSingles, tc.wantSingles)
 			}

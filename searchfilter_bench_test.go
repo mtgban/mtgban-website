@@ -30,8 +30,8 @@ func TestPriceFilterCacheConcurrent(t *testing.T) {
 		defer wg.Done()
 		filters := []*FilterPriceElem{filter}
 		for c := range 500 {
-			cardId := "bench-card-" + strconv.Itoa(c)
-			shouldSkipPriceNG(cardId, mtgban.BuylistEntry{BuyPrice: 6.0, Conditions: "NM"}, filters, "SCR050")
+			cardID := "bench-card-" + strconv.Itoa(c)
+			shouldSkipPriceNG(cardID, mtgban.BuylistEntry{BuyPrice: 6.0, Conditions: "NM"}, filters, "SCR050")
 		}
 	}()
 	wg.Wait()
@@ -68,9 +68,9 @@ func runPriceFilterRequest(nCards int, filter *FilterPriceElem) {
 		{Price: 2.0, Conditions: "HP"},
 	}
 	for c := range nCards {
-		cardId := "bench-card-" + strconv.Itoa(c)
+		cardID := "bench-card-" + strconv.Itoa(c)
 		for _, entry := range entries {
-			shouldSkipPriceNG(cardId, entry, filters, "SCR050")
+			shouldSkipPriceNG(cardID, entry, filters, "SCR050")
 		}
 	}
 }

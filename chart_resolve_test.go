@@ -169,7 +169,7 @@ func TestMagicFinishSearchID(t *testing.T) {
 	}
 
 	// Any printing that carries both finishes will do.
-	var uuid, foilId string
+	var uuid, foilID string
 	for _, id := range mtgmatcher.GetUUIDs() {
 		co, err := mtgmatcher.GetUUID(id)
 		if err != nil || co.Sealed || co.Foil || co.Etched {
@@ -180,7 +180,7 @@ func TestMagicFinishSearchID(t *testing.T) {
 			continue
 		}
 		if altCo, err := mtgmatcher.GetUUID(alt); err == nil && altCo.Foil {
-			uuid, foilId = id, alt
+			uuid, foilID = id, alt
 			break
 		}
 	}
@@ -188,8 +188,8 @@ func TestMagicFinishSearchID(t *testing.T) {
 		t.Skip("no card with both a foil and a nonfoil printing")
 	}
 
-	if got := magicFinishSearchID(uuid, true, false); got != foilId {
-		t.Errorf("magicFinishSearchID(%q, foil) = %q, want %q", uuid, got, foilId)
+	if got := magicFinishSearchID(uuid, true, false); got != foilID {
+		t.Errorf("magicFinishSearchID(%q, foil) = %q, want %q", uuid, got, foilID)
 	}
 	if got := magicFinishSearchID(uuid, false, false); got != uuid {
 		t.Errorf("magicFinishSearchID(%q, nonfoil) = %q, want %q", uuid, got, uuid)
