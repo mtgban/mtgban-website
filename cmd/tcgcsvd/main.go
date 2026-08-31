@@ -29,7 +29,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -53,11 +52,11 @@ type config struct {
 	} `json:"timeseries_config"`
 }
 
-// loadConfig reads the config from a local path or a b2:// bucket URL, the same
-// two schemes the server accepts, so a droplet can point this at the very
-// config.json it already deploys with (b2 needs BAN_CONFIG_KEY and
-// BAN_CONFIG_SECRET in the environment). An empty path falls back to
-// BAN_CONFIG_PATH.
+// loadConfig reads the config from wherever the path names - a local file, a
+// b2:// bucket URL, or any other scheme simplecloud.Open knows - so a droplet
+// can point this at the very config.json it already deploys with (b2 needs
+// BAN_CONFIG_KEY and BAN_CONFIG_SECRET in the environment). An empty path
+// falls back to BAN_CONFIG_PATH.
 func loadConfig(ctx context.Context, path string) (*config, error) {
 	if path == "" {
 		path = os.Getenv("BAN_CONFIG_PATH")
@@ -66,24 +65,8 @@ func loadConfig(ctx context.Context, path string) (*config, error) {
 		return nil, errors.New("no config path given; pass -config or set BAN_CONFIG_PATH")
 	}
 
-	u, err := url.Parse(path)
-	if err != nil {
-		return nil, err
-	}
-	var bucket simplecloud.ReadWriter
-	switch u.Scheme {
-	case "":
-		bucket = &simplecloud.FileBucket{}
-	case "b2":
-		bucket, err = simplecloud.NewB2Client(ctx, os.Getenv("BAN_CONFIG_KEY"), os.Getenv("BAN_CONFIG_SECRET"), u.Host)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("unsupported config path scheme %q", u.Scheme)
-	}
-
-	reader, err := simplecloud.InitReader(ctx, bucket, path)
+	reader, err := simplecloud.Open(ctx, path,
+		simplecloud.WithB2Credentials(os.Getenv("BAN_CONFIG_KEY"), os.Getenv("BAN_CONFIG_SECRET")))
 	if err != nil {
 		return nil, err
 	}
