@@ -44,11 +44,10 @@ fi
 echo "${DEPLOY_USER} ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/99-${DEPLOY_USER}-bootstrap
 chmod 440 /etc/sudoers.d/99-${DEPLOY_USER}-bootstrap
 
-# 2. Packages. bootstrap.sh installs these too, but doing it here means the
-#    slow part is over before anyone logs in.
+# 2. Enough to fetch the repo, which is where the rest of the list lives.
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y git nginx build-essential curl
+apt-get install -y git
 
 # 3. The control repo, which carries bootstrap.sh and everything it reads.
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$SRC_DIR"
@@ -56,7 +55,11 @@ if [ ! -d "$REPO_DIR/.git" ]; then
     sudo -u "$DEPLOY_USER" git clone "$ORIGIN" "$REPO_DIR"
 fi
 
-# 4. The Go the module asks for, by the same rule bootstrap.sh applies, so its
+# 4. Everything else the host serves with. bootstrap.sh runs this too, but
+#    doing it here means the slow part is over before anyone logs in.
+"$REPO_DIR/deploy/host-packages.sh"
+
+# 5. The Go the module asks for, by the same rule bootstrap.sh applies, so its
 #    own check finds a new-enough toolchain and skips the download.
 GO_WANT=go$(awk '/^go [0-9]/{print $2; exit}' "$REPO_DIR/go.mod")
 GO_ARCH=$(dpkg --print-architecture)
@@ -67,7 +70,7 @@ tar -C /usr/local -xzf "/tmp/${GO_WANT}.linux-${GO_ARCH}.tar.gz"
 rm -f "/tmp/${GO_WANT}.linux-${GO_ARCH}.tar.gz"
 ln -sf /usr/local/go/bin/go /usr/local/bin/go
 
-# 5. Secrets file, empty. Root-owned and unreadable by the deploy user, which
+# 6. Secrets file, empty. Root-owned and unreadable by the deploy user, which
 #    is what systemd's EnvironmentFile wants and what keeps the values off the
 #    account that ssh reaches.
 if [ ! -f /etc/mtgban.env ]; then
@@ -80,7 +83,7 @@ EOF
     chown root:root /etc/mtgban.env
 fi
 
-# 6. Say what is left, where whoever logs in will see it.
+# 7. Say what is left, where whoever logs in will see it.
 cat > /etc/motd <<EOF
 
   This droplet was prepared for: ${GAME}
