@@ -1,4 +1,3 @@
-// observability/store.go
 // Package observability records page visits in Postgres and answers the
 // admin dashboard's usage aggregates.
 package observability

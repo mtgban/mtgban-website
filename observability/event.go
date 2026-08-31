@@ -1,4 +1,3 @@
-// observability/event.go
 package observability
 
 import (

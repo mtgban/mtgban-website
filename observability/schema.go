@@ -1,4 +1,3 @@
-// observability/schema.go
 package observability
 
 import "database/sql"

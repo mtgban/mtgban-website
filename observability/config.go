@@ -1,4 +1,3 @@
-// observability/config.go
 package observability
 
 import (

@@ -42,7 +42,8 @@ import (
 const (
 	// FormatVersion is the wire version Encode stamps and Decode requires.
 	FormatVersion = byte(1)
-	MsgTypeFull   = byte(1)
+	// MsgTypeFull marks a full snapshot payload.
+	MsgTypeFull = byte(1)
 	// MsgTypeDelta is reserved so entry level deltas stay a non breaking add.
 	MsgTypeDelta = byte(2)
 )
