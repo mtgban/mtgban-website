@@ -2029,19 +2029,6 @@ func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
 				}
 			}
 		default:
-			// Adjust input for these known cases
-			newValue, found := isKnownPromo[value]
-			if found {
-				value = newValue
-			}
-
-			// Fall back to any promo type currently supported
-			if slices.Contains(mtgmatcher.AllPromoTypes(), value) {
-				if co.HasPromoType(value) {
-					return false
-				}
-			}
-
 			// Finally check any leftover tags
 			customTag, found := specialTags[co.Name]
 			if found && customTag == value {
@@ -2051,6 +2038,27 @@ func cardFilterIs(filters []string, co *mtgmatcher.CardObject) bool {
 			// same for set code tags
 			customTag, found = specialEditionTags[co.SetCode]
 			if found && customTag == value {
+				return false
+			}
+		}
+
+		// Every value reaches the promo types, including the ones a case
+		// above already asked about. Several names mean a Magic frame effect
+		// and another game's promo type at once - "extendedart" is a frame
+		// effect on a Magic card and a printing's own tag on a Flesh and
+		// Blood one - and while the case answered first, the second meaning
+		// was unreachable: is:extendedart asked a Flesh and Blood card for a
+		// frame effect it never carries and matched nothing, which not:
+		// turned into excluding nothing.
+		//
+		// A case that matched has already returned, so arriving here means
+		// its own reading did not hold and the promo type is the reading left.
+		newValue, found := isKnownPromo[value]
+		if found {
+			value = newValue
+		}
+		if slices.Contains(mtgmatcher.AllPromoTypes(), value) {
+			if co.HasPromoType(value) {
 				return false
 			}
 		}
