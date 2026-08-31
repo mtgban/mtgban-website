@@ -23,13 +23,7 @@ func TestMain(m *testing.M) {
 	// Best-effort datastore load: tests that need real card data guard
 	// themselves with t.Skip when the data isn't loaded, so a missing local
 	// datastore file shouldn't take down the whole package's test run.
-	var err error
-	DatastoreBucket, err = newReadBucket(Config.DatastorePath)
-	if err != nil {
-		log.Println("newReadBucket skipped:", err)
-		os.Exit(m.Run())
-	}
-	if err := loadDatastore(DatastoreBucket, Config.DatastorePath); err != nil {
+	if err := loadDatastore(Config.DatastorePath); err != nil {
 		log.Println("loadDatastore skipped:", err)
 		os.Exit(m.Run())
 	}

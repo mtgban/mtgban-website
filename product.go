@@ -15,7 +15,6 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher/magic"
 	"github.com/mtgban/mtgban-website/internal/tcgcatalog"
 	"github.com/mtgban/mtgban-website/timeseries"
-	"github.com/mtgban/simplecloud"
 )
 
 type EditionEntry struct {
@@ -729,10 +728,10 @@ func tcgCatalogPath() string {
 	return tcgCatalogFile
 }
 
-// loadTCGCatalog streams the catalog dump living alongside the datastore,
-// served by the same bucket.
+// loadTCGCatalog streams the catalog dump living alongside the datastore, and
+// so reached the same way.
 func loadTCGCatalog(path string) (map[string]tcgcatalog.Entry, *tcgcatalog.Category, error) {
-	reader, err := simplecloud.InitReader(context.Background(), DatastoreBucket, path)
+	reader, err := openBucketPath(context.Background(), path)
 	if err != nil {
 		return nil, nil, err
 	}
