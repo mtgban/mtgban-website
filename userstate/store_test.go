@@ -12,7 +12,7 @@ func freshHash(t *testing.T, c *Client) string {
 	if _, err := c.db.Exec(`DELETE FROM user_state WHERE email_hash = $1`, h); err != nil {
 		t.Fatalf("cleanup: %v", err)
 	}
-	t.Cleanup(func() { c.db.Exec(`DELETE FROM user_state WHERE email_hash = $1`, h) })
+	t.Cleanup(func() { _, _ = c.db.Exec(`DELETE FROM user_state WHERE email_hash = $1`, h) })
 	return h
 }
 
