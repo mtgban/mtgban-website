@@ -1,3 +1,4 @@
+// Package patreon holds the OAuth client behind the site's Patreon login.
 package patreon
 
 import (
@@ -12,6 +13,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
+// AuthToken is what the OAuth token exchange answers with.
 type AuthToken struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -20,6 +22,7 @@ type AuthToken struct {
 	TokenType    string `json:"token_type"`
 }
 
+// The Patreon OAuth endpoints, with the field selections the site reads.
 const (
 	PatreonTokenURL    = "https://www.patreon.com/api/oauth2/token"
 	PatreonIdentityURL = "https://www.patreon.com/api/oauth2/v2/identity?include=memberships&fields%5Buser%5D=email,first_name,full_name,image_url,last_name,social_connections,thumb_url,url,vanity"
@@ -27,6 +30,7 @@ const (
 	PatreonMemberOpts  = "?include=currently_entitled_tiers&fields%5Btier%5D=title"
 )
 
+// GetAuthToken exchanges an OAuth authorization code for a token.
 func GetAuthToken(ctx context.Context, clientID, secret, redirectURI, code string) (*AuthToken, error) {
 	if clientID == "" || secret == "" {
 		return nil, errors.New("missing client or secret information")
@@ -61,10 +65,12 @@ func GetAuthToken(ctx context.Context, clientID, secret, redirectURI, code strin
 	return &tokens, nil
 }
 
+// Client reads the Patreon API on behalf of one logged-in user.
 type Client struct {
 	Client *http.Client
 }
 
+// NewPatreonClient returns a client authenticated with the given token.
 func NewPatreonClient(ctx context.Context, token string) *Client {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{
 		AccessToken: token,
@@ -75,6 +81,7 @@ func NewPatreonClient(ctx context.Context, token string) *Client {
 	return &client
 }
 
+// UserData is the identity answer: the user and their memberships.
 type UserData struct {
 	Errors []struct {
 		Title    string `json:"title"`
@@ -97,8 +104,8 @@ type UserData struct {
 	} `json:"data"`
 }
 
-// Retrieve a user id for each membership of the current user
-// Only what is visible through the token is actually reported
+// GetUserData retrieves the current user and an id for each of their
+// memberships - only what the token can see is reported.
 func (c *Client) GetUserData(ctx context.Context) (*UserData, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, PatreonIdentityURL, http.NoBody)
 	if err != nil {
@@ -119,6 +126,7 @@ func (c *Client) GetUserData(ctx context.Context) (*UserData, error) {
 	return &userData, nil
 }
 
+// MembershipData is the membership answer: the tiers a pledge entitles.
 type MembershipData struct {
 	Errors []struct {
 		Title    string `json:"title"`
@@ -144,6 +152,7 @@ type MembershipData struct {
 	} `json:"included"`
 }
 
+// GetMembershipData retrieves the entitled tiers of one membership.
 func (c *Client) GetMembershipData(ctx context.Context, userID string) (*MembershipData, error) {
 	link := PatreonMemberURL + userID + PatreonMemberOpts
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, link, http.NoBody)

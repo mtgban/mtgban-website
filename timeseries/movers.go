@@ -6,6 +6,7 @@ import (
 	"fmt"
 )
 
+// MoverRow is one card's price movement over the requested window.
 type MoverRow struct {
 	MtgjsonUUID string
 	IsFoil      bool
@@ -20,6 +21,8 @@ type MoverRow struct {
 	Prior   float64
 }
 
+// GetMovers returns the cards that moved the most over a window, filtered
+// by the floor prices given.
 func (c *Client) GetMovers(ctx context.Context, datasetIndex int, windowDays int, minPrice, minPriorPrice float64) ([]MoverRow, error) {
 	column := columnForDataset(datasetIndex)
 	if column == "" {

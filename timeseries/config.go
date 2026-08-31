@@ -10,6 +10,8 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// SQLConfig names the database and how hard to lean on it, as the
+// config file spells it.
 type SQLConfig struct {
 	Host                   string `json:"host"`
 	Port                   int    `json:"port"`
@@ -23,6 +25,7 @@ type SQLConfig struct {
 	ConnMaxLifetimeSeconds int    `json:"conn_max_lifetime_seconds"`
 }
 
+// DSN renders the config as a lib/pq connection string.
 func (c SQLConfig) DSN() string {
 	sslMode := c.SSLMode
 	if sslMode == "" {

@@ -1,3 +1,4 @@
+// Package cardconduit submits cards to CardConduit's estimate API.
 package cardconduit
 
 import (
@@ -12,9 +13,11 @@ import (
 )
 
 const (
+	// EstimateURL is the endpoint estimates are submitted to.
 	EstimateURL = "https://cardconduit.com/api/v1.0/estimate"
 )
 
+// Item is one card of an estimate request.
 type Item struct {
 	ScryfallID string `json:"scryfall_id"`
 	Condition  string `json:"condition"`
@@ -24,10 +27,12 @@ type Item struct {
 	IsEtched   bool   `json:"is_etched"`
 }
 
+// Payload is the body of an estimate request.
 type Payload struct {
 	Items []Item `json:"items"`
 }
 
+// Response is what the estimate endpoint answers with.
 type Response struct {
 	Success  bool   `json:"success"`
 	Message  string `json:"message"`
@@ -41,7 +46,8 @@ type Response struct {
 	} `json:"data"`
 }
 
-// Forward items to CC and retrieve the URL containing the results
+// SendEstimate forwards items to CardConduit and returns the URL the
+// finished estimate can be read at.
 func SendEstimate(ctx context.Context, bearer string, items []Item) (string, error) {
 	var payload Payload
 	payload.Items = items

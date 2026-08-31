@@ -1,3 +1,5 @@
+// Package userstate persists per-user preferences and entitlements in
+// Postgres, keyed by a hash of the login email.
 package userstate
 
 import (

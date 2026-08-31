@@ -55,6 +55,7 @@ type Service struct {
 	promosCacheMu sync.RWMutex
 }
 
+// Set is one edition as the frontend palette lists it.
 type Set struct {
 	Code     string   `json:"code"`
 	Name     string   `json:"name"`
@@ -195,6 +196,7 @@ func (s *Service) Promos(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// CardMetaResponse describes one card for the frontend.
 type CardMetaResponse struct {
 	Name      string   `json:"name"`
 	Found     bool     `json:"found"`
@@ -285,6 +287,7 @@ func (s *Service) Sets(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// Store is one scraper as the frontend lists it.
 type Store struct {
 	Shorthand string `json:"shorthand"`
 	Name      string `json:"name"`
@@ -292,6 +295,7 @@ type Store struct {
 	Sealed    bool   `json:"sealed,omitempty"`
 }
 
+// StoresResponse lists the enabled sellers and vendors.
 type StoresResponse struct {
 	Sellers []Store `json:"sellers"`
 	Vendors []Store `json:"vendors"`
@@ -346,12 +350,14 @@ func (s *Service) Stores(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(out)
 }
 
+// NavTarget is one option of a frontend selector.
 type NavTarget struct {
 	Value string `json:"value"`
 	Label string `json:"label"`
 	Group string `json:"group,omitempty"`
 }
 
+// ArbitTargets is the arbit page's filter and sort options.
 type ArbitTargets struct {
 	Filters []NavTarget `json:"filters"`
 	Sorts   []NavTarget `json:"sorts"`
@@ -471,6 +477,7 @@ func (s *Service) ArbitTargetsJSON(variant string) template.JS {
 	return template.JS(data)
 }
 
+// SealedMetaResponse describes one sealed product for the frontend.
 type SealedMetaResponse struct {
 	Name        string `json:"name"`
 	Found       bool   `json:"found"`
