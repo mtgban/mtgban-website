@@ -26,6 +26,7 @@ import (
 var Country2flag = map[string]string{
 	"EU": "🇪🇺",
 	"JP": "🇯🇵",
+	"GB": "🇬🇧",
 }
 
 // colorRarityMap paints the rarity badge. The Lorcana entries are sampled
