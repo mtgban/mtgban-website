@@ -78,6 +78,7 @@ var FilterOptKeys = []string{
 	"nosyp",
 	"nostock",
 	"nosus",
+	"noindex",
 }
 
 type FilterOpt struct {
@@ -89,6 +90,10 @@ type FilterOpt struct {
 	BetaFlag   bool
 	NoSealed   bool
 	SealedOnly bool
+
+	// Shown only on the reverse page, whose two sides are a seller to buy
+	// from and a buylist to sell into
+	ReverseOnly bool
 }
 
 // User-readable option name and associated function/visibility option
@@ -265,6 +270,10 @@ var FilterOptConfig = map[string]FilterOpt{
 			}
 		},
 		GlobalOnly: true,
+	},
+	"noindex": {
+		Title:       "only Tradable",
+		ReverseOnly: true,
 	},
 }
 
@@ -584,6 +593,12 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		arbitFilters["nosus"] = !arbitFilters["nosus"]
 	}
 
+	// Same for reverse, where what it drops would otherwise fill the whole
+	// ranking. The form loop below still lets the option be turned off
+	if pageVars.ReverseMode {
+		arbitFilters["noindex"] = !arbitFilters["noindex"]
+	}
+
 	for k, v := range r.Form {
 		switch k {
 		case "source":
@@ -759,6 +774,11 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 		if config.BetaFlag && !anyOptionEnabled {
 			continue
 		}
+		// Options the page acts on itself, by choosing what to compare
+		// rather than by narrowing what a comparison keeps
+		if config.Func == nil {
+			continue
+		}
 		FilterOptConfig[key].Func(opts)
 	}
 
@@ -833,6 +853,16 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			continue
 		}
 
+		// An index price is a statistic, not an offer, and reverse buys from
+		// the scraper side: where an index has no supply to average it
+		// reports a fraction of a cent, and dividing a real buy price by that
+		// puts every such row above every real listing on the page. Global
+		// keeps them, since there the index is the reference the probe is
+		// measured against rather than a side of the trade
+		if pageVars.ReverseMode && arbitFilters["noindex"] && scraper.Info().MetadataOnly {
+			continue
+		}
+
 		// Set custom scraper options
 		if pageVars.GlobalMode && scraper.Info().Shorthand == "TCGDirect" {
 			opts.Conditions = BadConditions
@@ -882,8 +912,21 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			}
 		}
 
+		// The same option drops the derived buy prices the market contradicts.
+		// "only Legit" cannot reach them: it filters through CustomPriceFilter,
+		// which only ever sees the seller's side of the trade
+		if pageVars.ReverseMode && arbitFilters["noindex"] && suspectPrice != nil {
+			tcgMarket, _ := findSellerInventory("TCGMarket")
+			arbit = slices.DeleteFunc(arbit, func(res mtgban.ArbitEntry) bool {
+				return invalidDirectIn(tcgMarket, res.CardID, suspectPrice(res))
+			})
+			if len(arbit) == 0 {
+				continue
+			}
+		}
+
 		var sussy map[string]float64
-		if !arbitFilters["nosus"] && suspectPrice != nil {
+		if !arbitFilters["nosus"] && !arbitFilters["noindex"] && suspectPrice != nil {
 			sussy = map[string]float64{}
 
 			tcgMarket, _ := findSellerInventory("TCGMarket")
