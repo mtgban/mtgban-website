@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"io"
+	"net/url"
+	"os"
 
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/simplecloud"
@@ -15,11 +17,35 @@ type BucketKey struct {
 	AccessSecret string `json:"access_secret"`
 }
 
+// configBucketName is the bucket the config itself was read from, or "" when
+// the config is a local file. Parsed rather than remembered, so it cannot go
+// stale against the path a reload reads.
+func configBucketName() string {
+	u, err := url.Parse(Config.sourcePath)
+	if err != nil || u.Scheme != "b2" {
+		return ""
+	}
+	return u.Host
+}
+
 // bucketCredentials returns the key pair for the named bucket: the matching
-// bucket_keys entry when present, else the datastore pair.
+// bucket_keys entry when present, then the pair the config itself was read
+// with, else the datastore pair.
+//
+// The config bucket needs its own answer because its key pair is in the
+// environment, not the config file - a file cannot name the key it is itself
+// read with - so it can never be a bucket_keys entry. Everything filed beside
+// the config is read with it: the Google credentials, the key overrides. They
+// used to reach that bucket through ConfigBucket, which was already holding
+// the right pair; once each read began resolving its own path, they arrived
+// here instead and fell through to the datastore key, which B2 answers with
+// 401 on a key scoped to another bucket.
 func bucketCredentials(bucketName string) (string, string) {
 	if creds, ok := Config.BucketKeys[bucketName]; ok {
 		return creds.AccessKey, creds.AccessSecret
+	}
+	if bucketName != "" && bucketName == configBucketName() {
+		return os.Getenv("BAN_CONFIG_KEY"), os.Getenv("BAN_CONFIG_SECRET")
 	}
 	return Config.Datastore.BucketAccessKey, Config.Datastore.BucketSecretKey
 }
