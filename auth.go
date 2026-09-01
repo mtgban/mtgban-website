@@ -37,13 +37,6 @@ var APIRateLimiter = ratelimit.NewLimiter(APIRequestsPerSec, 2)
 
 var UserRateLimiter = ratelimit.NewLimiter(UserRequestsPerSec, 1)
 
-type PatreonGrant struct {
-	Category string `json:"category"`
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Tier     string `json:"tier"`
-}
-
 type PatreonConfig struct {
 	Source string            `json:"source"`
 	Client map[string]string `json:"client"`
@@ -202,7 +195,7 @@ func Auth(w http.ResponseWriter, r *http.Request) {
 
 	tierTitle := ""
 	// If user is in the allowed list, load the tier from here
-	for _, grant := range Config.Patreon.Grants {
+	for _, grant := range PatreonGrants() {
 		if strings.ToLower(grant.Email) == userData.Email {
 			tierTitle = grant.Tier
 			LogPages["Admin"].Printf("Granted %s (%s) %s tier for %s", grant.Name, grant.Email, grant.Tier, grant.Category)
@@ -488,14 +481,14 @@ func enforceSigning(next http.Handler) http.Handler {
 		initServerURL(r)
 
 		// Check if this endpoint can be bypassed
-		_, checkNoAuth := Config.ACL["Any"]
+		_, checkNoAuth := ACL()["Any"]
 		if checkNoAuth {
 			for _, nav := range ExtraNavs {
 				if nav.Link == r.URL.Path || slices.ContainsFunc(nav.SubPages, func(p NavElem) bool {
 					// Check prefix because Link may contain query params
 					return strings.HasPrefix(p.Link, r.URL.Path)
 				}) {
-					_, noAuth := Config.ACL["Any"][nav.Name]
+					_, noAuth := ACL()["Any"][nav.Name]
 					if noAuth {
 						recordPageHit(r)
 						noSigning(next).ServeHTTP(w, r)
@@ -690,7 +683,7 @@ func recoverPanic(r *http.Request, w http.ResponseWriter) {
 
 func getValuesForTier(tierTitle string) url.Values {
 	v := url.Values{}
-	tier, found := Config.ACL[tierTitle]
+	tier, found := ACL()[tierTitle]
 	if !found {
 		return v
 	}
