@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -89,4 +90,30 @@ func openBucketPath(ctx context.Context, path string) (io.ReadCloser, error) {
 	return simplecloud.Open(ctx, path,
 		simplecloud.WithResolver(bucketResolver),
 		simplecloud.WithHTTPClient(cleanhttp.DefaultClient()))
+}
+
+// openBucketWriter opens a path for writing. simplecloud.Open covers reads
+// only - a writer needs a backend that can write, which not every scheme it
+// reads from can - so the scheme switch survives here, for the two a
+// deployment keeps anything writable under.
+func openBucketWriter(ctx context.Context, path string) (io.WriteCloser, error) {
+	u, err := url.Parse(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var bucket simplecloud.ReadWriter
+	switch u.Scheme {
+	case "":
+		bucket = &simplecloud.FileBucket{}
+	case "b2":
+		bucket, err = newB2ClientFor(ctx, u.Host)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("cannot write to %q: unsupported scheme %q", path, u.Scheme)
+	}
+
+	return simplecloud.InitWriter(ctx, bucket, path)
 }

@@ -592,6 +592,14 @@ type ConfigType struct {
 
 	PopularSearches []PopularSearchEntry `json:"popular_searches"`
 
+	// ACL and the Patreon grants are read from their own files when a path is
+	// given, and from the fields below when it is not. See common.go: the
+	// fields are the migration's other half and go once every deployment has
+	// moved. A path may be shared between deployments or belong to one; that
+	// is a choice about the data, not about the code.
+	ACLPath           string `json:"acl_path"`
+	PatreonGrantsPath string `json:"patreon_grants_path"`
+
 	ACL map[string]map[string]map[string]string `json:"acl"`
 
 	Uploader map[string]string `json:"uploader"`
@@ -958,7 +966,7 @@ func genPageNav(activeTab, sig string) PageVars {
 
 	// Enable buttons according to the enabled features
 	for _, feat := range OrderNav {
-		_, noAuth := Config.ACL["Any"][feat]
+		_, noAuth := ACL()["Any"][feat]
 		validSig := expires > time.Now().Unix()
 		devMode := DevMode && !SigCheck
 		alwaysOnDev := DevMode && ExtraNavs[feat].AlwaysOnForDev
@@ -1016,7 +1024,7 @@ func genPageNav(activeTab, sig string) PageVars {
 		if !showPatreonLogin {
 			user = "Anonymous"
 		}
-		_, noAuth := Config.ACL["Any"][pageVars.Nav[mainNavIndex].Name]
+		_, noAuth := ACL()["Any"][pageVars.Nav[mainNavIndex].Name]
 		if noAuth {
 			user = ""
 		}
@@ -1070,7 +1078,7 @@ func preloadConfig(configPath string) error {
 	return nil
 }
 
-func loadVars(port, datastorePath, offlineKey string) error {
+func loadVars(port, datastorePath, offlineKey, aclPath, grantsPath string) error {
 	// Preload
 	Config.Game = DefaultGame
 	Config.OfflineKey = offlineKey
@@ -1099,6 +1107,12 @@ func loadVars(port, datastorePath, offlineKey string) error {
 	}
 	if datastorePath != "" {
 		Config.DatastorePath = datastorePath
+	}
+	if aclPath != "" {
+		Config.ACLPath = aclPath
+	}
+	if grantsPath != "" {
+		Config.PatreonGrantsPath = grantsPath
 	}
 
 	// Ensure needed defaults
@@ -1292,6 +1306,8 @@ func main() {
 	configFilePath := flag.String("cfg", "", "Load configuration file")
 	port := flag.String("port", "", "Override server port")
 	datastore := flag.String("ds", "", "Override datastore path")
+	aclPath := flag.String("acl", "", "Override access table path")
+	grantsPath := flag.String("grants", "", "Override Patreon grants path")
 
 	flag.BoolVar(&DevMode, "dev", false, "Enable developer mode")
 	sigCheck := flag.Bool("sig", false, "Enable signature verification")
@@ -1321,12 +1337,25 @@ func main() {
 	if err != nil {
 		log.Fatalln("unable to preload config file:", err)
 	}
-	err = loadVars(*port, *datastore, *offline)
+	err = loadVars(*port, *datastore, *offline, *aclPath, *grantsPath)
 	if err != nil {
 		if DevMode || Config.OfflineKey != "" {
 			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")
 		} else {
 			log.Fatalln("unable to load config file:", err)
+		}
+	}
+
+	// The access table and the grant list, from their own paths or from what
+	// the config carried. A deployment that cannot read its access table has
+	// no way to tell an admin from anyone else, so this is fatal for the same
+	// reason a missing config is.
+	err = loadCommonConfig(context.Background())
+	if err != nil {
+		if DevMode || Config.OfflineKey != "" {
+			log.Println("unable to load the shared config:", err)
+		} else {
+			log.Fatalln("unable to load the shared config:", err)
 		}
 	}
 

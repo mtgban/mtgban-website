@@ -209,9 +209,17 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		v.Set("msg", "New config loaded!")
 		doReboot = true
 
-		err := loadVars(Config.Port, Config.DatastorePath, Config.OfflineKey)
+		err := loadVars(Config.Port, Config.DatastorePath, Config.OfflineKey,
+			Config.ACLPath, Config.PatreonGrantsPath)
 		if err != nil {
 			v.Set("msg", "Failed to reload config: "+err.Error())
+		} else {
+			// The access table and the grants sit beside the config now, so a
+			// reload that stopped at the config would leave them as they were.
+			err = loadCommonConfig(r.Context())
+			if err != nil {
+				v.Set("msg", "Config reloaded, but: "+err.Error())
+			}
 		}
 
 	case "checkpoints":
@@ -335,6 +343,14 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 					Config = config
 					Config.sourcePath = configSourcePath
 					pageVars.InfoMessage = "Config updated"
+					// The access table and grants are served from their own
+					// holder now; republish so an edit to the inline acl or
+					// grants takes effect immediately, as it did when readers
+					// hit the config directly.
+					err = loadCommonConfig(r.Context())
+					if err != nil {
+						pageVars.WarningMessage = err.Error()
+					}
 				}
 			}
 		}
@@ -590,13 +606,13 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		duplicate := false
-		for _, person := range Config.Patreon.Grants {
+		for _, person := range PatreonGrants() {
 			if strings.EqualFold(person.Email, grantEmail) {
 				duplicate = true
 				break
 			}
 		}
-		_, tierExists := Config.ACL[grantTier]
+		_, tierExists := ACL()[grantTier]
 
 		switch {
 		case !strings.Contains(grantEmail, "@"):
@@ -606,23 +622,13 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		case !tierExists:
 			pageVars.WarningMessage = "unknown tier: " + grantTier
 		default:
-			newConfig := Config
-			newConfig.Patreon.Grants = append(slices.Clone(Config.Patreon.Grants), newGrant)
-
-			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
+			err := saveGrants(r.Context(), append(slices.Clone(PatreonGrants()), newGrant))
 			if err != nil {
+				log.Println(err)
 				pageVars.WarningMessage = err.Error()
 			} else {
-				err = writeConfigFile(newConfig, writer)
-				writer.Close()
-				if err != nil {
-					log.Println(err)
-					pageVars.WarningMessage = err.Error()
-				} else {
-					Config = newConfig
-					pageVars.InfoMessage = fmt.Sprintf("Granted %s tier to %s", newGrant.Tier, newGrant.Email)
-					LogPages["Admin"].Printf("Grant added: %+v", newGrant)
-				}
+				pageVars.InfoMessage = fmt.Sprintf("Granted %s tier to %s", newGrant.Tier, newGrant.Email)
+				LogPages["Admin"].Printf("Grant added: %+v", newGrant)
 			}
 		}
 	}
@@ -632,37 +638,29 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	// table rendered below and stays gone after a restart.
 	revokeEmail := strings.ToLower(strings.TrimSpace(r.FormValue("revokeEmail")))
 	if revokeEmail != "" {
-		idx := slices.IndexFunc(Config.Patreon.Grants, func(person PatreonGrant) bool {
+		idx := slices.IndexFunc(PatreonGrants(), func(person PatreonGrant) bool {
 			return strings.EqualFold(person.Email, revokeEmail)
 		})
 		if idx < 0 {
 			pageVars.WarningMessage = "no grant found for " + revokeEmail
 		} else {
-			removed := Config.Patreon.Grants[idx]
-			newConfig := Config
-			newConfig.Patreon.Grants = slices.Delete(slices.Clone(Config.Patreon.Grants), idx, idx+1)
+			grants := PatreonGrants()
+			removed := grants[idx]
 
-			writer, err := simplecloud.InitWriter(r.Context(), ConfigBucket, Config.sourcePath)
+			err := saveGrants(r.Context(), slices.Delete(slices.Clone(grants), idx, idx+1))
 			if err != nil {
+				log.Println(err)
 				pageVars.WarningMessage = err.Error()
 			} else {
-				err = writeConfigFile(newConfig, writer)
-				writer.Close()
-				if err != nil {
-					log.Println(err)
-					pageVars.WarningMessage = err.Error()
-				} else {
-					Config = newConfig
-					pageVars.InfoMessage = fmt.Sprintf("Removed %s grant from %s", removed.Tier, removed.Email)
-					LogPages["Admin"].Printf("Grant removed: %+v", removed)
-				}
+				pageVars.InfoMessage = fmt.Sprintf("Removed %s grant from %s", removed.Tier, removed.Email)
+				LogPages["Admin"].Printf("Grant removed: %+v", removed)
 			}
 		}
 	}
 
 	// -- People: Patreon Grants --
 	var userTable [][]string
-	for i, person := range Config.Patreon.Grants {
+	for i, person := range PatreonGrants() {
 		row := []string{
 			fmt.Sprintf("%d", i+1),
 			person.Category,
@@ -695,7 +693,7 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	pageVars.Page = page
 
 	var tiers []string
-	for tierName := range Config.ACL {
+	for tierName := range ACL() {
 		tiers = append(tiers, tierName)
 	}
 	sort.Slice(tiers, func(i, j int) bool {
@@ -1046,6 +1044,23 @@ const (
 )
 
 var apiUsersMutex sync.RWMutex
+
+// writeConfigTo writes the config to a path in a bucket, closing the writer
+// itself: for a bucket that is what finalises the upload, so its error is the
+// write's error and a caller that discarded it would call a failed save a
+// success.
+func writeConfigTo(ctx context.Context, bucket simplecloud.ReadWriter, path string, config ConfigType) error {
+	writer, err := simplecloud.InitWriter(ctx, bucket, path)
+	if err != nil {
+		return err
+	}
+	err = writeConfigFile(config, writer)
+	cerr := writer.Close()
+	if err != nil {
+		return err
+	}
+	return cerr
+}
 
 func writeConfigFile(config ConfigType, writer io.Writer) error {
 	e := json.NewEncoder(writer)
