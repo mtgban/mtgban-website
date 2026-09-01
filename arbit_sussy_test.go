@@ -1,10 +1,12 @@
 package main
 
 import (
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgban"
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
 // reversePageVars is one reverse-mode table whose second entry the page has
@@ -58,5 +60,86 @@ func TestReverseSussyBadge(t *testing.T) {
 	clean = clean[:strings.Index(clean, "</tr>")]
 	if strings.Contains(clean, "TCG Market is") {
 		t.Error("a price the market backs up was flagged anyway")
+	}
+}
+
+// seedReverseScrapers publishes one real seller, one index seller and one
+// vendor, all holding the same card, so a reverse comparison has both kinds
+// of buy side to choose between.
+func seedReverseScrapers(t *testing.T, cardID string) {
+	t.Helper()
+
+	prevSellers := sellersPtr.Load()
+	prevVendors := vendorsPtr.Load()
+	t.Cleanup(func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	})
+
+	shopInv := mtgban.InventoryRecord{}
+	shopInv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: 10, Quantity: 2, URL: "u"})
+
+	// What an index reports for a card its market has no supply to average
+	idxInv := mtgban.InventoryRecord{}
+	idxInv.Add(cardID, &mtgban.InventoryEntry{Conditions: "NM", Price: 0.02, URL: "u"})
+
+	sellers := []mtgban.Seller{
+		mtgban.NewSellerFromInventory(shopInv, mtgban.ScraperInfo{
+			Name: "Reverse Shop", Shorthand: "REVSHOP",
+		}),
+		mtgban.NewSellerFromInventory(idxInv, mtgban.ScraperInfo{
+			Name: "Reverse Index", Shorthand: "REVIDX", MetadataOnly: true,
+		}),
+	}
+	sellersPtr.Store(&sellers)
+
+	bl := mtgban.BuylistRecord{}
+	bl.Add(cardID, &mtgban.BuylistEntry{Conditions: "NM", BuyPrice: 40, Quantity: 2, URL: "u"})
+
+	vendors := []mtgban.Vendor{
+		mtgban.NewVendorFromBuylist(bl, mtgban.ScraperInfo{
+			Name: "Reverse Buyer", Shorthand: "REVBUY",
+		}),
+	}
+	vendorsPtr.Store(&vendors)
+}
+
+// renderReverse runs one reverse comparison the way the handler does.
+func renderReverse(t *testing.T, query string) string {
+	t.Helper()
+
+	oldDev := DevMode
+	DevMode = true
+	t.Cleanup(func() { DevMode = oldDev })
+
+	r := httptest.NewRequest("GET", "/reverse?"+query, nil)
+	w := httptest.NewRecorder()
+	pageVars := PageVars{ReverseMode: true, BetaNav: &NavElem{Short: "beta"}}
+	scraperCompare(w, r, pageVars, nil, nil, scraperCompareOpts{AllResults: true})
+	return w.Body.String()
+}
+
+// TestReverseDropsIndexSellers pins the buy side of a reverse row to something
+// that can actually be bought. An index reports a fraction of a cent where its
+// market has no supply, and dividing a real buy price by that put every such
+// row above every real listing on the page.
+func TestReverseDropsIndexSellers(t *testing.T) {
+	uuids := mtgmatcher.GetUUIDs()
+	if len(uuids) == 0 {
+		t.Skip("mtgmatcher data not loaded")
+	}
+	seedReverseScrapers(t, uuids[0])
+
+	page := renderReverse(t, "source=REVBUY")
+	if !strings.Contains(page, "Reverse Shop") {
+		t.Fatal("the real seller is missing from the default page")
+	}
+	if strings.Contains(page, "Reverse Index") {
+		t.Error("an index price is still one side of a trade by default")
+	}
+
+	page = renderReverse(t, "source=REVBUY&noindex=false")
+	if !strings.Contains(page, "Reverse Index") {
+		t.Error("turning the option off does not bring the index back")
 	}
 }
