@@ -864,14 +864,31 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			}
 		}
 
-		// Gather all the card Ids that might be invalid
+		// Gather all the card Ids that might be invalid. Which price is the
+		// suspect one depends on the page. Global compares against the
+		// reference seller's own listing, the only mode that fills
+		// ReferenceEntry at all. Reverse never sees that listing directly,
+		// but TCG Direct (net) derives its buy price from it, so a single
+		// overpriced Direct listing reaches the page as an offer to buy
+		var suspectPrice func(mtgban.ArbitEntry) float64
+		switch {
+		case pageVars.GlobalMode && scraper.Info().Shorthand == "TCGDirect":
+			suspectPrice = func(res mtgban.ArbitEntry) float64 {
+				return res.ReferenceEntry.Price
+			}
+		case pageVars.ReverseMode && source.Info().Shorthand == "TCGDirectNet":
+			suspectPrice = func(res mtgban.ArbitEntry) float64 {
+				return res.BuylistEntry.BuyPrice
+			}
+		}
+
 		var sussy map[string]float64
-		if !arbitFilters["nosus"] && scraper.Info().Shorthand == "TCGDirect" {
+		if !arbitFilters["nosus"] && suspectPrice != nil {
 			sussy = map[string]float64{}
 
 			tcgMarket, _ := findSellerInventory("TCGMarket")
 			for _, res := range arbit {
-				isSussy := invalidDirectIn(tcgMarket, res.CardID, res.ReferenceEntry.Price)
+				isSussy := invalidDirectIn(tcgMarket, res.CardID, suspectPrice(res))
 				if isSussy {
 					sussy[res.CardID] = tcgMarketPriceIn(tcgMarket, res.CardID)
 				}
