@@ -1703,6 +1703,9 @@ func renderTemplateFiles(tmpl string, isMobile bool) (baseName string, files []s
 	if name == "search.html" {
 		files = append(files, "templates/partials/search-landing.html")
 	}
+	if name == "arbit.html" {
+		files = append(files, "templates/partials/sussy-badge.html")
+	}
 	if name == "guide.html" {
 		files = append(files, "templates/partials/guide-faq.html")
 	}

@@ -511,13 +511,10 @@
                             <td class="m">
                                 {{if eq .BuylistEntry.BuyPrice 0.0}}
                                     $ {{printf "%.2f" .ReferenceEntry.Price}}
-                                    {{if (isSussy $arbitContainer.SussyList .CardID)}}
-                                        {{$susPrice := (index $arbitContainer.SussyList .CardID)}}
-                                        <span class=emoji title="CAUTION - This price looks a bit off, {{if $sealedSource}}the contents of this product have a very uneven distribution, and simulation or data may be wrong (IQR: {{printf "%.2f" $susPrice}}){{else}}TCG Market is {{if $susPrice}}${{printf "%.2f" $susPrice}}{{else}}missing{{end}}{{end}}">‼️ </span>
-                                    {{end}}
                                 {{else}}
                                     $ {{printf "%.2f" .BuylistEntry.BuyPrice}}
                                 {{end}}
+                                {{template "sussy-badge" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource}}
                             </td>
                         {{end}}
                         {{if not $save.HasNoCredit}}
