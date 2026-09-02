@@ -466,8 +466,9 @@ func getSetKeyrunes() map[string]string {
 // finishLabels spells the finishes finishLabel's rule below cannot: a name
 // that is not a foil at all, or one whose words do not split on the suffix.
 var finishLabels = map[string]string{
-	"1stedition":     "1st Edition",
-	"rainbowpillars": "Rainbow Pillars",
+	"1stedition":      "1st Edition",
+	"rainbowpillars":  "Rainbow Pillars",
+	"reverseholofoil": "Reverse Holo Foil",
 }
 
 // finishLabel spells the finish a card actually carries, or "" for one the
@@ -490,15 +491,23 @@ func finishLabel(co *mtgmatcher.CardObject) string {
 		mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
 		return ""
 	}
-	label, found := finishLabels[co.Finish]
+	return spellFinish(co.Finish)
+}
+
+// spellFinish is the rule finishLabel applies, on a name rather than on a
+// card, for callers listing the finishes a game has rather than naming one
+// card's. It spells the shared names too, since a list of what f: accepts has
+// to name them along with the rest.
+func spellFinish(finish string) string {
+	label, found := finishLabels[finish]
 	if found {
 		return label
 	}
-	base := strings.TrimSuffix(co.Finish, "foil")
-	if base != co.Finish && base != "" {
+	base := strings.TrimSuffix(finish, "foil")
+	if base != finish && base != "" {
 		return mtgmatcher.Title(base) + " Foil"
 	}
-	return mtgmatcher.Title(co.Finish)
+	return mtgmatcher.Title(finish)
 }
 
 func editionTitle(cardID string) string {

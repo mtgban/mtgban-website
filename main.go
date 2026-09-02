@@ -837,6 +837,23 @@ var paletteService = &palette.Service{
 	PromoAliases: func() map[string]string {
 		return isKnownPromo
 	},
+	FinishLabel: func(finish string) string {
+		// A treatment is a promo type on Magic, and the game spells its own
+		// promo types better than any rule could - "Step-and-Compleat",
+		// "Oil Slick foil", "Dragon Scale Foil". PromoTypeLabel title-cases
+		// the token when it has no spelling of its own, which is worse than
+		// the finish rule, so take it only where it actually says something.
+		if slices.Contains(altFoilTags, finish) {
+			label := mtgmatcher.PromoTypeLabel(finish)
+			if label != mtgmatcher.Title(finish) {
+				return label
+			}
+		}
+		return spellFinish(finish)
+	},
+	FoilTreatments: func() []string {
+		return altFoilTags
+	},
 	Sellers: GetSellers,
 	Vendors: GetVendors,
 	NewspaperPages: func() []palette.NewspaperPage {
@@ -1222,6 +1239,7 @@ func loadDatastore(ds string) error {
 	go cacheNewspaper()
 	go paletteService.BuildSetsCache()
 	go paletteService.BuildPromosCache()
+	go paletteService.BuildFinishesCache()
 
 	return nil
 }
@@ -1561,6 +1579,7 @@ func main() {
 	http.Handle("/api/palette/sets.json", noSigning(http.HandlerFunc(paletteService.Sets)))
 	http.Handle("/api/palette/stores.json", noSigning(http.HandlerFunc(paletteService.Stores)))
 	http.Handle("/api/palette/promos.json", noSigning(http.HandlerFunc(paletteService.Promos)))
+	http.Handle("/api/palette/finishes.json", noSigning(http.HandlerFunc(paletteService.Finishes)))
 	http.Handle("/api/offline/", noSigning(http.HandlerFunc(offlineService.Handle)))
 
 	http.Handle("/monroecards", http.RedirectHandler("/screener", http.StatusFound))
