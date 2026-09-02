@@ -1890,6 +1890,22 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 		if aliased && co.UUID != "" && co.FoilUUIDs[alias] == co.UUID {
 			return false
 		}
+
+		// Magic keeps its foil treatments as promo types rather than finishes
+		// - its CanonicalFinish answers with the three shared names and
+		// nothing else - so a galaxy foil is a foil whose treatment is filed
+		// elsewhere. A treatment is what a person means by finish, and
+		// uuid2card already prints it in place of the foil chip, so f: should
+		// reach it: altFoilTags is exactly the promo types that name a
+		// foiling, which is why it gates this and any promo type does not.
+		treatment := value
+		expanded, known := isKnownPromo[value]
+		if known {
+			treatment = expanded
+		}
+		if slices.Contains(altFoilTags, treatment) && co.HasPromoType(treatment) {
+			return false
+		}
 	}
 	return true
 }

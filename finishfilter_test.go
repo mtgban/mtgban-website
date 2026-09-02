@@ -126,3 +126,35 @@ func TestFinishFilterFollowsAnAlias(t *testing.T) {
 		t.Error("f:rainbowfoil matched a printing the alias does not name")
 	}
 }
+
+// Magic files its foil treatments as promo types, not finishes - its
+// CanonicalFinish answers with the three shared names and nothing else - so
+// the treatment has to be reached there or a galaxy foil is only ever f:foil.
+func TestFinishFilterReachesMagicTreatments(t *testing.T) {
+	galaxy := finishCard("m-2_f", mtgmatcher.FinishFoil, true)
+	galaxy.PromoTypes = []string{"galaxyfoil"}
+
+	if !matches("galaxyfoil", galaxy) {
+		t.Error("f:galaxyfoil did not match a card carrying that treatment")
+	}
+	if !matches("galaxy", galaxy) {
+		t.Error("f:galaxy did not expand the way is:galaxy does")
+	}
+	if matches("surgefoil", galaxy) {
+		t.Error("f:surgefoil matched a galaxy foil")
+	}
+	if !matches("foil", galaxy) {
+		t.Error("f:foil stopped reaching a treated foil")
+	}
+}
+
+// f: means the finish, so a promo type that names something else stays out of
+// reach even though it is a promo type like the treatments are.
+func TestFinishFilterIgnoresNonFoilPromoTypes(t *testing.T) {
+	prerelease := finishCard("m-3_f", mtgmatcher.FinishFoil, true)
+	prerelease.PromoTypes = []string{"prerelease"}
+
+	if matches("prerelease", prerelease) {
+		t.Error("f:prerelease matched: f: reaches foilings, not every promo type")
+	}
+}
