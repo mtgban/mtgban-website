@@ -1478,6 +1478,7 @@ var isKnownPromo = map[string]string{
 }
 
 var altFoilTags = []string{
+	"chocobotrackfoil",
 	"confettifoil",
 	"cosmicfoil",
 	"dazzlefoil",

@@ -153,3 +153,33 @@ func TestFinishesCacheCapitalisesFoil(t *testing.T) {
 		}
 	}
 }
+
+// altFoilTags is curated, because nothing in the data marks which promo types
+// are foilings - but where a game spells one out as a foil, the list can be
+// held to it. chocobotrackfoil was missing this way: 25 printings the game
+// calls "Chocobo Track Foil", which f: could not reach and the finish list did
+// not name.
+//
+// It catches only the ones a game says "foil" about. A treatment named for
+// what it looks like - Double Rainbow, Silver Scroll, Step-and-Compleat - is
+// still a judgement, and still has to be added by hand.
+func TestFoilTreatmentsCoverTheOnesNamedFoil(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	var missing []string
+	for _, promoType := range mtgmatcher.AllPromoTypes() {
+		label := mtgmatcher.PromoTypeLabel(promoType)
+		if !strings.HasSuffix(strings.ToLower(label), "foil") {
+			continue
+		}
+		if !slices.Contains(altFoilTags, promoType) {
+			missing = append(missing, promoType+" ("+label+")")
+		}
+	}
+	if len(missing) != 0 {
+		t.Errorf("the game calls these a foil and altFoilTags does not list them, "+
+			"so f: cannot reach them: %v", missing)
+	}
+}
