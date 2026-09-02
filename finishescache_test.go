@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -99,4 +100,56 @@ func TestFinishesCacheUsesTheGamesSpelling(t *testing.T) {
 		return
 	}
 	t.Skip("this datastore has no doublerainbow printing")
+}
+
+// Foil is capitalised throughout. The game's map spells fifteen treatments
+// "X foil" and seven "X Foil"; a list has to pick one, and this is the
+// spelling the finishes a game names itself already use - Cold Foil, Rainbow
+// Foil - so every row reads the same whichever half it came from.
+func TestFinishListLabelCapitalisesFoil(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+
+	tests := []struct{ finish, want string }{
+		// The fifteen the game spells lowercase.
+		{"surgefoil", "Surge Foil"},
+		{"galaxyfoil", "Galaxy Foil"},
+		{"embossed", "Embossed Foil"},
+		{"oilslick", "Oil Slick Foil"},
+		// The seven it already capitalises, unchanged.
+		{"firstplacefoil", "First Place Foil"},
+		{"dragonscalefoil", "Dragon Scale Foil"},
+		// The words are still the game's: only a trailing foil moves, and a
+		// treatment that is not "something foil" keeps its own shape.
+		{"doublerainbow", "Double Rainbow"},
+		{"stepandcompleat", "Step-and-Compleat"},
+		{"neonink", "Neon Ink"},
+		// Not a treatment: the finish rule spells it, as it does for the games
+		// that name their finishes rather than filing them as promo types -
+		// and it already capitalises Foil, which is why this is the spelling
+		// the rest were brought to.
+		{"coldfoil", "Cold Foil"},
+		{"1stedition", "1st Edition"},
+	}
+	for _, test := range tests {
+		if got := finishListLabel(test.finish); got != test.want {
+			t.Errorf("finishListLabel(%q) = %q, want %q", test.finish, got, test.want)
+		}
+	}
+}
+
+// Whatever the source, no row in the served list may spell it the other way.
+func TestFinishesCacheCapitalisesFoil(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	paletteService.BuildFinishesCache()
+
+	for _, finish := range fetchFinishes(t) {
+		if strings.HasSuffix(finish.Label, " foil") {
+			t.Errorf("%q is labelled %q, which spells Foil the other way",
+				finish.Value, finish.Label)
+		}
+	}
 }

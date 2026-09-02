@@ -494,6 +494,34 @@ func finishLabel(co *mtgmatcher.CardObject) string {
 	return spellFinish(co.Finish)
 }
 
+// finishListLabel spells a finish for a list of them, which is a harder job
+// than spelling one card's: the names come from two places.
+//
+// A treatment is a promo type on Magic, and the game spells its own promo
+// types better than any rule could - "Double Rainbow", "Step-and-Compleat",
+// "Dragon Scale Foil". PromoTypeLabel title-cases the bare token where it has
+// no spelling of its own, which is worse than the rule below, so it is taken
+// only where it says something.
+//
+// The words are the game's; the capital on Foil is ours. That map spells
+// fifteen of them "X foil" and seven "X Foil", and a list has to pick one -
+// this one is written the way the finishes a game names itself are spelled,
+// Cold Foil and Rainbow Foil, so every row reads the same whichever half of
+// the list it came from. Only a trailing "foil" moves: Double Rainbow and
+// Step-and-Compleat are not "something foil" and keep their own shape.
+func finishListLabel(finish string) string {
+	if slices.Contains(altFoilTags, finish) {
+		label := mtgmatcher.PromoTypeLabel(finish)
+		if label != mtgmatcher.Title(finish) {
+			if strings.HasSuffix(label, " foil") {
+				label = strings.TrimSuffix(label, " foil") + " Foil"
+			}
+			return label
+		}
+	}
+	return spellFinish(finish)
+}
+
 // spellFinish is the rule finishLabel applies, on a name rather than on a
 // card, for callers listing the finishes a game has rather than naming one
 // card's. It spells the shared names too, since a list of what f: accepts has
