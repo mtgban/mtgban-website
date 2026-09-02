@@ -48,11 +48,24 @@ type Service struct {
 	// the endpoint can offer them beside the type itself.
 	PromoAliases func() map[string]string
 
+	// FinishLabel spells a finish name the way a person writes it, since the
+	// matcher stores one as a single lowercase word.
+	FinishLabel func(string) string
+
+	// FoilTreatments names the promo types that are a foiling rather than an
+	// occasion. Magic files its treatments there rather than as finishes, and
+	// nothing in the data marks which ones they are, so the list is curated by
+	// the caller - the same list the finish filter accepts.
+	FoilTreatments func() []string
+
 	setsCache   []byte
 	setsCacheMu sync.RWMutex
 
 	promosCache   []byte
 	promosCacheMu sync.RWMutex
+
+	finishesCache   []byte
+	finishesCacheMu sync.RWMutex
 }
 
 // Set is one edition as the frontend palette lists it.
@@ -186,6 +199,104 @@ func (s *Service) Promos(w http.ResponseWriter, r *http.Request) {
 	s.promosCacheMu.RLock()
 	data := s.promosCache
 	s.promosCacheMu.RUnlock()
+	// cache not warm - dont serve [] for an hour
+	if len(data) == 0 {
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write([]byte(`[]`))
+		return
+	}
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Write(data)
+}
+
+// Finish is one finish the loaded game prints, as the palette lists it.
+type Finish struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+	Count int    `json:"count"`
+}
+
+// BuildFinishesCache rebuilds the finish list from the loaded game. Called on
+// datastore load, beside the promos cache.
+//
+// Read off the printings rather than from a table, because the vocabulary is
+// the game's: Lorcana prints cold foil and holofoil, Flesh and Blood rainbow
+// and cold, Yu-Gi-Oh prices print runs, and a game added tomorrow brings its
+// own. Every place a finish name can sit is collected - the name the printing
+// carries, the keys of the finishes it is sold in, and the spellings those
+// answer to - so the list is what the filter accepts rather than a second
+// answer to the same question.
+//
+// The foil treatments come from the caller, since Magic keeps them as promo
+// types and nothing in the data says which promo types are foilings.
+func (s *Service) BuildFinishesCache() {
+	treatments := map[string]bool{}
+	if s.FoilTreatments != nil {
+		for _, treatment := range s.FoilTreatments() {
+			treatments[treatment] = true
+		}
+	}
+
+	// One pass over the printings, as the promos cache does, counting how many
+	// wear each name so the commonest can lead.
+	counts := map[string]int{}
+	for _, uuid := range mtgmatcher.GetUUIDs() {
+		co, err := mtgmatcher.GetUUID(uuid)
+		if err != nil {
+			continue
+		}
+
+		seen := map[string]bool{}
+		for _, name := range co.PromoTypes {
+			if treatments[name] {
+				seen[name] = true
+			}
+		}
+		if co.Finish != "" {
+			seen[co.Finish] = true
+		}
+		for name := range co.FoilUUIDs {
+			seen[name] = true
+		}
+		for name := range co.FinishAliases {
+			seen[name] = true
+		}
+
+		for name := range seen {
+			counts[name]++
+		}
+	}
+
+	finishes := []Finish{}
+	for value, count := range counts {
+		label := value
+		if s.FinishLabel != nil {
+			label = s.FinishLabel(value)
+		}
+		finishes = append(finishes, Finish{Value: value, Label: label, Count: count})
+	}
+	sort.Slice(finishes, func(i, j int) bool {
+		if finishes[i].Count != finishes[j].Count {
+			return finishes[i].Count > finishes[j].Count
+		}
+		return finishes[i].Value < finishes[j].Value
+	})
+
+	data, err := json.Marshal(finishes)
+	if err != nil {
+		return
+	}
+	s.finishesCacheMu.Lock()
+	s.finishesCache = data
+	s.finishesCacheMu.Unlock()
+}
+
+// Finishes returns the loaded game's finishes.
+func (s *Service) Finishes(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	s.finishesCacheMu.RLock()
+	data := s.finishesCache
+	s.finishesCacheMu.RUnlock()
 	// cache not warm - dont serve [] for an hour
 	if len(data) == 0 {
 		w.Header().Set("Cache-Control", "no-store")
