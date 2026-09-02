@@ -232,7 +232,15 @@ func fixupNumberNG(code string, strict bool) []string {
 }
 
 func fixupFinishNG(code string) []string {
-	return strings.Split(strings.ToLower(code), ",")
+	filters := strings.Split(strings.ToLower(code), ",")
+	for i := range filters {
+		// Spell the query the way a finish is stored: one lowercase word, no
+		// separators. That is what makes "Rainbow Foil", "rainbow-foil" and
+		// "rainbowfoil" one query, and it leaves the shared names alone -
+		// foil, etched, nonfoil and the short forms are already one word.
+		filters[i] = mtgmatcher.NormalizeFinish(filters[i])
+	}
+	return filters
 }
 
 func fixupTypeNG(code string) []string {
@@ -1861,6 +1869,26 @@ func cardFilterFinish(filters []string, co *mtgmatcher.CardObject) bool {
 			if !co.Foil && !co.Etched {
 				return false
 			}
+		}
+
+		// The game's own name for what this printing carries. Where a game
+		// names no finishes of its own this is one of the three above and
+		// agrees with them, so it costs those games nothing. Where it does,
+		// it is the only thing telling two printings apart: Yu-Gi-Oh prices
+		// print runs, so f:1stedition and f:unlimited are the whole
+		// distinction and neither is a foilness a case can answer.
+		if co.Finish != "" && value == co.Finish {
+			return false
+		}
+
+		// A spelling this printing answers to. A game registers the bare
+		// treatment name beside the run-qualified one a product is actually
+		// sold under, so f:rainbowfoil reaches a product whose only rainbow
+		// is the Unlimited printing. An alias names a finish rather than a
+		// printing, so it counts only where it resolves to this one.
+		alias, aliased := co.FinishAliases[value]
+		if aliased && co.UUID != "" && co.FoilUUIDs[alias] == co.UUID {
+			return false
 		}
 	}
 	return true
