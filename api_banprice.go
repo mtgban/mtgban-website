@@ -1002,7 +1002,7 @@ func SimplePrice2CSV(w *csv.Writer, pm map[string]map[string]*BanPrice, uploaded
 func priceRowToCSV(pm map[string]map[string]*BanPrice, id string, allScrapers, allIndexes []string, condition string, preferFlavor, withSKU bool) ([]string, error) {
 	co, err := mtgmatcher.GetUUID(id)
 	if err != nil {
-		uuid := mtgmatcher.ExternalUUID(id)
+		uuid := externalUUID(id)
 		if uuid != "" {
 			co, err = mtgmatcher.GetUUID(uuid)
 		}
