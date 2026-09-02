@@ -1436,6 +1436,12 @@ func compareReleaseDate(filters []string, co *mtgmatcher.CardObject, cmpFunc fun
 }
 
 var isKnownPromo = map[string]string{
+	// The one expansion that is not a Magic promo type. Extended art is a
+	// frame effect on a Magic card and a promo type on the games that print
+	// it as a treatment, so the case in cardFilterIs answers the first
+	// reading and this lets the short form reach the second: without it "ea"
+	// arrives at the promo types as itself, which no game names anything.
+	"ea":        magic.FrameEffectExtendedArt,
 	"bf":        magic.PromoTypeBoosterfun,
 	"v":         magic.PromoTypeBoosterfun,
 	"rewards":   magic.PromoTypePlayerRewards,
