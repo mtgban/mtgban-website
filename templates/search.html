@@ -1122,7 +1122,7 @@
                                                 </div>
                                             {{end}}
                                             {{range $entries}}
-                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                                <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
                                                     {{if .Locked}}
                                                         <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                         <span class="locked-cta">
@@ -1134,11 +1134,7 @@
                                                     {{else if eq .URL ""}}
                                                         <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                     {{else}}
-                                                        {{if .Badge}}
-                                                        <a class="store-name amzn-badge" href="{{.URL}}" target="_blank" rel="sponsored noopener" aria-label="Available at Amazon"></a>
-                                                        {{else}}
                                                         <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
-                                                        {{end}}
                                                     {{end}}
                                                     {{if not .Locked}}
                                                     {{if and (eq $conditions "INDEX") $card.Sealed}}
@@ -1178,7 +1174,7 @@
                                                 <div class="price-cond-header cond-{{$conditions}}">{{if $card.Sealed}}Purchase from{{else}}Condition: {{$conditions}}{{end}}</div>
                                             {{end}}
                                             {{range $entries}}
-                                                <div class="price-row cond-{{$conditions}}{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
+                                                <div class="price-row cond-{{$conditions}}{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{end}}>
                                                     {{if .Locked}}
                                                         <span class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</span>
                                                         <span class="locked-cta">
@@ -1191,8 +1187,6 @@
                                                         <span class="store-cell">
                                                         {{if eq .URL ""}}
                                                             <a class="store-name dim">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
-                                                        {{else if .Badge}}
-                                                            <a class="store-name amzn-badge" href="{{.URL}}" target="_blank" rel="sponsored noopener" aria-label="Available at Amazon"></a>
                                                         {{else}}
                                                             <a class="store-name" href="{{.URL}}" target="_blank" rel="nofollow">{{.ScraperName}}{{if ne $conditions "INDEX"}} {{.Country}}{{end}}</a>
                                                         {{end}}
@@ -1254,7 +1248,7 @@
                                             {{end}}
                                         {{end}}
                                         {{range $entries}}
-                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}{{if .Badge}} price-row-badge{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{else}}title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'{{end}}>
+                                            <div class="price-row{{if .Locked}} price-row-locked{{end}}" {{if .Locked}}title="Join BAN to unlock additional buylists and tools!"{{else}}title='{{if and .Ratio (eq $conditions "NM")}}Ratio: {{printf "%.02f%%\n" .Ratio}}{{end}}{{if .Credit}}Credit: $ {{printf "%.2f\n" .Credit}}{{end}}{{if .MarketCredit}}Market: $ {{printf "%.2f\n" .MarketCredit}}{{end}}'{{end}}>
                                                 {{if .Locked}}
                                                     <span class="store-name dim">{{.ScraperName}} {{.Country}}</span>
                                                     <span class="locked-cta">
