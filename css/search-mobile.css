@@ -515,6 +515,25 @@
     border-bottom: none;
 }
 
+/* Names a stack of rows the way the desktop column header does. Only drawn on
+   an expanded card, where the tab bar that would otherwise name the panels is
+   not there - without it a sealed product's simulated values run straight into
+   the rows that are actual offers. */
+.m-panel-header {
+    padding: 0.6em 0.75em 0.35em;
+    border-top: 1px solid var(--border);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--greytext);
+}
+
+/* The first one opens the results rather than dividing them. */
+.m-tab-panel:first-of-type .m-panel-header {
+    border-top: none;
+}
+
 .m-vendor-row summary {
     display: flex;
     align-items: center;
