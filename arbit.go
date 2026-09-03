@@ -572,6 +572,39 @@ type scraperCompareOpts struct {
 	AnySpread        bool // use the higher spread/profitability thresholds (global mode only)
 }
 
+// suspectPriceFor answers the price on a row that one overpriced TCG Direct
+// listing can inflate, and nil where the page shows no such price.
+//
+// Which price it is depends on the page. Global compares against the reference
+// seller's own listing, the only mode that fills ReferenceEntry at all. Reverse
+// never sees that listing directly, but TCG Direct (net) derives its buy price
+// from it, so a single overpriced Direct listing reaches the page as an offer
+// to buy.
+//
+// The derived price is the same price wherever it is shown, so the side it
+// arrives on is what names it rather than the page: reverse reads it off the
+// source, and arbit off the vendor whose table it is. Keying on the source
+// alone left it unwarned on every arbit page, which is where most of it is
+// read - one Scrap Trawler offering $23934.02 against a $483.56 listing, and
+// a Mox Pearl offering $6941.24 on the pages of five separate sellers.
+func suspectPriceFor(globalMode, reverseMode bool, sourceShort, scraperShort string) func(mtgban.ArbitEntry) float64 {
+	switch {
+	case globalMode && scraperShort == "TCGDirect":
+		return func(res mtgban.ArbitEntry) float64 {
+			return res.ReferenceEntry.Price
+		}
+	case reverseMode && sourceShort == "TCGDirectNet":
+		return func(res mtgban.ArbitEntry) float64 {
+			return res.BuylistEntry.BuyPrice
+		}
+	case !globalMode && !reverseMode && scraperShort == "TCGDirectNet":
+		return func(res mtgban.ArbitEntry) float64 {
+			return res.BuylistEntry.BuyPrice
+		}
+	}
+	return nil
+}
+
 func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, allowlistSellers []string, blocklistVendors []string, cmp scraperCompareOpts) {
 	r.ParseForm()
 
@@ -894,23 +927,8 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 			}
 		}
 
-		// Gather all the card Ids that might be invalid. Which price is the
-		// suspect one depends on the page. Global compares against the
-		// reference seller's own listing, the only mode that fills
-		// ReferenceEntry at all. Reverse never sees that listing directly,
-		// but TCG Direct (net) derives its buy price from it, so a single
-		// overpriced Direct listing reaches the page as an offer to buy
-		var suspectPrice func(mtgban.ArbitEntry) float64
-		switch {
-		case pageVars.GlobalMode && scraper.Info().Shorthand == "TCGDirect":
-			suspectPrice = func(res mtgban.ArbitEntry) float64 {
-				return res.ReferenceEntry.Price
-			}
-		case pageVars.ReverseMode && source.Info().Shorthand == "TCGDirectNet":
-			suspectPrice = func(res mtgban.ArbitEntry) float64 {
-				return res.BuylistEntry.BuyPrice
-			}
-		}
+		suspectPrice := suspectPriceFor(pageVars.GlobalMode, pageVars.ReverseMode,
+			source.Info().Shorthand, scraper.Info().Shorthand)
 
 		// The same option drops the derived buy prices the market contradicts.
 		// "only Legit" cannot reach them: it filters through CustomPriceFilter,
