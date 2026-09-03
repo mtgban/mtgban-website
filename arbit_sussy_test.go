@@ -143,3 +143,46 @@ func TestReverseDropsIndexSellers(t *testing.T) {
 		t.Error("turning the option off does not bring the index back")
 	}
 }
+
+// TestSuspectPriceFor pins which side of a row carries the price a bad TCG
+// Direct listing inflates. The derived buy price is the same price on every
+// page, so the side it arrives on names it: reverse reads it off the source,
+// arbit off the vendor whose table it is. Reading only the source left every
+// arbit page unwarned.
+func TestSuspectPriceFor(t *testing.T) {
+	res := mtgban.ArbitEntry{
+		ReferenceEntry: mtgban.InventoryEntry{Price: 11},
+		BuylistEntry:   mtgban.BuylistEntry{BuyPrice: 22},
+	}
+	for _, tt := range []struct {
+		desc                    string
+		global, reverse         bool
+		sourceShort, scraperSho string
+		want                    float64
+	}{
+		{"global reads the reference listing off the probe", true, false, "CK", "TCGDirect", 11},
+		{"reverse reads the derived buy price off the source", false, true, "TCGDirectNet", "CK", 22},
+		{"arbit reads it off the vendor whose table it is", false, false, "CK", "TCGDirectNet", 22},
+		{"a seller of that name in arbit is not the vendor", false, false, "TCGDirectNet", "CK", 0},
+		{"an ordinary pairing carries no suspect price", false, false, "CK", "SCG", 0},
+		{"and neither does one in reverse", false, true, "CK", "SCG", 0},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			fn := suspectPriceFor(tt.global, tt.reverse, tt.sourceShort, tt.scraperSho)
+			if tt.want == 0 {
+				if fn != nil {
+					t.Errorf("suspectPriceFor(%v, %v, %q, %q) = a price, want none",
+						tt.global, tt.reverse, tt.sourceShort, tt.scraperSho)
+				}
+				return
+			}
+			if fn == nil {
+				t.Fatalf("suspectPriceFor(%v, %v, %q, %q) = none, want %.0f",
+					tt.global, tt.reverse, tt.sourceShort, tt.scraperSho, tt.want)
+			}
+			if got := fn(res); got != tt.want {
+				t.Errorf("suspect price = %.0f, want %.0f", got, tt.want)
+			}
+		})
+	}
+}
