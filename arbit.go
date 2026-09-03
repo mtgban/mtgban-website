@@ -772,7 +772,6 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	}
 
 	pageVars.ScraperShort = source.Info().Shorthand
-	pageVars.HasAffiliate = slices.Contains(Config.AffiliatesList, source.Info().Shorthand)
 	pageVars.ArbitFilters = arbitFilters
 	pageVars.ArbitOptKeys = FilterOptKeys
 	pageVars.ArbitOptConfig = FilterOptConfig

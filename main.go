@@ -128,7 +128,6 @@ type PageVars struct {
 	AltSearches []suggest.AltSearch
 
 	ScraperShort   string
-	HasAffiliate   bool
 	CanDownloadCSV bool
 
 	Arb                []Arbitrage
