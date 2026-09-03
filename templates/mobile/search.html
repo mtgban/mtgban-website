@@ -347,6 +347,13 @@
             {{/* Sellers panel */}}
             {{if $hasSellers}}
             <div class="m-tab-panel{{if or $expanded (not $defaultBuyers)}} active{{end}}" id="sellers-{{$cardId}}">
+                {{/* The index rows come first and are references: market prices,
+                     and on a sealed product the simulated expected values. What
+                     follows them is offers. Expanded there is no tab bar naming
+                     the panels, so name the offers where they begin, with the
+                     word the desktop column header uses - which is what stops a
+                     simulated value reading as a price to pay. */}}
+                {{$headed := false}}
                 {{$condsEntry := (index $.FoundSellers $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
@@ -376,6 +383,10 @@
                             {{end}}
                         </div>
                         {{else}}
+                        {{if and $expanded (not $headed)}}
+                            {{$headed = true}}
+                            <div class="m-panel-header">Sellers</div>
+                        {{end}}
                         <div class="m-cond-group{{if or $expanded (eq $conditions $defView)}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
@@ -434,6 +445,7 @@
             {{/* Buyers panel */}}
             {{if $hasBuyers}}
             <div class="m-tab-panel{{if or $expanded $defaultBuyers}} active{{end}}" id="buyers-{{$cardId}}">
+                {{$headed := false}}
                 {{$condsEntry := (index $.FoundVendors $cardId)}}
                 {{range $conditions := $.CondKeys}}
                     {{$entries := (index $condsEntry $conditions)}}
@@ -463,6 +475,10 @@
                             {{end}}
                         </div>
                         {{else}}
+                        {{if and $expanded (not $headed)}}
+                            {{$headed = true}}
+                            <div class="m-panel-header">Buyers</div>
+                        {{end}}
                         <div class="m-cond-group{{if or $expanded (eq $conditions $defView)}} active{{end}}" data-cond="{{$conditions}}" data-card="{{$cardId}}">
                             {{range $ei, $entry := $entries}}
                                 {{if $entry.Locked}}
