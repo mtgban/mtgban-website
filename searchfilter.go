@@ -219,11 +219,54 @@ func fixupRarityNG(code string) []string {
 	return filters
 }
 
+// foldCollectorNumber spells a collector number the one way both sides of a
+// comparison can agree on: without the set total it is printed beside, and
+// without the zeros that pad a run of digits.
+//
+// This is the rule mtgmatcher settled on long ago - pokemon's foldNumber, which
+// splits at the first slash and drops each digit run's leading zeros before
+// comparing anything - so a storefront writing "034/182" matches a catalog
+// holding "34". The filters here never followed, and compared what the user
+// typed against the stored string as written, so a padded number could not be
+// asked for by either spelling.
+//
+// Where it parts from foldNumber: that one keeps only letters and digits,
+// which would eat the dash out of PLST's "mh1-123" and the star that cns:
+// exists to preserve. Everything that is not a leading zero is kept here.
+func foldCollectorNumber(number string) string {
+	number, _, _ = strings.Cut(number, "/")
+	number = strings.ToLower(number)
+
+	var out strings.Builder
+	for i := 0; i < len(number); {
+		if number[i] < '0' || number[i] > '9' {
+			out.WriteByte(number[i])
+			i++
+			continue
+		}
+		j := i
+		for j < len(number) && number[j] >= '0' && number[j] <= '9' {
+			j++
+		}
+		// A run of digits loses its padding, but a run that is all zeros is
+		// the number zero rather than nothing at all: seven World
+		// Championship sets number a card "0" and another "00", and folding
+		// those away would leave an empty query answering for both.
+		run := strings.TrimLeft(number[i:j], "0")
+		if run == "" {
+			run = "0"
+		}
+		out.WriteString(run)
+		i = j
+	}
+	return out.String()
+}
+
 func fixupNumberNG(code string, strict bool) []string {
 	code = strings.ToLower(code)
 	filters := strings.Split(code, ",")
 	for i := range filters {
-		filters[i] = strings.TrimLeft(filters[i], "0")
+		filters[i] = foldCollectorNumber(filters[i])
 		if !strict {
 			filters[i] = strings.TrimRight(filters[i], magic.SuffixSpecial+magic.SuffixVariant+magic.SuffixPhiLow+"*")
 		}
@@ -1831,11 +1874,11 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 }
 
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, strings.ToLower(co.OriginalNumber))
+	return !slices.Contains(filters, foldCollectorNumber(co.OriginalNumber))
 }
 
 func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, strings.ToLower(co.Number))
+	return !slices.Contains(filters, foldCollectorNumber(co.Number))
 }
 
 func cardFilterNumberRegexp(filters []string, co *mtgmatcher.CardObject) bool {
