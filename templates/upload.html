@@ -1552,24 +1552,32 @@
         var form = document.getElementById("upload_form");
 
         // Always rebuild from current row state so removed/picked rows take effect.
-        form.querySelectorAll('input[name="hashes"], input[name="hashesQtys"], input[name="hashesCond"], input[name="hashesPrice"], input[name="hashesNotes"]').forEach(function(el) {
+        form.querySelectorAll('input[name="rows"], input[name="hashes"], input[name="hashesQtys"], input[name="hashesCond"], input[name="hashesPrice"], input[name="hashesNotes"]').forEach(function(el) {
             el.remove();
         });
 
         form.removeAttribute("enctype");
+
+        // One field for the whole list, not five values a row: the form parser
+        // counts values and stops at 10,000, handing the server an empty form
+        // rather than a short one. Five a row capped an export at 2,000 rows,
+        // which a few opened precons pass without trying.
+        var lines = [];
         exportRows(category || 'all').forEach(function(row) {
             if (!row.dataset.hash) return;
             if (row.classList.contains('ures-removed-row')) return;
-            var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice'],['notes','hashesNotes']];
-            pairs.forEach(function(pair) {
-                var input = document.createElement("input");
-                input.type = "hidden";
-                input.name = pair[1];
-                if (pair[0] === 'hash') input.id = "row-" + row.dataset[pair[0]];
-                input.value = row.dataset[pair[0]];
-                form.appendChild(input);
-            });
+            lines.push(['hash','qtys','cond','price','notes'].map(function(key) {
+                // Tabs and newlines are the separators, and no field this
+                // carries is allowed to hold one.
+                return (row.dataset[key] || '').replace(/[\t\r\n]+/g, ' ');
+            }).join('\t'));
         });
+
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "rows";
+        input.value = lines.join('\n');
+        form.appendChild(input);
     }
 
     // Active result view: 'all' | 'singles' | 'sealed' | 'notfound'. Falls back
@@ -1707,15 +1715,9 @@
 
         ensureHashesLoaded();
 
-        // Swap the hash
-        var input = document.getElementById("row-" + oldHash);
-        if (input) {
-            input.value = newHash;
-            input.id = "row-" + newHash;
-            btn.dataset.hash = newHash;
-        }
-
-        // Update row data-hash so the form tracks the new value
+        // Swap the hash on the row, which is where the form is rebuilt from
+        // when it is submitted - there is no per-row input left to edit.
+        btn.dataset.hash = newHash;
         btn.closest('tr').dataset.hash = newHash;
 
         // Mark the row as fixed

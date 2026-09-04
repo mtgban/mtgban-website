@@ -318,7 +318,12 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	pageVars := genPageNav("Upload", sig)
 
-	// Maximum form size
+	// Maximum form size. ParseForm is run first and on its own so that its
+	// error survives: ParseMultipartForm returns "not multipart" for a form
+	// that never was one, which hides a body the parser actually refused - and
+	// a refused body arrives as an empty form, indistinguishable from a
+	// request that carried nothing.
+	formErr := r.ParseForm()
 	r.ParseMultipartForm(MaxUploadFileSize)
 
 	// See if we need to download the ck csv only
@@ -622,6 +627,17 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	// Load a list of uuids from newspaper or search
 	hashes := r.Form["hashes"]
+	hashesQtys := r.Form["hashesQtys"]
+	hashesCond := r.Form["hashesCond"]
+	hashesPrice := r.Form["hashesPrice"]
+	hashesNotes := r.Form["hashesNotes"]
+
+	// A page of results posts its rows packed into one field instead, for the
+	// reason splitRows gives.
+	packed := r.FormValue("rows")
+	if packed != "" {
+		hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes = splitRows(packed)
+	}
 
 	// Load spreadsheet cloud url if present
 	gdocURL := r.FormValue("gdocURL")
@@ -634,6 +650,18 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// the Header and the size of the file
 	file, handler, err := r.FormFile("cardListFile")
 	if err != nil && gdocURL == "" && textArea == "" && len(hashes) == 0 {
+		// A GET is someone arriving at the uploader, which is this page. A
+		// POST that carries nothing is a request that went wrong on the way -
+		// a body too large for the form parser, most often - and silently
+		// showing the empty uploader tells whoever sent it nothing at all.
+		if r.Method == http.MethodPost {
+			log.Printf("POST carried no list: content-length %d, content-type %q, form error %v",
+				r.ContentLength, r.Header.Get("Content-Type"), formErr)
+			pageVars.WarningMessage = "No card list arrived with that request"
+			if formErr != nil {
+				pageVars.WarningMessage += ": " + formErr.Error()
+			}
+		}
 		render(w, "upload.html", pageVars)
 		return
 	} else if err == nil {
@@ -706,7 +734,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var uploadedData []UploadEntry
 	var uploadName string
 	if len(hashes) != 0 {
-		uploadedData, err = loadHashes(hashes, r.Form["hashesQtys"], r.Form["hashesCond"], r.Form["hashesPrice"], r.Form["hashesNotes"])
+		uploadedData, err = loadHashes(hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes)
 	} else if textArea != "" {
 		uploadedData, err = loadCsv(strings.NewReader(textArea), ',', maxRows)
 	} else if handler != nil {
@@ -1021,7 +1049,8 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			w.Header().Del("Content-Type")
 			w.Header().Del("Content-Disposition")
 			UserNotify("upload", err.Error())
-			pageVars.InfoMessage = "Unable to download CSV right now"
+			log.Printf("CSV export of %d entries failed: %s", len(uploadedData), err.Error())
+			pageVars.InfoMessage = "Unable to download CSV right now: " + err.Error()
 			render(w, "upload.html", pageVars)
 		}
 		return
@@ -1726,6 +1755,40 @@ func unpackSealed(entries []UploadEntry) []UploadEntry {
 	}
 
 	return out
+}
+
+// splitRows unpacks the row list a page of results posts back: one line per
+// row, tab-separated, in the order loadHashes reads them.
+//
+// It travels as a single form value rather than as five parallel arrays
+// because the form parser counts values, not bytes. Go stops at 10,000 of them
+// and hands back an empty form - not a truncated one - so five values a row
+// put the ceiling at 2,000 rows, which a handful of opened precons clears on
+// its own. What came back then was the uploader, as though the request had
+// carried nothing at all, which is exactly what the handler saw.
+//
+// The arrays are still read when this is absent: a hash transfer from search
+// or the newspaper posts those, and they are short enough never to have been
+// near the ceiling.
+func splitRows(packed string) (hashes, qtys, cond, prices, notes []string) {
+	for _, line := range strings.Split(packed, "\n") {
+		if line == "" {
+			continue
+		}
+
+		fields := strings.SplitN(line, "\t", 5)
+		for len(fields) < 5 {
+			fields = append(fields, "")
+		}
+
+		hashes = append(hashes, fields[0])
+		qtys = append(qtys, fields[1])
+		cond = append(cond, fields[2])
+		prices = append(prices, fields[3])
+		notes = append(notes, fields[4])
+	}
+
+	return hashes, qtys, cond, prices, notes
 }
 
 func loadHashes(hashes, qtys, cond, prices, notes []string) ([]UploadEntry, error) {
