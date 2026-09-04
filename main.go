@@ -1218,6 +1218,13 @@ func loadDatastore(ds string) error {
 	}
 	mtgmatcher.SetGlobalDatastore(backend)
 
+	// Cleared before it is rebuilt, and rebuilt here rather than alongside
+	// the caches below, so a number query can never be answered out of the
+	// previous datastore's uuids. While it is nil those queries scan, which
+	// is what they did before there was an index at all.
+	numberIdx.Store(nil)
+	buildNumberIndex()
+
 	ServerNotify("init", "Datastore installed")
 	SetLastDatastoreUpdate(time.Now())
 	go rebuildSuggestIndex()
