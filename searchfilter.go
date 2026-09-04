@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -275,6 +276,41 @@ func foldNumber(number string, strict bool) string {
 		return "0"
 	}
 	return number[zeros:]
+}
+
+// numberIndex files every uuid under the collector number it answers to, one
+// map per fold: the loose filter compares OriginalNumber and the strict one
+// Number, and the two disagree on most numbers a set decorates. Both are
+// built by calling foldNumber, never by repeating it, so the index and the
+// filter cannot come to spell a number two different ways - a drift that
+// would not raise an error, only quietly find nothing.
+type numberIndex struct {
+	loose  map[string][]string
+	strict map[string][]string
+}
+
+var numberIdx atomic.Pointer[numberIndex]
+
+// buildNumberIndex refiles the pool under both folds. It is rebuilt with the
+// datastore it describes, and a nil index simply sends number queries back to
+// scanning, which is what they did before.
+func buildNumberIndex() {
+	all := mtgmatcher.GetUUIDs()
+	idx := &numberIndex{
+		loose:  make(map[string][]string, len(all)/8),
+		strict: make(map[string][]string, len(all)/8),
+	}
+	for _, uuid := range all {
+		co, err := mtgmatcher.GetUUID(uuid)
+		if err != nil {
+			continue
+		}
+		loose := foldNumber(co.OriginalNumber, false)
+		idx.loose[loose] = append(idx.loose[loose], uuid)
+		strict := foldNumber(co.Number, true)
+		idx.strict[strict] = append(idx.strict[strict], uuid)
+	}
+	numberIdx.Store(idx)
 }
 
 func fixupNumberNG(code string, strict bool) []string {

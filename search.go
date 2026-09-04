@@ -1475,11 +1475,50 @@ func editionSeedCodes(filters []FilterElem) ([]string, bool) {
 	return nil, false
 }
 
+// numberSeedUUIDs returns the uuids of the first filter that exactly bounds
+// the result set by collector number, and whether one did.
+//
+// The disqualifications are the edition seed's, for the edition seed's
+// reasons: a negated filter names what to leave out rather than what to keep,
+// and an ApplyTo-scoped one passes every card outside its scope untouched, so
+// neither bounds anything. A filter carrying subfilters is a range, which
+// names no key of its own.
+func numberSeedUUIDs(filters []FilterElem) ([]string, bool) {
+	idx := numberIdx.Load()
+	if idx == nil {
+		return nil, false
+	}
+	for i := range filters {
+		if filters[i].Negate || filters[i].ApplyTo != nil ||
+			len(filters[i].Values) == 0 || len(filters[i].Subfilters) != 0 {
+			continue
+		}
+		var bucket map[string][]string
+		switch filters[i].Name {
+		case "number":
+			bucket = idx.loose
+		case "number_strict":
+			bucket = idx.strict
+		default:
+			continue
+		}
+		// fixupNumberNG folded the query with the same strictness the bucket
+		// was built with, so a value is already the key.
+		var uuids []string
+		for _, value := range filters[i].Values {
+			uuids = append(uuids, bucket[value]...)
+		}
+		return uuids, true
+	}
+	return nil, false
+}
+
 func searchAndFilter(config SearchConfig) ([]string, error) {
 	query := config.CleanQuery
 	filters := config.CardFilters
 
 	var uuids []string
+	var seeded bool
 	var err error
 
 	// With no text to search, the mode switch below degrades to seeding
@@ -1488,20 +1527,35 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 	// the union of two set buckets. Only the modes whose empty-query
 	// fallback is the full pool are eligible, and the seeded uuids flow
 	// into the same filtering loop as every other search.
+	//
+	// A seed that finds nothing has still answered. Reading that as "did
+	// not seed" sent the search back to the whole pool to rediscover the
+	// same emptiness, which is what "s:LEA cn:161" spent 6.4ms doing.
 	if query == "" {
 		if codes, ok := editionSeedCodes(filters); ok {
 			for _, code := range codes {
 				switch config.SearchMode {
 				case "", "prefix", "any":
 					uuids = append(uuids, mtgmatcher.GetUUIDsInSet(code)...)
+					seeded = true
 				case "sealed":
 					uuids = append(uuids, mtgmatcher.GetSealedUUIDsInSet(code)...)
+					seeded = true
 				}
+			}
+		}
+		// A number bounds the set the same way an edition does, and the
+		// index holds cards alone, so the sealed modes keep to the set
+		// index above.
+		if !seeded {
+			switch config.SearchMode {
+			case "", "prefix", "any":
+				uuids, seeded = numberSeedUUIDs(filters)
 			}
 		}
 	}
 
-	if uuids == nil {
+	if !seeded {
 		switch config.SearchMode {
 		case "exact":
 			uuids, err = mtgmatcher.SearchEquals(query)
