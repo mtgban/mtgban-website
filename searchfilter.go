@@ -72,6 +72,12 @@ type FilterElem struct {
 
 	// List of SetCode the filter should be applied to
 	ApplyTo []string
+
+	// Regexp is Values[0] compiled, for the filters that carry a pattern.
+	// The filter is built once and then run against every candidate, so
+	// compiling here rather than at the comparison is the difference
+	// between one compile and one per card.
+	Regexp *regexp.Regexp
 }
 
 type FilterStoreElem struct {
@@ -728,12 +734,15 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Values: []string{code},
 			})
 		case "namee":
+			// No fixup because we need to trust input
+			// but remove any possible containing characters on the sides
+			pattern := strings.Trim(code, "\"()")
+			re, _ := regexp.Compile(pattern)
 			filters = append(filters, FilterElem{
 				Name:   "name_regexp",
 				Negate: negate,
-				// No fixup because we need to trust input
-				// but remove any possible containing characters on the sides
-				Values: []string{strings.Trim(code, "\"()")},
+				Values: []string{pattern},
+				Regexp: re,
 			})
 		case "s", "set", "edition", "e":
 			filters = append(filters, FilterElem{
@@ -742,10 +751,12 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Values: fixupEditionNG(code),
 			})
 		case "se", "ee":
+			re, _ := regexp.Compile(code)
 			filters = append(filters, FilterElem{
 				Name:   "edition_regexp",
 				Negate: negate,
 				Values: []string{code},
+				Regexp: re,
 			})
 		case "cn", "cns", "number":
 			opt := "number"
@@ -795,11 +806,13 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				ApplyTo:    applyToSets,
 			})
 		case "cne":
+			re, _ := regexp.Compile(code)
 			filters = append(filters, FilterElem{
 				Name:   "number_regexp",
 				Negate: negate,
 				// No fixup because we need to trust input
 				Values: []string{code},
+				Regexp: re,
 			})
 		case "r":
 			opt := "rarity"
@@ -1661,12 +1674,8 @@ func applyCardFilter(name string, filters []string, co *mtgmatcher.CardObject) b
 	switch name {
 	case "name":
 		return cardFilterName(filters, co)
-	case "name_regexp":
-		return cardFilterNameRegexp(filters, co)
 	case "edition":
 		return cardFilterEdition(filters, co)
-	case "edition_regexp":
-		return cardFilterEditionRegexp(filters, co)
 	case "rarity":
 		return cardFilterRarity(filters, co)
 	case "format":
@@ -1689,8 +1698,6 @@ func applyCardFilter(name string, filters []string, co *mtgmatcher.CardObject) b
 		return cardFilterNumber(filters, co)
 	case "number_strict":
 		return cardFilterNumberStrict(filters, co)
-	case "number_regexp":
-		return cardFilterNumberRegexp(filters, co)
 	case "number_greater_than":
 		return cardFilterNumberGreaterThan(filters, co)
 	case "number_less_than":
@@ -1717,19 +1724,27 @@ func cardFilterName(filters []string, co *mtgmatcher.CardObject) bool {
 	return !mtgmatcher.Equals(filters[0], co.Name) && !mtgmatcher.Equals(filters[0], co.FlavorName)
 }
 
-func cardFilterNameRegexp(filters []string, co *mtgmatcher.CardObject) bool {
-	matched, _ := regexp.MatchString(filters[0], co.Name)
-	matchedFlavor, _ := regexp.MatchString(filters[0], co.FlavorName)
-	return !matched && !matchedFlavor
+// cardFilterRegexp is where every pattern filter compares. The pattern was
+// compiled when the query was parsed, and a pattern that would not compile
+// arrives nil and matches nothing - which is what the error discarded by the
+// MatchString these filters used to call already said.
+func cardFilterRegexp(name string, re *regexp.Regexp, co *mtgmatcher.CardObject) bool {
+	if re == nil {
+		return true
+	}
+	switch name {
+	case "name_regexp":
+		return !re.MatchString(co.Name) && !re.MatchString(co.FlavorName)
+	case "edition_regexp":
+		return !re.MatchString(co.Edition)
+	case "number_regexp":
+		return !re.MatchString(co.Number)
+	}
+	return true
 }
 
 func cardFilterEdition(filters []string, co *mtgmatcher.CardObject) bool {
 	return !slices.Contains(filters, co.SetCode)
-}
-
-func cardFilterEditionRegexp(filters []string, co *mtgmatcher.CardObject) bool {
-	matched, _ := regexp.MatchString(filters[0], co.Edition)
-	return !matched
 }
 
 func cardFilterRarity(filters []string, co *mtgmatcher.CardObject) bool {
@@ -1836,11 +1851,6 @@ func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
 
 func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
 	return !slices.Contains(filters, strings.ToLower(co.Number))
-}
-
-func cardFilterNumberRegexp(filters []string, co *mtgmatcher.CardObject) bool {
-	matched, _ := regexp.MatchString(filters[0], co.Number)
-	return !matched
 }
 
 func cardFilterNumberGreaterThan(filters []string, co *mtgmatcher.CardObject) bool {
@@ -2134,7 +2144,13 @@ func shouldSkipCardNG(cardID string, filters []FilterElem) bool {
 			continue
 		}
 
-		res := applyCardFilter(filters[i].Name, filters[i].Values, co)
+		var res bool
+		switch filters[i].Name {
+		case "name_regexp", "edition_regexp", "number_regexp":
+			res = cardFilterRegexp(filters[i].Name, filters[i].Regexp, co)
+		default:
+			res = applyCardFilter(filters[i].Name, filters[i].Values, co)
+		}
 		if filters[i].Negate {
 			res = !res
 		}
