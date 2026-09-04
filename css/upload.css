@@ -951,6 +951,32 @@
 .ures-views[data-ures-view="sealed"] .ures-block-sealed,
 .ures-views[data-ures-view="notfound"] .ures-block-notfound { display: block; }
 
+/* One opened product and what came out of it. Unlike the category blocks these
+   are not views to toggle between - every one of them is the reading, stacked
+   in the order the list mentions them, so they are shown rather than revealed. */
+.ures-block-unpacked {
+    display: block;
+    padding-top: 1.25em;
+    border-top: 1px solid var(--border-subtle);
+}
+.ures-block-unpacked:first-of-type {
+    padding-top: 0;
+    border-top: none;
+}
+.ures-block-unpacked .res-summary { margin-bottom: 1em; }
+/* The default table margin is the room under the last one on a page; between
+   two sections it is a hole, the same one .ures-views closes for the tabbed
+   view. Keep it only where it is still the bottom of the page. */
+.ures-block-unpacked .ures-wrap { margin-bottom: 1.5em; }
+.ures-block-unpacked:last-of-type .ures-wrap { margin-bottom: 6em; }
+.ures-block-unpacked .ures-block-title a { color: inherit; }
+.ures-block-sub {
+    margin-left: 0.6em;
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--text-dim);
+}
+
 /* ── Results table ── */
 .ures-wrap {
     background: var(--surface-1);
