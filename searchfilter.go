@@ -354,6 +354,20 @@ func fixupIDs(code string) []string {
 		if err == nil {
 			continue
 		}
+		// A "space:id" value names the id space to convert through - "tcg"
+		// for short, anything else as the matcher spells it - which is what
+		// reaches a space the spaceless walk must skip, like multiverse
+		space, id, qualified := strings.Cut(field, ":")
+		if qualified {
+			if space == "tcg" {
+				space = mtgmatcher.IDSpaceTCGplayer
+			}
+			uuid := mtgmatcher.ConvertID(space, id)
+			if uuid != "" {
+				fields[i] = uuid
+			}
+			continue
+		}
 		// XXX: id funcs report the first finish available
 		uuid := externalUUID(field)
 		if uuid != "" {
