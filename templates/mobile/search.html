@@ -185,6 +185,15 @@
     <div class="m-result-meta">
         <span>{{.TotalUnique}} result{{if ne .TotalUnique 1}}s{{end}} found</span>
         {{if gt .TotalUnique (len .AllKeys)}}<span class="m-meta-sub">({{len .AllKeys}} shown)</span>{{end}}
+        {{/* Only over a product that holds bonus cards as well as guaranteed
+             ones, where the two readings differ. */}}
+        {{if .ContentsProduct}}
+        <a class="m-sort-pill with-label{{if .ContentsGuaranteed}} active{{end}}"
+           href="?q={{.ContentsOtherQuery}}"
+           title="{{if .ContentsGuaranteed}}Also show the cards {{.ContentsProduct}} may come with{{else}}Show only the cards {{.ContentsProduct}} always comes with{{end}}">
+            <i data-lucide="package-check"></i>Guaranteed
+        </a>
+        {{end}}
         {{if not .NoSort}}
         <div class="m-sort-pills">
             {{$isChronoSorted := or (eq .SearchSort "chrono") (not .SearchSort)}}

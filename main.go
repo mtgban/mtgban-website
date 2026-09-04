@@ -112,8 +112,16 @@ type PageVars struct {
 
 	PopularSearches []PopularSearch
 
-	CanShowAll         bool
-	CleanSearchQuery   string
+	CanShowAll       bool
+	CleanSearchQuery string
+
+	// A contents:/decklist: search on a product that holds bonus cards as
+	// well as guaranteed ones: which of the two readings this is, and the
+	// query for the other one
+	ContentsProduct    string
+	ContentsGuaranteed bool
+	ContentsOtherQuery string
+
 	CheckpointsText    string
 	KeyOverridesText   string
 	OverrideStores     []string
