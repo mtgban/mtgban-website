@@ -53,6 +53,20 @@ type Entry struct {
 
 	// Value exported as-is (up to 1024 characters) from the source data
 	Notes string
+
+	// Unpacked marks a sealed product that was opened into the cards it
+	// holds, which are in the list beside it. The row is kept so the results
+	// still say where those cards came from, and counts for nothing: not
+	// towards a total, not towards a store's summary, and not into the
+	// optimizer, which would otherwise be told to buy the box as well as its
+	// contents.
+	Unpacked bool
+
+	// UnpackedFrom is the uuid of the product this card came out of, set on
+	// every card an Unpacked row produced. It is what keeps a card with the
+	// box it was in once the list has been sorted and split, so the results
+	// can be read a product at a time.
+	UnpackedFrom string
 }
 
 // Parser matches uploaded rows against the card database. The zero value is
@@ -125,8 +139,10 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 			continue
 		}
 
-		// Use id + condition to mimic a "sku"
-		sku := uploadedData[i].CardID + uploadedData[i].OriginalCondition
+		// Use id + condition to mimic a "sku", and the product it came out of
+		// where there is one: two precons holding the same staple hold one
+		// each, and a view that reads a box at a time has to say so in both.
+		sku := uploadedData[i].CardID + uploadedData[i].OriginalCondition + uploadedData[i].UnpackedFrom
 
 		if duplicatedHashes[sku] {
 			qty := 1
@@ -137,7 +153,8 @@ func MergeIdenticalEntries(uploadedData []Entry) []Entry {
 			// Iterate on the already added cards to update the quantity
 			for j := range uploadedDataClean {
 				if uploadedData[i].CardID == uploadedDataClean[j].CardID &&
-					uploadedData[i].OriginalCondition == uploadedDataClean[j].OriginalCondition {
+					uploadedData[i].OriginalCondition == uploadedDataClean[j].OriginalCondition &&
+					uploadedData[i].UnpackedFrom == uploadedDataClean[j].UnpackedFrom {
 					if uploadedDataClean[j].Quantity == 0 {
 						uploadedDataClean[j].Quantity++
 					}

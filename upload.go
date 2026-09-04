@@ -93,6 +93,140 @@ var uploadParser = &docparse.Parser{
 	PreferredPrinting: sortSets,
 }
 
+// unpackedTally accumulates one opened product's numbers as the results loop
+// walks the list: what its contents come to store by store, what is missing
+// from them, and what the product itself is worth whole.
+type unpackedTally struct {
+	Quantity      int
+	Highest       float64
+	ProductPrice  float64
+	Totals        map[string]float64
+	Missing       map[string]int
+	MissingPrices map[string]float64
+	ProductIndex  map[string]float64
+}
+
+// UnpackedSection is one opened product and the cards it held, which is how
+// the results read once a list has been unpacked: a box at a time, headed by
+// what the box is worth against what came out of it.
+type UnpackedSection struct {
+	// The product, as the row it was uploaded as
+	Product UploadEntry
+
+	// The cards it held, in the order the results are sorted
+	Entries []UploadEntry
+
+	// How many cards, after the multiplier and the per-card cap
+	Quantity int
+
+	// What the contents come to, taking each card's best offer
+	Contents float64
+
+	// What the product is worth whole, by the same measure
+	ProductPrice float64
+
+	// The product's own index prices, which for a sealed product are the
+	// expected values - what the box is reckoned to hold, beside what this
+	// one actually did
+	ProductIndex map[string]float64
+
+	// The contents' totals, per store and per index
+	Totals map[string]float64
+
+	// The contents no store carries, and what they would have come to
+	Missing       map[string]int
+	MissingPrices map[string]float64
+}
+
+// buildUnpackedSections gathers an unpacked list into one section per opened
+// product, in the order the sorted list first mentions each - so the sections
+// follow the sorting the reader asked for, as do the cards inside them.
+func buildUnpackedSections(entries []UploadEntry, tallies map[string]*unpackedTally) []UnpackedSection {
+	var order []string
+	sections := map[string]*UnpackedSection{}
+
+	sectionFor := func(product string) *UnpackedSection {
+		section := sections[product]
+		if section == nil {
+			section = &UnpackedSection{}
+			sections[product] = section
+			order = append(order, product)
+		}
+		return section
+	}
+
+	for _, entry := range entries {
+		switch {
+		case entry.Unpacked:
+			sectionFor(entry.CardID).Product = entry
+		case entry.UnpackedFrom != "":
+			section := sectionFor(entry.UnpackedFrom)
+			section.Entries = append(section.Entries, entry)
+		}
+	}
+
+	var out []UnpackedSection
+	for _, product := range order {
+		section := sections[product]
+		// A box with nothing under it is not a section to read: without its
+		// contents there is nothing to read it against.
+		if section.Product.CardID == "" || len(section.Entries) == 0 {
+			continue
+		}
+		tally := tallies[product]
+		if tally != nil {
+			section.Quantity = tally.Quantity
+			section.Contents = tally.Highest
+			section.ProductPrice = tally.ProductPrice
+			section.ProductIndex = tally.ProductIndex
+			section.Totals = tally.Totals
+			section.Missing = tally.Missing
+			section.MissingPrices = tally.MissingPrices
+		}
+		out = append(out, *section)
+	}
+
+	return out
+}
+
+// resultView decides which section the results open on, whether there is a bar
+// to switch between them, and whether the All tab is one of them. The All tab
+// appears only when both actionable categories are present; the bar appears
+// when more than one section (singles, sealed, not-found) does.
+//
+// An unpacked list has neither: its products head the sections and the rows
+// below them are all cards, under one set of store columns. Saying so is also
+// what keeps the export whole - Get CSV splits an All view into two files,
+// which here would be two requests for the same rows, the second cancelling
+// the first mid-download.
+func resultView(unpacked int, hasSingles, hasSealed, hasNotFound bool) (view string, tabs, all bool) {
+	if unpacked > 0 {
+		return "singles", false, false
+	}
+
+	sections := 0
+	for _, present := range []bool{hasSingles, hasSealed, hasNotFound} {
+		if present {
+			sections++
+		}
+	}
+	tabs = sections > 1
+	all = hasSingles && hasSealed
+
+	switch {
+	case all:
+		view = "all"
+	case hasSingles:
+		view = "singles"
+	case hasSealed:
+		view = "sealed"
+	default:
+		view = "notfound"
+	}
+
+	return view, tabs, all
+}
+
 // Subset of data used in the optimizer
 type OptimizedUploadEntry struct {
 	// The UUID of the card
@@ -572,7 +706,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var uploadedData []UploadEntry
 	var uploadName string
 	if len(hashes) != 0 {
-		uploadedData, err = loadHashes(hashes, r.Form["hashesQtys"], r.Form["hashesCond"], r.Form["hashesPrice"])
+		uploadedData, err = loadHashes(hashes, r.Form["hashesQtys"], r.Form["hashesCond"], r.Form["hashesPrice"], r.Form["hashesNotes"])
 	} else if textArea != "" {
 		uploadedData, err = loadCsv(strings.NewReader(textArea), ',', maxRows)
 	} else if handler != nil {
@@ -612,6 +746,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// matched-singles check that missed most real truncations.
 	if len(uploadedData) >= maxRows {
 		pageVars.WarningMessage = fmt.Sprintf("Input truncated to the first %d entries", maxRows)
+	}
+
+	// Opening the sealed rows is asked for, not assumed: the results say what a
+	// list of products is worth, and this says what the cards inside amount to.
+	// Before the merge, so a card that turns up twice - loose and inside a box
+	// - is added up by the rule that merges any other repeated row.
+	if r.FormValue("unpack") == "true" {
+		uploadedData = unpackSealed(uploadedData)
 	}
 
 	uploadedData = docparse.MergeIdenticalEntries(uploadedData)
@@ -874,7 +1016,10 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 		err = SimplePrice2CSV(csvWriter, results, uploadedData, nil, preferFlavor)
 		if err != nil {
+			// The page that goes out instead is a page, so it must not keep
+			// the headers that promised a file to save.
 			w.Header().Del("Content-Type")
+			w.Header().Del("Content-Disposition")
 			UserNotify("upload", err.Error())
 			pageVars.InfoMessage = "Unable to download CSV right now"
 			render(w, "upload.html", pageVars)
@@ -959,6 +1104,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.UploadEntries = uploadedData
 
+	// Offer to open the sealed rows only when there are any left to open, and
+	// say so when this list is already the contents of some.
+	pageVars.UnpackSealed = unpackableSealed(uploadedData)
+	for i := range uploadedData {
+		if uploadedData[i].Unpacked {
+			pageVars.UnpackedFrom++
+		}
+	}
+
 	// Load up image links
 	for _, data := range uploadedData {
 		if data.MismatchError != nil {
@@ -989,6 +1143,25 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	missingPrices := map[string]float64{}
 	resultPrices := map[string]map[string]float64{}
 
+	// The same tallies again, but per opened product, so an unpacked list can
+	// be read a box at a time: what came out of this one, against what the box
+	// itself is worth. Keyed by the product's uuid - its own row keys on the
+	// card id, the cards it produced on the product they name.
+	tallies := map[string]*unpackedTally{}
+	tallyFor := func(product string) *unpackedTally {
+		tally := tallies[product]
+		if tally == nil {
+			tally = &unpackedTally{
+				Totals:        map[string]float64{},
+				Missing:       map[string]int{},
+				MissingPrices: map[string]float64{},
+				ProductIndex:  map[string]float64{},
+			}
+			tallies[product] = tally
+		}
+		return tally
+	}
+
 	for i := range uploadedData {
 		// Skip unmatched cards
 		if uploadedData[i].MismatchError != nil {
@@ -1008,11 +1181,23 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Search for any missing entries (ie cards not sold or bought by a vendor)
+		// An opened product is not being traded as itself, so a store not
+		// carrying it is not a gap in this list.
 		for _, shorthand := range entryStores {
+			if uploadedData[i].Unpacked {
+				break
+			}
 			_, found := results[cardID][shorthand]
-			if !found {
-				missingCounts[shorthand]++
-				missingPrices[shorthand] += getPrice(indexResults[cardID]["TCGLow"], "")
+			if found {
+				continue
+			}
+			reference := getPrice(indexResults[cardID]["TCGLow"], "")
+			missingCounts[shorthand]++
+			missingPrices[shorthand] += reference
+			if uploadedData[i].UnpackedFrom != "" {
+				tally := tallyFor(uploadedData[i].UnpackedFrom)
+				tally.Missing[shorthand]++
+				tally.MissingPrices[shorthand] += reference
 			}
 		}
 
@@ -1038,20 +1223,46 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				qty = uploadedData[i].Quantity
 			}
 			indexPrice *= float64(adjustQty(qty, multiplier, maxQty))
+
+			// An opened product keeps its own index prices - for a sealed
+			// product those are the expected values, which is the number its
+			// section is read against - and adds nothing to the page: the
+			// cards it became are in the list already, and counting both
+			// would count them twice.
+			if uploadedData[i].Unpacked {
+				tallyFor(cardID).ProductIndex[indexKey] = indexPrice
+				continue
+			}
+
 			pageVars.TotalEntries[indexKey] += indexPrice
+			if uploadedData[i].UnpackedFrom != "" {
+				tallyFor(uploadedData[i].UnpackedFrom).Totals[indexKey] += indexPrice
+			}
 		}
 
-		// Quantity summary
-		qty := 1
-		if uploadedData[i].HasQuantity {
-			qty = uploadedData[i].Quantity
-		}
-		adjusted := adjustQty(qty, multiplier, maxQty)
-		pageVars.TotalQuantity += adjusted
-		if isSealed {
-			pageVars.SealedQuantity += adjusted
-		} else {
-			pageVars.SinglesQuantity += adjusted
+		// An opened product is still priced below - its section is headed by
+		// what the box is worth against what came out of it - but it counts
+		// for nothing else: not a quantity, not a store's summary, and not a
+		// row in the optimizer, which would otherwise be told to buy the box
+		// as well as its contents.
+		counts := !uploadedData[i].Unpacked
+
+		if counts {
+			// Quantity summary
+			qty := 1
+			if uploadedData[i].HasQuantity {
+				qty = uploadedData[i].Quantity
+			}
+			adjusted := adjustQty(qty, multiplier, maxQty)
+			pageVars.TotalQuantity += adjusted
+			if isSealed {
+				pageVars.SealedQuantity += adjusted
+			} else {
+				pageVars.SinglesQuantity += adjusted
+			}
+			if uploadedData[i].UnpackedFrom != "" {
+				tallyFor(uploadedData[i].UnpackedFrom).Quantity += adjusted
+			}
 		}
 
 		// Run summaries for each vendor
@@ -1087,8 +1298,11 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 
 			// Add to totals (unless it was an index, since it was already added)
 			_, found := indexResults[cardID][shorthand]
-			if !found {
+			if !found && counts {
 				pageVars.TotalEntries[shorthand] += price
+				if uploadedData[i].UnpackedFrom != "" {
+					tallyFor(uploadedData[i].UnpackedFrom).Totals[shorthand] += price
+				}
 			}
 
 			// Save the lowest or highest price depending on mode
@@ -1100,6 +1314,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				bestPrices = append(bestPrices, price)
 				bestStores = append(bestStores, shorthand)
 			}
+		}
+
+		// What the box is worth whole, which is the number its section is read
+		// against. The cards it became are the optimizer's business; it is not.
+		if !counts {
+			if len(bestPrices) > 0 {
+				tallyFor(cardID).ProductPrice = bestPrices[0]
+			}
+			continue
 		}
 
 		for j, bestPrice := range bestPrices {
@@ -1187,6 +1410,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 				} else {
 					singlesHighest += bestPrice
 				}
+				if uploadedData[i].UnpackedFrom != "" {
+					tallyFor(uploadedData[i].UnpackedFrom).Highest += bestPrice
+				}
 			}
 		}
 
@@ -1204,30 +1430,13 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	pageVars.SinglesHighest = singlesHighest
 	pageVars.SealedHighest = sealedHighest
 
-	// Decide which result sub-tabs to show. The All tab appears only when both
-	// actionable categories are present; the bar appears when more than one
-	// section (singles, sealed, not-found) exists.
-	hasSingles := len(singlesEntries) > 0
-	hasSealed := len(sealedEntries) > 0
-	hasNotFound := len(notFoundEntries) > 0
-	sections := 0
-	for _, present := range []bool{hasSingles, hasSealed, hasNotFound} {
-		if present {
-			sections++
-		}
-	}
-	pageVars.ShowResultTabs = sections > 1
-	pageVars.ShowAllTab = hasSingles && hasSealed
-	switch {
-	case pageVars.ShowAllTab:
-		pageVars.DefaultResultView = "all"
-	case hasSingles:
-		pageVars.DefaultResultView = "singles"
-	case hasSealed:
-		pageVars.DefaultResultView = "sealed"
-	default:
-		pageVars.DefaultResultView = "notfound"
-	}
+	// An unpacked list is read a box at a time rather than by category: the
+	// products are all opened ones, and the cards are all their contents.
+	pageVars.UnpackedSections = buildUnpackedSections(uploadedData, tallies)
+
+	pageVars.DefaultResultView, pageVars.ShowResultTabs, pageVars.ShowAllTab = resultView(
+		len(pageVars.UnpackedSections),
+		len(singlesEntries) > 0, len(sealedEntries) > 0, len(notFoundEntries) > 0)
 
 	pageVars.MissingCounts = missingCounts
 	pageVars.MissingPrices = missingPrices
@@ -1423,7 +1632,103 @@ func adjustQty(qty, multiplier, maxQty int) int {
 	return qty
 }
 
-func loadHashes(hashes, qtys, cond, prices []string) ([]UploadEntry, error) {
+// unpackableSealed counts the rows that hold a decklist, which is what decides
+// whether the results offer to open them. Counting rather than opening: the
+// answer is wanted on every result page, the contents only when asked for.
+func unpackableSealed(entries []UploadEntry) int {
+	var n int
+	for _, entry := range entries {
+		// A product already opened is not one left to open, so the offer goes
+		// away once it has been taken rather than inviting a second round.
+		if entry.CardID == "" || entry.Unpacked {
+			continue
+		}
+		co, err := mtgmatcher.GetUUID(entry.CardID)
+		if err != nil || !co.Sealed {
+			continue
+		}
+		if mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID) {
+			n++
+		}
+	}
+	return n
+}
+
+// unpackSealed answers what is inside the sealed products of an upload: every
+// product holding a decklist, and the cards it holds. Everything else is left
+// out - the loose cards, the products with nothing to open, the rows that did
+// not match.
+//
+// Dropping the rest is what makes the answer readable. Kept, a card held loose
+// as well as inside a box would arrive as two of that card, which is true of
+// the collection and says nothing about the box; a reader comparing the number
+// against the product would find it does not add up. The whole-collection view
+// is the one the reader already had, a click away.
+//
+// Only what a product is guaranteed to contain: GetDecklist walks the decks,
+// the cards filed beside them, and nested sealed within those, but never the
+// packs - a booster's contents are drawn when it is opened and are nobody's to
+// list beforehand. So a booster box is not opened here, and not shown either:
+// it has nothing to say about its contents.
+//
+// Quantities travel into the contents: two of a precon is two of every card in
+// it. Duplicates are left to MergeIdenticalEntries, which the caller runs next
+// and which already knows how to add a card to itself - two precons sharing a
+// staple hold two of it.
+func unpackSealed(entries []UploadEntry) []UploadEntry {
+	var out []UploadEntry
+
+	for _, entry := range entries {
+		co, err := mtgmatcher.GetUUID(entry.CardID)
+		if entry.CardID == "" || entry.Unpacked || err != nil || !co.Sealed ||
+			!mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID) {
+			continue
+		}
+
+		picks, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+		if err != nil || len(picks) == 0 {
+			continue
+		}
+
+		qty := entry.Quantity
+		if qty < 1 {
+			qty = 1
+		}
+
+		// The product stays, marked as opened, so the cards below it have a
+		// provenance. Ahead of them, since that is the order it reads in.
+		opened := entry
+		opened.Unpacked = true
+		out = append(out, opened)
+
+		for _, pick := range picks {
+			// The condition and the price came off the product and say
+			// nothing about a card inside it. What the product was is worth
+			// keeping though: it is the one thing a card in this list has
+			// that an uploaded one does not, and Notes is where a row's own
+			// words already travel to the export.
+			out = append(out, UploadEntry{
+				CardID:       pick,
+				HasQuantity:  true,
+				Quantity:     qty,
+				Notes:        co.Name,
+				UnpackedFrom: co.UUID,
+			})
+		}
+	}
+
+	// Nothing opened, nothing to say: hand the list back as it arrived. The
+	// setting asks for this on every upload, so a list with no product in it
+	// - or none that can be opened - would otherwise come back empty, which
+	// answers a question nobody asked.
+	if len(out) == 0 {
+		return entries
+	}
+
+	return out
+}
+
+func loadHashes(hashes, qtys, cond, prices, notes []string) ([]UploadEntry, error) {
 	var uploadEntries []UploadEntry
 
 	for i := range hashes {
@@ -1443,6 +1748,13 @@ func loadHashes(hashes, qtys, cond, prices []string) ([]UploadEntry, error) {
 
 		if len(prices) > i {
 			entry.OriginalPrice, _ = strconv.ParseFloat(prices[i], 64)
+		}
+
+		// Carried so a row keeps what it knows about itself across a
+		// re-submission - which is how an unpacked card still says which
+		// product it came out of once the results are exported.
+		if len(notes) > i {
+			entry.Notes = notes[i]
 		}
 
 		// Force a quantity to be set to avoid empty values in the UI

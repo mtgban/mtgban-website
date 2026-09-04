@@ -237,14 +237,24 @@ type PageVars struct {
 	EnabledSealedIndexes []string
 
 	// Additional sources for index keys if needed
-	AltKeys              []string
-	SellerKeys           []string
-	VendorKeys           []string
-	SealedSellerKeys     []string
-	SealedVendorKeys     []string
-	ModalSellerKeys      []string
-	ModalVendorKeys      []string
-	UploadEntries        []UploadEntry
+	AltKeys          []string
+	SellerKeys       []string
+	VendorKeys       []string
+	SealedSellerKeys []string
+	SealedVendorKeys []string
+	ModalSellerKeys  []string
+	ModalVendorKeys  []string
+	UploadEntries    []UploadEntry
+
+	// UnpackSealed counts the rows holding a decklist, which is what decides
+	// whether the results offer to open them. The contents themselves are
+	// resolved when the offer is taken, not before.
+	UnpackSealed int
+
+	// UnpackedFrom counts the products this list is the contents of, and is
+	// how the results say they are that rather than an upload: the rest of
+	// what was uploaded is deliberately not here.
+	UnpackedFrom         int
 	IsBuylist            bool
 	TotalEntries         map[string]float64
 	EnabledSellers       []string
@@ -279,6 +289,10 @@ type PageVars struct {
 	ShowResultTabs    bool
 	ShowAllTab        bool
 	DefaultResultView string
+
+	// One section per opened product, replacing the category split when the
+	// list was unpacked
+	UnpackedSections []UnpackedSection
 
 	// Price-movers screener payload (nil on non-screener pages).
 	Screener *ScreenerVars

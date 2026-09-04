@@ -26,6 +26,13 @@
         ['lowval','highval','lowvalabs','highvalabs','minmargin','nocond','noprice','customperc','noresults'].forEach(function (k) {
             if (opts.indexOf(k) >= 0) add(k, 'true');
         });
+        // The results page carries an unpack field of its own, which the Unpack
+        // action sets. A re-post from there says what that click said rather
+        // than what the setting says, so reloading a page of opened cards does
+        // not try to open them again.
+        if (opts.indexOf('unpack') >= 0 && !form.querySelector('[name="unpack"]')) {
+            add('unpack', 'true');
+        }
         add('percspread',     getCookie('UploadPercSpread')    || '60');
         add('percspreadmax',  getCookie('UploadPercSpreadMax') || '0');
         add('minval',         getCookie('UploadMinVal')        || '1');
@@ -53,12 +60,21 @@
             <div class="page-header">
                 <h1>Results{{if and .UploadQuery (not (eq .UploadQuery "hashes"))}} from {{if .UploadSourceURL}}<a class="upload-source-link" href="{{.UploadSourceURL}}" target="_blank" rel="nofollow noopener">{{.UploadQuery}}</a>{{else}}{{.UploadQuery}}{{end}}{{end}}</h1>
                 <p class="page-subtitle">
-                    {{if .UploadEntries}}{{len .UploadEntries}} row{{if ne (len .UploadEntries) 1}}s{{end}} &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
+                    {{if .UploadEntries}}{{len .UploadEntries}} row{{if ne (len .UploadEntries) 1}}s{{end}} &middot; {{end}}{{if .UnpackedFrom}}contents of {{.UnpackedFrom}} sealed product{{if ne .UnpackedFrom 1}}s{{end}} &middot; {{end}}{{if .IsBuylist}}Buylist{{else}}Retail{{end}} mode
                     {{if .RemoteLinkURL}}
                         &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="copyShareLink(this)" title="Copy shareable link">
                             <i data-lucide="share-2" style="width:14px;height:14px;vertical-align:-2px"></i> Share
                         </a>
                         <input type="hidden" id="remoteLinkURL" value="{{.RemoteLinkURL}}">
+                    {{end}}
+                    {{if .UnpackSealed}}
+                        {{/* Re-posts this list with the sealed rows opened. The rows
+                             are read off the page when the offer is taken, by the
+                             same helper the exports use, so nothing is resolved or
+                             carried for a reader who never asks. */}}
+                        &middot; <a href="javascript:void(0)" class="upload-share-link" onclick="runUnpack()" title="Price the cards inside the sealed products instead">
+                            <i data-lucide="package-open" style="width:14px;height:14px;vertical-align:-2px"></i> Unpack {{.UnpackSealed}} sealed
+                        </a>
                     {{end}}
                 </p>
             </div>
@@ -746,6 +762,16 @@
 {{$root := .Root}}
 {{$storeKeys := .StoreKeys}}
 {{$indexKeys := .IndexKeys}}
+{{/* A section of an unpacked list foots its own table: the totals are what
+     came out of that one product, not what the page holds. */}}
+{{$totals := $root.TotalEntries}}
+{{$missingCounts := $root.MissingCounts}}
+{{$missingPrices := $root.MissingPrices}}
+{{if .Scoped}}
+    {{$totals = .Totals}}
+    {{$missingCounts = .Missing}}
+    {{$missingPrices = .MissingPrices}}
+{{end}}
 <table class="ures-table">
     <thead>
         <tr>
@@ -764,7 +790,7 @@
             {{$cardId := .CardID}}
             {{$card := (index $root.Metadata .CardID)}}
             {{$scraperEntries := (index $root.ResultPrices (print .CardID .OriginalCondition))}}
-            <tr data-hash="{{.CardID}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}"
+            <tr data-hash="{{.CardID}}" data-qtys="{{.Quantity}}" data-cond="{{.OriginalCondition}}" data-price="{{.OriginalPrice}}" data-notes="{{.Notes}}"
                 {{if .MismatchAlias}}class="ures-alias-row"{{end}}>
                 <td>
                     <div class="ures-card-cell">
@@ -822,10 +848,10 @@
             <td style="text-align:center;font-family:var(--font-mono);font-weight:700">{{.Quantity}}</td>
             {{range $storeKeys}}
                 <td class="ures-price" style="font-weight:700">
-                    $ {{printf "%.2f" (index $root.TotalEntries .)}}
-                    {{$missing := (index $root.MissingCounts .)}}
+                    $ {{printf "%.2f" (index $totals .)}}
+                    {{$missing := (index $missingCounts .)}}
                     {{if ne $missing 0}}
-                        <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $root.MissingPrices .)}}</div>
+                        <div class="ures-missing">{{$missing}} missing &middot; ~$ {{printf "%.2f" (index $missingPrices .)}}</div>
                     {{end}}
                 </td>
             {{end}}
@@ -833,7 +859,7 @@
             <td>
                 <div class="ures-index" style="font-weight:600">
                     {{range $indexKeys}}
-                        {{$total := (index $root.TotalEntries .)}}
+                        {{$total := (index $totals .)}}
                         {{if $total}}
                         <span><span class="idx-label">{{scraper_name .}}</span><span class="idx-val">$ {{printf "%.2f" $total}}</span></span>
                         {{end}}
@@ -877,6 +903,61 @@
         <span class="label">Optimizer Max</span>
         <span class="val green">$ {{printf "%.2f" .Highest}}</span>
     </div>
+    {{end}}
+</div>
+{{end}}
+
+{{/* The strip over one opened product: what came out of it, store by store,
+     and the reading the whole view exists for - what the box is worth whole
+     against what it holds. */}}
+{{define "ures-unpacked-strip"}}
+{{$s := .Section}}
+<div class="res-summary">
+    <div class="res-summary-stat">
+        <span class="label">Cards</span>
+        <span class="val">{{$s.Quantity}}</span>
+    </div>
+    {{range .StoreKeys}}
+        <div class="res-summary-stat">
+            <span class="label">{{scraper_name .}}</span>
+            <span class="val">$ {{printf "%.2f" (index $s.Totals .)}}</span>
+            {{$gone := (index $s.Missing .)}}
+            {{if ne $gone 0}}
+                <span class="label">{{$gone}} missing</span>
+            {{end}}
+        </div>
+    {{end}}
+    {{range .IndexKeys}}
+        {{$total := (index $s.Totals .)}}
+        {{if $total}}
+        <div class="res-summary-stat">
+            <span class="label">{{scraper_name .}}</span>
+            <span class="val blue">$ {{printf "%.2f" $total}}</span>
+        </div>
+        {{end}}
+    {{end}}
+    {{/* The box's own numbers, after the ones its contents came to: what it
+         sells for, what it is reckoned to hold, and what it actually held. */}}
+    {{if $s.ProductPrice}}
+        <div class="res-summary-stat">
+            <span class="label">Sealed</span>
+            <span class="val">$ {{printf "%.2f" $s.ProductPrice}}</span>
+        </div>
+    {{end}}
+    {{range .SealedIndexKeys}}
+        {{$expected := (index $s.ProductIndex .)}}
+        {{if $expected}}
+        <div class="res-summary-stat">
+            <span class="label">{{scraper_name .}}</span>
+            <span class="val blue">$ {{printf "%.2f" $expected}}</span>
+        </div>
+        {{end}}
+    {{end}}
+    {{if $s.Contents}}
+        <div class="res-summary-stat">
+            <span class="label">Opened</span>
+            <span class="val{{if and $s.ProductPrice (gt $s.Contents $s.ProductPrice)}} green{{end}}">$ {{printf "%.2f" $s.Contents}}</span>
+        </div>
     {{end}}
 </div>
 {{end}}
@@ -933,7 +1014,26 @@
 
     <!-- Tab: Results -->
     <div class="res-panel active" id="panel-results" data-result-view="{{.DefaultResultView}}">
-        {{if .ShowResultTabs}}
+        {{/* An unpacked list is not a list of singles and a list of products,
+             it is a set of boxes and what each one held - so it is read that
+             way, a section per product, rather than through the category
+             tabs. */}}
+        {{if .UnpackedSections}}
+            {{$root := .}}
+            {{range .UnpackedSections}}
+                {{$card := (index $root.Metadata .Product.CardID)}}
+                <div class="ures-block ures-block-unpacked">
+                    <h3 class="ures-block-title">
+                        <a href="{{$card.SearchURL}}" target="_blank">{{$card.Name}}</a>
+                        <span class="ures-block-sub">{{$card.Edition}}{{if gt .Product.Quantity 1}} &middot; &times;{{.Product.Quantity}}{{end}}</span>
+                    </h3>
+                    {{template "ures-unpacked-strip" (dict "Section" . "StoreKeys" $root.ScraperKeys "IndexKeys" $root.IndexKeys "SealedIndexKeys" $root.SealedIndexKeys)}}
+                    <div class="ures-wrap">
+                        {{template "ures-results-table" (dict "Entries" .Entries "StoreKeys" $root.ScraperKeys "IndexKeys" $root.IndexKeys "Quantity" .Quantity "Noun" "card" "Root" $root "Scoped" true "Totals" .Totals "Missing" .Missing "MissingPrices" .MissingPrices)}}
+                    </div>
+                </div>
+            {{end}}
+        {{else if .ShowResultTabs}}
             <div class="ures-subtabs">
                 {{if .ShowAllTab}}<button class="ures-subtab{{if eq .DefaultResultView "all"}} on{{end}}" onclick="showUresView('all', this)">All</button>{{end}}
                 {{if .SinglesEntries}}<button class="ures-subtab{{if eq .DefaultResultView "singles"}} on{{end}}" onclick="showUresView('singles', this)">Singles</button>{{end}}
@@ -1428,6 +1528,7 @@
         <input type="hidden" id="res_deckbox" name="deckbox" value="">
         <input type="hidden" id="res_tcgplayer_csv" name="tcgplayer_csv" value="">
         <input type="hidden" id="res_csvscope" name="csvscope" value="">
+        <input type="hidden" id="res_unpack" name="unpack" value="">
     </form>
 
     <script>
@@ -1451,7 +1552,7 @@
         var form = document.getElementById("upload_form");
 
         // Always rebuild from current row state so removed/picked rows take effect.
-        form.querySelectorAll('input[name="hashes"], input[name="hashesQtys"], input[name="hashesCond"], input[name="hashesPrice"]').forEach(function(el) {
+        form.querySelectorAll('input[name="hashes"], input[name="hashesQtys"], input[name="hashesCond"], input[name="hashesPrice"], input[name="hashesNotes"]').forEach(function(el) {
             el.remove();
         });
 
@@ -1459,7 +1560,7 @@
         exportRows(category || 'all').forEach(function(row) {
             if (!row.dataset.hash) return;
             if (row.classList.contains('ures-removed-row')) return;
-            var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice']];
+            var pairs = [['hash','hashes'],['qtys','hashesQtys'],['cond','hashesCond'],['price','hashesPrice'],['notes','hashesNotes']];
             pairs.forEach(function(pair) {
                 var input = document.createElement("input");
                 input.type = "hidden";
@@ -1492,6 +1593,25 @@
         }
         var form = document.getElementById("upload_form");
         form.target = newWindow ? '_blank' : '';
+        form.submit();
+    }
+
+    // Re-posts the rows on the page with the sealed ones opened. The list is
+    // read off the page here rather than shipped with it, so a reader who never
+    // asks carries none of it - and the export fields are cleared, since this
+    // wants the results page back rather than a file.
+    function runUnpack() {
+        ensureHashesLoaded('all');
+        resExportFields.forEach(function(id) {
+            document.getElementById(id).value = "";
+        });
+        var scope = document.getElementById("res_csvscope");
+        if (scope) {
+            scope.value = "";
+        }
+        document.getElementById("res_unpack").value = "true";
+        var form = document.getElementById("upload_form");
+        form.target = '';
         form.submit();
     }
 
@@ -1713,6 +1833,11 @@
                 <input type="checkbox" data-misc="minmargin">
                 <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
                 <span>Allow <input type="text" id="opt-margin" value="10" class="settings-inline-num">% difference for multi-select</span>
+            </label>
+            <label class="settings-toggle">
+                <input type="checkbox" data-misc="unpack">
+                <span class="settings-toggle-track"><span class="settings-toggle-knob"></span></span>
+                <span>Unpack sealed products into the cards they hold</span>
             </label>
             <label class="settings-toggle">
                 <input type="checkbox" data-misc="nocond">
