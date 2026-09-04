@@ -1521,7 +1521,7 @@ func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 		var matchErr error
 
 		// Try matching via TCGplayer product ID first
-		uuid := mtgmatcher.ExternalUUID(item.ProductID)
+		uuid := mtgmatcher.ConvertID(mtgmatcher.IDSpaceTCGplayer, item.ProductID)
 		if uuid != "" {
 			cardID, matchErr = mtgmatcher.MatchID(uuid, item.IsFoil)
 		}
@@ -1655,7 +1655,7 @@ func loadCollection(ctx context.Context, link string, maxRows int) ([]UploadEntr
 		}
 
 		// Override header map and save relevant fields
-		if mtgmatcher.ExternalUUID(tcgID) != "" {
+		if mtgmatcher.ConvertID(mtgmatcher.IDSpaceTCGplayer, tcgID) != "" {
 			record[5] = tcgID
 
 			record[2] = "Normal"

@@ -81,7 +81,7 @@ func logTCGProductMatchReport(categoryID int, products []timeseries.TCGProduct) 
 	var matched int
 	var sampleUnmatched []string
 	for _, p := range products {
-		if mtgmatcher.ExternalUUID(strconv.Itoa(p.ProductID)) != "" {
+		if mtgmatcher.ConvertID(mtgmatcher.IDSpaceTCGplayer, strconv.Itoa(p.ProductID)) != "" {
 			matched++
 		} else if len(sampleUnmatched) < 3 {
 			sampleUnmatched = append(sampleUnmatched, fmt.Sprintf("%d %q", p.ProductID, p.Name))

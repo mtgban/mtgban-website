@@ -231,7 +231,7 @@ func fixupNumberNG(code string, strict bool) []string {
 	for i := range filters {
 		filters[i] = strings.TrimLeft(filters[i], "0")
 		if !strict {
-			filters[i] = strings.TrimRight(filters[i], magic.SuffixSpecial+magic.SuffixVariant+magic.SuffixPhiLow+"*")
+			filters[i] = strings.TrimRight(filters[i], magic.SuffixSpecial+magic.SuffixVariant+magic.SuffixPhi+"*")
 		}
 	}
 	return filters
@@ -350,13 +350,12 @@ func fixupColorNG(code string) []string {
 func fixupIDs(code string) []string {
 	fields := strings.Split(code, ",")
 	for i, field := range fields {
-		var uuid string
 		_, err := mtgmatcher.GetUUID(field)
 		if err == nil {
 			continue
 		}
 		// XXX: id funcs report the first finish available
-		uuid = mtgmatcher.ExternalUUID(field)
+		uuid := externalUUID(field)
 		if uuid != "" {
 			fields[i] = uuid
 			continue

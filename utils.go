@@ -23,6 +23,23 @@ import (
 	"github.com/mtgban/mtgban-website/internal/notify"
 )
 
+// externalUUID resolves an outside identifier without knowing which id space
+// it lives in, the way mtgmatcher.ExternalUUID used to: the spaces in their
+// historical order, first hit wins.
+func externalUUID(id string) string {
+	for _, space := range []string{
+		mtgmatcher.IDSpaceMTGJSON,
+		mtgmatcher.IDSpaceScryfall,
+		mtgmatcher.IDSpaceTCGplayer,
+	} {
+		uuid := mtgmatcher.ConvertID(space, id)
+		if uuid != "" {
+			return uuid
+		}
+	}
+	return ""
+}
+
 var Country2flag = map[string]string{
 	"EU": "🇪🇺",
 	"JP": "🇯🇵",
