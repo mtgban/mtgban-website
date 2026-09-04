@@ -67,6 +67,12 @@ type Entry struct {
 	// box it was in once the list has been sorted and split, so the results
 	// can be read a product at a time.
 	UnpackedFrom string
+
+	// UnpackedQuantity is how many of that product were opened. The cards
+	// carry it so the product's own row can be rebuilt from them alone when
+	// the page posts itself back: a box is priced per box, and two boxes'
+	// worth of cards has to be read against two boxes.
+	UnpackedQuantity int
 }
 
 // Parser matches uploaded rows against the card database. The zero value is

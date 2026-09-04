@@ -395,6 +395,8 @@ func TestLoadHashesCarriesTheNotes(t *testing.T) {
 		[]string{"2", "1"},
 		nil, nil,
 		[]string{"A Precon", "A Precon"},
+		[]string{"box-a", "box-a"},
+		[]string{"2", "2"},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -406,13 +408,18 @@ func TestLoadHashesCarriesTheNotes(t *testing.T) {
 		if entry.Notes != "A Precon" {
 			t.Errorf("%s lost its note: %q", entry.CardID, entry.Notes)
 		}
+		if entry.UnpackedFrom != "box-a" || entry.UnpackedQuantity != 2 {
+			t.Errorf("%s came back from %q x%d, want box-a x2",
+				entry.CardID, entry.UnpackedFrom, entry.UnpackedQuantity)
+		}
 	}
 }
 
 // A row with no note is unaffected, and a short notes list does not read past
 // its end.
 func TestLoadHashesToleratesMissingNotes(t *testing.T) {
-	entries, err := loadHashes([]string{"card-1", "card-2"}, nil, nil, nil, []string{"only one"})
+	entries, err := loadHashes([]string{"card-1", "card-2"}, nil, nil, nil,
+		[]string{"only one"}, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -626,11 +633,11 @@ func TestUnpackedResultsExportAsOneFile(t *testing.T) {
 // values a row, and the form parser counts values: it stops at 10,000 and
 // hands back an empty form rather than a short one.
 func TestSplitRowsUnpacksTheRowList(t *testing.T) {
-	hashes, qtys, cond, prices, notes := splitRows(
-		"uuid-a\t2\tNM\t1.50\tA Precon\n" +
-			"uuid-b\t1\t\t0\t\n" +
+	hashes, qtys, cond, prices, notes, from, fromQtys := splitRows(
+		"uuid-a\t2\tNM\t1.50\tA Precon\tbox-a\t2\n" +
+			"uuid-b\t1\t\t0\t\t\t\n" +
 			"\n" +
-			"uuid-c\t3\tSP\t9.99\tAnother Precon\n")
+			"uuid-c\t3\tSP\t9.99\tAnother Precon\tbox-b\t1\n")
 
 	if len(hashes) != 3 {
 		t.Fatalf("got %d rows, want 3 (the empty line is not one)", len(hashes))
@@ -646,12 +653,17 @@ func TestSplitRowsUnpacksTheRowList(t *testing.T) {
 	if hashes[2] != "uuid-c" || notes[2] != "Another Precon" {
 		t.Errorf("the row after the empty line is %q from %q", hashes[2], notes[2])
 	}
+	if from[0] != "box-a" || fromQtys[0] != "2" || from[1] != "" || from[2] != "box-b" {
+		t.Errorf("provenance came back as %v x%v", from, fromQtys)
+	}
 
-	// A row that lost its trailing fields keeps the ones it has.
-	hashes, qtys, cond, prices, notes = splitRows("uuid-d\t1\n")
-	if len(hashes) != 1 || hashes[0] != "uuid-d" || qtys[0] != "1" ||
-		cond[0] != "" || prices[0] != "" || notes[0] != "" {
-		t.Errorf("a short row came back as %v %v %v %v %v", hashes, qtys, cond, prices, notes)
+	// A row that lost its trailing fields keeps the ones it has, which is how
+	// a column can be added without breaking a page that predates it.
+	hashes, qtys, cond, prices, notes, from, fromQtys = splitRows("uuid-d\t1\n")
+	if len(hashes) != 1 || hashes[0] != "uuid-d" || qtys[0] != "1" || cond[0] != "" ||
+		prices[0] != "" || notes[0] != "" || from[0] != "" || fromQtys[0] != "" {
+		t.Errorf("a short row came back as %v %v %v %v %v %v %v",
+			hashes, qtys, cond, prices, notes, from, fromQtys)
 	}
 }
 
@@ -693,5 +705,164 @@ func TestExportPostsAListPastTheFormLimit(t *testing.T) {
 	}
 	if strings.Contains(rec.Body.String(), "<html") {
 		t.Error("the export came back as a page, which is what an empty form looks like")
+	}
+}
+
+// The page posts back only the cards, so the boxes they came out of are built
+// again from what the cards say: without that a reload, a printing picked or
+// an export flattened the sections into one list.
+func TestOpenedProductsComeBackFromTheirContents(t *testing.T) {
+	restored := restoreOpenedProducts([]UploadEntry{
+		{CardID: "card-1", UnpackedFrom: "box-a", UnpackedQuantity: 2, Quantity: 2, HasQuantity: true},
+		{CardID: "card-2", UnpackedFrom: "box-a", UnpackedQuantity: 2, Quantity: 2, HasQuantity: true},
+		{CardID: "card-3", UnpackedFrom: "box-b", UnpackedQuantity: 1, Quantity: 1, HasQuantity: true},
+		{CardID: "loose", Quantity: 1, HasQuantity: true},
+	})
+
+	sections := buildUnpackedSections(restored, map[string]*unpackedTally{})
+	if len(sections) != 2 {
+		t.Fatalf("got %d sections back, want the two boxes", len(sections))
+	}
+	if sections[0].Product.CardID != "box-a" || !sections[0].Product.Unpacked {
+		t.Errorf("the first section is headed by %q (unpacked=%v)",
+			sections[0].Product.CardID, sections[0].Product.Unpacked)
+	}
+	// Two of a box is what its contents were priced against, so the row that
+	// comes back has to say two as well.
+	if got := sections[0].Product.Quantity; got != 2 {
+		t.Errorf("box-a came back as %d, want the 2 that were opened", got)
+	}
+	if got := sections[1].Product.Quantity; got != 1 {
+		t.Errorf("box-b came back as %d, want 1", got)
+	}
+	if len(sections[0].Entries) != 2 || len(sections[1].Entries) != 1 {
+		t.Errorf("the sections hold %d and %d cards, want 2 and 1",
+			len(sections[0].Entries), len(sections[1].Entries))
+	}
+
+	// A product already in the list is not doubled by rebuilding it.
+	again := restoreOpenedProducts(restored)
+	if len(again) != len(restored) {
+		t.Errorf("rebuilding twice turned %d rows into %d", len(restored), len(again))
+	}
+}
+
+// The boxes head the page; a file is a list of cards to buy, sell or price,
+// and the box beside its own contents would be counted twice by anyone adding
+// the column up.
+func TestExportsLeaveTheOpenedProductsBehind(t *testing.T) {
+	entries := []UploadEntry{
+		{CardID: "box-a", Unpacked: true, Quantity: 1, HasQuantity: true},
+		{CardID: "card-1", UnpackedFrom: "box-a", Quantity: 1, HasQuantity: true},
+	}
+
+	out := withoutOpenedProducts(entries)
+	if len(out) != 1 || out[0].CardID != "card-1" {
+		t.Errorf("the export carries %d rows: %v", len(out), out)
+	}
+}
+
+// The whole round trip: a page of unpacked results posts itself back and comes
+// back as sections rather than as one flat list of cards.
+func TestUnpackedPageSurvivesItsOwnRoundTrip(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	sealed, _ := sealedProducts(t)
+	if sealed == "" {
+		t.Skip("this datastore has no sealed product with a decklist")
+	}
+	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
+	DevMode, SigCheck = true, false
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Upload"] == nil {
+		LogPages["Upload"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Upload")
+	}
+
+	// What the page holds after an unpack, and what it posts back: the cards,
+	// each naming the product it came out of. The products are not rows.
+	entries := unpackSealed([]UploadEntry{{CardID: sealed, Quantity: 2, HasQuantity: true}})
+	var packed strings.Builder
+	for _, entry := range entries {
+		if entry.Unpacked {
+			continue
+		}
+		fmt.Fprintf(&packed, "%s\t%d\t\t0\t%s\t%s\t%d\n", entry.CardID, entry.Quantity,
+			entry.Notes, entry.UnpackedFrom, entry.UnpackedQuantity)
+	}
+
+	form := url.Values{}
+	form.Set("mode", "false")
+	form.Set("rows", packed.String())
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	Upload(rec, req)
+
+	out := rec.Body.String()
+	if !strings.Contains(out, "ures-block-unpacked") {
+		t.Fatal("the page came back flattened, with no section for the product it opened")
+	}
+	product := mustCard(t, sealed)
+	if !strings.Contains(out, product.Name) {
+		t.Error("the rebuilt section is not headed by the product")
+	}
+}
+
+// A section holds what a box holds and is read against what that box is worth,
+// so its rows are not the reader's to remove: the comparison would be left
+// standing while one side of it stopped being the product's contents.
+func TestUnpackedRowsCannotBeRemoved(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	sealed, _ := sealedProducts(t)
+	if sealed == "" {
+		t.Skip("this datastore has no sealed product with a decklist")
+	}
+	entries := unpackSealed([]UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+
+	pageVars := PageVars{
+		UploadEntries: entries,
+		UnpackedFrom:  1,
+		Metadata:      map[string]GenericCard{},
+		TotalEntries:  map[string]float64{},
+		ResultPrices:  map[string]map[string]float64{},
+		MissingCounts: map[string]int{},
+		MissingPrices: map[string]float64{},
+	}
+	for _, entry := range entries {
+		pageVars.Metadata[entry.CardID] = uuid2card(entry.CardID, true, false, false)
+	}
+	pageVars.UnpackedSections = []UnpackedSection{{
+		Product:  entries[0],
+		Entries:  entries[1:],
+		Quantity: len(entries) - 1,
+		Totals:   map[string]float64{},
+		Missing:  map[string]int{},
+	}}
+
+	if out := renderUpload(t, pageVars); strings.Contains(out, "toggleRemoveRow(this)") {
+		t.Error("an unpacked section offers to remove the cards that came out of the box")
+	}
+
+	// Every other list keeps the button: this is the unpacked view's rule, not
+	// a new rule for the results.
+	flat := PageVars{
+		UploadEntries:     entries[1:],
+		SinglesEntries:    entries[1:],
+		DefaultResultView: "singles",
+		Metadata:          pageVars.Metadata,
+		TotalEntries:      map[string]float64{},
+		ResultPrices:      map[string]map[string]float64{},
+		MissingCounts:     map[string]int{},
+		MissingPrices:     map[string]float64{},
+	}
+	if out := renderUpload(t, flat); !strings.Contains(out, "toggleRemoveRow(this)") {
+		t.Error("an ordinary result no longer offers to remove a row")
 	}
 }

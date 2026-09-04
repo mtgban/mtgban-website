@@ -631,12 +631,14 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	hashesCond := r.Form["hashesCond"]
 	hashesPrice := r.Form["hashesPrice"]
 	hashesNotes := r.Form["hashesNotes"]
+	var hashesFrom, hashesFromQtys []string
 
 	// A page of results posts its rows packed into one field instead, for the
 	// reason splitRows gives.
 	packed := r.FormValue("rows")
 	if packed != "" {
-		hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes = splitRows(packed)
+		hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes,
+			hashesFrom, hashesFromQtys = splitRows(packed)
 	}
 
 	// Load spreadsheet cloud url if present
@@ -734,7 +736,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	var uploadedData []UploadEntry
 	var uploadName string
 	if len(hashes) != 0 {
-		uploadedData, err = loadHashes(hashes, hashesQtys, hashesCond, hashesPrice, hashesNotes)
+		uploadedData, err = loadHashes(hashes, hashesQtys, hashesCond, hashesPrice,
+			hashesNotes, hashesFrom, hashesFromQtys)
+		uploadedData = restoreOpenedProducts(uploadedData)
 	} else if textArea != "" {
 		uploadedData, err = loadCsv(strings.NewReader(textArea), ',', maxRows)
 	} else if handler != nil {
@@ -785,6 +789,15 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uploadedData = docparse.MergeIdenticalEntries(uploadedData)
+
+	// Every export below is a list of cards to buy, sell or price, and an
+	// opened product is none of those - it is where some of the cards came
+	// from. The page keeps it, where it heads the section its contents fill;
+	// a file would only have it sitting beside them, counted twice by anyone
+	// adding the column up.
+	if download || estimate || deckbox || tcgpCSV {
+		uploadedData = withoutOpenedProducts(uploadedData)
+	}
 
 	// Allow estimating on a separate page
 	if estimate {
@@ -1737,11 +1750,12 @@ func unpackSealed(entries []UploadEntry) []UploadEntry {
 			// that an uploaded one does not, and Notes is where a row's own
 			// words already travel to the export.
 			out = append(out, UploadEntry{
-				CardID:       pick,
-				HasQuantity:  true,
-				Quantity:     qty,
-				Notes:        co.Name,
-				UnpackedFrom: co.UUID,
+				CardID:           pick,
+				HasQuantity:      true,
+				Quantity:         qty,
+				Notes:            co.Name,
+				UnpackedFrom:     co.UUID,
+				UnpackedQuantity: qty,
 			})
 		}
 	}
@@ -1752,6 +1766,61 @@ func unpackSealed(entries []UploadEntry) []UploadEntry {
 	// answers a question nobody asked.
 	if len(out) == 0 {
 		return entries
+	}
+
+	return out
+}
+
+// withoutOpenedProducts drops the products an unpacked list opened, leaving
+// only the cards. See the call site for why the exports want that and the page
+// does not.
+func withoutOpenedProducts(entries []UploadEntry) []UploadEntry {
+	out := make([]UploadEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Unpacked {
+			continue
+		}
+		out = append(out, entry)
+	}
+
+	return out
+}
+
+// restoreOpenedProducts puts back the products an unpacked page does not post.
+// Its sections are headed by the box and its rows are only the cards that came
+// out of one, so a re-submission - a reload, a printing picked, an export -
+// carried the contents and lost what they were the contents of.
+//
+// Every card names its product and says how many were opened, which is all the
+// row needs: the same row the unpacking made, marked as opened and counting
+// for nothing, priced by uuid like any other. Rebuilding it here rather than
+// posting it keeps the box out of the exports, where it would otherwise turn
+// up beside its own contents.
+func restoreOpenedProducts(entries []UploadEntry) []UploadEntry {
+	present := map[string]bool{}
+	for _, entry := range entries {
+		if entry.Unpacked {
+			present[entry.CardID] = true
+		}
+	}
+
+	out := make([]UploadEntry, 0, len(entries))
+	for _, entry := range entries {
+		product := entry.UnpackedFrom
+		if product != "" && !present[product] {
+			present[product] = true
+			quantity := entry.UnpackedQuantity
+			if quantity < 1 {
+				quantity = 1
+			}
+			out = append(out, UploadEntry{
+				CardID:      product,
+				Unpacked:    true,
+				HasQuantity: true,
+				Quantity:    quantity,
+			})
+		}
+		out = append(out, entry)
 	}
 
 	return out
@@ -1770,14 +1839,16 @@ func unpackSealed(entries []UploadEntry) []UploadEntry {
 // The arrays are still read when this is absent: a hash transfer from search
 // or the newspaper posts those, and they are short enough never to have been
 // near the ceiling.
-func splitRows(packed string) (hashes, qtys, cond, prices, notes []string) {
+func splitRows(packed string) (hashes, qtys, cond, prices, notes, from, fromQtys []string) {
 	for _, line := range strings.Split(packed, "\n") {
 		if line == "" {
 			continue
 		}
 
-		fields := strings.SplitN(line, "\t", 5)
-		for len(fields) < 5 {
+		// Positional, and short lines are padded: a column added here is a
+		// column an older page simply does not send.
+		fields := strings.SplitN(line, "\t", 7)
+		for len(fields) < 7 {
 			fields = append(fields, "")
 		}
 
@@ -1786,12 +1857,14 @@ func splitRows(packed string) (hashes, qtys, cond, prices, notes []string) {
 		cond = append(cond, fields[2])
 		prices = append(prices, fields[3])
 		notes = append(notes, fields[4])
+		from = append(from, fields[5])
+		fromQtys = append(fromQtys, fields[6])
 	}
 
-	return hashes, qtys, cond, prices, notes
+	return hashes, qtys, cond, prices, notes, from, fromQtys
 }
 
-func loadHashes(hashes, qtys, cond, prices, notes []string) ([]UploadEntry, error) {
+func loadHashes(hashes, qtys, cond, prices, notes, from, fromQtys []string) ([]UploadEntry, error) {
 	var uploadEntries []UploadEntry
 
 	for i := range hashes {
@@ -1818,6 +1891,18 @@ func loadHashes(hashes, qtys, cond, prices, notes []string) ([]UploadEntry, erro
 		// product it came out of once the results are exported.
 		if len(notes) > i {
 			entry.Notes = notes[i]
+		}
+
+		// And which product that was, so the sections can be rebuilt rather
+		// than flattened every time the page posts itself back.
+		if len(from) > i {
+			entry.UnpackedFrom = from[i]
+		}
+		if len(fromQtys) > i {
+			opened, err := strconv.Atoi(fromQtys[i])
+			if err == nil {
+				entry.UnpackedQuantity = opened
+			}
 		}
 
 		// Force a quantity to be set to avoid empty values in the UI
