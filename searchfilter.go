@@ -39,6 +39,12 @@ type SearchConfig struct {
 	// String where to stash non-user facing data
 	PrivateData string
 
+	// The sealed product a contents:/decklist: query asked about, and whether
+	// it asked for only the cards the product is guaranteed to hold. Set so
+	// the page can offer the other reading of the same product.
+	ContentsProduct    string
+	ContentsGuaranteed bool
+
 	// Chain of filters to be applied to card filtering
 	CardFilters []FilterElem
 
@@ -734,6 +740,12 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			co, _ := mtgmatcher.GetUUID(uuids[0])
 			// Stash original product reference (name)
 			config.PrivateData = co.Name
+			// The other reading of the same product: only what it is
+			// guaranteed to hold
+			if !negate {
+				config.ContentsProduct = co.UUID
+				config.ContentsGuaranteed = true
+			}
 			// Retrieve decklist
 			uuids, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
 			// Assign data so that on error the entire db is returned
@@ -933,10 +945,18 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			})
 		case "contents":
 			config.SearchMode = "mixed"
+			uuids := fixupContents(code)
+			// Everything the product can hold, which for a drop with bonus
+			// cards is a great deal more than it always holds. Remembered so
+			// the page can offer the shorter reading; a negated query is
+			// asking about neither.
+			if len(uuids) == 1 && !negate {
+				config.ContentsProduct = uuids[0]
+			}
 			filters = append(filters, FilterElem{
 				Name:   "contents",
 				Negate: negate,
-				Values: fixupContents(code),
+				Values: uuids,
 			})
 		case "container":
 			filters = append(filters, FilterElem{

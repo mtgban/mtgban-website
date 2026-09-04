@@ -89,6 +89,38 @@ func searchSuggestions(rawQuery string, config SearchConfig, sealed bool) (strin
 	})
 }
 
+// contentsToggle answers whether a contents:/decklist: search can be read the
+// other way round, and names the product and the query that does it.
+//
+// A drop that can hold bonus cards lists every one of them beside the few it
+// always holds - a Secret Lair's five cards arrive buried in the planeswalkers
+// that might come with them - so the short list is worth offering. Only where
+// the two readings differ: a product with nothing guaranteed has no short list
+// to show, and one with no bonus cards is already showing it.
+func contentsToggle(query string, config SearchConfig) (name, other string) {
+	if config.ContentsProduct == "" {
+		return "", ""
+	}
+
+	co, err := mtgmatcher.GetUUID(config.ContentsProduct)
+	if err != nil {
+		return "", ""
+	}
+	if !mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID) {
+		return "", ""
+	}
+	if !mtgmatcher.SealedIsRandom(co.SetCode, co.UUID) {
+		return "", ""
+	}
+
+	// The filter is swapped in the query as it was typed, so whatever else it
+	// carries is carried over with it.
+	if config.ContentsGuaranteed {
+		return co.Name, strings.Replace(query, "decklist:", "contents:", 1)
+	}
+	return co.Name, strings.Replace(query, "contents:", "decklist:", 1)
+}
+
 // searchFallback re-reads a search whose name matched nothing, in the order a
 // searcher is likely to have meant it. "metal" names no card, but on the games
 // that print treatments as promo types it names a finish, and a storefront
@@ -534,6 +566,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		pageVars.SearchSort = config.SortMode
 		pageVars.NoSort = true
 	}
+
+	pageVars.ContentsProduct, pageVars.ContentsOtherQuery = contentsToggle(query, config)
+	pageVars.ContentsGuaranteed = config.ContentsGuaranteed
 
 	// Perform search
 	allKeys, err := searchAndFilter(config)

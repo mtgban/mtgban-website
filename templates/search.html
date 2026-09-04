@@ -121,6 +121,15 @@
                 result{{if ne .TotalUnique 1}}s{{end}} found
                 {{if gt .TotalUnique (len .AllKeys)}}({{len .AllKeys}} shown){{end}}
             </span>
+            {{/* Only over a product that holds bonus cards as well as
+                 guaranteed ones, where the two readings differ. */}}
+            {{if .ContentsProduct}}
+                <a class="search-sort-pill with-label{{if .ContentsGuaranteed}} active{{end}}"
+                   href="?q={{.ContentsOtherQuery}}"
+                   title="{{if .ContentsGuaranteed}}Also show the cards {{.ContentsProduct}} may come with{{else}}Show only the cards {{.ContentsProduct}} always comes with{{end}}">
+                    <i data-lucide="package-check"></i>Guaranteed only
+                </a>
+            {{end}}
         </div>
     {{end}}
 </div>
