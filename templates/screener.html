@@ -20,7 +20,7 @@
     </div>
     <script type="text/javascript" src="/js/followmouse.js?hash={{.Hash}}"></script>
 
-    <div class="page-wide news-data">
+    <div class="page-wide news-data" id="screenerPage">
         <div class="page-header news-data-header">
             <div>
                 <h1>Price Movers Screener</h1>
@@ -122,7 +122,7 @@
         </form>
         {{end}}
 
-        <div id="screenerLoading" class="screener-loading-overlay"><div class="screener-spinner"></div></div>
+        <div id="screenerLoading" class="screener-loading-overlay{{if .Screener.Deferred}} active{{end}}"><div class="screener-spinner"></div></div>
         <script>
         function screenerGo(form) {
             var o = document.getElementById('screenerLoading');
@@ -150,6 +150,41 @@
         })();
         </script>
 
+        {{if .Screener.Deferred}}
+        {{/* The rows are a cold archive read, so the page is painted without
+             them and asks for them itself. The reply is a whole page; the one
+             region that needed the rows is taken out of it, which is also the
+             region the filters live in - so the edition facets arrive with the
+             rows that produced them. */}}
+        <noscript>
+            <p class="page-subtitle"><a href="/screener?metric={{.Screener.SelMetric}}&window={{.Screener.SelWindow}}&kind={{.Screener.SelKind}}&move={{.Screener.Move}}&min_price={{.Screener.MinPrice}}&min_was={{.Screener.MinPriorPrice}}&min_pct={{.Screener.MinPct}}&max_pct={{.Screener.MaxPct}}&size={{.Screener.SelSize}}{{range .Screener.SelEditions}}&edition={{.}}{{end}}&rows=1">Load the results</a></p>
+        </noscript>
+        <script>
+        (function () {
+            var url = new URL(window.location.href);
+            url.searchParams.set('rows', '1');
+            var full = function () { window.location.replace(url.toString()); };
+            fetch(url.toString(), { credentials: 'same-origin' })
+                .then(function (r) {
+                    if (!r.ok) throw new Error(r.status);
+                    return r.text();
+                })
+                .then(function (html) {
+                    var next = new DOMParser().parseFromString(html, 'text/html').getElementById('screenerPage');
+                    var here = document.getElementById('screenerPage');
+                    // Nothing to swap in means something answered with a page
+                    // this one does not recognise - a login, an error - and
+                    // the honest thing is to go there.
+                    if (!next || !here) return full();
+                    here.replaceWith(next);
+                    var o = document.getElementById('screenerLoading');
+                    if (o) o.classList.remove('active');
+                    if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+                })
+                .catch(full);
+        })();
+        </script>
+        {{else}}
         <div class="news-table-wrap">
             <table class="table-data news-table" id="screenerTable" onmouseout="document.getElementById('hoverImage').src='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';var hw=document.getElementById('hoverWrap');hw.setAttribute('data-foil','false');hw.setAttribute('data-etched','false');">
                 <thead>
@@ -207,6 +242,7 @@
                 </form>
             </div>
         </div>
+        {{end}}
     </div>
 </div>
 {{end}}

@@ -502,6 +502,10 @@ type ScreenerVars struct {
 	PageSizes     []int
 	SelSize       int
 	Rows          []ScreenerResult
+
+	// Deferred marks the shell rendered before the rows exist: the filters
+	// paint, and the page asks for the rows itself.
+	Deferred bool
 }
 
 func atoiDefault(s string, def int) int {
@@ -594,6 +598,21 @@ func Screener(w http.ResponseWriter, r *http.Request) {
 		SelSize:       size,
 	}
 	pageVars.Screener = sv
+
+	// Building the rows is an archive read plus a resolve pass over tens of
+	// thousands of them, and the page used to spend that wait as a blank tab.
+	// Paint what the wait does not depend on, and let the page ask for the
+	// rest itself - the request it makes carries rows=1 and is answered in
+	// full. A warm cache renders here as it always did, since a round trip to
+	// ask for what is already in hand is a round trip wasted.
+	if r.FormValue("rows") != "1" {
+		_, warm := cachedScreenerRows(screenerCacheKey(metric, window, minPrice, minWas))
+		if !warm {
+			sv.Deferred = true
+			render(w, "screener.html", pageVars)
+			return
+		}
+	}
 
 	rows, err := cachedMovers(r.Context(), metric, window, minPrice, minWas)
 	if err != nil {
