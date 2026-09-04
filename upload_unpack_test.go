@@ -2,6 +2,12 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -613,5 +619,79 @@ func TestUnpackedResultsExportAsOneFile(t *testing.T) {
 			t.Errorf("%s: got (%q, tabs=%v, all=%v), want (%q, tabs=%v, all=%v)",
 				tt.name, view, tabs, all, tt.wantView, tt.wantTabs, tt.wantAll)
 		}
+	}
+}
+
+// The row list travels as one form value. Five parallel arrays cost five
+// values a row, and the form parser counts values: it stops at 10,000 and
+// hands back an empty form rather than a short one.
+func TestSplitRowsUnpacksTheRowList(t *testing.T) {
+	hashes, qtys, cond, prices, notes := splitRows(
+		"uuid-a\t2\tNM\t1.50\tA Precon\n" +
+			"uuid-b\t1\t\t0\t\n" +
+			"\n" +
+			"uuid-c\t3\tSP\t9.99\tAnother Precon\n")
+
+	if len(hashes) != 3 {
+		t.Fatalf("got %d rows, want 3 (the empty line is not one)", len(hashes))
+	}
+	if hashes[0] != "uuid-a" || qtys[0] != "2" || cond[0] != "NM" ||
+		prices[0] != "1.50" || notes[0] != "A Precon" {
+		t.Errorf("first row came back as %q %q %q %q %q",
+			hashes[0], qtys[0], cond[0], prices[0], notes[0])
+	}
+	if notes[1] != "" || cond[1] != "" {
+		t.Errorf("a row with empty fields came back as %q %q", cond[1], notes[1])
+	}
+	if hashes[2] != "uuid-c" || notes[2] != "Another Precon" {
+		t.Errorf("the row after the empty line is %q from %q", hashes[2], notes[2])
+	}
+
+	// A row that lost its trailing fields keeps the ones it has.
+	hashes, qtys, cond, prices, notes = splitRows("uuid-d\t1\n")
+	if len(hashes) != 1 || hashes[0] != "uuid-d" || qtys[0] != "1" ||
+		cond[0] != "" || prices[0] != "" || notes[0] != "" {
+		t.Errorf("a short row came back as %v %v %v %v %v", hashes, qtys, cond, prices, notes)
+	}
+}
+
+// End to end, at a size the old shape could not post: a few opened precons is
+// well past 2,000 rows, and what came back then was the uploader page.
+func TestExportPostsAListPastTheFormLimit(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	defer func(dev, sig bool) { DevMode, SigCheck = dev, sig }(DevMode, SigCheck)
+	DevMode, SigCheck = true, false
+	if LogPages == nil {
+		LogPages = map[string]*log.Logger{}
+	}
+	if LogPages["Upload"] == nil {
+		LogPages["Upload"] = log.New(io.Discard, "", 0)
+		defer delete(LogPages, "Upload")
+	}
+
+	// 2,500 rows: under the old five-a-row ceiling of 2,000, over it in values.
+	uuids := mtgmatcher.GetUUIDs()
+	var packed strings.Builder
+	for i := 0; i < 2500; i++ {
+		fmt.Fprintf(&packed, "%s\t1\t\t0\tA Precon\n", uuids[i%len(uuids)])
+	}
+
+	form := url.Values{}
+	form.Set("mode", "false")
+	form.Set("download", "true")
+	form.Set("rows", packed.String())
+
+	req := httptest.NewRequest(http.MethodPost, "/upload", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	Upload(rec, req)
+
+	if got := rec.Header().Get("Content-Type"); got != "text/csv" {
+		t.Fatalf("a 2500-row export came back as %q, want a file", got)
+	}
+	if strings.Contains(rec.Body.String(), "<html") {
+		t.Error("the export came back as a page, which is what an empty form looks like")
 	}
 }
