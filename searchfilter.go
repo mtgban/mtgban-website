@@ -237,6 +237,12 @@ func fixupNumberNG(code string, strict bool) []string {
 	return filters
 }
 
+// fixupPatternNG takes the quotes off a pattern query. Nothing else comes
+// off: every other character could be part of the pattern.
+func fixupPatternNG(code string) string {
+	return strings.Trim(code, "\"")
+}
+
 func fixupFinishNG(code string) []string {
 	filters := strings.Split(strings.ToLower(code), ",")
 	for i := range filters {
@@ -734,9 +740,7 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Values: []string{code},
 			})
 		case "namee":
-			// No fixup because we need to trust input
-			// but remove any possible containing characters on the sides
-			pattern := strings.Trim(code, "\"()")
+			pattern := fixupPatternNG(code)
 			re, _ := regexp.Compile(pattern)
 			filters = append(filters, FilterElem{
 				Name:   "name_regexp",
@@ -751,11 +755,12 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Values: fixupEditionNG(code),
 			})
 		case "se", "ee":
-			re, _ := regexp.Compile(code)
+			pattern := fixupPatternNG(code)
+			re, _ := regexp.Compile(pattern)
 			filters = append(filters, FilterElem{
 				Name:   "edition_regexp",
 				Negate: negate,
-				Values: []string{code},
+				Values: []string{pattern},
 				Regexp: re,
 			})
 		case "cn", "cns", "number":
@@ -806,12 +811,12 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				ApplyTo:    applyToSets,
 			})
 		case "cne":
-			re, _ := regexp.Compile(code)
+			pattern := fixupPatternNG(code)
+			re, _ := regexp.Compile(pattern)
 			filters = append(filters, FilterElem{
 				Name:   "number_regexp",
 				Negate: negate,
-				// No fixup because we need to trust input
-				Values: []string{code},
+				Values: []string{pattern},
 				Regexp: re,
 			})
 		case "r":
