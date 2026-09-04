@@ -1255,7 +1255,12 @@ func loadDatastore(ds string) error {
 	if err != nil {
 		return err
 	}
+	// Build from the loaded backend before publishing it. Disable seeding
+	// during the swap; queries without an index use the existing scan path.
+	idx := buildNumberIndex(backend)
+	numberIdx.Store(nil)
 	mtgmatcher.SetGlobalDatastore(backend)
+	numberIdx.Store(idx)
 
 	ServerNotify("init", "Datastore installed")
 	SetLastDatastoreUpdate(time.Now())
