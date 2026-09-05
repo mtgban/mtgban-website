@@ -66,6 +66,11 @@ type Deps struct {
 
 	RetailBlockList  func() []string
 	BuylistBlockList func() []string
+
+	// LastDatastoreUpdate reports when the card data was last replaced, so
+	// the catalog can reuse the half derived from it. Nil rebuilds every
+	// time, which is what a caller that does not track this would want.
+	LastDatastoreUpdate func() time.Time
 }
 
 // Service exposes the offline API endpoints and background refresh logic.
@@ -74,6 +79,9 @@ type Service struct {
 	manifestStore *bucketstore.Store[manifestFile]
 	imagesStore   *bucketstore.Store[ImagesManifest]
 	catalog       atomic.Pointer[catalogCache]
+	// fragments caches the catalog's datastore half. Only refreshCatalog
+	// touches it, under the mutex refreshManifest already holds.
+	fragments *catalogFragments
 	// refreshSignal wakes the background refresher; buffered so RequestRefresh
 	// never blocks and bursts coalesce.
 	refreshSignal chan struct{}
