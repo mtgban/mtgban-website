@@ -1572,11 +1572,14 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 				}
 			}
 		}
-		if err != nil {
+		// attemptMatch reads the query as a card name, which is no answer on
+		// the sealed tab: what is asked there is which product carries the
+		// name, and none is a better answer than a card nobody asked for.
+		if err != nil && config.SearchMode != "sealed" {
 			uuids, err = attemptMatch(query)
-			if err != nil {
-				return nil, err
-			}
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 
