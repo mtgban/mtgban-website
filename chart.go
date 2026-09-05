@@ -426,6 +426,50 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 // multi-card chart, plus the list of distinct reference names that have at
 // least one non-empty dataset. UUIDs that fail to resolve are skipped so a
 // single bad input doesn't take the whole chart down.
+// readChartRoster reads the archive once per roster id and returns the axis
+// every card shares along with each card's datasets.
+//
+// The page and the rendered image are the same read: a roster resolved to
+// targets, each read once, and the axis taken from the oldest date that came
+// back rather than from a second query. Sharing it is what keeps a link's
+// unfurl showing the chart the link opens.
+func readChartRoster(ctx context.Context, ids []string, lb timeseries.Lookback, resolve func(string) *chartTarget) (labels []string, cards []multiCardInput, earliest time.Time) {
+	var read []map[string]timeseries.ProviderPrices
+	var kept, names []string
+
+	for _, id := range ids {
+		target := resolve(id)
+		if target == nil {
+			continue
+		}
+		results := fetchChartPrices(ctx, target, lb)
+		kept = append(kept, id)
+		names = append(names, target.Name)
+		read = append(read, results)
+
+		oldest := earliestChartedDate(results, lb)
+		if !oldest.IsZero() && (earliest.IsZero() || oldest.Before(earliest)) {
+			earliest = oldest
+		}
+	}
+
+	if len(read) == 0 || earliest.IsZero() {
+		return nil, nil, time.Time{}
+	}
+
+	labels = getDateAxisValues(earliest)
+	cards = make([]multiCardInput, len(read))
+	for i, results := range read {
+		cards[i] = multiCardInput{
+			CardID:   kept[i],
+			Name:     names[i],
+			Datasets: chartDatasetsFrom(results, labels),
+		}
+	}
+
+	return labels, cards, earliest
+}
+
 func getDatasetsForMulti(ctx context.Context, cardIDs []string, labels []string, lb timeseries.Lookback) ([]Dataset, []string) {
 	cards := make([]multiCardInput, 0, len(cardIDs))
 	for _, cardID := range cardIDs {
