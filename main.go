@@ -801,6 +801,8 @@ var offlineService = offlineapi.NewService(offlineapi.Deps{
 	ScraperName:       scraperName,
 	CardObjectSources: cardobject2sources,
 
+	LastDatastoreUpdate: GetLastDatastoreUpdate,
+
 	ManifestBucket: func(ctx context.Context) (simplecloud.ReadWriter, string, error) {
 		omPath := Config.Offline.ManifestPath
 		if omPath == "" {

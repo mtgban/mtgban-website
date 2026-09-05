@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
@@ -108,9 +109,21 @@ type catalogCache struct {
 	gz      []byte
 }
 
-// refreshCatalog rebuilds the gzipped catalog document from the current
-// mtgmatcher datastore and scraper list.
-func (s *Service) refreshCatalog() {
+// catalogFragments holds the catalog's datastore half, already marshalled.
+// Cards and sets are derived from the datastore alone, so they only change
+// when it is replaced, while the store list changes with every scraper
+// reload - and a reload is what asks for a refresh.
+type catalogFragments struct {
+	source time.Time
+	cards  []byte
+	sets   []byte
+	nCards int
+	nSets  int
+}
+
+// buildCatalogFragments marshals the cards and sets of the current
+// datastore. Returns nil when the datastore holds no cards.
+func (s *Service) buildCatalogFragments(source time.Time) (*catalogFragments, error) {
 	cards := map[string]catalogCard{}
 	magic := s.magicImageKeys()
 	addCard := func(uuid string) {
@@ -132,8 +145,7 @@ func (s *Service) refreshCatalog() {
 	// would answer sync requests with an empty world instead of saying the
 	// server is not ready yet.
 	if len(cards) == 0 {
-		log.Println("offline: no cards loaded, catalog not rebuilt")
-		return
+		return nil, nil
 	}
 
 	sets := map[string]catalogSet{}
@@ -147,6 +159,48 @@ func (s *Service) refreshCatalog() {
 			Keyrune: strings.ToLower(set.KeyruneCode),
 			Date:    set.ReleaseDate,
 		}
+	}
+
+	rawCards, err := json.Marshal(cards)
+	if err != nil {
+		return nil, err
+	}
+	rawSets, err := json.Marshal(sets)
+	if err != nil {
+		return nil, err
+	}
+
+	return &catalogFragments{
+		source: source,
+		cards:  rawCards,
+		sets:   rawSets,
+		nCards: len(cards),
+		nSets:  len(sets),
+	}, nil
+}
+
+// refreshCatalog rebuilds the gzipped catalog document from the current
+// mtgmatcher datastore and scraper list. Only the store list is rebuilt
+// per call: the cards and sets are reused until the datastore is replaced.
+func (s *Service) refreshCatalog() {
+	source := time.Time{}
+	if s.deps.LastDatastoreUpdate != nil {
+		source = s.deps.LastDatastoreUpdate()
+	}
+
+	frags := s.fragments
+	if frags == nil || !frags.source.Equal(source) {
+		next, err := s.buildCatalogFragments(source)
+		if err != nil {
+			log.Println("offline: catalog marshal failed:", err)
+			return
+		}
+		if next == nil {
+			log.Println("offline: no cards loaded, catalog not rebuilt")
+			return
+		}
+		s.fragments = next
+		frags = next
 	}
 
 	retailBlock := s.deps.RetailBlockList()
@@ -183,28 +237,45 @@ func (s *Service) refreshCatalog() {
 		stores[info.Shorthand] = entry
 	}
 
-	doc := map[string]any{"sets": sets, "cards": cards, "stores": stores}
-	raw, err := json.Marshal(doc)
+	rawStores, err := json.Marshal(stores)
 	if err != nil {
 		log.Println("offline: catalog marshal failed:", err)
 		return
 	}
 
+	// The document these pieces make is what used to be marshalled whole,
+	// key order included: encoding/json sorts a map's keys, so cards, sets
+	// and stores come out in the order written here. Hashing the pieces
+	// rather than a joined copy keeps the version the same as before for
+	// the same content, without building the whole 37MB again.
+	parts := [][]byte{
+		[]byte(`{"cards":`), frags.cards,
+		[]byte(`,"sets":`), frags.sets,
+		[]byte(`,"stores":`), rawStores,
+		[]byte(`}`),
+	}
+
 	h := fnv.New64a()
-	h.Write(raw)
+	for _, part := range parts {
+		h.Write(part)
+	}
 	version := strconv.FormatUint(h.Sum64(), 16)
 
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
 	gz.Write([]byte(`{"version":"` + version + `",`))
-	gz.Write(raw[1:])
+	// Everything but the opening brace the version now stands in for
+	parts[0] = parts[0][1:]
+	for _, part := range parts {
+		gz.Write(part)
+	}
 	if err := gz.Close(); err != nil {
 		log.Println("offline: catalog gzip failed:", err)
 		return
 	}
 
 	s.catalog.Store(&catalogCache{version: version, gz: buf.Bytes()})
-	log.Printf("offline: catalog rebuilt, %d cards, %d sets, %d stores, %d KiB gz", len(cards), len(sets), len(stores), buf.Len()/1024)
+	log.Printf("offline: catalog rebuilt, %d cards, %d sets, %d stores, %d KiB gz", frags.nCards, frags.nSets, len(stores), buf.Len()/1024)
 }
 
 func (s *Service) catalogVersion() string {
