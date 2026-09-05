@@ -22,6 +22,111 @@ function __acEsc(s) {
     return d.innerHTML;
 }
 
+/* Leading words a name may be found without. Nobody types "Secret Lair Drop"
+ * to find a drop, and 762 of the 4,184 sealed names begin with it. */
+var __acSkippablePrefixes = ["The ", "Secret Lair Drop "];
+
+/* Names are compared with their case, diacritics and punctuation set aside,
+ * so that "jaces ire" finds "Jace's Ire" and "jotun" finds "Jötun Grunt".
+ *
+ * Letters and digits are kept whatever the script: 357 of the names carry no
+ * ASCII letter at all - Κλεοπάτρα, Воин Лакватуса, تهילה - and dropping
+ * everything but A-Z would leave each of them folding to nothing, findable by
+ * no one. */
+function __acFold(name) {
+    return name
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/[^\p{L}\p{N} ]/gu, "")
+        .toUpperCase();
+}
+
+var __acSkippableFolded = __acSkippablePrefixes.map(__acFold);
+
+/* The typed text, prepared once a keystroke rather than once a name. */
+function __acQuery(typed) {
+    return {
+        raw: typed,
+        upper: typed.toUpperCase(),
+        folded: __acFold(typed),
+    };
+}
+
+/* Where the typed text matches within a folded name, or -1: at the front, or
+ * past a prefix the name may be found without. */
+function __acMatchOffset(foldedName, foldedInput) {
+    if (!foldedInput) {
+        return -1;
+    }
+    if (foldedName.lastIndexOf(foldedInput, 0) === 0) {
+        return 0;
+    }
+    for (var i = 0; i < __acSkippableFolded.length; i++) {
+        var skip = __acSkippableFolded[i];
+        if (foldedName.lastIndexOf(skip, 0) !== 0) {
+            continue;
+        }
+        if (foldedName.lastIndexOf(foldedInput, skip.length) === skip.length) {
+            return skip.length;
+        }
+    }
+    return -1;
+}
+
+/* Where the typed text matches in a name, as a span of the name itself, or
+ * null if it does not. */
+function __acMatchSpan(name, foldedName, query) {
+    if (!query.raw) {
+        return null;
+    }
+
+    /* Punctuation and nothing else was typed, and it folds to nothing. One
+     * card really is named "_____", so compare the characters themselves: an
+     * empty fold compared against an empty fold matches every name there is,
+     * which is what the rule this replaced used to do. */
+    if (!query.folded.trim()) {
+        if (name.slice(0, query.raw.length).toUpperCase() !== query.upper) {
+            return null;
+        }
+        return { start: 0, end: query.raw.length };
+    }
+
+    var offset = __acMatchOffset(foldedName, query.folded);
+    if (offset < 0) {
+        return null;
+    }
+    return __acOriginalSpan(name, offset, query.folded.length);
+}
+
+/* Turn a span of the folded name back into a span of the name itself, which is
+ * the one the reader sees and the only one worth emboldening.
+ *
+ * Folding drops characters, so the two run at different rates: five typed
+ * characters can cover six of "Jace's", and a match that begins after "Secret
+ * Lair Drop " begins seventeen characters into the name rather than at nought.
+ * Walking the name and folding it a character at a time is what says where.
+ */
+function __acOriginalSpan(name, offset, length) {
+    var start = -1;
+    var seen = 0;
+    for (var i = 0; i < name.length; i++) {
+        var folded = __acFold(name[i]);
+        if (!folded) {
+            /* A character that folds away belongs to whatever follows it,
+             * unless the span has already begun - "Jace's" ends after the s. */
+            continue;
+        }
+        if (seen === offset && start < 0) {
+            start = i;
+        }
+        seen += folded.length;
+        if (start >= 0 && seen >= offset + length) {
+            return { start: start, end: i + 1 };
+        }
+    }
+    return { start: Math.max(start, 0), end: name.length };
+}
+
 /* Returns cached card meta, or null while a fetch is in flight. */
 function __acFetchCardMeta(name, onReady) {
     if (!name) return null;
@@ -44,6 +149,10 @@ async function autocomplete(form, inp, sealed) {
     var minlen = 3;
     var providerMode = false;
     const arr = await fetchNames(sealed);
+    /* Folded once, here, rather than per keystroke: the singles list is 37,000
+     * names, and every one of them used to be normalized again on every letter
+     * typed. */
+    const folded = arr.map(__acFold);
 
     // Track viewport listeners so we can detach them when the dropdown closes
     var viewportListenersAttached = false;
@@ -238,43 +347,50 @@ async function autocomplete(form, inp, sealed) {
         a.setAttribute("class", "autocomplete-items ac-dropdown");
 
         /* For each item in the array... */
+        var query = __acQuery(val);
         for (i = 0; i < arr.length; i++) {
-            let inputText = val.toUpperCase();
-            /* Check if the item starts with the same letters as the text field value */
-            if (arr[i].substr(0, val.length).toUpperCase() == inputText ||
-                arr[i].normalize("NFD").replace(/[\u0300-\u036f]/g, "").substr(0, val.length).toUpperCase() == inputText ||
-                arr[i].replace(/^The /g, "").substr(0, val.length).toUpperCase() == inputText ||
-                arr[i].replace(/^Secret Lair Drop /g, "").substr(0, val.length).toUpperCase() == inputText ||
-                arr[i].replace(/[^A-Za-z0-9 ]/g, "").substr(0, val.replace(/[^A-Za-z0-9 ]/g, "").length).toUpperCase() == val.replace(/[^A-Za-z0-9 ]/g, "").toUpperCase()) {
-                /* Create a DIV element for each matching element */
-                b = document.createElement("DIV");
-
-                /* Make the matching letters bold */
-                b.innerHTML = "<strong>" + arr[i].substr(0, val.length) + "</strong>";
-                b.innerHTML += arr[i].substr(val.length);
-
-                /* Insert a input field that will hold the current array item's
-                 * value, with any search filters the query carried kept in front */
-                b.innerHTML += "<input type='hidden' value='" + (filterPrefix + arr[i]).replace(/'/g, "&apos;").replace(/\"/g, "&quot;") + "'>";
-                /* Execute a function when someone clicks on the item value (DIV element) */
-                b.addEventListener("click", function(e) {
-                    /* Insert the value for the autocomplete text field */
-                    inp.value = this.getElementsByTagName("input")[0].value;
-                    /* Close the list of autocompleted values,
-                     * (or any other open lists of autocompleted values */
-                    closeAllLists();
-
-                    /* Submit the form (so that onSubmit may trigger) */
-                    /* We need to use this extended workaround due to Safari */
-                    const fakeButton = document.createElement('button');
-                    fakeButton.type = this.type;
-                    fakeButton.style.display = 'none';
-                    form.appendChild(fakeButton);
-                    fakeButton.click();
-                    fakeButton.remove();
-                });
-                a.appendChild(b);
+            /* Check whether the item is found by what was typed, at its front
+             * or past a prefix nobody types */
+            var span = __acMatchSpan(arr[i], folded[i], query);
+            if (!span) {
+                continue;
             }
+
+            /* Create a DIV element for each matching element */
+            b = document.createElement("DIV");
+
+            /* Make the matching letters bold - the ones that matched, which
+             * are not always the ones the name begins with */
+            var strong = document.createElement("strong");
+            strong.textContent = arr[i].slice(span.start, span.end);
+            b.appendChild(document.createTextNode(arr[i].slice(0, span.start)));
+            b.appendChild(strong);
+            b.appendChild(document.createTextNode(arr[i].slice(span.end)));
+
+            /* Insert a input field that will hold the current array item's
+             * value, with any search filters the query carried kept in front */
+            var hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.value = filterPrefix + arr[i];
+            b.appendChild(hidden);
+            /* Execute a function when someone clicks on the item value (DIV element) */
+            b.addEventListener("click", function(e) {
+                /* Insert the value for the autocomplete text field */
+                inp.value = this.getElementsByTagName("input")[0].value;
+                /* Close the list of autocompleted values,
+                 * (or any other open lists of autocompleted values */
+                closeAllLists();
+
+                /* Submit the form (so that onSubmit may trigger) */
+                /* We need to use this extended workaround due to Safari */
+                const fakeButton = document.createElement('button');
+                fakeButton.type = this.type;
+                fakeButton.style.display = 'none';
+                form.appendChild(fakeButton);
+                fakeButton.click();
+                fakeButton.remove();
+            });
+            a.appendChild(b);
         }
 
         /* Only append the dropdown if there are matching items */
@@ -340,8 +456,11 @@ async function autocomplete(form, inp, sealed) {
                 /* Provider rows splice a value, so select rather than copy text. */
                 if (x) x[currentFocus].click();
             } else {
-                /* initialize the input field with what is selected */
-                this.value = x[currentFocus].textContent;
+                /* initialize the input field with what is selected - the value
+                 * the row stands for, which carries the query's filters, and
+                 * not the name the row displays */
+                var chosen = x[currentFocus].getElementsByTagName("input")[0];
+                this.value = chosen ? chosen.value : x[currentFocus].textContent;
             }
         }
     });
@@ -405,3 +524,14 @@ async function autocomplete(form, inp, sealed) {
         });
     }
 };
+
+/* Exposed for the tests; the browser gets these from the script tag itself. */
+if (typeof self !== "undefined") {
+    self.AutocompleteMatch = {
+        fold: __acFold,
+        query: __acQuery,
+        matchOffset: __acMatchOffset,
+        originalSpan: __acOriginalSpan,
+        matchSpan: __acMatchSpan,
+    };
+}
