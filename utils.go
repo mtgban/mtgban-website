@@ -555,6 +555,27 @@ func spellFinish(finish string) string {
 	return mtgmatcher.Title(finish)
 }
 
+// finishDecoration spells a card's finish the way a title carries it: a
+// leading space and the name, or nothing where the finish says nothing worth
+// reading.
+//
+// The flags are the fallback rather than the answer. A game that names its own
+// finish says it better than "Foil" can, and Magic names none of its own, so
+// there the flags still speak for it. Anything titling a card uses this, so
+// two names for one printing cannot drift apart.
+func finishDecoration(co *mtgmatcher.CardObject) string {
+	label := finishLabel(co)
+	switch {
+	case label != "":
+		return " " + label
+	case co.Etched:
+		return " Etched"
+	case co.Foil:
+		return " Foil"
+	}
+	return ""
+}
+
 func editionTitle(cardID string) string {
 	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
@@ -573,16 +594,7 @@ func editionTitle(cardID string) string {
 		edition = fmt.Sprintf("%s (%s)", edition, tag)
 	}
 
-	finish := ""
-	label := finishLabel(co)
-	switch {
-	case label != "":
-		finish = " " + label
-	case co.Etched:
-		finish = " Etched"
-	case co.Foil:
-		finish = " Foil"
-	}
+	finish := finishDecoration(co)
 
 	extra := ""
 	if co.Sealed {
