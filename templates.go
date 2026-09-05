@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/palette"
 )
 
@@ -157,6 +158,17 @@ var funcMap = template.FuncMap{
 	},
 	"card_back": func() string {
 		return "/img/backs/" + Config.Game + ".webp"
+	},
+	// set_symbol hands the set-symbol block the image a set's cards print,
+	// where the game publishes one to point at. Only Pokemon does, on most
+	// of its sets; everywhere else this is empty and the block draws what
+	// it drew before.
+	"set_symbol": func(code string) string {
+		set, err := mtgmatcher.GetSet(code)
+		if err != nil {
+			return ""
+		}
+		return set.Symbol
 	},
 	// rarity_badge hands the set-symbol block the drawing for one rarity,
 	// already sized for the code it has to hold.
