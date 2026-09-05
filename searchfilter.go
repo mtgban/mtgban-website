@@ -225,14 +225,62 @@ func fixupRarityNG(code string) []string {
 	return filters
 }
 
+// numberDecorations are the marks that tell two printings of one collector
+// number apart. They are folded down because the numbers they are trimmed
+// from are: the catalog writes a capital phi, a lowercased number spells it
+// low, and a cutset holding the capital would not find it there.
+var numberDecorations = strings.ToLower(magic.SuffixSpecial + magic.SuffixVariant + magic.SuffixPhi + "*")
+
+// foldNumber spells a collector number the one way a number query compares.
+// Both the query and the card fold through here, so the two cannot come to
+// spell a number differently - which they did, the query alone being folded
+// while the card was read as it stands, so a padded catalog answered to
+// nothing: 8,531 Pokemon numbers are written "021" where a query says 21.
+func foldNumber(number string, strict bool) string {
+	var lower, marked bool
+	for i := 0; i < len(number); i++ {
+		// A collector number is digits and little else, and a digit asks for
+		// none of the steps below.
+		c := number[i]
+		if c-'0' <= 9 {
+			continue
+		}
+		if c > unicode.MaxASCII {
+			lower, marked = true, true
+		} else if 'A' <= c && c <= 'Z' {
+			lower = true
+		} else if c == '*' {
+			marked = true
+		}
+	}
+	// Lowercase before the marks are trimmed, never after: the Secret Lair
+	// slivers carry a capital phi, and it is the mapping that turns it into
+	// the mark the trim knows.
+	if lower {
+		number = strings.ToLower(number)
+	}
+	if marked && !strict {
+		number = strings.TrimRight(number, numberDecorations)
+	}
+	if len(number) == 0 || number[0] != '0' {
+		return number
+	}
+	zeros := 1
+	for zeros < len(number) && number[zeros] == '0' {
+		zeros++
+	}
+	// A number of nothing but zeros keeps a digit: emptied, it would answer
+	// to every card the catalog files without a number at all.
+	if zeros == len(number) {
+		return "0"
+	}
+	return number[zeros:]
+}
+
 func fixupNumberNG(code string, strict bool) []string {
-	code = strings.ToLower(code)
 	filters := strings.Split(code, ",")
 	for i := range filters {
-		filters[i] = strings.TrimLeft(filters[i], "0")
-		if !strict {
-			filters[i] = strings.TrimRight(filters[i], magic.SuffixSpecial+magic.SuffixVariant+magic.SuffixPhi+"*")
-		}
+		filters[i] = foldNumber(filters[i], strict)
 	}
 	return filters
 }
@@ -1864,11 +1912,11 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 }
 
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, strings.ToLower(co.OriginalNumber))
+	return !slices.Contains(filters, foldNumber(co.OriginalNumber, false))
 }
 
 func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, strings.ToLower(co.Number))
+	return !slices.Contains(filters, foldNumber(co.Number, true))
 }
 
 func cardFilterNumberGreaterThan(filters []string, co *mtgmatcher.CardObject) bool {
