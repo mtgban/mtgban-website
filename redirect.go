@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -130,10 +131,24 @@ func namesFinish(set, number, word string) bool {
 // what tells two printings of one number apart: 4ED 107 is Thoughtlace and
 // 107† is Drudge Skeletons, and cn: answers both.
 func CardRedirect(w http.ResponseWriter, r *http.Request) {
+	// Split the path as it was written rather than as it decodes, so a slash
+	// inside a part stays inside it: Flesh and Blood numbers a double-faced
+	// card WTR040//WTR039, which travels as %2F%2F and would otherwise arrive
+	// as two parts and read as the first alone. nginx hands the request URI
+	// over untouched where proxy_pass names an upstream and no path, which is
+	// how this site is served.
+	//
 	// Only the trailing slashes go: a leading one is an empty set code, and
 	// trimming it would promote the number into its place.
-	path := strings.TrimRight(strings.TrimPrefix(r.URL.Path, "/card/"), "/")
+	path := strings.TrimRight(strings.TrimPrefix(r.URL.EscapedPath(), "/card/"), "/")
 	fields := strings.Split(path, "/")
+	for i := range fields {
+		decoded, err := url.PathUnescape(fields[i])
+		if err != nil {
+			continue
+		}
+		fields[i] = decoded
+	}
 
 	// Each part narrows what the one before it asked for, and a path that
 	// stops early stops narrowing: a set alone is that set, and nothing at all
