@@ -84,9 +84,9 @@ func TestRenderHandlesAFlatLine(t *testing.T) {
 	}
 }
 
-// A day with no price is a hole in the record, and the line has to break over
-// it rather than run straight through as though the price had been observed.
-func TestAGapBreaksTheLine(t *testing.T) {
+// A day with no price is a day nobody wrote one down, not a day the card was
+// worth nothing. The line carries over it, the way the page's does.
+func TestAGapDoesNotBreakTheLine(t *testing.T) {
 	const n = 120
 	data := ramp(n)
 	for i := 40; i < 80; i++ {
@@ -106,14 +106,10 @@ func TestAGapBreaksTheLine(t *testing.T) {
 		return plot.Min.X + plot.Dx()*index/(n-1)
 	}
 
-	// The middle of the gap carries none of the line.
-	if columnHasColor(img, columnAt(60), plot, color.RGBA{0xff, 0, 0, 0xff}) {
-		t.Error("the line runs through a stretch with no prices in it")
-	}
-	// The stretches either side of it do.
-	for _, index := range []int{10, 110} {
+	// Across the gap and either side of it, the line is unbroken.
+	for _, index := range []int{10, 45, 60, 75, 110} {
 		if !columnHasColor(img, columnAt(index), plot, color.RGBA{0xff, 0, 0, 0xff}) {
-			t.Errorf("the line is missing at point %d, where there is a price", index)
+			t.Errorf("the line is missing at point %d, leaving a hole in it", index)
 		}
 	}
 }

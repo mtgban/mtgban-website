@@ -23,8 +23,8 @@ import (
 )
 
 // Series is one line: a name for the legend, the colour the site draws it in,
-// and one value per label. A NaN is a gap in the record rather than a zero,
-// and is drawn as a break in the line.
+// and one value per label. A NaN is a day nobody wrote a price down, rather
+// than a day the card was worth nothing: the line carries over it.
 type Series struct {
 	Name  string
 	Color string
@@ -216,7 +216,12 @@ func drawDateAxis(img *image.RGBA, plot image.Rectangle, labels []string) {
 	}
 }
 
-// drawSeries draws one line, breaking it wherever the record has a gap.
+// drawSeries draws one line, carried straight over the days that carry no
+// price rather than broken at them.
+//
+// A gap in the archive is a day nobody wrote down, not a day the card was
+// worth nothing, and the line either side of it is the same line. The page
+// spans them too.
 func drawSeries(img *image.RGBA, plot image.Rectangle, series Series, low, high float64) {
 	if len(series.Data) == 0 {
 		return
@@ -234,26 +239,23 @@ func drawSeries(img *image.RGBA, plot image.Rectangle, series Series, low, high 
 	}
 
 	var run [][2]float64
-	flush := func() {
-		if len(run) > 1 {
-			strokePath(img, plot, run, stroke)
-		} else if len(run) == 1 {
-			// A day on its own still happened; a dot says so where a line
-			// cannot.
-			dot(img, plot, run[0][0], run[0][1], stroke)
-		}
-		run = run[:0]
-	}
-
 	for i, value := range series.Data {
 		if math.IsNaN(value) || math.IsInf(value, 0) {
-			flush()
 			continue
 		}
 		x, y := pointAt(i)
 		run = append(run, [2]float64{x, y})
 	}
-	flush()
+
+	switch len(run) {
+	case 0:
+	case 1:
+		// One day on its own is still a price; a dot says so where a line
+		// cannot.
+		dot(img, plot, run[0][0], run[0][1], stroke)
+	default:
+		strokePath(img, plot, run, stroke)
+	}
 }
 
 // strokePath fills the polyline as one ribbon: out along one side of the run
