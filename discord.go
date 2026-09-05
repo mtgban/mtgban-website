@@ -687,6 +687,35 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+// tcgPrintingForCard names the printing TCGplayer prices this card under, for
+// the Printing filter on a product link, or "" to leave the filter off.
+//
+// The name is TCGplayer's rather than ours. It prices Magic under "Normal" and
+// "Foil", and every other game under the treatment or the print run the card
+// is sold as - "Rainbow Foil", "1st Edition". Saying "Foil" for one of those
+// filters the product down to a printing it does not have, which is a worse
+// link than one that simply lands on the product; so where the sub-types
+// cannot be had the filter comes off, exactly as the search page's link
+// already leaves it off.
+func tcgPrintingForCard(co *mtgmatcher.CardObject) string {
+	if Config.Game != DefaultGame {
+		pid, ok := tcgProductID(co)
+		if !ok || PricesArchiveDB == nil {
+			return ""
+		}
+		subTypes, cached := PricesArchiveDB.CachedTCGSubTypeBanIDs(pid)
+		if !cached {
+			return ""
+		}
+		return tcgSubTypeForCard(co, subTypes)
+	}
+
+	if co.Foil || co.Etched {
+		return "Foil"
+	}
+	return "Normal"
+}
+
 func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID string, lastSold bool) *discordgo.MessageEmbed {
 	// Convert search results into proper fields
 	var fields []*discordgo.MessageEmbedField
@@ -756,11 +785,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID st
 
 		tcgID := findTCGproductID(co.UUID)
 		productID, _ := strconv.Atoi(tcgID)
-		printing := "Normal"
-		if co.Etched || co.Foil {
-			printing = "Foil"
-		}
-		link = tcgplayer.GenerateProductURL(productID, printing, Config.Affiliate["TCG"], "", co.Language, false)
+		link = tcgplayer.GenerateProductURL(productID, tcgPrintingForCard(co), Config.Affiliate["TCG"], "", co.Language, false)
 	}
 
 	// Add a tag for ease of debugging
