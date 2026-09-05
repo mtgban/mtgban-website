@@ -24,6 +24,18 @@
         </linearGradient>
     </defs>
 </svg>
+{{/* A symbol published as an image arrives as a near-black silhouette on
+     transparency, which vanishes on the dark theme: inverting brings it up,
+     and the hue rotation is a no-op on the monochrome ones while keeping a
+     coloured one's hue should upstream ever serve one. object-fit stops a
+     symbol that is not square being squeezed into the square the badge fills.
+
+     The rule rides here rather than in a stylesheet because every mobile page
+     loads only its own, and this block is the one thing both bases include. */}}
+<style>
+    .set-symbol-art { object-fit: contain; vertical-align: middle; }
+    .dark-theme .set-symbol-art { filter: invert(1) hue-rotate(180deg); }
+</style>
 {{end}}
 
 {{/* The icon that stands for one set. Callers hand it what they have — a
@@ -35,7 +47,10 @@
      it is serving. */}}
 {{define "set-symbol"}}
     {{$badge := rarity_badge .Rarity .Code}}
-    {{if or .Keyrune (not $badge.Path)}}
+    {{$symbol := set_symbol .Code}}
+    {{if $symbol}}
+        <img class="set-symbol-art {{.Class}}" src="{{$symbol}}" alt="{{.Code}}" title="{{.Code}}" width="{{.Size}}" height="{{.Size}}" loading="lazy">
+    {{else if or .Keyrune (not $badge.Path)}}
         <i class="ss {{.Keyrune}} {{if gt .Size 20}}ss-2x{{else}}ss-1x{{end}} ss-fw {{.Class}}"></i>
     {{else if .Color}}
         <svg class="{{.Class}}" width="{{.Size}}" height="{{.Size}}" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
