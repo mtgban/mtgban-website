@@ -1518,6 +1518,9 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 			if err != nil {
 				uuids, err = mtgmatcher.SearchSealedContains(query)
 			}
+			if err != nil {
+				uuids, err = searchSealedFragment(query)
+			}
 		case "scryfall":
 			uuids, err = searchScryfall(query)
 		case "mixed":
@@ -1553,11 +1556,14 @@ func searchAndFilter(config SearchConfig) ([]string, error) {
 				}
 			}
 		}
-		if err != nil {
+		// attemptMatch reads the query as a card name, which is no answer on
+		// the sealed tab: what is asked there is which product carries the
+		// name, and none is a better answer than a card nobody asked for.
+		if err != nil && config.SearchMode != "sealed" {
 			uuids, err = attemptMatch(query)
-			if err != nil {
-				return nil, err
-			}
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -1670,6 +1676,33 @@ func searchScryfall(query string) ([]string, error) {
 }
 
 // Try searching for cards usign the Match algorithm
+// searchSealedFragment finds the products whose name holds a query somewhere
+// inside it, where SearchSealedContains found none.
+//
+// Names are normalized whole, and some of the rules that normalizes them key
+// on a surrounding space: an interior " the " is dropped, so "Secret Lair Drop
+// Teenage Mutant Ninja Turtles The Last Ronin" is stored as
+// "...turtleslastronin". A query is normalized alone, where a leading "the"
+// has no space in front of it to be dropped by, so "the last ronin" becomes
+// "thelastronin" - which that name does not contain, though it plainly holds
+// the words.
+//
+// Normalizing the query between two words puts those rules where they can see
+// both of its edges, which is where they were when the name was stored. The
+// words are the library's own to apply: asking it how a fragment spells itself
+// is what keeps this from being a second copy of its rules, which would drift.
+func searchSealedFragment(query string) ([]string, error) {
+	const between = "zzz"
+
+	fragment := mtgmatcher.Normalize(between + " " + query + " " + between)
+	fragment = strings.TrimSuffix(strings.TrimPrefix(fragment, between), between)
+	if fragment == "" {
+		return nil, mtgmatcher.ErrCardDoesNotExist
+	}
+
+	return mtgmatcher.SearchSealedContains(fragment)
+}
+
 func attemptMatch(query string) ([]string, error) {
 	var uuids []string
 	uuid, err := mtgmatcher.Match(&mtgmatcher.InputCard{
