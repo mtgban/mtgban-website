@@ -499,12 +499,13 @@ var finishLabels = map[string]string{
 // Magic's promo foils.
 //
 // Magic itself never reaches the rule: its CanonicalFinish answers only with
-// the three shared names, and its foil types live in PromoTypes. "normal" and
-// "nofoil" are here because a game spelling its plain printing that way means
-// the same nothing as the shared constant.
+// the three shared names, and its foil types live in PromoTypes. "normal" is
+// here beside them because a game that spells a finish with NormalizeFinish -
+// Flesh and Blood, Pokemon - keeps TCGplayer's word for the plain printing
+// rather than mapping it onto the constant, and it means the same nothing.
 func finishLabel(co *mtgmatcher.CardObject) string {
 	switch co.Finish {
-	case "", "normal", "nofoil",
+	case "", "normal",
 		mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
 		return ""
 	}

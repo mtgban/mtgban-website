@@ -291,12 +291,13 @@ func foilSubTypes(subTypes map[string]int64) []string {
 	return foils
 }
 
-// isPlainFinish reports whether a finish names a printing with no treatment.
-// A game spells that in its own words - "normal" where Flesh and Blood and
-// Pokemon write it, "nofoil" where Lorcana does - beside the shared constant.
+// isPlainFinish reports whether a finish names a printing with no treatment:
+// the shared constant, and "normal" where a game canonicalizes TCGplayer's
+// word for it rather than mapping it onto the constant - which Flesh and Blood
+// and Pokemon both do, since they spell a finish with NormalizeFinish.
 func isPlainFinish(finish string) bool {
 	switch finish {
-	case "", "normal", "nofoil", mtgmatcher.FinishNonfoil:
+	case "", "normal", mtgmatcher.FinishNonfoil:
 		return true
 	}
 	return false
