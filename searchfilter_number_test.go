@@ -6,34 +6,47 @@ import (
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 )
 
-// TestCollectorNumberPadded pins the padded catalog against the number query.
-// Pokemon writes 8,531 of its numbers with the padding the card face carries,
-// "021", where the query has always been folded to "21", so the two never met
-// and a number search answered nothing for the game.
-func TestCollectorNumberPadded(t *testing.T) {
+// TestCollectorNumberPlainForm pins a loose number query to the plain number
+// the loaded game reduces to. The query was folded by the search itself out
+// of the Magic suffix constants, which is a game's vocabulary in a filter
+// serving nine of them, and which spelled the phi in a case no number carries
+// so that "cn:635Φ" reached nothing.
+func TestCollectorNumberPlainForm(t *testing.T) {
 	for _, tt := range []struct {
-		desc, query, number string
-		want                bool
+		desc, query, number, original string
+		want                          bool
 	}{
-		{"the bare number reaches the padded printing", "cn:21", "021", true},
-		{"and the number as the card pads it reaches it too", "cn:021", "021", true},
-		{"a different number in the same set is still refused", "cn:22", "021", false},
 		{
-			// The padding is not a digit of its own: "21" and "021" are one
-			// number, where "121" is another.
-			desc:  "padding does not make one number another",
-			query: "cn:121", number: "021", want: false,
+			desc:  "the number the card prints reaches it",
+			query: "cn:635Φ", number: "635Φ", original: "635", want: true,
 		},
-		{"a lettered number folds the same way", "cn:51a", "051a", true},
+		{
+			desc:  "and so does the plain number behind the mark",
+			query: "cn:635", number: "635Φ", original: "635", want: true,
+		},
+		{
+			desc:  "the letters that name a printing read the same way",
+			query: "cn:139s", number: "139s", original: "139", want: true,
+		},
+		{
+			desc:  "a number a game writes with a slash of its own is not cut",
+			query: "cn:AAZ030//AAZ031", number: "AAZ030//AAZ031",
+			original: "AAZ030//AAZ031", want: true,
+		},
+		{
+			desc:  "and another number is still refused",
+			query: "cn:636", number: "635Φ", original: "635", want: false,
+		},
 	} {
 		t.Run(tt.desc, func(t *testing.T) {
 			co := &mtgmatcher.CardObject{}
 			co.Number = tt.number
-			co.OriginalNumber = tt.number
+			co.OriginalNumber = tt.original
 
 			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
 			elem := findNumberFilter(t, config, "number")
-			if skip := applyCardFilter("number", elem.Values, co); skip == tt.want {
+			skip := applyCardFilter("number", elem.Values, co)
+			if skip == tt.want {
 				t.Errorf("%s against %q: matched=%v, want %v",
 					tt.query, tt.number, !skip, tt.want)
 			}
@@ -41,51 +54,32 @@ func TestCollectorNumberPadded(t *testing.T) {
 	}
 }
 
-// TestCollectorNumberUppercaseMark pins the four Secret Lair slivers numbered
-// with a capital phi. The mark is trimmed from a lowercased number, so a
-// cutset spelling it capital finds nothing to trim and the query keeps a mark
-// the card no longer carries.
-func TestCollectorNumberUppercaseMark(t *testing.T) {
+// TestCollectorNumberStrictIsVerbatim pins the strict query to the number as
+// the catalog writes it. It used to have its padding trimmed like a loose
+// one, so "cns:021" asked for 21 and reached no card of the 8,531 Pokemon
+// numbers written with the padding their face carries.
+func TestCollectorNumberStrictIsVerbatim(t *testing.T) {
 	for _, tt := range []struct {
-		query, filter, number, original string
+		desc, query, number string
+		want                bool
 	}{
-		{"cn:635Φ", "number", "635Φ", "635"},
-		{"cn:635φ", "number", "635Φ", "635"},
-		{"cn:635", "number", "635Φ", "635"},
-		{"cns:635Φ", "number_strict", "635Φ", "635"},
+		{"the number as written reaches the printing", "cns:021", "021", true},
+		{"and the plain number does not", "cns:21", "021", false},
+		{"a mark is kept rather than trimmed", "cns:107★", "107★", true},
+		{"so the plain number misses the marked printing", "cns:107", "107★", false},
 	} {
-		t.Run(tt.query, func(t *testing.T) {
+		t.Run(tt.desc, func(t *testing.T) {
 			co := &mtgmatcher.CardObject{}
 			co.Number = tt.number
-			co.OriginalNumber = tt.original
+			co.OriginalNumber = tt.number
 
 			config := parseSearchOptionsNG(tt.query, nil, nil, nil)
-			elem := findNumberFilter(t, config, tt.filter)
-			if skip := applyCardFilter(tt.filter, elem.Values, co); skip {
-				t.Errorf("%s should reach the card numbered %s", tt.query, tt.number)
+			elem := findNumberFilter(t, config, "number_strict")
+			skip := applyCardFilter("number_strict", elem.Values, co)
+			if skip == tt.want {
+				t.Errorf("%s against %q: matched=%v, want %v",
+					tt.query, tt.number, !skip, tt.want)
 			}
 		})
-	}
-}
-
-// TestCollectorNumberComposite pins the numbers a game writes with a slash of
-// its own. Flesh and Blood numbers 296 printings "AAZ030//AAZ031", and the
-// set total no longer stands in a collector number at all, so nothing may be
-// cut there.
-func TestCollectorNumberComposite(t *testing.T) {
-	co := &mtgmatcher.CardObject{}
-	co.Number = "AAZ030//AAZ031"
-	co.OriginalNumber = "AAZ030//AAZ031"
-
-	config := parseSearchOptionsNG("cn:AAZ030//AAZ031", nil, nil, nil)
-	elem := findNumberFilter(t, config, "number")
-	if skip := applyCardFilter("number", elem.Values, co); skip {
-		t.Error("a composite number should reach the card that prints it")
-	}
-
-	config = parseSearchOptionsNG("cn:AAZ030", nil, nil, nil)
-	elem = findNumberFilter(t, config, "number")
-	if skip := applyCardFilter("number", elem.Values, co); !skip {
-		t.Error("the head of a composite number is another card's number")
 	}
 }
