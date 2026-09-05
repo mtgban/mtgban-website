@@ -969,6 +969,12 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 		hasDecklist = mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID)
 	}
 
+	// The path form where it names the card, the query where it cannot.
+	searchURL := fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query))
+	if short := cardPath(co); short != "" {
+		searchURL = short
+	}
+
 	sourceSealed := cardobject2sources(co)
 
 	var products string
@@ -1051,7 +1057,7 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 		ImageURL:     imgURL,
 		Title:        editionTitle(cardID),
 		Reserved:     co.Card.IsReserved,
-		SearchURL:    fmt.Sprintf("/%s?q=%s", path, url.QueryEscape(query)),
+		SearchURL:    searchURL,
 		SypList:      sypList,
 		Stocks:       stocks,
 		StocksURL:    stocksURL,
@@ -1079,6 +1085,50 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 		HasContentWarning: co.Card.HasContentWarning,
 		CropURL:           cropURL,
 	}
+}
+
+// cardPath is the /card/<set>/<number>/<finish> form of a printing: the URL
+// scryfall uses, which this site answers, and short enough to paste into a
+// chat window without it wrapping.
+//
+// Empty where the shape cannot name the card, and the query link is kept
+// instead: a sealed product, which the route would send to the wrong page, and
+// a number the number filter reads as nothing, which is any number made only
+// of zeros - the World Championship ad cards are numbered #0. Asked of the
+// filter itself rather than restated here, so the two cannot drift.
+func cardPath(co *mtgmatcher.CardObject) string {
+	if co.Sealed || co.SetCode == "" || co.Number == "" {
+		return ""
+	}
+	trimmed := fixupNumberNG(co.Number, true)
+	if len(trimmed) == 0 || trimmed[0] == "" {
+		return ""
+	}
+	// A number that carries a separator cannot be a path segment. Escaping it
+	// does not help: net/http decodes %2F before a handler sees the path, so
+	// Flesh and Blood's WTR040//WTR001 arrives as three segments and is read
+	// as WTR040 alone.
+	if strings.Contains(co.Number, "/") {
+		return ""
+	}
+
+	// The game's own name for what this printing carries, which is the name
+	// f: matches it under. Magic sets it to the same nonfoil/foil/etched a
+	// case on the two flags would produce, so this costs it nothing; a game
+	// that prices print runs rather than foilings - Yu-Gi-Oh sells 1stedition
+	// beside unlimited, and neither is a foilness - is named correctly only
+	// here. The flags answer for a datastore that names no finish at all.
+	finish := co.Finish
+	if finish == "" {
+		finish = "nonfoil"
+		if co.Etched {
+			finish = "etched"
+		} else if co.Foil {
+			finish = "foil"
+		}
+	}
+
+	return "/card/" + url.PathEscape(co.SetCode) + "/" + url.PathEscape(co.Number) + "/" + url.PathEscape(finish)
 }
 
 func genQuery(co *mtgmatcher.CardObject) string {
