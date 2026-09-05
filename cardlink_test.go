@@ -230,10 +230,9 @@ func TestCardPathNamesTheFinishTheGameUses(t *testing.T) {
 	}
 }
 
-// A number that carries a separator cannot be a path segment, and escaping it
-// does not help: net/http decodes %2F before a handler sees the path, so Flesh
-// and Blood's WTR040//WTR001 arrives as three segments and reads as WTR040.
-// Those keep the query link, which does name them.
+// What the path can and cannot spell. A number carrying a slash is escaped and
+// read back whole - see TestSplitNumberReadsASlashEitherWay - while a number of
+// zeros, which the filters read as no number, keeps the query link.
 func TestCardPathDeclinesANumberItCannotSpell(t *testing.T) {
 	for _, tt := range []struct {
 		name string
@@ -241,11 +240,11 @@ func TestCardPathDeclinesANumberItCannotSpell(t *testing.T) {
 		want string
 	}{
 		{
-			name: "a number split across two cards",
+			name: "a number split across two faces, which the path now escapes",
 			co: mtgmatcher.CardObject{
-				Card: mtgmatcher.Card{SetCode: "WTR", Number: "WTR040//WTR001", Finish: "1steditionnormal"},
+				Card: mtgmatcher.Card{SetCode: "WTR", Number: "WTR040//WTR039", Finish: "1steditionnormal"},
 			},
-			want: "",
+			want: "/card/WTR/WTR040%2F%2FWTR039/1steditionnormal",
 		},
 		{
 			name: "a number of zeros, which the filter reads as none",

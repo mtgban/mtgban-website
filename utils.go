@@ -1104,13 +1104,6 @@ func cardPath(co *mtgmatcher.CardObject) string {
 	if len(trimmed) == 0 || trimmed[0] == "" {
 		return ""
 	}
-	// A number that carries a separator cannot be a path segment. Escaping it
-	// does not help: net/http decodes %2F before a handler sees the path, so
-	// Flesh and Blood's WTR040//WTR001 arrives as three segments and is read
-	// as WTR040 alone.
-	if strings.Contains(co.Number, "/") {
-		return ""
-	}
 
 	// The game's own name for what this printing carries, which is the name
 	// f: matches it under. Magic sets it to the same nonfoil/foil/etched a
