@@ -806,6 +806,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The two fallback rows below stand in for a price this site does not
+	// have, with a link to go and look it up - which is worth offering only
+	// where the site carries that marketplace at all.
+	hasTCGScraper := marketplaceLoaded("TCG")
+	hasMKMScraper := marketplaceLoaded("MKM")
+
 	// Rebuild each card's INDEX rows. collapseIndex/collapseSealedEV scan the
 	// array themselves, so there's no per-entry dispatch here — just collapse
 	// each known source directly and pass the rest through, then sort the
@@ -836,7 +842,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// If no TCG reference was present, we manually add one to get the link
-		if !hasTCG && !pageVars.Metadata[cardID].Sealed && !skipIndex {
+		if !hasTCG && hasTCGScraper && !pageVars.Metadata[cardID].Sealed && !skipIndex {
 			var link string
 			if pageVars.Metadata[cardID].TCGId == "" {
 				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardID].Name) + "&utm_medium=" + Config.Affiliate["TCG"] + "&utm_source=" + Config.Affiliate["TCG"]
@@ -853,7 +859,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Same for CM
-		if !hasMKM && !pageVars.Metadata[cardID].Sealed && !skipIndex {
+		if !hasMKM && hasMKMScraper && !pageVars.Metadata[cardID].Sealed && !skipIndex {
 			co, err := mtgmatcher.GetUUID(cardID)
 			if err == nil {
 				var link string
@@ -1122,6 +1128,19 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	if DevMode {
 		log.Println("render took", time.Since(start))
 	}
+}
+
+// marketplaceLoaded reports whether this site serves a seller from the named
+// scraper family. Sellers only: the rows it gates stand in for a reference
+// price, which is a seller's to give.
+func marketplaceLoaded(family string) bool {
+	for _, seller := range GetSellers() {
+		if seller.Info().Family == family {
+			return true
+		}
+	}
+
+	return false
 }
 
 // collapseIndex folds a paired low/market reference (e.g. TCGLow + TCGMarket)
