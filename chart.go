@@ -422,6 +422,30 @@ func mergeMultiCardDatasets(cards []multiCardInput) ([]Dataset, []string) {
 	return datasets, refOrder
 }
 
+// chartLegendName names a card in a multi-card chart's legend, which has to
+// tell two printings of the same card apart: the set, the collector number
+// where there is one, and the finish.
+//
+// The finish is decorated the way a card title decorates it, which is by name
+// where the game gives one. Reading it off the Foil and Etched flags, as this
+// did, spells Magic's whole vocabulary and no other: charting a Flesh and
+// Blood rainbow foil beside its cold foil labelled both of them "Foil" and
+// left the legend saying the same thing twice about two different lines.
+func chartLegendName(co *mtgmatcher.CardObject) string {
+	if co.Sealed {
+		return co.Name
+	}
+
+	name := fmt.Sprintf("%s (%s)", co.Name, co.SetCode)
+	// Collector number disambiguates two printings that share a set+finish
+	// (e.g. a regular and a borderless).
+	if co.Number != "" {
+		name += " #" + co.Number
+	}
+
+	return name + finishDecoration(co)
+}
+
 // getDatasetsForMulti returns one dataset per (card × reference) pair for a
 // multi-card chart, plus the list of distinct reference names that have at
 // least one non-empty dataset. UUIDs that fail to resolve are skipped so a
@@ -435,21 +459,7 @@ func getDatasetsForMulti(ctx context.Context, cardIDs []string, labels []string,
 			continue
 		}
 
-		cardName := co.Name
-		if !co.Sealed {
-			cardName = fmt.Sprintf("%s (%s)", co.Name, co.SetCode)
-			// Collector number disambiguates two printings that share a
-			// set+finish (e.g. a regular and a borderless), so the legend at
-			// the top of a multi-card chart tells them apart.
-			if co.Number != "" {
-				cardName += " #" + co.Number
-			}
-			if co.Foil {
-				cardName += " Foil"
-			} else if co.Etched {
-				cardName += " Etched"
-			}
-		}
+		cardName := chartLegendName(co)
 
 		cards = append(cards, multiCardInput{
 			CardID:   cardID,
