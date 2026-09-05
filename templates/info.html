@@ -1,0 +1,377 @@
+{{define "extra-css"}}
+    <link rel="stylesheet" href="/css/info.css?hash={{.Hash}}">
+{{end}}
+
+{{define "content"}}
+<div class="info-page">
+
+    <header class="info-hero">
+        <h1 class="info-hero-title">Choose your tier</h1>
+        <p class="info-hero-sub">Every tier is named after a Magic format &mdash; and just like the formats, each one unlocks more of the game.</p>
+    </header>
+
+    <!-- Tier pills -->
+    <div class="info-pills" id="pills">
+        <div class="info-pill" data-idx="0" style="--tc:#9ca3af" onclick="infoPick(0)">
+            <span class="pill-label">Free</span>
+            <span class="pill-name">Promo</span>
+            <span class="pill-price">$0 / mo</span>
+        </div>
+        <div class="info-pill" data-idx="1" style="--tc:#60a5fa" onclick="infoPick(1)">
+            <span class="pill-name">Standard</span>
+            <span class="pill-price">$30 / mo</span>
+        </div>
+        <div class="info-pill" data-idx="2" style="--tc:#2dd4bf" onclick="infoPick(2)">
+            <span class="pill-name">Modern</span>
+            <span class="pill-price">$50 / mo</span>
+        </div>
+        <div class="info-pill" data-idx="3" style="--tc:#fbbf24" onclick="infoPick(3)">
+            <span class="pill-label">Popular</span>
+            <span class="pill-name">Legacy</span>
+            <span class="pill-price">$100 / mo</span>
+        </div>
+        <div class="info-pill" data-idx="4" style="--tc:#a78bfa" onclick="infoPick(4)">
+            <span class="pill-name">Vintage</span>
+            <span class="pill-price">$150 / mo</span>
+        </div>
+        <div class="info-pill" data-idx="5" style="--tc:#f97316" onclick="infoPick(5)">
+            <span class="pill-label">Enterprise</span>
+            <span class="pill-name">Type 1</span>
+            <span class="pill-price">$1,000 / mo</span>
+        </div>
+    </div>
+
+    <p class="info-hint" id="info-hint">Select a tier above to highlight its column &mdash; click again to clear</p>
+    <p class="info-hint-mobile">Scroll right to compare all tiers &rarr;</p>
+
+    <!-- Comparison matrix -->
+    <div class="info-matrix-wrap">
+        <table class="info-matrix">
+            <thead>
+                <tr>
+                    <th class="im-th-feat">Feature</th>
+                    <th class="im-th-tier" data-col="0">
+                        <div class="im-th-bar" style="background:#9ca3af"></div>
+                        <span class="im-th-name">Promo</span>
+                        <span class="im-th-price">Free</span>
+                    </th>
+                    <th class="im-th-tier" data-col="1">
+                        <div class="im-th-bar" style="background:#60a5fa"></div>
+                        <span class="im-th-name">Standard</span>
+                        <span class="im-th-price">$30/mo</span>
+                    </th>
+                    <th class="im-th-tier" data-col="2">
+                        <div class="im-th-bar" style="background:#2dd4bf"></div>
+                        <span class="im-th-name">Modern</span>
+                        <span class="im-th-price">$50/mo</span>
+                    </th>
+                    <th class="im-th-tier" data-col="3">
+                        <div class="im-th-bar" style="background:#fbbf24"></div>
+                        <span class="im-th-name">Legacy</span>
+                        <span class="im-th-price">$100/mo</span>
+                    </th>
+                    <th class="im-th-tier" data-col="4">
+                        <div class="im-th-bar" style="background:#a78bfa"></div>
+                        <span class="im-th-name">Vintage</span>
+                        <span class="im-th-price">$150/mo</span>
+                    </th>
+                    <th class="im-th-tier" data-col="5">
+                        <div class="im-th-bar" style="background:#f97316"></div>
+                        <span class="im-th-name">Type 1</span>
+                        <span class="im-th-price">$1,000/mo</span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+
+                <!-- Discord -->
+                <tr class="im-cat-row"><td colspan="7">Discord</td></tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Discord access</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+
+                <!-- Search -->
+                <tr class="im-cat-row"><td colspan="7">Search</td></tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Limited search</span>
+                        <span class="im-feat-desc">Search any card from our affiliates</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Search cards, sealed &amp; EVs</span>
+                        <span class="im-feat-desc">Powerful filters for edition, number, and more</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Download search as CSV</span>
+                        <span class="im-feat-desc">Export any search result to CSV</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Transfer search to Upload</span>
+                        <span class="im-feat-desc">Move your current search view directly into Upload</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+
+                <!-- Newspaper -->
+                <tr class="im-cat-row"><td colspan="7">Newspaper</td></tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Newspaper (3-day data)</span>
+                        <span class="im-feat-desc">Trend reports using 3-day-old data across multiple categories</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Newspaper (1-day data)</span>
+                        <span class="im-feat-desc">Trend reports using the latest data across multiple categories</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Newspaper Plus</span>
+                        <span class="im-feat-desc">Move any newspaper page to Upload, show 50 entries at a time</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+
+                <!-- Sleepers -->
+                <tr class="im-cat-row"><td colspan="7">Sleepers</td></tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Sleepers (3 types)</span>
+                        <span class="im-feat-desc">Identify when buylist is higher than market price</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Choose Your Own Adventure</span>
+                        <span class="im-feat-desc">Compare any two sellers and find arbitrage your way</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+
+                <!-- Upload -->
+                <tr class="im-cat-row"><td colspan="7">Upload</td></tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Upload Retail Demo</span>
+                        <span class="im-feat-desc">Best prices for up to 350 cards &mdash; Retail with Partners</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Upload Retail Full</span>
+                        <span class="im-feat-desc">Best prices for up to 350 cards &mdash; Retail with all Sellers</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Upload Buylist Basic</span>
+                        <span class="im-feat-desc">Up to 350 cards &mdash; Retail/Buylist + CSV download</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Upload Buylist + Optimizer</span>
+                        <span class="im-feat-desc">Up to 1,000 cards &mdash; Retail/Buylist with Optimizer + CSV download</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Upload No Limits</span>
+                        <span class="im-feat-desc">Up to 1,000 cards in UI and 10,000 in downloads &mdash; full Optimizer + CSV</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+
+                <!-- Global -->
+                <tr class="im-cat-row"><td colspan="7">Global</td></tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Global with MKM / TCG</span>
+                        <span class="im-feat-desc">Price differences between Cardmarket and TCGplayer</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Global with Partners</span>
+                        <span class="im-feat-desc">All partner vendors &mdash; min spread 200%</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Global with Partners (lower threshold)</span>
+                        <span class="im-feat-desc">All partner vendors &mdash; min spread 50%</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-check">&#10003;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-dash">&mdash;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">Global with all Sellers</span>
+                        <span class="im-feat-desc">Every tracked seller &mdash; min spread 50%</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+
+                <!-- API -->
+                <tr class="im-cat-row"><td colspan="7">API</td></tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">BAN API for Magic</span>
+                        <span class="im-feat-desc">Programmatic access to all Magic pricing data &mdash; $800/mo value, included</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+                <tr class="im-feat-row">
+                    <td class="im-td-feat">
+                        <span class="im-feat-name">BAN API for Lorcana</span>
+                        <span class="im-feat-desc">Programmatic access to Lorcana pricing data &mdash; +$200/mo value, included</span>
+                    </td>
+                    <td class="im-td-val" data-col="0"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="1"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="2"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="3"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="4"><span class="im-dash">&mdash;</span></td>
+                    <td class="im-td-val" data-col="5"><span class="im-check">&#10003;</span></td>
+                </tr>
+
+            </tbody>
+        </table>
+    </div>
+
+    <!-- CTA -->
+    <div class="info-cta">
+        <p class="info-cta-title">Ready to level up?</p>
+        <p class="info-cta-sub">Subscribe on Patreon to unlock your tier. Billing is monthly, cancel any time.</p>
+        {{if .PatreonLogin}}
+            <a class="info-cta-btn" href="{{.PatreonURL}}">Subscribe on Patreon</a>
+        {{end}}
+    </div>
+
+</div>
+{{end}}
+
+{{define "extra-scripts"}}
+<script src="/js/info.js?hash={{.Hash}}"></script>
+{{end}}
