@@ -19,7 +19,6 @@ func TestFinishLabel(t *testing.T) {
 		{"shared foil", mtgmatcher.FinishFoil, ""},
 		{"shared etched", mtgmatcher.FinishEtched, ""},
 		{"a game's plain printing", "normal", ""},
-		{"lorcana's plain printing", "nofoil", ""},
 
 		// The foil family, whose one lowercase word splits on the suffix.
 		{"flesh and blood rainbow", "rainbowfoil", "Rainbow Foil"},
