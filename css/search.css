@@ -107,6 +107,15 @@
     border-color: var(--accent-border, rgba(91,141,239,0.25));
     color: var(--search-link);
 }
+/* The same pill with room for a word rather than an icon alone, for the
+   switch between what a product may hold and what it always holds. */
+.search-sort-pill.with-label {
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: var(--text-sm);
+    white-space: nowrap;
+}
+
 .search-sort-pill .search-sort-dir.asc { color: #22c55e; }
 .search-sort-pill .search-sort-dir.desc { color: #ef4444; }
 

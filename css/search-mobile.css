@@ -142,6 +142,23 @@
     height: 18px;
 }
 
+/* The same pill with room for a word, for the switch between what a product
+   may hold and what it always holds. */
+.m-sort-pill.with-label {
+    gap: 4px;
+    padding: 0.3em 0.55em;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.m-sort-pill.with-label i,
+.m-sort-pill.with-label svg {
+    width: 14px;
+    height: 14px;
+}
+
 .m-sort-pill:active {
     background: rgba(255, 255, 255, 0.1);
     transform: scale(0.85);
