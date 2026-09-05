@@ -82,6 +82,10 @@ type PageVars struct {
 		Contents     string
 		ImageURL     string
 		ImageCropURL string
+
+		// WideImage asks for the large-image card rather than the thumbnail
+		// beside text, for a page whose image is the point of it
+		WideImage    bool
 		Description  string
 		RetailPrice  float64
 		BuylistPrice float64
@@ -1569,6 +1573,9 @@ func main() {
 	http.Handle("/api/cardmarket/", enforceSigning(http.HandlerFunc(MKMHandler)))
 	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
+	// Registered ahead of the subtree below, which reads whatever follows the
+	// prefix as a card id
+	http.Handle("/api/chart/image.png", noSigning(http.HandlerFunc(ChartImageAPI)))
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(http.HandlerFunc(BatchPricesAPI)))
 	http.Handle("/api/userstate/", noSigning(http.HandlerFunc(UserStateAPI)))

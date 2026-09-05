@@ -23,7 +23,6 @@ import (
 	"github.com/mtgban/go-mtgban/tcgplayer"
 	"github.com/mtgban/mtgban-website/internal/embed"
 	"github.com/mtgban/mtgban-website/internal/suggest"
-	"github.com/mtgban/mtgban-website/timeseries"
 )
 
 const (
@@ -276,6 +275,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.FormValue("q"))
 
 	oembed := strings.HasPrefix(r.URL.Path, "/search/oembed")
+	var oembedChart string
 	if oembed {
 		page := r.FormValue("url")
 		u, err := url.Parse(page)
@@ -286,7 +286,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 		values := u.Query()
 		query = values.Get("q")
-		if query == "" {
+		// A chart page names its cards in chart=, and has no query at all. It
+		// is still a page worth unfurling - more so than most, since what it
+		// shows is a picture.
+		oembedChart = values.Get("chart")
+		if query == "" && oembedChart == "" {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte(`Not Found`))
 			return
@@ -372,6 +376,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chartParam := r.FormValue("chart")
+	if oembedChart != "" {
+		chartParam = oembedChart
+	}
 	pageVars.ModalMode = r.FormValue("modal") == "1"
 
 	// The front-end enforces the same cap when batching cards, so let the JS
@@ -404,7 +411,12 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		chartTargets[id] = target
 		return target
 	}
-	if len(chartIDs) > 0 && !pageVars.DisableChart {
+	// Charting the page is gated on the signature, and an unfurl carries none:
+	// nobody is signed in behind a link preview. What it asks for is not the
+	// page though, it is the picture the image endpoint renders for anyone who
+	// asks, capped at six months - so let the roster resolve and answer it
+	// below, without ever rendering the chart page itself.
+	if len(chartIDs) > 0 && (!pageVars.DisableChart || oembed) {
 		// A crafted or over-long chart= URL that names more cards than the chart
 		// can render lands here; say so rather than silently dropping the tail.
 		if chartTruncated {
@@ -454,6 +466,16 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			query = chartParam
 		}
 		chartIDs = nil
+	}
+
+	// A chart page is a picture, and unfurls as one. Answered here rather than
+	// down with the card previews because a graph does not depend on anybody
+	// stocking the card today: the search below drops a card with no offers,
+	// and gives up entirely when every card has none, which is a chart worth
+	// looking at answered as though the page did not exist.
+	if oembed && chartID != "" {
+		writeChartOEmbed(w, chartIDs, chartSearchIDs, chartParam)
+		return
 	}
 
 	// If query is empty there is nothing to do
@@ -519,7 +541,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
 	pageVars.Embed.PageURL = ServerURL + r.URL.String()
-	pageVars.Embed.OEmbedURL = ServerURL + "/search/oembed?format=json&url=" + url.QueryEscape(ServerURL+"/search?q="+query)
+	// The url an unfurl comes back for. A chart page is named by its roster:
+	// the query was rewritten to the ids it plots, and answering that would
+	// unfurl the cards rather than the chart.
+	embedded := ServerURL + "/search?q=" + query
+	if chartID != "" {
+		embedded = ServerURL + "/search?chart=" + url.QueryEscape(chartParam)
+	}
+	pageVars.Embed.OEmbedURL = ServerURL + "/search/oembed?format=json&url=" + url.QueryEscape(embedded)
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
@@ -759,6 +788,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	preview := embedService.Generate(allKeys, ProcessEmbedSearchResultsSellers(foundSellers, true))
+
 	if oembed {
 		if len(allKeys) == 0 {
 			w.WriteHeader(http.StatusNotFound)
@@ -794,6 +824,15 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 		pageVars.Embed.RetailPrice = price4seller(allKeys[0], "TCGMarket")
 		pageVars.Embed.BuylistPrice = price4seller(allKeys[0], "CK")
+	}
+
+	// What a chart page is about is the chart, so that is the image it hands
+	// to whatever is unfurling it - after the card above, which would
+	// otherwise be the last word.
+	if chartID != "" {
+		pageVars.Embed.ImageURL = chartImageURL(chartParam)
+		pageVars.Embed.ImageCropURL = pageVars.Embed.ImageURL
+		pageVars.Embed.WideImage = true
 	}
 
 	// When the user asked to drop index data (skip:index), don't synthesize the
@@ -958,37 +997,18 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			// whatever providers have data — one path for every game, keyed on the
 			// cached ban_id. The ?chart= url keeps the mtgmatcher id (the search
 			// UI's identity for favorites/roster/legend); the ban_id is internal.
-			var earliest time.Time
-			var ids, names []string
-			var series []map[string]timeseries.ProviderPrices
-			for _, id := range chartIDs {
-				target := chartTargetFor(id)
-				if target == nil {
-					continue
-				}
-				// Read each card once and take the axis from what came back: a
-				// roster used to cost two archive round-trips per card, and
-				// against a hundred-partition prices table a round-trip is
-				// mostly planning.
-				results := fetchChartPrices(r.Context(), target, lb)
-				ids = append(ids, id)
-				names = append(names, target.Name)
-				series = append(series, results)
-				if e := earliestChartedDate(results, lb); !e.IsZero() && (earliest.IsZero() || e.Before(earliest)) {
-					earliest = e
-				}
-			}
-			if len(series) == 0 || earliest.IsZero() {
+			// Read each card once and take the axis from what came back: a
+			// roster used to cost two archive round-trips per card, and
+			// against a hundred-partition prices table a round-trip is
+			// mostly planning.
+			labels, cards, earliest := readChartRoster(r.Context(), chartIDs, lb, chartTargetFor)
+			if len(cards) == 0 {
 				pageVars.InfoMessage = "No chart data available"
 			} else {
-				pageVars.AxisLabels = getDateAxisValues(earliest)
-				cards := make([]multiCardInput, len(series))
-				for i, results := range series {
-					cards[i] = multiCardInput{
-						CardID:   ids[i],
-						Name:     names[i],
-						Datasets: chartDatasetsFrom(results, pageVars.AxisLabels),
-					}
+				pageVars.AxisLabels = labels
+				names := make([]string, len(cards))
+				for i, card := range cards {
+					names[i] = card.Name
 				}
 				if isMultiChart {
 					datasets, refs := mergeMultiCardDatasets(cards)

@@ -16,6 +16,7 @@ require (
 	github.com/mtgban/go-mtgban v0.8.2
 	github.com/mtgban/simplecloud v0.0.13
 	github.com/xuri/excelize/v2 v2.11.0
+	golang.org/x/image v0.38.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0

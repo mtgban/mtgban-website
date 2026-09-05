@@ -54,15 +54,41 @@ type Entry struct {
 
 // OEmbed is the oEmbed envelope Discord fetches to unfurl a link.
 type OEmbed struct {
-	Version         string `json:"version"`
-	ProviderName    string `json:"provider_name"`
-	ProviderURL     string `json:"provider_url"`
-	Title           string `json:"title"`
-	Type            string `json:"type"`
-	HTML            string `json:"html"`
+	Version      string `json:"version"`
+	ProviderName string `json:"provider_name"`
+	ProviderURL  string `json:"provider_url"`
+	Title        string `json:"title"`
+	Type         string `json:"type"`
+	HTML         string `json:"html"`
+
+	// URL, Width and Height are what a "photo" envelope is: the image itself,
+	// which a client shows at full size rather than as the thumbnail beside a
+	// block of text. Omitted by every other type.
+	URL    string `json:"url,omitempty"`
+	Width  int    `json:"width,omitempty"`
+	Height int    `json:"height,omitempty"`
+
 	ThumbnailURL    string `json:"thumbnail_url"`
 	ThumbnailWidth  int    `json:"thumbnail_width"`
 	ThumbnailHeight int    `json:"thumbnail_height"`
+}
+
+// Chart is the envelope for a page whose subject is a picture: the rendered
+// graph, given as the photo itself so a client shows it whole.
+func Chart(title, imageURL string, width, height int) *OEmbed {
+	return &OEmbed{
+		Version:         "1.0",
+		ProviderName:    "MTGBAN Price Search",
+		ProviderURL:     "https://mtgban.com",
+		Title:           title,
+		Type:            "photo",
+		URL:             imageURL,
+		Width:           width,
+		Height:          height,
+		ThumbnailURL:    imageURL,
+		ThumbnailWidth:  width,
+		ThumbnailHeight: height,
+	}
 }
 
 // SearchResult is one search summarized for an embed: the index, retail

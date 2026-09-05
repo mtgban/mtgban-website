@@ -19,7 +19,7 @@
         <meta name="twitter:creator" content="@MTG_BAN" />
         <meta name="twitter:site" content="@MTG_BAN" />
         <meta name="twitter:domain" content="https://mtgban.com/" />
-        <meta name="twitter:card" content="product" />
+        <meta name="twitter:card" content="{{if .Embed.WideImage}}summary_large_image{{else}}product{{end}}" />
         <meta name="twitter:image" content="{{.Embed.ImageCropURL}}" />
         <meta name="twitter:title" content="{{.Embed.Title}}" />
         <meta name="twitter:description" content="{{.Embed.Description}}" />
