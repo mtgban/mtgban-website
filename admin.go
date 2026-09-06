@@ -711,8 +711,9 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.DisableChart = IsStashingInProgress()
 
-	// Load on every admin view so the client-switched Usage tab is always populated.
-	if ObservabilityDB != nil {
+	// Only the Usage tab reads these aggregates and each one scans a 30-day
+	// window, so leave them alone unless that is the tab being rendered.
+	if ObservabilityDB != nil && page == "usage" {
 		since := time.Now().AddDate(0, 0, -30)
 		includeBots := r.FormValue("bots") == "1"
 		ctx := r.Context()

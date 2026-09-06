@@ -56,7 +56,7 @@
     <!-- Tabs -->
     <div class="admin-tabs">
         <button class="admin-tab{{if or (eq .Page "") (eq .Page "dashboard")}} active{{end}}" onclick="switchTab(this,'dashboard')">Dashboard</button>
-        <button class="admin-tab{{if eq .Page "usage"}} active{{end}}" onclick="switchTab(this,'usage')">Usage</button>
+        <button class="admin-tab{{if eq .Page "usage"}} active{{end}}" onclick="location.href='?page=usage'">Usage</button>
         <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="switchTab(this,'people')">People</button>
         <button class="admin-tab{{if eq .Page "config"}} active{{end}}" onclick="switchTab(this,'config')">Config</button>
         <button class="admin-tab{{if eq .Page "checkpoints"}} active{{end}}" onclick="switchTab(this,'checkpoints')">Checkpoints</button>
@@ -159,7 +159,7 @@
          USAGE
          ═══════════════════════ -->
     <div class="admin-panel{{if eq .Page "usage"}} active{{end}}" id="panel-usage">
-        {{template "admin-usage" .}}
+        {{if eq .Page "usage"}}{{template "admin-usage" .}}{{end}}
     </div>
 
     <!-- ═══════════════════════
