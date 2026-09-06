@@ -598,17 +598,25 @@ func stashInTimeseries() {
 		}
 	}
 
-	// Upsert all accumulated rows in batches
-	rows := make([]timeseries.PriceRow, 0, len(accumulated))
-	for _, row := range accumulated {
-		rows = append(rows, *row)
-	}
+	// Upsert all accumulated rows in batches. The wide table is out of reach
+	// for non-default games - its mtgjson_uuid column is Postgres type uuid,
+	// and their ids (Lorcana's "1459_f") are not uuids - so they persist
+	// exclusively through the long form below.
+	var upserted, errCount int
+	if Config.Game == DefaultGame {
+		rows := make([]timeseries.PriceRow, 0, len(accumulated))
+		for _, row := range accumulated {
+			rows = append(rows, *row)
+		}
 
-	upserted, err := PricesArchiveDB.UpsertRows(context.Background(), rows, 500)
-	var errCount int
-	if err != nil {
-		errCount = len(rows) - upserted
-		ServerNotify("timeseries", fmt.Sprintf("batch upsert error: %s", err))
+		var err error
+		upserted, err = PricesArchiveDB.UpsertRows(context.Background(), rows, 500)
+		if err != nil {
+			errCount = len(rows) - upserted
+			ServerNotify("timeseries", fmt.Sprintf("batch upsert error: %s", err))
+		}
+	} else if !Config.TimeseriesConfig.LongFormWrites {
+		ServerNotify("timeseries", "snapshot has nowhere to write: non-default games need long_form_writes enabled")
 	}
 
 	// Dual-write the same snapshot into the long form (variants + prices).
@@ -686,28 +694,80 @@ func warmVariantCache(ctx context.Context) error {
 	return nil
 }
 
-// stashLongForm mirrors the accumulated wide rows into the long prices table. It
-// warms the variant cache once, resolves each row's ban_id (minting new
-// printings on the fly), and emits one LongPrice per set provider column with a
-// positive price (zeros are omitted, matching the backfill). Returns the number
-// of price rows upserted.
-func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.PriceRow) (int, error) {
-	if err := warmVariantCache(ctx); err != nil {
-		return 0, fmt.Errorf("warm variant cache: %w", err)
-	}
-	longRows := make([]timeseries.LongPrice, 0, len(accumulated)*4)
-	for _, row := range accumulated {
+// stashRowBanID resolves an accumulated row to its long-form variant. The
+// default game is keyed by mtgjson uuid; any other game maps the card's
+// TCGplayer product plus its finish sub-type - the same identity the tcgcsv
+// ingest mints, so both writers converge on one ban_id per printing.
+func stashRowBanID(ctx context.Context, row *timeseries.PriceRow) (int64, error) {
+	if Config.Game == DefaultGame {
 		lang := ""
 		if row.Language != nil {
 			lang = *row.Language
 		}
-		banID, err := PricesArchiveDB.ResolveMagicBanID(ctx, timeseries.MagicVariant{
+		return PricesArchiveDB.ResolveMagicBanID(ctx, timeseries.MagicVariant{
 			MtgjsonUUID: row.MtgjsonUUID,
 			IsFoil:      row.IsFoil,
 			IsEtched:    row.IsEtched,
 			IsAlt:       row.IsAlt,
 			Language:    lang,
 		})
+	}
+
+	// row.MtgjsonUUID carries the game-native id on non-default instances
+	co, err := mtgmatcher.GetUUID(row.MtgjsonUUID)
+	if err != nil {
+		return 0, err
+	}
+	pid, ok := tcgProductID(co)
+	if !ok {
+		return 0, fmt.Errorf("no TCGplayer product id for %s", row.MtgjsonUUID)
+	}
+	category := GetTCGCategoryID()
+	if category <= 0 {
+		return 0, fmt.Errorf("no TCGplayer category for game %q: catalog not loaded", Config.Game)
+	}
+
+	// The sub-type has to be the one the tcgcsv ingest stores for this
+	// printing, or the two writers mint different ban_ids for it. Read it off
+	// the sub-types the product is actually priced under rather than assuming
+	// a name: Riftbound sells one "Foil", Lorcana sells "Cold Foil" and
+	// "Holofoil", and tcgSubTypeForCard is what the chart read path already
+	// uses to pair a card's finish with them.
+	subTypes, ok := PricesArchiveDB.CachedTCGSubTypeBanIDs(pid)
+	if !ok {
+		subTypes, err = PricesArchiveDB.LookupTCGSubTypeBanIDs(ctx, pid)
+		if err != nil {
+			return 0, err
+		}
+	}
+	subType := tcgSubTypeForCard(co, subTypes)
+	if subType == "" {
+		return 0, fmt.Errorf("no sub-type for %s: the product lists none for its finish", row.MtgjsonUUID)
+	}
+
+	return PricesArchiveDB.ResolveTCGBanID(ctx, timeseries.TCGVariant{
+		CategoryID: category, ProductID: pid, SubType: subType,
+	})
+}
+
+// stashLongForm mirrors the accumulated wide rows into the long prices table. It
+// warms the variant cache once, resolves each row's ban_id (minting new
+// printings on the fly), and emits one LongPrice per set provider column with a
+// positive price (zeros are omitted, matching the backfill). Returns the number
+// of price rows upserted.
+func stashLongForm(ctx context.Context, accumulated map[string]*timeseries.PriceRow) (int, error) {
+	// A game with no category has no variant identity for any of its rows, so
+	// say it once here: per-row resolution would log the same thing for every
+	// card in the snapshot.
+	if Config.Game != DefaultGame && GetTCGCategoryID() <= 0 {
+		return 0, fmt.Errorf("no TCGplayer category for game %q: catalog not loaded", Config.Game)
+	}
+	if err := warmVariantCache(ctx); err != nil {
+		return 0, fmt.Errorf("warm variant cache: %w", err)
+	}
+	longRows := make([]timeseries.LongPrice, 0, len(accumulated)*4)
+	for _, row := range accumulated {
+		banID, err := stashRowBanID(ctx, row)
 		if err != nil {
 			log.Println("long-form: resolve ban_id:", err)
 			continue
