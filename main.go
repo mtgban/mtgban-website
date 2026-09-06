@@ -1421,10 +1421,6 @@ func main() {
 		log.Fatalln("error opening databases:", err)
 	}
 
-	// Pick up access table / grant saves made by the peer deployments
-	// sharing the price database.
-	startAccessReloadListener()
-
 	// tcgcsv ingestion is optional: a deployment with no configured games or no
 	// price database simply doesn't get the crons or the admin button.
 	if err := initTCGCSVService(); err != nil {
