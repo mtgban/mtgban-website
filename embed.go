@@ -91,7 +91,7 @@ func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]Searc
 		for _, cond := range mtgban.DefaultGradeTags {
 			foundResults := foundSellers[cardID][cond]
 
-			// Loop through the results, keep track of the precessed
+			// Loop through the results, keep track of the processed
 			// elements in the map (and skip lower condition ones)
 			for _, result := range foundResults {
 				_, found := founders[result.ScraperName]
