@@ -105,32 +105,79 @@ func (c *Client) setGrants(grants []Grant) {
 }
 
 // Load fills the table and the grant list from the given sources and
-// remembers them, so a later SaveGrants writes back to wherever the list
-// came from.
+// remembers them, so a later save or reload goes back to wherever each
+// value came from.
 func (c *Client) Load(ctx context.Context, sources Sources) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	table := sources.FallbackTable
-	if sources.TablePath != "" {
-		table = nil
-		if err := c.readJSONPath(ctx, sources.TablePath, &table); err != nil {
-			return fmt.Errorf("acl %s: %w", sources.TablePath, err)
-		}
+	table, err := c.loadTable(ctx, sources)
+	if err != nil {
+		return err
 	}
-
-	grants := sources.FallbackGrants
-	if sources.GrantsPath != "" {
-		grants = nil
-		if err := c.readJSONPath(ctx, sources.GrantsPath, &grants); err != nil {
-			return fmt.Errorf("grants %s: %w", sources.GrantsPath, err)
-		}
+	grants, err := c.loadGrants(ctx, sources)
+	if err != nil {
+		return err
 	}
 
 	c.sources = sources
 	c.setTable(table)
 	c.setGrants(grants)
 	return nil
+}
+
+// ReloadTable re-reads just the access table, from the sources of the last
+// Load, and publishes it on success. The grant list is not touched: the two
+// values change independently, so a change to one must not re-fetch the
+// other.
+func (c *Client) ReloadTable(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	table, err := c.loadTable(ctx, c.sources)
+	if err != nil {
+		return err
+	}
+	c.setTable(table)
+	return nil
+}
+
+// ReloadGrants re-reads just the grant list, from the sources of the last
+// Load, and publishes it on success, mirroring ReloadTable.
+func (c *Client) ReloadGrants(ctx context.Context) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	grants, err := c.loadGrants(ctx, c.sources)
+	if err != nil {
+		return err
+	}
+	c.setGrants(grants)
+	return nil
+}
+
+func (c *Client) loadTable(ctx context.Context, sources Sources) (Table, error) {
+	if sources.TablePath == "" {
+		return sources.FallbackTable, nil
+	}
+	var table Table
+	err := c.readJSONPath(ctx, sources.TablePath, &table)
+	if err != nil {
+		return nil, fmt.Errorf("acl %s: %w", sources.TablePath, err)
+	}
+	return table, nil
+}
+
+func (c *Client) loadGrants(ctx context.Context, sources Sources) ([]Grant, error) {
+	if sources.GrantsPath == "" {
+		return sources.FallbackGrants, nil
+	}
+	var grants []Grant
+	err := c.readJSONPath(ctx, sources.GrantsPath, &grants)
+	if err != nil {
+		return nil, fmt.Errorf("grants %s: %w", sources.GrantsPath, err)
+	}
+	return grants, nil
 }
 
 // SaveGrants persists a new grant list to wherever the list was read from,
