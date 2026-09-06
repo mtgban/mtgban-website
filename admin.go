@@ -427,6 +427,39 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		pageVars.ACLSource = "inline config"
 	}
 
+	// -- Affiliates: handle POST if submitted --
+	newAffiliates := r.FormValue("affiliatesTextArea")
+	if newAffiliates != "" {
+		var parsed AffiliatesConfig
+		decoder := json.NewDecoder(strings.NewReader(newAffiliates))
+		// The value is a fixed three-key struct, so an unknown key is a typo
+		// that would otherwise be dropped without a word.
+		decoder.DisallowUnknownFields()
+		err := decoder.Decode(&parsed)
+		if err == nil {
+			err = saveAffiliates(r.Context(), parsed)
+		}
+		if err != nil {
+			pageVars.WarningMessage = "Affiliates not saved: " + err.Error()
+		} else {
+			pageVars.InfoMessage = "Affiliates updated"
+		}
+	}
+
+	// -- Affiliates: always load current text for the editor --
+	affiliatesText, affErr := json.MarshalIndent(Affiliates(), "", "    ")
+	if affErr != nil {
+		if pageVars.InfoMessage == "" {
+			pageVars.InfoMessage = affErr.Error()
+		}
+	} else {
+		pageVars.AffiliatesText = string(affiliatesText)
+	}
+	pageVars.AffiliatesSource = Config.AffiliatesPath
+	if pageVars.AffiliatesSource == "" {
+		pageVars.AffiliatesSource = "inline config"
+	}
+
 	// -- Key overrides: handle POST if submitted --
 	newOverrides := r.FormValue("keyOverridesTextArea")
 	if newOverrides != "" {

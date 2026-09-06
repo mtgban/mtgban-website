@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/mtgban/mtgban-website/internal/access"
@@ -68,6 +69,9 @@ type AffiliatesConfig struct {
 	BuylistList []string          `json:"affiliates_buylist_list"`
 }
 
+// affiliatesMu serialises the writers (loadAffiliates, saveAffiliates);
+// readers go through the atomic and never block.
+var affiliatesMu sync.Mutex
 var affiliatesPtr atomic.Pointer[AffiliatesConfig]
 
 // Affiliates returns the current affiliate data. The result is shared and
@@ -85,6 +89,9 @@ func Affiliates() AffiliatesConfig {
 // that cannot be read is an error, not a silent fallback, and the previous
 // value stays published.
 func loadAffiliates(ctx context.Context) error {
+	affiliatesMu.Lock()
+	defer affiliatesMu.Unlock()
+
 	value := AffiliatesConfig{
 		Codes:       Config.Affiliate,
 		List:        Config.AffiliatesList,
@@ -103,6 +110,45 @@ func loadAffiliates(ctx context.Context) error {
 		}
 	}
 	affiliatesPtr.Store(&value)
+	return nil
+}
+
+// saveAffiliates persists the affiliate data to wherever it was read from -
+// the shared file when a path is set, the inline config fields when not -
+// and publishes it on success, following the savers below.
+func saveAffiliates(ctx context.Context, value AffiliatesConfig) error {
+	affiliatesMu.Lock()
+	defer affiliatesMu.Unlock()
+
+	if Config.AffiliatesPath == "" {
+		err := updateInlineConfig(ctx, func(config *ConfigType) {
+			config.Affiliate = value.Codes
+			config.AffiliatesList = value.List
+			config.AffiliatesBuylistList = value.BuylistList
+		})
+		if err != nil {
+			return err
+		}
+		affiliatesPtr.Store(&value)
+		return nil
+	}
+
+	writer, err := openBucketWriter(ctx, Config.AffiliatesPath)
+	if err != nil {
+		return err
+	}
+	err = json.NewEncoder(writer).Encode(value)
+	// Close finalises the upload, so its error is the write's error too, and
+	// a failure there must not be reported as a save.
+	cerr := writer.Close()
+	if err != nil {
+		return err
+	}
+	if cerr != nil {
+		return cerr
+	}
+	affiliatesPtr.Store(&value)
+	notifyAccessReload(ctx, affiliatesReloadChannel)
 	return nil
 }
 

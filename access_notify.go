@@ -8,9 +8,10 @@ import (
 	"github.com/lib/pq"
 )
 
-// Deployments that split the access table and the grant list into their own
-// bucket files can share those files - the grants especially are one list
-// across the magic and lorcana sites. A save on one deployment then has to
+// Deployments that split the access table, the grant list and the affiliate
+// data into their own bucket files can share those files - the grants and
+// the affiliates are one value across the magic and lorcana sites. A save on
+// one deployment then has to
 // reach the others, and the shared price database already connects them all:
 // the saver sends a Postgres NOTIFY on the changed file's channel, and every
 // peer listening there re-reads that file - just that file, since the two
@@ -19,8 +20,9 @@ import (
 // The NOTIFY channels, one per shared file. The payload is the sender's
 // instance name, so the sender can recognize and skip its own notification.
 const (
-	aclReloadChannel    = "acl_reload"
-	grantsReloadChannel = "grants_reload"
+	aclReloadChannel        = "acl_reload"
+	grantsReloadChannel     = "grants_reload"
+	affiliatesReloadChannel = "affiliates_reload"
 )
 
 // notifyAccessReload tells the peer deployments to re-read the file behind
@@ -64,6 +66,9 @@ func startAccessReloadListener() {
 	}
 	if Config.PatreonGrantsPath != "" {
 		reloads[grantsReloadChannel] = Access.ReloadGrants
+	}
+	if Config.AffiliatesPath != "" {
+		reloads[affiliatesReloadChannel] = loadAffiliates
 	}
 	if len(reloads) == 0 {
 		return

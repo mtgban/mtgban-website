@@ -125,6 +125,8 @@ type PageVars struct {
 	CheckpointsText    string
 	ACLText            string
 	ACLSource          string
+	AffiliatesText     string
+	AffiliatesSource   string
 	KeyOverridesText   string
 	OverrideStores     []string
 	OverrideFixStore   string
