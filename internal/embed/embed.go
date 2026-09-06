@@ -161,14 +161,12 @@ func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 			return results[i].ScraperName < results[j].ScraperName
 		})
 
-		// Alsign to the longest name by appending whitespaces
-		alignLength := longestName(results)
+		// Padding is left to alignValues at the end: the index merge below
+		// rewrites pairs of rows into one and the rename after it changes a
+		// width again, so nothing measured here would survive anyway.
 		for _, entry := range results {
 			var value FieldValue
 
-			for i := len(entry.ScraperName); i < alignLength; i++ {
-				value.ExtraSpaces += " "
-			}
 			value.ScraperName = entry.ScraperName
 			value.Price = fmt.Sprintf("$%0.2f", entry.Price)
 
@@ -190,21 +188,21 @@ func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 
 				// Determine which index we're merging (either 'TCG' or 'MKM')
 				// since the scraper names are ('TCG Low' and 'TCG Market')
-				fields := strings.Fields(value.ScraperName)
-				if len(fields) < 2 || (fields[1] == "Direct" && !isSealed) {
+				nameParts := strings.Fields(value.ScraperName)
+				if len(nameParts) < 2 || (nameParts[1] == "Direct" && !isSealed) {
 					continue
 				}
 
 				found := false
 				for j = range field.Values {
 					// Look if an existing tag is present
-					if (!isSealed && !strings.HasPrefix(field.Values[j].ScraperName, fields[0])) ||
-						(isSealed && !strings.HasPrefix(field.Values[j].ScraperName, strings.Join(fields[0:2], " "))) {
+					if (!isSealed && !strings.HasPrefix(field.Values[j].ScraperName, nameParts[0])) ||
+						(isSealed && !strings.HasPrefix(field.Values[j].ScraperName, strings.Join(nameParts[0:2], " "))) {
 						continue
 					}
 
-					newScraperName = fields[0]
-					newTag = fmt.Sprintf("Low/%s", fields[1])
+					newScraperName = nameParts[0]
+					newTag = fmt.Sprintf("Low/%s", nameParts[1])
 
 					// Sealed case, since results are in order, if one is found, append a new tag
 					if isSealed {
@@ -330,17 +328,6 @@ func alignValues(field *Field) {
 		field.Values[i].ExtraSpaces = strings.Repeat(" ", longest-renderedNameWidth(field.Values[i]))
 		field.Length += fieldValueLength(field.Values[i])
 	}
-}
-
-// Obtain the length of the scraper with the longest name
-func longestName(results []Entry) (out int) {
-	for _, entry := range results {
-		probe := len(entry.ScraperName)
-		if probe > out {
-			out = probe
-		}
-	}
-	return
 }
 
 // LastSoldFields renders the latest sales for a card in the given language.
