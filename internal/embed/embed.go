@@ -64,10 +64,19 @@ type OEmbed struct {
 	Title           string `json:"title"`
 	Type            string `json:"type"`
 	HTML            string `json:"html"`
-	ThumbnailURL    string `json:"thumbnail_url"`
-	ThumbnailWidth  int    `json:"thumbnail_width"`
-	ThumbnailHeight int    `json:"thumbnail_height"`
+	Width           int    `json:"width"`
+	Height          int    `json:"height"`
+	ThumbnailURL    string `json:"thumbnail_url,omitempty"`
+	ThumbnailWidth  int    `json:"thumbnail_width,omitempty"`
+	ThumbnailHeight int    `json:"thumbnail_height,omitempty"`
 }
+
+// A card scan is always this size, so a preview of one can say so. A sealed
+// product's photo is not card-shaped and carries no dimensions at all.
+const (
+	cardImageWidth  = 488
+	cardImageHeight = 680
+)
 
 // SearchResult is one search summarized for an embed: the index, retail
 // and buylist rows found for a card.
@@ -383,12 +392,16 @@ func (s *Service) LastSoldFields(cardID string, lang string) ([]Field, error) {
 }
 
 // Generate builds the oEmbed preview panel for a search result page.
-// indexFor returns the index-price offers for one card, so every card in the
-// panel is quoted with its own prices.
-func (s *Service) Generate(allKeys []string, indexFor func(cardID string) []Entry) *OEmbed {
+// providerURL is the origin this instance publishes as its own, which the
+// consumer records as the provider - not BaseURL, which pins redirect links
+// to the instance name whatever host the reader arrived through. indexFor
+// returns the index-price offers for one card, so every card in the panel is
+// quoted with its own prices.
+func (s *Service) Generate(providerURL string, allKeys []string, indexFor func(cardID string) []Entry) *OEmbed {
 	title := "Search Preview"
 	img := ""
 	htmlBody := ""
+	sealed := false
 	var results []SearchResult
 
 	for _, cardID := range allKeys {
@@ -413,6 +426,7 @@ func (s *Service) Generate(allKeys []string, indexFor func(cardID string) []Entr
 				htmlBody += fmt.Sprintf("Printed in %s.\n\n", PrintingsLine(co.Printings))
 			}
 			img = co.Images["full"]
+			sealed = co.Sealed
 		}
 
 		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, s.EditionTitle(cardID))
@@ -456,15 +470,22 @@ func (s *Service) Generate(allKeys []string, indexFor func(cardID string) []Entr
 	// Trim any extra space or carriage feed from the final response
 	htmlBody = strings.TrimSpace(htmlBody)
 
-	return &OEmbed{
-		Version:         "1.0",
-		ProviderName:    "MTGBAN Price Search",
-		ProviderURL:     "https://mtgban.com",
-		Title:           title,
-		Type:            "link",
-		HTML:            htmlBody,
-		ThumbnailURL:    img,
-		ThumbnailWidth:  488,
-		ThumbnailHeight: 680,
+	out := &OEmbed{
+		Version:      "1.0",
+		ProviderName: "MTGBAN Price Search",
+		ProviderURL:  providerURL,
+		Title:        title,
+		// The panel travels in html, which oEmbed allows for a rich type
+		// only - and a rich type has to declare its size.
+		Type:         "rich",
+		HTML:         htmlBody,
+		Width:        cardImageWidth,
+		Height:       cardImageHeight,
+		ThumbnailURL: img,
 	}
+	if img != "" && !sealed {
+		out.ThumbnailWidth = cardImageWidth
+		out.ThumbnailHeight = cardImageHeight
+	}
+	return out
 }
