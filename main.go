@@ -119,6 +119,8 @@ type PageVars struct {
 	// The switch between the three readings of a sealed product's contents,
 	// nil unless the search is one of them over a product that has all three
 	Contents *ContentsViews
+	// Which reading a product's link opens, from the reader's settings
+	SealedContents string
 
 	CheckpointsText    string
 	KeyOverridesText   string

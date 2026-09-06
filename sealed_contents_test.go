@@ -277,3 +277,28 @@ func TestContentsSwitchRendersAsPills(t *testing.T) {
 		t.Error("an ordinary search offers the switch")
 	}
 }
+
+// The setting decides which reading a product's link opens, and only for a
+// product that has all three.
+func TestTheSettingPicksWhatALinkOpens(t *testing.T) {
+	for _, tt := range []struct {
+		name            string
+		random, hasDeck bool
+		pref, want      string
+	}{
+		{"both, unset", true, true, "", ContentsAll},
+		{"both, everything", true, true, ContentsAll, ContentsAll},
+		{"both, only fixed", true, true, ContentsFixed, ContentsFixed},
+		{"both, only variable", true, true, ContentsVariable, ContentsVariable},
+		{"both, nonsense", true, true, "sideways", ContentsAll},
+		// A booster box has no fixed list to open, and a plain precon has no
+		// variable one: neither has a choice to make.
+		{"booster box", true, false, ContentsFixed, ContentsAll},
+		{"plain precon", false, true, ContentsVariable, ContentsFixed},
+	} {
+		got := sealedContentsFilter(tt.random, tt.hasDeck, tt.pref)
+		if got != tt.want {
+			t.Errorf("%s: link opens %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}

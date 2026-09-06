@@ -490,7 +490,7 @@
                             </div>
                         </td>
                         {{if $showInfo}}
-                            <td>{{if $card.Sealed}}<a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>{{else if not $.GlobalMode}}{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true}}{{end}}</td>
+                            <td>{{if $card.Sealed}}<a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">🔎</span></a>{{else if not $.GlobalMode}}{{buylist_detail $.ScraperShort $card.HotlistStore .BuylistEntry.BuyPrice $card.GoodBuylist $card.HighestBuylist true}}{{end}}</td>
                         {{end}}
                         {{if not $save.HasNoConds}}
                             <td>

@@ -370,6 +370,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	pageVars.SearchBest = (readCookie(r, "SearchListingPriority") != "stores")
 	pageVars.DefaultTab = readCookie(r, "SearchDefaultTab")
+	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
 	pageVars.DefaultView = readCookie(r, "SearchDefaultView")
 	pageVars.MobileSearchLayout = readCookie(r, "MobileSearchLayout")
 

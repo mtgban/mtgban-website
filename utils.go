@@ -1264,6 +1264,31 @@ func readSetFlag(w http.ResponseWriter, r *http.Request, queryParam, cookieName 
 }
 
 // Read a cookie from the request
+// sealedContentsPref normalizes the setting that picks which reading a
+// product's link opens, defaulting to everything the product can hold - which
+// is what the link did before there was a choice.
+func sealedContentsPref(value string) string {
+	switch value {
+	case ContentsFixed, ContentsVariable:
+		return value
+	}
+	return ContentsAll
+}
+
+// sealedContentsFilter picks the filter a product's link should use. The
+// setting only applies to a product with something on both sides of it: a
+// booster box has no fixed list to open, and a plain precon has no variable
+// one, so both keep the only reading they have.
+func sealedContentsFilter(random, hasDeck bool, pref string) string {
+	if random && hasDeck {
+		return sealedContentsPref(pref)
+	}
+	if random {
+		return ContentsAll
+	}
+	return ContentsFixed
+}
+
 func readCookie(r *http.Request, cookieName string) string {
 	cookie, err := r.Cookie(cookieName)
 	if err != nil {

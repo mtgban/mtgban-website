@@ -268,10 +268,21 @@
         form.submit();
     }
 
+    // Which reading of a product's contents to open, from the same setting the
+    // product links follow. Only for a product that holds a fixed list and a
+    // variable one: everything else has a single reading, and asking for one
+    // it does not have finds nothing.
+    function sealedContentsFilter(name) {
+        var meta = S.sealedMetaCache[name];
+        if (!meta || !meta.hasContents || !meta.hasPicks) return 'contents';
+        var pref = (typeof getCookie === 'function' && getCookie('SearchSealedContents')) || '';
+        return (pref === 'decklist' || pref === 'variable') ? pref : 'contents';
+    }
+
     function sealedAction(kind, name) {
         // contents:/unpack: must route through /search; /sealed force-sets SearchMode="sealed".
         var path;
-        if      (kind === 'contents') path = '/search?q=' + encodeURIComponent('contents:"' + name + '"');
+        if      (kind === 'contents') path = '/search?q=' + encodeURIComponent(sealedContentsFilter(name) + ':"' + name + '"');
         else if (kind === 'unpack')   path = '/search?q=' + encodeURIComponent('unpack:"'   + name + '"');
         else                          path = '/sealed?q=' + encodeURIComponent(name);
         window.location.href = path;
