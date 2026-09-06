@@ -873,6 +873,11 @@
 .store-fix:hover { background: rgba(210,153,34,0.15); }
 html.admin-fix-mode .store-fix { display: inline-block; }
 
+/* The raw-record link rides the same admin Fix toggle as the store Fix
+   links: hidden until the wrench turns the mode on. */
+.raw-record { display: none; }
+html.admin-fix-mode .raw-record { display: inline-block; }
+
 .price-row {
     display: flex;
     align-items: center;

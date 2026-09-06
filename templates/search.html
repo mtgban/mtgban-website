@@ -1050,6 +1050,7 @@
                                     <button type="button" class="qi-toggle" title="More actions" aria-label="More actions" aria-expanded="false"><i data-lucide="ellipsis-vertical"></i></button>
                                     <div class="qi-actions">
                                     {{if $.CanFixSearch}}
+                                        <a class="raw-record" href="/api/mtgmatcher/raw/{{$cardId}}" target="_blank" rel="noopener" title="Raw mtgmatcher record for this card (admin)"><span class="emoji">&#128300;</span></a>
                                         <span class="emoji" style="cursor: pointer;" title="Toggle Fix mode — show a Fix link on each store (admin)" onclick="toggleAdminFixMode()">&#128295;</span>
                                     {{end}}
                                     {{if $card.Sealed}}
