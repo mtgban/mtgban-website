@@ -851,6 +851,10 @@ func scraperCompare(w http.ResponseWriter, r *http.Request, pageVars PageVars, a
 	miscSearchOpts := strings.Split(readCookie(r, "SearchMiscOpts"), ",")
 	preferFlavor := slices.Contains(miscSearchOpts, "preferFlavor")
 
+	// The sealed rows here carry the same link into a product's contents as
+	// the search results do, so they follow the same setting.
+	pageVars.SealedContents = sealedContentsPref(readCookie(r, "SearchSealedContents"))
+
 	// The pool of scrapers that source will be compared against
 	var scrapers []mtgban.Scraper
 	if pageVars.GlobalMode || pageVars.ReverseMode {

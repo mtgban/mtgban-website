@@ -1060,7 +1060,7 @@
                                             <a href='/api/tcgplayer/decklist/{{$card.UUID}}' title="Download a TCGplayer-formatted decklist"><img width=28 src="/img/misc/decklist.png"></a>
                                             <a href='/api/cardmarket/decklist/{{$card.UUID}}' title="Download a Cardmarket-formatted decklist"><img width=28 src="/img/misc/decklist-mkm.png"></a>
                                         {{end}}
-                                        <a href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">&#128270;</span></a>
+                                        <a href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' title="Search what can be found in this product"><span class="emoji">&#128270;</span></a>
                                     {{else if $.HasAvailable}}
                                         <a href='/sealed?q=container:"{{$card.Name}}"' title="Search which products can contain a reprint"><span class="emoji">&#128214;</span></a>
                                     {{end}}
@@ -1825,6 +1825,22 @@ body.modal-embed .cp-overlay { display: none !important; }
             <button class="settings-pill" data-val="priceRatio">Price Ratio</button>
             <button class="settings-pill" data-val="creditPrice">Credit Price</button>
             <button class="settings-pill" data-val="marketCredit">Credit Market</button>
+        </div>
+    </div>
+</section>
+
+<!-- Sealed Contents -->
+<section class="settings-section expanded">
+    <div class="settings-section-header" data-role="section-toggle">        <h3>Sealed Contents with Variable Cards</h3>
+
+        <i class="settings-section-chevron" data-lucide="chevron-right"></i>
+    </div>
+    <div class="settings-section-body">
+        <p class="section-desc">When unpacking, display all the possible cards, or choose to see only the fixed decklist or only the variable cards.</p>
+        <div class="settings-pills" id="settings-search-contents" data-cookie="SearchSealedContents">
+            <button class="settings-pill" data-val="contents">Everything</button>
+            <button class="settings-pill" data-val="decklist">Only fixed</button>
+            <button class="settings-pill" data-val="variable">Only variable</button>
         </div>
     </div>
 </section>

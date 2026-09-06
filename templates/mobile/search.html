@@ -274,7 +274,7 @@
                             <img src="/img/misc/decklist-mkm.png" alt=""><span>Cardmarket decklist</span>
                         </a>
                     {{end}}
-                    <a class="m-actions-item" href='/search?q={{if $card.Booster}}contents{{else}}decklist{{end}}:"{{$card.Name}}"' onclick="closeActionsMenus()">
+                    <a class="m-actions-item" href='/search?q={{sealed_contents_filter $card.Booster $card.HasDeck $.SealedContents}}:"{{$card.Name}}"' onclick="closeActionsMenus()">
                         <i data-lucide="search"></i><span>Search contents</span>
                     </a>
                 {{else if $.HasAvailable}}

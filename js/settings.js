@@ -29,6 +29,7 @@
         cookieLists: ['SearchSellersList', 'SearchVendorsList'],
         pills: {
             // search
+            'settings-search-contents': 'SearchSealedContents',
             'settings-search-sort': 'SearchDefaultSort',
             'settings-search-listing': 'SearchListingPriority',
             'settings-search-buylist-secondary': 'SearchBuylistSecondary',
@@ -46,6 +47,11 @@
             // upload
             'settings-upload-checks': 'UploadOptimizerOpts',
             'settings-upload-custom': 'UploadCustomOpts',
+        },
+        // A pill group whose cookie has never been set still has to show
+        // which way it behaves.
+        pillDefaults: {
+            'settings-search-contents': 'contents',
         },
         miscDefaults: {
             // upload
@@ -156,7 +162,7 @@
         const active = c && c.querySelector('.settings-pill.active');
         return active ? active.dataset.val : '';
     }
-    function bindPills(containerId, cookieName) {
+    function bindPills(containerId, cookieName, fallback) {
         const c = document.getElementById(containerId);
         if (!c) return;
         c.addEventListener('click', function (e) {
@@ -169,7 +175,7 @@
         });
         addBinding({
             load: function () {
-                const val = getCookie(cookieName);
+                const val = getCookie(cookieName) || fallback || '';
                 c.querySelectorAll('.settings-pill').forEach(function (btn) {
                     btn.classList.toggle('active', btn.dataset.val === val);
                 });
@@ -249,7 +255,9 @@
     function autoWire() {
         Object.entries(BINDINGS.lists || {}).forEach(function (e) { bindList(e[0], e[1]); });
         (BINDINGS.cookieLists || []).forEach(bindListByCookie);
-        Object.entries(BINDINGS.pills || {}).forEach(function (e) { bindPills(e[0], e[1]); });
+        Object.entries(BINDINGS.pills || {}).forEach(function (e) {
+            bindPills(e[0], e[1], (BINDINGS.pillDefaults || {})[e[0]]);
+        });
         (BINDINGS.selects || []).forEach(bindSelect);
         Object.entries(BINDINGS.texts || {}).forEach(function (e) { bindText(e[0], e[1]); });
         Object.entries(BINDINGS.misc || {}).forEach(function (e) {

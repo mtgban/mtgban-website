@@ -53,6 +53,9 @@ var funcMap = template.FuncMap{
 	},
 	"csv_without": csvWithout,
 	"first_csv":   firstCSV,
+	// Which of the three readings a sealed product's link opens, given what
+	// the product holds and what the reader asked for in the settings
+	"sealed_contents_filter": sealedContentsFilter,
 	"dec": func(i, j int) int {
 		return i - j
 	},
