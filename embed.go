@@ -109,11 +109,15 @@ func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]Searc
 	}
 
 	if len(results) > 0 {
-		// Drop duplicates by looking at the last one as they are alredy sorted
-		tmp := append(results[:0], results[0])
-		for i := range results {
-			if results[i].ScraperName != tmp[len(tmp)-1].ScraperName {
-				tmp = append(tmp, results[i])
+		// Drop duplicates by looking at the last one as they are already
+		// sorted. Into a slice of its own: results can still be the INDEX
+		// slice the map holds, and compacting that in place would rewrite
+		// the rows the page is about to render.
+		tmp := make([]SearchEntry, 0, len(results))
+		tmp = append(tmp, results[0])
+		for _, result := range results {
+			if result.ScraperName != tmp[len(tmp)-1].ScraperName {
+				tmp = append(tmp, result)
 			}
 		}
 		results = tmp
