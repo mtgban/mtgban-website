@@ -113,8 +113,13 @@ type PageVars struct {
 
 	PopularSearches []PopularSearch
 
-	CanShowAll         bool
-	CleanSearchQuery   string
+	CanShowAll       bool
+	CleanSearchQuery string
+
+	// The switch between the three readings of a sealed product's contents,
+	// nil unless the search is one of them over a product that has all three
+	Contents *ContentsViews
+
 	CheckpointsText    string
 	KeyOverridesText   string
 	OverrideStores     []string

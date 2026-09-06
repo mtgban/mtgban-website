@@ -119,6 +119,16 @@
             <a class="search-sort-settings" href="/random{{if .IsSealed}}sealed{{end}}{{if .ModalMode}}?chart={{.ChartIDsCSV}}&modal=1{{end}}" title="Random {{if .IsSealed}}Product{{else}}Card{{end}}"><i data-lucide="dice-5"></i></a>
         </span>
     </div>
+    {{/* Only over a product that holds a fixed list and a variable one, where
+         all three readings mean something. */}}
+    {{if .Contents}}
+        <div class="search-sort-row">
+            <span class="search-sort-label">Contents</span>
+            <a class="search-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}" title="Everything {{.Contents.Product}} can hold"><i data-lucide="boxes"></i></a>
+            <a class="search-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}" title="Only what {{.Contents.Product}} always holds"><i data-lucide="package-check"></i></a>
+            <a class="search-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}" title="Only the cards {{.Contents.Product}} might hold"><i data-lucide="dices"></i></a>
+        </div>
+    {{end}}
     {{if .TotalUnique}}
         <div class="search-result-divider">
             <span class="search-result-count">

@@ -180,6 +180,19 @@
     </script>
 
 
+    {{/* The three readings of a product's contents, where all three mean
+         something: it holds a fixed list and a variable one. */}}
+    {{if .Contents}}
+    <div class="m-result-meta">
+        <span>Contents</span>
+        <div class="m-sort-pills">
+            <a class="m-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}" title="Everything {{.Contents.Product}} can hold"><i data-lucide="boxes"></i></a>
+            <a class="m-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}" title="Only what {{.Contents.Product}} always holds"><i data-lucide="package-check"></i></a>
+            <a class="m-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}" title="Only the cards {{.Contents.Product}} might hold"><i data-lucide="dices"></i></a>
+        </div>
+    </div>
+    {{end}}
+
     {{/* Result count + sort pills */}}
     {{if .TotalUnique}}
     <div class="m-result-meta">

@@ -614,6 +614,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Offered once the search has found cards to switch between. A product
+	// that holds nothing but other products answers with those products: rows
+	// on the page, but not cards, and reading them another way finds nothing.
+	if containsSingles(allKeys) {
+		pageVars.Contents = contentsViews(query, config)
+	}
+
 	// Only used in hashing searches, fill in data with what is available
 	if config.FullQuery != "" {
 		pageVars.SearchQuery = config.FullQuery
@@ -1527,6 +1534,82 @@ func editionSeedCodes(filters []FilterElem) ([]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+// The three readings of a sealed product's contents: everything it can hold,
+// only what it always holds, only what it might. They name the filter that
+// searches for each.
+const (
+	ContentsAll      = "contents"
+	ContentsFixed    = "decklist"
+	ContentsVariable = "variable"
+)
+
+// containsSingles answers whether a result set holds a card, as opposed to
+// holding only the products that cards come in.
+func containsSingles(cardIDs []string) bool {
+	for _, cardID := range cardIDs {
+		co, err := mtgmatcher.GetUUID(cardID)
+		if err == nil && !co.Sealed {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ContentsViews is the switch between those three, for a product that has
+// something on both sides of it.
+type ContentsViews struct {
+	// The product, for the titles that say what is being switched
+	Product string
+
+	// Which reading is showing
+	Mode string
+
+	// The query for each, the current one included
+	All      string
+	Fixed    string
+	Variable string
+}
+
+// contentsViews answers whether a contents:/decklist:/variable: search can be
+// read another way, and with which queries.
+//
+// A drop that can hold bonus cards lists every one of them beside the few it
+// always holds - a Secret Lair's cards arrive buried in the ones that might
+// come with them. Only where all three readings mean something: a product with
+// nothing guaranteed has no fixed list, one with no bonus cards has no
+// variable list, and neither has anything to switch between.
+func contentsViews(query string, config SearchConfig) *ContentsViews {
+	if config.ContentsProduct == "" || config.ContentsMode == "" {
+		return nil
+	}
+
+	co, err := mtgmatcher.GetUUID(config.ContentsProduct)
+	if err != nil {
+		return nil
+	}
+	if !mtgmatcher.SealedHasDecklist(co.SetCode, co.UUID) {
+		return nil
+	}
+	if !mtgmatcher.SealedIsRandom(co.SetCode, co.UUID) {
+		return nil
+	}
+
+	// The filter is swapped in the query as it was typed, so whatever else it
+	// carries is carried over with it.
+	swap := func(to string) string {
+		return strings.Replace(query, config.ContentsMode+":", to+":", 1)
+	}
+
+	return &ContentsViews{
+		Product:  co.Name,
+		Mode:     config.ContentsMode,
+		All:      swap(ContentsAll),
+		Fixed:    swap(ContentsFixed),
+		Variable: swap(ContentsVariable),
+	}
 }
 
 func searchAndFilter(config SearchConfig) ([]string, error) {
