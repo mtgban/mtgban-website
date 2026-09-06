@@ -758,7 +758,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	preview := embedService.Generate(allKeys, ProcessEmbedSearchResultsSellers(foundSellers, true))
+	// Every card is quoted with its own index prices: one shared list would
+	// print the first card's numbers under every other card's heading.
+	preview := embedService.Generate(allKeys, func(cardID string) []embed.Entry {
+		return EmbedSellerEntries(foundSellers, cardID, true)
+	})
 	if oembed {
 		if len(allKeys) == 0 {
 			w.WriteHeader(http.StatusNotFound)

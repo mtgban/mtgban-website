@@ -48,25 +48,34 @@ func searchEntries2embed(results []SearchEntry) []embed.Entry {
 	return out
 }
 
+// firstEmbedCard names the card an embed speaks for when it can only speak
+// for one: the earliest by set, over every card the search found.
+func firstEmbedCard(found map[string]map[string][]SearchEntry) string {
+	sortedKeys := make([]string, 0, len(found))
+	for cardID := range found {
+		sortedKeys = append(sortedKeys, cardID)
+	}
+	if len(sortedKeys) > 1 {
+		sortData := resolveSortingData(sortedKeys)
+		sort.Slice(sortedKeys, func(i, j int) bool {
+			return cmpSets(sortData[sortedKeys[i]], sortData[sortedKeys[j]])
+		})
+	}
+	return sortedKeys[0]
+}
+
 // Retrieve cards from Sellers using the very first result
 func ProcessEmbedSearchResultsSellers(foundSellers map[string]map[string][]SearchEntry, index bool) []embed.Entry {
 	if len(foundSellers) == 0 {
 		return nil
 	}
+	return EmbedSellerEntries(foundSellers, firstEmbedCard(foundSellers), index)
+}
+
+// EmbedSellerEntries picks the offers an embed shows for one named card.
+func EmbedSellerEntries(foundSellers map[string]map[string][]SearchEntry, cardID string, index bool) []embed.Entry {
 	var results []SearchEntry
 
-	sortedKeysSeller := make([]string, 0, len(foundSellers))
-	for cardID := range foundSellers {
-		sortedKeysSeller = append(sortedKeysSeller, cardID)
-	}
-	if len(sortedKeysSeller) > 1 {
-		sortData := resolveSortingData(sortedKeysSeller)
-		sort.Slice(sortedKeysSeller, func(i, j int) bool {
-			return cmpSets(sortData[sortedKeysSeller[i]], sortData[sortedKeysSeller[j]])
-		})
-	}
-
-	cardID := sortedKeysSeller[0]
 	if index {
 		results = foundSellers[cardID]["INDEX"]
 
@@ -131,16 +140,5 @@ func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]Searc
 		return nil
 	}
 
-	sortedKeysVendor := make([]string, 0, len(foundVendors))
-	for cardID := range foundVendors {
-		sortedKeysVendor = append(sortedKeysVendor, cardID)
-	}
-	if len(sortedKeysVendor) > 1 {
-		sortData := resolveSortingData(sortedKeysVendor)
-		sort.Slice(sortedKeysVendor, func(i, j int) bool {
-			return cmpSets(sortData[sortedKeysVendor[i]], sortData[sortedKeysVendor[j]])
-		})
-	}
-
-	return searchEntries2embed(foundVendors[sortedKeysVendor[0]]["NM"])
+	return searchEntries2embed(foundVendors[firstEmbedCard(foundVendors)]["NM"])
 }

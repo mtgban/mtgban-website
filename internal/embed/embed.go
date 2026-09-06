@@ -29,6 +29,10 @@ const (
 	// MaxPrintings is how many printings are listed before the line
 	// truncates to "and more".
 	MaxPrintings = 12
+
+	// MaxPreviewCards is how many cards one preview panel lists. Distinct
+	// from MaxCustomEntries, which counts rows within a single field.
+	MaxPreviewCards = 8
 )
 
 // Service renders embeds, wired to the host's link building and data lookups.
@@ -379,21 +383,24 @@ func (s *Service) LastSoldFields(cardID string, lang string) ([]Field, error) {
 }
 
 // Generate builds the oEmbed preview panel for a search result page.
-// indexResults carries the index-price offers picked by the host; every
-// card shown shares the same list, matching the historical behavior.
-func (s *Service) Generate(allKeys []string, indexResults []Entry) *OEmbed {
+// indexFor returns the index-price offers for one card, so every card in the
+// panel is quoted with its own prices.
+func (s *Service) Generate(allKeys []string, indexFor func(cardID string) []Entry) *OEmbed {
 	title := "Search Preview"
 	img := ""
 	htmlBody := ""
 	var results []SearchResult
 
-	for i, cardID := range allKeys {
+	for _, cardID := range allKeys {
 		co, err := mtgmatcher.GetUUID(cardID)
 		if err != nil {
 			continue
 		}
 
-		if i == 0 {
+		// Title and thumbnail come from the first card that resolves, not
+		// from allKeys[0]: one id the datastore cannot place would otherwise
+		// leave the preview with neither.
+		if len(results) == 0 {
 			title = co.Name
 			if co.Sealed {
 				title += " 📦"
@@ -410,13 +417,18 @@ func (s *Service) Generate(allKeys []string, indexResults []Entry) *OEmbed {
 
 		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, s.EditionTitle(cardID))
 
+		var index []Entry
+		if indexFor != nil {
+			index = indexFor(cardID)
+		}
+
 		results = append(results, SearchResult{
 			CardID:        cardID,
-			ResultsIndex:  indexResults,
+			ResultsIndex:  index,
 			NamesOverride: []string{fieldName},
 		})
 
-		if i > MaxCustomEntries {
+		if len(results) == MaxPreviewCards {
 			break
 		}
 	}
