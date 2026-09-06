@@ -277,18 +277,32 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	oembed := strings.HasPrefix(r.URL.Path, "/search/oembed")
 	if oembed {
+		// A consumer that cannot read what we would send is told so rather
+		// than handed json it did not ask for.
+		switch format := r.FormValue("format"); format {
+		case "", "json":
+		default:
+			oembedError(w, http.StatusNotImplemented)
+			return
+		}
+
 		page := r.FormValue("url")
 		u, err := url.Parse(page)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`Internal Server Error`))
+			oembedError(w, http.StatusNotFound)
+			return
+		}
+		// An oEmbed provider answers for its own pages only. Any other host
+		// is a url we cannot speak for, so it gets the same answer as a page
+		// that carries no search at all.
+		if !trustedHostname(u.Host) {
+			oembedError(w, http.StatusNotFound)
 			return
 		}
 		values := u.Query()
 		query = values.Get("q")
 		if query == "" {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(`Not Found`))
+			oembedError(w, http.StatusNotFound)
 			return
 		}
 	}
@@ -365,6 +379,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanDownloadCSV = canDownloadCSV
 
 	if len(query) > MaxSearchQueryLen {
+		if oembed {
+			oembedError(w, http.StatusNotFound)
+			return
+		}
 		pageVars.ErrorMessage = TooLongMessage
 
 		render(w, "search.html", pageVars)
@@ -519,7 +537,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	// Keep track of what was searched
 	pageVars.SearchQuery = query
 	pageVars.Embed.PageURL = ServerURL + r.URL.String()
-	pageVars.Embed.OEmbedURL = ServerURL + "/search/oembed?format=json&url=" + url.QueryEscape(ServerURL+"/search?q="+query)
+	// Point the consumer at the very page it is unfurling: a fixed /search?q=
+	// names a different url than og:url on /sealed, or under any parameter
+	// the reader arrived with.
+	pageVars.Embed.OEmbedURL = ServerURL + "/search/oembed?format=json&url=" + url.QueryEscape(pageVars.Embed.PageURL)
 	pageVars.CondKeys = AllConditions
 	pageVars.Metadata = map[string]GenericCard{}
 	pageVars.ShowUpsell = !slices.Contains(miscSearchOpts, "noUpsell")
@@ -544,6 +565,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		// an invitation to answer a different question.
 		allKeys = searchFallback(config)
 		if len(allKeys) == 0 {
+			if oembed {
+				oembedError(w, http.StatusNotFound)
+				return
+			}
 			pageVars.InfoMessage = NoCardsMessage
 			pageVars.PopularSearches = getPopularSearches()
 			pageVars.CleanSearchQuery = config.CleanQuery
@@ -574,6 +599,10 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Early exit if there no matches are found
 	if len(allKeys) == 0 {
+		if oembed {
+			oembedError(w, http.StatusNotFound)
+			return
+		}
 		pageVars.InfoMessage = NoResultsMessage
 		if hidePromos {
 			pageVars.InfoMessage = NoPromosMessage
@@ -760,20 +789,13 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
-	preview := embedService.Generate(allKeys, func(cardID string) []embed.Entry {
+	preview := embedService.Generate(externalURL(), allKeys, func(cardID string) []embed.Entry {
 		return EmbedSellerEntries(foundSellers, cardID, true)
 	})
 	if oembed {
-		if len(allKeys) == 0 {
-			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(`Not Found`))
-			return
-		}
-
 		payload, err := json.Marshal(preview)
 		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`Internal Server Error`))
+			oembedError(w, http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

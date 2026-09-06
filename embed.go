@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"sort"
 
 	"github.com/mtgban/go-mtgban/mtgban"
@@ -141,4 +142,23 @@ func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]Searc
 	}
 
 	return searchEntries2embed(foundVendors[firstEmbedCard(foundVendors)]["NM"])
+}
+
+// externalURL is the origin this site is reachable at, which an oEmbed
+// consumer records as the provider. ServerURL is latched from the first
+// request on a host we trust, so it can still be empty behind one we do not.
+func externalURL() string {
+	if ServerURL != "" {
+		return ServerURL
+	}
+	return "https://mtgban.com"
+}
+
+// oembedError answers an oEmbed request with a status and nothing else. The
+// consumer asked for json and cannot read a rendered search page, which is
+// what the regular no-results paths would hand it.
+func oembedError(w http.ResponseWriter, status int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	w.Write([]byte(`{}`))
 }

@@ -146,6 +146,16 @@ func getServerURL(r *http.Request) string {
 // platform health check hits before any custom-domain traffic: latching that
 // would pin ServerURL to a hostname that isn't a registered Patreon redirect
 // target and then leak into every redirect, embed, and OAuth link.
+// trustedHostname reports whether a host belongs to this site: localhost in
+// dev, or an mtgban.com host in production. Matched on the hostname exactly
+// (dropping any :port) and by suffix rather than substring, so a spoofed
+// "…mtgban.com.evil.tld" can't slip through.
+func trustedHostname(host string) bool {
+	name, _, _ := strings.Cut(host, ":")
+	name = strings.ToLower(name)
+	return name == "localhost" || name == "mtgban.com" || strings.HasSuffix(name, ".mtgban.com")
+}
+
 func initServerURL(r *http.Request) {
 	if ServerURL != "" {
 		return
@@ -154,12 +164,7 @@ func initServerURL(r *http.Request) {
 	if host == "" {
 		host = r.Host
 	}
-	// Match the hostname exactly (dropping any :port) so only localhost in dev
-	// or an mtgban.com host in prod can latch ServerURL — a suffix check, not a
-	// substring one, so a spoofed "…mtgban.com.evil.tld" Host can't slip through.
-	name, _, _ := strings.Cut(host, ":")
-	name = strings.ToLower(name)
-	if name != "localhost" && name != "mtgban.com" && !strings.HasSuffix(name, ".mtgban.com") {
+	if !trustedHostname(host) {
 		return
 	}
 	ServerURL = getServerURL(r)
