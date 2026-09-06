@@ -964,6 +964,17 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 		case "variable":
 			config.SearchMode = "mixed"
 			uuids := fixupContents(code)
+			// Everything the product can hold goes in first, whatever comes
+			// of the rest: a product with nothing guaranteed has nothing to
+			// take back out, so all of its contents are variable, and a name
+			// that names no product matches nothing, as contents: has it. A
+			// case that left no filter behind was answered with the whole
+			// datastore.
+			filters = append(filters, FilterElem{
+				Name:   "contents",
+				Negate: negate,
+				Values: uuids,
+			})
 			if len(uuids) < 1 {
 				continue
 			}
@@ -980,10 +991,6 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				continue
 			}
 			filters = append(filters, FilterElem{
-				Name:   "contents",
-				Negate: negate,
-				Values: uuids,
-			}, FilterElem{
 				Name:   "idlookup",
 				Negate: !negate,
 				Values: picks,
@@ -1904,6 +1911,12 @@ func cardFilterIdlookup(filters []string, co *mtgmatcher.CardObject) bool {
 }
 
 func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
+	// A name that names no product leaves nothing to be the contents of: the
+	// loop below has nothing to fail on, and an answer of "everything" is
+	// the whole datastore handed back for a typo.
+	if len(filters) == 0 {
+		return true
+	}
 	values := cardobject2sources(co)
 	for _, filter := range filters {
 		if !slices.Contains(values, filter) {
