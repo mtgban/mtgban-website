@@ -1,0 +1,14 @@
+{{/*
+    A price the market does not back up: a TCG Direct listing far above TCG
+    Market, or a sealed product whose simulated contents are too unevenly
+    distributed to price. Rendered red with the explanation on hover, in the
+    reference column in global mode and the buy column in reverse.
+*/}}
+{{define "sussy-price"}}
+    {{if (isSussy .List .CardID)}}
+        {{$susPrice := (index .List .CardID)}}
+        <span class="arb-price-warn" title="CAUTION - This price looks a bit off, {{if .Sealed}}the contents of this product have a very uneven distribution, and simulation or data may be wrong (IQR: {{printf "%.2f" $susPrice}}){{else}}TCG Market is {{if $susPrice}}${{printf "%.2f" $susPrice}}{{else}}missing{{end}}{{end}}">$ {{printf "%.2f" .Price}}</span>
+    {{else}}
+        $ {{printf "%.2f" .Price}}
+    {{end}}
+{{end}}
