@@ -133,12 +133,6 @@ func getServerURL(r *http.Request) string {
 	return scheme + "://" + host
 }
 
-// initServerURL latches the external ServerURL from the first request on a host
-// we trust — localhost in dev, any *.mtgban.com in production. Requests on any
-// other host are ignored, notably the raw *.ondigitalocean.app app URL that a
-// platform health check hits before any custom-domain traffic: latching that
-// would pin ServerURL to a hostname that isn't a registered Patreon redirect
-// target and then leak into every redirect, embed, and OAuth link.
 // trustedHostname reports whether a host belongs to this site: localhost in
 // dev, or an mtgban.com host in production. Matched on the hostname exactly
 // (dropping any :port) and by suffix rather than substring, so a spoofed
@@ -149,6 +143,12 @@ func trustedHostname(host string) bool {
 	return name == "localhost" || name == "mtgban.com" || strings.HasSuffix(name, ".mtgban.com")
 }
 
+// initServerURL latches the external ServerURL from the first request on a host
+// we trust — localhost in dev, any *.mtgban.com in production. Requests on any
+// other host are ignored, notably the raw *.ondigitalocean.app app URL that a
+// platform health check hits before any custom-domain traffic: latching that
+// would pin ServerURL to a hostname that isn't a registered Patreon redirect
+// target and then leak into every redirect, embed, and OAuth link.
 func initServerURL(r *http.Request) {
 	if ServerURL != "" {
 		return
