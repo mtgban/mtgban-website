@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -631,14 +632,23 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		searchRes.ResultsSellers = ProcessEmbedSearchResultsSellers(foundSellers, false)
 		searchRes.ResultsVendors = ProcessEmbedSearchResultsVendors(foundVendors)
 
-		ogFields = embedService.FormatSearchResult(searchRes)
+		ogFields = embed.FormatSearchResult(externalURL(), searchRes)
 	} else if lastSold {
 		// Since grabLastSold is slow, spawn a goroutine and wait for the real
 		// results later, after posting a "please wait" message
 		go func() {
 			channel = make(chan *discordgo.MessageEmbed)
 			var errMsg string
-			ogFields, err = embedService.LastSoldFields(searchRes.CardID, co.Language)
+			// The fetch lives here rather than behind the formatting: it is
+			// the half that needs a context, a timeout and an error to
+			// report back to the reader.
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			var lastSales []tcgplayer.LatestSalesData
+			lastSales, err = getLastSold(ctx, searchRes.CardID, false)
+			cancel()
+			if err == nil {
+				ogFields = embed.LastSoldFields(lastSales2embed(lastSales), co.Language)
+			}
 			if err != nil {
 				if errors.Is(err, ErrMissingTCGId) {
 					errMsg = fmt.Sprintf("\"%s\" does not have any identifier set, I don't know what to do %s", content, emoteShurg)

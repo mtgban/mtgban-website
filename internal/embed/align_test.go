@@ -29,7 +29,6 @@ func priceColumn(v FieldValue) int {
 // printed and the prices step in and out. Every row of a field has to put its
 // price in the same column.
 func TestIndexValuesAlign(t *testing.T) {
-	svc := &Service{BaseURL: func() string { return "https://example.test" }}
 	res := &SearchResult{
 		CardID: "abcd",
 		ResultsIndex: []Entry{
@@ -44,7 +43,7 @@ func TestIndexValuesAlign(t *testing.T) {
 		},
 	}
 
-	for _, field := range svc.FormatSearchResult(res) {
+	for _, field := range FormatSearchResult("https://example.test", res) {
 		if len(field.Values) < 2 {
 			continue
 		}
@@ -64,7 +63,6 @@ func TestIndexValuesAlign(t *testing.T) {
 // Field.Length decides when a value spills into a continuation field, so the
 // re-padding has to leave it describing the values it actually holds.
 func TestFieldLengthMatchesValues(t *testing.T) {
-	svc := &Service{BaseURL: func() string { return "https://example.test" }}
 	res := &SearchResult{
 		CardID: "abcd",
 		ResultsIndex: []Entry{
@@ -74,7 +72,7 @@ func TestFieldLengthMatchesValues(t *testing.T) {
 		},
 	}
 
-	for _, field := range svc.FormatSearchResult(res) {
+	for _, field := range FormatSearchResult("https://example.test", res) {
 		var sum int
 		for _, value := range field.Values {
 			sum += fieldValueLength(value)

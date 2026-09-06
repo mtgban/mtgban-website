@@ -789,7 +789,7 @@ func Search(w http.ResponseWriter, r *http.Request) {
 
 	// Every card is quoted with its own index prices: one shared list would
 	// print the first card's numbers under every other card's heading.
-	preview := embedService.Generate(externalURL(), allKeys, func(cardID string) []embed.Entry {
+	preview := embed.Generate(externalURL(), allKeys, editionTitle, func(cardID string) []embed.Entry {
 		return EmbedSellerEntries(foundSellers, cardID, true)
 	})
 	if oembed {

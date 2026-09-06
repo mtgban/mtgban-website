@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"net/http"
 	"sort"
 	"strings"
@@ -16,22 +15,6 @@ type (
 	EmbedSearchResult = embed.SearchResult
 	EmbedField        = embed.Field
 )
-
-// embedService renders oEmbed previews and Discord panels. Instances always
-// serve under their instance name (the mtgban.com subdomain), so redirect
-// links anchor to it; dev runs point at the local server instead.
-var embedService = &embed.Service{
-	BaseURL: func() string {
-		if DevMode {
-			return "http://localhost:" + Config.Port
-		}
-		return "https://" + Config.InstanceName + ".mtgban.com"
-	},
-	EditionTitle: editionTitle,
-	LastSold: func(ctx context.Context, cardId string) ([]tcgplayer.LatestSalesData, error) {
-		return getLastSold(ctx, cardId, false)
-	},
-}
 
 // searchEntries2embed converts the picked offers into the embed input shape.
 func searchEntries2embed(results []SearchEntry) []embed.Entry {
@@ -136,6 +119,20 @@ func EmbedSellerEntries(foundSellers map[string]map[string][]SearchEntry, cardID
 	return searchEntries2embed(results)
 }
 
+// lastSales2embed converts the scraper's sales into the embed input shape.
+func lastSales2embed(sales []tcgplayer.LatestSalesData) []embed.Sale {
+	out := make([]embed.Sale, 0, len(sales))
+	for _, sale := range sales {
+		out = append(out, embed.Sale{
+			Language:      sale.Language,
+			PurchasePrice: sale.PurchasePrice,
+			ShippingPrice: sale.ShippingPrice,
+			OrderDate:     sale.OrderDate,
+		})
+	}
+	return out
+}
+
 // Retrieve cards from Vendors using the very first result
 func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]SearchEntry) []embed.Entry {
 	if len(foundVendors) == 0 {
@@ -145,9 +142,11 @@ func ProcessEmbedSearchResultsVendors(foundVendors map[string]map[string][]Searc
 	return searchEntries2embed(foundVendors[firstEmbedCard(foundVendors)]["NM"])
 }
 
-// externalURL is the origin this site is reachable at, which an oEmbed
-// consumer records as the provider. ServerURL is latched from the first
-// request on a host we trust, so it can still be empty behind one we do not.
+// externalURL is the origin this site is reachable at: what an oEmbed
+// consumer records as the provider, and what an embed's price links point
+// at. ServerURL is latched from the first request on a host we trust, so it
+// can still be empty behind one we do not - and a bot message can go out
+// before any request has come in at all.
 func externalURL() string {
 	if ServerURL != "" {
 		return ServerURL

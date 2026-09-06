@@ -71,7 +71,7 @@ func TestPreviewQuotesEachCardWithItsOwnPrices(t *testing.T) {
 	}
 
 	prices := map[string]float64{ids[0]: 1.11, ids[1]: 22.22}
-	out := embedService.Generate(externalURL(), ids[:2], func(cardID string) []embed.Entry {
+	out := embed.Generate(externalURL(), ids[:2], editionTitle, func(cardID string) []embed.Entry {
 		return []embed.Entry{{ScraperName: "TCG Low", Shorthand: "TCGLow", Price: prices[cardID]}}
 	})
 
