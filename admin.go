@@ -714,18 +714,70 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 	// Only the Usage tab reads these aggregates and each one scans a 30-day
 	// window, so leave them alone unless that is the tab being rendered.
 	if ObservabilityDB != nil && page == "usage" {
-		since := time.Now().AddDate(0, 0, -30)
-		includeBots := r.FormValue("bots") == "1"
-		ctx := r.Context()
-		dash := &UsageDashboard{Since: since, IncludeBots: includeBots, Instance: observabilityInstance}
-		dash.TopPages, _ = ObservabilityDB.TopPages(ctx, since, includeBots, observabilityInstance)
-		dash.ByTier, _ = ObservabilityDB.UsageByTier(ctx, since, includeBots, observabilityInstance)
-		dash.ByDevice, _ = ObservabilityDB.DeviceSplit(ctx, since, includeBots, observabilityInstance)
-		dash.SubViews = subViewsOf(dash.TopPages)
-		pageVars.UsageStats = dash
+		pageVars.UsageStats = loadUsageDashboard(r.Context(), r.FormValue("bots") == "1")
 	}
 
 	render(w, "admin.html", pageVars)
+}
+
+// usageCacheTTL bounds how stale the Usage tab may be. Everything behind it
+// aggregates a 30-day window, so the numbers barely move minute to minute and
+// a reload costs nothing until the copy ages out.
+const usageCacheTTL = 5 * time.Minute
+
+type usageCacheEntry struct {
+	dash    *UsageDashboard
+	fetched time.Time
+}
+
+// usageCache holds one entry per bots setting, the only axis the dashboard
+// varies on. The lock covers the queries as well as the map, so a second
+// viewer waits for the first one's answer instead of starting the same scans.
+var usageCache = struct {
+	mu     sync.Mutex
+	byBots map[bool]usageCacheEntry
+}{byBots: map[bool]usageCacheEntry{}}
+
+// loadUsageDashboard returns the telemetry aggregates for the Usage tab,
+// reusing a recent copy when there is one.
+func loadUsageDashboard(ctx context.Context, includeBots bool) *UsageDashboard {
+	usageCache.mu.Lock()
+	defer usageCache.mu.Unlock()
+
+	entry, found := usageCache.byBots[includeBots]
+	if found && time.Since(entry.fetched) < usageCacheTTL {
+		return entry.dash
+	}
+
+	since := time.Now().AddDate(0, 0, -30)
+	dash := &UsageDashboard{Since: since, IncludeBots: includeBots, Instance: observabilityInstance}
+
+	failed := false
+	var err error
+	dash.TopPages, err = ObservabilityDB.TopPages(ctx, since, includeBots, observabilityInstance)
+	if err != nil {
+		log.Println("usage: top pages:", err)
+		failed = true
+	}
+	dash.ByTier, err = ObservabilityDB.UsageByTier(ctx, since, includeBots, observabilityInstance)
+	if err != nil {
+		log.Println("usage: by tier:", err)
+		failed = true
+	}
+	dash.ByDevice, err = ObservabilityDB.DeviceSplit(ctx, since, includeBots, observabilityInstance)
+	if err != nil {
+		log.Println("usage: device split:", err)
+		failed = true
+	}
+	dash.SubViews = subViewsOf(dash.TopPages)
+
+	// A query that failed leaves its table empty, so let the next view retry
+	// rather than serving the gap for the rest of the window.
+	if !failed {
+		usageCache.byBots[includeBots] = usageCacheEntry{dash: dash, fetched: time.Now()}
+	}
+
+	return dash
 }
 
 // subViewPrefixes are the paths the Usage tab breaks out in their own table.
