@@ -36,9 +36,6 @@ type SearchConfig struct {
 	// used to suggest broader searches when nothing is found
 	AppliedFilters []string
 
-	// String where to stash non-user facing data
-	PrivateData string
-
 	// Chain of filters to be applied to card filtering
 	CardFilters []FilterElem
 
@@ -732,8 +729,6 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			}
 			// Retrieve the data to search from the first uuid
 			co, _ := mtgmatcher.GetUUID(uuids[0])
-			// Stash original product reference (name)
-			config.PrivateData = co.Name
 			// Retrieve decklist
 			uuids, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
 			// Assign data so that on error the entire db is returned
