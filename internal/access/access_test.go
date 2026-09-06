@@ -10,9 +10,15 @@ import (
 	"testing"
 )
 
+// inlineSink captures what the inline fallbacks would persist to the config.
+type inlineSink struct {
+	table  Table
+	grants []Grant
+}
+
 // fileHooks reach plain files, standing in for the bucket openers the site
-// injects. saveInline captures what the inline fallback would persist.
-func fileHooks(saveInline *[]Grant) Hooks {
+// injects.
+func fileHooks(sink *inlineSink) Hooks {
 	return Hooks{
 		Open: func(_ context.Context, path string) (io.ReadCloser, error) {
 			return os.Open(path)
@@ -20,11 +26,18 @@ func fileHooks(saveInline *[]Grant) Hooks {
 		OpenWrite: func(_ context.Context, path string) (io.WriteCloser, error) {
 			return os.Create(path)
 		},
-		SaveInline: func(_ context.Context, grants []Grant) error {
-			if saveInline == nil {
+		SaveTableInline: func(_ context.Context, table Table) error {
+			if sink == nil {
 				return errors.New("no inline sink")
 			}
-			*saveInline = grants
+			sink.table = table
+			return nil
+		},
+		SaveGrantsInline: func(_ context.Context, grants []Grant) error {
+			if sink == nil {
+				return errors.New("no inline sink")
+			}
+			sink.grants = grants
 			return nil
 		},
 	}
@@ -139,8 +152,8 @@ func TestSaveGrantsWritesThePath(t *testing.T) {
 // Without a grants path the save goes through the inline hook — the config
 // write-back — and still publishes on success.
 func TestSaveGrantsFallsBackInline(t *testing.T) {
-	var saved []Grant
-	c := New(fileHooks(&saved))
+	var sink inlineSink
+	c := New(fileHooks(&sink))
 	err := c.Load(context.Background(), Sources{
 		FallbackGrants: []Grant{{Email: "a@example.com"}},
 	})
@@ -151,10 +164,64 @@ func TestSaveGrantsFallsBackInline(t *testing.T) {
 	if err := c.SaveGrants(context.Background(), next); err != nil {
 		t.Fatal(err)
 	}
-	if len(saved) != 2 {
-		t.Errorf("inline sink got %d grants, want 2", len(saved))
+	if len(sink.grants) != 2 {
+		t.Errorf("inline sink got %d grants, want 2", len(sink.grants))
 	}
 	if len(c.Grants()) != 2 {
 		t.Errorf("published %d grants, want 2", len(c.Grants()))
+	}
+}
+
+// With a table path set, a save writes the file and publishes the new table.
+func TestSaveTableWritesThePath(t *testing.T) {
+	dir := t.TempDir()
+	tablePath := filepath.Join(dir, "acl.json")
+	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+
+	c := New(fileHooks(nil))
+	err := c.Load(context.Background(), Sources{TablePath: tablePath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := Table{"Root": {"Search": {}}, "Mods": {"Search": {}}}
+	if err := c.SaveTable(context.Background(), next); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Table()) != 2 {
+		t.Errorf("published %d tiers, want 2", len(c.Table()))
+	}
+	var onDisk Table
+	data, err := os.ReadFile(tablePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &onDisk); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := onDisk["Mods"]; !ok || len(onDisk) != 2 {
+		t.Errorf("file holds %v, want the saved pair", onDisk)
+	}
+}
+
+// Without a table path the save goes through the inline hook — the config
+// write-back — and still publishes on success.
+func TestSaveTableFallsBackInline(t *testing.T) {
+	var sink inlineSink
+	c := New(fileHooks(&sink))
+	err := c.Load(context.Background(), Sources{
+		FallbackTable: Table{"Root": {"Search": {}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	next := Table{"Root": {"Search": {}}, "Mods": {"Search": {}}}
+	if err := c.SaveTable(context.Background(), next); err != nil {
+		t.Fatal(err)
+	}
+	if len(sink.table) != 2 {
+		t.Errorf("inline sink got %d tiers, want 2", len(sink.table))
+	}
+	if len(c.Table()) != 2 {
+		t.Errorf("published %d tiers, want 2", len(c.Table()))
 	}
 }

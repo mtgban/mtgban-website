@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 
 	"github.com/mtgban/mtgban-website/internal/access"
 )
@@ -17,9 +18,10 @@ import (
 type PatreonGrant = access.Grant
 
 var Access = access.New(access.Hooks{
-	Open:       openBucketPath,
-	OpenWrite:  openBucketWriter,
-	SaveInline: savePatreonGrantsInline,
+	Open:             openBucketPath,
+	OpenWrite:        openBucketWriter,
+	SaveTableInline:  saveACLInline,
+	SaveGrantsInline: savePatreonGrantsInline,
 })
 
 // ACL returns the tier -> feature -> option table this deployment enforces.
@@ -49,13 +51,47 @@ func saveGrants(ctx context.Context, grants []PatreonGrant) error {
 	return Access.SaveGrants(ctx, grants)
 }
 
-// savePatreonGrantsInline rewrites the config file with the new grant list,
-// which is where the admin page has always written it. Used only while a
-// config still carries its grants inline; goes away with the migration,
-// together with both inline fields.
+func saveACL(ctx context.Context, table access.Table) error {
+	return Access.SaveTable(ctx, table)
+}
+
+// The inline savers rewrite the config file with the new value, which is
+// where both have always been written. Used only while a config still
+// carries the value inline; they go away with the migration, together with
+// the inline fields.
+
 func savePatreonGrantsInline(ctx context.Context, grants []PatreonGrant) error {
+	return updateInlineConfig(ctx, func(config *ConfigType) {
+		config.Patreon.Grants = grants
+	})
+}
+
+func saveACLInline(ctx context.Context, table access.Table) error {
+	return updateInlineConfig(ctx, func(config *ConfigType) {
+		config.ACL = table
+	})
+}
+
+// validateACLTable refuses tables that would obviously lock the site out: an
+// empty table grants nothing to anyone, and a table where no tier carries
+// Admin could not be fixed from the admin page again.
+func validateACLTable(table access.Table) error {
+	if len(table) == 0 {
+		return errors.New("table is empty")
+	}
+	for _, features := range table {
+		if _, found := features["Admin"]; found {
+			return nil
+		}
+	}
+	return errors.New("no tier grants Admin, which would lock the admin page out")
+}
+
+// updateInlineConfig persists a mutated copy of the config to where it was
+// loaded from and publishes it on success.
+func updateInlineConfig(ctx context.Context, mutate func(*ConfigType)) error {
 	newConfig := Config
-	newConfig.Patreon.Grants = grants
+	mutate(&newConfig)
 	if err := writeConfigTo(ctx, ConfigBucket, Config.sourcePath, newConfig); err != nil {
 		return err
 	}

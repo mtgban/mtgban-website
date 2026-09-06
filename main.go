@@ -123,6 +123,8 @@ type PageVars struct {
 	SealedContents string
 
 	CheckpointsText    string
+	ACLText            string
+	ACLSource          string
 	KeyOverridesText   string
 	OverrideStores     []string
 	OverrideFixStore   string

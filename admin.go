@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/mtgban/mtgban-website/internal/access"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
 	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/simplecloud"
@@ -392,6 +393,38 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		pageVars.CheckpointsText = cpText
+	}
+
+	// -- Access table: handle POST if submitted --
+	newACL := r.FormValue("aclTextArea")
+	if newACL != "" {
+		var parsed access.Table
+		err := json.Unmarshal([]byte(newACL), &parsed)
+		if err == nil {
+			err = validateACLTable(parsed)
+		}
+		if err == nil {
+			err = saveACL(r.Context(), parsed)
+		}
+		if err != nil {
+			pageVars.WarningMessage = "Access table not saved: " + err.Error()
+		} else {
+			pageVars.InfoMessage = "Access table updated"
+		}
+	}
+
+	// -- Access table: always load current text for the editor --
+	aclText, aclErr := json.MarshalIndent(ACL(), "", "    ")
+	if aclErr != nil {
+		if pageVars.InfoMessage == "" {
+			pageVars.InfoMessage = aclErr.Error()
+		}
+	} else {
+		pageVars.ACLText = string(aclText)
+	}
+	pageVars.ACLSource = Config.ACLPath
+	if pageVars.ACLSource == "" {
+		pageVars.ACLSource = "inline config"
 	}
 
 	// -- Key overrides: handle POST if submitted --

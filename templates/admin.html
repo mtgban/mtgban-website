@@ -60,6 +60,7 @@
         <button class="admin-tab{{if eq .Page "people"}} active{{end}}" onclick="switchTab(this,'people')">People</button>
         <button class="admin-tab{{if eq .Page "config"}} active{{end}}" onclick="switchTab(this,'config')">Config</button>
         <button class="admin-tab{{if eq .Page "checkpoints"}} active{{end}}" onclick="switchTab(this,'checkpoints')">Checkpoints</button>
+        <button class="admin-tab{{if eq .Page "acl"}} active{{end}}" onclick="switchTab(this,'acl')">Access</button>
         <button class="admin-tab{{if eq .Page "overrides"}} active{{end}}" onclick="switchTab(this,'overrides')">Key Overrides</button>
         <button class="admin-tab{{if eq .Page "tools"}} active{{end}}" onclick="switchTab(this,'tools')">Tools</button>
     </div>
@@ -234,7 +235,7 @@
     </div>
 
     <!-- CodeMirror — shared by Config and Checkpoints editors -->
-    {{if or .CleanSearchQuery .CheckpointsText .KeyOverridesText}}
+    {{if or .CleanSearchQuery .CheckpointsText .ACLText .KeyOverridesText}}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css" integrity="sha512-uf06llspW44/LZpHzHT6qBOIVODjWtv4MxCricRxkzvopAlSWnTf6hpZTFxuuZcuNE9CBQhqE0Seu1CoRk84nQ==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/theme/dracula.min.css" integrity="sha512-gFMl3u9d0xt3WR8ZeW05MWm3yZ+ZfgsBVXLSOiFz2xeVrZ8Neg0+V1kkRIo9LikyA/T9HuS91kDfc2XWse0K0A==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.js" integrity="sha512-6cPYokihlrofMNApz7OXVQNObWjLiKGIBBb7+UB+AuMiRCLKmFKgrwms21sHq3bdFFZWpfHYRJBJvMFMPj1S9g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -298,6 +299,27 @@
             </p>
         </div>
         {{end}}
+    </div>
+
+    <!-- ═══════════════════════
+         ACCESS TABLE
+         ═══════════════════════ -->
+    <div class="admin-panel{{if eq .Page "acl"}} active{{end}}" id="panel-acl">
+        <div class="admin-config-wrap">
+            <div class="admin-config-header">
+                <h2>Access Table Editor</h2>
+                <span class="warn-tag">{{.ACLSource}}</span>
+                <div class="config-actions">
+                    <button class="cfg-btn cfg-format" onclick="formatEditorByName('acl')">Format JSON</button>
+                    <button class="cfg-btn cfg-secondary" onclick="window.location.replace(window.location)">Reset</button>
+                    <button class="cfg-btn cfg-primary" data-update-for="acl" onclick="document.getElementById('aclForm').requestSubmit()">Update</button>
+                </div>
+            </div>
+            <form id="aclForm" action="/admin?page=acl" method="post">
+                <textarea id="aclTextArea" name="aclTextArea" style="display:none;">{{.ACLText}}</textarea>
+                <div id="aclEditor"></div>
+            </form>
+        </div>
     </div>
 
     <!-- ═══════════════════════
@@ -652,7 +674,7 @@ window.addEventListener("beforeunload", function(e) {
 })();
 </script>
 
-{{if or .CleanSearchQuery .CheckpointsText .KeyOverridesText}}
+{{if or .CleanSearchQuery .CheckpointsText .ACLText .KeyOverridesText}}
 <script>
 (function() {
     var cfg = initJSONEditor({ name: "config", textareaId: "textArea", editorId: "configEditor", formId: "configForm" });
@@ -660,6 +682,8 @@ window.addEventListener("beforeunload", function(e) {
 
     var ckpt = initJSONEditor({ name: "checkpoints", textareaId: "checkpointsTextArea", editorId: "checkpointsEditor", formId: "checkpointsForm" });
     if (ckpt) window.__jsonEditors["checkpoints"] = ckpt;
+    var acle = initJSONEditor({ name: "acl", textareaId: "aclTextArea", editorId: "aclEditor", formId: "aclForm" });
+    if (acle) window.__jsonEditors["acl"] = acle;
 
     var ovr = initJSONEditor({ name: "overrides", textareaId: "keyOverridesTextArea", editorId: "overridesEditor", formId: "overridesForm" });
     if (ovr) window.__jsonEditors["overrides"] = ovr;
