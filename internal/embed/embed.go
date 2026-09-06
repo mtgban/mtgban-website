@@ -4,7 +4,6 @@
 package embed
 
 import (
-	"context"
 	"fmt"
 	"path"
 	"sort"
@@ -13,7 +12,6 @@ import (
 
 	"github.com/danielgtaylor/unistyle"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
-	"github.com/mtgban/go-mtgban/tcgplayer"
 )
 
 const (
@@ -34,18 +32,6 @@ const (
 	// from MaxCustomEntries, which counts rows within a single field.
 	MaxPreviewCards = 8
 )
-
-// Service renders embeds, wired to the host's link building and data lookups.
-type Service struct {
-	// BaseURL returns the absolute origin used for redirect links.
-	BaseURL func() string
-
-	// EditionTitle renders a card id's edition line.
-	EditionTitle func(cardId string) string
-
-	// LastSold returns the latest TCGplayer sales for a card.
-	LastSold func(ctx context.Context, cardId string) ([]tcgplayer.LatestSalesData, error)
-}
 
 // Entry is the slice of one store offer an embed renders. The host picks
 // which offers to show and converts them from its own result type.
@@ -90,6 +76,17 @@ type SearchResult struct {
 	NamesOverride   []string
 }
 
+// Sale is one recorded sale a last-sold panel lists: the four values it
+// prints and nothing else. Declared here rather than taken from the
+// scraper's own type, which would have a formatting package carrying an
+// http client and a tls stack to name them.
+type Sale struct {
+	Language      string
+	PurchasePrice float64
+	ShippingPrice float64
+	OrderDate     time.Time
+}
+
 // Field is one embed field, a titled column of aligned rows.
 type Field struct {
 	Name   string
@@ -130,8 +127,9 @@ func PrintingsLine(printings []string) string {
 }
 
 // FormatSearchResult renders a search as embed fields, one each for the
-// index, retail and buylist results.
-func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
+// index, retail and buylist results. baseURL is the origin the price links
+// point at.
+func FormatSearchResult(baseURL string, searchRes *SearchResult) (fields []Field) {
 	// Add two embed fields, one for retail and one for buylist
 	for i, results := range [][]Entry{
 		searchRes.ResultsIndex, searchRes.ResultsSellers, searchRes.ResultsVendors,
@@ -186,7 +184,7 @@ func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 			// Build url for our redirect
 			kind := strings.ToLower(string(fieldNames[i][0]))
 			store := entry.Shorthand
-			value.Link = s.BaseURL() + "/" + path.Join("go", kind, store, searchRes.CardID)
+			value.Link = baseURL + "/" + path.Join("go", kind, store, searchRes.CardID)
 
 			if entry.Ratio > 60 {
 				value.SuffixEmoji += "🔥"
@@ -343,18 +341,11 @@ func alignValues(field *Field) {
 	}
 }
 
-// LastSoldFields renders the latest sales for a card in the given language.
-// Called from a discord session, so there is no context information available.
-func (s *Service) LastSoldFields(cardID string, lang string) ([]Field, error) {
+// LastSoldFields renders sales already fetched, in the given language. The
+// fetch stays with the caller: it is the half that needs a context, a
+// timeout and an error to report, and none of that is formatting.
+func LastSoldFields(lastSales []Sale, lang string) []Field {
 	var fields []Field
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	lastSales, err := s.LastSold(ctx, cardID)
-	if err != nil {
-		return nil, err
-	}
 
 	var hasValues bool
 	for _, entry := range lastSales {
@@ -385,19 +376,19 @@ func (s *Service) LastSoldFields(cardID string, lang string) ([]Field, error) {
 	// No prices received, this is not an error,
 	// but print a message warning the user
 	if !hasValues {
-		return nil, nil
+		return nil
 	}
 
-	return fields, nil
+	return fields
 }
 
 // Generate builds the oEmbed preview panel for a search result page.
 // providerURL is the origin this instance publishes as its own, which the
 // consumer records as the provider - not BaseURL, which pins redirect links
-// to the instance name whatever host the reader arrived through. indexFor
-// returns the index-price offers for one card, so every card in the panel is
-// quoted with its own prices.
-func (s *Service) Generate(providerURL string, allKeys []string, indexFor func(cardID string) []Entry) *OEmbed {
+// to the instance name whatever host the reader arrived through. editionTitle
+// renders a card's edition line, and indexFor returns the index-price offers
+// for one card, so every card in the panel is quoted with its own prices.
+func Generate(providerURL string, allKeys []string, editionTitle func(cardID string) string, indexFor func(cardID string) []Entry) *OEmbed {
 	title := "Search Preview"
 	img := ""
 	htmlBody := ""
@@ -429,7 +420,7 @@ func (s *Service) Generate(providerURL string, allKeys []string, indexFor func(c
 			sealed = co.Sealed
 		}
 
-		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, s.EditionTitle(cardID))
+		fieldName := fmt.Sprintf("[%s] %s - %s", co.SetCode, co.Name, editionTitle(cardID))
 
 		var index []Entry
 		if indexFor != nil {
@@ -448,7 +439,9 @@ func (s *Service) Generate(providerURL string, allKeys []string, indexFor func(c
 	}
 
 	for _, result := range results {
-		fields := s.FormatSearchResult(&result)
+		// The panel prints names and prices and never a link, so the origin
+		// handed over here only ever shows up if that changes.
+		fields := FormatSearchResult(providerURL, &result)
 
 		for _, field := range fields {
 			htmlBody += unistyle.BoldSans(field.Name) + "\n"
