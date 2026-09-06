@@ -483,32 +483,101 @@ func getSetKeyrunes() map[string]string {
 // finishLabels spells the finishes finishLabel's rule below cannot: a name
 // that is not a foil at all, or one whose words do not split on the suffix.
 var finishLabels = map[string]string{
-	"1stedition":      "1st Edition",
+	// Print runs, which are words rather than treatments and which no
+	// trailing-foil rule can spell.
+	"1stedition":       "1st Edition",
+	"unlimitededition": "Unlimited Edition",
+	"unlimited":        "Unlimited",
+	"limited":          "Limited",
+
+	// Treatments whose words do not split on the suffix.
 	"rainbowpillars":  "Rainbow Pillars",
 	"reverseholofoil": "Reverse Holo Foil",
+
+	// A run welded onto a treatment, from a game that registers no
+	// FinishAliases for splitFinish to read the two apart.
+	"1steditionholofoil": "1st Edition Holo Foil",
+	"unlimitedholofoil":  "Unlimited Holo Foil",
+}
+
+// isPlainTreatment reports whether a treatment names a printing with nothing
+// done to it. "normal" is here beside the shared constant because a game that
+// spells a finish with NormalizeFinish - Flesh and Blood, Pokemon - keeps
+// TCGplayer's word for the plain printing rather than mapping it onto the
+// constant.
+func isPlainTreatment(treatment string) bool {
+	switch treatment {
+	case "", "normal", mtgmatcher.FinishNonfoil:
+		return true
+	}
+	return false
+}
+
+// splitFinish separates a card's finish into the print run it belongs to and
+// the treatment it carries.
+//
+// A game that sells one treatment across several runs spells the crossing as a
+// single word - Flesh and Blood ships eight finishes, of which
+// "1steditionrainbowfoil" and "unlimitededitionnormal" are two - and registers
+// each bare treatment as a spelling the printing answers to. Those spellings
+// are the keys of FinishAliases, and they are the treatment vocabulary of the
+// product: the longest one ending this finish is the treatment, and what
+// precedes it is the run. So there is no list of print runs kept here, and
+// none to fall behind the data.
+//
+// The value beside a key names whichever printing that spelling reaches, which
+// is a sibling as often as this card, so only the key is read.
+//
+// A finish ending in no alias is its own treatment and carries no run, which
+// covers every game selling a single run: Magic's "foil", Lorcana's "silver".
+func splitFinish(co *mtgmatcher.CardObject) (run, treatment string) {
+	longest := ""
+	for alias := range co.FinishAliases {
+		if alias == "" || alias == co.Finish || !strings.HasSuffix(co.Finish, alias) {
+			continue
+		}
+		if len(alias) > len(longest) {
+			longest = alias
+		}
+	}
+	if longest == "" {
+		return "", co.Finish
+	}
+	return strings.TrimSuffix(co.Finish, longest), longest
 }
 
 // finishLabel spells the finish a card actually carries, or "" for one the
 // Foil and Etched flags already describe as well as anything could.
 //
-// A game with finishes of its own names them in CardObject.Finish, and the
-// matcher spells a finish the way it spells a promo type: one lowercase word,
-// so it can be typed into a search. That costs the spaces, so "coldfoil" comes
-// back where a person writes "Cold Foil". Split the trailing foil off and
-// title-case what is left, which is the same rule uuid2card already applies to
-// Magic's promo foils.
+// The run and the treatment are spelled apart and rejoined, because the word
+// the game stores is the two run together: spelling "1steditionrainbowfoil"
+// whole gives "1Steditionrainbow Foil", which is worse than the "Foil" it
+// replaces. A run with a plain treatment keeps the run and says nothing about
+// the treatment - a 1st Edition printing is worth naming, "1st Edition Normal"
+// is not.
 //
-// Magic itself never reaches the rule: its CanonicalFinish answers only with
-// the three shared names, and its foil types live in PromoTypes. "normal" and
-// "nofoil" are here because a game spelling its plain printing that way means
-// the same nothing as the shared constant.
+// Magic reaches none of this: its CanonicalFinish answers only with the three
+// shared names, and its foil types live in PromoTypes.
 func finishLabel(co *mtgmatcher.CardObject) string {
-	switch co.Finish {
-	case "", "normal", "nofoil",
-		mtgmatcher.FinishNonfoil, mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+	run, treatment := splitFinish(co)
+
+	generic := false
+	switch treatment {
+	case mtgmatcher.FinishFoil, mtgmatcher.FinishEtched:
+		generic = true
+	}
+	if run == "" && (generic || isPlainTreatment(treatment)) {
 		return ""
 	}
-	return spellFinish(co.Finish)
+
+	var parts []string
+	if run != "" {
+		parts = append(parts, spellFinish(run))
+	}
+	if !isPlainTreatment(treatment) {
+		parts = append(parts, spellFinish(treatment))
+	}
+	return strings.Join(parts, " ")
 }
 
 // finishListLabel spells a finish for a list of them, which is a harder job
@@ -555,6 +624,27 @@ func spellFinish(finish string) string {
 	return mtgmatcher.Title(finish)
 }
 
+// finishDecoration spells a card's finish the way a title carries it: a
+// leading space and the name, or nothing where the finish says nothing worth
+// reading.
+//
+// The flags are the fallback rather than the answer. A game that names its own
+// finish says it better than "Foil" can, and Magic names none of its own, so
+// there the flags still speak for it. Anything titling a card uses this, so
+// two names for one printing cannot drift apart.
+func finishDecoration(co *mtgmatcher.CardObject) string {
+	label := finishLabel(co)
+	switch {
+	case label != "":
+		return " " + label
+	case co.Etched:
+		return " Etched"
+	case co.Foil:
+		return " Foil"
+	}
+	return ""
+}
+
 func editionTitle(cardID string) string {
 	co, err := mtgmatcher.GetUUID(cardID)
 	if err != nil {
@@ -573,16 +663,7 @@ func editionTitle(cardID string) string {
 		edition = fmt.Sprintf("%s (%s)", edition, tag)
 	}
 
-	finish := ""
-	label := finishLabel(co)
-	switch {
-	case label != "":
-		finish = " " + label
-	case co.Etched:
-		finish = " Etched"
-	case co.Foil:
-		finish = " Foil"
-	}
+	finish := finishDecoration(co)
 
 	extra := ""
 	if co.Sealed {

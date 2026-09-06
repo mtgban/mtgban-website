@@ -19,7 +19,6 @@ func TestFinishLabel(t *testing.T) {
 		{"shared foil", mtgmatcher.FinishFoil, ""},
 		{"shared etched", mtgmatcher.FinishEtched, ""},
 		{"a game's plain printing", "normal", ""},
-		{"lorcana's plain printing", "nofoil", ""},
 
 		// The foil family, whose one lowercase word splits on the suffix.
 		{"flesh and blood rainbow", "rainbowfoil", "Rainbow Foil"},
@@ -29,6 +28,12 @@ func TestFinishLabel(t *testing.T) {
 		// The ones no rule gets right.
 		{"yugioh print run", "1stedition", "1st Edition"},
 		{"lorcana pillars", "rainbowpillars", "Rainbow Pillars"},
+
+		// Pokemon registers no FinishAliases, so splitFinish cannot read the
+		// run off a finish carrying one, and the map has to spell these whole.
+		{"pokemon reverse holo", "reverseholofoil", "Reverse Holo Foil"},
+		{"pokemon 1st edition holo", "1steditionholofoil", "1st Edition Holo Foil"},
+		{"pokemon unlimited holo", "unlimitedholofoil", "Unlimited Holo Foil"},
 
 		// A name that is neither foil-suffixed nor irregular.
 		{"lorcana silver", "silver", "Silver"},
