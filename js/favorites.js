@@ -338,8 +338,8 @@
             html += '</span>';
             html += '</span>';
             // Charts are login-gated server-side, so only offer the button
-            // when the pane was rendered for a logged-in user.
-            if (favs.length > 1 && container.dataset.loggedIn === 'true') {
+            // where the page that rendered the pane could chart at all.
+            if (favs.length > 1 && container.dataset.chartsEnabled === 'true') {
                 html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.chartFavorites()" title="Chart favorites" aria-label="Chart favorites"><i data-lucide="chart-line"></i></button>';
             }
             html += '<button class="landing-pane-btn landing-pane-btn-icon" onclick="window.manualRefreshFavorites()" title="Update prices" aria-label="Update prices"><i data-lucide="refresh-cw"></i></button>';

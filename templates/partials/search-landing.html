@@ -11,7 +11,7 @@
         <div class="landing-pane landing-pane-recent" id="desktop-recent-searches">
             <div class="landing-empty">Your recent searches will appear here.</div>
         </div>
-        <div class="landing-pane landing-pane-favorites" id="desktop-favorites" data-logged-in="{{.PatreonLogin}}">
+        <div class="landing-pane landing-pane-favorites" id="desktop-favorites" data-charts-enabled="{{not .DisableChart}}">
             <div class="landing-pane-header">
                 <span class="landing-pane-title">Favorites</span>
             </div>
