@@ -1613,6 +1613,7 @@ func main() {
 	http.Handle("/api/tcgplayer/", enforceSigning(http.HandlerFunc(TCGHandler)))
 	http.Handle("/api/cardmarket/", enforceSigning(http.HandlerFunc(MKMHandler)))
 	http.Handle("/api/search/", enforceSigning(http.HandlerFunc(SearchAPI)))
+	http.Handle("/api/mtgmatcher/raw/", enforceSigning(http.HandlerFunc(RawCardAPI)))
 	http.Handle("/api/suggest", noSigning(http.HandlerFunc(SuggestAPI)))
 	http.Handle("/api/chart/", noSigning(http.HandlerFunc(ChartDataAPI)))
 	http.Handle("/api/prices/", enforceSigning(http.HandlerFunc(BatchPricesAPI)))
