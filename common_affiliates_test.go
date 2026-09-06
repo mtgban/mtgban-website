@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,6 +60,33 @@ func TestLoadAffiliatesReadsThePath(t *testing.T) {
 	}
 	if Affiliates().BuylistList != nil {
 		t.Errorf("buylist list not in the file but not empty: %v", Affiliates().BuylistList)
+	}
+}
+
+// With a path set, a save writes the shared file and publishes the value.
+// (The peer notification is a no-op here: tests run without a price DB.)
+func TestSaveAffiliatesWritesThePath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "affiliates.json")
+	withAffiliateConfig(t, map[string]string{"TCG": "12345"}, nil, path)
+
+	next := AffiliatesConfig{Codes: map[string]string{"TCG": "67890"}, List: []string{"CK"}}
+	if err := saveAffiliates(context.Background(), next); err != nil {
+		t.Fatal(err)
+	}
+	if Affiliates().Codes["TCG"] != "67890" {
+		t.Errorf("published codes are not the saved ones: %v", Affiliates().Codes)
+	}
+
+	var onDisk AffiliatesConfig
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &onDisk); err != nil {
+		t.Fatal(err)
+	}
+	if onDisk.Codes["TCG"] != "67890" || len(onDisk.List) != 1 {
+		t.Errorf("file holds %+v, want the saved value", onDisk)
 	}
 }
 
