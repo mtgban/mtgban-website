@@ -180,19 +180,6 @@
     </script>
 
 
-    {{/* The three readings of a product's contents, where all three mean
-         something: it holds a fixed list and a variable one. */}}
-    {{if .Contents}}
-    <div class="m-result-meta">
-        <span>Contents</span>
-        <div class="m-sort-pills">
-            <a class="m-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}" title="Everything {{.Contents.Product}} can hold"><i data-lucide="boxes"></i></a>
-            <a class="m-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}" title="Only what {{.Contents.Product}} always holds"><i data-lucide="package-check"></i></a>
-            <a class="m-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}" title="Only the cards {{.Contents.Product}} might hold"><i data-lucide="dices"></i></a>
-        </div>
-    </div>
-    {{end}}
-
     {{/* Result count + sort pills */}}
     {{if .TotalUnique}}
     <div class="m-result-meta">
@@ -209,6 +196,20 @@
             <a class="m-sort-pill{{if eq .SearchSort "buylist"}} active{{if .ReverseMode}} reversed{{end}}{{end}}" href="?q={{.SearchQuery}}&sort=buylist{{if and (eq .SearchSort "buylist") (not .ReverseMode)}}&reverse=true{{end}}" title="Buylist Price"><i data-lucide="shopping-cart"></i>{{if eq .SearchSort "buylist"}}<i class="m-sort-dir" data-lucide="{{if .ReverseMode}}arrow-down{{else}}arrow-up{{end}}"></i>{{end}}</a>
         </div>
         {{end}}
+    </div>
+    {{end}}
+
+    {{/* The three readings of a product's contents, where all three mean
+         something: it holds a fixed list and a variable one. Under the count,
+         as a slimmer row: it qualifies the results, the way the sort does. */}}
+    {{if .Contents}}
+    <div class="m-result-meta m-result-meta-contents">
+        <span>Contents</span>
+        <div class="m-sort-pills">
+            <a class="m-sort-pill{{if eq .Contents.Mode "contents"}} active{{end}}" href="?q={{.Contents.All}}" title="Everything {{.Contents.Product}} can hold"><i data-lucide="boxes"></i></a>
+            <a class="m-sort-pill{{if eq .Contents.Mode "decklist"}} active{{end}}" href="?q={{.Contents.Fixed}}" title="Only what {{.Contents.Product}} always holds"><i data-lucide="package-check"></i></a>
+            <a class="m-sort-pill{{if eq .Contents.Mode "variable"}} active{{end}}" href="?q={{.Contents.Variable}}" title="Only the cards {{.Contents.Product}} might hold"><i data-lucide="dices"></i></a>
+        </div>
     </div>
     {{end}}
 
@@ -691,6 +692,17 @@
                     <button type="button" class="m-settings-pill" data-val="prices">By Price</button>
                     <button type="button" class="m-settings-pill" data-val="credit">By Credit</button>
                     <button type="button" class="m-settings-pill" data-val="market">By Market</button>
+                </div>
+            </div>
+
+            {{/* Sealed Contents - which reading a product's link opens, where the
+                 product holds a fixed list and a variable one */}}
+            <div class="m-settings-section">
+                <div class="m-settings-label">Sealed Contents with Variable Cards</div>
+                <div class="m-settings-pills" id="m-set-sealed-contents">
+                    <button type="button" class="m-settings-pill active" data-val="contents">Everything</button>
+                    <button type="button" class="m-settings-pill" data-val="decklist">Only fixed</button>
+                    <button type="button" class="m-settings-pill" data-val="variable">Only variable</button>
                 </div>
             </div>
 
@@ -1187,6 +1199,15 @@ function loadSettings() {
         });
     }
 
+    // Sealed Contents
+    var contents = getCookie('SearchSealedContents');
+    if (contents) {
+        var group = document.getElementById('m-set-sealed-contents');
+        group.querySelectorAll('.m-settings-pill').forEach(function(p) {
+            p.classList.toggle('active', p.getAttribute('data-val') === contents);
+        });
+    }
+
     // Preferred Sort Stores
     var sp = getCookie('SearchSellersPriority');
     if (sp) document.getElementById('m-set-sellers-priority').value = sp;
@@ -1240,6 +1261,10 @@ function saveSettings() {
     // Listing Priority
     var lpPill = document.querySelector('#m-set-listing-priority .m-settings-pill.active');
     setCookie('SearchListingPriority', lpPill ? lpPill.getAttribute('data-val') : 'stores', 1000);
+
+    // Sealed Contents
+    var contentsPill = document.querySelector('#m-set-sealed-contents .m-settings-pill.active');
+    setCookie('SearchSealedContents', contentsPill ? contentsPill.getAttribute('data-val') : 'contents', 1000);
 
     // Preferred Sort Stores
     setCookie('SearchSellersPriority', document.getElementById('m-set-sellers-priority').value, 1000);

@@ -155,6 +155,21 @@
     padding-right: 0.2em;
 }
 
+/* The contents switch sits under the result count as a slimmer row: the
+   count row has already spent its padding above, so this one keeps only what
+   separates it from the first card. */
+.m-result-meta-contents {
+    padding: 0 0 0.5em;
+    margin-top: -0.35em;
+}
+
+/* One icon per pill here and no direction arrow beside it, so the right
+   padding the sort pills trim to balance their arrow would sit the icon off
+   centre in its highlight. */
+.m-result-meta-contents .m-sort-pill.active {
+    padding-right: 0.5em;
+}
+
 .m-sort-pill .m-sort-dir,
 .m-sort-pill .m-sort-dir svg {
     width: 20px;
