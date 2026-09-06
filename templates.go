@@ -139,7 +139,7 @@ var funcMap = template.FuncMap{
 		return i == length/3-1 || i == length*2/3-1 || i == length-1
 	},
 	"load_partner": func(s string) string {
-		return Config.Affiliate[s]
+		return Affiliates().Codes[s]
 	},
 	"game_title": func() string {
 		return gameMap[Config.Game]

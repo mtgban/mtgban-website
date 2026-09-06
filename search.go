@@ -888,11 +888,11 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		if !hasTCG && hasTCGScraper && !pageVars.Metadata[cardID].Sealed && !skipIndex {
 			var link string
 			if pageVars.Metadata[cardID].TCGId == "" {
-				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardID].Name) + "&utm_medium=" + Config.Affiliate["TCG"] + "&utm_source=" + Config.Affiliate["TCG"]
+				link = "https://www.tcgplayer.com/search/all/product?q=" + url.QueryEscape(pageVars.Metadata[cardID].Name) + "&utm_medium=" + Affiliates().Codes["TCG"] + "&utm_source=" + Affiliates().Codes["TCG"]
 			} else {
 				tcgID, _ := strconv.Atoi(pageVars.Metadata[cardID].TCGId)
 
-				link = tcgplayer.GenerateProductURL(tcgID, "", Config.Affiliate["TCG"], "", "", false)
+				link = tcgplayer.GenerateProductURL(tcgID, "", Affiliates().Codes["TCG"], "", "", false)
 			}
 			tmp = append(tmp, SearchEntry{
 				ScraperName: "TCGplayer",
@@ -912,9 +912,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the
 					// name-only fallback has to carry it too.
-					link = cardmarket.SearchURL(pageVars.Metadata[cardID].Name, game, Config.Affiliate["MKM"])
+					link = cardmarket.SearchURL(pageVars.Metadata[cardID].Name, game, Affiliates().Codes["MKM"])
 				} else {
-					link = cardmarket.BuildURL(id, game, Config.Affiliate["MKM"], co.Foil || co.Etched)
+					link = cardmarket.BuildURL(id, game, Affiliates().Codes["MKM"], co.Foil || co.Etched)
 				}
 				tmp = append(tmp, SearchEntry{
 					ScraperName: "CardMarket",
@@ -944,9 +944,9 @@ func Search(w http.ResponseWriter, r *http.Request) {
 					}
 					entries := foundSet[cardID][cond]
 					for i := range entries {
-						if j == 0 && !slices.Contains(Config.AffiliatesList, entries[i].Shorthand) {
+						if j == 0 && !slices.Contains(Affiliates().List, entries[i].Shorthand) {
 							entries[i].Locked = true
-						} else if j == 1 && !slices.Contains(Config.AffiliatesBuylistList, entries[i].Shorthand) {
+						} else if j == 1 && !slices.Contains(Affiliates().BuylistList, entries[i].Shorthand) {
 							entries[i].Locked = true
 						}
 					}

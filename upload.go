@@ -345,7 +345,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 			}
 			log.Println("SCG dataId:", dataID)
 
-			url := "https://goto.starcitygames.com/c/" + Config.Affiliate["SCG"] + `/3052179/37198/?u=https%3A%2F%2Fstarcitygames.com%2Fshop%2Fdeck-builder%2F%3Fdata%3D` + dataID
+			url := "https://goto.starcitygames.com/c/" + Affiliates().Codes["SCG"] + `/3052179/37198/?u=https%3A%2F%2Fstarcitygames.com%2Fshop%2Fdeck-builder%2F%3Fdata%3D` + dataID
 			http.Redirect(w, r, url, http.StatusFound)
 			return
 		}
@@ -502,7 +502,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Force stores if not allowed to change them
 	enabledSellers := readCookie(r, "enabledSellers")
 	if len(enabledSellers) == 0 || !canChangeStores {
-		pageVars.EnabledSellers = Config.AffiliatesList
+		pageVars.EnabledSellers = Affiliates().List
 	} else {
 		pageVars.EnabledSellers = strings.Split(enabledSellers, "|")
 	}
@@ -592,7 +592,7 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Override in case not allowed to change list
 		if !canChangeStores {
-			stores = Config.AffiliatesList
+			stores = Affiliates().List
 			sealedStores = sealedSellers
 		}
 		for _, store := range stores {

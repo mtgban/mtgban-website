@@ -573,6 +573,8 @@ type ConfigType struct {
 	DiscordNotifHook       string             `json:"discord_notif_hook"`
 	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
 	DiscordInviteLink      string             `json:"discord_invite_link"`
+	// The affiliate fields are fallbacks read only when AffiliatesPath is
+	// not set; use Affiliates() (common.go) instead of these.
 	Affiliate              map[string]string  `json:"affiliate"`
 	AffiliatesList         []string           `json:"affiliates_list"`
 	AffiliatesBuylistList  []string           `json:"affiliates_buylist_list"`
@@ -601,6 +603,13 @@ type ConfigType struct {
 	// is a choice about the data, not about the code.
 	ACLPath           string `json:"acl_path"`
 	PatreonGrantsPath string `json:"patreon_grants_path"`
+
+	// AffiliatesPath does the same for the affiliate data - the codes and
+	// the two store lists above - which every game shares: the codes are
+	// the partner accounts, and a store a game doesn't carry never matches
+	// its list entries. The file holds the three sections under their
+	// config key names.
+	AffiliatesPath string `json:"affiliates_path"`
 
 	ACL map[string]map[string]map[string]string `json:"acl"`
 
