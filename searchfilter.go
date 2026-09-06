@@ -515,6 +515,7 @@ var FilterOperations = map[string][]string{
 	"contents":  []string{":"},
 	"container": []string{":"},
 	"decklist":  []string{":"},
+	"variable":  []string{":"},
 	"ci":        []string{":"},
 	"identity":  []string{":"},
 	"cond":      []string{":", ">", "<"},
@@ -932,6 +933,33 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				Name:   "contents",
 				Negate: negate,
 				Values: fixupContents(code),
+			})
+		// What the product can hold minus what it always holds: the same
+		// filter as contents, with the guaranteed cards taken back out. No
+		// list is built for it - the two filters compose, and the second one
+		// is the decklist the case above searches for on its own.
+		case "variable":
+			config.SearchMode = "mixed"
+			uuids := fixupContents(code)
+			if len(uuids) < 1 {
+				continue
+			}
+			co, err := mtgmatcher.GetUUID(uuids[0])
+			if err != nil {
+				continue
+			}
+			picks, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+			if err != nil {
+				continue
+			}
+			filters = append(filters, FilterElem{
+				Name:   "contents",
+				Negate: negate,
+				Values: uuids,
+			}, FilterElem{
+				Name:   "idlookup",
+				Negate: !negate,
+				Values: picks,
 			})
 		case "container":
 			filters = append(filters, FilterElem{
