@@ -237,7 +237,7 @@ type AffiliateConfig struct {
 	// Name of the store (displayed in the title)
 	Name string
 
-	// Key to access the Config.Affiliate map
+	// Key to access the affiliate codes map
 	Handle string
 
 	// List of query parameters to be set to the same config value
@@ -306,7 +306,7 @@ var AffiliateStores = []AffiliateConfig{
 			u.RawQuery = v.Encode()
 
 			link := u.String()
-			u, _ = u.Parse(fmt.Sprintf(tcgplayer.PartnerProductURL, Config.Affiliate["TCG"]))
+			u, _ = u.Parse(fmt.Sprintf(tcgplayer.PartnerProductURL, Affiliates().Codes["TCG"]))
 			v = url.Values{}
 			v.Set("u", link)
 			u.RawQuery = v.Encode()
@@ -350,7 +350,7 @@ var AffiliateStores = []AffiliateConfig{
 		Name:    "Star City Games",
 		URLFunc: func(u *url.URL) *url.URL {
 			link := u.String()
-			u, _ = u.Parse(fmt.Sprintf(starcitygames.PartnerProductURL, Config.Affiliate["SCG"]))
+			u, _ = u.Parse(fmt.Sprintf(starcitygames.PartnerProductURL, Affiliates().Codes["SCG"]))
 			v := url.Values{}
 			v.Set("u", link)
 			u.RawQuery = v.Encode()
@@ -471,7 +471,7 @@ func checkForLinks(mGuildID, mContent string) (string, string) {
 			// Add the MTGBAN affiliation
 			v := u.Query()
 			for _, value := range store.DefaultFields {
-				v.Set(value, Config.Affiliate[store.Handle])
+				v.Set(value, Affiliates().Codes[store.Handle])
 			}
 			for storeField, value := range store.CustomFields {
 				v.Set(storeField, value)
@@ -770,7 +770,7 @@ func prepareCard(searchRes *EmbedSearchResult, ogFields []EmbedField, guildID st
 		if co.Etched || co.Foil {
 			printing = "Foil"
 		}
-		link = tcgplayer.GenerateProductURL(productID, printing, Config.Affiliate["TCG"], "", co.Language, false)
+		link = tcgplayer.GenerateProductURL(productID, printing, Affiliates().Codes["TCG"], "", co.Language, false)
 	}
 
 	// Add a tag for ease of debugging

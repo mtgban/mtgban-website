@@ -2,16 +2,21 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"sync/atomic"
 
 	"github.com/mtgban/mtgban-website/internal/access"
 )
 
-// The access table and the grant list live beside the config rather than
-// inside it: see internal/access. This file wires the package to what stays
-// deployment-owned — the bucket openers (credentials) and the inline-config
-// fallback that persists grants into the config until every deployment has
-// its paths split out.
+// The access table, the grant list and the affiliate data live beside the
+// config rather than inside it: see internal/access for the first two. This
+// file wires the package to what stays deployment-owned — the bucket openers
+// (credentials) and the inline-config fallback that persists grants into the
+// config until every deployment has its paths split out — and holds the
+// affiliate data, which follows the same path-or-fallback rule but is never
+// written at runtime.
 
 // PatreonGrant keeps its historical name for the config decode and the admin
 // code; the type lives with the package that manages the list.
@@ -36,15 +41,69 @@ func PatreonGrants() []PatreonGrant {
 	return Access.Grants()
 }
 
-// loadCommonConfig fills the access table and the grant list, from their own
-// paths where one is configured and from the config itself where none is.
+// loadCommonConfig fills the access table, the grant list and the affiliate
+// data, each from its own path where one is configured and from the config
+// itself where none is.
 func loadCommonConfig(ctx context.Context) error {
-	return Access.Load(ctx, access.Sources{
+	err := Access.Load(ctx, access.Sources{
 		TablePath:      Config.ACLPath,
 		GrantsPath:     Config.PatreonGrantsPath,
 		FallbackTable:  Config.ACL,
 		FallbackGrants: Config.Patreon.Grants,
 	})
+	if err != nil {
+		return err
+	}
+	return loadAffiliates(ctx)
+}
+
+// AffiliatesConfig is the affiliate data every game shares: the codes are
+// the partner accounts, and a store a game doesn't carry never matches its
+// list entries, so one file serves all deployments. The json keys match the
+// inline config fields the value migrates out of, which makes the shared
+// file the same shape as the config section it replaces.
+type AffiliatesConfig struct {
+	Codes       map[string]string `json:"affiliate"`
+	List        []string          `json:"affiliates_list"`
+	BuylistList []string          `json:"affiliates_buylist_list"`
+}
+
+var affiliatesPtr atomic.Pointer[AffiliatesConfig]
+
+// Affiliates returns the current affiliate data. The result is shared and
+// must not be modified.
+func Affiliates() AffiliatesConfig {
+	value := affiliatesPtr.Load()
+	if value == nil {
+		return AffiliatesConfig{}
+	}
+	return *value
+}
+
+// loadAffiliates fills the affiliate data, from its own path where one is
+// configured and from the config itself where none is. A configured path
+// that cannot be read is an error, not a silent fallback, and the previous
+// value stays published.
+func loadAffiliates(ctx context.Context) error {
+	value := AffiliatesConfig{
+		Codes:       Config.Affiliate,
+		List:        Config.AffiliatesList,
+		BuylistList: Config.AffiliatesBuylistList,
+	}
+	if Config.AffiliatesPath != "" {
+		value = AffiliatesConfig{}
+		reader, err := openBucketPath(ctx, Config.AffiliatesPath)
+		if err != nil {
+			return fmt.Errorf("affiliates %s: %w", Config.AffiliatesPath, err)
+		}
+		defer reader.Close()
+		err = json.NewDecoder(reader).Decode(&value)
+		if err != nil {
+			return fmt.Errorf("affiliates %s: %w", Config.AffiliatesPath, err)
+		}
+	}
+	affiliatesPtr.Store(&value)
+	return nil
 }
 
 // The savers notify the peer deployments (access_notify.go) once the value

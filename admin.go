@@ -529,8 +529,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ref := ""
-		if slices.Contains(Config.AffiliatesList, seller.Info().Shorthand) ||
-			slices.Contains(Config.AffiliatesList, key) {
+		if slices.Contains(Affiliates().List, seller.Info().Shorthand) ||
+			slices.Contains(Affiliates().List, key) {
 			ref = "👍"
 		}
 
@@ -582,8 +582,8 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ref := ""
-		if slices.Contains(Config.AffiliatesBuylistList, vendor.Info().Shorthand) ||
-			slices.Contains(Config.AffiliatesBuylistList, key) {
+		if slices.Contains(Affiliates().BuylistList, vendor.Info().Shorthand) ||
+			slices.Contains(Affiliates().BuylistList, key) {
 			ref = "👍"
 		}
 
