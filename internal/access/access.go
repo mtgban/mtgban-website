@@ -32,13 +32,14 @@ type Grant struct {
 type Table map[string]map[string]map[string]string
 
 // Hooks are the deployment-owned halves: how a path reaches its backend
-// (credentials live with the caller) and how grants persist into the inline
-// config while one still carries them. SaveInline goes away with the
-// migration, once no config holds an inline grant list.
+// (credentials live with the caller) and how each value persists into the
+// inline config while one still carries it. The inline hooks go away with
+// the migration, once no config holds an inline table or grant list.
 type Hooks struct {
-	Open       func(ctx context.Context, path string) (io.ReadCloser, error)
-	OpenWrite  func(ctx context.Context, path string) (io.WriteCloser, error)
-	SaveInline func(ctx context.Context, grants []Grant) error
+	Open             func(ctx context.Context, path string) (io.ReadCloser, error)
+	OpenWrite        func(ctx context.Context, path string) (io.WriteCloser, error)
+	SaveTableInline  func(ctx context.Context, table Table) error
+	SaveGrantsInline func(ctx context.Context, grants []Grant) error
 }
 
 // Sources says where a Load reads from: a path where one is configured, the
@@ -140,30 +141,56 @@ func (c *Client) SaveGrants(ctx context.Context, grants []Grant) error {
 	defer c.mu.Unlock()
 
 	if c.sources.GrantsPath == "" {
-		if err := c.hooks.SaveInline(ctx, grants); err != nil {
+		if err := c.hooks.SaveGrantsInline(ctx, grants); err != nil {
 			return err
 		}
 		c.setGrants(grants)
 		return nil
 	}
 
-	writer, err := c.hooks.OpenWrite(ctx, c.sources.GrantsPath)
+	if err := c.writeJSONPath(ctx, c.sources.GrantsPath, grants); err != nil {
+		return err
+	}
+	c.setGrants(grants)
+	return nil
+}
+
+// SaveTable persists a new access table to wherever the table was read from,
+// and publishes it on success, mirroring SaveGrants.
+func (c *Client) SaveTable(ctx context.Context, table Table) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.sources.TablePath == "" {
+		if err := c.hooks.SaveTableInline(ctx, table); err != nil {
+			return err
+		}
+		c.setTable(table)
+		return nil
+	}
+
+	if err := c.writeJSONPath(ctx, c.sources.TablePath, table); err != nil {
+		return err
+	}
+	c.setTable(table)
+	return nil
+}
+
+// writeJSONPath encodes v as json at a path through the caller's OpenWrite
+// hook.
+func (c *Client) writeJSONPath(ctx context.Context, path string, v any) error {
+	writer, err := c.hooks.OpenWrite(ctx, path)
 	if err != nil {
 		return err
 	}
-	err = json.NewEncoder(writer).Encode(grants)
+	err = json.NewEncoder(writer).Encode(v)
 	// Close finalises the upload, so its error is the write's error too, and
 	// a failure there must not be reported as a save.
 	cerr := writer.Close()
 	if err != nil {
 		return err
 	}
-	if cerr != nil {
-		return cerr
-	}
-
-	c.setGrants(grants)
-	return nil
+	return cerr
 }
 
 // readJSONPath decodes the json at a path into v, letting the caller's Open
