@@ -202,6 +202,11 @@
 .admin-table th.c { text-align: center; }
 .admin-table th.num, .admin-table td.num { text-align: right; }
 .admin-table th.num { width: 6em; }
+/* A header that sorts its table on click, and says which way it last did */
+.admin-table[data-sortable] th { cursor: pointer; user-select: none; }
+.admin-table th[aria-sort]::after { margin-left: 0.35em; }
+.admin-table th[aria-sort="ascending"]::after { content: "\2191"; }
+.admin-table th[aria-sort="descending"]::after { content: "\2193"; }
 .admin-table td {
     padding: 7px 12px;
     border-bottom: 1px solid var(--border-subtle);
