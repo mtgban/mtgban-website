@@ -228,14 +228,21 @@ func fixupRarityNG(code string) []string {
 	return filters
 }
 
+// fixupNumberNG spells a number query the way the card it will be compared
+// against is spelled. A loose query is reduced to the plain number by the
+// game whose datastore is loaded, which is the same reduction that game's
+// loader used to build OriginalNumber, so the two cannot come to spell a
+// number differently. A strict query is compared against the number as the
+// catalog writes it and so is left as it is, padding and marks and all.
 func fixupNumberNG(code string, strict bool) []string {
-	code = strings.ToLower(code)
 	filters := strings.Split(code, ",")
 	for i := range filters {
-		filters[i] = strings.TrimLeft(filters[i], "0")
 		if !strict {
-			filters[i] = strings.TrimRight(filters[i], magic.SuffixSpecial+magic.SuffixVariant+magic.SuffixPhi+"*")
+			// Before the case is folded, not after: the mark a number
+			// carries is spelled the way the catalog spells it.
+			filters[i] = mtgmatcher.PlainNumber(filters[i])
 		}
+		filters[i] = strings.ToLower(filters[i])
 	}
 	return filters
 }
