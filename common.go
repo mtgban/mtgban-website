@@ -47,12 +47,31 @@ func loadCommonConfig(ctx context.Context) error {
 	})
 }
 
+// The savers notify the peer deployments (access_notify.go) once the value
+// is persisted, each on its own channel so a peer re-reads only the file
+// that changed - and only when the save went to its own file, since an
+// inline save rewrites this deployment's config, which no peer reads.
+
 func saveGrants(ctx context.Context, grants []PatreonGrant) error {
-	return Access.SaveGrants(ctx, grants)
+	err := Access.SaveGrants(ctx, grants)
+	if err != nil {
+		return err
+	}
+	if Config.PatreonGrantsPath != "" {
+		notifyAccessReload(ctx, grantsReloadChannel)
+	}
+	return nil
 }
 
 func saveACL(ctx context.Context, table access.Table) error {
-	return Access.SaveTable(ctx, table)
+	err := Access.SaveTable(ctx, table)
+	if err != nil {
+		return err
+	}
+	if Config.ACLPath != "" {
+		notifyAccessReload(ctx, aclReloadChannel)
+	}
+	return nil
 }
 
 // The inline savers rewrite the config file with the new value, which is

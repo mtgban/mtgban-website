@@ -117,6 +117,71 @@ func TestLoadReportsAMissingFile(t *testing.T) {
 	}
 }
 
+// A reload re-reads one value from the sources of the last Load and leaves
+// the other alone: the two files change independently, and the point of the
+// per-value reload is not re-fetching the one that didn't.
+func TestReloadRefreshesOneValueOnly(t *testing.T) {
+	dir := t.TempDir()
+	tablePath := filepath.Join(dir, "acl.json")
+	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+	grantsPath := filepath.Join(dir, "grants.json")
+	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com"}})
+
+	c := New(fileHooks(nil))
+	err := c.Load(context.Background(), Sources{
+		TablePath:  tablePath,
+		GrantsPath: grantsPath,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Both files change behind the client's back, as a peer's save would.
+	writeJSON(t, tablePath, Table{"Root": {"Search": {}}, "Mods": {"Search": {}}})
+	writeJSON(t, grantsPath, []Grant{{Email: "a@example.com"}, {Email: "b@example.com"}})
+
+	if err := c.ReloadGrants(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Grants()) != 2 {
+		t.Errorf("reload published %d grants, want 2", len(c.Grants()))
+	}
+	if len(c.Table()) != 1 {
+		t.Errorf("grants reload touched the table: %v", c.Table())
+	}
+
+	if err := c.ReloadTable(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Table()) != 2 {
+		t.Errorf("reload published %d tiers, want 2", len(c.Table()))
+	}
+}
+
+// A reload that fails keeps the value it could not replace, mirroring Load's
+// no-fallback-on-error rule.
+func TestReloadKeepsTheValueOnError(t *testing.T) {
+	dir := t.TempDir()
+	tablePath := filepath.Join(dir, "acl.json")
+	writeJSON(t, tablePath, Table{"Root": {"Search": {}}})
+
+	c := New(fileHooks(nil))
+	err := c.Load(context.Background(), Sources{TablePath: tablePath})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.Remove(tablePath); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.ReloadTable(context.Background()); err == nil {
+		t.Fatal("missing table path did not error")
+	}
+	if _, ok := c.Table()["Root"]; !ok {
+		t.Errorf("failed reload dropped the table: %v", c.Table())
+	}
+}
+
 // With a grants path set, a save writes the file and publishes the new list.
 func TestSaveGrantsWritesThePath(t *testing.T) {
 	dir := t.TempDir()
