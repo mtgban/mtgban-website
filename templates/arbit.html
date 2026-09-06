@@ -511,11 +511,10 @@
                         {{if not $save.HasNoPrice}}
                             <td class="m">
                                 {{if eq .BuylistEntry.BuyPrice 0.0}}
-                                    $ {{printf "%.2f" .ReferenceEntry.Price}}
+                                    {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .ReferenceEntry.Price}}
                                 {{else}}
-                                    $ {{printf "%.2f" .BuylistEntry.BuyPrice}}
+                                    {{template "sussy-price" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource "Price" .BuylistEntry.BuyPrice}}
                                 {{end}}
-                                {{template "sussy-badge" dict "List" $arbitContainer.SussyList "CardID" .CardID "Sealed" $sealedSource}}
                             </td>
                         {{end}}
                         {{if not $save.HasNoCredit}}

@@ -390,6 +390,10 @@
 .arb-spread-up { color: var(--asuccess); font-weight: 600; }
 .arb-spread-down { color: var(--adanger); font-weight: 600; }
 
+/* A price the market does not back up (invalid Direct / high sealed IQR):
+   red like the search page's price-warn, explanation on the native title */
+.arb-price-warn { color: var(--adanger); cursor: help; }
+
 /* Icon spans both rows on the left, name over edition on the right —
    replaces the old .card-info wrapper with a grid so the text column
    flexes with the available space (minmax 0..220px) */
