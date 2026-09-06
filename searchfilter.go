@@ -36,6 +36,12 @@ type SearchConfig struct {
 	// used to suggest broader searches when nothing is found
 	AppliedFilters []string
 
+	// The sealed product a contents:/decklist:/variable: query asked about,
+	// and which of the three readings it asked for. Set so the page can offer
+	// the other two.
+	ContentsProduct string
+	ContentsMode    string
+
 	// Chain of filters to be applied to card filtering
 	CardFilters []FilterElem
 
@@ -729,9 +735,18 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 				continue
 			}
 			// Retrieve the data to search from the first uuid
-			co, _ := mtgmatcher.GetUUID(uuids[0])
+			co, err := mtgmatcher.GetUUID(uuids[0])
+			if err != nil {
+				continue
+			}
+			// Only what the product always holds, which is one of three
+			// readings the page can switch between
+			if !negate {
+				config.ContentsProduct = co.UUID
+				config.ContentsMode = ContentsFixed
+			}
 			// Retrieve decklist
-			uuids, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
+			uuids, err = mtgmatcher.GetDecklist(co.SetCode, co.UUID)
 			// Assign data so that on error the entire db is returned
 			config.UUIDs = uuids
 			config.SearchMode = "hashing"
@@ -929,10 +944,18 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			})
 		case "contents":
 			config.SearchMode = "mixed"
+			uuids := fixupContents(code)
+			// Everything the product can hold. Remembered so the page can
+			// offer the other two readings; a negated query asks for none of
+			// them.
+			if len(uuids) == 1 && !negate {
+				config.ContentsProduct = uuids[0]
+				config.ContentsMode = ContentsAll
+			}
 			filters = append(filters, FilterElem{
 				Name:   "contents",
 				Negate: negate,
-				Values: fixupContents(code),
+				Values: uuids,
 			})
 		// What the product can hold minus what it always holds: the same
 		// filter as contents, with the guaranteed cards taken back out. No
@@ -947,6 +970,10 @@ func parseSearchOptionsNG(query string, blocklistRetail, blocklistBuylist []stri
 			co, err := mtgmatcher.GetUUID(uuids[0])
 			if err != nil {
 				continue
+			}
+			if !negate {
+				config.ContentsProduct = co.UUID
+				config.ContentsMode = ContentsVariable
 			}
 			picks, err := mtgmatcher.GetDecklist(co.SetCode, co.UUID)
 			if err != nil {
