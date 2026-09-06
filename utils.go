@@ -491,7 +491,13 @@ var finishLabels = map[string]string{
 	"limited":          "Limited",
 
 	// Treatments whose words do not split on the suffix.
-	"rainbowpillars": "Rainbow Pillars",
+	"rainbowpillars":  "Rainbow Pillars",
+	"reverseholofoil": "Reverse Holo Foil",
+
+	// A run welded onto a treatment, from a game that registers no
+	// FinishAliases for splitFinish to read the two apart.
+	"1steditionholofoil": "1st Edition Holo Foil",
+	"unlimitedholofoil":  "Unlimited Holo Foil",
 }
 
 // isPlainTreatment reports whether a treatment names a printing with nothing

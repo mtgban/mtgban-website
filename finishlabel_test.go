@@ -29,6 +29,12 @@ func TestFinishLabel(t *testing.T) {
 		{"yugioh print run", "1stedition", "1st Edition"},
 		{"lorcana pillars", "rainbowpillars", "Rainbow Pillars"},
 
+		// Pokemon registers no FinishAliases, so splitFinish cannot read the
+		// run off a finish carrying one, and the map has to spell these whole.
+		{"pokemon reverse holo", "reverseholofoil", "Reverse Holo Foil"},
+		{"pokemon 1st edition holo", "1steditionholofoil", "1st Edition Holo Foil"},
+		{"pokemon unlimited holo", "unlimitedholofoil", "Unlimited Holo Foil"},
+
 		// A name that is neither foil-suffixed nor irregular.
 		{"lorcana silver", "silver", "Silver"},
 		{"yugioh unlimited", "unlimited", "Unlimited"},
