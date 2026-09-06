@@ -123,7 +123,7 @@ func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 	for i, results := range [][]Entry{
 		searchRes.ResultsIndex, searchRes.ResultsSellers, searchRes.ResultsVendors,
 	} {
-		// Skip amepty results
+		// Skip empty results
 		if results == nil {
 			continue
 		}
@@ -206,7 +206,7 @@ func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 
 					// Sealed case, since results are in order, if one is found, append a new tag
 					if isSealed {
-						// Skip in case Mediam is equal to EV
+						// Skip in case Median is equal to EV
 						if field.Values[j].Price == value.Price {
 							shouldSkip = true
 							field.Values[j].ExtraSpaces = ""
@@ -226,7 +226,7 @@ func (s *Service) FormatSearchResult(searchRes *SearchResult) (fields []Field) {
 					continue
 				}
 
-				// If found, then edit the exiting one instead of appending a new value
+				// If found, then edit the existing one instead of appending a new value
 				if found {
 					field.Length -= fieldValueLength(field.Values[j])
 
