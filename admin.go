@@ -25,6 +25,7 @@ import (
 
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/mtgban/mtgban-website/internal/diskusage"
+	"github.com/mtgban/mtgban-website/observability"
 	"github.com/mtgban/simplecloud"
 
 	"github.com/mackerelio/go-osstat/memory"
@@ -719,11 +720,32 @@ func Admin(w http.ResponseWriter, r *http.Request) {
 		dash.TopPages, _ = ObservabilityDB.TopPages(ctx, since, includeBots, observabilityInstance)
 		dash.ByTier, _ = ObservabilityDB.UsageByTier(ctx, since, includeBots, observabilityInstance)
 		dash.ByDevice, _ = ObservabilityDB.DeviceSplit(ctx, since, includeBots, observabilityInstance)
-		dash.SubViews, _ = ObservabilityDB.SubViewBreakdown(ctx, since, includeBots, observabilityInstance)
+		dash.SubViews = subViewsOf(dash.TopPages)
 		pageVars.UsageStats = dash
 	}
 
 	render(w, "admin.html", pageVars)
+}
+
+// subViewPrefixes are the paths the Usage tab breaks out in their own table.
+var subViewPrefixes = []string{"newspaper/", "sleepers/"}
+
+// subViewsOf narrows the per-path aggregate to the sub-view rows. The database
+// used to answer this with a second query, identical to the one behind
+// TopPages but for a prefix filter on path. That filter tests the grouping key
+// alone, so it can be applied here to the same effect - as long as TopPages
+// stays unlimited, or rows past its cut would go missing from this table.
+func subViewsOf(all []observability.PathAgg) []observability.PathAgg {
+	var out []observability.PathAgg
+	for _, agg := range all {
+		for _, prefix := range subViewPrefixes {
+			if strings.HasPrefix(agg.Path, prefix) {
+				out = append(out, agg)
+				break
+			}
+		}
+	}
+	return out
 }
 
 func isBusyGithubAction(key string) (bool, error) {

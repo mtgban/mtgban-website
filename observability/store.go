@@ -123,26 +123,3 @@ GROUP BY path, device ORDER BY path, device`
 	}
 	return out, rows.Err()
 }
-
-// SubViewBreakdown returns only newspaper/ and sleepers/ sub-view rows for one instance.
-func (c *Client) SubViewBreakdown(ctx context.Context, since time.Time, includeBots bool, instance string) ([]PathAgg, error) {
-	const q = `SELECT path, count(*), count(DISTINCT visitor)
-FROM events
-WHERE ts >= $1 AND instance = $2 AND ($3 OR NOT is_bot)
-  AND (path LIKE 'newspaper/%' OR path LIKE 'sleepers/%')
-GROUP BY path ORDER BY count(*) DESC`
-	rows, err := c.db.QueryContext(ctx, q, since, instance, includeBots)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []PathAgg
-	for rows.Next() {
-		var a PathAgg
-		if err := rows.Scan(&a.Path, &a.Hits, &a.Uniques); err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
-}
