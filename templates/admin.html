@@ -77,10 +77,10 @@
                 <span class="count">{{len (index .Tables 0)}} providers</span>
             </div>
             <div class="admin-table-wrap">
-            <table class="table-data admin-table">
+            <table class="table-data admin-table" data-sortable>
                 <thead><tr>
                     <th>Name</th><th>Id</th><th>Tag</th>
-                    <th>Last Update</th><th>Entries</th>
+                    <th>Last Update</th><th data-sort="number">Entries</th>
                     <th class="c">Ref</th><th class="c">Status</th>
                 </tr></thead>
                 <tbody>
@@ -108,10 +108,10 @@
                 <span class="count">{{len (index .Tables 1)}} providers</span>
             </div>
             <div class="admin-table-wrap">
-            <table class="table-data admin-table">
+            <table class="table-data admin-table" data-sortable>
                 <thead><tr>
                     <th>Name</th><th>Id</th><th>Tag</th>
-                    <th>Last Update</th><th>Entries</th>
+                    <th>Last Update</th><th data-sort="number">Entries</th>
                     <th class="c">Ref</th><th class="c">Status</th>
                 </tr></thead>
                 <tbody>
@@ -669,6 +669,41 @@ window.addEventListener("beforeunload", function(e) {
             utcSpan.style.visibility = toUtc ? 'visible' : 'hidden';
             el.title = toUtc ? 'Click to show local time' : 'Click to show UTC';
             el.dataset.showing = toUtc ? 'utc' : 'local';
+        });
+    });
+})();
+</script>
+<script>
+// Click a header to sort its table on that column, and again to reverse.
+// Text compares as text and Entries as a number; Last Update compares the
+// time behind the cell rather than the local-time words written over it.
+(function() {
+    document.querySelectorAll('table.admin-table[data-sortable]').forEach(function(table) {
+        var body = table.tBodies[0];
+        if (!body) return;
+        var headers = table.querySelectorAll('thead th');
+        headers.forEach(function(th, col) {
+            th.addEventListener('click', function() {
+                var numeric = th.dataset.sort === 'number';
+                var asc = th.getAttribute('aria-sort') !== 'ascending';
+                headers.forEach(function(other) { other.removeAttribute('aria-sort'); });
+                th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+
+                var keyOf = function(row) {
+                    var cell = row.cells[col];
+                    if (!cell) return numeric ? 0 : '';
+                    var time = cell.querySelector('time[datetime]');
+                    var text = time ? time.getAttribute('datetime') : cell.textContent.trim();
+                    return numeric ? (parseFloat(text) || 0) : text.toLowerCase();
+                };
+                var rows = Array.prototype.slice.call(body.rows);
+                rows.sort(function(a, b) {
+                    var ka = keyOf(a), kb = keyOf(b);
+                    var cmp = numeric ? ka - kb : (ka < kb ? -1 : ka > kb ? 1 : 0);
+                    return asc ? cmp : -cmp;
+                });
+                rows.forEach(function(row) { body.appendChild(row); });
+            });
         });
     });
 })();
