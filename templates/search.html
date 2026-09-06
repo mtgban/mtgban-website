@@ -13,20 +13,26 @@
         <meta property="og:site_name" content="MTGBAN Price Search" />
         <meta property="og:type" content="product" />
         <meta property="og:title" content="{{.Embed.Title}}" />
-        <meta property="og:description" content="{{.Embed.Contents}}" />
+        <meta property="og:description" content="{{.Embed.Description}}" />
         <meta property="og:url" content="{{.Embed.PageURL}}" />
         <meta property="og:image" content="{{.Embed.ImageURL}}" />
         <meta name="twitter:creator" content="@MTG_BAN" />
         <meta name="twitter:site" content="@MTG_BAN" />
         <meta name="twitter:domain" content="https://mtgban.com/" />
-        <meta name="twitter:card" content="product" />
+        <meta name="twitter:card" content="summary" />
         <meta name="twitter:image" content="{{.Embed.ImageCropURL}}" />
         <meta name="twitter:title" content="{{.Embed.Title}}" />
         <meta name="twitter:description" content="{{.Embed.Description}}" />
-        <meta name="twitter:label1" content="TCGplayer Market Price" />
+        {{/* Named after the scrapers this site actually loaded, and skipped
+             entirely where it carries neither. */}}
+        {{if .Embed.RetailLabel}}
+        <meta name="twitter:label1" content="{{.Embed.RetailLabel}} Retail" />
         <meta name="twitter:data1" content="{{if .Embed.RetailPrice}}{{printf "$ %.2f" .Embed.RetailPrice}}{{else}}N/A{{end}}" />
-        <meta name="twitter:label2" content="Card Kingdom Buylist" />
+        {{end}}
+        {{if .Embed.BuylistLabel}}
+        <meta name="twitter:label2" content="{{.Embed.BuylistLabel}} Buylist" />
         <meta name="twitter:data2" content="{{if .Embed.BuylistPrice}}{{printf "$ %.2f" .Embed.BuylistPrice}}{{else}}N/A{{end}}" />
+        {{end}}
     {{end}}
 {{end}}
 

@@ -803,23 +803,32 @@ func Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pageVars.Embed.Title = preview.Title
-	pageVars.Embed.Contents = preview.HTML
-	pageVars.Embed.Description = preview.HTML
 	if len(allKeys) > 0 {
 		pageVars.Embed.ImageURL = pageVars.Metadata[allKeys[0]].ImageURL
 		pageVars.Embed.ImageCropURL = pageVars.Embed.ImageURL
 
 		co, err := mtgmatcher.GetUUID(allKeys[0])
-		if err == nil && len(co.Printings) > 0 {
-			pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", embed.PrintingsLine(co.Printings))
+		if err == nil {
+			// A sealed product has no printings line, so it says what it is
+			// instead. Either way this is prose: the preview panel reads as
+			// bold-styled unicode, which is Discord's alphabet and nobody
+			// else's.
+			if len(co.Printings) > 0 {
+				pageVars.Embed.Description = fmt.Sprintf("Printed in %s.", embed.PrintingsLine(co.Printings))
+			} else {
+				pageVars.Embed.Description = fmt.Sprintf("%s - %s", co.Name, editionTitle(allKeys[0]))
+			}
 			imgCrop := co.Images["crop"]
 			if imgCrop != "" {
 				pageVars.Embed.ImageCropURL = imgCrop
 			}
 		}
 
-		pageVars.Embed.RetailPrice = price4seller(allKeys[0], "TCGMarket")
-		pageVars.Embed.BuylistPrice = price4seller(allKeys[0], "CK")
+		// Name the store each price came from rather than assuming which
+		// ones this site carries: an instance without them would otherwise
+		// print "N/A" under the name of a marketplace it never loaded.
+		pageVars.Embed.RetailLabel, pageVars.Embed.RetailPrice = sellerReference(allKeys[0], "TCGMarket")
+		pageVars.Embed.BuylistLabel, pageVars.Embed.BuylistPrice = vendorReference(allKeys[0], "CK")
 	}
 
 	// When the user asked to drop index data (skip:index), don't synthesize the

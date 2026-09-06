@@ -79,11 +79,12 @@ type PageVars struct {
 		OEmbedURL    string
 		PageURL      string
 		Title        string
-		Contents     string
 		ImageURL     string
 		ImageCropURL string
 		Description  string
+		RetailLabel  string
 		RetailPrice  float64
+		BuylistLabel string
 		BuylistPrice float64
 	}
 

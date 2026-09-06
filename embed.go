@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/tcgplayer"
@@ -161,4 +162,29 @@ func oembedError(w http.ResponseWriter, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	w.Write([]byte(`{}`))
+}
+
+// sellerReference names a reference seller and its price for a card, or
+// nothing at all where this site does not carry that seller.
+func sellerReference(cardID, shorthand string) (string, float64) {
+	for _, seller := range GetSellers() {
+		if !strings.EqualFold(seller.Info().Shorthand, shorthand) {
+			continue
+		}
+		return seller.Info().Name, price4seller(cardID, shorthand)
+	}
+	return "", 0
+}
+
+// vendorReference is sellerReference for a buylist. Card Kingdom answers to
+// the same shorthand on both sides, so asking the wrong one reads a retail
+// price out under a buylist label.
+func vendorReference(cardID, shorthand string) (string, float64) {
+	for _, vendor := range GetVendors() {
+		if !strings.EqualFold(vendor.Info().Shorthand, shorthand) {
+			continue
+		}
+		return vendor.Info().Name, price4vendor(cardID, shorthand)
+	}
+	return "", 0
 }
