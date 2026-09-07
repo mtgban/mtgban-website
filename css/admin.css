@@ -577,6 +577,26 @@
     min-height: 500px;
     border: none;
     border-radius: 0;
+
+    /* A number here multiplies the font size, so a line is the same height
+       whatever font is in use and whatever glyphs it happens to carry.
+       "normal" is neither: the editor measures one hidden sample line and lays
+       every line out on that measurement, and the sample - ten x's, no
+       wrapper - is shorter than a line carrying braces and quotes, and shorter
+       again when a cold load measures it before the web font has arrived.
+       Two pixels a line is thirty lines of error by the bottom of a long
+       config, which is a caret nowhere near the pointer. 1.3 is what the font
+       renders at today, to within a quarter of a pixel. */
+    line-height: 1.3;
+}
+
+/* Each line is an inline-block, so it sits on its wrapper's baseline and the
+   wrapper adds leading underneath it - leading the measured sample, which has
+   no wrapper, knows nothing about. Aligned to the top there is none, and the
+   distance between two lines is exactly the height that was measured. */
+.admin-config-wrap .CodeMirror pre.CodeMirror-line,
+.admin-config-wrap .CodeMirror pre.CodeMirror-line-like {
+    vertical-align: top;
 }
 .admin-config-wrap .CodeMirror-gutters {
     padding-right: 14px;
