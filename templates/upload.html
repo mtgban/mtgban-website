@@ -297,8 +297,13 @@
                         <input type="submit" id="submit_default" class="upload-btn upload-btn-primary" value="Upload" onclick="submitForm('upload', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}}>
                         {{if .CanBuylist}}
                             <input type="submit" id="submit_download" class="upload-btn upload-btn-secondary" value="Get CSV" onclick="submitForm('download', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            {{/* Both send the list to a Magic-only site, so
+                                 neither is offered where the cards are not
+                                 Magic. */}}
+                            {{if .MagicOnlyExports}}
                             <input type="submit" id="submit_estimate" class="upload-btn upload-btn-secondary" value="CardConduit" onclick="submitForm('estimate', true); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
                             <input type="submit" id="submit_deckbox" class="upload-btn upload-btn-secondary" value="Deckbox" onclick="submitForm('deckbox', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
+                            {{end}}
                             <input type="submit" id="submit_tcgplayer_csv" class="upload-btn upload-btn-secondary" value="TCGplayer CSV" onclick="submitForm('tcgplayer_csv', false); return false;" {{if and (not .RemoteLinkURL) (not .CardHashes)}}disabled{{end}} style="display:none">
                         {{end}}
                         {{if .Optimized}}
@@ -1013,8 +1018,10 @@
             {{if .CanBuylist}}
             <div class="res-btn-sep"></div>
             <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('download', false)">Get CSV</button>
+            {{if .MagicOnlyExports}}
             <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="submitExport('estimate', true)">CardConduit</button>
             <button class="upload-btn upload-btn-secondary res-export-btn" data-singles-only onclick="submitExport('deckbox', false)">Deckbox</button>
+            {{end}}
             <button class="upload-btn upload-btn-secondary res-export-btn" onclick="submitExport('tcgplayer_csv', false)">TCGplayer CSV</button>
             {{end}}
         </div>
