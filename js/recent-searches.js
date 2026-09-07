@@ -1,10 +1,15 @@
 // Recent Searches - localStorage-backed search history for mobile
 (function() {
     var STORAGE_KEY = 'mtgban_recent_searches';
+    var PENDING_KEY = 'mtgban_pending_search'; // sessionStorage: query awaiting its answer
     var MAX_ENTRIES = 15;
     var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
     var TOMB_CAP = 50;
     function isLive(s) { return !s.del; }
+    // What the entry reads as. q stays the identity - the link, the dedup key,
+    // and what pin and delete address - so a relabelled search still re-runs
+    // exactly what was typed.
+    function displayQuery(s) { return s.d || s.q; }
     function mtime(s) { return s.m || s.t || 0; }
     function getLiveSearches() { return getRecentSearches().filter(isLive); }
 
@@ -68,7 +73,10 @@
         return pinned.concat(unpinned);
     }
 
-    function addSearch(query) {
+    // The label is the readable query the server rebuilt for this search, and
+    // is stored only when it says something the raw query doesn't: an ordinary
+    // search is already its own best label, while a uuid is a wall of letters.
+    function addSearch(query, label) {
         query = query.trim();
         if (!query || query.length < 2) return;
 
@@ -82,14 +90,19 @@
         var token = parseSetToken(query);
 
         var t = Date.now();
-        searches.unshift({
+        var entry = {
             q: query,
             t: t,
             m: t,
             img: '',
             set: token.set,
             keyrune: token.keyrune
-        });
+        };
+        label = (label || '').trim();
+        if (label && label.toLowerCase() !== query.toLowerCase()) {
+            entry.d = label;
+        }
+        searches.unshift(entry);
 
         saveRecentSearches(searches);
     }
@@ -146,7 +159,7 @@
             searches.forEach(function(s) {
                 html += '<a class="m-recent-item" href="?q=' + encodeURIComponent(s.q) + '">';
                 html += '<span class="m-recent-icon">&#128269;</span>';
-                html += '<span class="m-recent-query">' + escapeHtml(s.q) + '</span>';
+                html += '<span class="m-recent-query">' + escapeHtml(displayQuery(s)) + '</span>';
                 html += '<span class="m-recent-arrow">&rsaquo;</span>';
                 html += '</a>';
             });
@@ -175,7 +188,7 @@
                     html += '</div>';
                 }
                 html += '<div class="landing-item-info">';
-                html += '<span class="landing-item-query">' + escapeHtml(s.q) + '</span>';
+                html += '<span class="landing-item-query">' + escapeHtml(displayQuery(s)) + '</span>';
                 html += '</div>';
                 html += '<div class="landing-item-actions">';
                 html += '<button class="landing-item-pin' + (s.pinned ? ' pinned' : '') + '" data-q="' + escapeAttr(s.q) + '" onclick="window.toggleRecentPin(this.dataset.q, event)" title="' + (s.pinned ? 'Unpin' : 'Pin to top') + '">';
@@ -233,7 +246,10 @@
         }
     };
 
-    // Record search on form submit (page bars and navbar share this store)
+    // Note the search on form submit (page bars and navbar share this store).
+    // Submitting only remembers the question; the results page decides whether
+    // it was worth keeping, so a search that finds nothing never reaches the
+    // list. The marker is per-tab and consumed by the page that answers it.
     function hookFormSubmit() {
         var pairs = [['searchform', 'searchbox'], ['nav-searchform', 'nav-searchbox']];
         pairs.forEach(function(ids) {
@@ -242,10 +258,42 @@
             form.addEventListener('submit', function() {
                 var input = document.getElementById(ids[1]);
                 if (input && input.value.trim()) {
-                    addSearch(input.value);
+                    try {
+                        sessionStorage.setItem(PENDING_KEY, input.value.trim());
+                    } catch (e) {
+                        // No sessionStorage: fall back to recording the search
+                        // unconditionally, which is what always happened before.
+                        addSearch(input.value);
+                    }
                 }
             });
         });
+    }
+
+    // The other half of hookFormSubmit: this page is the answer to whatever
+    // was submitted last. Keep the search only when it found something, and
+    // label it with the readable query the server rebuilt - a uuid search
+    // comes back as the card's own name, set and number.
+    function recordPendingSearch() {
+        var params = new URLSearchParams(window.location.search);
+        var q = (params.get('q') || '').trim();
+        // No query means this is not the answer to anything, so leave a
+        // pending search waiting for the page that is.
+        if (!q) return;
+
+        var pending;
+        try {
+            pending = sessionStorage.getItem(PENDING_KEY);
+            if (!pending) return;
+            sessionStorage.removeItem(PENDING_KEY);
+        } catch (e) {
+            return;
+        }
+        if (pending.trim().toLowerCase() !== q.toLowerCase()) return;
+
+        var answer = window.BAN_SEARCH_RESULT || {};
+        if (!answer.found) return;
+        addSearch(q, answer.label);
     }
 
     function captureFirstResultImage() {
@@ -294,6 +342,7 @@
     // Initialize on DOM ready
     function init() {
         hookFormSubmit();
+        recordPendingSearch();
         captureFirstResultImage();
         renderRecentSearches();
     }
