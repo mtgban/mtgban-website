@@ -699,6 +699,10 @@ window.addEventListener("beforeunload", function(e) {
 // Click a header to sort its table on that column, and again to reverse.
 // Text compares as text and Entries as a number; Last Update compares the
 // time behind the cell rather than the local-time words written over it.
+//
+// A name opens A to Z. A number or a date opens biggest first: the most
+// entries and the freshest update are what a header like that is clicked
+// to find, and the smallest is what the second click is for.
 (function() {
     document.querySelectorAll('table.admin-table[data-sortable]').forEach(function(table) {
         var body = table.tBodies[0];
@@ -707,7 +711,10 @@ window.addEventListener("beforeunload", function(e) {
         headers.forEach(function(th, col) {
             th.addEventListener('click', function() {
                 var numeric = th.dataset.sort === 'number';
-                var asc = th.getAttribute('aria-sort') !== 'ascending';
+                var first = body.rows[0] && body.rows[0].cells[col];
+                var dated = !!(first && first.querySelector('time[datetime]'));
+                var current = th.getAttribute('aria-sort');
+                var asc = current ? current === 'descending' : !(numeric || dated);
                 headers.forEach(function(other) { other.removeAttribute('aria-sort'); });
                 th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
 
