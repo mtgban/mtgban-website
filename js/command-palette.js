@@ -1256,9 +1256,10 @@
 
         // On /upload results page: surface the same export buttons the page renders.
         // Results page exposes window.submitExport(field, newWindow); input page does not.
+        // Which exports it renders is the page's call - CardConduit is Magic-only -
+        // so offer what is actually there rather than listing all four again here.
         if (window.location.pathname === '/upload' && typeof window.submitExport === 'function') {
-            rows.push({ type: 'header', title: 'Export Results' });
-            rows.push(
+            var exportItems = [
                 { type: 'upload-export', title: 'Get CSV',              subtitle: 'All results as CSV',
                   icon: 'download',
                   exportField: 'download',       exportNewWindow: false },
@@ -1271,7 +1272,13 @@
                 { type: 'upload-export', title: 'TCGplayer CSV',        subtitle: 'TCGplayer-format CSV',
                   iconHtml: '<img src="/img/logo/tcgapp.png" alt="">',
                   exportField: 'tcgplayer_csv',  exportNewWindow: false }
-            );
+            ].filter(function (row) {
+                return !!document.querySelector('.res-export-btn[onclick*="\'' + row.exportField + '\'"]');
+            });
+            if (exportItems.length > 0) {
+                rows.push({ type: 'header', title: 'Export Results' });
+                rows.push.apply(rows, exportItems);
+            }
         }
 
         return rows;

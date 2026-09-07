@@ -274,6 +274,7 @@ type PageVars struct {
 	EnabledSealedSellers []string
 	EnabledSealedVendors []string
 	CanBuylist           bool
+	MagicOnlyExports     bool
 	CanChangeStores      bool
 	CanUploadCustom      bool
 	RemoteLinkURL        string

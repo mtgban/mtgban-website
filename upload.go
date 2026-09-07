@@ -460,9 +460,16 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		maxQty = v
 	}
 
+	// CardConduit and Deckbox are Magic-only destinations, and each addresses
+	// a card by an identifier only Magic cards carry - a Scryfall id for the
+	// estimate, a Deckbox id for the CSV. Anywhere else the export has nothing
+	// to name the cards with, so the page does not offer it.
+	magicOnlyExports := Config.Game == DefaultGame
+
 	// Set flags needed to show elements on the page ui
 	pageVars.IsBuylist = blMode
 	pageVars.CanBuylist = canBuylist
+	pageVars.MagicOnlyExports = magicOnlyExports
 	pageVars.CanChangeStores = canChangeStores
 	pageVars.CanUploadCustom = canUploadCustom
 
@@ -715,7 +722,9 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 	// Load optional modes
 	download, _ := strconv.ParseBool(r.FormValue("download"))
 	estimate, _ := strconv.ParseBool(r.FormValue("estimate"))
+	estimate = estimate && magicOnlyExports
 	deckbox, _ := strconv.ParseBool(r.FormValue("deckbox"))
+	deckbox = deckbox && magicOnlyExports
 	tcgpCSV, _ := strconv.ParseBool(r.FormValue("tcgplayer_csv"))
 
 	// Increase upload limit if allowed
