@@ -14,6 +14,58 @@
     display: flex;
     justify-content: center;
 }
+/* ── Tier tint ─────────────────────────────────────────────
+   The bar wears the colour of whoever is reading it, in the shades issue
+   #45 picked to match Discord. A wash rather than a repaint: strongest at
+   the brand and gone by the middle of the bar, with the bottom rule picking
+   up the rest, so the navbar still reads as the navbar.
+
+   Each tier is named twice on purpose - the colour, then the wash - so a
+   tier with no colour of its own draws nothing at all rather than washing
+   the bar in whatever a missing variable falls back to. */
+.navbar-v2[data-tier="vintage"] { --tier-tint: 155, 89, 182; }
+.navbar-v2[data-tier="legacy"]  { --tier-tint: 52, 152, 219; }
+.navbar-v2[data-tier="modern"]  { --tier-tint: 231, 76, 60; }
+.navbar-v2[data-tier="pioneer"] { --tier-tint: 26, 188, 156; }
+/* Not tiers anyone subscribes to, so not among the four the issue picked. Gold
+   out of the same Flat UI family, which reads as staff and sits beside the
+   others without being mistaken for one. */
+.navbar-v2[data-tier="admin"]       { --tier-tint: 241, 196, 15; }
+.navbar-v2[data-tier="root"]        { --tier-tint: 241, 196, 15; }
+.navbar-v2[data-tier="mods"]        { --tier-tint: 241, 196, 15; }
+.navbar-v2[data-tier="lost boys"]   { --tier-tint: 241, 196, 15; }
+
+.navbar-v2[data-tier="vintage"],
+.navbar-v2[data-tier="legacy"],
+.navbar-v2[data-tier="modern"],
+.navbar-v2[data-tier="pioneer"],
+.navbar-v2[data-tier="admin"],
+.navbar-v2[data-tier="root"],
+.navbar-v2[data-tier="mods"],
+.navbar-v2[data-tier="lost boys"] {
+    background-image: linear-gradient(
+        100deg,
+        rgba(var(--tier-tint), var(--tier-wash-near, 0.30)) 0%,
+        rgba(var(--tier-tint), var(--tier-wash-far, 0.14)) 28%,
+        rgba(var(--tier-tint), 0) 62%
+    );
+    border-bottom-color: rgba(var(--tier-tint), 0.45);
+}
+
+/* The light bar is a saturated pale blue to begin with, so the wash that
+   reads on the dark one barely shows there - a blue tier on a blue bar least
+   of all. Lean on it harder rather than picking different colours. */
+body.light-theme .navbar-v2[data-tier] {
+    --tier-wash-near: 0.40;
+    --tier-wash-far: 0.18;
+}
+/* The same again for the red, which the light bar mutes for its own reason:
+   pale blue under it turns it mauve. */
+body.light-theme .navbar-v2[data-tier="modern"] {
+    --tier-wash-near: 0.54;
+    --tier-wash-far: 0.24;
+}
+
 .nav2-inner {
     position: relative;
     box-sizing: border-box;

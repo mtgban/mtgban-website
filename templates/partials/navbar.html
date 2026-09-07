@@ -1,5 +1,5 @@
 {{define "navbar"}}
-<nav class="navbar-v2">
+<nav class="navbar-v2"{{if .UserTier}} data-tier="{{.UserTier}}"{{end}}>
   <div class="nav2-inner">
 
     <a class="nav2-brand" href="/" title="Home">
