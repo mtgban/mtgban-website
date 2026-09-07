@@ -633,6 +633,23 @@ func Search(w http.ResponseWriter, r *http.Request) {
 	pageVars.CanShowAll = canShowAll
 	pageVars.CleanSearchQuery = config.CleanQuery
 
+	// A product asked for under another spelling of its name - the slug its
+	// path carries, most often - is shown under the name the catalog gives
+	// it. The page found the product; the title and the box should say
+	// which, not echo the spelling that found it. Only an exact match with
+	// nothing else in the query, so a filtered or partial search keeps
+	// reading as what was typed.
+	if pageVars.IsSealed && len(config.CardFilters) == 0 && len(allKeys) == 1 {
+		exact, err := mtgmatcher.SearchSealedEquals(query)
+		if err == nil && len(exact) == 1 && exact[0] == allKeys[0] {
+			co, err := mtgmatcher.GetUUID(allKeys[0])
+			if err == nil && co.Name != query {
+				pageVars.SearchQuery = co.Name
+				pageVars.CleanSearchQuery = co.Name
+			}
+		}
+	}
+
 	// CardHashes carries the full result list (with the per-copy repeats that
 	// decklist/hashing searches produce) so transferring to the Uploader keeps
 	// the quantities. Rendering shows each unique card once, so dedupe the keys
