@@ -62,6 +62,44 @@ func TestTheSearchPageHandsOverTheReadableQuery(t *testing.T) {
 	}
 }
 
+// A search that named one printing hands over that printing's own canonical
+// path, so the recent list links to /card/SLD/1116jpn/nonfoil rather than
+// rebuilding a query string. A search with many results names no single card
+// and carries no link.
+func TestASingleResultHandsOverItsCanonicalLink(t *testing.T) {
+	if !datastoreLoaded() {
+		t.Skip("no datastore loaded")
+	}
+	uuids, err := searchAndFilter(parseSearchOptionsWrapper("Plaguecrafter s:SLD cns:1116jpn f:nonfoil"))
+	if err != nil || len(uuids) != 1 {
+		t.Skipf("expected one printing, got %d (%v)", len(uuids), err)
+	}
+	card := uuid2card(uuids[0], false, true, false)
+	if card.SearchURL == "" {
+		t.Fatal("the printing carries no SearchURL to hand over")
+	}
+
+	for _, template := range []string{"search.html", "mobile/search.html"} {
+		one := renderSearch(t, template, PageVars{
+			SearchQuery: "Plaguecrafter s:SLD cn:1116jpn f:nonfoil",
+			CardHashes:  uuids,
+			Metadata:    map[string]GenericCard{uuids[0]: card},
+		})
+		if !strings.Contains(one, "url: \""+card.SearchURL+"\"") {
+			t.Errorf("%s: a single result does not hand over %q", template, card.SearchURL)
+		}
+
+		many := renderSearch(t, template, PageVars{
+			SearchQuery: "Plaguecrafter",
+			CardHashes:  []string{"a", "b"},
+			Metadata:    map[string]GenericCard{"a": card},
+		})
+		if !strings.Contains(many, `url: "",`) {
+			t.Errorf("%s: a multi-result page hands over a link it has no right to", template)
+		}
+	}
+}
+
 // The label rides through Go's JS escaping, so a name carrying a quote cannot
 // end the string it sits in.
 func TestTheReadableQueryCannotBreakOutOfItsString(t *testing.T) {

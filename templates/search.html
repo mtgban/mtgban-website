@@ -57,9 +57,11 @@
     <script type="text/javascript">
         // What this page is the answer to, for the recent searches list: the
         // readable query the server rebuilt (a uuid search comes back as the
-        // card's own name, set and number) and whether anything was found.
+        // card's own name, set and number), the canonical link to it when it
+        // named a single printing, and whether anything was found at all.
         window.BAN_SEARCH_RESULT = {
             label: {{.SearchQuery}},
+            url: {{if eq (len .CardHashes) 1}}{{(index .Metadata (index .CardHashes 0)).SearchURL}}{{else}}{{""}}{{end}},
             found: {{if .CardHashes}}true{{else}}false{{end}}
         };
     </script>

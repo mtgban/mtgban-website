@@ -6,10 +6,15 @@
     var TOMB_TTL_MS = 30 * 24 * 60 * 60 * 1000;
     var TOMB_CAP = 50;
     function isLive(s) { return !s.del; }
-    // What the entry reads as. q stays the identity - the link, the dedup key,
-    // and what pin and delete address - so a relabelled search still re-runs
-    // exactly what was typed.
+    // What the entry reads as. q stays the identity - the dedup key and what
+    // pin and delete address - so a relabelled search still names exactly what
+    // was typed.
     function displayQuery(s) { return s.d || s.q; }
+    // Where it goes. A search that named one printing carries that printing's
+    // own canonical path, which is shorter, survives changes to the query
+    // syntax, and does not depend on which route the reader is looking from.
+    // Anything else re-runs the query from where it stands.
+    function entryHref(s) { return s.u || ('?q=' + encodeURIComponent(s.q)); }
     function mtime(s) { return s.m || s.t || 0; }
     function getLiveSearches() { return getRecentSearches().filter(isLive); }
 
@@ -76,7 +81,7 @@
     // The label is the readable query the server rebuilt for this search, and
     // is stored only when it says something the raw query doesn't: an ordinary
     // search is already its own best label, while a uuid is a wall of letters.
-    function addSearch(query, label) {
+    function addSearch(query, label, href) {
         query = query.trim();
         if (!query || query.length < 2) return;
 
@@ -101,6 +106,10 @@
         label = (label || '').trim();
         if (label && label.toLowerCase() !== query.toLowerCase()) {
             entry.d = label;
+        }
+        href = (href || '').trim();
+        if (href) {
+            entry.u = href;
         }
         searches.unshift(entry);
 
@@ -157,7 +166,7 @@
             html += '</div>';
             html += '<div class="m-recent-list">';
             searches.forEach(function(s) {
-                html += '<a class="m-recent-item" href="?q=' + encodeURIComponent(s.q) + '">';
+                html += '<a class="m-recent-item" href="' + escapeAttr(entryHref(s)) + '">';
                 html += '<span class="m-recent-icon">&#128269;</span>';
                 html += '<span class="m-recent-query">' + escapeHtml(displayQuery(s)) + '</span>';
                 html += '<span class="m-recent-arrow">&rsaquo;</span>';
@@ -175,7 +184,7 @@
             searches.forEach(function(s) {
                 var cropSrc = s.crop || '';
                 var token = parseSetToken(s.q);
-                html += '<a class="landing-item landing-item-recent' + (cropSrc ? ' has-crop' : '') + '"' + (cropSrc ? ' style="background-image:url(\'' + escapeAttr(cropSrc) + '\')"' : '') + ' href="?q=' + encodeURIComponent(s.q) + '">';
+                html += '<a class="landing-item landing-item-recent' + (cropSrc ? ' has-crop' : '') + '"' + (cropSrc ? ' style="background-image:url(\'' + escapeAttr(cropSrc) + '\')"' : '') + ' href="' + escapeAttr(entryHref(s)) + '">';
                 if (!cropSrc) {
                     html += '<div class="landing-item-thumb">';
                     if (token.keyrune) {
@@ -293,7 +302,7 @@
 
         var answer = window.BAN_SEARCH_RESULT || {};
         if (!answer.found) return;
-        addSearch(q, answer.label);
+        addSearch(q, answer.label, answer.url);
     }
 
     function captureFirstResultImage() {
