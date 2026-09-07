@@ -386,7 +386,7 @@ var gameMap = map[string]string{
 	"onepiece":      "One Piece Card Game",
 	"yugioh":        "YuGiOh",
 	"riftbound":     "Riftbound: League of Legends Trading Card Game",
-	"fleshandblood": "Flesh and Blood",
+	"fleshandblood": "Flesh and Blood TCG",
 	"pokemon":       "Pokemon",
 }
 
