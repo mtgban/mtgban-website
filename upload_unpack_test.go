@@ -866,3 +866,51 @@ func TestUnpackedRowsCannotBeRemoved(t *testing.T) {
 		t.Error("an ordinary result no longer offers to remove a row")
 	}
 }
+
+// Unpacking is asked in order to read what is inside these products, so the
+// page it lands on is the one that shows them. The optimizer answers what to
+// buy and where, which is a different question, and a standing preference for
+// it does not carry here.
+func TestUnpackedResultsIgnoreTheOptimizerPreference(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	sealed, _ := sealedProducts(t)
+	if sealed == "" {
+		t.Skip("this datastore has no sealed product with a decklist")
+	}
+	entries := unpackSealed([]UploadEntry{{CardID: sealed, Quantity: 1, HasQuantity: true}})
+
+	pageVars := PageVars{
+		UploadEntries: entries,
+		UnpackedFrom:  1,
+		Metadata:      map[string]GenericCard{},
+		TotalEntries:  map[string]float64{},
+		ResultPrices:  map[string]map[string]float64{},
+		MissingCounts: map[string]int{},
+		MissingPrices: map[string]float64{},
+	}
+	for _, entry := range entries {
+		pageVars.Metadata[entry.CardID] = uuid2card(entry.CardID, true, false, false)
+	}
+	pageVars.UnpackedSections = []UnpackedSection{{
+		Product:  entries[0],
+		Entries:  entries[1:],
+		Quantity: len(entries) - 1,
+		Totals:   map[string]float64{},
+		Missing:  map[string]int{},
+	}}
+
+	if out := renderUpload(t, pageVars); !strings.Contains(out, "uploadIsUnpacked = true") {
+		t.Error("an unpacked page still follows the preference for the optimizer")
+	}
+
+	// Every other result keeps the preference it was given.
+	flat := pageVars
+	flat.UnpackedSections = nil
+	flat.UnpackedFrom = 0
+	flat.SinglesEntries = entries[1:]
+	if out := renderUpload(t, flat); !strings.Contains(out, "uploadIsUnpacked = false") {
+		t.Error("an ordinary result no longer follows the preference")
+	}
+}
