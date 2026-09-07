@@ -20,6 +20,15 @@
     <script type="text/javascript" src="/js/fetchnames.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/confirm-dialog.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/user-state.js?hash={{.Hash}}"></script>
+    <script type="text/javascript">
+        // What this page is the answer to, for the recent searches list: the
+        // readable query the server rebuilt (a uuid search comes back as the
+        // card's own name, set and number) and whether anything was found.
+        window.BAN_SEARCH_RESULT = {
+            label: {{.SearchQuery}},
+            found: {{if .CardHashes}}true{{else}}false{{end}}
+        };
+    </script>
     <script type="text/javascript" src="/js/recent-searches.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/favorites.js?hash={{.Hash}}"></script>
     <script type="text/javascript" src="/js/cookies.js?hash={{.Hash}}"></script>
