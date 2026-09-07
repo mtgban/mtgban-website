@@ -1926,8 +1926,20 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 	return false
 }
 
+// cardFilterNumber matches the plain number a printing carries, and also the
+// decorated one it prints. fixupNumberNG takes Magic's own decorations off the
+// query, so "cn:123\u2605" already arrives as "123" and finds the star printing
+// through OriginalNumber. The language and variant tags the datastore appends
+// to a duplicated card - the "jpn" of SLD's 1116jpn, "ita", "alt" - are not
+// decorations it knows to strip, so a query naming one only ever matched
+// nothing. Those numbers are what the search results carry in data-number and
+// what a favorite turns back into a cn: query, so the link the site built for
+// 870 printings led to an empty page. Comparing against Number as well is
+// purely additive: every query that matched before still matches the same
+// cards, because OriginalNumber is checked first and is never longer.
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, strings.ToLower(co.OriginalNumber))
+	return !slices.Contains(filters, strings.ToLower(co.OriginalNumber)) &&
+		!slices.Contains(filters, strings.ToLower(co.Number))
 }
 
 func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
