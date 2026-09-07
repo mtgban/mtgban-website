@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
@@ -190,6 +191,71 @@ func CardRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 	r.URL.RawQuery = v.Encode()
 	r.URL.Path = "/search"
+
+	http.Redirect(w, r, r.URL.String(), http.StatusFound)
+}
+
+// sealedSlugSeparators is every run of characters a slug does not keep.
+var sealedSlugSeparators = regexp.MustCompile(`[^a-z0-9]+`)
+
+// sealedSlug spells a product's name the way a path can carry it: lowercase,
+// letters and digits only, one hyphen between words. Lossy on purpose - the
+// name is recovered by slugging every product in the set the same way and
+// matching, not by reversing this. No two products in a set slug alike
+// (4,185 products across 342 sets, none), which is what lets the slug stand
+// in for the name at all.
+func sealedSlug(name string) string {
+	return strings.Trim(sealedSlugSeparators.ReplaceAllString(strings.ToLower(name), "-"), "-")
+}
+
+// sealedProductBySlug finds the product in a set that a slug names, or nil.
+func sealedProductBySlug(setCode, slug string) *mtgmatcher.SealedProduct {
+	set, err := mtgmatcher.GetSet(strings.ToUpper(setCode))
+	if err != nil || slug == "" {
+		return nil
+	}
+	for i := range set.SealedProduct {
+		if sealedSlug(set.SealedProduct[i].Name) == slug {
+			return &set.SealedProduct[i]
+		}
+	}
+	return nil
+}
+
+// SealedRedirect answers /sealed/<set>/<slug> for a product, the way
+// CardRedirect answers /card/<set>/<number> for a printing: a link short
+// enough to paste, resolved into the search the sealed tab already runs.
+//
+// Every part is optional from the right, and each part narrows the one before
+// it: /sealed/<set> is that set's products, and /sealed is the tab itself. A
+// slug that names no product in the set is searched for as the words it is
+// made of, so it fails as a search that says so rather than as a dead link.
+func SealedRedirect(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimRight(strings.TrimPrefix(r.URL.Path, "/sealed/"), "/")
+	fields := strings.Split(path, "/")
+
+	var query string
+	set := fields[0]
+	if set != "" {
+		query = "s:" + set
+
+		if len(fields) > 1 && fields[1] != "" {
+			slug := fields[1]
+			product := sealedProductBySlug(set, slug)
+			if product != nil {
+				query = product.Name
+			} else {
+				query += " " + strings.ReplaceAll(slug, "-", " ")
+			}
+		}
+	}
+
+	v := r.URL.Query()
+	if query != "" {
+		v.Set("q", query)
+	}
+	r.URL.RawQuery = v.Encode()
+	r.URL.Path = "/sealed"
 
 	http.Redirect(w, r, r.URL.String(), http.StatusFound)
 }

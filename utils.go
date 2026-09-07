@@ -1091,13 +1091,27 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 // scryfall uses, which this site answers, and short enough to paste into a
 // chat window without it wrapping.
 //
-// Empty where the shape cannot name the card, and the query link is kept
-// instead: a sealed product, which the route would send to the wrong page, and
-// a number the number filter reads as nothing, which is any number made only
-// of zeros - the World Championship ad cards are numbered #0. Asked of the
-// filter itself rather than restated here, so the two cannot drift.
+// A sealed product has no number to be named by, so it takes the other shape
+// this site answers, /sealed/<set>/<slug>, with the name slugged the way
+// SealedRedirect slugs the set's products to find it again.
+//
+// Empty where neither shape can name the card, and the query link is kept
+// instead: a number the number filter reads as nothing, which is any number
+// made only of zeros - the World Championship ad cards are numbered #0 - or a
+// product name with no letter or digit a slug can keep. Asked of the filter
+// and the slug themselves rather than restated here, so the two cannot drift.
 func cardPath(co *mtgmatcher.CardObject) string {
-	if co.Sealed || co.SetCode == "" || co.Number == "" {
+	if co.SetCode == "" {
+		return ""
+	}
+	if co.Sealed {
+		slug := sealedSlug(co.Name)
+		if slug == "" {
+			return ""
+		}
+		return "/sealed/" + url.PathEscape(co.SetCode) + "/" + slug
+	}
+	if co.Number == "" {
 		return ""
 	}
 	trimmed := fixupNumberNG(co.Number, true)
