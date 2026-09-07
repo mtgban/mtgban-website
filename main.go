@@ -71,7 +71,11 @@ type PageVars struct {
 	PatreonIDs   map[string]string
 	PatreonURL   string
 	PatreonLogin bool
-	Hash         string
+
+	// The tier of whoever is reading, lowercased, for the navbar to tint
+	// itself by. Empty for a reader who is not signed in.
+	UserTier string
+	Hash     string
 
 	IsMobile bool
 
@@ -568,13 +572,13 @@ type ConfigType struct {
 	// FormatEvents are the game-wide chart markers no ban list reports - a
 	// format launching, say. Everything else on the checkpoint timeline comes
 	// from the ban list document or the set registry.
-	FormatEvents           []FormatEvent      `json:"format_events,omitempty"`
-	ScraperConfig          ScraperConfig      `json:"scraper_config"`
-	TimeseriesConfig       TimeseriesConfig   `json:"timeseries_config"`
-	DiscordHook            string             `json:"discord_hook"`
-	DiscordNotifHook       string             `json:"discord_notif_hook"`
-	DiscordAPINotifHook    string             `json:"discord_api_notif_hook"`
-	DiscordInviteLink      string             `json:"discord_invite_link"`
+	FormatEvents        []FormatEvent    `json:"format_events,omitempty"`
+	ScraperConfig       ScraperConfig    `json:"scraper_config"`
+	TimeseriesConfig    TimeseriesConfig `json:"timeseries_config"`
+	DiscordHook         string           `json:"discord_hook"`
+	DiscordNotifHook    string           `json:"discord_notif_hook"`
+	DiscordAPINotifHook string           `json:"discord_api_notif_hook"`
+	DiscordInviteLink   string           `json:"discord_invite_link"`
 	// The affiliate fields are fallbacks read only when AffiliatesPath is
 	// not set; use Affiliates() (common.go) instead of these.
 	Affiliate              map[string]string  `json:"affiliate"`
@@ -955,6 +959,10 @@ func genPageNav(activeTab, sig string) PageVars {
 		PatreonURL:   ServerURL + "/auth",
 		PatreonLogin: showPatreonLogin,
 		Hash:         BuildCommit,
+
+		// Read off the signature that is already parsed above, so the navbar
+		// can wear the tier without asking anybody
+		UserTier: strings.ToLower(sigParams.Get("UserTier")),
 	}
 
 	if Config.Game != DefaultGame {

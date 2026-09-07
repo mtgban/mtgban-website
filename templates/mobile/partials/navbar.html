@@ -1,5 +1,5 @@
 {{define "navbar"}}
-<nav class="m-nav">
+<nav class="m-nav"{{if .UserTier}} data-tier="{{.UserTier}}"{{end}}>
     <a class="m-nav-home" href="/">
         <img class="m-nav-logo-img" src="/img/logo/ban-stroop.png" alt="BAN">
         <span class="m-nav-logo-lockup">
