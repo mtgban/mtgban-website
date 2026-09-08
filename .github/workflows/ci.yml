@@ -10,6 +10,43 @@ permissions:
   contents: read
 
 jobs:
+  # Formatting, vet and lint read no datastore, so they run on their own and
+  # report in seconds rather than behind the 400 MB download.
+  style:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting
+        run: |
+          unformatted=$(gofmt -s -l .)
+          if [ -n "$unformatted" ]; then
+            echo "these files are not gofmt-ed:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: go vet ./...
+        run: go vet ./...
+
+      - name: Lint
+        run: |
+          go run github.com/mgechev/revive@v1.13.0 \
+            -set_exit_status -config .revive.toml ./...
+
+      # revive reads the syntax tree; staticcheck follows the values through
+      # it. Pinned, since a new release finding new things would fail a build
+      # that changed nothing.
+      - name: Staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+
   build-and-test:
     runs-on: ubuntu-latest
     env:
@@ -61,14 +98,6 @@ jobs:
 
       - name: go build ./...
         run: go build ./...
-
-      - name: go vet ./...
-        run: go vet ./...
-
-      - name: Lint
-        run: |
-          go run github.com/mgechev/revive@v1.13.0 \
-            -set_exit_status -config .revive.toml ./...
 
       - name: go test ./...
         run: go test ./...
