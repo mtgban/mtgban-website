@@ -33,8 +33,6 @@ import (
 )
 
 const (
-	mtgjsonURL = "https://mtgjson.com/api/v5/AllPrintings.json"
-
 	dispatchURL = "https://api.github.com/repos/mtgban/go-mtgban/dispatches"
 	workflowURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/workflows/"
 	gaStatusURL = "https://api.github.com/repos/mtgban/go-mtgban/actions/runs?status="
