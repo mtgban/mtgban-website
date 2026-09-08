@@ -32,12 +32,19 @@ var __acSkippablePrefixes = ["The ", "Secret Lair Drop "];
  * Letters and digits are kept whatever the script: 357 of the names carry no
  * ASCII letter at all - Κλεοπάτρα, Воин Лакватуса, تهילה - and dropping
  * everything but A-Z would leave each of them folding to nothing, findable by
- * no one. */
+ * no one.
+ *
+ * Dropped punctuation can leave two spaces where it stood between words -
+ * Lorcana's "Ursula - Whisper of the Sea", a split card's "Fire // Ice" -
+ * and a doubled space matches nothing anyone types, so runs collapse to one.
+ * Punctuation inside a word still folds clean away: "limduls" keeps finding
+ * "Lim-Dûl's Vault". */
 function __acFold(name) {
     return name
         .normalize("NFD")
         .replace(/[̀-ͯ]/g, "")
         .replace(/[^\p{L}\p{N} ]/gu, "")
+        .replace(/ {2,}/g, " ")
         .toUpperCase();
 }
 
@@ -109,12 +116,25 @@ function __acMatchSpan(name, foldedName, query) {
 function __acOriginalSpan(name, offset, length) {
     var start = -1;
     var seen = 0;
+    var prevSpace = false;
     for (var i = 0; i < name.length; i++) {
         var folded = __acFold(name[i]);
         if (!folded) {
             /* A character that folds away belongs to whatever follows it,
-             * unless the span has already begun - "Jace's" ends after the s. */
+             * unless the span has already begun - "Jace's" ends after the s.
+             * It leaves prevSpace alone: the spaces around a dropped dash
+             * are still one collapsed run. */
             continue;
+        }
+        if (folded === " ") {
+            /* The whole-name fold collapsed this run to its first space;
+             * count the rest the same way it did - not at all. */
+            if (prevSpace) {
+                continue;
+            }
+            prevSpace = true;
+        } else {
+            prevSpace = false;
         }
         if (seen === offset && start < 0) {
             start = i;
