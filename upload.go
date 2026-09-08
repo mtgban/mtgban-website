@@ -2424,6 +2424,20 @@ func loadCsv(reader io.ReadSeeker, comma rune, maxRows int) ([]UploadEntry, erro
 		if err == io.EOF {
 			break
 		} else if err != nil {
+			// A parse error is about one line and the reader steps over it,
+			// so the row is kept to say which line was dropped and the read
+			// carries on. Anything else is the file itself failing - an
+			// uploaded file over the memory limit is a temp file on disk,
+			// and a temp file can stop being readable mid-read - and
+			// csv.Reader answers with that same error for every row asked of
+			// it afterwards. Carrying on there filled the list to maxRows
+			// with one error repeated (15000 rows for an unlimited upload)
+			// and handed it back as a successful upload, which the page then
+			// blamed on the list being too long.
+			var parseErr *csv.ParseError
+			if !errors.As(err, &parseErr) {
+				return nil, fmt.Errorf("could not read the file past line %d: %w", i, err)
+			}
 			var res UploadEntry
 			res.MismatchError = err
 			uploadEntries = append(uploadEntries, res)
