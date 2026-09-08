@@ -8,25 +8,61 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"unicode"
 
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/mtgban-website/internal/embed"
+	"golang.org/x/text/unicode/norm"
 )
 
-// suggestEntry pairs the lowercase form a typed prefix is matched against
+// suggestEntry pairs the folded form a typed prefix is matched against
 // with the name to display for it.
 type suggestEntry struct {
-	lower string
-	name  string
+	folded string
+	name   string
 }
 
 // suggestIndex is the autocomplete index: name entries sorted by their
-// lowercase form, per game side. The pairing is rebuilt here because the
+// folded form, per game side. The pairing is rebuilt here because the
 // datastore's canonical and lowercase name lists are each sorted on their
 // own, so equal indexes in the two lists do not name the same card.
 type suggestIndex struct {
 	singles []suggestEntry
 	sealed  []suggestEntry
+}
+
+// foldSuggestName is the matching form of a name: case, diacritics and
+// punctuation set aside, so "jaces ire" finds "Jace's Ire" and "jotun"
+// finds "Jötun Grunt". It mirrors __acFold in js/autocomplete.js - the two
+// matchers should find the same names - with the same space rule: the
+// spaces around a dropped dash are one collapsed run, so "ursula whisper"
+// finds "Ursula - Whisper of the Sea" and "fire ice" finds "Fire // Ice",
+// while punctuation inside a word still folds clean away and "limduls"
+// keeps finding "Lim-Dûl's Vault".
+//
+// Letters and digits are kept whatever the script: hundreds of the names
+// carry no ASCII letter at all, and folding to a-z alone would leave them
+// findable by no one.
+func foldSuggestName(name string) string {
+	var sb strings.Builder
+	prevSpace := false
+	for _, r := range norm.NFD.String(name) {
+		switch {
+		case unicode.Is(unicode.Mn, r):
+			// The combining marks NFD split off the base letters.
+		case r == ' ':
+			if !prevSpace {
+				sb.WriteRune(' ')
+			}
+			prevSpace = true
+		case unicode.IsLetter(r) || unicode.IsNumber(r):
+			sb.WriteRune(unicode.ToLower(r))
+			prevSpace = false
+		default:
+			// Punctuation folds away and leaves the run state alone.
+		}
+	}
+	return sb.String()
 }
 
 var suggestIndexPtr atomic.Pointer[suggestIndex]
@@ -43,10 +79,13 @@ func rebuildSuggestIndex() {
 func buildSuggestEntries(names []string) []suggestEntry {
 	entries := make([]suggestEntry, len(names))
 	for i, name := range names {
-		entries[i] = suggestEntry{lower: strings.ToLower(name), name: name}
+		entries[i] = suggestEntry{folded: foldSuggestName(name), name: name}
 	}
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].lower < entries[j].lower
+		if entries[i].folded != entries[j].folded {
+			return entries[i].folded < entries[j].folded
+		}
+		return entries[i].name < entries[j].name
 	})
 	return entries
 }
@@ -55,18 +94,19 @@ func buildSuggestEntries(names []string) []suggestEntry {
 // candidates, and every match costs a printings-line render.
 const maxSuggestions = 30
 
-// prefixMatches returns the first entries whose lowercase form starts with
-// prefix, located by binary search over the sorted index.
+// prefixMatches returns the first entries whose folded form starts with
+// prefix (itself already folded), located by binary search over the sorted
+// index.
 func (idx *suggestIndex) prefixMatches(prefix string, sealed bool) []suggestEntry {
 	entries := idx.singles
 	if sealed {
 		entries = idx.sealed
 	}
 	start := sort.Search(len(entries), func(i int) bool {
-		return entries[i].lower >= prefix
+		return entries[i].folded >= prefix
 	})
 	end := start
-	for end < len(entries) && end-start < maxSuggestions && strings.HasPrefix(entries[end].lower, prefix) {
+	for end < len(entries) && end-start < maxSuggestions && strings.HasPrefix(entries[end].folded, prefix) {
 		end++
 	}
 	return entries[start:end]
@@ -93,8 +133,15 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prefix := strings.ToLower(r.FormValue("q"))
-	if len(prefix) < 3 {
+	// The length gate reads the typed text, but the match runs on its folded
+	// form - and a query that folds to nothing (all punctuation) matches
+	// every entry as an empty prefix, so it answers nothing instead.
+	if len(r.FormValue("q")) < 3 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	prefix := foldSuggestName(r.FormValue("q"))
+	if prefix == "" {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -112,7 +159,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	var links []string
 	for _, entry := range idx.prefixMatches(prefix, sealed) {
 		suggestions = append(suggestions, entry.name)
-		printings, _ := mtgmatcher.Printings4Card(entry.lower)
+		printings, _ := mtgmatcher.Printings4Card(entry.name)
 		results = append(results, embed.PrintingsLine(printings))
 		links = append(links, ServerURL+"/search?q="+url.QueryEscape(entry.name))
 	}
@@ -121,8 +168,10 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 		suggestions = append(suggestions, "")
 	}
 
+	// The first element echoes the query, per the opensearch suggestions
+	// shape - the text as typed, not the folded form it was matched by.
 	out := []any{}
-	out = append(out, prefix)
+	out = append(out, r.FormValue("q"))
 	for _, tags := range [][]string{suggestions, results, links} {
 		if tags == nil {
 			break
