@@ -19,8 +19,6 @@ import (
 )
 
 const (
-	newsPageSize = 25
-
 	DefaultPageSize = 25
 
 	MaxSYPResults      = 2500

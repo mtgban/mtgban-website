@@ -42,15 +42,6 @@ func sealedProducts(t *testing.T) (withDeck, withoutDeck string) {
 	return withDeck, withoutDeck
 }
 
-func quantityOf(entries []UploadEntry, cardID string) int {
-	for _, entry := range entries {
-		if entry.CardID == cardID {
-			return entry.Quantity
-		}
-	}
-	return 0
-}
-
 // The quantity travels into the contents: two of a precon is two of every card
 // in it.
 func TestUnpackSealedCarriesTheQuantityInside(t *testing.T) {

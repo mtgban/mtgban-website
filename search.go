@@ -1938,15 +1938,9 @@ func resolveBestPrices(cardIDs []string, stores []string, price4 func(cardId, sh
 	return prices
 }
 
-// Sort cards by their collector number and finish (nonfoil-foil-etched)
-func sortByNumberAndFinish(uuidI, uuidJ string, strip bool) bool {
-	sortingI, _ := getSortingData(uuidI)
-	sortingJ, _ := getSortingData(uuidJ)
-	return cmpNumberAndFinish(sortingI, sortingJ, strip)
-}
-
-// cmpNumberAndFinish is sortByNumberAndFinish over already-resolved sorting
-// data; nil data (an unknown id) sorts like the lookup error it stands for.
+// cmpNumberAndFinish sorts cards by their collector number and finish
+// (nonfoil-foil-etched); nil data (an unknown id) sorts like the lookup
+// error it stands for.
 func cmpNumberAndFinish(sortingI, sortingJ *SortingData, strip bool) bool {
 	if sortingI == nil || sortingJ == nil {
 		return false
@@ -2069,15 +2063,8 @@ func cmpSets(sortingI, sortingJ *SortingData) bool {
 	return setDateI.After(setDateJ)
 }
 
-// Sort card by their names, trying to keep cards grouped by edition, following
-// the same rules as sortSets
-func sortSetsAlphabetical(uuidI, uuidJ string, preferFlavor bool) bool {
-	sortingI, _ := getSortingData(uuidI)
-	sortingJ, _ := getSortingData(uuidJ)
-	return cmpSetsAlphabetical(sortingI, sortingJ, preferFlavor)
-}
-
-// cmpSetsAlphabetical is sortSetsAlphabetical over already-resolved sorting data.
+// cmpSetsAlphabetical sorts cards by their names, trying to keep cards
+// grouped by edition, following the same rules as sortSets.
 func cmpSetsAlphabetical(sortingI, sortingJ *SortingData, preferFlavor bool) bool {
 	if sortingI == nil || sortingJ == nil {
 		return false
@@ -2106,14 +2093,8 @@ func cmpSetsAlphabetical(sortingI, sortingJ *SortingData, preferFlavor bool) boo
 	return cInameLower < cJnameLower
 }
 
-// Sort card by their names, keeping cards grouped by edition alphabetically
-func sortSetsAlphabeticalSet(uuidI, uuidJ string, preferFlavor bool) bool {
-	sortingI, _ := getSortingData(uuidI)
-	sortingJ, _ := getSortingData(uuidJ)
-	return cmpSetsAlphabeticalSet(sortingI, sortingJ, preferFlavor)
-}
-
-// cmpSetsAlphabeticalSet is sortSetsAlphabeticalSet over already-resolved sorting data.
+// cmpSetsAlphabeticalSet sorts cards by their names, keeping cards grouped
+// by edition alphabetically.
 func cmpSetsAlphabeticalSet(sortingI, sortingJ *SortingData, preferFlavor bool) bool {
 	if sortingI == nil || sortingJ == nil {
 		return false
