@@ -602,7 +602,7 @@ func getReprintsGlobal(tcgLow, tcgMarket mtgban.InventoryRecord) ([]string, map[
 		var shouldSkip bool
 		for i := range reprints {
 			// Skip cards that are not old enough
-			if time.Now().Sub(reprints[i].Date).Hours()/24/365 <= YearsBeforeReprint {
+			if time.Since(reprints[i].Date).Hours()/24/365 <= YearsBeforeReprint {
 				shouldSkip = true
 				break
 			}
