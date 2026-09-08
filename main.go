@@ -363,7 +363,7 @@ type NavElem struct {
 }
 
 var DefaultNav = []NavElem{
-	NavElem{
+	{
 		Name:  "Home",
 		Short: "🏡",
 		Link:  "/",
