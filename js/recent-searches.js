@@ -14,7 +14,21 @@
     // own canonical path, which is shorter, survives changes to the query
     // syntax, and does not depend on which route the reader is looking from.
     // Anything else re-runs the query from where it stands.
-    function entryHref(s) { return s.u || ('?q=' + encodeURIComponent(s.q)); }
+    //
+    // The path is only ever written by the server, but it is read back out of
+    // localStorage, which the sync round-trips and anything on the origin can
+    // write. So it is checked rather than trusted: one leading slash and no
+    // second one means a path on this site, which is the only shape the server
+    // produces and the only one that cannot carry a scheme. A "javascript:"
+    // or "//evil.test" that got into the store is dropped for the query form,
+    // which was the only link this list had before.
+    function samePathOnThisSite(u) {
+        return typeof u === 'string' && u.charAt(0) === '/' && u.charAt(1) !== '/' && u.charAt(1) !== '\\';
+    }
+    function entryHref(s) {
+        if (samePathOnThisSite(s.u)) return s.u;
+        return '?q=' + encodeURIComponent(s.q);
+    }
     function mtime(s) { return s.m || s.t || 0; }
     function getLiveSearches() { return getRecentSearches().filter(isLive); }
 
