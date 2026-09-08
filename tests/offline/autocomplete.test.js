@@ -42,6 +42,20 @@ test("a name found without its diacritics highlights the letters it has", () => 
     expect(highlight("Jötun Grunt", "jotun")).toBe("[Jötun] Grunt");
 });
 
+// A dash between words drops like any punctuation, but it takes a space with
+// it: " - " used to fold to a doubled space no one types. Every Lorcana name
+// is "Name - Subtitle", so "ursula whisper" found nothing at all.
+test("a subtitle after a spaced dash is found without the dash", () => {
+    expect(highlight("Ursula - Whisper of the Sea", "ursula whisper"))
+        .toBe("[Ursula - Whisper] of the Sea");
+    expect(highlight("Fire // Ice", "fire ice")).toBe("[Fire // Ice]");
+});
+
+test("typing the dash spaced as printed still matches", () => {
+    expect(highlight("Ursula - Whisper of the Sea", "ursula - whisper"))
+        .toBe("[Ursula - Whisper] of the Sea");
+});
+
 test("typing the prefix itself still matches from the front", () => {
     expect(highlight("Secret Lair Drop A Box of Rocks", "secret lair"))
         .toBe("[Secret Lair] Drop A Box of Rocks");
@@ -73,7 +87,10 @@ test("the whole name highlights when the whole name is typed", () => {
 test("folding sets case, diacritics and punctuation aside", () => {
     expect(fold("Jace's Ire")).toBe("JACES IRE");
     expect(fold("Jötun Grunt")).toBe("JOTUN GRUNT");
-    expect(fold("Fire // Ice")).toBe("FIRE  ICE");
+    // The space a dropped dash or slash leaves behind collapses with the
+    // one already there, so the fold reads the way anyone would type it.
+    expect(fold("Fire // Ice")).toBe("FIRE ICE");
+    expect(fold("Ursula - Whisper of the Sea")).toBe("URSULA WHISPER OF THE SEA");
 });
 
 // 357 of the names carry no ASCII letter at all. Folding to A-Z alone would
