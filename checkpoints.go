@@ -116,7 +116,7 @@ func reloadCheckpoints() error {
 // nothing here to write.
 func saveCheckpoints(ctx context.Context, events []CheckpointEvent) error {
 	if Config.Game == DefaultGame {
-		return errors.New("Magic checkpoints come from the published ban list and cannot be edited")
+		return errors.New("checkpoints for Magic come from the published ban list and cannot be edited")
 	}
 	return checkpointsStore.Save(ctx, checkpointsFile{Events: events})
 }

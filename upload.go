@@ -1979,7 +1979,7 @@ func loadMoxfield(ctx context.Context, link string, maxRows int) ([]UploadEntry,
 func loadCollectr(ctx context.Context, link string, maxRows int) ([]UploadEntry, string, error) {
 	proxyBase := Config.Uploader["collectr"]
 	if proxyBase == "" {
-		return nil, "", errors.New("Collectr uploader not configured")
+		return nil, "", errors.New("no Collectr proxy is configured")
 	}
 
 	items, err := collectr.Load(ctx, proxyBase, link, Config.Game, maxRows)
