@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log"
 	"strings"
@@ -277,6 +278,86 @@ func TestLoadCsvRefusesAFileThatIsOnlyASeparator(t *testing.T) {
 
 	if _, err := loadCsv(strings.NewReader("sep=;\n"), ',', uploadRowLimit); err == nil {
 		t.Fatal("a file with nothing after its separator line was accepted")
+	}
+}
+
+// dyingReader serves a prefix and then fails every read after it, which is how
+// an uploaded file behaves when it is a temp file on a disk that goes away.
+type dyingReader struct {
+	data  []byte
+	pos   int
+	until int
+}
+
+func (d *dyingReader) Read(p []byte) (int, error) {
+	if d.pos >= d.until {
+		return 0, errors.New("the file went away")
+	}
+	end := d.until
+	if end > len(d.data) {
+		end = len(d.data)
+	}
+	n := copy(p, d.data[d.pos:end])
+	d.pos += n
+	return n, nil
+}
+
+func (d *dyingReader) Seek(offset int64, whence int) (int64, error) {
+	d.pos = int(offset)
+	return offset, nil
+}
+
+// A file that stops being readable is not a list, and it is not a long list
+// either. csv.Reader answers with the same error for every row asked of it
+// once the reader underneath has failed, so a loop that records the error and
+// carries on fills itself to the row limit with one error repeated - and used
+// to hand that back as a successful upload of 15000 rows.
+func TestLoadCsvStopsWhenTheFileStopsBeingReadable(t *testing.T) {
+	quietUploadLog(t)
+
+	var b strings.Builder
+	b.WriteString("Name,Edition,Quantity\n")
+	for i := 0; i < 20; i++ {
+		b.WriteString("Lightning Bolt,Beta,1\n")
+	}
+
+	for _, maxRows := range []int{50, MaxUploadTotalEntries} {
+		reader := &dyingReader{data: []byte(b.String()), until: 60}
+		entries, err := loadCsv(reader, ',', maxRows)
+		if err == nil {
+			t.Errorf("maxRows=%d: a file that died mid-read came back as %d good entries",
+				maxRows, len(entries))
+			continue
+		}
+		if len(entries) != 0 {
+			t.Errorf("maxRows=%d: %d entries came back beside the error", maxRows, len(entries))
+		}
+		if !strings.Contains(err.Error(), "the file went away") {
+			t.Errorf("maxRows=%d: error is %q, want it to carry the read failure", maxRows, err)
+		}
+	}
+}
+
+// The other half of that: trouble inside the file is not the file failing.
+// A stray quote is swallowed rather than ending the read - LazyQuotes is set
+// for exactly that - so loadCsv still answers with rows and no error, which is
+// what makes the hard stop above specific to a reader that has actually died.
+func TestLoadCsvDoesNotFailAFileOverAStrayQuote(t *testing.T) {
+	quietUploadLog(t)
+
+	body := "Name,Edition,Quantity\n" +
+		"Lightning Bolt,Beta,4\n" +
+		"Sol\"Ring,Commander 2013,1\n"
+
+	entries, err := loadCsv(strings.NewReader(body), ',', uploadRowLimit)
+	if err != nil {
+		t.Fatalf("a stray quote failed the whole file: %v", err)
+	}
+	if len(entries) == 0 {
+		t.Fatal("a stray quote emptied the file")
+	}
+	if entries[0].Card.Name != "Lightning Bolt" {
+		t.Errorf("first card is %q, want Lightning Bolt", entries[0].Card.Name)
 	}
 }
 
