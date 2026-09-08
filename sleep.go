@@ -232,7 +232,7 @@ func getBulks(skipEditions []string) map[string]int {
 		if err != nil {
 			continue
 		}
-		if time.Now().Sub(releaseDate).Hours()/24/365 > 5 {
+		if time.Since(releaseDate).Hours()/24/365 > 5 {
 			continue
 		}
 
@@ -366,7 +366,7 @@ func getReprints(skipEditions []string) map[string]int {
 		// Use Seconds to give a heavier weight on older items and square of
 		// price to let expensive cards have a bigger impact
 		// Log just spreads the results more nicely on the tier system
-		tiers[uuid] = int(math.Log(float64(time.Now().Sub(latest).Seconds()) * minPrice * minPrice))
+		tiers[uuid] = int(math.Log(float64(time.Since(latest).Seconds()) * minPrice * minPrice))
 	}
 
 	return tiers
