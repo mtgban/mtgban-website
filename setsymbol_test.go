@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
@@ -92,6 +93,44 @@ func TestSetSymbolBlock(t *testing.T) {
 			t.Errorf("%s: %q missing %q", tc.name, got, tc.want)
 		}
 		t.Logf("%-18s %s", tc.name, got)
+	}
+
+	// A set whose game publishes a symbol draws that image instead of either
+	// the glyph or the badge. set_symbol reads the loaded datastore, which a
+	// test has none of, so it answers here for one set only - which is also
+	// what pins that a set without one is untouched.
+	symbolFuncs := template.FuncMap{}
+	for name, fn := range funcMap {
+		symbolFuncs[name] = fn
+	}
+	symbolFuncs["set_symbol"] = func(code string) string {
+		if code == "SVI" {
+			return "https://assets.tcgdex.net/univ/sv/sv01/symbol.webp"
+		}
+		return ""
+	}
+	symbolTmpl, err := tmplparse.ParseFiles("set-symbol.html", []string{"templates/partials/set-symbol.html"}, symbolFuncs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, want string
+		arg        map[string]any
+	}{
+		{"symbol card", `src="https://assets.tcgdex.net/univ/sv/sv01/symbol.webp"`, card("", "SVI", "C", "var(--normal)", false)},
+		{"symbol sized", `width="20" height="20"`, edition("", "SVI")},
+		{"symbol keeps the code", `alt="SVI"`, edition("", "SVI")},
+		{"no symbol still badges", `>OP01</text>`, edition("", "OP01")},
+	} {
+		var b bytes.Buffer
+		if err := symbolTmpl.ExecuteTemplate(&b, "set-symbol", tc.arg); err != nil {
+			t.Fatal(err)
+		}
+		got := strings.Join(strings.Fields(b.String()), " ")
+		if !strings.Contains(got, tc.want) {
+			t.Errorf("%s: %q missing %q", tc.name, got, tc.want)
+		}
+		t.Logf("%-22s %s", tc.name, got)
 	}
 
 	// A deployment with no drawings is a keyrune one, and keeps the font's
