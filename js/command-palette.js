@@ -37,6 +37,24 @@
         return out;
     })();
 
+    // The link each nav entry actually has, as the page rendered it. A saved
+    // search carries its own copy, but a saved search is read back out of
+    // localStorage - which the user-state sync round-trips and anything on the
+    // origin can write - so the copy is used to look the link up here rather
+    // than to navigate with. What is followed is always the server's own.
+    var NAV_LINKS = (function () {
+        var out = {};
+        var nav = palette.nav || [];
+        for (var i = 0; i < nav.length; i++) {
+            if (nav[i].name && nav[i].link) out[nav[i].name] = nav[i].link;
+        }
+        return out;
+    })();
+
+    // A sub-view's parameter is stored too, so it is held to the shape one has:
+    // "page=syp", "sort=retail". Anything else is dropped rather than appended.
+    var NAV_PARAM_RE = /^[A-Za-z0-9_.-]+=[A-Za-z0-9_.,%-]*$/;
+
     // State
     var S = {
         open:               false,
@@ -342,15 +360,23 @@
         if (!chipArray || chipArray.length === 0) return null;
         var first = chipArray[0];
         if (!first || first.type !== 'nav') return null;
-        var parentKey = first.navName ? NAV_PARENTS[first.navName] : null;
-        if (!parentKey) return first.navLink || null;     // leaf nav
 
-        var base = (first.navLink || '').split('?')[0];
+        // Named, not carried: the stored chip says which nav entry it was,
+        // and the link comes from the table the page rendered. A name that
+        // no longer exists - a page the reader lost access to, an entry that
+        // was renamed - resolves to nothing and navigates nowhere.
+        var link = NAV_LINKS[first.navName];
+        if (!link) return null;
+
+        var parentKey = first.navName ? NAV_PARENTS[first.navName] : null;
+        if (!parentKey) return link;                      // leaf nav
+
+        var base = link.split('?')[0];
         var params = [];
         for (var i = 1; i < chipArray.length; i++) {
             var c = chipArray[i];
             if (c.type !== 'nav-sub' || c._parentKey !== parentKey) return null;
-            if (c._urlParam) params.push(c._urlParam);
+            if (c._urlParam && NAV_PARAM_RE.test(c._urlParam)) params.push(c._urlParam);
         }
         return base + (params.length ? '?' + params.join('&') : '');
     }
