@@ -17,10 +17,10 @@ func TestCardRedirectFollowsScryfallsShape(t *testing.T) {
 		path string
 		want string
 	}{
-		{"set and number", "/card/lea/1", "s:lea cns:1"},
-		{"the name scryfall appends", "/card/otj/1/another-round", "s:otj cns:1"},
-		{"anything else past it", "/card/10e/1%E2%98%85/ancestors-chosen/en", "s:10e cns:1★"},
-		{"a trailing slash", "/card/sld/1/", "s:sld cns:1"},
+		{"set and number", "/card/lea/1", "Animate Wall s:lea cns:1"},
+		{"the name scryfall appends", "/card/otj/1/another-round", "Another Round s:otj cns:1"},
+		{"anything else past it", "/card/10e/1%E2%98%85/ancestors-chosen/en", "Ancestor's Chosen s:10e cns:1★"},
+		{"a trailing slash", "/card/sld/1/", "Snow-Covered Plains s:sld cns:1"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
@@ -164,12 +164,12 @@ func TestCardRedirectTakesAFinishOrTheName(t *testing.T) {
 	}
 
 	for _, tt := range []struct{ path, want string }{
-		{"/card/otj/1/foil", "s:otj cns:1 f:foil"},
-		{"/card/otj/1/nonfoil", "s:otj cns:1 f:nonfoil"},
+		{"/card/otj/1/foil", "Another Round s:otj cns:1 f:foil"},
+		{"/card/otj/1/nonfoil", "Another Round s:otj cns:1 f:nonfoil"},
 		// Scryfall's own link, whose third part is the card
-		{"/card/otj/1/another-round", "s:otj cns:1"},
+		{"/card/otj/1/another-round", "Another Round s:otj cns:1"},
 		// A finish this printing is not sold in is not one of its finishes
-		{"/card/otj/1/etched", "s:otj cns:1"},
+		{"/card/otj/1/etched", "Another Round s:otj cns:1"},
 	} {
 		rec := httptest.NewRecorder()
 		CardRedirect(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
@@ -317,5 +317,47 @@ func TestCardRedirectReadsAFinishOverAName(t *testing.T) {
 	}
 	if len(keys) < 2 {
 		t.Errorf("%q came to %d results, want every finish of the card", query, len(keys))
+	}
+}
+
+// A result links its printing by the card path, and the path comes back with
+// the name in front, the way the link used to read outright: the filters find
+// the printing, the name is what the search box shows for it.
+func TestCardPathComesBackWithItsName(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	set, err := mtgmatcher.GetSet("LEA")
+	if err != nil || len(set.Cards) == 0 {
+		t.Skip("this datastore has no LEA")
+	}
+
+	for _, id := range mtgmatcher.FinishSiblings(set.Cards[0].UUID) {
+		co, err := mtgmatcher.GetUUID(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := cardPath(co)
+		if path == "" {
+			t.Fatalf("%s has no card path", co.Name)
+		}
+
+		rec := httptest.NewRecorder()
+		CardRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		loc, err := url.Parse(rec.Header().Get("Location"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		query := loc.Query().Get("q")
+		if !strings.HasPrefix(query, co.Name+" ") {
+			t.Errorf("%s asked %q, want it to open with %s", path, query, co.Name)
+		}
+		keys, err := searchAndFilter(parseSearchOptionsNG(query, nil, nil, nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(keys) != 1 || keys[0] != id {
+			t.Errorf("%q came to %v, want just %s", query, keys, id)
+		}
 	}
 }
