@@ -46,7 +46,12 @@
 
             var iconEl = document.createElement('span');
             iconEl.className = 'cp-chip-icon';
-            iconEl.innerHTML = '<i data-lucide="' + (chip.icon || 'tag') + '"></i>';
+            // Built rather than written: the icon name comes off a saved
+            // search, and pasted into an attribute it could close the quote
+            // and open one of its own. setAttribute cannot be escaped out of.
+            var iconTag = document.createElement('i');
+            iconTag.setAttribute('data-lucide', chip.icon || 'tag');
+            iconEl.appendChild(iconTag);
             el.appendChild(iconEl);
 
             var labelEl = document.createElement('span');

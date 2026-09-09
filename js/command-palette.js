@@ -327,6 +327,17 @@
 
     // Returns a navigation URL if the chip set is a "nav composition" (one parent
     // nav chip + zero or more nav-sub chips for that parent), else null.
+    // A saved search carries the link it was saved from, and a saved search
+    // is read back out of localStorage - which the user-state sync round-trips
+    // and anything on the origin can write. So the link is checked rather than
+    // trusted before it becomes a navigation: one leading slash and no second
+    // one is a path on this site, the only shape the nav table produces and the
+    // only one that cannot carry a "javascript:" scheme.
+    function samePathOnThisSite(url) {
+        return typeof url === 'string' && url.charAt(0) === '/' &&
+            url.charAt(1) !== '/' && url.charAt(1) !== '\\';
+    }
+
     function chipsNavURL(chipArray) {
         if (!chipArray || chipArray.length === 0) return null;
         var first = chipArray[0];
@@ -1016,7 +1027,7 @@
                     }
                     setJSON(SAVED_KEY, all);
                     var navUrl = chipsNavURL(cmd.chips);
-                    if (navUrl) { window.location.href = navUrl; return; }
+                    if (samePathOnThisSite(navUrl)) { window.location.href = navUrl; return; }
                     recordRecentSearch(cmd.query);
                     window.location.href = '/search?q=' + encodeURIComponent(cmd.query);
                 }; })(s),
