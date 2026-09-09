@@ -18,8 +18,9 @@ import (
 // suggestEntry pairs the folded form a typed prefix is matched against
 // with the name to display for it.
 type suggestEntry struct {
-	folded string
-	name   string
+	folded   string
+	squashed string
+	name     string
 }
 
 // suggestIndex is the autocomplete index: name entries sorted by their
@@ -29,6 +30,21 @@ type suggestEntry struct {
 type suggestIndex struct {
 	singles []suggestEntry
 	sealed  []suggestEntry
+
+	// The same entries again, sorted by the spaces-closed fold. A name that
+	// spells a join with a hyphen loses it to the fold without leaving a
+	// space - "Blue-Eyed Silver Zombie" folds to "blueeyed silver zombie" -
+	// so a reader who types the space it looks like has no prefix to match.
+	// Closing the spaces on both sides gives them one.
+	singlesSquashed []suggestEntry
+	sealedSquashed  []suggestEntry
+}
+
+// squashSuggestName closes up the spaces in an already-folded name, so that
+// where one spelling puts a space the other can put nothing at all: it is what
+// lets "blue eyed" reach "Blue-Eyed ...", and "fireice" reach "Fire // Ice".
+func squashSuggestName(folded string) string {
+	return strings.ReplaceAll(folded, " ", "")
 }
 
 // foldSuggestName is the matching form of a name: case, diacritics and
@@ -70,46 +86,99 @@ var suggestIndexPtr atomic.Pointer[suggestIndex]
 // rebuildSuggestIndex derives the autocomplete index from the loaded card
 // data. Called from loadDatastore, the one place the card data swaps.
 func rebuildSuggestIndex() {
-	suggestIndexPtr.Store(&suggestIndex{
-		singles: buildSuggestEntries(mtgmatcher.AllNames("canonical", false)),
-		sealed:  buildSuggestEntries(mtgmatcher.AllNames("canonical", true)),
-	})
+	suggestIndexPtr.Store(newSuggestIndex(
+		mtgmatcher.AllNames("canonical", false),
+		mtgmatcher.AllNames("canonical", true),
+	))
 }
 
-func buildSuggestEntries(names []string) []suggestEntry {
-	entries := make([]suggestEntry, len(names))
-	for i, name := range names {
-		entries[i] = suggestEntry{folded: foldSuggestName(name), name: name}
+// newSuggestIndex builds the two sorted views each side is looked up in.
+func newSuggestIndex(singles, sealed []string) *suggestIndex {
+	byFold, bySquashed := buildSuggestEntries(singles)
+	sealedByFold, sealedBySquashed := buildSuggestEntries(sealed)
+	return &suggestIndex{
+		singles:         byFold,
+		singlesSquashed: bySquashed,
+		sealed:          sealedByFold,
+		sealedSquashed:  sealedBySquashed,
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].folded != entries[j].folded {
-			return entries[i].folded < entries[j].folded
+}
+
+// buildSuggestEntries returns the same entries twice, sorted by each of the
+// two forms a typed prefix is looked up in. They share their strings; what
+// differs is the order, because each lookup is a binary search over its own.
+func buildSuggestEntries(names []string) (byFold, bySquashed []suggestEntry) {
+	byFold = make([]suggestEntry, len(names))
+	for i, name := range names {
+		folded := foldSuggestName(name)
+		byFold[i] = suggestEntry{folded: folded, squashed: squashSuggestName(folded), name: name}
+	}
+	sort.Slice(byFold, func(i, j int) bool {
+		if byFold[i].folded != byFold[j].folded {
+			return byFold[i].folded < byFold[j].folded
 		}
-		return entries[i].name < entries[j].name
+		return byFold[i].name < byFold[j].name
 	})
-	return entries
+
+	bySquashed = make([]suggestEntry, len(byFold))
+	copy(bySquashed, byFold)
+	sort.Slice(bySquashed, func(i, j int) bool {
+		if bySquashed[i].squashed != bySquashed[j].squashed {
+			return bySquashed[i].squashed < bySquashed[j].squashed
+		}
+		return bySquashed[i].name < bySquashed[j].name
+	})
+	return byFold, bySquashed
 }
 
 // maxSuggestions caps a response: the search box renders at most 30
 // candidates, and every match costs a printings-line render.
 const maxSuggestions = 30
 
-// prefixMatches returns the first entries whose folded form starts with
-// prefix (itself already folded), located by binary search over the sorted
-// index.
-func (idx *suggestIndex) prefixMatches(prefix string, sealed bool) []suggestEntry {
-	entries := idx.singles
+// prefixMatches returns the entries a typed prefix reaches, by folded form
+// first and then by the spaces-closed form, each a binary search over the view
+// sorted for it. Both run every time rather than the second standing in for a
+// failed first: the two disagree in both directions, since a typed space has
+// to reach a hyphen in the name and a typed hyphen has to reach a space.
+// Names already found keep the place the folded search gave them.
+func (idx *suggestIndex) matchesFor(typed string, sealed bool) []suggestEntry {
+	folded := foldSuggestName(typed)
+	return idx.prefixMatches(folded, squashSuggestName(folded), sealed)
+}
+
+func (idx *suggestIndex) prefixMatches(folded, squashed string, sealed bool) []suggestEntry {
+	byFold, bySquashed := idx.singles, idx.singlesSquashed
 	if sealed {
-		entries = idx.sealed
+		byFold, bySquashed = idx.sealed, idx.sealedSquashed
+	}
+
+	seen := make(map[string]bool, maxSuggestions)
+	out := appendPrefixMatches(nil, byFold, folded, seen, func(e suggestEntry) string { return e.folded })
+	return appendPrefixMatches(out, bySquashed, squashed, seen, func(e suggestEntry) string { return e.squashed })
+}
+
+// appendPrefixMatches collects entries whose key starts with prefix, from a
+// slice sorted by that key, up to the response cap. A name already collected
+// is skipped rather than ending the walk: the two views hold the same names in
+// different orders, so a repeat says nothing about what follows it.
+func appendPrefixMatches(out, entries []suggestEntry, prefix string, seen map[string]bool, key func(suggestEntry) string) []suggestEntry {
+	if prefix == "" {
+		return out
 	}
 	start := sort.Search(len(entries), func(i int) bool {
-		return entries[i].folded >= prefix
+		return key(entries[i]) >= prefix
 	})
-	end := start
-	for end < len(entries) && end-start < maxSuggestions && strings.HasPrefix(entries[end].folded, prefix) {
-		end++
+	for i := start; i < len(entries) && len(out) < maxSuggestions; i++ {
+		if !strings.HasPrefix(key(entries[i]), prefix) {
+			break
+		}
+		if seen[entries[i].name] {
+			continue
+		}
+		seen[entries[i].name] = true
+		out = append(out, entries[i])
 	}
-	return entries[start:end]
+	return out
 }
 
 func SuggestAPI(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +226,7 @@ func SuggestAPI(w http.ResponseWriter, r *http.Request) {
 	var suggestions []string
 	var results []string
 	var links []string
-	for _, entry := range idx.prefixMatches(prefix, sealed) {
+	for _, entry := range idx.prefixMatches(prefix, squashSuggestName(prefix), sealed) {
 		suggestions = append(suggestions, entry.name)
 		printings, _ := mtgmatcher.Printings4Card(entry.name)
 		results = append(results, embed.PrintingsLine(printings))
