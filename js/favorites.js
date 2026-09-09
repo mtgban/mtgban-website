@@ -170,7 +170,7 @@
 
         var query = name;
         if (setCode) query += ' s:' + setCode;
-        if (number) query += ' cn:' + number;
+        if (number) query += ' cns:' + number;
         if (isEtched) query += ' f:etched';
         else if (isFoil) query += ' f:foil';
 
@@ -723,7 +723,7 @@
 
             var query = name;
             if (c[3]) query += ' s:' + c[3];
-            if (c[4]) query += ' cn:' + c[4];
+            if (c[4]) query += ' cns:' + c[4];
             if (etched) query += ' f:etched';
             else if (foil) query += ' f:foil';
 
