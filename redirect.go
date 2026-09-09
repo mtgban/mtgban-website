@@ -68,24 +68,31 @@ func Redirect(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-// namesFinish reports whether a word names a finish of the printing at set and
-// number. It is how the third part of a card path is told from the card name
-// scryfall puts in the same position, and it asks with the filter the query
-// would run, over the printings the path already names - so a word this route
-// accepts is a word the search answers. A name answers to nothing: spelled the
-// way finishes are spelled, "another-round" is "anotherround", which no
-// printing is sold as.
-func namesFinish(set, number, word string) bool {
+// printingsAt returns the cards a set files under a number, as printed.
+func printingsAt(set, number string) []mtgmatcher.Card {
 	edition, err := mtgmatcher.GetSet(set)
 	if err != nil {
-		return false
+		return nil
 	}
-
-	values := fixupFinishNG(word)
+	var cards []mtgmatcher.Card
 	for _, card := range edition.Cards {
-		if !strings.EqualFold(card.Number, number) {
-			continue
+		if strings.EqualFold(card.Number, number) {
+			cards = append(cards, card)
 		}
+	}
+	return cards
+}
+
+// namesFinish reports whether a word names a finish of one of the cards. It is
+// how the third part of a card path is told from the card name scryfall puts
+// in the same position, and it asks with the filter the query would run, over
+// the printings the path already names - so a word this route accepts is a
+// word the search answers. A name answers to nothing: spelled the way finishes
+// are spelled, "another-round" is "anotherround", which no printing is sold
+// as.
+func namesFinish(cards []mtgmatcher.Card, word string) bool {
+	values := fixupFinishNG(word)
+	for _, card := range cards {
 		// A set carries one card object per printing, in its plain finish;
 		// f:foil is answered by a sibling of that one rather than by it.
 		for _, id := range mtgmatcher.FinishSiblings(card.UUID) {
@@ -124,7 +131,10 @@ func namesFinish(set, number, word string) bool {
 // for: a number names one printing, and this site prices its foil and its
 // nonfoil separately. It also means a set code scryfall spells differently, or
 // a number this game writes another way, fails as a search that says so rather
-// than as a dead link.
+// than as a dead link. The name goes in front of the filters where the set
+// files a card under the number, since the query is what the search box
+// shows, and a person reads a name there - the way a result's link always
+// read.
 //
 // The number is matched as printed, with cns: rather than cn:. Scryfall writes
 // it the way the card does, stars and daggers included, and those are exactly
@@ -164,7 +174,11 @@ func CardRedirect(w http.ResponseWriter, r *http.Request) {
 			number := fields[1]
 			query += " cns:" + number
 
-			if len(fields) > 2 && namesFinish(set, number, fields[2]) {
+			cards := printingsAt(set, number)
+			if len(cards) > 0 {
+				query = cards[0].Name + " " + query
+			}
+			if len(fields) > 2 && namesFinish(cards, fields[2]) {
 				query += " f:" + fields[2]
 			}
 		}
