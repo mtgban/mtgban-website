@@ -329,12 +329,29 @@ func loadRarityBadges() {
 	}
 	rarityBadges[""] = fallback
 
-	entries, _ := os.ReadDir("img/setsymbol/" + Config.Game)
+	// The directory is named for the game, but the name is written by whoever
+	// edits the config, so it is matched against the games the matcher
+	// actually registers and the registered spelling is what gets joined. A
+	// game nobody registered has no symbols to read, and a name like "../.."
+	// matches none of them.
+	var game string
+	for _, registered := range mtgmatcher.RegisteredGames() {
+		if registered == Config.Game {
+			game = registered
+			break
+		}
+	}
+	if game == "" {
+		log.Println("no set symbols for unregistered game:", Config.Game)
+		return
+	}
+
+	entries, _ := os.ReadDir("img/setsymbol/" + game)
 	for _, entry := range entries {
 		if !strings.HasSuffix(entry.Name(), ".svg") {
 			continue
 		}
-		badge, err := readBadge("img/setsymbol/" + Config.Game + "/" + entry.Name())
+		badge, err := readBadge("img/setsymbol/" + game + "/" + entry.Name())
 		if err != nil {
 			log.Println("skipping set symbol:", err)
 			continue
