@@ -60,7 +60,11 @@
             case 's':
                 out.set = val.toUpperCase();
                 break;
+            /* Both spellings, one behaviour: the offline catalog stores the
+             * number a printing prints, so an exact compare is already what
+             * cns: means online, and cn: has always been read that way here. */
             case 'cn':
+            case 'cns':
                 out.number = val;
                 break;
             case 'f':

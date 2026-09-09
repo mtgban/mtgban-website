@@ -28,6 +28,20 @@ test('cn operator and bare digits both set number', () => {
     expect(p('sol ring 4').names).toEqual(['sol', 'ring']);
 });
 
+// Every link the site builds for one printing spells the number cns: - it is
+// the number the printing prints, marks and all - so offline has to read it.
+// The offline catalog already stores that number and compares it exactly, so
+// the two spellings mean the same thing here.
+test('cns is read the same way cn is', () => {
+    expect(p('cns:1116jpn').number).toBe('1116jpn');
+    expect(p('cns:123').number).toBe('123');
+    expect(p('plaguecrafter s:sld cns:1116jpn f:nonfoil')).toMatchObject({
+        set: 'SLD', number: '1116jpn', finish: 'nonfoil', names: ['plaguecrafter'],
+    });
+    // and it is not left sitting in the unsupported pile
+    expect(p('cns:1116jpn').unsupported).toEqual([]);
+});
+
 test('collector numbers with letters need cn:', () => {
     const r = p('cn:234a');
     expect(r.number).toBe('234a');

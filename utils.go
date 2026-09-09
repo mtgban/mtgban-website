@@ -1127,7 +1127,8 @@ func cardPath(co *mtgmatcher.CardObject) string {
 func genQuery(co *mtgmatcher.CardObject) string {
 	query := co.Name
 	if !co.Sealed {
-		query = fmt.Sprintf("%s s:%s cn:%s", co.Name, co.SetCode, co.Number)
+		// cns: compares the number as printed, which is what co.Number is.
+		query = fmt.Sprintf("%s s:%s cns:%s", co.Name, co.SetCode, co.Number)
 		if co.Etched {
 			query += " f:etched"
 		} else if co.Foil {
