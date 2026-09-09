@@ -1595,7 +1595,10 @@
     function showCardImageFromBtn(btn) {
         var header = btn.closest('.result-header');
         if (!header) return;
-        var url = header.getAttribute('data-image-url');
+        // httpURL, not sameSiteURL: the art is served from Scryfall and
+        // TCGplayer, so this asks for a scheme it can trust rather than an
+        // origin it cannot have.
+        var url = httpURL(header.getAttribute('data-image-url'));
         if (!url) return;
         document.getElementById('cardImageModalImg').src = url;
         document.getElementById('cardImageModal').classList.add('open');
@@ -1648,11 +1651,15 @@ body.modal-embed .cp-overlay { display: none !important; }
             if (a.dataset.modalDecorated === '1') return;
             var raw = a.getAttribute('href');
             if (!raw) return;
-            if (raw.charAt(0) === '#' || raw.indexOf('javascript:') === 0) return;
+            if (raw.charAt(0) === '#') return;
             if (a.target === '_blank') return;
-            var url;
-            try { url = new URL(raw, window.location.href); } catch (e) { return; }
-            if (url.origin !== window.location.origin) return;
+            // Parsed rather than pattern-matched: naming "javascript:" alone
+            // left "data:" and "vbscript:" through, and sameSiteURL settles
+            // the scheme and the origin in one answer. What it hands back is
+            // already absolute, so building a URL from it cannot throw.
+            var safe = sameSiteURL(raw);
+            if (!safe) return;
+            var url = new URL(safe);
             if (!/^\/(search|sealed)\/?$/.test(url.pathname)) return;
             if (chartCtx && !url.searchParams.has('chart')) {
                 url.searchParams.set('chart', chartCtx);
