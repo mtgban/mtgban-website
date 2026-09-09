@@ -48,28 +48,41 @@ function __acFold(name) {
         .toUpperCase();
 }
 
+/* The fold with its spaces closed up. A name spelling a join with a hyphen
+ * loses it to the fold without leaving a space - "Blue-Eyed Silver Zombie"
+ * folds to "BLUEEYED SILVER ZOMBIE" - so a reader who types the space it looks
+ * like has no prefix to match. Closing the spaces on both sides gives them
+ * one, in both directions: a typed space reaches a hyphen, and a typed hyphen
+ * reaches the space in "Fire // Ice". */
+function __acSquash(folded) {
+    return folded.replace(/ /g, "");
+}
+
 var __acSkippableFolded = __acSkippablePrefixes.map(__acFold);
+var __acSkippableSquashed = __acSkippableFolded.map(__acSquash);
 
 /* The typed text, prepared once a keystroke rather than once a name. */
 function __acQuery(typed) {
+    var folded = __acFold(typed);
     return {
         raw: typed,
         upper: typed.toUpperCase(),
-        folded: __acFold(typed),
+        folded: folded,
+        squashed: __acSquash(folded),
     };
 }
 
 /* Where the typed text matches within a folded name, or -1: at the front, or
  * past a prefix the name may be found without. */
-function __acMatchOffset(foldedName, foldedInput) {
+function __acMatchOffset(foldedName, foldedInput, skippables) {
     if (!foldedInput) {
         return -1;
     }
     if (foldedName.lastIndexOf(foldedInput, 0) === 0) {
         return 0;
     }
-    for (var i = 0; i < __acSkippableFolded.length; i++) {
-        var skip = __acSkippableFolded[i];
+    for (var i = 0; i < skippables.length; i++) {
+        var skip = skippables[i];
         if (foldedName.lastIndexOf(skip, 0) !== 0) {
             continue;
         }
@@ -82,7 +95,7 @@ function __acMatchOffset(foldedName, foldedInput) {
 
 /* Where the typed text matches in a name, as a span of the name itself, or
  * null if it does not. */
-function __acMatchSpan(name, foldedName, query) {
+function __acMatchSpan(name, foldedName, query, squashedName) {
     if (!query.raw) {
         return null;
     }
@@ -98,11 +111,20 @@ function __acMatchSpan(name, foldedName, query) {
         return { start: 0, end: query.raw.length };
     }
 
-    var offset = __acMatchOffset(foldedName, query.folded);
+    var offset = __acMatchOffset(foldedName, query.folded, __acSkippableFolded);
+    if (offset >= 0) {
+        return __acOriginalSpan(name, offset, query.folded.length, false);
+    }
+
+    /* Nothing matched with the spaces where they fell, so try again with them
+     * closed up on both sides - which is the only way a typed space reaches a
+     * hyphen the fold swallowed. */
+    var squashed = typeof squashedName === "string" ? squashedName : __acSquash(foldedName);
+    offset = __acMatchOffset(squashed, query.squashed, __acSkippableSquashed);
     if (offset < 0) {
         return null;
     }
-    return __acOriginalSpan(name, offset, query.folded.length);
+    return __acOriginalSpan(name, offset, query.squashed.length, true);
 }
 
 /* Turn a span of the folded name back into a span of the name itself, which is
@@ -113,7 +135,7 @@ function __acMatchSpan(name, foldedName, query) {
  * Lair Drop " begins seventeen characters into the name rather than at nought.
  * Walking the name and folding it a character at a time is what says where.
  */
-function __acOriginalSpan(name, offset, length) {
+function __acOriginalSpan(name, offset, length, squashed) {
     var start = -1;
     var seen = 0;
     var prevSpace = false;
@@ -127,6 +149,11 @@ function __acOriginalSpan(name, offset, length) {
             continue;
         }
         if (folded === " ") {
+            /* Matching with the spaces closed up counted none of them, so
+             * neither does this walk. */
+            if (squashed) {
+                continue;
+            }
             /* The whole-name fold collapsed this run to its first space;
              * count the rest the same way it did - not at all. */
             if (prevSpace) {
@@ -173,6 +200,7 @@ async function autocomplete(form, inp, sealed) {
      * names, and every one of them used to be normalized again on every letter
      * typed. */
     const folded = arr.map(__acFold);
+    const squashed = folded.map(__acSquash);
 
     // Track viewport listeners so we can detach them when the dropdown closes
     var viewportListenersAttached = false;
@@ -371,7 +399,7 @@ async function autocomplete(form, inp, sealed) {
         for (i = 0; i < arr.length; i++) {
             /* Check whether the item is found by what was typed, at its front
              * or past a prefix nobody types */
-            var span = __acMatchSpan(arr[i], folded[i], query);
+            var span = __acMatchSpan(arr[i], folded[i], query, squashed[i]);
             if (!span) {
                 continue;
             }
@@ -549,6 +577,7 @@ async function autocomplete(form, inp, sealed) {
 if (typeof self !== "undefined") {
     self.AutocompleteMatch = {
         fold: __acFold,
+        squash: __acSquash,
         query: __acQuery,
         matchOffset: __acMatchOffset,
         originalSpan: __acOriginalSpan,

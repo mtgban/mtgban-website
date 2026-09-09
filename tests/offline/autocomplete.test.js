@@ -121,3 +121,42 @@ test("a drop is found past the punctuation its name opens with", () => {
     expect(highlight("Secret Lair Drop “explosion sounds”", "explosion"))
         .toBe("Secret Lair Drop “[explosion] sounds”");
 });
+
+// A hyphen joining two words is the one place the fold and the reader
+// disagree: the fold closes the gap, the reader types a space into it. Both
+// spellings have to reach the card, and 1,131 of Yu-Gi-Oh's 16,419 names and
+// 1,265 of Magic's 37,131 carry such a hyphen.
+test("a hyphen joining two words is reached by typing a space", () => {
+    expect(highlight("Blue-Eyed Silver Zombie", "blue eyed"))
+        .toBe("[Blue-Eyed] Silver Zombie");
+    expect(highlight("Blue-Eyed Silver Zombie", "blue-eyed"))
+        .toBe("[Blue-Eyed] Silver Zombie");
+    expect(highlight("Blue-Eyed Silver Zombie", "blueeyed"))
+        .toBe("[Blue-Eyed] Silver Zombie");
+    expect(highlight("3-Hump Lacooda", "3 hump")).toBe("[3-Hump] Lacooda");
+    /* Six letters typed cover six of the name, so the span stops before the
+     * apostrophe-s that nobody typed - the same rule "limduls" already showed
+     * from the other side. */
+    expect(highlight("Lim-Dûl's Vault", "lim dul")).toBe("[Lim-Dûl]'s Vault");
+});
+
+// The span still has to hold the space the reader typed.
+test("a match that spans the join keeps the whole of it", () => {
+    expect(highlight("Blue-Eyed Silver Zombie", "blue eyed silver"))
+        .toBe("[Blue-Eyed Silver] Zombie");
+});
+
+// And the other direction: where the name has the space, a reader who runs the
+// words together still finds it.
+test("a space in the name is reached by typing none", () => {
+    expect(highlight("Fire // Ice", "fireice")).toBe("[Fire // Ice]");
+    expect(highlight("Ursula - Whisper of the Sea", "ursulawhisper"))
+        .toBe("[Ursula - Whisper] of the Sea");
+});
+
+// Closing the spaces must not make everything match everything.
+test("closing the spaces does not match an unrelated name", () => {
+    expect(highlight("Lightning Bolt", "blue eyed")).toBe(null);
+    expect(highlight("Blue-Eyed Silver Zombie", "counterspell")).toBe(null);
+    expect(highlight("Blue-Eyed Silver Zombie", "eyed silver")).toBe(null);
+});

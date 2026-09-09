@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
+	"sort"
 	"testing"
 )
 
@@ -31,13 +32,13 @@ func TestFoldSuggestName(t *testing.T) {
 }
 
 func TestSuggestPrefixMatchesFoldedNames(t *testing.T) {
-	idx := &suggestIndex{singles: buildSuggestEntries([]string{
+	idx := newSuggestIndex([]string{
 		"Ursula - Whisper of the Sea",
 		"Jace's Ire",
 		"Fire // Ice",
 		"Lim-Dûl's Vault",
 		"Lightning Bolt",
-	})}
+	}, nil)
 
 	for _, tt := range []struct {
 		typed string
@@ -49,15 +50,83 @@ func TestSuggestPrefixMatchesFoldedNames(t *testing.T) {
 		{"fire ice", "Fire // Ice"},
 		{"limduls", "Lim-Dûl's Vault"},
 	} {
-		matches := idx.prefixMatches(foldSuggestName(tt.typed), false)
+		matches := idx.matchesFor(tt.typed, false)
 		if len(matches) != 1 || matches[0].name != tt.want {
 			t.Errorf("%q matched %v, want just %q", tt.typed, matches, tt.want)
 		}
 	}
 
-	if matches := idx.prefixMatches(foldSuggestName("counterspell"), false); len(matches) != 0 {
+	if matches := idx.matchesFor("counterspell", false); len(matches) != 0 {
 		t.Errorf("counterspell matched %v, want nothing", matches)
 	}
+}
+
+// A hyphen joining two words is the one place the fold and the reader
+// disagree: the fold closes the gap, the reader types a space into it. The
+// cases mirror tests/offline/autocomplete.test.js - both matchers have to find
+// the same names, and 1,131 of Yu-Gi-Oh's 16,419 names carry such a hyphen.
+func TestSuggestReachesAJoiningHyphenFromEitherSpelling(t *testing.T) {
+	idx := newSuggestIndex([]string{
+		"Blue-Eyed Silver Zombie",
+		"Roar of the Blue-Eyed Dragons",
+		"3-Hump Lacooda",
+		"Fire // Ice",
+		"Lightning Bolt",
+	}, nil)
+
+	for _, tt := range []struct {
+		typed string
+		want  string
+	}{
+		{"blue eyed", "Blue-Eyed Silver Zombie"},
+		{"blue-eyed", "Blue-Eyed Silver Zombie"},
+		{"blueeyed", "Blue-Eyed Silver Zombie"},
+		{"blue eyed silver", "Blue-Eyed Silver Zombie"},
+		{"3 hump", "3-Hump Lacooda"},
+		{"3-hump", "3-Hump Lacooda"},
+		// The other direction: the name carries the space, the reader does not.
+		{"fireice", "Fire // Ice"},
+		{"fire ice", "Fire // Ice"},
+	} {
+		matches := idx.matchesFor(tt.typed, false)
+		if len(matches) != 1 || matches[0].name != tt.want {
+			t.Errorf("%q matched %v, want just %q", tt.typed, names(matches), tt.want)
+		}
+	}
+
+	// Closing the spaces must not make everything match everything.
+	for _, typed := range []string{"counterspell", "eyed silver", "silver zombie"} {
+		if matches := idx.matchesFor(typed, false); len(matches) != 0 {
+			t.Errorf("%q matched %v, want nothing", typed, names(matches))
+		}
+	}
+}
+
+// A name found by both folds is offered once, in the place the folded search
+// gave it, rather than twice.
+func TestSuggestOffersANameFoundTwiceOnlyOnce(t *testing.T) {
+	idx := newSuggestIndex([]string{"Blue-Eyed Silver Zombie", "Blue Eyed Rival"}, nil)
+
+	got := names(idx.matchesFor("blueeyed", false))
+	want := []string{"Blue Eyed Rival", "Blue-Eyed Silver Zombie"}
+	if len(got) != 2 {
+		t.Fatalf("matched %v, want both names once each", got)
+	}
+	sort.Strings(got)
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("matched %v, want %v", got, want)
+			break
+		}
+	}
+}
+
+func names(entries []suggestEntry) []string {
+	out := make([]string, len(entries))
+	for i, e := range entries {
+		out[i] = e.name
+	}
+	return out
 }
 
 func TestSuggestPrefixMatchesCapsTheAnswer(t *testing.T) {
@@ -65,8 +134,8 @@ func TestSuggestPrefixMatchesCapsTheAnswer(t *testing.T) {
 	for i := range names {
 		names[i] = fmt.Sprintf("Same Prefix %02d", i)
 	}
-	idx := &suggestIndex{singles: buildSuggestEntries(names)}
-	matches := idx.prefixMatches(foldSuggestName("same prefix"), false)
+	idx := newSuggestIndex(names, nil)
+	matches := idx.matchesFor("same prefix", false)
 	if len(matches) != maxSuggestions {
 		t.Errorf("got %d matches, want the %d cap", len(matches), maxSuggestions)
 	}
