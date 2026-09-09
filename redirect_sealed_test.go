@@ -120,3 +120,61 @@ func TestSealedPathLandsOnTheProduct(t *testing.T) {
 		t.Errorf("%s -> %s does not show %q", cardPath(co), landing, product.Name)
 	}
 }
+
+// A set is linked the way the path names it, wherever a sealed page links
+// one: the landing's tiles and a result's set symbol.
+func TestSealedSetLinksBySetPath(t *testing.T) {
+	landing := PageVars{
+		BetaNav:     &NavElem{Short: "b"},
+		IsSealed:    true,
+		EditionSort: []string{"Core Sets"},
+		EditionList: map[string][]EditionEntry{"Core Sets": {{Code: "FDN", Name: "Foundations"}}},
+	}
+	for _, mobile := range []bool{false, true} {
+		out := renderPage(t, "search.html", mobile, landing)
+		if !strings.Contains(out, `href="/sealed/FDN"`) {
+			t.Errorf("mobile=%v: the tile does not link /sealed/FDN", mobile)
+		}
+		if strings.Contains(out, "sealed?q=s:") {
+			t.Errorf("mobile=%v: a tile still links the set as a query", mobile)
+		}
+	}
+
+	result := sealedPageVars("", "sealed-1")
+	result.BetaNav = &NavElem{Short: "b"}
+	result.IsSealed = true
+	result.SearchQuery = "A Booster Box"
+	card := result.Metadata["sealed-1"]
+	card.SetCode = "FDN"
+	result.Metadata["sealed-1"] = card
+	out := renderPage(t, "search.html", false, result)
+	if !strings.Contains(out, `class="result-set-link" href="/sealed/FDN"`) {
+		t.Error("the result's set symbol does not link /sealed/FDN")
+	}
+}
+
+// The products a card is found in are linked by their paths too.
+func TestSourceProductsLinkByPath(t *testing.T) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		t.Skip("no datastore loaded")
+	}
+	for _, id := range mtgmatcher.GetUUIDs() {
+		co, err := mtgmatcher.GetUUID(id)
+		if err != nil || len(cardobject2sources(co)) == 0 {
+			continue
+		}
+		product, err := mtgmatcher.GetUUID(cardobject2sources(co)[0])
+		if err != nil {
+			continue
+		}
+		products := uuid2card(id, false, false, false).Products
+		if !strings.Contains(products, "href="+cardPath(product)+">") {
+			t.Errorf("%s is found in %s, but links it as %s", co.Name, product.Name, products)
+		}
+		if strings.Contains(products, "sealed?q=") {
+			t.Errorf("%s still links a product as a query: %s", co.Name, products)
+		}
+		return
+	}
+	t.Skip("no card with a source product")
+}

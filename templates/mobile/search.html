@@ -129,7 +129,7 @@
             </div>
             <div class="m-sealed-grid">
                 {{range $editionList}}
-                    <a class="m-sealed-edition" href="/sealed?q=s:{{.Code}}">
+                    <a class="m-sealed-edition" href="/sealed/{{.Code}}">
                         {{template "set-symbol" dict "Keyrune" .Keyrune "Code" .Code "Rarity" "" "Color" "var(--normal)" "Foil" false "Size" 20 "Class" ""}} {{.Name}}
                     </a>
                 {{end}}

@@ -988,7 +988,7 @@ func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) Gener
 			if err != nil {
 				continue
 			}
-			products += "<a href=/sealed?q=" + sealed + ">" + sealedCo.Name + "</a>"
+			products += "<a href=" + cardPath(sealedCo) + ">" + sealedCo.Name + "</a>"
 			numProducts++
 		}
 		products += "</h4>"
