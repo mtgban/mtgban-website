@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -48,12 +49,30 @@ func toggleMobileView(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	// Only honor same-origin relative redirect targets to avoid an open
-	// redirect: require a leading single slash (rejects "//evil.com",
-	// "https://evil.com", "javascript:", etc.).
-	redirect := r.FormValue("redirect")
-	if !strings.HasPrefix(redirect, "/") || strings.HasPrefix(redirect, "//") {
-		redirect = "/"
+	// Where to go back to comes from the query, so a stranger's link chooses
+	// it and it is only followed when it names a path on this site.
+	//
+	// Checked here rather than behind a helper on purpose: the analysis
+	// credits a check it can see beside the redirect it guards, and a helper
+	// returning a string reads to it as though nothing was checked at all.
+	//
+	// Three spellings leave the site if only the leading slash is asked
+	// about. A browser reads the backslash of "/\evil.test" as the second
+	// half of an authority; it strips tabs and newlines before it resolves
+	// anything, so "/<tab>/evil.test" arrives as "//evil.test"; and url.Parse
+	// settles neither, because Go keeps a backslash in the path where a
+	// browser does not.
+	asked := strings.NewReplacer("\t", "", "\n", "", "\r", "").Replace(r.FormValue("redirect"))
+
+	// Default out, and take what was asked for only inside the check - the
+	// analysis follows the value itself, not a flag set about it, so the
+	// assignment has to sit in the guarded branch to count as guarded.
+	redirect := "/"
+	if strings.HasPrefix(asked, "/") && !strings.HasPrefix(asked, "//") && !strings.HasPrefix(asked, `/\`) {
+		parsed, err := url.Parse(asked)
+		if err == nil && parsed.Scheme == "" && parsed.Host == "" && parsed.Opaque == "" {
+			redirect = asked
+		}
 	}
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
