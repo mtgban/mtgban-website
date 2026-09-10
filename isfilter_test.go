@@ -18,12 +18,14 @@ var isCaseNames = []string{
 }
 
 // Letting every value fall through to the promo types can only widen what
-// matches, and on Magic it widens nothing: none of the names answered by a
-// case of its own is also a Magic promo type, so no Magic card can reach the
-// fallback through one. The names that do carry both meanings belong to the
-// other games - "extendedart" is a frame effect on a Magic card and a
-// printing's own tag on a Flesh and Blood one.
-func TestIsFilterCaseNamesAreNotMagicPromoTypes(t *testing.T) {
+// matches, and on Magic it widens nothing as long as a name answered by a
+// case of its own agrees with the promo type of the same name wherever a
+// Magic card carries both. Since go-mtgban v0.8.3 the loader tags every
+// extended-art, showcase and borderless printing with that word, the same
+// fact the case reads off the frame effect or the border, so the two
+// answers have to be one answer on every printing - or the order of the
+// case and the fallback would decide what "is:extendedart" matches.
+func TestIsFilterCasesAgreeWithMagicPromoTypes(t *testing.T) {
 	all := mtgmatcher.AllPromoTypes()
 	if len(all) == 0 {
 		t.Skip("no datastore loaded")
@@ -35,10 +37,19 @@ func TestIsFilterCaseNamesAreNotMagicPromoTypes(t *testing.T) {
 			both = append(both, name)
 		}
 	}
-	if len(both) != 0 {
-		t.Errorf("these names are answered by a case and are also Magic promo types, "+
-			"so the fallthrough changes what they match: %v", both)
+	for _, uuid := range mtgmatcher.GetUUIDs() {
+		co, err := mtgmatcher.GetUUID(uuid)
+		if err != nil || co.Sealed {
+			continue
+		}
+		for _, name := range both {
+			byCase := !cardFilterIs([]string{name}, co)
+			if byCase != co.HasPromoType(name) {
+				t.Errorf("is:%s answers %v for %s by its case and %v by the promo type", name, byCase, uuid, co.HasPromoType(name))
+			}
+		}
 	}
+	t.Logf("%d names carry both meanings on Magic: %v", len(both), both)
 }
 
 // The promo-type check moved out from under default:, so a value with no case
