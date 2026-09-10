@@ -140,3 +140,41 @@ func TestBuildNextSellersRejectsEmpty(t *testing.T) {
 		}
 	})
 }
+
+// The reload endpoint answers with what the install decided, so the decision
+// has to travel: a refusal that only reached the notification channel left
+// the endpoint reporting ok while the site went on serving what it had.
+func TestUpdateAnswersTheInstall(t *testing.T) {
+	prevSellers := sellersPtr.Load()
+	prevVendors := vendorsPtr.Load()
+	defer func() {
+		sellersPtr.Store(prevSellers)
+		vendorsPtr.Store(prevVendors)
+	}()
+
+	now := time.Now()
+	old := now.Add(-time.Hour)
+
+	err := updateVendors(buylistOf("ZZV", 500, now))
+	if err != nil {
+		t.Fatalf("first registration refused: %s", err)
+	}
+	err = updateVendors(buylistOf("ZZV", 500, old))
+	if err == nil {
+		t.Fatal("older buylist installed, want the refusal answered")
+	}
+	for _, vendor := range GetVendors() {
+		if vendor.Info().Shorthand == "ZZV" && !vendor.Info().BuylistTimestamp.Equal(now) {
+			t.Error("refused buylist replaced the served one anyway")
+		}
+	}
+
+	err = updateSellers(inventoryOf("ZZS", 500, now))
+	if err != nil {
+		t.Fatalf("first registration refused: %s", err)
+	}
+	err = updateSellers(inventoryOf("ZZS", 0, now))
+	if err == nil {
+		t.Fatal("empty inventory installed, want the refusal answered")
+	}
+}
