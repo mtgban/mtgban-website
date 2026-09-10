@@ -122,7 +122,7 @@ func TestCollectorNumberPLST(t *testing.T) {
 	// split, and that range comparisons reduce to the embedded value.
 	co := &mtgmatcher.CardObject{}
 	co.Number = "AKH-127"
-	co.OriginalNumber = "AKH-127"
+	co.PlainNumber = "AKH-127"
 
 	config := parseSearchOptionsNG("cn:akh-127", nil, nil, nil)
 	var elem *FilterElem
@@ -285,7 +285,7 @@ func TestSetNumberShorthand(t *testing.T) {
 func TestCollectorNumberStrict(t *testing.T) {
 	co := &mtgmatcher.CardObject{}
 	co.Number = "107★"
-	co.OriginalNumber = "107"
+	co.PlainNumber = "107"
 
 	config := parseSearchOptionsNG("cn:107", nil, nil, nil)
 	elem := findNumberFilter(t, config, "number")
