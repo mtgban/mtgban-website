@@ -1577,6 +1577,7 @@ func main() {
 	http.HandleFunc("/http:/", UploadURLRedirect)
 	http.HandleFunc("/https:/", UploadURLRedirect)
 	http.HandleFunc("/card/", CardRedirect)
+	http.HandleFunc("/sealed/", SealedRedirect)
 	http.HandleFunc("/random", RandomSearch)
 	http.HandleFunc("/randomsealed", RandomSealedSearch)
 	http.HandleFunc("/discord", func(w http.ResponseWriter, r *http.Request) {
