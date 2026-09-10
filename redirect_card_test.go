@@ -320,9 +320,18 @@ func TestCardRedirectReadsAFinishOverAName(t *testing.T) {
 	}
 }
 
-// A result links its printing by the card path, and the path comes back with
-// the name in front, the way the link used to read outright: the filters find
-// the printing, the name is what the search box shows for it.
+// cardPath is the /card/<set>/<number>[/<finish>] shape a link to a printing
+// arrives in, escaped the way a browser sends it.
+func cardPath(co *mtgmatcher.CardObject, finish string) string {
+	path := "/card/" + url.PathEscape(co.SetCode) + "/" + url.PathEscape(co.Number)
+	if finish != "" {
+		path += "/" + url.PathEscape(finish)
+	}
+	return path
+}
+
+// A path that names a finish comes back with the name in front: the filters
+// find the printing, the name is what the search box shows for it.
 func TestCardPathComesBackWithItsName(t *testing.T) {
 	if len(mtgmatcher.GetUUIDs()) == 0 {
 		t.Skip("no datastore loaded")
@@ -337,10 +346,7 @@ func TestCardPathComesBackWithItsName(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		path := cardPath(co)
-		if path == "" {
-			t.Fatalf("%s has no card path", co.Name)
-		}
+		path := cardPath(co, co.Finish)
 
 		rec := httptest.NewRecorder()
 		CardRedirect(rec, httptest.NewRequest(http.MethodGet, path, nil))

@@ -63,9 +63,9 @@ func TestSplitNumbersAgainstTheGameThatHasThem(t *testing.T) {
 		}
 		split++
 
-		link := cardPath(co)
+		link := cardPath(co, "")
 		if !strings.Contains(link, "%2F") {
-			t.Fatalf("%s links as %q, want the slash escaped", co.Number, link)
+			t.Fatalf("%s escapes as %q, want the slash escaped", co.Number, link)
 		}
 
 		rec := httptest.NewRecorder()
