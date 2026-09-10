@@ -490,7 +490,7 @@ func newspaperFilterValues(results []NewspaperResult) (editions, variants []stri
 }
 
 func cacheNewspaper() {
-	if Config.OfflineKey != "" || SkipNewspaper {
+	if SkipNewspaper {
 		return
 	}
 
