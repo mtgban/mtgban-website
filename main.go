@@ -343,9 +343,6 @@ type NavElem struct {
 	// Whether this tab should always be enabled in DevMode
 	AlwaysOnForDev bool
 
-	// Enable page when running offline
-	AllowOffline bool
-
 	// Allow to receive POST requests
 	CanPOST bool
 
@@ -447,7 +444,6 @@ func init() {
 					},
 				},
 			},
-			AllowOffline: true,
 		},
 		"Newspaper": {
 			Name:        "Newspaper",
@@ -544,7 +540,6 @@ func init() {
 
 			CanPOST:        true,
 			AlwaysOnForDev: true,
-			AllowOffline:   true,
 		},
 	}
 }
@@ -552,7 +547,6 @@ func init() {
 var Config ConfigType
 
 type ConfigType struct {
-	OfflineKey    string `json:"offline_key,omitempty"`
 	Port          string `json:"port"`
 	DatastorePath string `json:"datastore_path"`
 	Datastore     struct {
@@ -978,10 +972,6 @@ func genPageNav(activeTab, sig string) PageVars {
 			pageVars.DisableChart = true
 		}
 	}
-	if Config.OfflineKey != "" {
-		pageVars.DisableChart = true
-	}
-
 	// Allocate a new navigation bar
 	pageVars.Nav = make([]NavElem, len(DefaultNav))
 	copy(pageVars.Nav, DefaultNav)
@@ -992,22 +982,16 @@ func genPageNav(activeTab, sig string) PageVars {
 		validSig := expires > time.Now().Unix()
 		devMode := DevMode && !SigCheck
 		alwaysOnDev := DevMode && ExtraNavs[feat].AlwaysOnForDev
-		offline := Config.OfflineKey != "" && ExtraNavs[feat].AllowOffline
-
 		if !validSig && !devMode && !noAuth {
 			continue
 		}
 
-		allowed := devMode || noAuth || alwaysOnDev || offline
+		allowed := devMode || noAuth || alwaysOnDev
 		if !allowed {
 			allowed, _ = strconv.ParseBool(sigParams.Get(feat))
 		}
 
 		if !allowed {
-			continue
-		}
-
-		if Config.OfflineKey != "" && !ExtraNavs[feat].AllowOffline {
 			continue
 		}
 
@@ -1050,10 +1034,6 @@ func genPageNav(activeTab, sig string) PageVars {
 		if noAuth {
 			user = ""
 		}
-	}
-
-	if Config.OfflineKey != "" {
-		user = "Offline Mode"
 	}
 
 	extra := NavElem{
@@ -1100,10 +1080,9 @@ func preloadConfig(configPath string) error {
 	return nil
 }
 
-func loadVars(port, datastorePath, offlineKey, aclPath, grantsPath string) error {
+func loadVars(port, datastorePath, aclPath, grantsPath string) error {
 	// Preload
 	Config.Game = DefaultGame
-	Config.OfflineKey = offlineKey
 
 	reader, err := simplecloud.InitReader(context.Background(), ConfigBucket, Config.sourcePath)
 	if err != nil {
@@ -1336,7 +1315,6 @@ func main() {
 	flag.BoolVar(&SkipPrices, "noload", false, "Do not load price data")
 	flag.BoolVar(&SkipNewspaper, "nonews", false, "Do not load newspaper data")
 	flag.StringVar(&LogDir, "log", "logs", "Directory for scrapers logs")
-	offline := flag.String("offline", "", "API key to run in offline mode")
 
 	tcgcsvBackfill := flag.Bool("tcgcsv-backfill", false, "Backfill tcg_prices from tcgcsv archives, then exit")
 	tcgcsvFrom := flag.String("tcgcsv-from", "", "Backfill start date YYYY-MM-DD (default: earliest archive, 2024-02-08; an explicit date fetches the whole range, bypassing the resume cursor)")
@@ -1359,9 +1337,9 @@ func main() {
 	if err != nil {
 		log.Fatalln("unable to preload config file:", err)
 	}
-	err = loadVars(*port, *datastore, *offline, *aclPath, *grantsPath)
+	err = loadVars(*port, *datastore, *aclPath, *grantsPath)
 	if err != nil {
-		if DevMode || Config.OfflineKey != "" {
+		if DevMode {
 			log.Println("unable to load config file:", Config.sourcePath, "- using safe defaults")
 		} else {
 			log.Fatalln("unable to load config file:", err)
@@ -1374,7 +1352,7 @@ func main() {
 	// reason a missing config is.
 	err = loadCommonConfig(context.Background())
 	if err != nil {
-		if DevMode || Config.OfflineKey != "" {
+		if DevMode {
 			log.Println("unable to load the shared config:", err)
 		} else {
 			log.Fatalln("unable to load the shared config:", err)
@@ -1480,22 +1458,6 @@ func main() {
 
 	if SkipPrices {
 		log.Println("no prices loaded as requested")
-	} else if Config.OfflineKey != "" {
-		go func() {
-			log.Println("Loading scrapers from API")
-			err := loadScrapersAPI(context.Background(), Config.OfflineKey)
-			if err != nil {
-				log.Fatalln("error loading scrapers:", err)
-			}
-
-			// Update set values after loading prices
-			runSealedAnalysis()
-			// runSealedAnalysis loads the catalog, which is what names this
-			// site's own TCGplayer category, so the variant scope is only
-			// complete now.
-			warmVariantCacheIfEnabled()
-			offlineService.RefreshManifest()
-		}()
 	} else {
 		go func() {
 			log.Println("Loading", len(Config.ScraperConfig.Config), "Scrapers")
@@ -1600,10 +1562,6 @@ func main() {
 	http.HandleFunc("/toggle-mobile", toggleMobileView)
 
 	for _, nav := range ExtraNavs {
-		if Config.OfflineKey != "" && !nav.AllowOffline {
-			continue
-		}
-
 		// Set up logging
 		logFile, err := logfile.New(&logfile.LogFile{
 			FileName:    path.Join(LogDir, nav.Name+".log"),
