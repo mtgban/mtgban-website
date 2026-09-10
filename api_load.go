@@ -124,7 +124,10 @@ func loadScrapersAPI(ctx context.Context, apiKey string) error {
 			Game:               Config.Game,
 		})
 
-		updateSellers(seller)
+		err := updateSellers(seller)
+		if err != nil {
+			log.Println("skipping", store, "inventory:", err)
+		}
 	}
 	for store, buylist := range buylist {
 		vendor := mtgban.NewVendorFromBuylist(buylist, mtgban.ScraperInfo{
@@ -134,7 +137,10 @@ func loadScrapersAPI(ctx context.Context, apiKey string) error {
 			MetadataOnly:     slices.Contains(buylistMeta, store),
 			Game:             Config.Game,
 		})
-		updateVendors(vendor)
+		err := updateVendors(vendor)
+		if err != nil {
+			log.Println("skipping", store, "buylist:", err)
+		}
 	}
 
 	return nil

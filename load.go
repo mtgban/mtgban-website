@@ -234,6 +234,7 @@ func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, f
 		reader.Close()
 	}()
 
+	var installErr error
 	switch kind {
 	case "retail":
 		scraper, err := mtgban.ReadSellerFromJSON(reader)
@@ -242,7 +243,7 @@ func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, f
 			reader.Close()
 			return err
 		}
-		updateSellers(scraper)
+		installErr = updateSellers(scraper)
 	case "buylist":
 		scraper, err := mtgban.ReadVendorFromJSON(reader)
 		if err != nil {
@@ -250,15 +251,21 @@ func loadScraper(bucket simplecloud.Reader, base, game, name, kind, shorthand, f
 			reader.Close()
 			return err
 		}
-		updateVendors(scraper)
+		installErr = updateVendors(scraper)
 	}
 
 	cancel()
 	reader.Close()
-	return nil
+	return installErr
 }
 
-func updateSellers(scraper mtgban.Scraper) {
+// updateSellers installs the seller over its registered slot, answering with
+// the refusal where buildNextSellers turns the swap down. The caller is what
+// carries the answer back to whoever asked for the load - the reload
+// endpoint used to write its "ok" before this decision was made, so a
+// refused install was invisible to the workflow that pinged it and only the
+// notification channel knew.
+func updateSellers(scraper mtgban.Scraper) error {
 	seller := applyInventoryOverrides(scraper.(mtgban.Seller))
 
 	scrapersWriteMu.Lock()
@@ -278,12 +285,13 @@ func updateSellers(scraper mtgban.Scraper) {
 	if err != nil {
 		msg := fmt.Sprintf("seller %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
 		ServerNotify("refresh", msg, true)
-		return
+		return err
 	}
 	sellersPtr.Store(&next)
 
 	msg := fmt.Sprintf("%s inventory updated at position %d", scraper.Info().Shorthand, sellerIndex)
 	ServerNotify("refresh", msg)
+	return nil
 }
 
 func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]mtgban.Seller, error) {
@@ -329,7 +337,8 @@ func buildNextSellers(current []mtgban.Seller, seller mtgban.Seller, i int) ([]m
 	return next, nil
 }
 
-func updateVendors(scraper mtgban.Scraper) {
+// updateVendors is updateSellers for the buylist side.
+func updateVendors(scraper mtgban.Scraper) error {
 	vendor := applyBuylistOverrides(scraper.(mtgban.Vendor))
 
 	scrapersWriteMu.Lock()
@@ -349,12 +358,13 @@ func updateVendors(scraper mtgban.Scraper) {
 	if err != nil {
 		msg := fmt.Sprintf("vendor %s %s - %s", scraper.Info().Name, scraper.Info().Shorthand, err.Error())
 		ServerNotify("refresh", msg, true)
-		return
+		return err
 	}
 	vendorsPtr.Store(&next)
 
 	msg := fmt.Sprintf("%s buylist updated at position %d", scraper.Info().Shorthand, vendorIndex)
 	ServerNotify("refresh", msg)
+	return nil
 }
 
 func buildNextVendors(current []mtgban.Vendor, vendor mtgban.Vendor, i int) ([]mtgban.Vendor, error) {
