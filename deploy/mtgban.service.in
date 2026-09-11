@@ -23,6 +23,11 @@ EnvironmentFile=/etc/mtgban.env
 ExecStart=@CO_PREFIX@%i/mtgban-website -port %i -cfg @CFG@ -log logs
 KillSignal=SIGTERM
 TimeoutStopSec=15s
+# How the instance ended, on every stop - including the ones the process is in
+# no state to log itself. SERVICE_RESULT is "success" for a stop someone asked
+# for, "oom-kill", "timeout" or "signal" for the rest.
+ExecStopPost=/usr/bin/logger -t mtgban-website -p daemon.notice \
+    port %i stopped: result=${SERVICE_RESULT} exit=${EXIT_CODE}/${EXIT_STATUS}
 
 [Install]
 WantedBy=multi-user.target
