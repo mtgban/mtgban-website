@@ -1651,7 +1651,13 @@ func main() {
 		}
 	}()
 
-	<-done
+	// Which signal arrived, and how long the process had been up for. Every
+	// stop used to read alike from here, so a deploy, someone's Ctrl-C, and a
+	// libc upgrade bouncing the service through needrestart were told apart
+	// only by the wall clock - and the one worth knowing about is the one
+	// nobody remembers doing.
+	sig := <-done
+	ServerNotify("shutdown", "Server asked to stop ("+sig.String()+") after "+uptime()+" of uptime")
 
 	// Wind down the background jobs alongside the listener: an ingest that is
 	// mid-crawl stops at its next checkpoint instead of running into the exit.
