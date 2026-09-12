@@ -47,7 +47,7 @@ func TestTheRebuiltQueryFindsThePrintingItNames(t *testing.T) {
 			missed++
 			if missed < 5 {
 				t.Errorf("%q does not find %s (number %q, plain %q)",
-					genQuery(co), co.Name, co.Number, co.OriginalNumber)
+					genQuery(co), co.Name, co.Number, co.PlainNumber)
 			}
 		}
 	}
@@ -71,7 +71,7 @@ func TestTheRebuiltQueryKeepsTheMarksTheNumberCarries(t *testing.T) {
 	var tagged *mtgmatcher.CardObject
 	for _, uuid := range mtgmatcher.GetUUIDs() {
 		co, err := mtgmatcher.GetUUID(uuid)
-		if err != nil || co.Sealed || co.Number == co.OriginalNumber {
+		if err != nil || co.Sealed || co.Number == co.PlainNumber {
 			continue
 		}
 		tagged = co
