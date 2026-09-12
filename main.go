@@ -1250,12 +1250,10 @@ func loadDatastore(ds string) error {
 	}
 	defer reader.Close()
 
-	// LoadDatastore would read the file whole and try every registered loader.
-	backend, err := mtgmatcher.Open(datastoreGame(), reader)
-	if err != nil {
+	// Build privately, then publish one immutable backend snapshot.
+	if err := dsreload.Load(datastoreGame(), reader); err != nil {
 		return err
 	}
-	mtgmatcher.SetGlobalDatastore(backend)
 
 	ServerNotify("init", "Datastore installed")
 	SetLastDatastoreUpdate(time.Now())

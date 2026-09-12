@@ -72,6 +72,9 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Race-check datastore publication
+        run: go test -race ./... -run "^TestPublication"
+
       - name: Compute datastore cache key
         id: ds
         run: |
