@@ -825,7 +825,7 @@ func showVariant(cardID string) bool {
 	if err != nil {
 		return false
 	}
-	return setDate.After(mtgmatcher.PromosForEverybodyYay)
+	return setDate.After(magic.PromosForEverybodyYay)
 }
 
 func uuid2card(cardID string, useThumbs, genPrints, preferFlavorName bool) GenericCard {
