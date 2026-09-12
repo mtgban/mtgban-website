@@ -15,9 +15,10 @@ import (
 	"sync"
 	"time"
 
+	cm "github.com/mtgban/go-cardmarket"
+
 	"github.com/BlueMonday/go-scryfall"
 
-	"github.com/mtgban/go-mtgban/cardmarket"
 	"github.com/mtgban/go-mtgban/mtgban"
 	"github.com/mtgban/go-mtgban/mtgmatcher"
 	"github.com/mtgban/go-mtgban/tcgplayer"
@@ -907,14 +908,14 @@ func Search(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				var link string
 
-				game := cardmarket.GameFromName(Config.Game)
+				game := cm.GameFromName(Config.Game)
 				id, err := strconv.Atoi(co.Identifiers["mcmId"])
 				if err != nil || id == 0 {
 					// Cardmarket names the game in every product path, so the
 					// name-only fallback has to carry it too.
-					link = cardmarket.SearchURL(pageVars.Metadata[cardID].Name, game, Affiliates().Codes["MKM"])
+					link = cm.SearchURL(pageVars.Metadata[cardID].Name, game, Affiliates().Codes["MKM"])
 				} else {
-					link = cardmarket.BuildURL(id, game, Affiliates().Codes["MKM"], co.Foil || co.Etched)
+					link = cm.BuildURL(id, game, Affiliates().Codes["MKM"], co.Foil || co.Etched)
 				}
 				tmp = append(tmp, SearchEntry{
 					ScraperName: "CardMarket",

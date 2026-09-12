@@ -1431,7 +1431,7 @@ func compareCollectorNumber(filters []string, co *mtgmatcher.CardObject, cmpFunc
 	}
 	var values [2]int
 
-	for i, num := range []string{filters[0], co.OriginalNumber} {
+	for i, num := range []string{filters[0], co.PlainNumber} {
 		ref, err := strconv.Atoi(num)
 		if err != nil {
 			ref, err = strconv.Atoi(mtgmatcher.ExtractNumberValue(num))
@@ -1927,7 +1927,7 @@ func cardFilterContents(filters []string, co *mtgmatcher.CardObject) bool {
 }
 
 func cardFilterNumber(filters []string, co *mtgmatcher.CardObject) bool {
-	return !slices.Contains(filters, strings.ToLower(co.OriginalNumber))
+	return !slices.Contains(filters, strings.ToLower(co.PlainNumber))
 }
 
 func cardFilterNumberStrict(filters []string, co *mtgmatcher.CardObject) bool {
