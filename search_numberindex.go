@@ -20,8 +20,8 @@ var numberIdx atomic.Pointer[numberIndex]
 func buildNumberIndex(b *mtgmatcher.Backend) *numberIndex {
 	all := b.GetUUIDs()
 	idx := &numberIndex{
-		loose:  make(map[string][]string, len(all)/8),
-		strict: make(map[string][]string, len(all)/8),
+		loose:  make(map[string][]string),
+		strict: make(map[string][]string),
 	}
 	for _, uuid := range all {
 		co, err := b.GetUUID(uuid)
