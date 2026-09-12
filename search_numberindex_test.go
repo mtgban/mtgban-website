@@ -111,3 +111,60 @@ func TestNumberSearchMatchesUnseededSearch(t *testing.T) {
 		})
 	}
 }
+
+// BenchmarkNumberIndexSearch measures the same request path with the index
+// disabled and enabled, after first checking that the result sets agree.
+func BenchmarkNumberIndexSearch(b *testing.B) {
+	if len(mtgmatcher.GetUUIDs()) == 0 {
+		b.Skip("Need a datastore")
+	}
+	previous := numberIdx.Load()
+	b.Cleanup(func() { numberIdx.Store(previous) })
+	idx := buildNumberIndex(mtgmatcher.GlobalDatastore())
+	for _, query := range []string{"cn:635", "cn:161", "cns:107★"} {
+		config := parseSearchOptionsNG(query, nil, nil, nil)
+		numberIdx.Store(nil)
+		scanned, err := searchAndFilter(config)
+		if err != nil {
+			b.Fatal(err)
+		}
+		numberIdx.Store(idx)
+		indexed, err := searchAndFilter(config)
+		if err != nil {
+			b.Fatal(err)
+		}
+		slices.Sort(scanned)
+		slices.Sort(indexed)
+		if !slices.Equal(scanned, indexed) {
+			b.Fatalf("%s: indexed and scanned results differ", query)
+		}
+		b.Logf("%s: %d identical results", query, len(indexed))
+		for _, mode := range []string{"scan", "index"} {
+			b.Run(query+"/"+mode, func(b *testing.B) {
+				numberIdx.Store(nil)
+				if mode == "index" {
+					numberIdx.Store(idx)
+				}
+				b.ReportAllocs()
+				for b.Loop() {
+					if _, err := searchAndFilter(config); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkNumberIndexBuild(b *testing.B) {
+	backend := mtgmatcher.GlobalDatastore()
+	if len(backend.GetUUIDs()) == 0 {
+		b.Skip("Need a datastore")
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		if buildNumberIndex(backend) == nil {
+			b.Fatal("missing index")
+		}
+	}
+}
